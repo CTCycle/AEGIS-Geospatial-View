@@ -32,6 +32,7 @@ class ProviderCircuitOpenError(ProviderError):
 class ProviderRateLimitError(ProviderError):
     """Raised when a provider rejects or cannot satisfy rate limits."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self, message: str, *, retry_after_seconds: float | None = None
     ) -> None:

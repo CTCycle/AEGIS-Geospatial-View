@@ -66,7 +66,7 @@ class DeterministicToolPlanner:
                         reason="Provider-native layer discovery was explicitly requested.",
                         arguments={
                             "provider_id": provider_id,
-                            "query": turn.entity_target or turn.user_text,
+                            "query": turn.entity_target or turn.map_target or "",
                             "limit": 50,
                             "refresh": False,
                         },
@@ -86,7 +86,6 @@ class DeterministicToolPlanner:
     @staticmethod
     def _select_capabilities(turn: TurnParseResult) -> list[str]:
         selected: list[str] = []
-        text = turn.user_text.casefold()
         commands = getattr(turn, "overlay_commands", [])
         has_fetching_command = any(
             command.action in {"add", "show", "update"} for command in commands
@@ -99,19 +98,6 @@ class DeterministicToolPlanner:
                 if command.action not in {"add", "show", "update"}:
                     continue
                 selected.extend(command.selector.capability_ids)
-        if not turn.requested_layers:
-            if "air quality" in text and "forecast" in text:
-                selected.append("get_air_quality_forecast")
-            elif "weather" in text or ("forecast" in text and "rain" in text):
-                selected.append("get_weather_forecast")
-
-            if any(marker in text for marker in ("nearby", "poi", "amenities")):
-                selected.append("get_nearby_poi")
-
-            if turn.task_class == "direct_query" and any(
-                marker in text for marker in ("coordinate", "latitude", "longitude")
-            ):
-                selected.append("location_to_coordinates")
         return list(dict.fromkeys(selected))
 
     # -------------------------------------------------------------------------
@@ -130,13 +116,6 @@ class DeterministicToolPlanner:
     @staticmethod
     def _build_visualization_update(turn: TurnParseResult) -> dict[str, object]:
         basemap = turn.requested_basemap
-        if (
-            not basemap
-            and turn.task_class == "map_search"
-            and not turn.requested_layers
-            and not turn.overlay_commands
-        ):
-            basemap = "osm_default"
         update: dict[str, object] = {}
         if basemap:
             update["basemap_replacement"] = basemap
@@ -146,6 +125,11 @@ class DeterministicToolPlanner:
         )
         if turn.requested_layers and (not turn.overlay_commands or has_fetching_command):
             update["add_layer_ids"] = list(dict.fromkeys(turn.requested_layers))
+        if turn.viewport_intent is not None:
+            # A viewport-only follow-up still belongs to the deterministic map
+            # pipeline.  The execution layer reads the typed intent from the
+            # turn contract when rebuilding the session.
+            update["viewport_change"] = True
         if turn.overlay_commands:
             update["overlay_commands"] = [
                 command.model_dump(mode="json") for command in turn.overlay_commands

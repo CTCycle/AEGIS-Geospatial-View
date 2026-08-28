@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
-from collections.abc import Sequence
 from typing import Any, Literal
 
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
@@ -45,49 +44,6 @@ class AgentResponseBuilder:
         )
 
     # -------------------------------------------------------------------------
-    @classmethod
-    def should_build_fallback_map(
-        cls,
-        *,
-        task_class: str,
-        requires_location: bool,
-        location_signals: Sequence[Any],
-        tool_payload: dict[str, Any] | None,
-    ) -> bool:
-        if task_class != "map_search":
-            return False
-        if not requires_location and not location_signals:
-            return False
-        if not is_json_object(tool_payload):
-            return True
-        if cls.tool_payload_has_error(tool_payload):
-            return False
-        catalog_only_tools = {
-            "list_geospatial_capabilities",
-            "describe_geospatial_capability",
-        }
-        for tool_call in json_array(tool_payload.get("tool_calls")):
-            if not is_json_object(tool_call):
-                continue
-            tool_name = str(tool_call.get("name") or "")
-            if tool_name not in catalog_only_tools:
-                return False
-        for result in json_array(tool_payload.get("tool_results")):
-            if not is_json_object(result):
-                continue
-            content = result.get("content")
-            if not is_json_object(content):
-                continue
-            data = content.get("data")
-            if not is_json_object(data):
-                continue
-            if data.get("map_session") or data.get("direct_result") or data.get(
-                "capability_selection"
-            ):
-                return False
-        return True
-
-    # -------------------------------------------------------------------------
     @staticmethod
     def tool_payload_has_error(tool_payload: dict[str, Any] | None) -> bool:
         if not is_json_object(tool_payload):
@@ -109,6 +65,7 @@ class AgentResponseBuilder:
         map_session: MapSession | None,
         direct_result: dict[str, Any] | None,
         tool_payload: dict[str, Any] | None,
+        require_verified_result: bool = False,
     ) -> str:
         if map_session is not None:
             return cls.compose_map_session_message(map_session.model_dump(mode="json"))
@@ -118,6 +75,8 @@ class AgentResponseBuilder:
         tool_error = cls.extract_tool_error_message(tool_payload)
         if tool_error is not None:
             return tool_error
+        if require_verified_result:
+            return "I could not verify a map result for this request."
         return fallback_text or "Done."
 
     # -------------------------------------------------------------------------
@@ -150,6 +109,7 @@ class AgentResponseBuilder:
         tool_payload: dict[str, Any] | None,
         user_text: str,
         is_capability_question: bool,
+        require_verified_result: bool = False,
     ) -> ChatOperationResult:
         warnings = cls.collect_operation_warnings(
             map_session=map_session,
@@ -185,6 +145,13 @@ class AgentResponseBuilder:
                 kind="capability_catalog",
                 status="success",
                 message=assistant_message,
+                warnings=warnings,
+            )
+        if require_verified_result:
+            return ChatOperationResult(
+                kind="error",
+                status="failed",
+                message=assistant_message or "I could not verify a map result for this request.",
                 warnings=warnings,
             )
         _ = user_text

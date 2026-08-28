@@ -28,7 +28,6 @@ from server.services.agent.capability_resolver import CapabilityResolver
 from server.services.agent.direct_turn_response import DirectTurnResponseService
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.orchestrator import AgentOrchestrator
-from server.services.agent.overlay_inference import OverlayInferenceService
 from server.services.agent.parser_service import ParserService
 from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.policy_engine import PolicyEngine
@@ -307,10 +306,6 @@ def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
         pipeline_router=DeterministicAgentRouter(),
         tool_planner=DeterministicToolPlanner(),
         tool_plan_executor=ToolPlanExecutor(tool_registry=registry),
-        overlay_inference_service=OverlayInferenceService(
-            capability_registry=search.capability_registry,
-            runtime_registry=runtime,
-        ),
         capability_resolver=CapabilityResolver(
             capability_registry=search.capability_registry,
             runtime_registry=runtime,
@@ -324,16 +319,29 @@ def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
     )
 
 ###############################################################################
-def test_houses_rule_selects_residential_buildings_and_not_amenities() -> None:
+def test_domain_rules_do_not_infer_layers_from_example_prose() -> None:
     extracted = ParserService._apply_domain_rules(
         "Show houses around the Coliseum in Rome, satellite view please.",
         LLMParserExtraction(),
         {},
     )
-    assert extracted.requested_layers == ["overpass_residential_buildings"]
-    assert "amenit" not in " ".join(extracted.requested_layers).lower()
-    assert extracted.requested_basemap == "esri_world_imagery"
-    assert extracted.entity_target == "residential_buildings"
+    assert extracted.requested_layers == []
+    assert extracted.requested_basemap is None
+    assert extracted.entity_target is None
+
+    typed = ParserService._apply_domain_rules(
+        "An unrelated wording variant.",
+        LLMParserExtraction(
+            task_class="map_search",
+            requested_layers=["overpass_residential_buildings"],
+            requested_basemap="esri_world_imagery",
+            entity_target="residential_buildings",
+        ),
+        {},
+    )
+    assert typed.requested_layers == ["overpass_residential_buildings"]
+    assert typed.requested_basemap == "esri_world_imagery"
+    assert typed.entity_target == "residential_buildings"
 
 ###############################################################################
 def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() -> None:

@@ -246,7 +246,11 @@ class PlannedTurnExecutionService:
             operation = ChatOperationResult(kind="error", status="failed", message=assistant_message)
         else:
             assistant_message = AgentResponseBuilder.build_verified_assistant_message(
-                "", map_session=map_session, direct_result=direct_result, tool_payload=tool_payload
+                "",
+                map_session=map_session,
+                direct_result=direct_result,
+                tool_payload=tool_payload,
+                require_verified_result=turn_contract.task_class == "map_search",
             )
             operation = AgentResponseBuilder.build_verified_operation_result(
                 assistant_message=assistant_message,
@@ -255,6 +259,7 @@ class PlannedTurnExecutionService:
                 tool_payload=tool_payload,
                 user_text=turn_contract.user_text,
                 is_capability_question=False,
+                require_verified_result=turn_contract.task_class == "map_search",
             )
             if any(not result.ok for result in planned_results) and operation.status == "success":
                 operation = operation.model_copy(update={"status": "partial"})

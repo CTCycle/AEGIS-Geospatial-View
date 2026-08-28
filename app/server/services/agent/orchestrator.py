@@ -27,7 +27,6 @@ from server.services.agent.native_tool_loop import (
     AgentToolLoopRequest,
     NativeToolLoop,
 )
-from server.services.agent.overlay_inference import OverlayInferenceService
 from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.parser_service import ParserService
 from server.services.agent.policy_engine import PolicyEngine
@@ -64,7 +63,6 @@ class AgentOrchestrator:
         request_builder: RequestBuilder,
         native_tool_loop: NativeToolLoop,
         agent_tool_catalog_service: AgentToolCatalogService,
-        overlay_inference_service: OverlayInferenceService,
         settings_repo: ModelSettingsRepository,
         history_service: ChatHistoryService,
         conversation_repository: ConversationRepository,
@@ -85,7 +83,6 @@ class AgentOrchestrator:
         self.settings_repo = settings_repo
         self.agent_tool_catalog_service = agent_tool_catalog_service
         self.agent_tool_catalog_service.register_with(self.tool_registry)
-        self.overlay_inference_service = overlay_inference_service
         self.native_tool_loop = native_tool_loop
         self.history_service = history_service
         self.conversation_repository = conversation_repository
@@ -108,7 +105,6 @@ class AgentOrchestrator:
             search_orchestrator=self.search_orchestrator,
             policy_engine=self.policy_engine,
             request_builder=self.request_builder,
-            overlay_inference_service=self.overlay_inference_service,
             location_memory_service=self.location_memory_service,
             response_synthesizer=self.response_synthesizer,
             history_service=self.history_service,
@@ -288,7 +284,7 @@ class AgentOrchestrator:
                 settings.agent_model_provider,
                 settings.agent_model_name,
             )
-            turn_contract = self.parser_service.build_fallback_turn_result(
+            turn_contract = self.parser_service.build_parser_failure_turn_result(
                 user_message=payload.message,
                 memory_snapshot=latest_memory,
                 conversation_messages=recent_messages,
@@ -448,11 +444,6 @@ class AgentOrchestrator:
             },
         )
         deterministic_tools_available = (
-            isinstance(  # pyright: ignore[reportUnnecessaryIsInstance]
-                self.agent_tool_catalog_service,
-                AgentToolCatalogService,
-            )
-            and
             (bool(tool_plan.steps) or bool(tool_plan.visualization_update))
             and all(
                 self.tool_registry.has_native_tool(step.tool_name)
@@ -473,12 +464,10 @@ class AgentOrchestrator:
                 tool_plan=tool_plan,
                 progress_callback=progress_callback,
             )
+        build_native_tools = getattr(self.agent_tool_catalog_service, "build_native_tools", None)
         native_tools = (
-            self.agent_tool_catalog_service.build_native_tools(native_context)
-            if isinstance(  # pyright: ignore[reportUnnecessaryIsInstance]
-                self.agent_tool_catalog_service,
-                AgentToolCatalogService,
-            )
+            build_native_tools(native_context)
+            if callable(build_native_tools)
             else self.tool_registry.list_native_tools()
         )
         tool_loop_result = await self.native_tool_loop.run(
@@ -563,13 +552,6 @@ class AgentOrchestrator:
                 turn_contract=turn_contract,
                 latest_memory=latest_memory,
             )
-        if map_session is None and AgentResponseBuilder.should_build_fallback_map(
-            task_class=turn_contract.task_class,
-            requires_location=turn_contract.normalized_action.requires_location,
-            location_signals=turn_contract.location_signals,
-            tool_payload=tool_payload,
-        ):
-            map_session = await self.turn_state_assembler.build_map_session_from_turn_contract(turn_contract, latest_memory)
         if map_session is not None and turn_contract.overlay_commands and not overlay_mutation_results:
             map_session, overlay_mutation_results = self.turn_state_assembler.apply_overlay_commands(
                 map_session,
@@ -587,6 +569,10 @@ class AgentOrchestrator:
             map_session=map_session,
             direct_result=direct_result,
             tool_payload=tool_payload,
+            require_verified_result=(
+                turn_contract.task_class == "map_search"
+                and turn_contract.context_query.kind == "none"
+            ),
         )
         operation = AgentResponseBuilder.build_verified_operation_result(
             assistant_message=assistant_message,
@@ -594,8 +580,10 @@ class AgentOrchestrator:
             direct_result=direct_result,
             tool_payload=tool_payload,
             user_text=turn_contract.user_text,
-            is_capability_question=AgentTurnSupport.is_capability_question(
-                turn_contract.user_text
+            is_capability_question=turn_contract.context_query.kind == "capabilities",
+            require_verified_result=(
+                turn_contract.task_class == "map_search"
+                and turn_contract.context_query.kind == "none"
             ),
         )
         if tool_loop_result.failure_category is not None:

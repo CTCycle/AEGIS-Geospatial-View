@@ -27,7 +27,6 @@ from server.services.agent.conversation_state import ConversationTaskStateServic
 from server.services.agent.direct_turn_response import DirectTurnResponseService
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.native_tool_loop import AgentToolLoopResult
-from server.services.agent.overlay_inference import OverlayInferenceService
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.policy_engine import AgentPolicyConstraints
@@ -142,6 +141,66 @@ class _Parser:
         )
 
 ###############################################################################
+class _StructuredParser:
+    """Minimal parser double that returns an explicit typed contract."""
+
+    last_context_usage = None
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        *,
+        label: str,
+        latitude: float,
+        longitude: float,
+        layers: list[str] | None = None,
+        basemap: str | None = "osm_default",
+    ) -> None:
+        self.label = label
+        self.latitude = latitude
+        self.longitude = longitude
+        self.layers = list(layers or [])
+        self.basemap = basemap
+
+    # -------------------------------------------------------------------------
+    def parse_turn(
+        self,
+        user_message: str,
+        memory_snapshot: dict,
+        conversation_messages: list[dict],
+        **_kwargs: Any,
+    ) -> TurnParseResult:
+        return TurnParseResult(
+            user_text=user_message,
+            conversation_context=ConversationContextSnapshot(
+                recent_messages=[],
+                memory_snapshot=memory_snapshot,
+            ),
+            task_class="map_search",
+            location_signals=[
+                LocationSignal(
+                    signal_type="city",
+                    raw_value=self.label,
+                    normalized_value=self.label,
+                    latitude=self.latitude,
+                    longitude=self.longitude,
+                    confidence=0.95,
+                )
+            ],
+            normalized_action=NormalizedAction(
+                action_id="data_layer_query" if self.layers else "map_search",
+                action_label="Structured map request",
+                task_tags=["map"],
+                action_tags=["catalog"] if self.layers else [],
+                requires_location=True,
+            ),
+            parser_confidence=0.95,
+            requested_layers=self.layers,
+            requested_basemap=self.basemap,
+            tools_needed=bool(self.layers),
+        )
+
+###############################################################################
 class _DeicticParser(_Parser):
 
     # -------------------------------------------------------------------------
@@ -159,7 +218,14 @@ class _DeicticParser(_Parser):
                 memory_snapshot=memory_snapshot,
             ),
             task_class="direct_query",
-            location_signals=[],
+            location_signals=[
+                LocationSignal(
+                    signal_type="deictic",
+                    raw_value="there",
+                    normalized_value="there",
+                    confidence=0.9,
+                )
+            ],
             normalized_action=NormalizedAction(
                 action_id="get_weather_forecast",
                 action_label="Weather Forecast",
@@ -321,6 +387,12 @@ class _CoordinateParser(_Parser):
                 requires_location=True,
             ),
             parser_confidence=0.95,
+            requested_layers=[
+                "tomtom_traffic_flow",
+                "rainviewer_precipitation_radar",
+            ],
+            requested_basemap="osm_default",
+            tools_needed=True,
         )
 
 ###############################################################################
@@ -358,6 +430,9 @@ class _MemoryMapParser(_Parser):
             ),
             ambiguities=["missing_location", "deictic_without_memory"],
             parser_confidence=0.9,
+            requested_layers=["tomtom_traffic_flow"],
+            requested_basemap="osm_default",
+            tools_needed=True,
         )
 
 ###############################################################################
@@ -514,31 +589,36 @@ class _Catalog:
     # -------------------------------------------------------------------------
     async def _handler(self, arguments: dict[str, Any], context: Any) -> dict[str, Any]:
         _ = arguments, context
+        capability_id = str(arguments.get("capability_id") or "weather_overlay")
+        capability_arguments = arguments.get("arguments") or {}
+        latitude = float(capability_arguments.get("latitude") or 41.9028)
+        longitude = float(capability_arguments.get("longitude") or 12.4964)
+        label = str(capability_arguments.get("location") or "Rome")
         return {
             "ok": True,
             "operation": "map_session_created",
-            "capability_id": "weather_overlay",
-            "arguments": {},
+            "capability_id": capability_id,
+            "arguments": capability_arguments,
             "map_session": MapSession(
                 session_id="map-1",
                 resolved_location=ResolvedLocation(
-                    label="Rome",
-                    latitude=41.9028,
-                    longitude=12.4964,
+                    label=label,
+                    latitude=latitude,
+                    longitude=longitude,
                     source="resolver",
                     confidence=0.9,
                 ),
                 basemap_id="osm_default",
-                overlay_ids=["weather_overlay"],
+                overlay_ids=[capability_id],
                 viewport={
-                    "center_latitude": 41.9028,
-                    "center_longitude": 12.4964,
+                    "center_latitude": latitude,
+                    "center_longitude": longitude,
                     "radius_m": 2500.0,
                 },
                 basemap={"id": "osm_default", "label": "OpenStreetMap"},
-                overlays=[{"id": "weather_overlay", "label": "Weather Overlay"}],
-                center={"latitude": 41.9028, "longitude": 12.4964},
-                bounds=[12.0, 41.0, 13.0, 42.0],
+                overlays=[{"id": capability_id, "label": capability_id}],
+                center={"latitude": latitude, "longitude": longitude},
+                bounds=[longitude - 0.01, latitude - 0.01, longitude + 0.01, latitude + 0.01],
             ).model_dump(mode="json"),
             "direct_result": None,
             "capability_selection": None,
@@ -650,10 +730,6 @@ def _build_test_orchestrator(**kwargs: Any) -> AgentOrchestrator:
     synthesizer = _ResponseSynthesizer()
     kwargs.update(
         task_state_service=task_state,
-        overlay_inference_service=OverlayInferenceService(
-            capability_registry=capability_registry,
-            runtime_registry=runtime_registry,
-        ),
         capability_resolver=CapabilityResolver(
             capability_registry=capability_registry,
             runtime_registry=runtime_registry,
@@ -882,7 +958,7 @@ def test_orchestrator_uses_verified_tool_map_session() -> None:
     run_async_in_thread(_run())
 
 ###############################################################################
-def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
+def test_orchestrator_does_not_build_a_map_when_tool_loop_only_chats() -> None:
     async def _run() -> None:
         policy = _Policy()
         history = _HistoryRepo()
@@ -919,24 +995,22 @@ def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
             history_service=history, conversation_repository=history,  # type: ignore[arg-type]
-            tool_planner=_VisualizationOnlyPlanner(),  # type: ignore[arg-type]
         )
 
         response = await orchestrator.run_turn(ChatTurnRequest(conversation_id="test-conversation", message="show Rome"))
 
-        assert response.map_session is not None
+        assert response.map_session is None
         assert response.operation is not None
-        assert response.operation.kind == "map_session"
-        assert response.decision.plan.state == "map_search"
-        assert response.decision.plan.mode == "map"
-        assert response.map_session.resolved_location.label == "Rome"
-        assert search_orchestrator.requests
-        assert response.assistant_message.startswith("Map ready for Rome")
+        assert response.operation.kind == "error"
+        assert response.decision.plan.state == "direct_response"
+        assert response.decision.plan.mode is None
+        assert "could not verify" in response.assistant_message.lower()
+        assert not search_orchestrator.requests
 
     run_async_in_thread(_run())
 
 ###############################################################################
-def test_orchestrator_fallback_map_infers_requested_overlay_from_user_text() -> None:
+def test_orchestrator_does_not_infer_requested_overlay_from_user_text() -> None:
     async def _run() -> None:
         policy = _Policy()
         history = _HistoryRepo()
@@ -977,9 +1051,10 @@ def test_orchestrator_fallback_map_infers_requested_overlay_from_user_text() -> 
 
         response = await orchestrator.run_turn(ChatTurnRequest(conversation_id="test-conversation", message="show Rome with traffic"))
 
-        assert response.map_session is not None
-        assert "tomtom_traffic_flow" in response.map_session.overlay_ids
-        assert search_orchestrator.requests[0].overlay_ids == ["tomtom_traffic_flow"]
+        assert response.map_session is None
+        assert response.operation is not None
+        assert response.operation.kind == "error"
+        assert not search_orchestrator.requests
 
     run_async_in_thread(_run())
 
@@ -1000,13 +1075,18 @@ def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap(
         )
         orchestrator = AgentOrchestrator(
             search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
-            parser_service=_Parser(),  # type: ignore[arg-type]
+            parser_service=_StructuredParser(
+                label="Rome",
+                latitude=41.9028,
+                longitude=12.4964,
+                basemap="osm_default",
+            ),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
             tool_registry=_test_tool_registry(),
             request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
-            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            agent_tool_catalog_service=_Catalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
             history_service=history, conversation_repository=history,  # type: ignore[arg-type]
         )
@@ -1040,13 +1120,19 @@ def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session(
         )
         orchestrator = AgentOrchestrator(
             search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
-            parser_service=_Parser(),  # type: ignore[arg-type]
+            parser_service=_StructuredParser(
+                label="Rome",
+                latitude=41.9028,
+                longitude=12.4964,
+                layers=["tomtom_traffic_flow"],
+                basemap="osm_default",
+            ),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
             tool_registry=_test_tool_registry(),
             request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
-            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            agent_tool_catalog_service=_Catalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
             history_service=history, conversation_repository=history,  # type: ignore[arg-type]
         )
@@ -1080,13 +1166,19 @@ def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainvi
         )
         orchestrator = AgentOrchestrator(
             search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
-            parser_service=_ZurichParser(),  # type: ignore[arg-type]
+            parser_service=_StructuredParser(
+                label="Zurich",
+                latitude=47.3769,
+                longitude=8.5417,
+                layers=["rainviewer_precipitation_radar"],
+                basemap="osm_default",
+            ),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
             tool_registry=_test_tool_registry(),
             request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
-            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            agent_tool_catalog_service=_Catalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
             history_service=history, conversation_repository=history,  # type: ignore[arg-type]
         )
@@ -1118,13 +1210,19 @@ def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -
         )
         orchestrator = AgentOrchestrator(
             search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
-            parser_service=_ParisParser(),  # type: ignore[arg-type]
+            parser_service=_StructuredParser(
+                label="Paris",
+                latitude=48.8566,
+                longitude=2.3522,
+                layers=["openaq_air_quality"],
+                basemap="osm_default",
+            ),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
             tool_registry=_test_tool_registry(),
             request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
-            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            agent_tool_catalog_service=_Catalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
             history_service=history, conversation_repository=history,  # type: ignore[arg-type]
         )
@@ -1154,13 +1252,19 @@ def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning(
         )
         orchestrator = AgentOrchestrator(
             search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
-            parser_service=_TimesSquareParser(),  # type: ignore[arg-type]
+            parser_service=_StructuredParser(
+                label="Times Square",
+                latitude=40.758,
+                longitude=-73.9855,
+                layers=["windy_webcams"],
+                basemap="osm_default",
+            ),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
             tool_registry=_test_tool_registry(),
             request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
-            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            agent_tool_catalog_service=_Catalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
             history_service=history, conversation_repository=history,  # type: ignore[arg-type]
         )
@@ -1545,7 +1649,7 @@ def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() 
             tool_registry=_test_tool_registry(),
             request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
-            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            agent_tool_catalog_service=_Catalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
             history_service=history, conversation_repository=history,  # type: ignore[arg-type]
         )
@@ -1601,13 +1705,19 @@ def test_orchestrator_updates_active_location_when_user_switches_places() -> Non
         )
         orchestrator = AgentOrchestrator(
             search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
-            parser_service=_ParisParser(),  # type: ignore[arg-type]
+            parser_service=_StructuredParser(
+                label="Paris",
+                latitude=48.8566,
+                longitude=2.3522,
+                layers=["tomtom_traffic_flow"],
+                basemap="osm_default",
+            ),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
             tool_registry=_test_tool_registry(),
             request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
-            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            agent_tool_catalog_service=_Catalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
             history_service=history, conversation_repository=history,  # type: ignore[arg-type]
         )
@@ -1648,7 +1758,7 @@ def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_withou
             tool_registry=_test_tool_registry(),
             request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
-            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            agent_tool_catalog_service=_Catalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
             history_service=history, conversation_repository=history,  # type: ignore[arg-type]
         )

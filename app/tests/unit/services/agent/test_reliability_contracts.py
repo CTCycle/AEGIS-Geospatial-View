@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+from server.domain.agent.extraction_schemas import LLMParserExtraction
 from server.services.agent.parser_service import ParserService
 from server.services.geospatial.overpass import OverpassService
 
 ###############################################################################
 def test_conceptual_basemap_question_is_not_a_map_fallback() -> None:
-    extracted = ParserService._fallback_extraction(
-        "What is the difference between a map layer and a basemap?"
+    extracted = ParserService._apply_domain_rules(
+        "What is the difference between a map layer and a basemap?",
+        LLMParserExtraction(
+            task_class="general_question",
+            action_id="chat_response",
+            action_label="General question",
+            task_tags=["chat"],
+            requires_location=False,
+            direct_response_sufficient=True,
+        ),
+        {},
     )
 
     assert extracted.task_class == "general_question"
@@ -17,7 +27,22 @@ def test_explicit_no_map_request_is_direct_and_poi_categories_are_typed() -> Non
     text = "Give me the coordinates of Cape Town, South Africa, and do not render a map."
     extracted = ParserService._apply_domain_rules(
         text,
-        ParserService._fallback_extraction(text),
+        LLMParserExtraction(
+            task_class="direct_query",
+            action_id="location_to_coordinates",
+            action_label="Location lookup",
+            task_tags=["coordinates"],
+            action_tags=["direct"],
+            requires_location=True,
+            direct_response_sufficient=True,
+            location_signals=[
+                {
+                    "signal_type": "city",
+                    "raw_value": "Cape Town, South Africa",
+                    "normalized_value": "Cape Town, South Africa",
+                }
+            ],
+        ),
         {},
     )
 
@@ -28,7 +53,14 @@ def test_explicit_no_map_request_is_direct_and_poi_categories_are_typed() -> Non
     poi_text = "Show bicycle parking and rail stations around Tokyo Station."
     poi = ParserService._apply_domain_rules(
         poi_text,
-        ParserService._fallback_extraction(poi_text),
+        LLMParserExtraction(
+            task_class="map_search",
+            action_id="map_search",
+            action_label="Nearby places",
+            task_tags=["map", "poi"],
+            requires_location=True,
+            poi_categories=["bicycle_parking", "rail_stations"],
+        ),
         {},
     )
     assert poi.poi_categories == ["bicycle_parking", "rail_stations"]

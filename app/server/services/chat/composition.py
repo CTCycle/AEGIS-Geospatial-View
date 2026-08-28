@@ -13,13 +13,13 @@ from server.services.agent.direct_turn_response import DirectTurnResponseService
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.location_resolver import LocationResolver
 from server.services.agent.native_tool_loop import NativeToolLoop
-from server.services.agent.overlay_inference import OverlayInferenceService
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent.parser_service import ParserService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
+from server.services.agent.tool_argument_builder import ToolArgumentBuilder
 from server.services.agent.tool_planner import DeterministicToolPlanner
 from server.services.chat.maintenance_service import ChatMaintenanceService
 from server.services.chat.model_library import ChatModelLibraryService
@@ -78,6 +78,8 @@ def build_chat_runtime(
     parser_service = ParserService(
         llm_factory=llm_factory,
         settings_repo=settings_repo,
+        capability_registry=capability_registry,
+        runtime_registry=runtime_registry,
     )
     location_memory_service = LocationMemoryService()
     location_resolver = LocationResolver()
@@ -87,7 +89,7 @@ def build_chat_runtime(
         runtime_registry=runtime_registry,
     )
     tool_registry = ToolRegistry(runtime_registry=runtime_registry)
-    request_builder = RequestBuilder()
+    request_builder = RequestBuilder(capability_registry=capability_registry)
     agent_tool_catalog_service = AgentToolCatalogService(
         capability_registry=capability_registry,
         runtime_registry=runtime_registry,
@@ -110,7 +112,9 @@ def build_chat_runtime(
     )
     task_state_service = ConversationTaskStateService()
     pipeline_router = DeterministicAgentRouter()
-    tool_planner = DeterministicToolPlanner()
+    tool_planner = DeterministicToolPlanner(
+        ToolArgumentBuilder(capability_registry=capability_registry)
+    )
     tool_plan_executor = ToolPlanExecutor(tool_registry=tool_registry)
     direct_turn_response_service = DirectTurnResponseService(
         task_state_service=task_state_service,
@@ -144,10 +148,6 @@ def build_chat_runtime(
             tool_planner=tool_planner,
             tool_plan_executor=tool_plan_executor,
             direct_turn_response_service=direct_turn_response_service,
-            overlay_inference_service=OverlayInferenceService(
-                capability_registry=capability_registry,
-                runtime_registry=runtime_registry,
-            ),
             capability_resolver=CapabilityResolver(
                 capability_registry=capability_registry,
                 runtime_registry=runtime_registry,

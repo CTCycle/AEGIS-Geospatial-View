@@ -76,7 +76,7 @@ class AgentTurnHistoryService:
     ) -> Any:
         latest_memory = json_object(latest_memory)
         memory_signals = self.location_memory_service.resolve_explicit_references(
-            turn_contract.user_text,
+            list(turn_contract.location_signals),
             latest_memory,
         )
         if not memory_signals:

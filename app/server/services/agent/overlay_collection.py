@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from hashlib import sha256
+from math import asin, cos, radians, sin, sqrt
 from typing import Any, Iterable, cast
+import unicodedata
 
 from server.contracts.extraction import OverlayCommand, OverlaySelector
 from server.contracts.geospatial import (
@@ -15,6 +17,7 @@ from server.contracts.geospatial import (
 )
 
 
+###############################################################################
 class OverlayCollectionService:
     """Resolve and apply typed overlay commands without refetching the map.
 
@@ -24,28 +27,21 @@ class OverlayCollectionService:
     overwriting a newer user action.
     """
 
-    _CONCEPT_ALIASES: dict[str, set[str]] = {
-        "weather": {"weather", "forecast", "temperature", "wind"},
-        "precipitation": {"precipitation", "rain", "rainfall"},
-        "air quality": {"air quality", "air_quality", "pollution", "aqi"},
-        "satellite": {"satellite", "imagery", "remote sensing"},
-        "active fire": {"active fire", "active_fire", "fires", "fire"},
-        "land cover": {"land cover", "land_cover", "landuse", "land use"},
-    }
-
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def _norm(value: object) -> str:
-        text = " ".join(str(value or "").casefold().split())
-        return "".join(character for character in text if character.isalnum() or character == " ")
+        text = unicodedata.normalize("NFKC", str(value or "")).casefold()
+        return " ".join(
+            "".join(character if character.isalnum() else " " for character in text).split()
+        )
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _tokens(cls, value: object) -> set[str]:
         normalized = cls._norm(value)
-        return {item for item in normalized.replace("_", " ").split() if item}
+        return {item for item in normalized.split() if item}
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _selector_values(cls, selector: OverlaySelector) -> list[str]:
         return [
@@ -59,32 +55,20 @@ class OverlayCollectionService:
             *selector.tags,
         ]
 
-    # ------------------------------------------------------------------
-    @classmethod
-    def _aliases_for(cls, value: str) -> set[str]:
-        normalized = cls._norm(value)
-        aliases = {normalized}
-        for canonical, variants in cls._CONCEPT_ALIASES.items():
-            if normalized == cls._norm(canonical) or normalized in {cls._norm(item) for item in variants}:
-                aliases.update(cls._norm(item) for item in variants)
-                aliases.add(cls._norm(canonical))
-        return aliases
-
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _concept_matches(cls, concepts: set[str], value: str) -> bool:
-        aliases = cls._aliases_for(value)
-        concept_tokens: set[str] = set()
+        normalized = cls._norm(value)
+        if not normalized:
+            return False
+        if normalized in concepts:
+            return True
+        candidate_tokens: set[str] = set()
         for concept in concepts:
-            concept_tokens.update(cls._tokens(concept))
-        return any(
-            alias in concepts
-            or any(alias in concept or concept in alias for concept in concepts)
-            or cls._tokens(alias).issubset(concept_tokens)
-            for alias in aliases
-        )
+            candidate_tokens.update(cls._tokens(concept))
+        return cls._tokens(normalized).issubset(candidate_tokens)
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _metadata_values(cls, metadata: dict[str, Any], *keys: str) -> list[str]:
         values: list[str] = []
@@ -100,7 +84,7 @@ class OverlayCollectionService:
                 )
         return list(dict.fromkeys(values))
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _selector_matches_metadata(
         cls,
@@ -181,7 +165,7 @@ class OverlayCollectionService:
                 return False
         return True
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _instance_concepts(cls, instance: OverlayInstance) -> set[str]:
         descriptor = instance.descriptor
@@ -204,7 +188,7 @@ class OverlayCollectionService:
                 flattened.append(value)
         return {cls._norm(item) for item in flattened if cls._norm(item)}
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _matches_identity(cls, instance: OverlayInstance, selector: OverlaySelector) -> bool:
         if selector.instance_ids and instance.instance_id in selector.instance_ids:
@@ -221,7 +205,7 @@ class OverlayCollectionService:
             return False
         return True
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _matches_filters(cls, instance: OverlayInstance, selector: OverlaySelector) -> bool:
         concepts = cls._instance_concepts(instance)
@@ -254,7 +238,7 @@ class OverlayCollectionService:
             return False
         return True
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _location_point(cls, value: object) -> tuple[float, float] | None:
         if not isinstance(value, dict):
@@ -266,7 +250,7 @@ class OverlayCollectionService:
             return float(latitude), float(longitude)
         return None
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _bbox_contains(cls, bbox: object, point: tuple[float, float] | None) -> bool:
         if point is None:
@@ -278,7 +262,7 @@ class OverlayCollectionService:
         latitude, longitude = point
         return min_lat <= latitude <= max_lat and min_lon <= longitude <= max_lon
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def _bbox_values(value: object) -> tuple[float, float, float, float] | None:
         if not isinstance(value, list):
@@ -300,7 +284,7 @@ class OverlayCollectionService:
             return None
         return tuple(numbers)  # type: ignore[return-value]
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _scope_matches(
         cls,
@@ -332,9 +316,13 @@ class OverlayCollectionService:
             return True
         target_point = cls._location_point(target)
         if target_point is not None and instance_point is not None:
-            return abs(target_point[0] - instance_point[0]) < 0.25 and abs(
-                target_point[1] - instance_point[1]
-            ) < 0.25
+            target_radius = target.get("radius_m")
+            instance_radius = instance.viewport.get("radius_m") if instance.viewport else None
+            if isinstance(target_radius, (int, float)) and target_radius > 0:
+                return cls._distance_m(target_point, instance_point) <= float(target_radius)
+            if isinstance(instance_radius, (int, float)) and instance_radius > 0:
+                return cls._distance_m(target_point, instance_point) <= float(instance_radius)
+            return target_point == instance_point
         target_label_value = scope.label
         if not target_label_value:
             target_label_value = target.get("label") or target.get("raw_value")
@@ -350,7 +338,24 @@ class OverlayCollectionService:
         }
         return target_label in instance_labels
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _distance_m(
+        left: tuple[float, float],
+        right: tuple[float, float],
+    ) -> float:
+        earth_radius_m = 6_371_000.0
+        left_lat, left_lon = map(radians, left)
+        right_lat, right_lon = map(radians, right)
+        delta_lat = right_lat - left_lat
+        delta_lon = right_lon - left_lon
+        haversine = (
+            sin(delta_lat / 2) ** 2
+            + cos(left_lat) * cos(right_lat) * sin(delta_lon / 2) ** 2
+        )
+        return 2 * earth_radius_m * asin(sqrt(haversine))
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _bboxes_intersect(left: object, right: object) -> bool:
         left_values = OverlayCollectionService._bbox_values(left)
@@ -366,7 +371,7 @@ class OverlayCollectionService:
             or r_max_lat < l_min_lat
         )
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _matching_instances(
         cls,
@@ -409,7 +414,7 @@ class OverlayCollectionService:
             and cls._scope_matches(instance, command, current_view=current_view)
         ]
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _variant(cls, command: OverlayCommand) -> dict[str, str | None]:
         patch = command.patch
@@ -419,7 +424,7 @@ class OverlayCollectionService:
             "format": patch.format,
         }
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _scope_key(cls, command: OverlayCommand) -> str:
         if command.scope.kind == "global":
@@ -433,7 +438,7 @@ class OverlayCollectionService:
             return f"location:{cls._norm(label)}:{point[0]:.4f}:{point[1]:.4f}"
         return f"location:{cls._norm(label)}"
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _stable_id(cls, capability_id: str, scope_key: str, variant: dict[str, str | None]) -> str:
         seed = "|".join(
@@ -441,7 +446,7 @@ class OverlayCollectionService:
         )
         return f"overlay-{sha256(seed.encode('utf-8')).hexdigest()[:16]}"
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _catalog_candidates(
         cls,
@@ -475,11 +480,22 @@ class OverlayCollectionService:
                         for value in cast(list[Any], raw_descriptor_values)
                         if isinstance(value, str)
                     )
+            raw_metadata = item.get("metadata")
+            if isinstance(raw_metadata, dict):
+                for metadata_key in ("keywords", "action_tags", "task_tags", "capabilities"):
+                    raw_values = raw_metadata.get(metadata_key)
+                    if isinstance(raw_values, list):
+                        tag_values.extend(
+                            value
+                            for value in cast(list[Any], raw_values)
+                            if isinstance(value, str)
+                        )
             descriptor_concepts = descriptor_values.get("concepts")
             if isinstance(descriptor_concepts, list):
                 concepts.extend(
                     value for value in cast(list[Any], descriptor_concepts) if isinstance(value, str)
                 )
+            concepts.extend(tag_values)
             concepts = list(dict.fromkeys(concepts))
             haystack = {
                 cls._norm(capability_id),
@@ -494,7 +510,9 @@ class OverlayCollectionService:
                 *[cls._norm(value) for value in concepts],
             }
             selector = command.selector
-            if selector.capability_ids and capability_id not in selector.capability_ids:
+            if selector.capability_ids and cls._norm(capability_id) not in {
+                cls._norm(value) for value in selector.capability_ids
+            }:
                 continue
             if selector.providers and cls._norm(provider) not in {cls._norm(value) for value in selector.providers}:
                 continue
@@ -536,7 +554,7 @@ class OverlayCollectionService:
             )
         return candidates
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _instance_from_catalog(
         cls,
@@ -575,13 +593,13 @@ class OverlayCollectionService:
             inspections=list(candidate.get("inspections") or []),
         )
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _unmatched_label(cls, command: OverlayCommand) -> str:
         values = cls._selector_values(command.selector)
         return ", ".join(values) if values else "the requested overlay"
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def apply(
         cls,
@@ -739,7 +757,7 @@ class OverlayCollectionService:
             clarification=clarification,
         )
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def apply_commands(
         cls,
@@ -763,7 +781,7 @@ class OverlayCollectionService:
             results.append(result)
         return current, results
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def has_matching_instances(
         cls,
@@ -775,7 +793,7 @@ class OverlayCollectionService:
         """Return whether a command can be satisfied from active state alone."""
         return bool(cls._matching_instances(collection, command, current_view=current_view))
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def from_map_session(cls, session: MapSession | dict[str, Any] | None) -> OverlayCollectionState:
         if session is None:
@@ -836,7 +854,7 @@ class OverlayCollectionService:
             instances=instances,
         )
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def merge_into_map_session(
         cls,

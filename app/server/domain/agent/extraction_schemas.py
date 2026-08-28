@@ -13,6 +13,24 @@ class LLMTemporalSignal(BaseModel):
     mode: Literal["current", "historical", "forecast", "none"] = "none"
     raw_text: str | None = None
     reference_time_iso: str | None = None
+    start_time_iso: str | None = None
+    end_time_iso: str | None = None
+    granularity: Literal["instant", "hour", "day", "month", "year", "custom", "none"] = "none"
+    aggregation: Literal["none", "instant", "sum", "mean", "min", "max", "count"] = "none"
+
+###############################################################################
+class LLMContextQuery(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    kind: Literal[
+        "none",
+        "active_location",
+        "active_overlays",
+        "active_map_summary",
+        "previous_user_request",
+        "capabilities",
+        "failure",
+    ] = "none"
 
 ###############################################################################
 class LLMLocationSignal(BaseModel):
@@ -152,6 +170,7 @@ class LLMParserExtraction(BaseModel):
     requires_location: bool = True
     location_signals: list[LLMLocationSignal] = Field(default_factory=lambda: list[LLMLocationSignal]())
     temporal_signal: LLMTemporalSignal = Field(default_factory=LLMTemporalSignal)
+    context_query: LLMContextQuery = Field(default_factory=LLMContextQuery)
     ambiguities: list[str] = Field(default_factory=lambda: list[str]())
     disallowed_patterns: list[LLMDisallowedPattern] = Field(default_factory=lambda: list[LLMDisallowedPattern]())
     parser_confidence: float = Field(default=0.5, ge=0.0, le=1.0)

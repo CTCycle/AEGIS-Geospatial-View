@@ -19,6 +19,7 @@ from server.services.geospatial.providers.base import (
 )
 
 
+###############################################################################
 def _provider_failure_code(error: Exception) -> str:
     if isinstance(error, ProviderAuthError):
         return "auth_required"

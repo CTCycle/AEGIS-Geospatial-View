@@ -16,7 +16,6 @@ from server.repositories.schemas.models import (
     ConversationRecord,
 )
 
-
 ###############################################################################
 @pytest.fixture
 def backend(tmp_path: Path):
@@ -28,7 +27,6 @@ def backend(tmp_path: Path):
     Base.metadata.drop_all(repository.engine)
     repository.engine.dispose()
 
-
 ###############################################################################
 def test_canonical_schema_has_fifteen_application_tables_and_version_table(backend) -> None:
     tables = set(inspect(backend.engine).get_table_names())
@@ -39,7 +37,6 @@ def test_canonical_schema_has_fifteen_application_tables_and_version_table(backe
         column["name"]
         for column in inspect(backend.engine).get_columns("conversations")
     }
-
 
 ###############################################################################
 def test_conversation_messages_use_atomic_sequence_and_native_json(backend) -> None:
@@ -71,7 +68,6 @@ def test_conversation_messages_use_atomic_sequence_and_native_json(backend) -> N
         conversation = session.get(ConversationRecord, "conv_conformance")
         assert conversation is not None
         assert conversation.next_message_sequence == 1
-
 
 ###############################################################################
 def test_conversation_allows_one_active_run_by_constraint(backend) -> None:

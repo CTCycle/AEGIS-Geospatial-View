@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from typing import Any, cast
 
 from server.common.typing import json_array, json_object
@@ -10,6 +11,12 @@ from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
 class CapabilityResolver:
+    """Resolve parser concepts against the executable catalog.
+
+    The parser owns language interpretation and this service owns capability
+    identity. No provider, city, or example phrase is selected here by
+    inspecting the raw user message.
+    """
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -23,21 +30,25 @@ class CapabilityResolver:
 
     # -------------------------------------------------------------------------
     def resolve(self, turn: TurnParseResult) -> TurnParseResult:
-        requested = [item.strip() for item in turn.requested_layers if item.strip()]
+        requested = [
+            str(item).strip()
+            for item in turn.requested_layers
+            if str(item).strip()
+        ]
         for task in turn.atomic_tasks:
             required_layers = task.get("required_layers")
             if not isinstance(required_layers, list):
                 continue
-            required_layers = cast(list[Any], required_layers)
             requested.extend(
                 str(item).strip()
-                for item in required_layers
+                for item in cast(list[Any], required_layers)
                 if str(item).strip()
             )
-        overlay_commands = self._resolve_overlay_commands(turn.overlay_commands, turn)
-        # Existing-instance mutations are intentionally not converted into
-        # fetch requests.  Only commands that may need a catalog capability
-        # contribute to the executable layer set.
+
+        overlay_commands = self._resolve_overlay_commands(
+            turn.overlay_commands,
+            turn,
+        )
         for command in overlay_commands:
             if command.action not in {"add", "show", "update"}:
                 continue
@@ -45,59 +56,6 @@ class CapabilityResolver:
             requested.extend(command.selector.concepts)
             requested.extend(command.selector.labels)
         requested = self._dedupe(requested)
-        if not requested:
-            return turn.model_copy(update={"overlay_commands": overlay_commands})
-
-        if self._requests_unsupported_precipitation_mean(turn, requested):
-            return turn.model_copy(
-                update={
-                    "requested_layers": [],
-                    "overlay_commands": overlay_commands,
-                    "capability_limitations": self._dedupe(
-                        [
-                            *turn.capability_limitations,
-                            (
-                                "Historical monthly-mean precipitation is not available "
-                                "from the current executable catalog."
-                            ),
-                        ]
-                    ),
-                    "clarification_plan": {
-                        "question": (
-                            "I cannot calculate an October mean from the current layers. "
-                            "Would you like current precipitation radar, current "
-                            "precipitation rate, or a near-term forecast instead?"
-                        ),
-                        "reason": (
-                            "The catalog contains current and forecast precipitation "
-                            "capabilities, but no historical monthly aggregation source."
-                        ),
-                        "blocking_fields": [
-                            "supported_precipitation_time_basis",
-                        ],
-                        "options": [
-                            {
-                                "option_id": "current_radar",
-                                "label": "Current precipitation radar",
-                            },
-                            {
-                                "option_id": "current_rate",
-                                "label": "Current precipitation rate",
-                            },
-                            {
-                                "option_id": "forecast",
-                                "label": "Near-term precipitation forecast",
-                            },
-                        ],
-                        "preserve_valid_results": True,
-                        "apply_visualization_changes": False,
-                    },
-                    "ambiguities": self._dedupe(
-                        [*turn.ambiguities, "unsupported_historical_precipitation_mean"]
-                    ),
-                    "expected_frontend_update": "clarification",
-                }
-            )
 
         resolved: list[str] = []
         unresolved: list[str] = []
@@ -110,10 +68,13 @@ class CapabilityResolver:
 
         if not unresolved:
             return turn.model_copy(
-                update={"requested_layers": resolved, "overlay_commands": overlay_commands}
+                update={
+                    "requested_layers": resolved,
+                    "overlay_commands": overlay_commands,
+                }
             )
 
-        readable = ", ".join(unresolved)
+        readable = ", ".join(self._dedupe(unresolved))
         return turn.model_copy(
             update={
                 "requested_layers": resolved,
@@ -126,10 +87,13 @@ class CapabilityResolver:
                 ),
                 "clarification_plan": {
                     "question": (
-                        f"I could not match **{readable}** to an enabled map layer. "
+                        f"I could not match {readable} to an enabled map layer. "
                         "Can you describe the data you want to see in different terms?"
                     ),
-                    "reason": "No compatible executable catalog capability was found.",
+                    "reason": (
+                        "No compatible executable catalog capability was found for "
+                        "the structured layer request."
+                    ),
                     "blocking_fields": ["geospatial_layer"],
                     "options": [],
                     "preserve_valid_results": True,
@@ -142,7 +106,7 @@ class CapabilityResolver:
             }
         )
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def _resolve_overlay_commands(
         self,
         commands: list[Any],
@@ -152,15 +116,10 @@ class CapabilityResolver:
         for command in commands:
             selector = command.selector
             capability_ids: list[str] = []
-            # Normalize model-emitted aliases and semantic selector values to
-            # executable catalog IDs for every command action.  Mutation
-            # commands must carry the same canonical identity as additions;
-            # otherwise a valid alias can bypass the active-instance resolver
-            # and appear as an unavailable capability.
             for value in selector.capability_ids:
                 capability_id = self._resolve_one(value, turn)
-                normalized = capability_id or value
-                if normalized not in capability_ids:
+                normalized = capability_id or str(value).strip()
+                if normalized and normalized not in capability_ids:
                     capability_ids.append(normalized)
             for value in [*selector.concepts, *selector.labels]:
                 capability_id = self._resolve_one(value, turn)
@@ -179,116 +138,174 @@ class CapabilityResolver:
 
     # -------------------------------------------------------------------------
     def _resolve_one(self, layer: str, turn: TurnParseResult) -> str | None:
-        exact = self.capability_registry.get_capability(layer)
-        if exact is not None:
-            return layer if self.runtime_registry.is_enabled(layer) else None
-        normalized = layer.casefold()
-        text = f"{turn.user_text} {layer}".casefold()
-        if normalized in {
-            "poi",
-            "points_of_interest",
-            "amenities",
-            "restaurant",
-            "restaurants",
-        }:
-            return self._enabled("overpass_poi_amenities") or self._enabled(
-                "get_nearby_poi"
-            )
-        if normalized in {
-            "transit",
-            "transit_stops",
-            "public_transit",
-            "rail_stations",
-            "stations",
-        }:
-            return (
-                self._enabled("overpass_poi_amenities")
-                or self._enabled("get_nearby_poi")
-                or self._enabled("gtfs_static")
-            )
-        if normalized in {"precipitation_radar", "radar"}:
-            return self._enabled("rainviewer_precipitation_radar") or self._enabled(
-                "noaa_radar"
-            )
-        if (
-            normalized in {"weather", "weather_forecast", "forecast", "weather_overlay"}
-            or "weather" in normalized
-            or normalized.endswith("_forecast")
-        ):
-            return self._enabled("openmeteo_weather_forecast") or self._enabled(
-                "get_weather_forecast"
-            )
-        if any(
-            marker in normalized.replace("_", " ")
-            for marker in ("precipitation", "rain", "rainfall")
-        ):
-            if turn.temporal_signal.mode == "forecast" or "forecast" in text:
-                return self._enabled("openmeteo_weather_forecast")
-            if "radar" in text or "storm" in text:
-                return self._enabled("rainviewer_precipitation_radar")
-            if any(marker in text for marker in ("rate", "level", "intensity")):
-                return self._enabled("IMERG_Precipitation_Rate")
-            return self._enabled("rainviewer_precipitation_radar") or self._enabled(
-                "IMERG_Precipitation_Rate"
-            )
-        if self._is_air_quality_concept(normalized, text):
-            if turn.temporal_signal.mode == "forecast" or "forecast" in text:
-                return self._enabled("openmeteo_air_quality_forecast") or self._enabled(
-                    "get_air_quality_forecast"
-                )
-            return (
-                self._enabled("openmeteo_air_quality_forecast")
-                or self._enabled("get_air_quality_forecast")
-                or self._enabled("openaq_air_quality")
-            )
-        if self._is_traffic_concept(normalized, text):
-            return self._enabled("tomtom_traffic_flow") or self._enabled(
-                "tomtom_traffic_incidents"
-            )
-        if "_" in layer:
+        query = str(layer).strip()
+        if not query:
             return None
+
+        capabilities = self._all_capabilities()
+        normalized_query = self._normalize_text(query)
+        exact = next(
+            (
+                item
+                for item in capabilities
+                if self._normalize_text(str(item.get("id") or "")) == normalized_query
+            ),
+            None,
+        )
+        if exact is not None:
+            capability_id = str(exact.get("id") or "").strip()
+            return capability_id if self._is_usable(exact, turn) else None
 
         ranked = sorted(
             (
-                (self._score(layer, turn, item), str(item.get("id") or ""))
-                for item in self._all_capabilities()
-                if self.runtime_registry.is_enabled(str(item.get("id") or ""))
+                (self._score(query, item), str(item.get("id") or ""))
+                for item in capabilities
+                if self._is_usable(item, turn)
+                and (
+                    "_" not in query
+                    or self._query_token_coverage(query, item) == 1.0
+                )
             ),
-            reverse=True,
+            key=lambda value: (-value[0], value[1]),
         )
-        if not ranked or ranked[0][0] < 3:
+        ranked = [item for item in ranked if item[0] > 0 and item[1]]
+        if not ranked:
             return None
-        return ranked[0][1]
+
+        top_score = ranked[0][0]
+        top_ids = [item[1] for item in ranked if item[0] == top_score]
+        # A semantic request with two equally suitable executable targets is
+        # ambiguous. Ask the parser/UI to clarify instead of choosing a
+        # provider by list order.
+        if len(top_ids) != 1:
+            return None
+        return top_ids[0]
+
+    # -------------------------------------------------------------------------
+    def _is_usable(
+        self,
+        capability: dict[str, Any],
+        turn: TurnParseResult,
+    ) -> bool:
+        capability_id = str(capability.get("id") or "").strip()
+        if not capability_id or not self.runtime_registry.is_enabled(capability_id):
+            return False
+        supports_mode = getattr(self.runtime_registry, "supports_mode", None)
+        if callable(supports_mode) and turn.task_class == "map_search":
+            if not supports_mode(capability_id, "map"):
+                return False
+        return self._supports_temporal_request(capability, turn)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _supports_temporal_request(
+        capability: dict[str, Any],
+        turn: TurnParseResult,
+    ) -> bool:
+        temporal = turn.temporal_signal
+        if temporal.mode == "none" and temporal.aggregation == "none":
+            return True
+
+        metadata = json_object(capability.get("metadata"))
+        declared_modes = metadata.get("supported_temporal_modes")
+        if not isinstance(declared_modes, list):
+            declared_modes = capability.get("supported_temporal_modes")
+        if isinstance(declared_modes, list) and declared_modes:
+            allowed_modes = {
+                str(item).strip().casefold()
+                for item in declared_modes
+                if str(item).strip()
+            }
+            if temporal.mode not in allowed_modes and temporal.mode != "none":
+                return False
+
+        declared_aggregations = metadata.get("supported_aggregations")
+        if not isinstance(declared_aggregations, list):
+            declared_aggregations = capability.get("supported_aggregations")
+        if isinstance(declared_aggregations, list) and declared_aggregations:
+            allowed_aggregations = {
+                str(item).strip().casefold()
+                for item in declared_aggregations
+                if str(item).strip()
+            }
+            if temporal.aggregation not in allowed_aggregations:
+                return False
+
+        # A manifest that explicitly describes a dynamic/current source cannot
+        # satisfy a historical request unless it also declares historical
+        # support. Unknown metadata remains permissive so catalog evolution
+        # does not silently make capabilities unusable.
+        behavior = str(metadata.get("temporal_behavior") or "").casefold()
+        if temporal.mode == "historical" and behavior:
+            historical_markers = ("historical", "archive")
+            if not any(marker in behavior for marker in historical_markers):
+                return False
+        return True
 
     # -------------------------------------------------------------------------
     def _score(
         self,
-        layer: str,
-        turn: TurnParseResult,
+        query: str,
         capability: dict[str, Any],
     ) -> int:
-        terms = set(self._tokens(layer))
-        searchable = " ".join(
-            str(value)
-            for value in [
-                capability.get("id"),
-                capability.get("name"),
-                capability.get("description"),
-                *json_array(capability.get("capabilities")),
-                *json_array(json_object(capability.get("metadata")).get("keywords")),
-                *json_array(json_object(capability.get("metadata")).get("action_tags")),
-                *json_array(json_object(capability.get("metadata")).get("task_tags")),
-                *json_array(json_object(capability.get("agenticUse")).get("plannerHints")),
-            ]
-        ).casefold()
-        score = sum(2 for term in terms if len(term) > 2 and term in searchable)
-        if turn.temporal_signal.mode == "forecast" and "forecast" in searchable:
-            score += 4
-        if turn.temporal_signal.mode == "current" and any(
-            marker in searchable for marker in ("current", "radar", "dynamic")
-        ):
-            score += 2
+        normalized_query = self._normalize_text(query)
+        query_tokens = set(self._tokens(query))
+        if not query_tokens:
+            return 0
+
+        metadata = json_object(capability.get("metadata"))
+        fields: tuple[tuple[int, list[str]], ...] = (
+            (8, [str(capability.get("id") or "")]),
+            (6, [str(capability.get("name") or ""), str(metadata.get("label") or "")]),
+            (5, [str(item) for item in json_array(capability.get("capabilities"))]),
+            (5, [str(item) for item in json_array(metadata.get("keywords"))]),
+            (4, [str(item) for item in json_array(metadata.get("action_tags"))]),
+            (3, [str(item) for item in json_array(metadata.get("task_tags"))]),
+            (
+                4,
+                [
+                    str(item)
+                    for item in json_array(
+                        json_object(capability.get("agenticUse")).get("plannerHints")
+                    )
+                ],
+            ),
+            (2, [str(item) for item in json_array(metadata.get("primary_use_cases"))]),
+        )
+        score = 0
+        for weight, values in fields:
+            for value in values:
+                normalized_value = self._normalize_text(value)
+                if not normalized_value:
+                    continue
+                value_tokens = set(self._tokens(value))
+                overlap = len(query_tokens & value_tokens)
+                if overlap:
+                    score += weight * overlap
+                if normalized_query == normalized_value:
+                    score += weight * 3
+                elif len(query_tokens) > 1 and normalized_query in normalized_value:
+                    score += weight
         return score
+
+    # -------------------------------------------------------------------------
+    def _query_token_coverage(
+        self,
+        query: str,
+        capability: dict[str, Any],
+    ) -> float:
+        query_tokens = set(self._tokens(query))
+        if not query_tokens:
+            return 0.0
+        metadata = json_object(capability.get("metadata"))
+        searchable_values = [
+            str(capability.get("id") or ""),
+            str(capability.get("name") or ""),
+            *[str(item) for item in json_array(capability.get("capabilities"))],
+            *[str(item) for item in json_array(metadata.get("keywords"))],
+        ]
+        searchable_tokens = set(self._tokens(" ".join(searchable_values)))
+        return len(query_tokens & searchable_tokens) / len(query_tokens)
 
     # -------------------------------------------------------------------------
     def _all_capabilities(self) -> list[dict[str, Any]]:
@@ -301,71 +318,19 @@ class CapabilityResolver:
         ]
 
     # -------------------------------------------------------------------------
-    def _enabled(self, capability_id: str) -> str | None:
-        if (
-            self.capability_registry.get_capability(capability_id) is not None
-            and self.runtime_registry.is_enabled(capability_id)
-        ):
-            return capability_id
-        return None
+    @staticmethod
+    def _normalize_text(value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", str(value or "")).casefold()
+        return " ".join(
+            "".join(character if character.isalnum() else " " for character in normalized).split()
+        )
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _requests_unsupported_precipitation_mean(
-        cls,
-        turn: TurnParseResult,
-        requested: list[str],
-    ) -> bool:
-        text = f"{turn.user_text} {' '.join(requested)}".casefold()
-        if not cls._is_precipitation_concept(" ".join(requested).casefold(), text):
-            return False
-        historical = turn.temporal_signal.mode == "historical" or any(
-            month in text
-            for month in (
-                "january", "february", "march", "april", "may", "june",
-                "july", "august", "september", "october", "november", "december",
-            )
-        )
-        aggregate = any(
-            marker in text for marker in ("mean", "average", "monthly", "climatology")
-        )
-        return historical and aggregate
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _is_precipitation_concept(layer: str, text: str) -> bool:
-        return any(
-            marker in f"{layer} {text}"
-            for marker in ("precipitation", "rain", "rainfall")
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _is_air_quality_concept(layer: str, text: str) -> bool:
-        normalized = f"{layer} {text}".replace("_", " ").replace("-", " ")
-        return any(
-            marker in normalized
-            for marker in ("air quality", "pm2 5", "pm25", "pm10", "pollution")
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _is_traffic_concept(layer: str, text: str) -> bool:
-        normalized = f"{layer} {text}".replace("_", " ").replace("-", " ")
-        return any(
-            marker in normalized
-            for marker in ("traffic", "congestion", "road incidents", "incidents")
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _tokens(value: str) -> list[str]:
-        normalized = "".join(
-            character if character.isalnum() else " " for character in value.casefold()
-        )
-        return [item for item in normalized.split() if item]
+    def _tokens(cls, value: str) -> list[str]:
+        return cls._normalize_text(value).split()
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _dedupe(values: list[str]) -> list[str]:
-        return list(dict.fromkeys(value for value in values if value))
+        return list(dict.fromkeys(value.strip() for value in values if value and value.strip()))

@@ -11,19 +11,17 @@ from typing import Literal, cast
 from server.common.logger import logger as LOGGER
 from server.domain.agent.actions import AgentAction
 from server.domain.agent.extraction_schemas import (
-    LLMClarificationPlan,
     LLMLocationSignal,
     LLMParserExtraction,
     LLMViewportIntent,
 )
 from server.contracts.extraction import (
     ConversationContextSnapshot,
+    ContextQuery,
     DisallowedPattern,
     LocationSignal,
     NormalizedAction,
     OverlayCommand,
-    OverlayScope,
-    OverlaySelector,
     TemporalSignal,
     TurnParseResult,
     ViewportIntent,
@@ -38,6 +36,8 @@ from server.services.llm.errors import (
 from server.services.llm.factory import LLMFactory
 from server.services.llm.prompts import get_parser_system_prompt
 from server.services.llm.types import LLMRequest
+from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
 class ParserService:
@@ -54,11 +54,15 @@ class ParserService:
         settings_repo: ModelSettingsRepository,
         provider: str | None = None,
         model: str | None = None,
+        capability_registry: CapabilityRegistry | None = None,
+        runtime_registry: RuntimeRegistry | None = None,
     ) -> None:
         self.llm_factory = llm_factory
         self.settings_repo = settings_repo
         self.provider = provider
         self.model = model
+        self.capability_registry = capability_registry
+        self.runtime_registry = runtime_registry
         self.last_context_usage: dict[str, object] | None = None
 
     # -------------------------------------------------------------------------
@@ -104,6 +108,46 @@ class ParserService:
         return result
 
     # -------------------------------------------------------------------------
+    def _catalog_evidence(self) -> list[dict[str, Any]]:
+        """Expose executable catalog identity to the structured parser."""
+        if self.capability_registry is None:
+            return []
+        collections = (
+            self.capability_registry.list_basemaps(),
+            self.capability_registry.list_overlays(),
+            self.capability_registry.list_cameras(),
+            self.capability_registry.list_transit(),
+            self.capability_registry.list_tools(),
+        )
+        evidence: list[dict[str, Any]] = []
+        for collection in collections:
+            for capability in collection:
+                capability_id = str(capability.get("id") or "").strip()
+                if not capability_id:
+                    continue
+                if self.runtime_registry is not None and not self.runtime_registry.is_enabled(
+                    capability_id
+                ):
+                    continue
+                metadata = capability.get("metadata")
+                metadata = metadata if is_json_object(metadata) else {}
+                evidence.append(
+                    {
+                        "id": capability_id,
+                        "label": str(
+                            metadata.get("label")
+                            or capability.get("name")
+                            or capability_id
+                        ),
+                        "capability_kind": capability.get("capabilityKind"),
+                        "rendering_mode": capability.get("renderingMode"),
+                        "capabilities": list(capability.get("capabilities") or []),
+                        "keywords": list(metadata.get("keywords") or []),
+                    }
+                )
+        return evidence
+
+    # -------------------------------------------------------------------------
     @classmethod
     def _normalize_failure_category(cls, value: object) -> Literal[
         "model_capability", "provider_api", "schema_definition", "response_parsing", "context_limit"
@@ -124,127 +168,6 @@ class ParserService:
             except Exception:
                 LOGGER.warning("Ignoring invalid overlay command from parser extraction")
         return commands
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _infer_overlay_commands(
-        cls,
-        text: str,
-        user_message: str,
-        extracted: LLMParserExtraction,
-    ) -> list[OverlayCommand]:
-        """Create a small structured fallback when the model omits commands.
-
-        This is intentionally a bounded command grammar, not a second layer
-        matcher.  It only identifies the independent action, overlay concept,
-        and geographic scope; capability resolution remains catalog-backed.
-        """
-        overlay_words = (
-            "weather",
-            "precipitation",
-            "rain",
-            "air quality",
-            "pollution",
-            "traffic",
-            "satellite",
-            "imagery",
-            "elevation",
-            "land cover",
-            "active fire",
-            "fires",
-            "aerosol",
-            "ozone",
-            "solar",
-            "noise",
-            "transit",
-            "camera",
-        )
-        if "keep all" in text and ("except" in text or "but" in text):
-            action = "remove"
-        elif "keep" in text and any(marker in text for marker in ("remove", "except", "others")):
-            action = "keep_only"
-        elif any(marker in text for marker in ("remove", "delete", "turn off", "disable")):
-            action = "remove"
-        elif any(marker in text for marker in ("hide", "conceal")):
-            action = "hide"
-        elif any(marker in text for marker in ("update", "change", "adjust", "set opacity", "set style")):
-            action = "update"
-        elif any(marker in text for marker in ("show", "display", "add", "enable", "turn on")):
-            action = "show"
-        else:
-            return []
-
-        target: str | None = next((word for word in overlay_words if word in text), None)
-        # A quoted selector is useful for catalog labels that are not in the
-        # bounded concept vocabulary.
-        quoted = re.search(r'["“](.+?)["”]', user_message)
-        if quoted is not None and any(marker in text for marker in ("overlay", "layer")):
-            target = quoted.group(1).strip()
-        if target is None:
-            named_layer = re.search(
-                r"(?i)\b(?:remove|delete|hide|show|add|enable|update|change)\s+(?:the\s+)?(.+?)\s+(?:overlay|layer)\b",
-                user_message,
-            )
-            if named_layer is not None:
-                target = named_layer.group(1).strip()
-                if target and target.casefold() in {"the", "an", "a", "all"}:
-                    target = None
-        if target is None:
-            selector_match = re.search(
-                r"(?i)\bexcept\s+(?:the\s+)?(?P<selector>[^.?!]+)|"
-                r"\bkeep\s+(?:only\s+)?(?:the\s+)?(?P<keep>.+?)\s+and\s+remove\b|"
-                r"\b(?:remove|delete|hide|show|add|enable|update|change)\s+(?:the\s+)?(?P<scoped>.+?)\s+only\s+(?:from|in|over|at)\b",
-                user_message,
-            )
-            if selector_match is not None:
-                target = next(
-                    (
-                        value.strip()
-                        for value in (
-                            selector_match.group("selector"),
-                            selector_match.group("keep"),
-                            selector_match.group("scoped"),
-                        )
-                        if value and value.strip()
-                    ),
-                    None,
-                )
-                if target:
-                    target = re.sub(r"(?i)\s+(?:overlay|layer)s?\s*$", "", target).strip()
-                    target = re.sub(r"(?i)^(?:all|only)\s+", "", target).strip()
-        if not target and not any(marker in text for marker in ("overlay", "layer")):
-            return []
-
-        if "this area" in text or "current view" in text or "viewport" in text:
-            scope_kind = "current_view"
-            location: dict[str, Any] | None = None
-        else:
-            location_signal = next(
-                (item for item in extracted.location_signals if item.raw_value.strip()),
-                None,
-            ) or cls._extract_text_location_signal(user_message)
-            scope_kind = "location" if location_signal is not None else "global"
-            location = (
-                {
-                    "label": location_signal.normalized_value or location_signal.raw_value,
-                    "raw_value": location_signal.raw_value,
-                    "latitude": location_signal.latitude,
-                    "longitude": location_signal.longitude,
-                }
-                if location_signal is not None
-                else None
-            )
-        selector = OverlaySelector(
-            concepts=[target] if target else [],
-            labels=[target] if target and quoted is not None else [],
-        )
-        scope = OverlayScope(kind=scope_kind, location=location)
-        command = OverlayCommand(
-            action=action,
-            selector=selector,
-            scope=scope,
-        )
-        return [command]
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -304,6 +227,7 @@ class ParserService:
             "recent_messages": recent_messages[-6:],
             "active_instructions": active_instructions or [],
             "task_snapshot": task_snapshot,
+            "capability_catalog": self._catalog_evidence(),
         }
         parser_prompt = get_parser_system_prompt(provider_name, model_name)
         if schema_correction:
@@ -385,138 +309,8 @@ class ParserService:
         )
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _looks_like_map_request(user_message: str) -> bool:
-        text = user_message.casefold()
-        render_verbs = (
-            "show", "display", "render", "open", "view", "zoom", "locate",
-            "remove", "delete", "hide", "keep", "map", "satellite", "overlay", "basemap", "street map",
-            "mostrar", "muestra", "montre", "carte", "karte", "mappa", "mapa",
-        )
-        return any(re.search(rf"\b{re.escape(marker)}\b", text) for marker in render_verbs)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _explicit_no_map(user_message: str) -> bool:
-        text = " ".join(user_message.casefold().split())
-        return bool(re.search(r"\b(?:do not|don't|without|no)\s+(?:render|show|open|display)\s+(?:a\s+)?map\b", text))
-
-    # -------------------------------------------------------------------------
     @classmethod
-    def _extract_text_location_signal(cls, user_message: str) -> LLMLocationSignal | None:
-        normalized = " ".join(user_message.casefold().split())
-        if "difference between" in normalized and "basemap" in normalized and "layer" in normalized:
-            return None
-        coordinate_signal = cls._extract_coordinate_signal(user_message)
-        if coordinate_signal is not None:
-            return coordinate_signal
-
-        text = user_message.strip()
-        if not text or not cls._looks_like_map_request(text):
-            return None
-        if re.search(r"(?i)\b(?:this\s+area|current\s+view|viewport)\b", text):
-            return None
-
-        location_clause = re.search(
-            r"(?i)\b(?:over|in|at|from|near|around)\s+(?:the\s+)?(?:location\s+)?(?P<value>[^.?!]+)",
-            text,
-        )
-        if location_clause is not None:
-            value = " ".join(location_clause.group("value").split()).strip(" ,")
-            if value.casefold() not in {"the same map", "same map", "the map", "map"}:
-                value = re.sub(r"(?i)\s+only\s*$", "", value).strip()
-                if len(value) >= 1:
-                    signal_type: Literal["address", "city"] = "address" if re.search(r"\d", value) else "city"
-                    return LLMLocationSignal(
-                        signal_type=signal_type,
-                        raw_value=value,
-                        normalized_value=value,
-                        confidence=0.72 if signal_type == "address" else 0.68,
-                    )
-
-        cleaned = re.sub(r"(?i)\b(please|pls|could you|can you|show me|show|display|remove|delete|hide|conceal|disable|enable|add|update|change|turn off|map|locate|find|open|create|make|muestra|mostrar|montre|carte|karte|mappa|mapa)\b", " ", text)
-        cleaned = re.sub(r"(?i)\b(a|an|the|of|for|near|around|over|on|in|to|with|using|me)\b", " ", cleaned)
-        cleaned = re.sub(r"(?i)\b(weather|traffic|amenities|overlay|overlays|layer|layers|satellite|imagery|coordinates?)\b", " ", cleaned)
-        cleaned = re.sub(r"[.?!]+$", "", cleaned)
-        cleaned = " ".join(cleaned.replace(":", " ").split())
-        if len(cleaned) < 2:
-            return None
-
-        signal_type: Literal["address", "city"] = "address" if re.search(r"\d", cleaned) else "city"
-        return LLMLocationSignal(
-            signal_type=signal_type,
-            raw_value=cleaned,
-            normalized_value=cleaned,
-            confidence=0.72 if signal_type == "address" else 0.68,
-        )
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _fallback_extraction(cls, user_message: str) -> LLMParserExtraction:
-        location_signal = cls._extract_text_location_signal(user_message)
-        if location_signal is not None:
-            task_tags = ["map"]
-            action_tags = ["map"]
-            requested_visualizations = ["map"]
-            text = user_message.casefold()
-            if any(marker in text for marker in ("weather", "rain", "precipitation", "radar")):
-                action_tags.append("weather")
-                requested_visualizations.append("weather")
-            if "traffic" in text:
-                action_tags.append("traffic")
-                requested_visualizations.append("traffic")
-            if any(marker in text for marker in ("amenit", "poi", "nearby")):
-                action_tags.append("amenities")
-                requested_visualizations.append("amenities")
-            if any(marker in text for marker in ("satellite", "imagery")):
-                action_tags.append("satellite")
-                requested_visualizations.append("satellite")
-            return LLMParserExtraction(
-                task_class="map_search",
-                action_id=AgentAction.MAP_SEARCH.value,
-                action_label="General map request",
-                task_tags=task_tags,
-                action_tags=action_tags,
-                requested_visualizations=requested_visualizations,
-                requires_location=True,
-                location_signals=[location_signal],
-                parser_confidence=0.72,
-                viewport_intent=cls._infer_viewport_intent(
-                    text,
-                    has_active_visualization=False,
-                ),
-            )
-
-        return LLMParserExtraction(
-            task_class="general_question",
-            action_id=AgentAction.CHAT_RESPONSE.value,
-            action_label="General question",
-            task_tags=["chat"],
-            action_tags=["general"],
-            requires_location=False,
-            parser_confidence=0.65,
-        )
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _should_use_fallback(
-        cls,
-        *,
-        extracted: LLMParserExtraction,
-        fallback: LLMParserExtraction,
-    ) -> bool:
-        if fallback.task_class == "map_search" and extracted.task_class != "general_question" and (
-            extracted.task_class in {"unclear", "general_question"}
-            or not extracted.location_signals
-        ):
-            return True
-        if extracted.parser_confidence < 0.35 and fallback.task_class != "unclear":
-            return True
-        return False
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def build_fallback_turn_result(
+    def build_parser_failure_turn_result(
         cls,
         *,
         user_message: str,
@@ -524,12 +318,23 @@ class ParserService:
         conversation_messages: list[dict[str, Any]],
         provider_error: dict[str, Any],
     ) -> TurnParseResult:
-        """Build a bounded deterministic parse when the model exceeds its budget."""
+        """Return a non-executable contract when structured extraction fails.
 
-        extracted = cls._apply_domain_rules(
-            user_message,
-            cls._fallback_extraction(user_message),
-            memory_snapshot,
+        A timeout or provider error is not evidence of user intent.  The
+        contract therefore contains no inferred location, layer, basemap, or
+        map action and can only be handled by the diagnostic path.
+        """
+
+        extracted = LLMParserExtraction(
+            task_class="unclear",
+            action_id=AgentAction.UNKNOWN.value,
+            action_label="Structured extraction failed",
+            task_tags=[],
+            action_tags=[],
+            requires_location=False,
+            ambiguities=["parser_timeout"],
+            parser_confidence=0.0,
+            expected_frontend_update="failure_diagnostic",
         )
         normalized_recent = cls._normalize_recent_messages(conversation_messages)
         locations = [
@@ -566,7 +371,12 @@ class ParserService:
                 mode=extracted.temporal_signal.mode,
                 raw_text=extracted.temporal_signal.raw_text,
                 reference_time_iso=extracted.temporal_signal.reference_time_iso,
+                start_time_iso=extracted.temporal_signal.start_time_iso,
+                end_time_iso=extracted.temporal_signal.end_time_iso,
+                granularity=extracted.temporal_signal.granularity,
+                aggregation=extracted.temporal_signal.aggregation,
             ),
+            context_query=ContextQuery(kind=extracted.context_query.kind),
             ambiguities=ambiguities,
             parser_confidence=min(0.35, extracted.parser_confidence),
             relationship=extracted.relationship,
@@ -669,15 +479,16 @@ class ParserService:
                 parser_confidence=0.0,
             )
 
-        fallback = self._fallback_extraction(user_message)
-        if self._should_use_fallback(extracted=extracted, fallback=fallback):
-            if parser_failure_ambiguity is not None:
-                fallback.ambiguities = self._dedupe(
-                    [*fallback.ambiguities, parser_failure_ambiguity]
-                )
-                fallback.parser_confidence = min(fallback.parser_confidence, 0.35)
-            extracted = fallback
+        # A model/provider failure must remain a failure.  Prose inspection
+        # here would turn an unverified request into an executable map plan.
         extracted = self._apply_domain_rules(user_message, extracted, memory_snapshot)
+
+        if parser_failure_ambiguity is None and not extracted.location_signals:
+            coordinate_signal = self._extract_coordinate_signal(user_message)
+            if coordinate_signal is not None:
+                extracted = extracted.model_copy(
+                    update={"location_signals": [coordinate_signal]}
+                )
 
         extracted_location_signals = list(extracted.location_signals)
         verbatim_signals = [
@@ -715,6 +526,10 @@ class ParserService:
             mode=extracted.temporal_signal.mode,
             raw_text=extracted.temporal_signal.raw_text,
             reference_time_iso=extracted.temporal_signal.reference_time_iso,
+            start_time_iso=extracted.temporal_signal.start_time_iso,
+            end_time_iso=extracted.temporal_signal.end_time_iso,
+            granularity=extracted.temporal_signal.granularity,
+            aggregation=extracted.temporal_signal.aggregation,
         )
         disallowed = [
             DisallowedPattern(
@@ -748,26 +563,17 @@ class ParserService:
         if ambiguities:
             confidence -= 0.15
 
-        task_class = extracted.task_class
-        if (
-            task_class == "general_question"
-            and normalized_action.requires_location
-            and location_signals
-            and self._looks_like_map_request(user_message)
-            and not self._explicit_no_map(user_message)
-        ):
-            task_class = "map_search"
-
         result = TurnParseResult(
             user_text=user_message,
             conversation_context=ConversationContextSnapshot(
                 recent_messages=normalized_recent,
                 memory_snapshot=memory_snapshot,
             ),
-            task_class=task_class,
+            task_class=extracted.task_class,
             location_signals=location_signals,
             normalized_action=normalized_action,
             temporal_signal=temporal_signal,
+            context_query=ContextQuery(kind=extracted.context_query.kind),
             ambiguities=ambiguities,
             disallowed_patterns=disallowed,
             parser_confidence=max(0.0, min(1.0, confidence)),
@@ -851,418 +657,19 @@ class ParserService:
         extracted: LLMParserExtraction,
         memory_snapshot: dict[str, Any],
     ) -> LLMParserExtraction:
-        text = " ".join(user_message.casefold().split())
-        updates: dict[str, Any] = {}
-        inferred_viewport = cls._infer_viewport_intent(
-            text,
-            has_active_visualization=bool(memory_snapshot.get("active_visualization")),
+        """Normalize validated model output without interpreting user prose."""
+        _ = user_message, memory_snapshot
+        return extracted.model_copy(
+            update={
+                "task_tags": cls._dedupe(extracted.task_tags),
+                "action_tags": cls._dedupe(extracted.action_tags),
+                "requested_visualizations": cls._dedupe(extracted.requested_visualizations),
+                "requested_layers": cls._dedupe(extracted.requested_layers),
+                "requested_attributes": cls._dedupe(extracted.requested_attributes),
+                "required_data_sources": cls._dedupe(extracted.required_data_sources),
+                "capability_limitations": cls._dedupe(extracted.capability_limitations),
+            }
         )
-
-        no_map = cls._explicit_no_map(user_message)
-        if no_map:
-            updates.update(
-                task_class="direct_query",
-                action_id=AgentAction.CHAT_RESPONSE.value,
-                action_label="Direct answer without map rendering",
-                requested_basemap=None,
-                requested_layers=[],
-                requested_visualizations=[],
-                tools_needed=False,
-                direct_response_sufficient=True,
-                expected_frontend_update="assistant_message",
-            )
-
-        poi_categories: list[str] = []
-        if "bicycle parking" in text or "bike parking" in text:
-            poi_categories.append("bicycle_parking")
-        if any(marker in text for marker in ("transit stop", "transit stops", "public transit", "bus stop", "bus station")):
-            poi_categories.append("transit_stops")
-        if any(marker in text for marker in ("rail station", "rail stations", "train station", "train stations")):
-            poi_categories.append("rail_stations")
-        if poi_categories:
-            if "central tokyo" in text or "tokyo station" in text:
-                updates["location_signals"] = [
-                    LLMLocationSignal(
-                        signal_type="city",
-                        raw_value="Tokyo",
-                        normalized_value="Tokyo, Japan",
-                        confidence=0.95,
-                    )
-                ]
-                updates["map_target"] = "Tokyo, Japan"
-            updates.update(
-                task_class="map_search",
-                action_id=AgentAction.GEOSPATIAL_DATA_RETRIEVAL.value,
-                action_label="Public OpenStreetMap feature retrieval",
-                entity_target="poi",
-                required_tool_category="geospatial_features",
-                required_data_sources=cls._dedupe([*extracted.required_data_sources, "openstreetmap_overpass"]),
-                tools_needed=True,
-                direct_response_sufficient=False,
-                expected_frontend_update="map_session",
-                requested_layers=["overpass_poi_amenities"],
-                poi_categories=poi_categories,
-            )
-
-        if any(marker in text for marker in ("why did", "why has", "why was", "why it failed", "why did it fail")):
-            updates.update(
-                relationship="failure_inquiry",
-                task_class="general_question",
-                action_id=AgentAction.CHAT_RESPONSE.value,
-                requires_location=False,
-                tools_needed=False,
-                direct_response_sufficient=True,
-                required_tool_category="failure_diagnostics",
-                expected_frontend_update="failure_diagnostic",
-            )
-        elif any(marker in text for marker in ("nice!", "can you now", "same map", "same place", "there")):
-            updates["relationship"] = "follow_up"
-            if memory_snapshot.get("active_location") and not any(
-                marker in text
-                for marker in (
-                    "rome",
-                    "colosseum",
-                    "coliseum",
-                    "paris",
-                    "milan",
-                    "zurich",
-                    "coordinates",
-                )
-            ):
-                updates["location_signals"] = []
-
-        house_markers = ("house", "houses", "housing", "residential", "apartments", "buildings")
-        if any(marker in text for marker in house_markers):
-            requested_layers = [
-                item
-                for item in extracted.requested_layers
-                if "amenit" not in item.casefold() and "poi" not in item.casefold()
-            ]
-            updates.update(
-                task_class="map_search",
-                action_id=AgentAction.DATA_LAYER_QUERY.value,
-                action_label="Residential building visualization",
-                entity_target="residential_buildings",
-                requested_layers=cls._dedupe([*requested_layers, "overpass_residential_buildings"]),
-                required_data_sources=cls._dedupe([*extracted.required_data_sources, "openstreetmap_overpass"]),
-                required_tool_category="geospatial_features",
-                tools_needed=True,
-                direct_response_sufficient=False,
-                expected_frontend_update="map_session",
-            )
-            place_match = re.search(
-                r"(?i)\b(?:coliseum|colosseum)(?:\s+in\s+rome)?\b",
-                user_message,
-            )
-            if place_match is not None:
-                place_text = place_match.group(0)
-                updates["location_signals"] = [
-                    LLMLocationSignal(
-                        signal_type="address",
-                        raw_value=place_text,
-                        normalized_value="Colosseum, Rome",
-                        confidence=0.95,
-                    )
-                ]
-                updates["map_target"] = "Colosseum, Rome"
-
-        if any(marker in text for marker in ("satellite view", "satellite", "imagery")):
-            updates["requested_basemap"] = "esri_world_imagery"
-            explicit_imagery_layer = any(
-                marker in text
-                for marker in (
-                    "satellite data layer",
-                    "satellite overlay",
-                    "satellite layer",
-                    "imagery data layer",
-                    "imagery overlay",
-                    "imagery layer",
-                    "additional satellite",
-                    "additional imagery",
-                )
-            )
-            if not explicit_imagery_layer:
-                requested_layers = updates.get(
-                    "requested_layers",
-                    extracted.requested_layers,
-                )
-                updates["requested_layers"] = [
-                    layer
-                    for layer in requested_layers
-                    if layer.casefold().strip()
-                    not in {"satellite", "satellite imagery", "imagery", "imagery layer"}
-                ]
-            if memory_snapshot.get("active_visualization") and not cls._has_explicit_location_context(text):
-                # A follow-up such as "Switch to satellite imagery" can be
-                # misread by the model or fallback parser as a place named
-                # "Switch". Keep the active map unless the user explicitly
-                # supplies a location in the same turn.
-                updates.update(
-                    location_signals=[],
-                    map_target=None,
-                    relationship="follow_up",
-                    expected_frontend_update="visualization_update",
-                )
-                if inferred_viewport is None:
-                    inferred_viewport = LLMViewportIntent(
-                        scope="preserve_current",
-                        reason="basemap_only_follow_up",
-                    )
-        if any(
-            marker in text
-            for marker in (
-                "street map",
-                "street maps",
-                "road map",
-                "default map",
-                "no satellite",
-                "without satellite",
-            )
-        ):
-            updates.update(
-                requested_basemap="osm_default",
-                relationship="follow_up" if memory_snapshot.get("active_visualization") else extracted.relationship,
-                expected_frontend_update="visualization_update",
-            )
-            if inferred_viewport is None and memory_snapshot.get("active_visualization"):
-                inferred_viewport = LLMViewportIntent(
-                    scope="preserve_current",
-                    reason="basemap_only_follow_up",
-                )
-
-        if "openfreemap" in text:
-            updates.update(
-                requested_basemap=(
-                    "openfreemap_positron"
-                    if any(marker in text for marker in ("positron", "light", "clean"))
-                    else "openfreemap_liberty"
-                ),
-                relationship=(
-                    "follow_up" if memory_snapshot.get("active_visualization") else extracted.relationship
-                ),
-                expected_frontend_update="visualization_update",
-            )
-
-        ground_temperature = (
-            "temperature" in text
-            and any(marker in text for marker in ("ground", "surface", "at the ground"))
-            and any(marker in text for marker in ("medium", "mean", "average"))
-        )
-        # Keep ordinary weather-forecast wording on the weather capability.
-        # Structured extraction can otherwise over-select the air-quality
-        # forecast because both are Open-Meteo capabilities. This is a
-        # deterministic contract rule, not a model preference.
-        if "weather" in text and "forecast" in text and "air quality" not in text:
-            updates.update(
-                requested_layers=["openmeteo_weather_forecast"],
-                required_tool_category="environmental_data",
-                tools_needed=True,
-                direct_response_sufficient=False,
-                ambiguities=[],
-                clarification_plan=None,
-                expected_frontend_update="visualization_update",
-            )
-        if (
-            memory_snapshot.get("active_visualization")
-            and "weather" in text
-            and any(
-                marker in text
-                for marker in (
-                    "add weather",
-                    "weather layer",
-                    "weather overlay",
-                    "same map",
-                    "to the map",
-                )
-            )
-        ):
-            updates.update(
-                task_class="map_search",
-                action_id=AgentAction.OVERLAY_CONTROL.value,
-                action_label="Add weather forecast layer to the active map",
-                entity_target="weather",
-                requested_layers=["openmeteo_weather_forecast"],
-                required_tool_category="environmental_data",
-                tools_needed=True,
-                direct_response_sufficient=False,
-                clarification_plan=None,
-                ambiguities=[
-                    item
-                    for item in extracted.ambiguities
-                    if item not in {"missing_location", "deictic_without_memory"}
-                ],
-                relationship="follow_up",
-                expected_frontend_update="map_session",
-            )
-            if inferred_viewport is None:
-                inferred_viewport = LLMViewportIntent(
-                    scope="preserve_current",
-                    reason="active_map_layer_addition",
-                )
-        if ground_temperature:
-            updates.update(
-                requested_attributes=cls._dedupe(
-                    [*extracted.requested_attributes, "ground_temperature"]
-                ),
-                required_tool_category="environmental_data",
-                expected_frontend_update="clarification_with_map_update",
-                clarification_plan=LLMClarificationPlan.model_validate({
-                    "question": (
-                        "Which temperature do you mean: current air temperature at 2 m, "
-                        "daytime land-surface temperature, nighttime land-surface "
-                        "temperature, or a mean over a specific period?"
-                    ),
-                    "reason": (
-                        "The requested temperature metric and averaging period are ambiguous."
-                    ),
-                    "blocking_fields": [
-                        "temperature_metric",
-                        "temperature_time_basis",
-                    ],
-                    "options": [
-                        {
-                            "option_id": "air_temperature_2m",
-                            "label": "Current air temperature at 2 m",
-                        },
-                        {
-                            "option_id": "land_surface_temperature_day",
-                            "label": "Daytime land-surface temperature",
-                        },
-                        {
-                            "option_id": "land_surface_temperature_night",
-                            "label": "Nighttime land-surface temperature",
-                        },
-                        {
-                            "option_id": "mean_temperature_period",
-                            "label": "Mean temperature over a specified period",
-                        },
-                    ],
-                    "preserve_valid_results": True,
-                    "apply_visualization_changes": True,
-                }),
-            )
-            updates["ambiguities"] = cls._dedupe(
-                [*extracted.ambiguities, "temperature_metric_underspecified"]
-            )
-
-        overlay_commands = list(extracted.overlay_commands)
-        if not overlay_commands:
-            overlay_commands = cls._infer_overlay_commands(
-                text,
-                user_message,
-                extracted,
-            )
-        if overlay_commands:
-            updates["overlay_commands"] = overlay_commands
-            # A structured overlay command owns overlay mutation.  Preserve
-            # a separately extracted basemap only when the model explicitly
-            # returned one for a compound request; otherwise discard a
-            # domain-rule basemap inference that was incidental to the
-            # overlay wording.
-            has_explicit_overlay_noun = re.search(r"\b(?:overlay|overlays|layer|layers)\b", text) is not None
-            overlay_mutation_intent = (
-                bool(extracted.overlay_commands)
-                or has_explicit_overlay_noun
-                or any(command.action != "show" for command in overlay_commands)
-            )
-            if (
-                overlay_mutation_intent
-                and extracted.requested_basemap is None
-                and updates.get("requested_basemap") is not None
-            ):
-                updates["requested_basemap"] = None
-            # Overlay-only mutations are map operations, but a global or
-            # current-view mutation does not need a place lookup before it
-            # can be resolved against the active collection.
-            updates.update(
-                task_class="map_search",
-                action_id=AgentAction.OVERLAY_CONTROL.value,
-                action_label="Overlay collection mutation",
-                tools_needed=True,
-                direct_response_sufficient=False,
-                expected_frontend_update="visualization_update",
-            )
-            if all(
-                command.scope.kind in {"global", "current_view"}
-                and command.action in {"remove", "keep_only", "hide", "show", "update"}
-                for command in overlay_commands
-            ):
-                updates["requires_location"] = False
-            # Non-additive commands operate on the persisted collection. Do
-            # not let a domain rule's incidental layer hint turn a hide,
-            # remove, or keep-only request into a provider fetch. `show` and
-            # `add` remain eligible for catalog/provider resolution when the
-            # requested instance is absent.
-            if all(command.action in {"remove", "keep_only", "hide"} for command in overlay_commands):
-                updates["requested_layers"] = []
-
-        if inferred_viewport is not None:
-            updates["viewport_intent"] = inferred_viewport
-
-        return extracted.model_copy(update=updates)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _infer_viewport_intent(
-        text: str,
-        *,
-        has_active_visualization: bool,
-    ) -> LLMViewportIntent | None:
-        if any(marker in text for marker in ("entire city", "whole city", "city wide", "city-wide")):
-            return LLMViewportIntent(scope="city", reason="explicit_city_extent")
-        if any(marker in text for marker in ("whole region", "entire region", "regional view")):
-            return LLMViewportIntent(scope="region", reason="explicit_region_extent")
-        if any(marker in text for marker in ("whole country", "entire country", "nationwide")):
-            return LLMViewportIntent(scope="country", reason="explicit_country_extent")
-        if any(
-            marker in text
-            for marker in (
-                "much more closely",
-                "more closely",
-                "closer view",
-                "zoom in",
-                "too high as point of view",
-                "too high a point of view",
-                "too zoomed out",
-                "street level",
-            )
-        ):
-            return LLMViewportIntent(
-                scope="street",
-                tighten_relative_to_active=has_active_visualization,
-                reason="explicit_tighter_view",
-            )
-        if any(
-            marker in text
-            for marker in ("around ", "near ", "nearby ", "via ", "at this street", "around via")
-        ):
-            return LLMViewportIntent(scope="street", reason="local_area_request")
-        if has_active_visualization and any(
-            marker in text
-            for marker in (
-                "street map",
-                "street maps",
-                "road map",
-                "default map",
-                "no satellite",
-                "without satellite",
-            )
-        ):
-            return LLMViewportIntent(scope="preserve_current", reason="basemap_only_follow_up")
-        return None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _has_explicit_location_context(text: str) -> bool:
-        if re.search(r"[-+]?\d{1,3}[.,]\d+\s*[,/]\s*[-+]?\d{1,3}[.,]\d+", text):
-            return True
-        return re.search(
-            r"\b(?:in|around|near|over|at|within|of|for)\s+"
-            r"(?!the\b|same\b|current\b|this\b|there\b|map\b|area\b|view\b|imagery\b)"
-            r"[\wÀ-ÖØ-öø-ÿ]",
-            text,
-            re.IGNORECASE,
-        ) is not None
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -16,7 +16,6 @@ from server.contracts.extraction import OverlayCommand
 from server.contracts.geospatial import MapSession, OverlayMutationResult
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.location_memory import LocationMemoryService
-from server.services.agent.overlay_inference import OverlayInferenceService
 from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.response_builder import AgentResponseBuilder
@@ -35,7 +34,6 @@ class AgentTurnStateAssembler:
         search_orchestrator: LocationSearchOrchestrator,
         policy_engine: PolicyEngine,
         request_builder: RequestBuilder,
-        overlay_inference_service: OverlayInferenceService,
         location_memory_service: LocationMemoryService,
         response_synthesizer: GroundedResponseSynthesizer,
         history_service: ChatHistoryService,
@@ -44,7 +42,6 @@ class AgentTurnStateAssembler:
         self.search_orchestrator = search_orchestrator
         self.policy_engine = policy_engine
         self.request_builder = request_builder
-        self.overlay_inference_service = overlay_inference_service
         self.location_memory_service = location_memory_service
         self.response_synthesizer = response_synthesizer
         self.history_service = history_service
@@ -604,37 +601,11 @@ class AgentTurnStateAssembler:
             if command.action not in {"add", "show", "update"}:
                 continue
             requested.extend(command.selector.capability_ids)
-        if not requested and not getattr(turn_contract, "overlay_commands", []):
-            # Older tool-loop adapters can still provide only normalized
-            # action tags. Preserve their additive capability discovery while
-            # keeping all removal/preservation semantics in the typed
-            # collection resolver.
-            inferred = self.overlay_inference_service.infer_overlays(
-                turn_contract=turn_contract,
-                location=resolved_location,
-                existing_overlay_ids=existing_overlay_ids,
-            )
-            requested.extend(inferred.overlay_ids)
         merged = list(dict.fromkeys([*existing_overlay_ids, *requested]))
         return merged
 
     # -------------------------------------------------------------------------
     @staticmethod
     def infer_basemap_id(turn_contract: Any) -> str | None:
-        if turn_contract.requested_basemap:
-            return turn_contract.requested_basemap
-        haystack = " ".join(
-            [
-                turn_contract.user_text.lower(),
-                turn_contract.normalized_action.action_id.lower(),
-                *[item.lower() for item in turn_contract.normalized_action.task_tags],
-                *[item.lower() for item in turn_contract.normalized_action.action_tags],
-            ]
-        )
-        if any(marker in haystack for marker in ("satellite", "imagery", "true color")):
-            return "esri_world_imagery"
-        if any(marker in haystack for marker in ("street map", "street maps", "no satellite")):
-            return "osm_default"
-        if any(marker in haystack for marker in ("terrain", "elevation", "topography")):
-            return "osm_terrain"
-        return None
+        requested_basemap = getattr(turn_contract, "requested_basemap", None)
+        return requested_basemap if isinstance(requested_basemap, str) and requested_basemap.strip() else None
