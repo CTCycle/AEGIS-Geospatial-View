@@ -17,6 +17,17 @@ LocationSignalType = Literal[
     "street",
 ]
 TemporalMode = Literal["current", "historical", "forecast", "none"]
+TemporalGranularity = Literal["instant", "hour", "day", "month", "year", "custom", "none"]
+TemporalAggregation = Literal["none", "instant", "sum", "mean", "min", "max", "count"]
+ContextQueryKind = Literal[
+    "none",
+    "active_location",
+    "active_overlays",
+    "active_map_summary",
+    "previous_user_request",
+    "capabilities",
+    "failure",
+]
 OverlayAction = Literal["add", "remove", "keep_only", "show", "hide", "update"]
 OverlayScopeKind = Literal["global", "current_view", "location"]
 OverlayVisibility = Literal["any", "visible", "hidden"]
@@ -47,6 +58,16 @@ class TemporalSignal(BaseModel):
     mode: TemporalMode = "none"
     raw_text: str | None = None
     reference_time_iso: str | None = None
+    start_time_iso: str | None = None
+    end_time_iso: str | None = None
+    granularity: TemporalGranularity = "none"
+    aggregation: TemporalAggregation = "none"
+
+###############################################################################
+class ContextQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: ContextQueryKind = "none"
 
 ###############################################################################
 class NormalizedAction(BaseModel):
@@ -153,6 +174,7 @@ class TurnParseResult(BaseModel):
     location_signals: list[LocationSignal] = Field(default_factory=lambda: list[LocationSignal]())
     normalized_action: NormalizedAction
     temporal_signal: TemporalSignal = Field(default_factory=TemporalSignal)
+    context_query: ContextQuery = Field(default_factory=ContextQuery)
     ambiguities: list[str] = Field(default_factory=lambda: list[str]())
     disallowed_patterns: list[DisallowedPattern] = Field(default_factory=lambda: list[DisallowedPattern]())
     parser_confidence: float = Field(default=0.0, ge=0.0, le=1.0)

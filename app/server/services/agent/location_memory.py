@@ -4,14 +4,11 @@ from typing import Any
 
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
-import re
-
 from server.domain.agent.decision import ResolvedLocation
 from server.contracts.extraction import LocationSignal, NormalizedAction
 
 ###############################################################################
 class LocationMemoryService:
-    REFERENCE_PATTERN = re.compile(r"\b(there|that place|same place|same area|there now)\b", re.IGNORECASE)
 
     # -------------------------------------------------------------------------
     def build_memory_snapshot(self, last_assistant_payload: dict[str, Any] | None) -> dict[str, Any]:
@@ -24,8 +21,12 @@ class LocationMemoryService:
         }
 
     # -------------------------------------------------------------------------
-    def resolve_explicit_references(self, user_text: str, snapshot: dict[str, Any]) -> list[LocationSignal]:
-        if not self.REFERENCE_PATTERN.search(user_text):
+    def resolve_explicit_references(
+        self,
+        signals: list[LocationSignal],
+        snapshot: dict[str, Any],
+    ) -> list[LocationSignal]:
+        if not any(signal.signal_type == "deictic" for signal in signals):
             return []
         active = json_object(snapshot.get("active_location"))
         if not active:
@@ -38,8 +39,8 @@ class LocationMemoryService:
                 signal_type="deictic",
                 raw_value=label,
                 normalized_value=label,
-            latitude=float(active.get("latitude") or 0.0),
-            longitude=float(active.get("longitude") or 0.0),
+                latitude=float(active.get("latitude") or 0.0),
+                longitude=float(active.get("longitude") or 0.0),
                 confidence=0.85,
                 source="memory",
             )

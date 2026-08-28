@@ -7,7 +7,6 @@ import pytest
 from server.common.paths import DATABASE_FILE_PATH
 from server.configurations import build_database_settings
 
-
 ###############################################################################
 def test_database_settings_use_default_sqlite_path(monkeypatch) -> None:
     monkeypatch.delenv("AEGIS_DATA_DIR", raising=False)
@@ -17,7 +16,6 @@ def test_database_settings_use_default_sqlite_path(monkeypatch) -> None:
 
     assert settings.database_path == str(DATABASE_FILE_PATH)
     assert settings.sqlite_lock_timeout_seconds == 60
-
 
 ###############################################################################
 def test_database_settings_use_short_data_directory_override(
@@ -30,13 +28,11 @@ def test_database_settings_use_short_data_directory_override(
 
     assert settings.database_path == str(tmp_path / "database.db")
 
-
 ###############################################################################
 def test_database_settings_read_sqlite_lock_timeout(monkeypatch) -> None:
     monkeypatch.setenv("SQLITE_LOCK_TIMEOUT", "12")
 
     assert build_database_settings().sqlite_lock_timeout_seconds == 12
-
 
 ###############################################################################
 @pytest.mark.parametrize("value", ["0", "-1", "not-an-integer"])

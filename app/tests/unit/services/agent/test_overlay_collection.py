@@ -12,6 +12,7 @@ from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.agent.turn_state_assembler import AgentTurnStateAssembler
 
 
+###############################################################################
 def _instance(
     instance_id: str,
     capability_id: str,
@@ -42,6 +43,7 @@ def _instance(
     )
 
 
+###############################################################################
 def test_hide_one_instance_preserves_unrelated_descriptor() -> None:
     weather = _instance(
         "weather-zurich",
@@ -74,6 +76,7 @@ def test_hide_one_instance_preserves_unrelated_descriptor() -> None:
     assert result.updated_instance_ids == ["weather-zurich"]
 
 
+###############################################################################
 def test_identity_resolution_falls_through_unmatched_instance_alias_to_capability() -> None:
     weather = _instance(
         "weather-zurich",
@@ -101,6 +104,7 @@ def test_identity_resolution_falls_through_unmatched_instance_alias_to_capabilit
     assert result.updated_instance_ids == ["weather-zurich"]
 
 
+###############################################################################
 def test_location_scoped_remove_does_not_remove_other_scope() -> None:
     zurich = _instance(
         "weather-zurich",
@@ -132,6 +136,7 @@ def test_location_scoped_remove_does_not_remove_other_scope() -> None:
     assert result.removed_instance_ids == ["weather-zurich"]
 
 
+###############################################################################
 def test_keep_only_removes_nonmatching_instances() -> None:
     collection = OverlayCollectionState(
         instances=[
@@ -151,6 +156,7 @@ def test_keep_only_removes_nonmatching_instances() -> None:
     assert result.removed_instance_ids == ["traffic"]
 
 
+###############################################################################
 def test_revision_conflict_preserves_collection() -> None:
     collection = OverlayCollectionState(revision=3)
     command = OverlayCommand(
@@ -166,6 +172,7 @@ def test_revision_conflict_preserves_collection() -> None:
     assert result.clarification
 
 
+###############################################################################
 def test_add_reuses_same_capability_and_scope_identity() -> None:
     collection = OverlayCollectionState()
     command = OverlayCommand(
@@ -203,6 +210,7 @@ def test_add_reuses_same_capability_and_scope_identity() -> None:
     assert second_result.added_instance_ids == []
 
 
+###############################################################################
 def test_catalog_selector_filters_provider_type_and_tags() -> None:
     command = OverlayCommand(
         action="add",
@@ -242,6 +250,7 @@ def test_catalog_selector_filters_provider_type_and_tags() -> None:
     assert updated.instances[0].descriptor["tags"] == ["forecast"]
 
 
+###############################################################################
 def test_catalog_selector_accepts_redundant_alias_fields_for_capability() -> None:
     command = OverlayCommand(
         action="show",
@@ -271,6 +280,7 @@ def test_catalog_selector_accepts_redundant_alias_fields_for_capability() -> Non
     assert updated.instances[0].capability_id == "openmeteo_weather_forecast"
 
 
+###############################################################################
 def test_unmatched_selector_that_targets_active_basemap_is_explained_without_mutation() -> None:
     command = OverlayCommand(
         action="hide",
@@ -296,6 +306,7 @@ def test_unmatched_selector_that_targets_active_basemap_is_explained_without_mut
     assert "active map basemap, not an overlay" in result.clarification
 
 
+###############################################################################
 def test_ambiguous_catalog_selector_and_no_match_preserve_state() -> None:
     ambiguous = OverlayCommand(
         action="add",
@@ -325,6 +336,7 @@ def test_ambiguous_catalog_selector_and_no_match_preserve_state() -> None:
     assert no_match_result.unmatched_selectors == ["missing"]
 
 
+###############################################################################
 def test_provider_candidate_is_committed_against_active_revision_without_dropping_state() -> None:
     location = ResolvedLocation(label="Zurich", latitude=47.37, longitude=8.54, country="Switzerland")
     viewport = ViewportPolicy(center_latitude=47.37, center_longitude=8.54)
@@ -369,6 +381,7 @@ def test_provider_candidate_is_committed_against_active_revision_without_droppin
     assert results[0].added_instance_ids == [updated.overlay_collection.instances[0].instance_id]
 
 
+###############################################################################
 def test_merge_clears_failure_for_instance_resolved_in_authoritative_collection() -> None:
     weather = _instance(
         "weather-zurich",

@@ -714,12 +714,18 @@ class AgentToolCatalogService:
         action_id = parsed_request.normalized_action.action_id if parsed_request is not None else capability_id
         temporal_mode = parsed_request.temporal_signal.mode if parsed_request is not None else None
         temporal_text = parsed_request.temporal_signal.raw_text if parsed_request is not None else None
+        temporal_reference_time_iso = (
+            parsed_request.temporal_signal.reference_time_iso
+            if parsed_request is not None
+            else None
+        )
         return ExecutionPlan(
             state="direct_tool",
             mode="direct_text",
             action_id=action_id,
             temporal_mode=None if temporal_mode == "none" else temporal_mode,
             temporal_text=temporal_text,
+            temporal_reference_time_iso=temporal_reference_time_iso,
             tool_id=capability_id,
         )
 

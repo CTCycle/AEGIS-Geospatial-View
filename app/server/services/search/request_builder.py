@@ -14,6 +14,7 @@ from server.contracts.geospatial import (
     ProviderLayerSelection,
     ViewportPolicy,
 )
+from server.services.geospatial.capability_registry import CapabilityRegistry
 
 ###############################################################################
 class RequestBuilder:
@@ -30,6 +31,10 @@ class RequestBuilder:
         "country": 250000.0,
         "auto": DEFAULT_RADIUS_M,
     }
+
+    # -------------------------------------------------------------------------
+    def __init__(self, capability_registry: CapabilityRegistry | None = None) -> None:
+        self.capability_registry = capability_registry
 
     # -------------------------------------------------------------------------
     def build_location_search_request(
@@ -87,12 +92,23 @@ class RequestBuilder:
     def choose_basemap(self, plan: ExecutionPlan) -> str:
         if plan.basemap_id:
             return plan.basemap_id
-        if plan.action_id in {"weather", "air_quality"}:
-            return "osm_dark"
-        if plan.action_id in {"imagery", "satellite"}:
-            return "esri_world_imagery"
-        if plan.action_id in {"solar", "terrain"}:
-            return "osm_terrain"
+        if self.capability_registry is not None:
+            candidates = []
+            for basemap in self.capability_registry.list_basemaps():
+                capability_id = str(basemap.get("id") or "").strip()
+                if not capability_id:
+                    continue
+                agentic_use = basemap.get("agenticUse")
+                default_enabled = (
+                    bool(agentic_use.get("defaultEnabled"))
+                    if isinstance(agentic_use, dict)
+                    else False
+                )
+                candidates.append((not default_enabled, capability_id))
+            if candidates:
+                return min(candidates)[1]
+        # The standalone builder remains usable in isolated unit tests. The
+        # application composition supplies the catalog-backed default above.
         return "osm_default"
 
     # -------------------------------------------------------------------------
@@ -104,6 +120,7 @@ class RequestBuilder:
         viewport_intent: ViewportIntent | None = None,
         active_visualization: dict[str, Any] | None = None,
     ) -> ViewportPolicy:
+        _ = action
         current_viewport = self._coerce_active_viewport(active_visualization)
         location_changed = self._active_location_differs(location, active_visualization)
         if (
@@ -133,7 +150,7 @@ class RequestBuilder:
             if tightened is not None:
                 return tightened
 
-        scope = explicit_scope or self._scope_from_resolved_location(location) or self._scope_from_action(action)
+        scope = explicit_scope or self._scope_from_resolved_location(location) or "auto"
         radius_m = viewport_intent.radius_hint_m if viewport_intent and viewport_intent.radius_hint_m else self.SCOPE_RADII_M.get(scope, self.DEFAULT_RADIUS_M)
         radius_m = self._clamp_radius(radius_m)
         bbox = self._padded_bbox_for_scope(location.bbox, scope)
@@ -152,36 +169,24 @@ class RequestBuilder:
 
     # -------------------------------------------------------------------------
     def build_presentation(self, overlays: list[str]) -> PresentationPolicy:
-        high_contrast = any(
-            marker in overlay
-            for overlay in overlays
-            for marker in ("air_quality", "traffic", "precipitation")
-        )
+        high_contrast = False
+        if self.capability_registry is not None:
+            for overlay_id in overlays:
+                capability = self.capability_registry.get_capability(overlay_id)
+                metadata = capability.get("metadata") if capability else None
+                metadata = metadata if isinstance(metadata, dict) else {}
+                map_type_tags = metadata.get("map_type_tags")
+                if isinstance(map_type_tags, list) and any(
+                    str(tag).casefold() in {"thematic", "operational"}
+                    for tag in map_type_tags
+                ):
+                    high_contrast = True
+                    break
         return PresentationPolicy(
             emphasize_overlays=bool(overlays),
             high_contrast=high_contrast,
             show_legend=bool(overlays),
         )
-
-    # -------------------------------------------------------------------------
-    def _scope_from_action(self, action: NormalizedAction) -> str:
-        action_text = " ".join(
-            [
-                action.action_id,
-                action.action_label,
-                *action.task_tags,
-                *action.action_tags,
-            ]
-        ).lower()
-        if any(marker in action_text for marker in ("exact_address", "exact address", "address")):
-            return "street"
-        if any(marker in action_text for marker in ("wide", "city", "city_level", "entire city")):
-            return "city"
-        if any(marker in action_text for marker in ("region", "regional", "country", "island", "province")):
-            return "region"
-        if action.action_id in {"traffic", "air_quality"}:
-            return "district"
-        return "auto"
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -47,7 +47,6 @@ def test_sqlite_connection_listener_applies_expected_pragmas() -> None:
         "PRAGMA synchronous=NORMAL",
     ]
 
-
 ###############################################################################
 def test_sqlite_engine_applies_pragmas_to_live_connections(tmp_path: Path) -> None:
     repository = SQLiteRepository(

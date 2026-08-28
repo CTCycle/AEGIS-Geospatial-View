@@ -46,7 +46,6 @@ def test_provider_context_overflow_is_not_misclassified_as_capability_failure() 
     assert error.category == "context_limit"
     assert error.code == "context_limit_exceeded"
 
-
 ###############################################################################
 def test_provider_bad_request_without_capability_evidence_stays_provider_api() -> None:
 
@@ -63,7 +62,6 @@ def test_provider_bad_request_without_capability_evidence_stays_provider_api() -
 
     assert error.category == "provider_api"
     assert error.code == "provider_bad_request"
-
 
 ###############################################################################
 def test_explicit_provider_capability_rejection_is_classified_as_model_capability() -> None:

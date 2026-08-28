@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.services.geospatial.inspection import MapInspectionService
 
 
+###############################################################################
 def test_feature_metadata_is_bounded_and_allowlisted() -> None:
     inspections = MapInspectionService.build_for_descriptor(
         {
@@ -39,6 +40,7 @@ def test_feature_metadata_is_bounded_and_allowlisted() -> None:
     assert all(len(str(field.value)) <= MapInspectionService.MAX_TEXT for field in inspection.fields)
 
 
+###############################################################################
 def test_location_metadata_gets_point_association() -> None:
     inspections = MapInspectionService.build_for_descriptor(
         {
@@ -62,6 +64,7 @@ def test_location_metadata_gets_point_association() -> None:
     assert inspection.source_url == "https://example.test/camera/1"
 
 
+###############################################################################
 def test_raster_metadata_is_overlay_level_and_rejects_unsafe_links() -> None:
     inspections = MapInspectionService.build_for_descriptor(
         {
@@ -87,6 +90,7 @@ def test_raster_metadata_is_overlay_level_and_rejects_unsafe_links() -> None:
     assert inspection.warnings == ["Values are not available per raster cell."]
 
 
+###############################################################################
 def test_non_spatial_dataset_metadata_remains_inspectable() -> None:
     inspections = MapInspectionService.build_for_descriptor(
         {

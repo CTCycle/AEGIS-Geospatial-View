@@ -74,7 +74,6 @@ def test_prepare_request_does_not_invent_limit_for_unknown_model() -> None:
     prepared = prepare_request(request, provider="test")
     assert prepared.messages == request.messages
 
-
 ###############################################################################
 def test_prepare_request_compacts_known_history_and_preserves_current_input() -> None:
     request = LLMRequest(

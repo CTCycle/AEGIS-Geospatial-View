@@ -81,12 +81,13 @@ class DirectTurnResponseService:
         context_usage: Any,
         preflight_decision: PolicyDecision | None = None,
     ) -> ChatTurnResponse | None:
-        deterministic_context_question = AgentTurnSupport.is_deterministic_context_question(
-            turn_contract.user_text
+        context_query_kind = getattr(
+            getattr(turn_contract, "context_query", None),
+            "kind",
+            "none",
         )
         if (
             AgentTurnSupport.has_parser_authentication_failure(turn_contract)
-            and not deterministic_context_question
         ):
             assistant_message = (
                 "I could not use the configured agent model because the saved API key was rejected. "
@@ -117,7 +118,6 @@ class DirectTurnResponseService:
 
         if (
             AgentTurnSupport.has_parser_runtime_failure(turn_contract)
-            and not deterministic_context_question
         ):
             provider_error = getattr(turn_contract, "provider_error", None)
             provider_error_object = provider_error if is_json_object(provider_error) else None
@@ -152,7 +152,7 @@ class DirectTurnResponseService:
                 progress_summary="Intent extraction failed.",
             )
 
-        if turn_contract.relationship == "failure_inquiry":
+        if turn_contract.relationship == "failure_inquiry" or context_query_kind == "failure":
             failure = self.task_state_service.latest_failure(conversation_key)
             if failure is None:
                 assistant_message = (
@@ -207,18 +207,17 @@ class DirectTurnResponseService:
 
         if (
             turn_contract.task_class == "general_question"
-            or AgentTurnSupport.is_capability_question(turn_contract.user_text)
-            or deterministic_context_question
+            or context_query_kind != "none"
         ):
-            fallback_message = AgentTurnSupport.compose_general_question_message(
-                turn_contract.user_text,
+            fallback_message = AgentTurnSupport.compose_context_query_message(
+                context_query_kind,
                 recent_messages,
                 latest_memory,
             )
             operation = ChatOperationResult(
                 kind=(
                     "capability_catalog"
-                    if AgentTurnSupport.is_capability_question(turn_contract.user_text)
+                    if context_query_kind == "capabilities"
                     else "direct_answer"
                 ),
                 status="success",

@@ -54,6 +54,7 @@ class ExecutionPlan(BaseModel):
     action_id: str
     temporal_mode: str | None = None
     temporal_text: str | None = None
+    temporal_reference_time_iso: str | None = None
     basemap_id: str | None = None
     overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
     tool_id: str | None = None

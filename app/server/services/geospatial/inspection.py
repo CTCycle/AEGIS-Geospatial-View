@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 from server.contracts.geospatial import InspectionAssociation, InspectionField, MapInspection
 
 
+###############################################################################
 class MapInspectionService:
     MAX_FIELDS = 14
     MAX_TEXT = 240
@@ -61,7 +62,7 @@ class MapInspectionService:
     _DATASET_KEYS = {"metric", "period", "geography", "source", "license", "update_time", "updated_at", "updatedAt"}
     _URL_KEYS = {"source_url", "sourceUrl", "official_url", "officialUrl", "dataset_url", "datasetUrl", "license_url", "licenseUrl"}
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _bounded_scalar(cls, value: object) -> str | int | float | bool | None:
         if isinstance(value, bool | int | float):
@@ -71,7 +72,7 @@ class MapInspectionService:
             return text[: cls.MAX_TEXT] if text else None
         return None
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def _safe_url(value: object) -> str | None:
         if not isinstance(value, str):
@@ -82,7 +83,7 @@ class MapInspectionService:
             return None
         return candidate[:500]
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _field_category(cls, key: str) -> str:
         if key in cls._MEASUREMENT_KEYS:
@@ -97,7 +98,7 @@ class MapInspectionService:
             return "dataset"
         return "general"
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _fields(
         cls,
@@ -134,7 +135,7 @@ class MapInspectionService:
                 break
         return fields, source_url, freshness
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def _inspection(
         cls,
@@ -167,7 +168,7 @@ class MapInspectionService:
             geometry=geometry,
         )
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def build_for_descriptor(cls, descriptor: dict[str, Any]) -> list[MapInspection]:
         provider = str(descriptor.get("provider") or "") or None
@@ -260,7 +261,7 @@ class MapInspectionService:
                 results.append(raster)
         return results
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def attach_to_descriptor(cls, descriptor: dict[str, Any]) -> dict[str, Any]:
         inspections = cls.build_for_descriptor(descriptor)

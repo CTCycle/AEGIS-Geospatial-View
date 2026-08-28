@@ -28,26 +28,21 @@ __all__ = [
 class OpenAQServiceError(Exception):
     """Base exception for OpenAQ service failures."""
 
-
 ###############################################################################
 class OpenAQRequestError(OpenAQServiceError):
     """Raised when OpenAQ API cannot fulfill the request."""
-
 
 ###############################################################################
 class OpenAQAuthError(OpenAQServiceError):
     """Raised when OpenAQ rejects the configured API key."""
 
-
 ###############################################################################
 class OpenAQRateLimitError(OpenAQServiceError):
     """Raised when OpenAQ applies a rate limit."""
 
-
 ###############################################################################
 class OpenAQInvalidQueryError(OpenAQServiceError):
     """Raised when OpenAQ rejects a deterministic query."""
-
 
 ###############################################################################
 class OpenAQMalformedPayloadError(OpenAQServiceError):

@@ -57,6 +57,7 @@ def test_map_session_message_includes_readable_warnings() -> None:
     assert "TOMTOM_API_KEY" not in message
 
 
+###############################################################################
 def test_map_session_message_reports_current_visibility_state() -> None:
     message = AgentOrchestrator._compose_map_session_message(
         {

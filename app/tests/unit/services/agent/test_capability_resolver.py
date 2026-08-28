@@ -19,6 +19,8 @@ def _turn(
     layer: str,
     *,
     temporal_mode: str = "none",
+    temporal_granularity: str = "none",
+    temporal_aggregation: str = "none",
     atomic_layers: list[str] | None = None,
 ) -> TurnParseResult:
     return TurnParseResult(
@@ -31,7 +33,11 @@ def _turn(
             requested_visualizations=[layer],
             requires_location=True,
         ),
-        temporal_signal=TemporalSignal(mode=temporal_mode),
+        temporal_signal=TemporalSignal(
+            mode=temporal_mode,
+            granularity=temporal_granularity,
+            aggregation=temporal_aggregation,
+        ),
         parser_confidence=0.9,
         requested_layers=[layer],
         atomic_tasks=(
@@ -75,14 +81,14 @@ def test_preserves_enabled_exact_capability_id() -> None:
 ###############################################################################
 def test_resolves_precipitation_radar_semantics() -> None:
     resolved = _resolver().resolve(
-        _turn("Show current rain radar over Paris", "precipitation")
+        _turn("Show current rain radar over Paris", "rain radar")
     )
     assert resolved.requested_layers == ["rainviewer_precipitation_radar"]
 
 ###############################################################################
 def test_resolves_precipitation_rate_semantics() -> None:
     resolved = _resolver().resolve(
-        _turn("Show precipitation intensity over Paris", "precipitation")
+        _turn("Show precipitation intensity over Paris", "precipitation rate")
     )
     assert resolved.requested_layers == ["IMERG_Precipitation_Rate"]
 
@@ -91,21 +97,24 @@ def test_resolves_forecast_semantics() -> None:
     resolved = _resolver().resolve(
         _turn(
             "Show the rain forecast over Paris",
-            "precipitation",
+            "openmeteo_weather_forecast",
             temporal_mode="forecast",
         )
     )
     assert resolved.requested_layers == ["openmeteo_weather_forecast"]
 
 
-def test_canonicalizes_alias_capability_ids_inside_overlay_commands() -> None:
-    turn = _turn("Show weather over Zurich", "weather_forecast")
+###############################################################################
+def test_preserves_canonical_capability_ids_inside_overlay_commands() -> None:
+    turn = _turn("Show weather over Zurich", "openmeteo_weather_forecast")
     turn = turn.model_copy(
         update={
             "overlay_commands": [
                 OverlayCommand(
                     action="add",
-                    selector=OverlaySelector(capability_ids=["weather_forecast"]),
+                    selector=OverlaySelector(
+                        capability_ids=["openmeteo_weather_forecast"]
+                    ),
                 )
             ]
         }
@@ -118,6 +127,7 @@ def test_canonicalizes_alias_capability_ids_inside_overlay_commands() -> None:
     ]
 
 
+###############################################################################
 def test_preserves_unmatched_capability_ids_for_focused_clarification() -> None:
     turn = _turn("Hide the fictional overlay", "fictional")
     turn = turn.model_copy(
@@ -140,7 +150,7 @@ def test_preserves_unmatched_capability_ids_for_focused_clarification() -> None:
 ###############################################################################
 def test_resolves_air_quality_underscore_semantics_to_enabled_capability() -> None:
     resolved = _resolver().resolve(
-        _turn("Show air quality overlay for Paris", "air_quality")
+        _turn("Show air quality forecast overlay for Paris", "openmeteo_air_quality_forecast")
     )
     assert resolved.requested_layers == ["openmeteo_air_quality_forecast"]
     assert resolved.clarification_plan is None
@@ -151,7 +161,10 @@ def test_resolves_all_supported_atomic_task_layers() -> None:
         _turn(
             "Show air quality and weather around Zurich",
             "openmeteo_air_quality_forecast",
-            atomic_layers=["air_quality", "weather"],
+            atomic_layers=[
+                "openmeteo_air_quality_forecast",
+                "openmeteo_weather_forecast",
+            ],
         )
     )
 
@@ -167,12 +180,17 @@ def test_resolves_generic_poi_transit_and_radar_atomic_layers() -> None:
         _turn(
             "Show restaurants, transit stops, and precipitation radar around Rome",
             "overpass_poi_amenities",
-            atomic_layers=["poi", "transit_stops", "precipitation_radar"],
+            atomic_layers=[
+                "overpass_poi_amenities",
+                "gtfs_static",
+                "rainviewer_precipitation_radar",
+            ],
         )
     )
 
     assert resolved.requested_layers == [
         "overpass_poi_amenities",
+        "gtfs_static",
         "rainviewer_precipitation_radar",
     ]
     assert resolved.clarification_plan is None
@@ -180,25 +198,27 @@ def test_resolves_generic_poi_transit_and_radar_atomic_layers() -> None:
 ###############################################################################
 def test_resolves_traffic_semantics_to_enabled_capability() -> None:
     resolved = _resolver().resolve(
-        _turn("Show traffic around the Colosseum in Rome", "traffic")
+        _turn("Show traffic flow around the Colosseum in Rome", "tomtom_traffic_flow")
     )
     assert resolved.requested_layers == ["tomtom_traffic_flow"]
     assert resolved.clarification_plan is None
 
 ###############################################################################
-def test_october_mean_returns_supported_alternatives_instead_of_invalid_id() -> None:
+def test_unsupported_historical_aggregation_is_reported_without_date_special_cases() -> None:
     resolved = _resolver().resolve(
         _turn(
             "Can you now show Tour Eiffel area with rain level in October (mean value)",
-            "precipitation",
+            "openmeteo_weather_forecast",
             temporal_mode="historical",
+            temporal_granularity="month",
+            temporal_aggregation="mean",
         )
     )
     assert resolved.requested_layers == []
     assert resolved.clarification_plan is not None
-    assert "October mean" in resolved.clarification_plan["question"]
-    assert "current precipitation radar" in resolved.clarification_plan["question"]
-    assert "unsupported_historical_precipitation_mean" in resolved.ambiguities
+    assert "October" not in resolved.clarification_plan["question"]
+    assert "structured layer request" in resolved.clarification_plan["reason"]
+    assert "unresolved_geospatial_capability" in resolved.ambiguities
 
 ###############################################################################
 class _DisabledRuntimeRegistry:

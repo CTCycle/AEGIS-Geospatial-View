@@ -11,7 +11,6 @@ config = context.config
 
 target_metadata = Base.metadata
 
-
 ###############################################################################
 def _run_migrations(connection: Connection) -> None:
     context.configure(
@@ -26,7 +25,6 @@ def _run_migrations(connection: Connection) -> None:
     with context.begin_transaction():
         context.run_migrations()
 
-
 ###############################################################################
 def _include_object(
     object_: object,
@@ -37,7 +35,6 @@ def _include_object(
 ) -> bool:
     del object_, reflected, compare_to
     return not (object_type == "table" and name == "alembic_version")
-
 
 ###############################################################################
 def run_migrations_offline() -> None:
@@ -57,7 +54,6 @@ def run_migrations_offline() -> None:
             context.run_migrations()
     finally:
         engine.dispose()
-
 
 ###############################################################################
 def run_migrations_online() -> None:

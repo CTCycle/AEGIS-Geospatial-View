@@ -8,7 +8,6 @@ from server.services.llm.types import FailureCategory
 class LLMConfigurationError(ValueError):
     """Raised when a selected LLM provider cannot be used due to local settings."""
 
-
 ###############################################################################
 class LLMStructuredOutputError(RuntimeError):
     """Safe structured-output failure with a user-actionable category."""
@@ -38,7 +37,6 @@ class LLMStructuredOutputError(RuntimeError):
         self.metadata = dict(metadata or {})
         super().__init__(detail)
 
-
 ###############################################################################
 class LLMContextLimitError(LLMStructuredOutputError):
     """Raised when the selected model cannot accept the prepared context."""
@@ -54,7 +52,6 @@ class LLMContextLimitError(LLMStructuredOutputError):
             detail=detail,
         )
 
-
 ###############################################################################
 class LLMRequestSchemaError(LLMStructuredOutputError):
     """Raised for invalid local response schemas or native tool definitions."""
@@ -69,7 +66,6 @@ class LLMRequestSchemaError(LLMStructuredOutputError):
             code="invalid_schema_definition",
             detail=detail,
         )
-
 
 ###############################################################################
 class LLMResponseParsingError(LLMStructuredOutputError):

@@ -45,10 +45,10 @@ def _turn(
     )
 
 ###############################################################################
-def test_location_only_map_uses_deterministic_visualization_update() -> None:
+def test_location_only_map_does_not_invent_a_basemap_in_the_planner() -> None:
     plan = DeterministicToolPlanner().build_plan(_turn("Show Rome"), "place_resolution")
     assert plan.steps == []
-    assert plan.visualization_update == {"basemap_replacement": "osm_default"}
+    assert plan.visualization_update == {}
 
 ###############################################################################
 def test_layer_plan_contains_location_arguments() -> None:
@@ -73,12 +73,18 @@ def test_provider_layer_selection_uses_provider_render_tool() -> None:
     }
 
 ###############################################################################
-def test_air_quality_forecast_selects_direct_capability() -> None:
+def test_typed_capability_is_selected_without_prose_keyword_inference() -> None:
     plan = DeterministicToolPlanner().build_plan(
-        _turn("Get air quality forecast for Milan", task_class="direct_query"),
+        _turn(
+            "An unrelated wording variant",
+            task_class="direct_query",
+            layers=["openmeteo_air_quality_forecast"],
+        ),
         "environmental_data",
     )
-    assert [step.capability_id for step in plan.steps] == ["get_air_quality_forecast"]
+    assert [step.capability_id for step in plan.steps] == [
+        "openmeteo_air_quality_forecast"
+    ]
 
 ###############################################################################
 def test_basemap_replacement_is_deterministic() -> None:
@@ -90,6 +96,7 @@ def test_basemap_replacement_is_deterministic() -> None:
     assert plan.visualization_update == {"basemap_replacement": "esri_world_imagery"}
 
 
+###############################################################################
 def test_non_additive_overlay_command_does_not_emit_provider_layer_addition() -> None:
     plan = DeterministicToolPlanner().build_plan(
         _turn(

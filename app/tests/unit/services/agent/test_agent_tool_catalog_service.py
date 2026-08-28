@@ -445,9 +445,10 @@ def test_provider_layer_listing_does_not_render_first_layer_implicitly() -> None
 def test_provider_layer_rendering_surfaces_failed_provider_without_map_success() -> None:
     service = _service()
 
+    ###############################################################################
     class _FailedSearchOrchestrator:
 
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------------
         async def execute(self, payload):  # noqa: ANN001
             return MapSession(
                 session_id="map-failed",

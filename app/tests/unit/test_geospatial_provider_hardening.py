@@ -28,20 +28,28 @@ from server.services.geospatial.providers.noaa import NOAAProvider
 
 ###############################################################################
 def test_shared_http_rejects_redirects_and_limits_response_bytes(monkeypatch) -> None:
+
+    ###############################################################################
     class _Response:
         status_code = 200
         headers = {"content-length": "4"}
 
+        # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
 
+        # -------------------------------------------------------------------------
         async def __aexit__(self, *args):
             return None
 
+        # -------------------------------------------------------------------------
         async def aiter_bytes(self):
             yield b"1234"
 
+    ###############################################################################
     class _Client:
+
+        # -------------------------------------------------------------------------
         def stream(self, *args, **kwargs):
             return _Response()
 

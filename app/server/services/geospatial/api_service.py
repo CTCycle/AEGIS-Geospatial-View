@@ -70,6 +70,7 @@ class GeospatialUnsupportedTileError(GeospatialApiServiceError):
 class GeospatialProviderResponseError(GeospatialApiServiceError):
     """Raised when a provider result cannot be exposed as GeoJSON."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, message: str, *, error_code: str, status_code: int) -> None:
         super().__init__(message)
         self.error_code = error_code

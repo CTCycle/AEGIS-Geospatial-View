@@ -5,9 +5,14 @@ from server.common.typing import is_json_array, is_json_object, json_object
 from typing import Any
 
 from server.contracts.extraction import TurnParseResult
+from server.services.geospatial.capability_registry import CapabilityRegistry
 
 ###############################################################################
 class ToolArgumentBuilder:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, capability_registry: CapabilityRegistry | None = None) -> None:
+        self.capability_registry = capability_registry
 
     # -------------------------------------------------------------------------
     def build_location_arguments(
@@ -63,23 +68,10 @@ class ToolArgumentBuilder:
     # -------------------------------------------------------------------------
     @staticmethod
     def _has_explicit_location_signal(turn: TurnParseResult) -> bool:
-        user_text = turn.user_text.casefold()
-        follow_up_tokens = {
-            "again",
-            "current",
-            "here",
-            "keep",
-            "map",
-            "same",
-            "switch",
-            "there",
-            "use",
-        }
         for signal in turn.location_signals:
             if signal.signal_type == "deictic":
                 continue
-            raw_value = str(signal.raw_value or "").strip().casefold()
-            if raw_value and raw_value not in follow_up_tokens and raw_value in user_text:
+            if str(signal.raw_value or "").strip():
                 return True
         return False
 
@@ -100,6 +92,14 @@ class ToolArgumentBuilder:
             arguments["time"] = temporal.raw_text
         if temporal.reference_time_iso:
             arguments["reference_time_iso"] = temporal.reference_time_iso
+        if temporal.start_time_iso:
+            arguments["start_time_iso"] = temporal.start_time_iso
+        if temporal.end_time_iso:
+            arguments["end_time_iso"] = temporal.end_time_iso
+        if temporal.granularity != "none":
+            arguments["temporal_granularity"] = temporal.granularity
+        if temporal.aggregation != "none":
+            arguments["aggregation"] = temporal.aggregation
         return arguments
 
     # -------------------------------------------------------------------------
@@ -109,20 +109,26 @@ class ToolArgumentBuilder:
         turn: TurnParseResult,
         memory_snapshot: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        location_capabilities = {
-            "get_air_quality_forecast",
-            "get_nearby_poi",
-            "get_weather_forecast",
-            "location_to_coordinates",
-        }
+        capability = (
+            self.capability_registry.get_capability(capability_id)
+            if self.capability_registry is not None
+            else {}
+        ) or {}
+        metadata = capability.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        is_direct = (
+            str(capability.get("type") or "").casefold() == "direct-tool"
+            or str(metadata.get("retrieval_mode") or "").casefold() == "direct"
+        )
         arguments = (
             self.build_location_arguments(turn, memory_snapshot)
-            if capability_id in location_capabilities
+            if is_direct
             else self.build_bbox_arguments(turn, memory_snapshot)
         )
         arguments.update(self.build_temporal_arguments(turn))
-        if capability_id == "get_nearby_poi":
-            arguments["query"] = turn.entity_target or turn.user_text
-        elif capability_id == "location_to_coordinates":
-            arguments["query"] = arguments.get("location") or turn.user_text
+        if capability and str(capability.get("type") or "").casefold() == "direct-tool":
+            if turn.entity_target:
+                arguments["query"] = turn.entity_target
+            elif turn.poi_categories:
+                arguments["query"] = ", ".join(turn.poi_categories)
         return {key: value for key, value in arguments.items() if value is not None}

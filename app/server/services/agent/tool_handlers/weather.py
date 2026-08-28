@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from server.common.typing import is_json_array, is_json_object
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.services.geospatial.openmeteo import OpenMeteoService
@@ -30,10 +30,14 @@ def _select_requested_forecast(
     hourly = result.get("hourly_forecast")
     if not is_json_array(hourly):
         return None
-    temporal_text = (plan.temporal_text or "").lower()
     target_date = None
-    if "tomorrow" in temporal_text:
-        target_date = (datetime.now() + timedelta(days=1)).date()
+    if plan.temporal_reference_time_iso:
+        try:
+            target_date = datetime.fromisoformat(
+                plan.temporal_reference_time_iso
+            ).date()
+        except ValueError:
+            target_date = None
 
     fallback: dict[str, object] | None = None
     for row in hourly:

@@ -15,6 +15,7 @@ def test_request_builder_uses_wide_radius_for_city_level_intent() -> None:
             task_tags=["map", "city", "wide_view"],
             action_tags=["city_level"],
         ),
+        viewport_intent=ViewportIntent(scope="city"),
     )
 
     assert viewport.radius_m == 18000.0
@@ -37,6 +38,7 @@ def test_request_builder_uses_tighter_radius_for_exact_address_intent() -> None:
             task_tags=["map", "address"],
             action_tags=["exact_address"],
         ),
+        viewport_intent=ViewportIntent(scope="street"),
     )
 
     assert viewport.radius_m <= 350.0

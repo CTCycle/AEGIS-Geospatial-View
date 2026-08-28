@@ -9,7 +9,6 @@ import server.app as app_module
 from server.configurations import environment
 from server.configurations.startup import reload_settings_for_tests
 
-
 ###############################################################################
 def test_application_starts_against_isolated_sqlite_database(
     monkeypatch,
