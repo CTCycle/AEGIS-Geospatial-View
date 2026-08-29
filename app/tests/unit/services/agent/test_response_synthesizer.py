@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from server.contracts.chat import ChatOperationResult
 from server.domain.agent.decision import ResolvedLocation
 from server.contracts.geospatial import MapSession, ViewportPolicy
+from server.prompts.response import (
+    VERIFIED_EVIDENCE_USER_TEMPLATE,
+    build_grounded_response_system_prompt,
+)
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
 
 ###############################################################################
@@ -79,6 +83,8 @@ def test_synthesizer_returns_grounded_markdown_and_bounded_evidence() -> None:
     assert "Verified fallback." in request_text
     assert "Current data only." in request_text
     assert "How much rain is there?" in request_text
+    assert provider.requests[0].messages[0]["content"] == build_grounded_response_system_prompt()
+    assert request_text.startswith(VERIFIED_EVIDENCE_USER_TEMPLATE.split("{", maxsplit=1)[0])
 
 ###############################################################################
 def test_synthesizer_evidence_marks_metadata_only_overlays() -> None:

@@ -1,12 +1,13 @@
 # Execution And Data Flow
 
-Last updated: 2026-08-27
+Last updated: 2026-08-30
 
 ## Layering
 
 AEGIS uses these main backend layers:
 
 - API routes: `app/server/api/*.py`
+- Prompt declarations and builders: `app/server/prompts/*.py`
 - Services and orchestration: `app/server/services/**`
 - Persistence: `app/server/repositories/**`
 - Application contracts: `app/server/contracts/**`
@@ -26,10 +27,18 @@ AEGIS uses these main backend layers:
 - `app/server/repositories/database/sqlite.py` defines the concrete SQLite database holder.
 - `contracts/` holds transport, normalized-provider, extraction, run-event,
   and persistence-neutral application models.
-- `domain/` holds domain behavior and policies; compatibility exports may
-  remain at older contract paths while callers migrate to `contracts/`.
+- `domain/` owns structured schemas, domain behavior, and policies; `contracts/`
+  owns application transport and persistence-neutral contracts.
 - Provider adapters normalize JSON objects and provider failures at the LLM
   boundary; API and agent layers consume provider-neutral contracts.
+- `services/agent/` owns deterministic orchestration, planning, policy, and
+  validation; it consumes prompt builders but does not define free-form model
+  instructions.
+- `services/llm/` owns provider invocation and protocol translation; provider
+  prompt text is declared in `app/server/prompts/providers.py`.
+- `app/server/prompts/` is the sole source of free-form model instructions and
+  prompt templates. Its modules are separated by parser, agent, response,
+  context, and provider responsibilities.
 - Runtime job state is owned by `app/server/services/jobs.py`.
 - SQLite engine/session construction is centralized in `app/server/repositories/database/engine.py`.
 - Static reference catalog file loading lives under `app/server/services/catalog/loader.py`; lookup and seeding live under `app/server/repositories/catalog/`.
@@ -70,14 +79,14 @@ Geospatial API services are composed during application startup and accessed thr
 ## Chat Orchestration Pipeline
 
 1. `AgentOrchestrator` loads volatile conversation task and visualization state.
-2. `ParserService` produces structured intent, relationship, entities, typed overlay commands, visualization changes, and ambiguities using the selected agent model.
+2. `ParserService` produces structured intent, relationship, entities, typed overlay commands, visualization changes, and ambiguities using the selected agent model and the canonical parser builder.
 3. `ConversationTaskStateService` creates or updates the current task record.
 4. `CapabilityResolver` converts semantic layer concepts into enabled executable manifest IDs or returns a structured clarification when no temporally compatible capability exists.
 5. `DeterministicAgentRouter` selects one specialist group.
 6. `DeterministicToolPlanner` creates a typed, deduplicated dependency plan.
 7. `PolicyEngine` restricts native tools and capability IDs to the routed scope.
 8. `ToolPlanExecutor` applies timeouts, bounded transient retries, validation, and partial-failure tracking.
-9. `NativeToolLoop` remains the bounded fallback when catalog discovery is required.
+9. `NativeToolLoop` remains the bounded fallback when catalog discovery is required; its native-agent and replaceable working-state messages come from the canonical prompt builders.
 10. Verified results become a map session, direct answer, clarification, or diagnostic response.
 11. Successful and partial outcomes are passed to the same selected agent model through a validated `GroundedSynthesisResult` structured-output schema; deterministic prose remains the fallback.
 12. Overlay changes are applied to the revisioned `OverlayCollectionState` by
@@ -101,7 +110,7 @@ a structured ambiguity clarification instead of silently selecting a place.
 
 - `AgentTurnHistoryService` owns request-id idempotency, prior-message lookup, and conversation-state memory merging.
 - `AgentTurnStateAssembler` owns map-session reconstruction, memory snapshot updates, and partial clarification map-state application.
-- `AgentTurnSupport` owns static fallback helpers for direct rejection, general capability answers, parser-failure classification, and native-tool loop prompt assembly.
+- `AgentTurnSupport` owns static fallback helpers for direct rejection, general capability answers, and parser-failure classification. Native-tool prompt assembly belongs to `app/server/prompts/agent.py`.
 
 The composition root constructs `DeterministicAgentRouter`,
 `DeterministicToolPlanner`, and `ToolPlanExecutor` and passes them explicitly
@@ -120,7 +129,9 @@ that conversation. There is no global or recently used chat session to resolve.
 
 Every model phase receives freshly assembled conversation directives, task state,
 map memory, summarized older turns, recent verbatim turns, verified tool outcomes,
-and policy constraints. The current user message is supplied exactly once.
+and policy constraints through the relevant canonical prompt builder. The current
+user message is supplied exactly once. Business services do not define free-form
+model instructions inline.
 
 ## Geospatial Capability Pipeline
 

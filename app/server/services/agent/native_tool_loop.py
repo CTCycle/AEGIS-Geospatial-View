@@ -110,6 +110,7 @@ class NativeToolLoop:
                     for result in all_results
                 ],
             )
+            messages[1] = working_state
             LOGGER.info(
                 "tool_loop_started provider=%s model=%s iteration=%s",
                 request.provider,
@@ -121,7 +122,7 @@ class NativeToolLoop:
                     LLMRequest(
                         model=request.model,
                         provider=request.provider,
-                        messages=messages,
+                        messages=list(messages),
                         tools=request.tools,
                         tool_choice="auto",
                         temperature=request.temperature,

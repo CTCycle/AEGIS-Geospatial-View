@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from pydantic import BaseModel
 
+from server.prompts.providers import build_deepseek_json_schema_instruction
 from server.services.llm.deepseek_provider import DeepSeekProvider
 from server.services.llm.types import LLMRequest
 
@@ -58,3 +59,6 @@ def test_structured_output_uses_deepseek_json_object_mode(monkeypatch) -> None:
     assert call["response_format"] == {"type": "json_object"}
     assert "JSON schema" in call["messages"][-1]["content"]
     assert '"answer"' in call["messages"][-1]["content"]
+    assert call["messages"][-1]["content"] == build_deepseek_json_schema_instruction(
+        _StructuredPayload.model_json_schema()
+    )

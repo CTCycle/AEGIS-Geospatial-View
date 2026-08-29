@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-08-20
+Last updated: 2026-08-30
 
 ## Purpose
 
@@ -30,6 +30,7 @@ AEGIS Geospatial View/
       configurations/
       contracts/
       domain/
+      prompts/
       migrations/
       repositories/
       services/
@@ -60,8 +61,13 @@ Key backend directories under `app/server`:
   Canonical transport, extraction, run-event, normalized-provider, and
   persistence-neutral application models.
 - `domain/`
-  Domain behavior, policies, and agent decision/runtime models. Older contract
-  modules export the canonical `contracts/` definitions for compatibility.
+  Structured domain schemas, behavior, policies, and agent decision/runtime
+  models. It remains the source of truth for typed agent extraction and
+  execution contracts.
+- `prompts/`
+  Sole source of free-form model instructions and prompt templates. Modules are
+  separated by parser, native-agent, grounded-response, context, and provider
+  responsibilities; builders perform composition.
 - `repositories/`
   Persistence, serialization, database helpers, credential encryption material, and reference catalog seeding.
 - `repositories/database/`
@@ -82,8 +88,9 @@ Key backend directories under `app/server`:
   Durable conversation-run lifecycle, steering, event publication, WebSocket
   lifecycle/replay services, and bounded realtime metrics.
 - `services/llm/`
-  Provider adapters, model catalogs, structured-output handling, request
-  normalization, and safe provider error classification.
+  Provider invocation, model catalogs, structured-output handling, request
+  normalization, protocol translation, and safe provider error classification.
+  Provider-specific prompt text is declared in `prompts/providers.py`.
 - `app.py`
   Sole composition root. It constructs the SQLite repository, initializes the
   schema, wires explicit repository/service dependencies, and owns lifecycle
@@ -100,6 +107,18 @@ python app/scripts/generate_openapi.py
 
 The unit contract test and CI diff check keep the shared file synchronized with
 the current backend routes and Pydantic response models.
+
+## Ownership Boundaries
+
+- `prompts/` owns free-form instructions and prompt templates only.
+- `domain/` owns structured schemas and domain contracts.
+- `services/agent/` owns deterministic orchestration, planning, policy, and
+  validation.
+- `services/llm/` owns provider invocation and protocol translation.
+- Executable native-tool schemas remain in
+  `services/agent/agent_tool_catalog_service.py`, the runtime catalog source of
+  truth. They are not duplicated into prompt modules.
+- No business service defines free-form model instructions inline.
 
 ## Frontend Areas
 
