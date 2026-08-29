@@ -12,6 +12,7 @@ from openai import OpenAI
 
 from server.services.llm.base import LLMProvider
 from server.services.llm.context_budget import compute_context_usage, prepare_request
+from server.prompts.providers import build_deepseek_json_schema_instruction
 from server.services.llm.errors import (
     LLMProviderRequestError,
     LLMResponseParsingError,
@@ -243,13 +244,12 @@ class DeepSeekProvider(LLMProvider):
     def _messages_with_json_schema(
         messages: list[dict[str, Any]], schema: dict[str, Any]
     ) -> list[dict[str, Any]]:
-        schema_instruction = (
-            "Return JSON only. The response must match this JSON schema:\n"
-            f"{json.dumps(schema, ensure_ascii=True, separators=(',', ':'))}"
-        )
         return [
             *messages,
-            {"role": "system", "content": schema_instruction},
+            {
+                "role": "system",
+                "content": build_deepseek_json_schema_instruction(schema),
+            },
         ]
 
     # -------------------------------------------------------------------------

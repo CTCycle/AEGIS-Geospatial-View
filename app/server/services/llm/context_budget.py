@@ -9,6 +9,7 @@ from typing import Any
 from server.services.llm.cloud_catalog import get_model_context_profile
 from server.services.llm.errors import LLMContextLimitError
 from server.services.llm.types import ContextUsage, LLMRequest, ModelContextProfile
+from server.prompts.context import build_compacted_history_summary
 
 CONTEXT_HEADROOM_TOKENS = 512
 UNKNOWN_OUTPUT_ALLOWANCE_TOKENS = 2048
@@ -276,7 +277,7 @@ def _compact_messages(messages: list[dict[str, Any]], budget: int) -> tuple[list
                     break
             summary = {
                 "role": "system",
-                "content": "COMPACTED CONVERSATION SUMMARY (older turns): " + " | ".join(reversed(snippets)),
+                "content": build_compacted_history_summary(" | ".join(reversed(snippets))),
             }
             selected = [messages[index] for index in range(len(messages)) if index in selected_indices]
             system_count = sum(

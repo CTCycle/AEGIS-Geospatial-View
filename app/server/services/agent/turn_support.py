@@ -6,40 +6,6 @@ from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDec
 
 ###############################################################################
 class AgentTurnSupport:
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def build_native_agent_messages(
-        *,
-        turn_contract: Any,
-        memory_snapshot: dict[str, Any],
-        constraints: Any,
-        active_instructions: list[dict[str, Any]] | None = None,
-        task_snapshot: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        return [
-            {
-                "role": "system",
-                "content": (
-                    "You are the AEGIS geospatial agent. Use native tools when geospatial "
-                    "catalog discovery, capability description, or execution is needed. "
-                    "Do not invent tool results. Call only the provided tools by exact name. "
-                    "After tool results are returned, provide a concise user-facing answer."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    "Parsed request:\n"
-                    f"{turn_contract.model_dump_json()}\n\n"
-                    f"Map memory:\n{memory_snapshot}\n\n"
-                    f"Active conversation instructions:\n{active_instructions or []}\n\n"
-                    f"Current task state:\n{task_snapshot or {}}\n\n"
-                    f"Policy constraints:\n{constraints}"
-                ),
-            },
-        ]
-
     # -------------------------------------------------------------------------
     @staticmethod
     def build_direct_reject_decision(action_id: str) -> PolicyDecision:

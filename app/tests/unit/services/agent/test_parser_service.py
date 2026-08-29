@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from server.domain.agent.extraction_schemas import LLMParserExtraction
 from server.services.agent.parser_service import ParserService
-from server.services.llm.prompts import PARSER_SYSTEM_PROMPT
+from server.prompts.parser import PARSER_SYSTEM_PROMPT
 from server.services.llm.errors import (
     LLMConfigurationError,
     LLMProviderRequestError,
@@ -390,7 +388,5 @@ def test_parser_domain_boundary_does_not_invent_intent_from_prose() -> None:
     assert extracted.requested_layers == []
     assert extracted.requested_basemap is None
     assert extracted.overlay_commands == []
-
-
 
 

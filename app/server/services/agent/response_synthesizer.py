@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.common.typing import is_json_array, is_json_object
 
-import json
 import logging
 import re
 from typing import Any, Literal
@@ -13,7 +12,7 @@ from server.contracts.chat import ChatOperationResult
 from server.contracts.geospatial import MapSession
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.llm.factory import LLMFactory
-from server.services.llm.prompts import get_agent_response_prompt
+from server.prompts.response import build_response_prompt
 from server.services.llm.errors import LLMProviderRequestError, LLMStructuredOutputError
 from server.services.llm.types import LLMRequest
 
@@ -101,26 +100,7 @@ class GroundedResponseSynthesizer:
                 LLMRequest(
                     model=settings.agent_model_name,
                     temperature=0.35,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": get_agent_response_prompt(
-                                provider=settings.agent_model_provider,
-                                model=settings.agent_model_name,
-                            ),
-                        },
-                        {
-                            "role": "user",
-                            "content": (
-                                "Write the final response using only this verified evidence:\n"
-                                + json.dumps(
-                                    evidence,
-                                    ensure_ascii=False,
-                                    separators=(",", ":"),
-                                )
-                            ),
-                        },
-                    ],
+                    messages=build_response_prompt(evidence),
                     metadata={"purpose": "grounded_agent_response"},
                 ),
                 GroundedSynthesisResult,
@@ -184,21 +164,25 @@ class GroundedResponseSynthesizer:
             "location": resolved.label,
             "basemap": map_session.basemap_id,
             "overlays": [
-                {
-                    "id": overlay.get("id"),
-                    "label": overlay.get("label") or overlay.get("name"),
-                    "rendering_mode": overlay.get("rendering_mode"),
-                    "source_protocol": overlay.get("source_protocol"),
-                    "display_limitation": (
-                        "metadata/setup context only; do not describe as live rendered map data"
-                        if overlay.get("rendering_mode") == "metadata-only"
-                        else None
-                    ),
-                }
+                GroundedResponseSynthesizer._overlay_summary(overlay)
                 for overlay in map_session.overlays
                 if is_json_object(overlay)
             ],
             "warnings": list(map_session.compliance_warnings),
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _overlay_summary(overlay: dict[str, Any]) -> dict[str, Any]:
+        rendering_mode = overlay.get("rendering_mode")
+        metadata_only = rendering_mode == "metadata-only"
+        return {
+            "id": overlay.get("id"),
+            "label": overlay.get("label") or overlay.get("name"),
+            "rendering_mode": rendering_mode,
+            "source_protocol": overlay.get("source_protocol"),
+            "rendered": not metadata_only,
+            "status": "metadata_only" if metadata_only else "rendered",
         }
 
     # -------------------------------------------------------------------------
