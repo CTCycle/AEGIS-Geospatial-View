@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-08-27
+Last updated: 2026-08-30
 
 ## Summary
 
@@ -30,6 +30,21 @@ remain separate. Satellite language selects the imagery basemap unless the user
 explicitly requests an imagery data layer.
 
 The agentic path uses the current normalized routing and capability contracts.
+
+## Prompt Architecture
+
+`app/server/prompts/` is the sole source of free-form model instructions and
+prompt templates. `parser.py` defines structured turn-interpretation guidance,
+`agent.py` defines native-agent and replaceable working-state messages,
+`response.py` defines grounded synthesis, `context.py` defines the compacted
+history envelope, and `providers.py` defines provider-specific protocol
+instructions. Builders compose literal fragments at the model boundary.
+
+The Pydantic extraction model remains the sole structural parser contract;
+prompt prose describes meaning and decision criteria without duplicating its
+fields or enums. Deterministic orchestration, planning, policy, retries, and
+budgets remain in `services/agent/` and `services/llm/`. No business service
+defines free-form model instructions inline.
 
 ## Conversation Context
 
@@ -113,7 +128,9 @@ Provider-neutral LLM tool contracts are translated by adapters for:
 
 Provider-specific schemas do not leak into parser, policy, or executor models.
 Native tools and structured response JSON are separate request modes; provider
-responses are normalized to JSON objects before agent synthesis.
+responses are normalized to JSON objects before agent synthesis. DeepSeek JSON
+schema enforcement and the Ollama native-tool capability probe are declared in
+`app/server/prompts/providers.py`; adapters only translate and invoke them.
 
 ## Response Contract
 

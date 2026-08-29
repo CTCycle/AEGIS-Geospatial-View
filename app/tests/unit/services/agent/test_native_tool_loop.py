@@ -105,6 +105,57 @@ def test_native_tool_loop_executes_single_tool_call() -> None:
     run_async_in_thread(_run())
 
 ###############################################################################
+def test_native_tool_loop_replaces_working_state_instead_of_appending_it() -> None:
+    async def _run() -> None:
+        provider = _Provider(
+            [
+                LLMResult(
+                    content="",
+                    tool_calls=[LLMToolCall(id="1", name="lookup", arguments={"q": "Rome"})],
+                ),
+                LLMResult(content="done"),
+            ]
+        )
+        registry = _registry()
+
+        async def handler(arguments: dict[str, Any], context: AgentExecutionContext) -> dict[str, Any]:
+            _ = context
+            return {"echo": arguments["q"]}
+
+        registry.register_native_tool(_tool(), handler)
+        loop = NativeToolLoop(provider_factory=_Factory(provider), tool_registry=registry)
+        result = await loop.run(
+            AgentToolLoopRequest(
+                provider="test",
+                model="model",
+                messages=[
+                    {"role": "system", "content": "native agent"},
+                    {"role": "user", "content": "lookup Rome"},
+                ],
+                tools=registry.list_native_tools(),
+                temperature=0,
+                context=AgentExecutionContext(parsed_request={"task": "lookup"}),
+            )
+        )
+
+        assert result.final_text == "done"
+        working_states = [
+            message
+            for request in provider.requests
+            for message in request.messages
+            if "WORKING_STATE" in str(message.get("content"))
+        ]
+        assert len(working_states) == 2
+        assert '"completed_tool_results": []' in str(working_states[0]["content"])
+        assert '"tool": "lookup"' in str(working_states[1]["content"])
+        assert all(
+            sum("WORKING_STATE" in str(message.get("content")) for message in request.messages) == 1
+            for request in provider.requests
+        )
+
+    run_async_in_thread(_run())
+
+###############################################################################
 def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
     async def _run() -> None:
         provider = _Provider(

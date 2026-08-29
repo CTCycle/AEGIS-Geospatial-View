@@ -7,6 +7,7 @@ from server.services.llm.context_budget import (
     resolve_model_context_profile,
     prepare_request,
 )
+from server.prompts.context import build_compacted_history_summary
 from server.services.llm.types import LLMRequest
 
 ###############################################################################
@@ -88,4 +89,7 @@ def test_prepare_request_compacts_known_history_and_preserves_current_input() ->
     prepared = prepare_request(request, provider="test")
     assert len(prepared.messages) < len(request.messages)
     assert prepared.messages[-1]["content"] == "CURRENT"
-    assert any("COMPACTED CONVERSATION SUMMARY" in str(item.get("content")) for item in prepared.messages)
+    assert any(
+        str(item.get("content")).startswith(build_compacted_history_summary(""))
+        for item in prepared.messages
+    )

@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 from urllib.error import HTTPError
 
+from server.prompts.providers import OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.types import LLMToolDefinition
 
@@ -111,6 +112,30 @@ def test_ollama_accepts_successful_tool_request_without_tool_call() -> None:
 
     assert provider.supports_tools("llama") is True
     assert provider._tool_support_source("llama") == "ollama_tool_request_accepted"
+
+###############################################################################
+def test_ollama_tool_probe_uses_canonical_prompt() -> None:
+
+    ###############################################################################
+    class _Provider(OllamaProvider):
+
+        # -------------------------------------------------------------------------
+        def __init__(self) -> None:
+            super().__init__(base_url="http://ollama-canonical-probe.test")
+            self.chat_payload = None
+
+        # -------------------------------------------------------------------------
+        def _post_json(self, path: str, payload: dict):
+            if path == "/api/show":
+                return {}
+            self.chat_payload = payload
+            return {"message": {"content": "No call made."}}
+
+    provider = _Provider()
+
+    assert provider.supports_tools("llama") is True
+    assert provider.chat_payload is not None
+    assert provider.chat_payload["messages"][0]["content"] == OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT
 
 ###############################################################################
 def test_ollama_rejects_explicit_unsupported_tool_error() -> None:

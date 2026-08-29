@@ -21,6 +21,7 @@ from server.contracts.extraction import (
 )
 from server.contracts.geospatial import MapSession
 from server.domain.agent.pipeline import ToolPlan
+from server.prompts.agent import build_native_agent_system_prompt
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.capability_resolver import CapabilityResolver
 from server.services.agent.conversation_state import ConversationTaskStateService
@@ -1006,6 +1007,8 @@ def test_orchestrator_does_not_build_a_map_when_tool_loop_only_chats() -> None:
         assert response.decision.plan.mode is None
         assert "could not verify" in response.assistant_message.lower()
         assert not search_orchestrator.requests
+        assert native_loop.requests
+        assert native_loop.requests[0].messages[0]["content"] == build_native_agent_system_prompt()
 
     run_async_in_thread(_run())
 

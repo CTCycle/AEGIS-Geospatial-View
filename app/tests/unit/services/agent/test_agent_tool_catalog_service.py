@@ -309,6 +309,18 @@ def test_catalog_builds_stable_native_tools() -> None:
     ]
 
 ###############################################################################
+def test_native_tool_descriptions_define_discovery_selection_boundaries() -> None:
+    definitions = {
+        item.name: item.description for item in _service().build_native_tools()
+    }
+
+    assert "does not execute a capability" in definitions["list_geospatial_capabilities"]
+    assert "Do not guess an ID" in definitions["describe_geospatial_capability"]
+    assert "policy-allowlisted" in definitions["execute_geospatial_capability"]
+    assert "explicitly routed and policy-allowlisted" in definitions["fetch_geospatial_provider_layers"]
+    assert "exact provider_id and layer_id" in definitions["render_geospatial_provider_layer"]
+
+###############################################################################
 def test_catalog_pagination_is_deterministic() -> None:
     service = _service()
     first = service.list_geospatial_capabilities(CapabilityCatalogFilter(limit=1))

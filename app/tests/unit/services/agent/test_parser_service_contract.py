@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from server.domain.agent.extraction_schemas import LLMParserExtraction
+from server.prompts.parser import PARSER_SCHEMA_CORRECTION, build_parser_prompt
 from server.services.agent.parser_service import ParserService
+from server.services.llm.errors import LLMResponseParsingError
 
 ###############################################################################
 def _failure():  # noqa: ANN202
@@ -38,3 +41,62 @@ def test_structural_coordinate_extraction_is_independent_of_execution_planning()
     assert extracted.signal_type == "coordinates"
     assert extracted.latitude == 41.9
     assert extracted.longitude == 12.5
+
+###############################################################################
+class _PromptProvider:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, *, invalid_first: bool = False) -> None:
+        self.invalid_first = invalid_first
+        self.requests = []
+
+    # -------------------------------------------------------------------------
+    def structured_output(self, request, schema):  # noqa: ANN001
+        _ = schema
+        self.requests.append(request)
+        if self.invalid_first and len(self.requests) == 1:
+            raise LLMResponseParsingError(
+                provider="test",
+                model="test-model",
+                stage="structured_output",
+                detail="The structured payload did not match the extraction schema.",
+            )
+        return LLMParserExtraction(
+            task_class="general_question",
+            action_id="chat_response",
+            requires_location=False,
+        ).model_dump(mode="json")
+
+###############################################################################
+class _PromptFactory:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, provider: _PromptProvider) -> None:
+        self.provider = provider
+
+    # -------------------------------------------------------------------------
+    def get_provider(self, provider: str) -> _PromptProvider:
+        _ = provider
+        return self.provider
+
+###############################################################################
+def test_parser_uses_canonical_prompt_for_normal_and_schema_correction_calls() -> None:
+    provider = _PromptProvider(invalid_first=True)
+    parser = ParserService(
+        llm_factory=_PromptFactory(provider),  # type: ignore[arg-type]
+        settings_repo=object(),
+        provider="test",
+        model="test-model",
+    )
+
+    parser.parse_turn(
+        user_message="What is currently on the map?",
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+
+    assert len(provider.requests) == 2
+    assert provider.requests[0].messages[0]["content"] == build_parser_prompt()
+    corrected_prompt = provider.requests[1].messages[0]["content"]
+    assert corrected_prompt == build_parser_prompt(schema_correction=True)
+    assert corrected_prompt.count(PARSER_SCHEMA_CORRECTION) == 1
