@@ -13,7 +13,6 @@ from server.domain.agent.actions import AgentAction
 from server.domain.agent.extraction_schemas import (
     LLMLocationSignal,
     LLMParserExtraction,
-    LLMViewportIntent,
 )
 from server.contracts.extraction import (
     ConversationContextSnapshot,
@@ -34,7 +33,7 @@ from server.services.llm.errors import (
     LLMStructuredOutputError,
 )
 from server.services.llm.factory import LLMFactory
-from server.services.llm.prompts import get_parser_system_prompt
+from server.prompts.parser import build_parser_prompt
 from server.services.llm.types import LLMRequest
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
@@ -229,13 +228,7 @@ class ParserService:
             "task_snapshot": task_snapshot,
             "capability_catalog": self._catalog_evidence(),
         }
-        parser_prompt = get_parser_system_prompt(provider_name, model_name)
-        if schema_correction:
-            parser_prompt += (
-                "\n\nSCHEMA CORRECTION: The previous response did not validate. "
-                "Return only one JSON object matching every enum and field in the schema. "
-                "Do not place relationship values such as failure_inquiry or follow_up in task_class."
-            )
+        parser_prompt = build_parser_prompt(schema_correction=schema_correction)
         request = LLMRequest(
             model=model_name,
             temperature=0.0,

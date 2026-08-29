@@ -39,6 +39,7 @@ from server.services.agent.turn_support import AgentTurnSupport
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.tool_planner import DeterministicToolPlanner
+from server.prompts.agent import build_native_agent_messages
 from server.services.chat.history_service import ChatHistoryService
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
@@ -474,7 +475,7 @@ class AgentOrchestrator:
             AgentToolLoopRequest(
                 provider=settings.agent_model_provider,
                 model=settings.agent_model_name,
-                messages=AgentTurnSupport.build_native_agent_messages(
+                messages=build_native_agent_messages(
                     turn_contract=turn_contract,
                     memory_snapshot=latest_memory,
                     constraints=constraints,

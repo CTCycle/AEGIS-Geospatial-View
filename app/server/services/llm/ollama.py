@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 
 from server.services.llm.base import LLMProvider
 from server.services.llm.context_budget import compute_context_usage, prepare_request
+from server.prompts.providers import OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT
 from server.services.llm.errors import (
     LLMProviderRequestError,
     LLMResponseParsingError,
@@ -301,7 +302,7 @@ class OllamaProvider(LLMProvider):
             "messages": [
                 {
                     "role": "user",
-                    "content": "Call the aegis_tool_probe tool with empty arguments.",
+                    "content": OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT,
                 }
             ],
             "stream": False,

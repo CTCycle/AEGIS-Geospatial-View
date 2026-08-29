@@ -65,28 +65,54 @@ class AgentToolCatalogService:
         definitions = [
             LLMToolDefinition(
                 name="list_geospatial_capabilities",
-                description="List available geospatial capabilities with deterministic pagination and filters.",
+                description=(
+                    "Discover enabled geospatial capabilities before selecting an unknown "
+                    "basemap, overlay, direct tool, or catalog action. Use filters to "
+                    "narrow discovery; this tool does not execute a capability."
+                ),
                 parameters_json_schema={
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "query": {"type": ["string", "null"]},
-                        "category": {"type": ["string", "null"]},
-                        "geometry_type": {"type": ["string", "null"]},
+                        "query": {
+                            "type": ["string", "null"],
+                            "description": "Optional text or concept to match against catalog identity and description.",
+                        },
+                        "category": {
+                            "type": ["string", "null"],
+                            "description": "Optional catalog category such as basemap, overlay, or tool.",
+                        },
+                        "geometry_type": {
+                            "type": ["string", "null"],
+                            "description": "Optional geometry filter when the requested data shape is known.",
+                        },
                         "bbox": {
                             "type": ["array", "null"],
                             "items": {"type": "number"},
                             "minItems": 4,
                             "maxItems": 4,
+                            "description": "Optional west, south, east, north extent for spatial discovery.",
                         },
-                        "limit": {"type": "integer", "minimum": 1, "maximum": CATALOG_PAGE_LIMIT},
-                        "cursor": {"type": ["string", "null"]},
+                        "limit": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": CATALOG_PAGE_LIMIT,
+                            "description": "Page size; use the returned cursor to continue discovery.",
+                        },
+                        "cursor": {
+                            "type": ["string", "null"],
+                            "description": "Cursor returned by a previous catalog page.",
+                        },
                     },
                 },
             ),
             LLMToolDefinition(
                 name="describe_geospatial_capability",
-                description="Return full manifest metadata and executable argument schema for one capability.",
+                description=(
+                    "Inspect one exact capability ID after discovery when its manifest, "
+                    "rendering mode, provider metadata, or executable argument schema is "
+                    "needed. Do not guess an ID or use this for execution."
+                ),
                 parameters_json_schema={
                     "type": "object",
                     "additionalProperties": False,
@@ -96,31 +122,46 @@ class AgentToolCatalogService:
             ),
             LLMToolDefinition(
                 name="execute_geospatial_capability",
-                description="Execute a geospatial capability by stable manifest capability_id after schema validation.",
+                description=(
+                    "Execute one already-selected, policy-allowlisted manifest capability "
+                    "by exact capability_id after its arguments are known. Use for the "
+                    "catalog's basemap, overlay, or direct-tool path; do not use for "
+                    "discovery or provider-native layer selection."
+                ),
                 parameters_json_schema={
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "capability_id": {"type": "string"},
-                        "arguments": {"type": "object"},
+                        "capability_id": {
+                            "type": "string",
+                            "description": "Exact stable capability ID from catalog discovery or the routed plan.",
+                        },
+                        "arguments": {
+                            "type": "object",
+                            "description": "Arguments matching the capability's executable argument schema.",
+                        },
                     },
                     "required": ["capability_id", "arguments"],
                 },
             ),
             LLMToolDefinition(
                 name="fetch_geospatial_provider_layers",
-                description="Fetch normalized provider-native geospatial layers without returning raw provider XML.",
+                description=(
+                    "Discover normalized provider-native layers only for an explicitly "
+                    "routed and policy-allowlisted provider when the catalog does not "
+                    "already identify the requested layer. This does not render a layer."
+                ),
                 parameters_json_schema={
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
                         "provider_id": {
                             "type": "string",
-                            "description": "Provider ID, for example gibs.",
+                            "description": "Exact routed provider ID, for example gibs.",
                         },
                         "query": {
                             "type": ["string", "null"],
-                            "description": "Optional search text for provider-native layers.",
+                            "description": "Optional material query refinement for provider-native layer discovery.",
                         },
                         "limit": {
                             "type": "integer",
@@ -130,6 +171,7 @@ class AgentToolCatalogService:
                         },
                         "refresh": {
                             "type": "boolean",
+                            "description": "Refresh provider metadata only when cached discovery is insufficient.",
                             "default": False,
                         },
                     },
@@ -138,16 +180,35 @@ class AgentToolCatalogService:
             ),
             LLMToolDefinition(
                 name="render_geospatial_provider_layer",
-                description="Render one provider-native layer descriptor into a normalized map session overlay.",
+                description=(
+                    "Render one explicitly selected normalized provider-native layer "
+                    "after discovery returned its exact provider_id and layer_id. "
+                    "Do not guess layer IDs or use this for generic catalog capabilities."
+                ),
                 parameters_json_schema={
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "provider_id": {"type": "string"},
-                        "layer_id": {"type": "string"},
-                        "time": {"type": ["string", "null"]},
-                        "style": {"type": ["string", "null"]},
-                        "format": {"type": ["string", "null"]},
+                        "provider_id": {
+                            "type": "string",
+                            "description": "Exact provider ID returned by the routed discovery call.",
+                        },
+                        "layer_id": {
+                            "type": "string",
+                            "description": "Exact normalized layer ID returned by provider discovery.",
+                        },
+                        "time": {
+                            "type": ["string", "null"],
+                            "description": "Optional time parameter supported by the selected layer.",
+                        },
+                        "style": {
+                            "type": ["string", "null"],
+                            "description": "Optional style parameter supported by the selected layer.",
+                        },
+                        "format": {
+                            "type": ["string", "null"],
+                            "description": "Optional format parameter supported by the selected layer.",
+                        },
                     },
                     "required": ["provider_id", "layer_id"],
                 },

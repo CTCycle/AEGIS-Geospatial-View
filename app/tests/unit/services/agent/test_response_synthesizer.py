@@ -126,9 +126,11 @@ def test_synthesizer_evidence_marks_metadata_only_overlays() -> None:
         task_status="completed",
     )
 
+    system_text = provider.requests[0].messages[0]["content"]
     request_text = provider.requests[0].messages[1]["content"]
-    assert "metadata-only" in request_text
-    assert "do not describe as live rendered map data" in request_text
+    assert '"rendered":false' in request_text
+    assert '"status":"metadata_only"' in request_text
+    assert "not a live rendered map layer" in system_text
 
 ###############################################################################
 def test_synthesizer_falls_back_when_model_fails() -> None:
