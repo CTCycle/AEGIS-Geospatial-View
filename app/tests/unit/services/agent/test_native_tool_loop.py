@@ -16,13 +16,14 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
 
+
 ###############################################################################
 class _Credentials:
-
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN001
         _ = provider, label
         return None
+
 
 ###############################################################################
 def _registry() -> ToolRegistry:
@@ -32,6 +33,7 @@ def _registry() -> ToolRegistry:
             credentials_repo=_Credentials(),  # type: ignore[arg-type]
         )
     )
+
 
 ###############################################################################
 def _tool(name: str = "lookup") -> LLMToolDefinition:
@@ -45,9 +47,9 @@ def _tool(name: str = "lookup") -> LLMToolDefinition:
         },
     )
 
+
 ###############################################################################
 class _Provider:
-
     # -------------------------------------------------------------------------
     def __init__(self, responses: list[LLMResult]) -> None:
         self.responses = responses
@@ -58,9 +60,9 @@ class _Provider:
         self.requests.append(request)
         return self.responses.pop(0)
 
+
 ###############################################################################
 class _Factory:
-
     # -------------------------------------------------------------------------
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
@@ -69,6 +71,7 @@ class _Factory:
     def get_provider(self, provider: str) -> _Provider:
         return self.provider
 
+
 ###############################################################################
 def test_native_tool_loop_executes_single_tool_call() -> None:
     async def _run() -> None:
@@ -76,18 +79,24 @@ def test_native_tool_loop_executes_single_tool_call() -> None:
             [
                 LLMResult(
                     content="",
-                    tool_calls=[LLMToolCall(id="1", name="lookup", arguments={"q": "Rome"})],
+                    tool_calls=[
+                        LLMToolCall(id="1", name="lookup", arguments={"q": "Rome"})
+                    ],
                 ),
                 LLMResult(content="done"),
             ]
         )
         registry = _registry()
 
-        async def handler(arguments: dict[str, Any], context: AgentExecutionContext) -> dict[str, Any]:
+        async def handler(
+            arguments: dict[str, Any], context: AgentExecutionContext
+        ) -> dict[str, Any]:
             return {"echo": arguments["q"], "conversation": context.conversation_id}
 
         registry.register_native_tool(_tool(), handler)
-        loop = NativeToolLoop(provider_factory=_Factory(provider), tool_registry=registry)
+        loop = NativeToolLoop(
+            provider_factory=_Factory(provider), tool_registry=registry
+        )
         result = await loop.run(
             AgentToolLoopRequest(
                 provider="test",
@@ -104,6 +113,7 @@ def test_native_tool_loop_executes_single_tool_call() -> None:
 
     run_async_in_thread(_run())
 
+
 ###############################################################################
 def test_native_tool_loop_replaces_working_state_instead_of_appending_it() -> None:
     async def _run() -> None:
@@ -111,19 +121,25 @@ def test_native_tool_loop_replaces_working_state_instead_of_appending_it() -> No
             [
                 LLMResult(
                     content="",
-                    tool_calls=[LLMToolCall(id="1", name="lookup", arguments={"q": "Rome"})],
+                    tool_calls=[
+                        LLMToolCall(id="1", name="lookup", arguments={"q": "Rome"})
+                    ],
                 ),
                 LLMResult(content="done"),
             ]
         )
         registry = _registry()
 
-        async def handler(arguments: dict[str, Any], context: AgentExecutionContext) -> dict[str, Any]:
+        async def handler(
+            arguments: dict[str, Any], context: AgentExecutionContext
+        ) -> dict[str, Any]:
             _ = context
             return {"echo": arguments["q"]}
 
         registry.register_native_tool(_tool(), handler)
-        loop = NativeToolLoop(provider_factory=_Factory(provider), tool_registry=registry)
+        loop = NativeToolLoop(
+            provider_factory=_Factory(provider), tool_registry=registry
+        )
         result = await loop.run(
             AgentToolLoopRequest(
                 provider="test",
@@ -149,11 +165,16 @@ def test_native_tool_loop_replaces_working_state_instead_of_appending_it() -> No
         assert '"completed_tool_results": []' in str(working_states[0]["content"])
         assert '"tool": "lookup"' in str(working_states[1]["content"])
         assert all(
-            sum("WORKING_STATE" in str(message.get("content")) for message in request.messages) == 1
+            sum(
+                "WORKING_STATE" in str(message.get("content"))
+                for message in request.messages
+            )
+            == 1
             for request in provider.requests
         )
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
@@ -169,11 +190,15 @@ def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
         )
         registry = _registry()
 
-        async def handler(arguments: dict[str, Any], context: AgentExecutionContext) -> dict[str, Any]:
+        async def handler(
+            arguments: dict[str, Any], context: AgentExecutionContext
+        ) -> dict[str, Any]:
             return arguments
 
         registry.register_native_tool(_tool(), handler)
-        loop = NativeToolLoop(provider_factory=_Factory(provider), tool_registry=registry)
+        loop = NativeToolLoop(
+            provider_factory=_Factory(provider), tool_registry=registry
+        )
         result = await loop.run(
             AgentToolLoopRequest(
                 provider="test",
@@ -188,6 +213,7 @@ def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
 
     run_async_in_thread(_run())
 
+
 ###############################################################################
 def test_native_tool_loop_stops_at_max_iterations() -> None:
     async def _run() -> None:
@@ -195,14 +221,18 @@ def test_native_tool_loop_stops_at_max_iterations() -> None:
             [
                 LLMResult(
                     content="",
-                    tool_calls=[LLMToolCall(id=str(index), name="lookup", arguments={"q": "x"})],
+                    tool_calls=[
+                        LLMToolCall(id=str(index), name="lookup", arguments={"q": "x"})
+                    ],
                 )
                 for index in range(3)
             ]
         )
         registry = _registry()
 
-        async def handler(arguments: dict[str, Any], context: AgentExecutionContext) -> dict[str, Any]:
+        async def handler(
+            arguments: dict[str, Any], context: AgentExecutionContext
+        ) -> dict[str, Any]:
             return arguments
 
         registry.register_native_tool(_tool(), handler)
@@ -225,6 +255,7 @@ def test_native_tool_loop_stops_at_max_iterations() -> None:
 
     run_async_in_thread(_run())
 
+
 ###############################################################################
 def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> None:
     async def _run() -> None:
@@ -232,18 +263,24 @@ def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> No
             [
                 LLMResult(
                     content="",
-                    tool_calls=[LLMToolCall(id="1", name="lookup", arguments={"q": "x"})],
+                    tool_calls=[
+                        LLMToolCall(id="1", name="lookup", arguments={"q": "x"})
+                    ],
                 ),
                 LLMResult(content="handled"),
             ]
         )
         registry = _registry()
 
-        async def handler(arguments: dict[str, Any], context: AgentExecutionContext) -> dict[str, Any]:
+        async def handler(
+            arguments: dict[str, Any], context: AgentExecutionContext
+        ) -> dict[str, Any]:
             raise AssertionError("policy-rejected tool must not execute")
 
         registry.register_native_tool(_tool(), handler)
-        loop = NativeToolLoop(provider_factory=_Factory(provider), tool_registry=registry)
+        loop = NativeToolLoop(
+            provider_factory=_Factory(provider), tool_registry=registry
+        )
         result = await loop.run(
             AgentToolLoopRequest(
                 provider="test",
@@ -260,6 +297,7 @@ def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> No
         assert result.tool_results[0].content["error"]["code"] == "tool_rejected"
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_native_tool_loop_uses_the_latest_map_session_result() -> None:

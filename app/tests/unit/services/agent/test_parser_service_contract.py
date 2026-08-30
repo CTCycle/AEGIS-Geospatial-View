@@ -5,6 +5,7 @@ from server.prompts.parser import PARSER_SCHEMA_CORRECTION, build_parser_prompt
 from server.services.agent.parser_service import ParserService
 from server.services.llm.errors import LLMResponseParsingError
 
+
 ###############################################################################
 def _failure():  # noqa: ANN202
     return ParserService.build_parser_failure_turn_result(
@@ -20,6 +21,7 @@ def _failure():  # noqa: ANN202
         },
     )
 
+
 ###############################################################################
 def test_parser_failure_contract_is_non_executable_and_diagnostic() -> None:
     result = _failure()
@@ -33,8 +35,11 @@ def test_parser_failure_contract_is_non_executable_and_diagnostic() -> None:
     assert result.expected_frontend_update == "failure_diagnostic"
     assert result.failure_category == "provider_api"
 
+
 ###############################################################################
-def test_structural_coordinate_extraction_is_independent_of_execution_planning() -> None:
+def test_structural_coordinate_extraction_is_independent_of_execution_planning() -> (
+    None
+):
     extracted = ParserService._extract_coordinate_signal("Show a map of 41.9, 12.5")
 
     assert extracted is not None
@@ -42,9 +47,9 @@ def test_structural_coordinate_extraction_is_independent_of_execution_planning()
     assert extracted.latitude == 41.9
     assert extracted.longitude == 12.5
 
+
 ###############################################################################
 class _PromptProvider:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, invalid_first: bool = False) -> None:
         self.invalid_first = invalid_first
@@ -67,9 +72,9 @@ class _PromptProvider:
             requires_location=False,
         ).model_dump(mode="json")
 
+
 ###############################################################################
 class _PromptFactory:
-
     # -------------------------------------------------------------------------
     def __init__(self, provider: _PromptProvider) -> None:
         self.provider = provider
@@ -78,6 +83,7 @@ class _PromptFactory:
     def get_provider(self, provider: str) -> _PromptProvider:
         _ = provider
         return self.provider
+
 
 ###############################################################################
 def test_parser_uses_canonical_prompt_for_normal_and_schema_correction_calls() -> None:

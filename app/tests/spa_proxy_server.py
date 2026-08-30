@@ -8,6 +8,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib import error, parse, request
 
+
 ###############################################################################
 class SpaProxyHandler(SimpleHTTPRequestHandler):
     server_version = "AEGIS-SpaProxy/1.0"
@@ -99,6 +100,7 @@ class SpaProxyHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(str(exc).encode("utf-8"))
 
+
 ###############################################################################
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -107,6 +109,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--frontend-root", required=True)
     parser.add_argument("--backend-base-url", required=True)
     return parser.parse_args()
+
 
 ###############################################################################
 def main() -> int:

@@ -7,9 +7,9 @@ from server.common.typing import json_array, json_object
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 class GeospatialCatalogService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -28,10 +28,9 @@ class GeospatialCatalogService:
         reliability = json_object(item.get("reliability"))
         requires_credentials = bool(auth.get("required", False))
         capability_kind = str(item.get("capabilityKind") or kind)
-        is_available = (
-            self.runtime_registry.is_enabled(capability_id)
-            and self.runtime_registry.credentials_present(capability_id)
-        )
+        is_available = self.runtime_registry.is_enabled(
+            capability_id
+        ) and self.runtime_registry.credentials_present(capability_id)
         descriptor = {
             "id": capability_id,
             "name": str(item.get("name") or capability_id),
@@ -117,7 +116,9 @@ class GeospatialCatalogService:
         requires_credentials = bool(auth.get("required", False))
         is_available = True
         if requires_credentials:
-            is_available = self.runtime_registry.provider_credentials_present(provider_id)
+            is_available = self.runtime_registry.provider_credentials_present(
+                provider_id
+            )
         return {
             "id": provider_id,
             "name": str(item.get("name") or provider_id),
@@ -158,14 +159,14 @@ class GeospatialCatalogService:
         snapshot = self.capability_registry.load_capabilities()
         self.runtime_registry.build_snapshot()
 
-        providers = [
-            self._provider_descriptor(item) for item in snapshot.providers
-        ]
+        providers = [self._provider_descriptor(item) for item in snapshot.providers]
         basemaps = [
-            self._descriptor(item, "basemap") for item in self.capability_registry.list_basemaps()
+            self._descriptor(item, "basemap")
+            for item in self.capability_registry.list_basemaps()
         ]
         overlays = [
-            self._descriptor(item, "overlay") for item in self.capability_registry.list_overlays()
+            self._descriptor(item, "overlay")
+            for item in self.capability_registry.list_overlays()
         ]
         cameras = [
             self._descriptor(item, "camera-network")
@@ -175,7 +176,10 @@ class GeospatialCatalogService:
             self._descriptor(item, "transit")
             for item in self.capability_registry.list_transit()
         ]
-        tools = [self._descriptor(item, "tool") for item in self.capability_registry.list_tools()]
+        tools = [
+            self._descriptor(item, "tool")
+            for item in self.capability_registry.list_tools()
+        ]
         return {
             "capabilities": basemaps + overlays + cameras + transit + tools,
             "providers": providers,

@@ -9,9 +9,9 @@ from server.contracts.chat import ChatOperationResult, ChatTurnResponse
 from server.contracts.events import RunEventType
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 
+
 ###############################################################################
 class _FakeAgentOrchestrator:
-
     # -------------------------------------------------------------------------
     def __init__(self, response: ChatTurnResponse) -> None:
         self.response = response
@@ -21,9 +21,9 @@ class _FakeAgentOrchestrator:
         _ = payload
         return self.response
 
+
 ###############################################################################
 class _FakeRunRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, snapshot: AgentRunSnapshot) -> None:
         self.snapshot = snapshot
@@ -37,7 +37,9 @@ class _FakeRunRepository:
     # -------------------------------------------------------------------------
     def mark_started(self, run_id: str) -> AgentRunSnapshot:
         assert run_id == self.snapshot.run_id
-        self.snapshot = self.snapshot.model_copy(update={"state": AgentRunState.RUNNING})
+        self.snapshot = self.snapshot.model_copy(
+            update={"state": AgentRunState.RUNNING}
+        )
         return self.snapshot
 
     # -------------------------------------------------------------------------
@@ -51,7 +53,9 @@ class _FakeRunRepository:
     def mark_completed(self, run_id: str) -> AgentRunSnapshot:
         assert run_id == self.snapshot.run_id
         self.completed = True
-        self.snapshot = self.snapshot.model_copy(update={"state": AgentRunState.COMPLETED})
+        self.snapshot = self.snapshot.model_copy(
+            update={"state": AgentRunState.COMPLETED}
+        )
         return self.snapshot
 
     # -------------------------------------------------------------------------
@@ -84,16 +88,18 @@ class _FakeRunRepository:
     # -------------------------------------------------------------------------
     def request_cancel(self, run_id: str) -> AgentRunSnapshot:
         assert run_id == self.snapshot.run_id
-        self.snapshot = self.snapshot.model_copy(update={"state": AgentRunState.CANCELLED})
+        self.snapshot = self.snapshot.model_copy(
+            update={"state": AgentRunState.CANCELLED}
+        )
         return self.snapshot
 
     # -------------------------------------------------------------------------
     def request_cancel_once(self, run_id: str) -> tuple[AgentRunSnapshot, bool]:
         return self.request_cancel(run_id), True
 
+
 ###############################################################################
 class _FakeEventPublisher:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.events: list[dict[str, object]] = []
@@ -101,6 +107,7 @@ class _FakeEventPublisher:
     # -------------------------------------------------------------------------
     async def publish(self, **kwargs):  # noqa: ANN003
         self.events.append(kwargs)
+
 
 ###############################################################################
 def _snapshot() -> AgentRunSnapshot:
@@ -113,6 +120,7 @@ def _snapshot() -> AgentRunSnapshot:
         state=AgentRunState.PENDING,
         created_at=datetime.now(UTC),
     )
+
 
 ###############################################################################
 def _failed_response() -> ChatTurnResponse:
@@ -142,7 +150,11 @@ def _failed_response() -> ChatTurnResponse:
         },
         decision=PolicyDecision.model_validate(
             {
-                "plan": {"state": "direct_response", "action_id": "ask", "mode": "direct_text"},
+                "plan": {
+                    "state": "direct_response",
+                    "action_id": "ask",
+                    "mode": "direct_text",
+                },
                 "trace": {"steps": ["parser_failed"]},
             }
         ),
@@ -152,6 +164,7 @@ def _failed_response() -> ChatTurnResponse:
             message="Configured parser model is unavailable.",
         ),
     )
+
 
 ###############################################################################
 def test_execute_run_marks_failed_operation_as_failed_run() -> None:

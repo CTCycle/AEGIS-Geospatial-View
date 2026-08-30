@@ -6,7 +6,11 @@ from typing import Any
 from server.common.logger import logger as LOGGER
 from server.domain.agent.context import ConversationDirective
 from server.domain.agent.execution import AgentExecutionContext
-from server.domain.agent.pipeline import ConversationTaskRecord, ToolPlan, VisualizationUpdate
+from server.domain.agent.pipeline import (
+    ConversationTaskRecord,
+    ToolPlan,
+    VisualizationUpdate,
+)
 from server.contracts.chat import ChatOperationResult, ChatTurnResponse
 from server.contracts.extraction import TurnParseResult
 from server.contracts.geospatial import MapSession, OverlayMutationResult
@@ -21,9 +25,9 @@ from server.services.chat.history_service import ChatHistoryService
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 
+
 ###############################################################################
 class PlannedTurnExecutionService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -53,7 +57,9 @@ class PlannedTurnExecutionService:
         try:
             return MapSession.model_validate(raw)
         except Exception:
-            LOGGER.warning("Ignoring invalid active map session while applying overlay command")
+            LOGGER.warning(
+                "Ignoring invalid active map session while applying overlay command"
+            )
             return None
 
     # -------------------------------------------------------------------------
@@ -85,7 +91,10 @@ class PlannedTurnExecutionService:
         for command in turn_contract.overlay_commands:
             if command.action in {"remove", "keep_only", "hide"}:
                 continue
-            if command.action in {"show", "update"} and not OverlayCollectionService.has_matching_instances(
+            if command.action in {
+                "show",
+                "update",
+            } and not OverlayCollectionService.has_matching_instances(
                 collection,
                 command,
                 current_view=current_view,
@@ -95,7 +104,12 @@ class PlannedTurnExecutionService:
                 return False
             if command.action == "show":
                 continue
-            if command.action == "update" and command.patch.time is None and command.patch.style is None and command.patch.format is None:
+            if (
+                command.action == "update"
+                and command.patch.time is None
+                and command.patch.style is None
+                and command.patch.format is None
+            ):
                 continue
             return False
         return True
@@ -141,32 +155,36 @@ class PlannedTurnExecutionService:
                 tool_plan,
                 native_context,
                 on_tool_started=(
-                    lambda step: progress_callback(
-                        "tool_call_started",
-                        {
-                            "request_id": request_id,
-                            "conversation_id": conversation_id,
-                            "tool_call_id": step.step_id,
-                            "name": step.tool_name,
-                        },
+                    lambda step: (
+                        progress_callback(
+                            "tool_call_started",
+                            {
+                                "request_id": request_id,
+                                "conversation_id": conversation_id,
+                                "tool_call_id": step.step_id,
+                                "name": step.tool_name,
+                            },
+                        )
+                        if progress_callback is not None
+                        else None
                     )
-                    if progress_callback is not None
-                    else None
                 ),
                 on_tool_completed=(
-                    lambda result: progress_callback(
-                        "tool_call_completed",
-                        {
-                            "request_id": request_id,
-                            "conversation_id": conversation_id,
-                            "tool_call_id": result.step_id,
-                            "name": result.provenance.tool_name,
-                            "ok": result.ok,
-                            "error": result.error_message,
-                        },
+                    lambda result: (
+                        progress_callback(
+                            "tool_call_completed",
+                            {
+                                "request_id": request_id,
+                                "conversation_id": conversation_id,
+                                "tool_call_id": result.step_id,
+                                "name": result.provenance.tool_name,
+                                "ok": result.ok,
+                                "error": result.error_message,
+                            },
+                        )
+                        if progress_callback is not None
+                        else None
                     )
-                    if progress_callback is not None
-                    else None
                 ),
             )
         tool_payload: dict[str, Any] = {
@@ -176,7 +194,9 @@ class PlannedTurnExecutionService:
                     "id": result.step_id,
                     "name": result.provenance.tool_name,
                     "arguments": next(
-                        step.arguments for step in tool_plan.steps if step.step_id == result.step_id
+                        step.arguments
+                        for step in tool_plan.steps
+                        if step.step_id == result.step_id
                     ),
                 }
                 for result in planned_results
@@ -207,7 +227,11 @@ class PlannedTurnExecutionService:
             result
             for result in planned_results
             if not result.ok
-            and next(step.required for step in tool_plan.steps if step.step_id == result.step_id)
+            and next(
+                step.required
+                for step in tool_plan.steps
+                if step.step_id == result.step_id
+            )
         ]
         if not local_overlay_mutation:
             map_session = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
@@ -234,16 +258,31 @@ class PlannedTurnExecutionService:
             ),
             None,
         )
-        direct_result = self.turn_state_assembler.extract_direct_result_from_tool_results(tool_payload)
+        direct_result = (
+            self.turn_state_assembler.extract_direct_result_from_tool_results(
+                tool_payload
+            )
+        )
         if required_failures and map_session is None and direct_result is None:
-            assistant_message = required_failures[0].error_message or "The required geospatial tool failed."
-            operation = ChatOperationResult(kind="error", status="failed", message=assistant_message)
-        elif turn_contract.task_class == "map_search" and map_session is None and direct_result is None:
+            assistant_message = (
+                required_failures[0].error_message
+                or "The required geospatial tool failed."
+            )
+            operation = ChatOperationResult(
+                kind="error", status="failed", message=assistant_message
+            )
+        elif (
+            turn_contract.task_class == "map_search"
+            and map_session is None
+            and direct_result is None
+        ):
             assistant_message = (
                 "I could not create a map session from this request. "
                 "Try a more specific place name or choose an available map layer."
             )
-            operation = ChatOperationResult(kind="error", status="failed", message=assistant_message)
+            operation = ChatOperationResult(
+                kind="error", status="failed", message=assistant_message
+            )
         else:
             assistant_message = AgentResponseBuilder.build_verified_assistant_message(
                 "",
@@ -261,7 +300,10 @@ class PlannedTurnExecutionService:
                 is_capability_question=False,
                 require_verified_result=turn_contract.task_class == "map_search",
             )
-            if any(not result.ok for result in planned_results) and operation.status == "success":
+            if (
+                any(not result.ok for result in planned_results)
+                and operation.status == "success"
+            ):
                 operation = operation.model_copy(update={"status": "partial"})
             if turn_contract.clarification_plan is not None:
                 operation = operation.model_copy(update={"status": "partial"})
@@ -288,7 +330,9 @@ class PlannedTurnExecutionService:
                 ],
                 task_snapshot=self.task_state_service.serialize(conversation_key),
             )
-            synthesis_category = getattr(self.response_synthesizer, "last_failure_category", None)
+            synthesis_category = getattr(
+                self.response_synthesizer, "last_failure_category", None
+            )
             operation = operation.model_copy(
                 update={
                     "message": assistant_message,
@@ -303,7 +347,8 @@ class PlannedTurnExecutionService:
                             else []
                         ),
                     ],
-                    "failure_category": synthesis_category or operation.failure_category,
+                    "failure_category": synthesis_category
+                    or operation.failure_category,
                 }
             )
         decision = AgentResponseBuilder.build_final_decision(
@@ -326,7 +371,9 @@ class PlannedTurnExecutionService:
             direct_result=direct_result,
             tool_payload=tool_payload,
         )
-        failure = self.turn_state_assembler.failure_from_operation(operation, tool_payload)
+        failure = self.turn_state_assembler.failure_from_operation(
+            operation, tool_payload
+        )
         self.task_state_service.update_task(
             conversation_key,
             task.task_id,
@@ -373,7 +420,9 @@ class PlannedTurnExecutionService:
         visualization_update = VisualizationUpdate(
             basemap_replacement=(
                 tool_plan.visualization_update.get("basemap_replacement")
-                if isinstance(tool_plan.visualization_update.get("basemap_replacement"), str)
+                if isinstance(
+                    tool_plan.visualization_update.get("basemap_replacement"), str
+                )
                 else turn_contract.requested_basemap
             ),
             add_layer_ids=(
@@ -383,7 +432,9 @@ class PlannedTurnExecutionService:
             ),
             remove_layer_ids=removed_instance_ids,
             collection_revision=(
-                map_session.overlay_collection_revision if map_session is not None else None
+                map_session.overlay_collection_revision
+                if map_session is not None
+                else None
             ),
             added_instance_ids=added_instance_ids,
             removed_instance_ids=removed_instance_ids,

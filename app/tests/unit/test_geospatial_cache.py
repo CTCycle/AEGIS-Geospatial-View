@@ -7,9 +7,9 @@ from server.services.geospatial.cache import (
 )
 from server.services.geospatial.providers.base import ProviderRequest
 
+
 ###############################################################################
 class _Clock:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.value = 0.0
@@ -18,12 +18,18 @@ class _Clock:
     def __call__(self) -> float:
         return self.value
 
+
 ###############################################################################
 def test_geospatial_cache_returns_hit_stale_then_miss() -> None:
     clock = _Clock()
     cache = GeospatialCache(clock=clock)
 
-    cache.set("rainviewer:metadata", {"frame": 1}, ttl_seconds=10, stale_while_revalidate_seconds=5)
+    cache.set(
+        "rainviewer:metadata",
+        {"frame": 1},
+        ttl_seconds=10,
+        stale_while_revalidate_seconds=5,
+    )
 
     assert cache.get("rainviewer:metadata").status == CacheLookupStatus.HIT
     clock.value = 11.0
@@ -33,6 +39,7 @@ def test_geospatial_cache_returns_hit_stale_then_miss() -> None:
     clock.value = 16.0
     assert cache.get("rainviewer:metadata").status == CacheLookupStatus.MISS
 
+
 ###############################################################################
 def test_geospatial_cache_can_invalidate_entries() -> None:
     cache = GeospatialCache()
@@ -41,6 +48,7 @@ def test_geospatial_cache_can_invalidate_entries() -> None:
     cache.invalidate("openaq:stations")
 
     assert cache.get("openaq:stations").status == CacheLookupStatus.MISS
+
 
 ###############################################################################
 def test_geospatial_cache_key_for_request_excludes_raw_credentials() -> None:

@@ -3,7 +3,12 @@ from __future__ import annotations
 from tests.conftest import run_async_in_thread
 from typing import Any
 
-from server.domain.agent.decision import ClarificationRequest, DecisionTrace, ExecutionPlan, PolicyDecision
+from server.domain.agent.decision import (
+    ClarificationRequest,
+    DecisionTrace,
+    ExecutionPlan,
+    PolicyDecision,
+)
 from server.domain.agent.pipeline import ConversationTaskRecord, TaskFailureDetail
 from server.contracts.extraction import (
     ConversationContextSnapshot,
@@ -13,9 +18,9 @@ from server.contracts.extraction import (
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.direct_turn_response import DirectTurnResponseService
 
+
 ###############################################################################
 class _History:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.messages: list[dict[str, Any]] = []
@@ -24,12 +29,13 @@ class _History:
     def append_message(self, **kwargs: Any) -> None:
         self.messages.append(kwargs)
 
+
 ###############################################################################
 class _Synthesizer:
-
     # -------------------------------------------------------------------------
     def synthesize(self, *, fallback_text: str, **_: Any) -> str:
         return f"synthesized: {fallback_text}"
+
 
 ###############################################################################
 def _turn(
@@ -52,12 +58,18 @@ def _turn(
         ambiguities=ambiguities or [],
     )
 
-###############################################################################
-def _task(state: ConversationTaskStateService, turn: TurnParseResult) -> ConversationTaskRecord:
-    return state.start_task("conversation", turn, "direct_chat")
 
 ###############################################################################
-def _service() -> tuple[DirectTurnResponseService, ConversationTaskStateService, _History]:
+def _task(
+    state: ConversationTaskStateService, turn: TurnParseResult
+) -> ConversationTaskRecord:
+    return state.start_task("conversation", turn, "direct_chat")
+
+
+###############################################################################
+def _service() -> tuple[
+    DirectTurnResponseService, ConversationTaskStateService, _History
+]:
     state = ConversationTaskStateService()
     history = _History()
     return (
@@ -69,6 +81,7 @@ def _service() -> tuple[DirectTurnResponseService, ConversationTaskStateService,
         state,
         history,
     )
+
 
 ###############################################################################
 def test_parser_authentication_failure_persists_stable_failure_response() -> None:
@@ -99,6 +112,7 @@ def test_parser_authentication_failure_persists_stable_failure_response() -> Non
         assert response.task_snapshot.tasks[-1].status == "failed"
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_provider_authentication_failure_persists_stable_failure_response() -> None:
@@ -132,6 +146,7 @@ def test_provider_authentication_failure_persists_stable_failure_response() -> N
         assert history.messages[-1]["content"] == response.assistant_message
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_failure_inquiry_explains_the_latest_structured_failure() -> None:
@@ -174,6 +189,7 @@ def test_failure_inquiry_explains_the_latest_structured_failure() -> None:
 
     run_async_in_thread(_run())
 
+
 ###############################################################################
 def test_preflight_clarification_is_persisted_as_partial_response() -> None:
     async def _run() -> None:
@@ -210,9 +226,12 @@ def test_preflight_clarification_is_persisted_as_partial_response() -> None:
         assert response.operation.kind == "clarification"
         assert response.operation.status == "partial"
         assert response.assistant_message == "synthesized: Which location should I use?"
-        assert history.messages[-1]["structured_payload"]["decision"] == decision.model_dump(mode="json")
+        assert history.messages[-1]["structured_payload"][
+            "decision"
+        ] == decision.model_dump(mode="json")
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_general_question_uses_active_map_location_without_tool_call() -> None:
@@ -236,6 +255,7 @@ def test_general_question_uses_active_map_location_without_tool_call() -> None:
         assert "Lugano" in response.assistant_message
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_context_question_bypasses_map_planning_and_parser_failure() -> None:
@@ -271,6 +291,7 @@ def test_context_question_bypasses_map_planning_and_parser_failure() -> None:
         assert response.operation.kind == "direct_answer"
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_map_summary_bypasses_parser_failure_without_inventing_areas() -> None:

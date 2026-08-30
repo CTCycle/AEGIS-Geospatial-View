@@ -32,6 +32,7 @@ from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCach
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ChatRuntime:
@@ -40,6 +41,7 @@ class ChatRuntime:
     maintenance_service: ChatMaintenanceService
     agent_orchestrator: AgentOrchestrator
     conversation_repository: ConversationRepository
+
 
 ###############################################################################
 def build_chat_runtime(

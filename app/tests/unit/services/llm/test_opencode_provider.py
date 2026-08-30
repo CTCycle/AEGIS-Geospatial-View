@@ -12,13 +12,14 @@ from server.services.llm.opencode_provider import (
 )
 from server.services.llm.types import LLMRequest
 
+
 ###############################################################################
 class _StructuredPayload(BaseModel):
     answer: str
 
+
 ###############################################################################
 class _Response:
-
     # -------------------------------------------------------------------------
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
@@ -31,9 +32,9 @@ class _Response:
     def json(self) -> dict[str, object]:
         return self.payload
 
+
 ###############################################################################
 class _Completions:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
@@ -49,16 +50,19 @@ class _Completions:
             choices=[SimpleNamespace(message=message, finish_reason="stop")]
         )
 
+
 ###############################################################################
 class _Client:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.completions = _Completions()
         self.chat = SimpleNamespace(completions=self.completions)
 
+
 ###############################################################################
-def test_zen_catalog_keeps_live_models_even_when_static_capabilities_are_unknown(monkeypatch) -> None:
+def test_zen_catalog_keeps_live_models_even_when_static_capabilities_are_unknown(
+    monkeypatch,
+) -> None:
     captured: dict[str, object] = {}
 
     def fake_get(url: str, **kwargs):  # noqa: ANN003, ANN202
@@ -85,6 +89,7 @@ def test_zen_catalog_keeps_live_models_even_when_static_capabilities_are_unknown
     assert captured["url"] == "https://opencode.ai/zen/v1/models"
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer test-key"
 
+
 ###############################################################################
 def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
@@ -93,6 +98,7 @@ def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     assert provider.supports_tools("deepseek-v4-flash") is True
     assert provider.supports_structured_output("deepseek-v4-flash") is True
     assert provider.supports_tools("claude-opus-5") is None
+
 
 ###############################################################################
 def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -> None:

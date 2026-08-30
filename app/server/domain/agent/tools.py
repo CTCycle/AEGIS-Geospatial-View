@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.domain.agent.actions import AgentAction
 from server.domain.llm.types import LLMToolDefinition
 
+
 ###############################################################################
 class AgentToolName(str, Enum):
     SEARCH_MAPS = "search_maps"
@@ -21,17 +22,21 @@ class AgentToolName(str, Enum):
     INTERROGATE_VISIBLE_LAYERS = "interrogate_visible_layers"
     COMBINE_MAP_DATA_WITH_EXTERNAL_SOURCES = "combine_map_data_with_external_sources"
 
+
 ###############################################################################
 class AgentToolDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
     description: str
-    parameters_json_schema: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    parameters_json_schema: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]()
+    )
     action_scope: list[AgentAction] = Field(default_factory=lambda: list[AgentAction]())
     requires_map_context: bool = False
     source_manifest_id: str | None = None
     source_capability_id: str | None = None
+
 
 ###############################################################################
 class AgentToolCall(BaseModel):
@@ -40,6 +45,7 @@ class AgentToolCall(BaseModel):
     id: str | None = None
     name: str
     arguments: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+
 
 ###############################################################################
 class AgentToolResult(BaseModel):
@@ -50,11 +56,13 @@ class AgentToolResult(BaseModel):
     result: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     error: str | None = None
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ToolError:
     code: str
     message: str
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -74,6 +82,7 @@ class ToolExecutionEnvelope:
             else {"code": self.error.code, "message": self.error.message},
             "metadata": self.metadata,
         }
+
 
 ###############################################################################
 @dataclass(frozen=True)

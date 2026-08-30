@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 from server.contracts.geospatial import LayerHealthStatus
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class SourceHealthRecord:

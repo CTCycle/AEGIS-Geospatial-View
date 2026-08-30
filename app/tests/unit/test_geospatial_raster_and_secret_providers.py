@@ -6,6 +6,7 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.rainviewer import RainViewerProvider
 from server.services.geospatial.providers.tomtom import TomTomProvider
 
+
 ###############################################################################
 def test_rainviewer_provider_emits_renderable_raster_payload() -> None:
     rainviewer = run_async_in_thread(
@@ -16,6 +17,7 @@ def test_rainviewer_provider_emits_renderable_raster_payload() -> None:
 
     assert rainviewer.payload["renderingMode"] == "raster-tile"
     assert rainviewer.attribution
+
 
 ###############################################################################
 def test_tomtom_traffic_flow_keeps_key_server_side() -> None:

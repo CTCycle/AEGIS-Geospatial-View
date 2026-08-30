@@ -1,5 +1,6 @@
 from server.services.agent.orchestrator import AgentOrchestrator
 
+
 ###############################################################################
 def test_map_session_message_uses_human_readable_labels() -> None:
     message = AgentOrchestrator._compose_map_session_message(
@@ -20,6 +21,7 @@ def test_map_session_message_uses_human_readable_labels() -> None:
     assert "osm_default" not in message
     assert "tomtom_traffic_flow" not in message
 
+
 ###############################################################################
 def test_map_session_message_humanizes_missing_label_fallbacks() -> None:
     message = AgentOrchestrator._compose_map_session_message(
@@ -37,6 +39,7 @@ def test_map_session_message_humanizes_missing_label_fallbacks() -> None:
     assert "osm_default" not in message
     assert "rainviewer_precipitation_radar" not in message
 
+
 ###############################################################################
 def test_map_session_message_includes_readable_warnings() -> None:
     message = AgentOrchestrator._compose_map_session_message(
@@ -53,7 +56,10 @@ def test_map_session_message_includes_readable_warnings() -> None:
     )
 
     assert "Some requested map data needs attention:" in message
-    assert "TomTom Traffic Flow: TomTom API key is required to render this provider tile layer." in message
+    assert (
+        "TomTom Traffic Flow: TomTom API key is required to render this provider tile layer."
+        in message
+    )
     assert "TOMTOM_API_KEY" not in message
 
 
@@ -76,6 +82,7 @@ def test_map_session_message_reports_current_visibility_state() -> None:
     assert "Visible overlays: the Traffic overlay." in message
     assert "Hidden overlays: the Weather Forecast overlay." in message
     assert "I added" not in message
+
 
 ###############################################################################
 def test_direct_coordinate_message_includes_coordinates() -> None:
@@ -101,6 +108,7 @@ def test_direct_coordinate_message_includes_coordinates() -> None:
     assert message == "Coordinates for Shibuya Crossing: 35.659495, 139.700498."
     assert "Executed direct tool" not in message
 
+
 ###############################################################################
 def test_direct_weather_message_summarizes_current_conditions() -> None:
     message = AgentOrchestrator._compose_direct_tool_message(
@@ -121,8 +129,12 @@ def test_direct_weather_message_summarizes_current_conditions() -> None:
         },
     )
 
-    assert message == "Weather for Naples at 2026-04-24T18:45: temperature 18.6 C, precipitation 0 mm."
+    assert (
+        message
+        == "Weather for Naples at 2026-04-24T18:45: temperature 18.6 C, precipitation 0 mm."
+    )
     assert "Executed direct tool" not in message
+
 
 ###############################################################################
 def test_parser_runtime_failure_message_is_actionable() -> None:
@@ -133,6 +145,7 @@ def test_parser_runtime_failure_message_is_actionable() -> None:
 
     assert AgentOrchestrator._has_parser_runtime_failure(_TurnContract())
 
+
 ###############################################################################
 def test_provider_parser_failure_is_terminal_even_after_heuristic_extraction() -> None:
 
@@ -142,6 +155,7 @@ def test_provider_parser_failure_is_terminal_even_after_heuristic_extraction() -
         task_class = "map_search"
 
     assert AgentOrchestrator._has_parser_runtime_failure(_TurnContract())
+
 
 ###############################################################################
 def test_general_question_can_answer_previous_user_request() -> None:
@@ -156,6 +170,7 @@ def test_general_question_can_answer_previous_user_request() -> None:
 
     assert message == "You just asked: Show me Rome"
 
+
 ###############################################################################
 def test_general_question_can_answer_active_map_location() -> None:
     message = AgentOrchestrator._compose_general_question_message(
@@ -166,6 +181,7 @@ def test_general_question_can_answer_active_map_location() -> None:
 
     assert message == "The map is currently centered on Lugano."
 
+
 ###############################################################################
 def test_general_question_accepts_which_city_variant() -> None:
     message = AgentOrchestrator._compose_general_question_message(
@@ -175,6 +191,7 @@ def test_general_question_accepts_which_city_variant() -> None:
     )
 
     assert message == "The map is currently centered on Zurich."
+
 
 ###############################################################################
 def test_general_question_can_answer_active_map_overlays() -> None:
@@ -198,6 +215,7 @@ def test_general_question_can_answer_active_map_overlays() -> None:
         "The current map includes these overlays: Open-Meteo Air Quality Forecast."
     )
 
+
 ###############################################################################
 def test_general_question_can_summarize_active_map() -> None:
     message = AgentOrchestrator._compose_general_question_message(
@@ -216,6 +234,7 @@ def test_general_question_can_summarize_active_map() -> None:
         "The map is centered on Zurich using Satellite Imagery. "
         "The current map has no overlays requested."
     )
+
 
 ###############################################################################
 def test_general_question_can_summarize_interesting_areas_from_active_map() -> None:

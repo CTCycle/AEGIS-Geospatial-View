@@ -20,6 +20,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class NOAAProvider(GeospatialProvider):
     provider_id = "noaa"
@@ -138,7 +139,9 @@ class NOAAProvider(GeospatialProvider):
         warnings = list(station_warnings)
         for station in selected:
             station_id = str(station["id"])
-            observation_url = f"{self.COOPS_DATA_URL}?{urlencode({**query, 'station': station_id})}"
+            observation_url = (
+                f"{self.COOPS_DATA_URL}?{urlencode({**query, 'station': station_id})}"
+            )
             payload = await call_json_fetcher(
                 self.fetcher,
                 observation_url,
@@ -146,7 +149,9 @@ class NOAAProvider(GeospatialProvider):
             )
             feature = _normalize_coops_observation(payload, station, query)
             if feature is None:
-                warnings.append(f"NOAA station '{station_id}' returned no current water level.")
+                warnings.append(
+                    f"NOAA station '{station_id}' returned no current water level."
+                )
             else:
                 features.append(feature)
 
@@ -200,9 +205,12 @@ class NOAAProvider(GeospatialProvider):
                 return (
                     [json_object(item) for item in json_array(cached.value)],
                     True,
-                    ["NOAA station metadata refresh failed; using stale station metadata."],
+                    [
+                        "NOAA station metadata refresh failed; using stale station metadata."
+                    ],
                 )
             raise
+
 
 ###############################################################################
 def _coops_query(request: ProviderRequest) -> dict[str, str]:
@@ -217,6 +225,7 @@ def _coops_query(request: ProviderRequest) -> dict[str, str]:
         "format": "json",
         "application": "AEGIS-Geospatial-View",
     }
+
 
 ###############################################################################
 def _normalize_coops_stations(payload: object) -> list[dict[str, object]]:
@@ -256,6 +265,7 @@ def _normalize_coops_stations(payload: object) -> list[dict[str, object]]:
         )
     return stations
 
+
 ###############################################################################
 def _filter_stations(
     stations: list[dict[str, object]], request: ProviderRequest
@@ -277,6 +287,7 @@ def _filter_stations(
     limit = max(1, min(int(request.params.get("station_limit") or 25), 100))
     return filtered[:limit]
 
+
 ###############################################################################
 def _normalize_coops_observation(
     payload: object,
@@ -284,7 +295,9 @@ def _normalize_coops_observation(
     query: dict[str, str],
 ) -> dict[str, object] | None:
     if not is_json_object(payload):
-        raise ProviderMalformedPayloadError("NOAA CO-OPS observation must be an object.")
+        raise ProviderMalformedPayloadError(
+            "NOAA CO-OPS observation must be an object."
+        )
     if payload.get("error"):
         raise ProviderUnavailableError("NOAA CO-OPS rejected the observation request.")
     raw_data = payload.get("data")
@@ -294,7 +307,9 @@ def _normalize_coops_observation(
         )
     for raw_item in reversed(json_array(raw_data)):
         item = json_object(raw_item)
-        value = _float_or_none(item.get("v") if item.get("v") is not None else item.get("value"))
+        value = _float_or_none(
+            item.get("v") if item.get("v") is not None else item.get("value")
+        )
         timestamp = item.get("t") or item.get("time")
         if value is None or not isinstance(timestamp, str) or not timestamp.strip():
             continue
@@ -315,14 +330,16 @@ def _normalize_coops_observation(
         }
     return None
 
+
 ###############################################################################
 def _float_or_none(value: object) -> float | None:
     if not isinstance(value, int | float | str):
         return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
+
 
 ###############################################################################
 def _station_in_bbox(
@@ -339,6 +356,7 @@ def _station_in_bbox(
         return False
     return south <= latitude <= north and west <= longitude <= east
 
+
 ###############################################################################
 def _normalize_noaa_alerts(payload: object) -> list[dict[str, object]]:
     if not is_json_object(payload):
@@ -351,7 +369,9 @@ def _normalize_noaa_alerts(payload: object) -> list[dict[str, object]]:
         if not is_json_object(item):
             continue
         properties = json_object(item.get("properties"))
-        geometry = item.get("geometry") if is_json_object(item.get("geometry")) else None
+        geometry = (
+            item.get("geometry") if is_json_object(item.get("geometry")) else None
+        )
         features.append(
             {
                 "id": str(item.get("id") or properties.get("id") or ""),

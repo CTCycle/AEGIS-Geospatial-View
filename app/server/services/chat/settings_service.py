@@ -23,13 +23,14 @@ from server.services.chat.model_library import (
 from server.services.cryptography import CredentialEncryptionService
 from server.services.llm.context_budget import resolve_model_context_profile
 
+
 ###############################################################################
 class ChatSettingsValidationError(ValueError):
     pass
 
+
 ###############################################################################
 class ChatSettingsService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -93,7 +94,9 @@ class ChatSettingsService:
             selected = self.model_library_service.find_model(
                 provider=record.agent_model_provider,
                 model_name=record.agent_model_name,
-                ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url),
+                ollama_url=self.model_library_service.normalize_ollama_url(
+                    record.ollama_url
+                ),
             )
             if selected is not None:
                 for key in (
@@ -157,9 +160,7 @@ class ChatSettingsService:
             else current.agent_model_name
         )
         next_ollama_url = self.model_library_service.normalize_ollama_url(
-            payload.ollama_url
-            if payload.ollama_url is not None
-            else current.ollama_url
+            payload.ollama_url if payload.ollama_url is not None else current.ollama_url
         )
         next_openai_base_url = (
             None
@@ -225,7 +226,9 @@ class ChatSettingsService:
         return self.get_settings()
 
     # -------------------------------------------------------------------------
-    def _available_models(self, *, ollama_url: str) -> dict[str, list[dict[str, object]]]:
+    def _available_models(
+        self, *, ollama_url: str
+    ) -> dict[str, list[dict[str, object]]]:
         available: dict[str, list[dict[str, object]]] = {}
         libraries = [
             self.model_library_service.list_models(ollama_url=ollama_url),
@@ -273,7 +276,9 @@ class ChatSettingsService:
             return record
 
         available_models = self._available_models(
-            ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url)
+            ollama_url=self.model_library_service.normalize_ollama_url(
+                record.ollama_url
+            )
         )
         repaired = self._select_agent_assignment(
             current_provider=assignment["provider"],
@@ -290,12 +295,16 @@ class ChatSettingsService:
         self._validate_local_model_selection(
             agent_model_provider=repaired["provider"],
             agent_model_name=repaired["model"],
-            ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url),
+            ollama_url=self.model_library_service.normalize_ollama_url(
+                record.ollama_url
+            ),
         )
         self._validate_agent_capabilities(
             agent_model_provider=repaired["provider"],
             agent_model_name=repaired["model"],
-            ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url),
+            ollama_url=self.model_library_service.normalize_ollama_url(
+                record.ollama_url
+            ),
         )
         return self._persist_agent_assignment(
             record,
@@ -375,7 +384,10 @@ class ChatSettingsService:
             raise ChatSettingsValidationError(
                 "Selected agent model does not support native tool calling."
             )
-        if agent_model is not None and agent_model.get("supports_structured_output") is False:
+        if (
+            agent_model is not None
+            and agent_model.get("supports_structured_output") is False
+        ):
             raise ChatSettingsValidationError(
                 "Selected agent model does not support structured output."
             )
@@ -449,9 +461,7 @@ class ChatSettingsService:
             }.get(provider, [])
         )
         candidates = [
-            item
-            for item in models
-            if self._agent_requirements_met(model=item)
+            item for item in models if self._agent_requirements_met(model=item)
         ]
         if not candidates:
             return None

@@ -20,9 +20,9 @@ from server.services.agent.location_resolver import LocationResolver
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 class PolicyEngine:
-
     LOCATION_AMBIGUITY_CODES = frozenset(
         {
             "ambiguous_place_name",
@@ -139,7 +139,11 @@ class PolicyEngine:
                 reason="Request contains blocked policy patterns.",
             )
         allowed = constraints.get("allowed_tool_names")
-        if is_json_array(allowed) and allowed and tool_name not in set(map(str, allowed)):
+        if (
+            is_json_array(allowed)
+            and allowed
+            and tool_name not in set(map(str, allowed))
+        ):
             return ToolAuthorizationResult(
                 allowed=False,
                 reason=f"Tool '{tool_name}' is not allowed by policy constraints.",
@@ -210,27 +214,40 @@ class PolicyEngine:
             return ToolAuthorizationResult(
                 allowed=False,
                 reason=f"Capability '{capability_id}' is disabled.",
-                metadata={"code": "unsupported_capability", "provider_health": provider_health},
+                metadata={
+                    "code": "unsupported_capability",
+                    "provider_health": provider_health,
+                },
             )
         if provider_health == "missing_credentials":
             return ToolAuthorizationResult(
                 allowed=False,
                 reason=f"Capability '{capability_id}' requires provider credentials.",
-                metadata={"code": "missing_credentials", "provider_health": provider_health},
+                metadata={
+                    "code": "missing_credentials",
+                    "provider_health": provider_health,
+                },
             )
 
         requested_mode = self._requested_capability_mode(parsed_request)
-        if requested_mode is not None and not runtime_registry.supports_mode(capability_id, requested_mode):
+        if requested_mode is not None and not runtime_registry.supports_mode(
+            capability_id, requested_mode
+        ):
             return ToolAuthorizationResult(
                 allowed=False,
                 reason=(
                     f"Capability '{capability_id}' does not support the requested "
                     f"{'map' if requested_mode == 'map' else 'direct text'} mode."
                 ),
-                metadata={"code": "unsupported_capability", "requested_mode": requested_mode},
+                metadata={
+                    "code": "unsupported_capability",
+                    "requested_mode": requested_mode,
+                },
             )
 
-        if self._requires_location_for_capability(parsed_request, capability) and not self._has_location_context(
+        if self._requires_location_for_capability(
+            parsed_request, capability
+        ) and not self._has_location_context(
             arguments=arguments,
             parsed_request=parsed_request,
         ):
@@ -251,7 +268,9 @@ class PolicyEngine:
         return ToolAuthorizationResult(allowed=True)
 
     # -------------------------------------------------------------------------
-    def _validate_task_class(self, turn: TurnParseResult) -> ClarificationRequest | None:
+    def _validate_task_class(
+        self, turn: TurnParseResult
+    ) -> ClarificationRequest | None:
         if turn.task_class in {"map_search", "direct_query", "general_question"}:
             return None
         return ClarificationRequest(
@@ -261,7 +280,9 @@ class PolicyEngine:
         )
 
     # -------------------------------------------------------------------------
-    def _enforce_location_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
+    def _enforce_location_policy(
+        self, turn: TurnParseResult
+    ) -> ClarificationRequest | None:
         location_ambiguity = self._build_location_ambiguity_clarification(turn)
         if location_ambiguity is not None:
             return location_ambiguity
@@ -271,10 +292,9 @@ class PolicyEngine:
                 reason="The request refers to a previous location, but no active location is available.",
                 missing_fields=["location"],
             )
-        if (
-            any(signal.signal_type == "deictic" for signal in turn.location_signals)
-            and not turn.conversation_context.memory_snapshot.get("active_location")
-        ):
+        if any(
+            signal.signal_type == "deictic" for signal in turn.location_signals
+        ) and not turn.conversation_context.memory_snapshot.get("active_location"):
             return ClarificationRequest(
                 question="Which location should I use?",
                 reason="The request refers to a previous location, but no active location is available.",
@@ -390,13 +410,17 @@ class PolicyEngine:
         return ""
 
     # -------------------------------------------------------------------------
-    def _enforce_safety_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
+    def _enforce_safety_policy(
+        self, turn: TurnParseResult
+    ) -> ClarificationRequest | None:
         actionable_patterns = self._actionable_disallowed_patterns(turn)
         if not actionable_patterns:
             return None
         return ClarificationRequest(
             question="I cannot execute this request with the current policy constraints.",
-            reason="; ".join(item.reason for item in actionable_patterns if item.reason),
+            reason="; ".join(
+                item.reason for item in actionable_patterns if item.reason
+            ),
             missing_fields=[],
         )
 
@@ -411,7 +435,9 @@ class PolicyEngine:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _requires_location_for_capability(parsed_request: TurnParseResult, capability: dict[str, Any]) -> bool:
+    def _requires_location_for_capability(
+        parsed_request: TurnParseResult, capability: dict[str, Any]
+    ) -> bool:
         if parsed_request.normalized_action.requires_location:
             return True
         metadata = json_object(capability.get("metadata"))
@@ -425,11 +451,15 @@ class PolicyEngine:
         arguments: dict[str, Any],
         parsed_request: TurnParseResult,
     ) -> bool:
-        if any(key in arguments for key in ("location", "latitude", "longitude", "bbox")):
+        if any(
+            key in arguments for key in ("location", "latitude", "longitude", "bbox")
+        ):
             return True
         if parsed_request.location_signals:
             return True
-        active_location = parsed_request.conversation_context.memory_snapshot.get("active_location")
+        active_location = parsed_request.conversation_context.memory_snapshot.get(
+            "active_location"
+        )
         return is_json_object(active_location) and bool(active_location.get("label"))
 
     # -------------------------------------------------------------------------

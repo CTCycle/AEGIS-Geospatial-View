@@ -40,6 +40,7 @@ WMS_XML = """<?xml version="1.0"?>
 </WMS_Capabilities>
 """
 
+
 ###############################################################################
 async def _assert_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None) -> str:
@@ -60,6 +61,7 @@ async def _assert_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
     assert layer.render.tile_url_template is not None
     assert "GoogleMapsCompatible_Level9" in layer.render.tile_url_template
 
+
 ###############################################################################
 async def _assert_nasa_gibs_provider_describes_one_layer() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None) -> str:
@@ -73,9 +75,11 @@ async def _assert_nasa_gibs_provider_describes_one_layer() -> None:
     assert layer.title == "MODIS Terra NDVI 8-Day"
     assert "EPSG:3857" in layer.crs
 
+
 ###############################################################################
 def test_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
     run_async_in_thread(_assert_nasa_gibs_provider_parses_xml_and_prefers_wmts())
+
 
 ###############################################################################
 def test_nasa_gibs_provider_describes_one_layer() -> None:

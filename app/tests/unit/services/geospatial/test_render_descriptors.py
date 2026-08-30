@@ -9,9 +9,9 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.search.request_builder import RequestBuilder
 
+
 ###############################################################################
 class _CapabilityRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(self, capability: dict) -> None:
         self.capability = capability
@@ -19,6 +19,7 @@ class _CapabilityRegistry:
     # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict | None:
         return self.capability if self.capability["id"] == capability_id else None
+
 
 ###############################################################################
 def _request():
@@ -37,26 +38,34 @@ def _request():
         ),
     )
 
+
 ###############################################################################
-def test_render_descriptor_service_exposes_configurable_openfreemap_style(monkeypatch) -> None:
+def test_render_descriptor_service_exposes_configurable_openfreemap_style(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("OPENFREEMAP_STYLE_BASE_URL", "https://maps.internal.example")
     service = RenderDescriptorService(
-        capability_registry=_CapabilityRegistry({
-            "id": "openfreemap_liberty",
-            "name": "OpenFreeMap Liberty",
-            "provider": "openfreemap",
-            "metadata": {
-                "label": "OpenFreeMap Liberty",
-                "style_url": "https://tiles.openfreemap.org/styles/liberty",
-                "attribution": "OpenFreeMap",
-            },
-        }),
+        capability_registry=_CapabilityRegistry(
+            {
+                "id": "openfreemap_liberty",
+                "name": "OpenFreeMap Liberty",
+                "provider": "openfreemap",
+                "metadata": {
+                    "label": "OpenFreeMap Liberty",
+                    "style_url": "https://tiles.openfreemap.org/styles/liberty",
+                    "attribution": "OpenFreeMap",
+                },
+            }
+        ),
     )
 
-    result = run_async_in_thread(service.build_basemap_descriptor("openfreemap_liberty"))
+    result = run_async_in_thread(
+        service.build_basemap_descriptor("openfreemap_liberty")
+    )
 
     assert result is not None
     assert result["style_url"] == "https://maps.internal.example/styles/liberty"
+
 
 ###############################################################################
 def test_render_descriptor_service_builds_complete_wms_template() -> None:
@@ -81,6 +90,7 @@ def test_render_descriptor_service_builds_complete_wms_template() -> None:
     assert "transparent=true" in template
     assert "time=2026-06-18" in template
 
+
 ###############################################################################
 def test_render_descriptor_service_builds_complete_wmts_template() -> None:
     template = RenderDescriptorService.build_wmts_tile_template(
@@ -103,28 +113,36 @@ def test_render_descriptor_service_builds_complete_wmts_template() -> None:
     assert "format=image/png" in template
     assert "time=2026-06-18" in template
 
+
 ###############################################################################
 def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
     service = RenderDescriptorService(
-        capability_registry=_CapabilityRegistry({
-            "id": "rainviewer_precipitation_radar",
-            "name": "RainViewer Precipitation Radar",
-            "provider": "rainviewer",
-            "type": "tile",
-            "capabilityKind": "raster-overlay",
-            "renderingMode": "raster-tile",
-            "metadata": {
-                "url": "https://tilecache.rainviewer.com/v2/radar/test/256/{z}/{x}/{y}/2/1_1.png",
-                "default_opacity": 0.7,
-            },
-        }),
+        capability_registry=_CapabilityRegistry(
+            {
+                "id": "rainviewer_precipitation_radar",
+                "name": "RainViewer Precipitation Radar",
+                "provider": "rainviewer",
+                "type": "tile",
+                "capabilityKind": "raster-overlay",
+                "renderingMode": "raster-tile",
+                "metadata": {
+                    "url": "https://tilecache.rainviewer.com/v2/radar/test/256/{z}/{x}/{y}/2/1_1.png",
+                    "default_opacity": 0.7,
+                },
+            }
+        ),
     )
 
-    result = run_async_in_thread(service.build_overlay_descriptor("rainviewer_precipitation_radar", request=_request()))
+    result = run_async_in_thread(
+        service.build_overlay_descriptor(
+            "rainviewer_precipitation_radar", request=_request()
+        )
+    )
 
     assert result is not None
     descriptor, _warnings = result
     assert descriptor["max_zoom"] == 7
+
 
 ###############################################################################
 def test_census_demographic_render_uses_server_provider_endpoint() -> None:
@@ -146,18 +164,29 @@ def test_census_demographic_render_uses_server_provider_endpoint() -> None:
     assert descriptor["rendering_mode"] == "choropleth"
     assert warnings == []
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("rendering_mode", "capability_kind", "capability_type", "metadata"),
     [
-        ("xyz", "raster-overlay", "tile", {"url": "https://example.test/{z}/{x}/{y}.png"}),
+        (
+            "xyz",
+            "raster-overlay",
+            "tile",
+            {"url": "https://example.test/{z}/{x}/{y}.png"},
+        ),
         (
             "raster-tile",
             "raster-overlay",
             "tile",
             {"url": "https://example.test/{z}/{x}/{y}.png"},
         ),
-        ("wms", "raster-overlay", "wms", {"url": "https://example.test/wms", "layers": "x"}),
+        (
+            "wms",
+            "raster-overlay",
+            "wms",
+            {"url": "https://example.test/wms", "layers": "x"},
+        ),
         (
             "wmts",
             "raster-overlay",
@@ -196,16 +225,22 @@ def test_overlay_descriptor_covers_every_declared_rendering_mode(
         "renderingMode": rendering_mode,
         "metadata": {
             "source_protocol": rendering_mode,
-            "data_format": "GeoJSON" if rendering_mode in {
+            "data_format": "GeoJSON"
+            if rendering_mode
+            in {
                 "geojson",
                 "clustered-points",
                 "choropleth",
                 "camera-points",
-            } else "tile",
-            "geometry_type": "Point" if rendering_mode in {
+            }
+            else "tile",
+            "geometry_type": "Point"
+            if rendering_mode
+            in {
                 "clustered-points",
                 "camera-points",
-            } else "Polygon",
+            }
+            else "Polygon",
             **metadata,
         },
     }

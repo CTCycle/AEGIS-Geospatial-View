@@ -5,6 +5,7 @@ from pathlib import Path
 
 from server.services.geospatial.materialization_runner import materialize_datasets
 
+
 ###############################################################################
 def _write_manifest(path: Path, capability_id: str, source_file: Path) -> None:
     path.write_text(
@@ -41,6 +42,7 @@ def _write_manifest(path: Path, capability_id: str, source_file: Path) -> None:
         ),
         encoding="utf-8",
     )
+
 
 ###############################################################################
 def test_materialize_datasets_filters_by_capability_id(tmp_path: Path) -> None:

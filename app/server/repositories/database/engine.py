@@ -11,6 +11,7 @@ from server.configurations import DatabaseSettings
 
 SQLITE_BUSY_TIMEOUT_MS = 5000
 
+
 ###############################################################################
 def configure_sqlite_connection(dbapi_connection: Any) -> None:
     cursor = dbapi_connection.cursor()
@@ -19,6 +20,7 @@ def configure_sqlite_connection(dbapi_connection: Any) -> None:
     cursor.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.close()
+
 
 ###############################################################################
 def build_engine(settings: DatabaseSettings) -> Engine:
@@ -34,6 +36,7 @@ def build_engine(settings: DatabaseSettings) -> Engine:
 
     event.listen(engine, "connect", on_connect)
     return engine
+
 
 ###############################################################################
 def build_session_factory(engine: Engine) -> sessionmaker[Session]:

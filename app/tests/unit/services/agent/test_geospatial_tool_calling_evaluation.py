@@ -11,6 +11,7 @@ from server.contracts.extraction import (
 )
 from server.services.agent.tool_planner import DeterministicToolPlanner
 
+
 ###############################################################################
 def _turn(
     text: str,
@@ -55,6 +56,7 @@ def _turn(
         required_tool_category=required_tool_category,
         tools_needed=tools_needed,
     )
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -197,7 +199,10 @@ def test_deterministic_geospatial_tool_calling_scenarios(
     del name
     plan = DeterministicToolPlanner().build_plan(turn, specialist, memory)
     assert plan.selected_tools == expected_tools
-    assert [step.capability_id for step in plan.steps if step.capability_id] == expected_capabilities
+    assert [
+        step.capability_id for step in plan.steps if step.capability_id
+    ] == expected_capabilities
+
 
 ###############################################################################
 def test_bbox_evaluation_preserves_canonical_coordinate_order() -> None:

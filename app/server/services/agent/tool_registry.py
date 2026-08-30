@@ -28,9 +28,9 @@ from server.services.llm.types import LLMToolDefinition
 ToolHandler = Callable[[ExecutionPlan, ResolvedLocation], Awaitable[dict[str, object]]]
 NativeToolHandler = Callable[[dict[str, Any], Any], Awaitable[Any]]
 
+
 ###############################################################################
 class ToolRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, runtime_registry: RuntimeRegistry) -> None:
         self.runtime_registry = runtime_registry
@@ -138,30 +138,50 @@ class ToolRegistry:
                 for key, child in value.items():
                     child_path = cls._child_path(path, key)
                     key_lower = key.lower()
-                    if key_lower in {"latitude", "lat"} and isinstance(child, (int, float)):
+                    if key_lower in {"latitude", "lat"} and isinstance(
+                        child, (int, float)
+                    ):
                         if not -90 <= child <= 90:
-                            return f"Argument '{child_path}' must be between -90 and 90."
-                    if key_lower in {"longitude", "lon", "lng"} and isinstance(child, (int, float)):
+                            return (
+                                f"Argument '{child_path}' must be between -90 and 90."
+                            )
+                    if key_lower in {"longitude", "lon", "lng"} and isinstance(
+                        child, (int, float)
+                    ):
                         if not -180 <= child <= 180:
-                            return f"Argument '{child_path}' must be between -180 and 180."
-                    if key_lower in {"radius", "radius_m", "radius_km"} and isinstance(child, (int, float)):
+                            return (
+                                f"Argument '{child_path}' must be between -180 and 180."
+                            )
+                    if key_lower in {"radius", "radius_m", "radius_km"} and isinstance(
+                        child, (int, float)
+                    ):
                         if child <= 0:
                             return f"Argument '{child_path}' must be greater than zero."
                     nested_error = walk(child, child_path)
                     if nested_error:
                         return nested_error
                 bbox = value.get("bbox")
-                if is_json_array(bbox) and len(bbox) == 4 and all(isinstance(item, (int, float)) for item in bbox):
+                if (
+                    is_json_array(bbox)
+                    and len(bbox) == 4
+                    and all(isinstance(item, (int, float)) for item in bbox)
+                ):
                     west, south, east, north = bbox
                     if west < -180 or east > 180 or south < -90 or north > 90:
                         return "Argument 'bbox' contains coordinates outside supported ranges."
                     if west > east or south > north:
                         return "Argument 'bbox' must be ordered west,south,east,north."
-                for start_key, end_key in (("start", "end"), ("start_time", "end_time"), ("from", "to")):
+                for start_key, end_key in (
+                    ("start", "end"),
+                    ("start_time", "end_time"),
+                    ("from", "to"),
+                ):
                     start, end = value.get(start_key), value.get(end_key)
                     if isinstance(start, str) and isinstance(end, str):
                         try:
-                            if datetime.fromisoformat(start.replace("Z", "+00:00")) > datetime.fromisoformat(end.replace("Z", "+00:00")):
+                            if datetime.fromisoformat(
+                                start.replace("Z", "+00:00")
+                            ) > datetime.fromisoformat(end.replace("Z", "+00:00")):
                                 return f"Arguments '{start_key}' and '{end_key}' are in reverse order."
                         except ValueError:
                             return f"Argument '{start_key}' or '{end_key}' is not a valid ISO-8601 timestamp."
@@ -236,7 +256,9 @@ class ToolRegistry:
             if not is_json_object(field_schema):
                 continue
             field_path = cls._child_path(path, field_name)
-            field_error = cls._validate_schema_node(field_schema, field_value, path=field_path)
+            field_error = cls._validate_schema_node(
+                field_schema, field_value, path=field_path
+            )
             if field_error is not None:
                 return field_error
         return None
@@ -252,10 +274,14 @@ class ToolRegistry:
     ) -> str | None:
         min_items = schema.get("minItems")
         if isinstance(min_items, int) and len(value) < min_items:
-            return f"{cls._label_for_path(path)} must contain at least {min_items} items."
+            return (
+                f"{cls._label_for_path(path)} must contain at least {min_items} items."
+            )
         max_items = schema.get("maxItems")
         if isinstance(max_items, int) and len(value) > max_items:
-            return f"{cls._label_for_path(path)} must contain at most {max_items} items."
+            return (
+                f"{cls._label_for_path(path)} must contain at most {max_items} items."
+            )
 
         item_schema = schema.get("items")
         if not is_json_object(item_schema):
@@ -312,11 +338,21 @@ class ToolRegistry:
     # -------------------------------------------------------------------------
     @staticmethod
     def _matches_json_type(value: Any, expected_type: Any) -> bool:
-        expected = {expected_type} if isinstance(expected_type, str) else set(expected_type)
+        expected = (
+            {expected_type} if isinstance(expected_type, str) else set(expected_type)
+        )
         return (
             ("string" in expected and isinstance(value, str))
-            or ("integer" in expected and isinstance(value, int) and not isinstance(value, bool))
-            or ("number" in expected and isinstance(value, (int, float)) and not isinstance(value, bool))
+            or (
+                "integer" in expected
+                and isinstance(value, int)
+                and not isinstance(value, bool)
+            )
+            or (
+                "number" in expected
+                and isinstance(value, (int, float))
+                and not isinstance(value, bool)
+            )
             or ("boolean" in expected and isinstance(value, bool))
             or ("object" in expected and is_json_object(value))
             or ("array" in expected and is_json_array(value))

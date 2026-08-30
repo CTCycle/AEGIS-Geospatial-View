@@ -20,6 +20,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class CensusProvider(GeospatialProvider):
     provider_id = "census"
@@ -32,7 +33,9 @@ class CensusProvider(GeospatialProvider):
         "https://tigerweb.geo.census.gov/arcgis/rest/services/"
         "TIGERweb/State_County/MapServer"
     )
-    TIGERWEB_HYDRO_URL = f"{TIGERWEB_TRACTS_ROOT.rsplit('/', 2)[0]}/Hydro/MapServer/0/query"
+    TIGERWEB_HYDRO_URL = (
+        f"{TIGERWEB_TRACTS_ROOT.rsplit('/', 2)[0]}/Hydro/MapServer/0/query"
+    )
     ACS_API_ROOT = "https://api.census.gov/data"
     DEFAULT_ACS_VINTAGE = "2023"
 
@@ -94,7 +97,9 @@ class CensusProvider(GeospatialProvider):
         vintage = _acs_vintage(request)
         variable = str(request.params.get("variable") or "B01003_001E").strip().upper()
         if not re.fullmatch(r"B\d{5}_\d{3}[AE]", variable):
-            raise ProviderInvalidQueryError("Census ACS variable must look like B01003_001E.")
+            raise ProviderInvalidQueryError(
+                "Census ACS variable must look like B01003_001E."
+            )
         if not request.params.get("live"):
             return ProviderResponse(
                 capability_id=request.capability_id,
@@ -199,19 +204,32 @@ class CensusProvider(GeospatialProvider):
                     else "tract" in lowered and "block group" not in lowered
                 )
                 if geography_match:
-                    exact_vintage = int(vintage in item_context) if vintage != "latest" else 0
+                    exact_vintage = (
+                        int(vintage in item_context) if vintage != "latest" else 0
+                    )
                     year_match = max(
-                        [int(value) for value in re.findall(r"\b20\d{2}\b", item_context)]
+                        [
+                            int(value)
+                            for value in re.findall(r"\b20\d{2}\b", item_context)
+                        ]
                         or [0]
                     )
-                    candidates.append((exact_vintage, year_match, str(layer_id), item_context))
+                    candidates.append(
+                        (exact_vintage, year_match, str(layer_id), item_context)
+                    )
                 child_layers = item.get("layers")
                 await collect(child_layers, item_context, rank + 1)
                 child_ids = json_array(item.get("subLayerIds"))
                 if child_ids and str(layer_id) not in visited_groups:
                     visited_groups.add(str(layer_id))
                     child_payload = await self._fetch_json(f"{root}/{layer_id}?f=json")
-                    await collect(child_payload.get("layers") if is_json_object(child_payload) else None, item_context, rank + 1)
+                    await collect(
+                        child_payload.get("layers")
+                        if is_json_object(child_payload)
+                        else None,
+                        item_context,
+                        rank + 1,
+                    )
 
         await collect(
             root_payload.get("layers") if is_json_object(root_payload) else None,
@@ -256,14 +274,24 @@ class CensusProvider(GeospatialProvider):
                 params.append(("in", "tract:*"))
             url = f"{self.ACS_API_ROOT}/{vintage}/acs/acs5?{urlencode(params)}"
             payload = await self._fetch_json(url)
-            if not is_json_array(payload) or not payload or not is_json_array(payload[0]):
-                raise ProviderMalformedPayloadError("Census ACS response must be a table.")
+            if (
+                not is_json_array(payload)
+                or not payload
+                or not is_json_array(payload[0])
+            ):
+                raise ProviderMalformedPayloadError(
+                    "Census ACS response must be a table."
+                )
             headers = [str(value) for value in json_array(payload[0])]
             for raw_row in json_array(payload)[1:]:
                 row_values = json_array(raw_row)
                 if len(row_values) != len(headers):
-                    raise ProviderMalformedPayloadError("Census ACS row width is invalid.")
-                row = {headers[index]: str(value) for index, value in enumerate(row_values)}
+                    raise ProviderMalformedPayloadError(
+                        "Census ACS row width is invalid."
+                    )
+                row = {
+                    headers[index]: str(value) for index, value in enumerate(row_values)
+                }
                 key = _acs_row_key(row, geography)
                 if key:
                     rows[key] = row
@@ -272,6 +300,7 @@ class CensusProvider(GeospatialProvider):
     # -------------------------------------------------------------------------
     async def _fetch_json(self, url: str) -> object:
         return await call_json_fetcher(self.fetcher, url, None)
+
 
 ###############################################################################
 def _arcgis_query_url(service_url: str, request: ProviderRequest) -> str:
@@ -290,26 +319,46 @@ def _arcgis_query_url(service_url: str, request: ProviderRequest) -> str:
         params["geometry"] = f"{min_lon},{min_lat},{max_lon},{max_lat}"
     return f"{service_url}?{urlencode(params)}"
 
+
 ###############################################################################
 def _geojson_features(payload: object, *, provider_label: str) -> list[dict[str, Any]]:
     if not is_json_object(payload) or payload.get("type") != "FeatureCollection":
-        raise ProviderMalformedPayloadError(f"{provider_label} response must be GeoJSON.")
+        raise ProviderMalformedPayloadError(
+            f"{provider_label} response must be GeoJSON."
+        )
     features = payload.get("features")
     if not is_json_array(features):
-        raise ProviderMalformedPayloadError(f"{provider_label} response is missing features.")
-    return [dict(json_object(item)) for item in json_array(features) if is_json_object(item)]
+        raise ProviderMalformedPayloadError(
+            f"{provider_label} response is missing features."
+        )
+    return [
+        dict(json_object(item)) for item in json_array(features) if is_json_object(item)
+    ]
+
 
 ###############################################################################
 def _geography_for_request(request: ProviderRequest) -> str:
-    raw = str(
-        request.params.get("geography")
-        or ("county" if "acs_demographic_joins" in request.capability_id else "tract")
-    ).strip().casefold().replace("-", "_")
+    raw = (
+        str(
+            request.params.get("geography")
+            or (
+                "county"
+                if "acs_demographic_joins" in request.capability_id
+                else "tract"
+            )
+        )
+        .strip()
+        .casefold()
+        .replace("-", "_")
+    )
     aliases = {"counties": "county", "tracts": "tract", "block_groups": "block_group"}
     geography = aliases.get(raw, raw)
     if geography not in {"county", "tract", "block_group"}:
-        raise ProviderInvalidQueryError("Census geography must be county, tract, or block_group.")
+        raise ProviderInvalidQueryError(
+            "Census geography must be county, tract, or block_group."
+        )
     return geography
+
 
 ###############################################################################
 def _acs_vintage(request: ProviderRequest) -> str:
@@ -324,9 +373,13 @@ def _acs_vintage(request: ProviderRequest) -> str:
         raise ProviderInvalidQueryError("Census ACS vintage must be a four-digit year.")
     return vintage
 
+
 ###############################################################################
 def _acs_geography(geography: str) -> str:
-    return {"county": "county", "tract": "tract", "block_group": "block group"}[geography]
+    return {"county": "county", "tract": "tract", "block_group": "block group"}[
+        geography
+    ]
+
 
 ###############################################################################
 def _feature_geoid(feature: dict[str, Any]) -> str | None:
@@ -337,6 +390,7 @@ def _feature_geoid(feature: dict[str, Any]) -> str | None:
     feature_id = feature.get("id")
     return str(feature_id) if feature_id is not None else None
 
+
 ###############################################################################
 def _normalize_geoid(value: str | None) -> str:
     if not value:
@@ -346,6 +400,7 @@ def _normalize_geoid(value: str | None) -> str:
     if "US" in upper:
         text = text[upper.index("US") + 2 :]
     return "".join(character for character in text if character.isdigit())
+
 
 ###############################################################################
 def _acs_row_key(row: dict[str, str], geography: str) -> str:
@@ -359,6 +414,7 @@ def _acs_row_key(row: dict[str, str], geography: str) -> str:
         return state + county + tract
     return state + county + tract + block_group
 
+
 ###############################################################################
 def _float_or_none(value: object) -> float | None:
     if not isinstance(value, int | float | str):
@@ -367,8 +423,9 @@ def _float_or_none(value: object) -> float | None:
         if value == "" or value == "-":
             return None
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
+
 
 ###############################################################################
 def _public_number(value: float | None) -> int | float | None:

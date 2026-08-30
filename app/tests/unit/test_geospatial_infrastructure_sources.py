@@ -6,6 +6,7 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
 from server.services.geospatial.providers.overture import OvertureProvider
 
+
 ###############################################################################
 def test_openchargemap_infrastructure_source_normalizes_live_station() -> None:
     async def fetcher(url, headers):
@@ -34,6 +35,7 @@ def test_openchargemap_infrastructure_source_normalizes_live_station() -> None:
     assert response.payload["features"][0]["category"] == "ev_charging"
     assert response.payload["features"][0]["source"] == "openchargemap"
 
+
 ###############################################################################
 def test_overture_maps_queries_ingested_places_index(tmp_path) -> None:
     index = tmp_path / "places.geojson"
@@ -50,8 +52,11 @@ def test_overture_maps_queries_ingested_places_index(tmp_path) -> None:
     assert response.payload["features"][0]["source"] == "overture"
     assert response.payload["totalResults"] == 1
 
+
 ###############################################################################
-def test_overture_maps_can_augment_local_places_with_overpass_and_deduplicate(tmp_path) -> None:
+def test_overture_maps_can_augment_local_places_with_overpass_and_deduplicate(
+    tmp_path,
+) -> None:
     index = tmp_path / "places.geojson"
     index.write_text(
         '{"type":"FeatureCollection","features":[{"type":"Feature","id":"overture-1","properties":{"name":"Cafe Roma","category":"cafe"},"geometry":{"type":"Point","coordinates":[12.5,41.9]}}]}',

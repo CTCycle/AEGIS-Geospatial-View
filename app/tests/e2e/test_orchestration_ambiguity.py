@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import APIRequestContext
 
+
 ###############################################################################
 def _turn(api_context: APIRequestContext, message: str):
     conversation_response = api_context.post(
@@ -15,21 +16,28 @@ def _turn(api_context: APIRequestContext, message: str):
     if response.status in {400, 502, 503}:
         pytest.skip(
             f"Provider unavailable for orchestration check ({response.status})."
-    )
+        )
     assert response.ok, f"Expected 200, got {response.status}"
     body = response.json()
     assistant = str(body.get("assistant_message") or "").lower()
     if "configured agent model" in assistant and "structured extraction" in assistant:
-        pytest.skip("Configured agent model cannot perform structured extraction for orchestration check.")
+        pytest.skip(
+            "Configured agent model cannot perform structured extraction for orchestration check."
+        )
     return body
+
 
 ###############################################################################
 def test_ambiguous_temporal_request_produces_clarification(
     api_context: APIRequestContext,
 ) -> None:
     body = _turn(api_context, "Show me weather")
-    assert body.get("decision", {}).get("plan", {}).get("state") in {"clarify", "reject"}
+    assert body.get("decision", {}).get("plan", {}).get("state") in {
+        "clarify",
+        "reject",
+    }
     assert body.get("map_session") is None
+
 
 ###############################################################################
 def test_missing_location_produces_clarification_or_validation(
@@ -41,6 +49,7 @@ def test_missing_location_produces_clarification_or_validation(
     assistant = str(body.get("assistant_message") or "").lower()
     assert "location" in assistant or "where" in assistant or "clarify" in assistant
 
+
 ###############################################################################
 def test_direct_coordinates_request_does_not_create_map_session(
     api_context: APIRequestContext,
@@ -49,7 +58,12 @@ def test_direct_coordinates_request_does_not_create_map_session(
     assert body.get("map_session") is None
     assistant = str(body.get("assistant_message") or "")
     normalized = assistant.lower()
-    assert "latitude" in normalized or "coordinates" in normalized or "clarify" in normalized
+    assert (
+        "latitude" in normalized
+        or "coordinates" in normalized
+        or "clarify" in normalized
+    )
+
 
 ###############################################################################
 def test_runtime_overlay_request_reply_does_not_leak_internal_tool_ids(
@@ -59,6 +73,7 @@ def test_runtime_overlay_request_reply_does_not_leak_internal_tool_ids(
     assistant = str(body.get("assistant_message") or "")
     assert "tool_" not in assistant.lower()
     assert "internal id" not in assistant.lower()
+
 
 ###############################################################################
 def test_missing_key_request_clarifies_or_falls_back_consistently(

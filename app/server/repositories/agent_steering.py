@@ -7,11 +7,14 @@ from sqlalchemy.exc import IntegrityError
 
 from server.domain.steering import SteeringMessageRecord
 from server.repositories.database.sqlite import SQLiteRepository
-from server.repositories.schemas.models import AgentRunRecord, AgentSteeringMessageRecord
+from server.repositories.schemas.models import (
+    AgentRunRecord,
+    AgentSteeringMessageRecord,
+)
+
 
 ###############################################################################
 class AgentSteeringRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
@@ -55,8 +58,7 @@ class AgentSteeringRepository:
         """Persist the steering mutation and its run version in one transaction."""
         with self._session_factory() as session:
             run = session.scalar(
-                select(AgentRunRecord)
-                .where(AgentRunRecord.id == run_id)
+                select(AgentRunRecord).where(AgentRunRecord.id == run_id)
             )
             if run is None:
                 raise ValueError("Run not found.")
@@ -64,12 +66,20 @@ class AgentSteeringRepository:
                 existing = session.scalar(
                     select(AgentSteeringMessageRecord).where(
                         AgentSteeringMessageRecord.run_id == run_id,
-                        AgentSteeringMessageRecord.client_mutation_id == client_mutation_id,
+                        AgentSteeringMessageRecord.client_mutation_id
+                        == client_mutation_id,
                     )
                 )
                 if existing is not None:
-                    return self._to_domain(existing), run.active_run_version, run.aggregated_request
-            if expected_run_version is not None and run.active_run_version != expected_run_version:
+                    return (
+                        self._to_domain(existing),
+                        run.active_run_version,
+                        run.aggregated_request,
+                    )
+            if (
+                expected_run_version is not None
+                and run.active_run_version != expected_run_version
+            ):
                 raise ValueError("Run version conflict.")
             record = AgentSteeringMessageRecord(
                 id=f"steer_{uuid4().hex}",
@@ -104,11 +114,15 @@ class AgentSteeringRepository:
     # -------------------------------------------------------------------------
     def list_steering_messages(self, run_id: str) -> list[SteeringMessageRecord]:
         with self._session_factory() as session:
-            rows = session.execute(
-                select(AgentSteeringMessageRecord)
-                .where(AgentSteeringMessageRecord.run_id == run_id)
-                .order_by(AgentSteeringMessageRecord.created_at.asc())
-            ).scalars().all()
+            rows = (
+                session.execute(
+                    select(AgentSteeringMessageRecord)
+                    .where(AgentSteeringMessageRecord.run_id == run_id)
+                    .order_by(AgentSteeringMessageRecord.created_at.asc())
+                )
+                .scalars()
+                .all()
+            )
             return [self._to_domain(row) for row in rows]
 
     # -------------------------------------------------------------------------
@@ -118,12 +132,17 @@ class AgentSteeringRepository:
         client_mutation_id: str,
     ) -> SteeringMessageRecord | None:
         with self._session_factory() as session:
-            row = session.execute(
-                select(AgentSteeringMessageRecord).where(
-                    AgentSteeringMessageRecord.run_id == run_id,
-                    AgentSteeringMessageRecord.client_mutation_id == client_mutation_id,
+            row = (
+                session.execute(
+                    select(AgentSteeringMessageRecord).where(
+                        AgentSteeringMessageRecord.run_id == run_id,
+                        AgentSteeringMessageRecord.client_mutation_id
+                        == client_mutation_id,
+                    )
                 )
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
             return self._to_domain(row) if row is not None else None
 
     # -------------------------------------------------------------------------

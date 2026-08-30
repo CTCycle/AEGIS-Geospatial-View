@@ -11,9 +11,9 @@ from server.services.llm.ollama import OllamaProvider
 from server.services.llm.opencode_provider import OpenCodeProvider
 from server.services.llm.openai_provider import OpenAIProvider
 
+
 ###############################################################################
 class _SettingsRepo:
-
     # -------------------------------------------------------------------------
     def get_or_create(self):  # noqa: ANN201
         return SimpleNamespace(
@@ -22,9 +22,9 @@ class _SettingsRepo:
             google_base_url="https://generativelanguage.googleapis.test",
         )
 
+
 ###############################################################################
 class _CredentialsRepo:
-
     # -------------------------------------------------------------------------
     def __init__(self, mapping: dict[tuple[str, str], str]) -> None:
         self.mapping = mapping
@@ -41,19 +41,20 @@ class _CredentialsRepo:
     def mark_used(self, *, provider: str, label: str) -> None:
         self.mark_used_calls.append((provider, label))
 
+
 ###############################################################################
 class _Crypto:
-
     # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:
         return f"decrypted:{encrypted_value}"
 
+
 ###############################################################################
 class _FailingCrypto:
-
     # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:  # noqa: ARG002
         raise ValueError("bad key")
+
 
 ###############################################################################
 def test_openai_credential_is_read_from_repository(monkeypatch) -> None:
@@ -71,6 +72,7 @@ def test_openai_credential_is_read_from_repository(monkeypatch) -> None:
     provider = factory.get_provider("openai")
     assert provider == ("decrypted:enc-openai", "https://api.openai.test")
     assert repo.mark_used_calls == [("openai", "api_key")]
+
 
 ###############################################################################
 def test_google_credential_is_read_from_repository(monkeypatch) -> None:
@@ -92,6 +94,7 @@ def test_google_credential_is_read_from_repository(monkeypatch) -> None:
     )
     assert repo.mark_used_calls == [("google", "api_key")]
 
+
 ###############################################################################
 def test_environment_variables_are_not_used_as_fallback(monkeypatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "sk-env-ignored")
@@ -108,6 +111,7 @@ def test_environment_variables_are_not_used_as_fallback(monkeypatch) -> None:
     with pytest.raises(ValueError, match="Google credentials are not configured"):
         factory.get_provider("google")
 
+
 ###############################################################################
 def test_missing_credentials_follow_current_failure_path() -> None:
     factory = LLMFactory(
@@ -118,6 +122,7 @@ def test_missing_credentials_follow_current_failure_path() -> None:
 
     with pytest.raises(ValueError, match="OpenAI credentials are not configured"):
         factory.get_provider("openai")
+
 
 ###############################################################################
 def test_unreadable_credentials_raise_configuration_error() -> None:
@@ -135,6 +140,7 @@ def test_unreadable_credentials_raise_configuration_error() -> None:
         factory.get_provider("openai")
     assert repo.mark_used_calls == []
 
+
 ###############################################################################
 def test_get_provider_returns_ollama_provider_type() -> None:
     factory = LLMFactory(
@@ -145,6 +151,7 @@ def test_get_provider_returns_ollama_provider_type() -> None:
 
     provider = factory.get_provider("ollama")
     assert isinstance(provider, OllamaProvider)
+
 
 ###############################################################################
 def test_get_provider_returns_openai_provider_type() -> None:
@@ -157,6 +164,7 @@ def test_get_provider_returns_openai_provider_type() -> None:
     provider = factory.get_provider("openai")
     assert isinstance(provider, OpenAIProvider)
 
+
 ###############################################################################
 def test_get_provider_returns_google_provider_type() -> None:
     factory = LLMFactory(
@@ -167,6 +175,7 @@ def test_get_provider_returns_google_provider_type() -> None:
 
     provider = factory.get_provider("google")
     assert isinstance(provider, GoogleProvider)
+
 
 ###############################################################################
 def test_get_provider_returns_opencode_provider_types() -> None:
@@ -194,6 +203,7 @@ def test_get_provider_returns_opencode_provider_types() -> None:
         ("opencode-go", "api_key"),
     ]
 
+
 ###############################################################################
 def test_missing_opencode_credentials_are_provider_specific() -> None:
     factory = LLMFactory(
@@ -206,6 +216,7 @@ def test_missing_opencode_credentials_are_provider_specific() -> None:
         factory.get_provider("opencode")
     with pytest.raises(LLMConfigurationError, match="OpenCode Go credentials"):
         factory.get_provider("opencode-go")
+
 
 ###############################################################################
 def test_get_provider_keeps_structured_output_available_for_ollama() -> None:

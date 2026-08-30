@@ -7,12 +7,15 @@ from urllib.request import Request, urlopen
 
 from server.domain.geospatial.validation import EndpointValidationResult
 
+
 ###############################################################################
 class EndpointValidationService:
     """Performs sampled, read-only health checks for manifest endpoints."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, timeout_seconds: float = 5.0, max_bytes: int = 1_000_000) -> None:
+    def __init__(
+        self, *, timeout_seconds: float = 5.0, max_bytes: int = 1_000_000
+    ) -> None:
         self.timeout_seconds = timeout_seconds
         self.max_bytes = max_bytes
 
@@ -65,7 +68,9 @@ class EndpointValidationService:
                 message="No public sampled endpoint is available for this manifest.",
             )
         try:
-            request = Request(url, headers={"User-Agent": "AEGIS-EndpointValidation/1.0"})
+            request = Request(
+                url, headers={"User-Agent": "AEGIS-EndpointValidation/1.0"}
+            )
             with urlopen(request, timeout=self.timeout_seconds) as response:  # noqa: S310
                 status = getattr(response, "status", None)
                 read_limit = self.max_bytes if "json" in data_format.lower() else 2048

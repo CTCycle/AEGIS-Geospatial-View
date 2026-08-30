@@ -5,12 +5,13 @@ from server.services.geospatial.coverage import CoverageService
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 class _NoCredentials:
-
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN201
         return None
+
 
 ###############################################################################
 def test_coverage_global_policy_supported() -> None:

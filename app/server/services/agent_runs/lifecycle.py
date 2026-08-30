@@ -21,9 +21,9 @@ from server.services.agent_runs.exceptions import (
 )
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 
+
 ###############################################################################
 class RunLifecycleService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -67,12 +67,16 @@ class RunLifecycleService:
         payload: AgentRunCreateRequest,
     ) -> tuple[AgentRunCreateResult, bool]:
         try:
-            self.conversation_repository.verify_conversation_access(conversation_id, None)
+            self.conversation_repository.verify_conversation_access(
+                conversation_id, None
+            )
         except ValueError as exc:
             raise RunNotFoundError("Conversation not found.") from exc
         except PermissionError as exc:
             raise RunAccessError("Conversation access denied.") from exc
-        aggregate = self.aggregation_service.build_aggregated_request(payload.message, [])
+        aggregate = self.aggregation_service.build_aggregated_request(
+            payload.message, []
+        )
         try:
             run, created = self.run_repository.create_or_get_run(
                 conversation_id,
@@ -109,8 +113,12 @@ class RunLifecycleService:
         self._tasks.clear()
 
     # -------------------------------------------------------------------------
-    async def cancel_run(self, conversation_id: str, run_id: str) -> AgentRunCancelResponse:
-        response, _transitioned = await self.cancel_run_with_status(conversation_id, run_id)
+    async def cancel_run(
+        self, conversation_id: str, run_id: str
+    ) -> AgentRunCancelResponse:
+        response, _transitioned = await self.cancel_run_with_status(
+            conversation_id, run_id
+        )
         return response
 
     # -------------------------------------------------------------------------

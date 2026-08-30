@@ -3,7 +3,12 @@ from __future__ import annotations
 from server.contracts.runs import AgentRunSnapshot
 from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
 from server.contracts.chat import ChatTurnRequest, ChatTurnResponse
-from server.contracts.events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage, RunEventVisibility
+from server.contracts.events import (
+    RUN_PROGRESS_LABELS,
+    RunEventType,
+    RunProgressStage,
+    RunEventVisibility,
+)
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
@@ -13,9 +18,9 @@ from server.services.agent_runs.events import RunEventPublisher
 import hashlib
 import json
 
+
 ###############################################################################
 class AgentRunOrchestrator:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -171,7 +176,10 @@ class AgentRunOrchestrator:
             ),
         )
         await self._publish_response(latest, response)
-        if response.operation is not None and response.operation.kind == "clarification":
+        if (
+            response.operation is not None
+            and response.operation.kind == "clarification"
+        ):
             clarified, transitioned = self.run_repository.mark_completed_if_current(
                 run_id, snapshot.active_run_version
             )
@@ -200,7 +208,9 @@ class AgentRunOrchestrator:
                     "task_snapshot": response.task_snapshot.model_dump(mode="json")
                     if response.task_snapshot is not None
                     else None,
-                    "visualization_update": response.visualization_update.model_dump(mode="json")
+                    "visualization_update": response.visualization_update.model_dump(
+                        mode="json"
+                    )
                     if response.visualization_update is not None
                     else None,
                 },
@@ -211,7 +221,9 @@ class AgentRunOrchestrator:
                 run_id,
                 snapshot.active_run_version,
                 "agent_operation_failed",
-                response.operation.message if response.operation is not None else "Failed",
+                response.operation.message
+                if response.operation is not None
+                else "Failed",
             )
             if not transitioned:
                 if failed.cancel_requested_at is not None:
@@ -267,10 +279,14 @@ class AgentRunOrchestrator:
                 "task_snapshot": response.task_snapshot.model_dump(mode="json")
                 if response.task_snapshot is not None
                 else None,
-                "failure_diagnostic": response.failure_diagnostic.model_dump(mode="json")
+                "failure_diagnostic": response.failure_diagnostic.model_dump(
+                    mode="json"
+                )
                 if response.failure_diagnostic is not None
                 else None,
-                "visualization_update": response.visualization_update.model_dump(mode="json")
+                "visualization_update": response.visualization_update.model_dump(
+                    mode="json"
+                )
                 if response.visualization_update is not None
                 else None,
                 "context_revision": response.context_revision,
@@ -290,7 +306,9 @@ class AgentRunOrchestrator:
                     if response.operation is not None
                     else None,
                     "model_calls": self._model_call_count(response),
-                    "tool_calls": len((response.tool_payload or {}).get("tool_calls", [])),
+                    "tool_calls": len(
+                        (response.tool_payload or {}).get("tool_calls", [])
+                    ),
                 },
             ),
         )
@@ -327,7 +345,9 @@ class AgentRunOrchestrator:
 
     # -------------------------------------------------------------------------
     async def _publish_cancelled(self, snapshot: AgentRunSnapshot) -> None:
-        cancelled, transitioned = self.run_repository.request_cancel_once(snapshot.run_id)
+        cancelled, transitioned = self.run_repository.request_cancel_once(
+            snapshot.run_id
+        )
         if not transitioned:
             return
         await self._publish_progress(cancelled, RunProgressStage.CANCELLED)

@@ -10,9 +10,9 @@ from sqlalchemy import desc, select, update
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ChatMessageRecord, ConversationRecord
 
+
 ###############################################################################
 class ChatHistoryRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
@@ -93,7 +93,9 @@ class ChatHistoryRepository:
         return payload if is_json_object(payload) else None
 
     # -------------------------------------------------------------------------
-    def list_recent_messages(self, conversation_id: str, limit: int) -> list[dict[str, Any]]:
+    def list_recent_messages(
+        self, conversation_id: str, limit: int
+    ) -> list[dict[str, Any]]:
         with self._session_factory() as session:
             statement = (
                 select(ChatMessageRecord)
@@ -107,15 +109,19 @@ class ChatHistoryRepository:
     # -------------------------------------------------------------------------
     def get_last_assistant_message(self, conversation_id: str) -> dict[str, Any] | None:
         with self._session_factory() as session:
-            row = session.execute(
-                select(ChatMessageRecord)
-                .where(
-                    ChatMessageRecord.conversation_id == conversation_id,
-                    ChatMessageRecord.role == "assistant",
+            row = (
+                session.execute(
+                    select(ChatMessageRecord)
+                    .where(
+                        ChatMessageRecord.conversation_id == conversation_id,
+                        ChatMessageRecord.role == "assistant",
+                    )
+                    .order_by(desc(ChatMessageRecord.turn_index))
+                    .limit(1)
                 )
-                .order_by(desc(ChatMessageRecord.turn_index))
-                .limit(1)
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
         return self._to_message_dict(row) if row is not None else None
 
     # -------------------------------------------------------------------------
@@ -123,21 +129,29 @@ class ChatHistoryRepository:
         self, *, conversation_id: str, role: str, request_id: str
     ) -> dict[str, Any] | None:
         with self._session_factory() as session:
-            row = session.execute(
-                select(ChatMessageRecord).where(
-                    ChatMessageRecord.conversation_id == conversation_id,
-                    ChatMessageRecord.role == role,
-                    ChatMessageRecord.request_id == request_id,
+            row = (
+                session.execute(
+                    select(ChatMessageRecord).where(
+                        ChatMessageRecord.conversation_id == conversation_id,
+                        ChatMessageRecord.role == role,
+                        ChatMessageRecord.request_id == request_id,
+                    )
                 )
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
         return self._to_message_dict(row) if row is not None else None
 
     # -------------------------------------------------------------------------
     def list_messages(self, *, conversation_id: str) -> list[dict[str, Any]]:
         with self._session_factory() as session:
-            rows = session.execute(
-                select(ChatMessageRecord)
-                .where(ChatMessageRecord.conversation_id == conversation_id)
-                .order_by(ChatMessageRecord.turn_index.asc())
-            ).scalars().all()
+            rows = (
+                session.execute(
+                    select(ChatMessageRecord)
+                    .where(ChatMessageRecord.conversation_id == conversation_id)
+                    .order_by(ChatMessageRecord.turn_index.asc())
+                )
+                .scalars()
+                .all()
+            )
         return [self._to_message_dict(row) for row in rows]

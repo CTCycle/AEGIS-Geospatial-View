@@ -4,6 +4,7 @@ from server.domain.agent.decision import ResolvedLocation
 from server.contracts.extraction import NormalizedAction, ViewportIntent
 from server.services.search.request_builder import RequestBuilder
 
+
 ###############################################################################
 def test_request_builder_uses_wide_radius_for_city_level_intent() -> None:
     builder = RequestBuilder()
@@ -19,6 +20,7 @@ def test_request_builder_uses_wide_radius_for_city_level_intent() -> None:
     )
 
     assert viewport.radius_m == 18000.0
+
 
 ###############################################################################
 def test_request_builder_uses_tighter_radius_for_exact_address_intent() -> None:
@@ -44,8 +46,11 @@ def test_request_builder_uses_tighter_radius_for_exact_address_intent() -> None:
     assert viewport.radius_m <= 350.0
     assert viewport.bbox is not None
 
+
 ###############################################################################
-def test_request_builder_prefers_explicit_viewport_intent_over_generic_defaults() -> None:
+def test_request_builder_prefers_explicit_viewport_intent_over_generic_defaults() -> (
+    None
+):
     builder = RequestBuilder()
     viewport = builder.build_viewport(
         ResolvedLocation(label="Genoa", latitude=44.4056, longitude=8.9463),
@@ -59,6 +64,7 @@ def test_request_builder_prefers_explicit_viewport_intent_over_generic_defaults(
     )
 
     assert viewport.radius_m == 350.0
+
 
 ###############################################################################
 def test_request_builder_tightens_relative_to_active_viewport() -> None:
@@ -88,6 +94,7 @@ def test_request_builder_tightens_relative_to_active_viewport() -> None:
     assert viewport.radius_m < 2500.0
     assert viewport.radius_m <= 875.0
 
+
 ###############################################################################
 def test_request_builder_uses_geocoder_bbox_when_parser_intent_is_absent() -> None:
     builder = RequestBuilder()
@@ -111,8 +118,11 @@ def test_request_builder_uses_geocoder_bbox_when_parser_intent_is_absent() -> No
     assert viewport.bbox is not None
     assert viewport.radius_m <= 400.0
 
+
 ###############################################################################
-def test_request_builder_preserves_current_viewport_for_basemap_only_follow_up() -> None:
+def test_request_builder_preserves_current_viewport_for_basemap_only_follow_up() -> (
+    None
+):
     builder = RequestBuilder()
     viewport = builder.build_viewport(
         ResolvedLocation(label="Genoa", latitude=44.4056, longitude=8.9463),
@@ -122,7 +132,9 @@ def test_request_builder_preserves_current_viewport_for_basemap_only_follow_up()
             task_tags=["map"],
             action_tags=[],
         ),
-        viewport_intent=ViewportIntent(scope="preserve_current", reason="basemap_only_follow_up"),
+        viewport_intent=ViewportIntent(
+            scope="preserve_current", reason="basemap_only_follow_up"
+        ),
         active_visualization={
             "viewport": {
                 "center_latitude": 44.4056,
@@ -135,6 +147,7 @@ def test_request_builder_preserves_current_viewport_for_basemap_only_follow_up()
 
     assert viewport.radius_m == 640.0
     assert viewport.bbox == [8.94, 44.4, 8.95, 44.41]
+
 
 ###############################################################################
 def test_request_builder_recenters_when_follow_up_changes_location() -> None:
@@ -152,7 +165,9 @@ def test_request_builder_recenters_when_follow_up_changes_location() -> None:
             task_tags=["map"],
             action_tags=["correction"],
         ),
-        viewport_intent=ViewportIntent(scope="preserve_current", reason="location_correction"),
+        viewport_intent=ViewportIntent(
+            scope="preserve_current", reason="location_correction"
+        ),
         active_visualization={
             "resolved_location": {
                 "label": "Lugano",
@@ -170,5 +185,3 @@ def test_request_builder_recenters_when_follow_up_changes_location() -> None:
     assert viewport.center_latitude == 47.3769
     assert viewport.center_longitude == 8.5417
     assert viewport.radius_m == 18000.0
-
-

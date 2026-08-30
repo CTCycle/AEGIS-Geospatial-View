@@ -7,11 +7,13 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 from server.domain.agent.decision import ResolvedLocation
 from server.contracts.extraction import LocationSignal, NormalizedAction
 
+
 ###############################################################################
 class LocationMemoryService:
-
     # -------------------------------------------------------------------------
-    def build_memory_snapshot(self, last_assistant_payload: dict[str, Any] | None) -> dict[str, Any]:
+    def build_memory_snapshot(
+        self, last_assistant_payload: dict[str, Any] | None
+    ) -> dict[str, Any]:
         if last_assistant_payload is None:
             return {"location_slots": [], "active_location": None}
         snapshot = json_object(last_assistant_payload.get("memory_snapshot"))
@@ -63,13 +65,20 @@ class LocationMemoryService:
             "address": resolved_location.address,
             "location_type": resolved_location.location_type,
             "location_class": resolved_location.location_class,
-            "bbox": list(resolved_location.bbox) if is_json_array(resolved_location.bbox) else None,
+            "bbox": list(resolved_location.bbox)
+            if is_json_array(resolved_location.bbox)
+            else None,
             "bbox_source": resolved_location.bbox_source,
             "source": resolved_location.source,
             "confidence": resolved_location.confidence,
             "action_id": action.action_id,
         }
-        slots = [entry for entry in slots if not is_json_object(entry) or entry.get("label") != resolved_location.label]
+        slots = [
+            entry
+            for entry in slots
+            if not is_json_object(entry)
+            or entry.get("label") != resolved_location.label
+        ]
         slots.insert(0, location_payload)
         return {
             "location_slots": slots[:8],

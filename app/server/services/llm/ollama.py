@@ -27,9 +27,9 @@ from server.services.llm.types import (
     ModelDescriptor,
 )
 
+
 ###############################################################################
 class _OllamaLibraryParser(HTMLParser):
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__()
@@ -73,6 +73,7 @@ class _OllamaLibraryParser(HTMLParser):
         self._active_model = None
         self._chunks = []
 
+
 ###############################################################################
 class OllamaProvider(LLMProvider):
     provider_name = "ollama"
@@ -90,7 +91,9 @@ class OllamaProvider(LLMProvider):
         tool_capability_cache: OllamaToolCapabilityCache | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
-        self.tool_capability_cache = tool_capability_cache or OllamaToolCapabilityCache()
+        self.tool_capability_cache = (
+            tool_capability_cache or OllamaToolCapabilityCache()
+        )
         self.last_context_usage: dict[str, Any] | None = None
         self.last_list_models_error: str | None = None
 
@@ -148,7 +151,9 @@ class OllamaProvider(LLMProvider):
         try:
             payload = self._get_json("/api/tags")
         except Exception as exc:
-            self.last_list_models_error = str(exc) or f"Unable to reach Ollama at {self.base_url}."
+            self.last_list_models_error = (
+                str(exc) or f"Unable to reach Ollama at {self.base_url}."
+            )
             return []
         self.last_list_models_error = None
         models: list[ModelDescriptor] = []
@@ -158,9 +163,7 @@ class OllamaProvider(LLMProvider):
             model_name = str(item.get("name") or "")
             if not model_name:
                 continue
-            details = (
-                json_object(item.get("details"))
-            )
+            details = json_object(item.get("details"))
             family = str(details.get("family") or "").strip()
             parameter_size = str(details.get("parameter_size") or "").strip()
             quantization_level = str(details.get("quantization_level") or "").strip()
@@ -211,7 +214,9 @@ class OllamaProvider(LLMProvider):
         else:
             capabilities = self.get_model_capabilities(model_name)
         supports_tools: bool | None = (
-            "tools" in capabilities if tag_capabilities is not None else self.supports_tools(model_name)
+            "tools" in capabilities
+            if tag_capabilities is not None
+            else self.supports_tools(model_name)
         )
         if supports_tools is True:
             capabilities.add("tools")
@@ -441,7 +446,9 @@ class OllamaProvider(LLMProvider):
         if usage.selected_context_window is not None:
             payload["options"]["num_ctx"] = usage.selected_context_window
         if native_tools:
-            payload["tools"] = [self.tool_to_ollama_schema(tool) for tool in native_tools]
+            payload["tools"] = [
+                self.tool_to_ollama_schema(tool) for tool in native_tools
+            ]
         if schema:
             payload["format"] = schema
         try:
@@ -474,7 +481,9 @@ class OllamaProvider(LLMProvider):
         if usage.selected_context_window is not None:
             payload["options"]["num_ctx"] = usage.selected_context_window
         for event in self._stream_post("/api/chat", payload):
-            message = event.get("message") if is_json_object(event.get("message")) else None
+            message = (
+                event.get("message") if is_json_object(event.get("message")) else None
+            )
             if message is not None:
                 content = message.get("content")
                 if isinstance(content, str) and content:
@@ -487,7 +496,9 @@ class OllamaProvider(LLMProvider):
         self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
         model_json_schema = getattr(schema, "model_json_schema", None)
-        schema_json = json_object(model_json_schema()) if callable(model_json_schema) else {}
+        schema_json = (
+            json_object(model_json_schema()) if callable(model_json_schema) else {}
+        )
         effective_request = prepare_request(
             replace(request, response_json_schema=schema_json),
             provider=self.provider_name,

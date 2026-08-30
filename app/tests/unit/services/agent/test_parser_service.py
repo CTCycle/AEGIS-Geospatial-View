@@ -11,9 +11,9 @@ from server.services.llm.errors import (
     LLMResponseParsingError,
 )
 
+
 ###############################################################################
 class _ProviderStub:
-
     # -------------------------------------------------------------------------
     def __init__(self, payload: dict[str, object] | None = None) -> None:
         self.payload = payload or {
@@ -38,7 +38,6 @@ class _ProviderStub:
 
 ###############################################################################
 class _FactoryStub:
-
     # -------------------------------------------------------------------------
     def __init__(self, payload: dict[str, object] | None = None) -> None:
         self.provider = _ProviderStub(payload)
@@ -50,15 +49,15 @@ class _FactoryStub:
 
 ###############################################################################
 class _ConfigErrorFactoryStub:
-
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str):  # noqa: ARG002
-        raise LLMConfigurationError("OpenAI credentials are saved but cannot be decrypted.")
+        raise LLMConfigurationError(
+            "OpenAI credentials are saved but cannot be decrypted."
+        )
 
 
 ###############################################################################
 class _RetryProviderStub(_ProviderStub):
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__()
@@ -80,7 +79,6 @@ class _RetryProviderStub(_ProviderStub):
 
 ###############################################################################
 class _RetryFactoryStub:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.provider = _RetryProviderStub()
@@ -92,7 +90,6 @@ class _RetryFactoryStub:
 
 ###############################################################################
 class _SchemaCorrectionProviderStub(_ProviderStub):
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__()
@@ -113,7 +110,6 @@ class _SchemaCorrectionProviderStub(_ProviderStub):
 
 ###############################################################################
 class _SchemaCorrectionFactoryStub:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.provider = _SchemaCorrectionProviderStub()
@@ -121,6 +117,7 @@ class _SchemaCorrectionFactoryStub:
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str):  # noqa: ARG002
         return self.provider
+
 
 ###############################################################################
 def test_parser_service_classifies_direct_query() -> None:
@@ -159,6 +156,7 @@ def test_parser_service_classifies_direct_query() -> None:
     assert result.task_class == "direct_query"
     assert result.normalized_action.action_id == "geospatial_data_retrieval"
 
+
 ###############################################################################
 def test_parser_service_retries_transient_provider_failure() -> None:
     factory = _RetryFactoryStub()
@@ -178,6 +176,7 @@ def test_parser_service_retries_transient_provider_failure() -> None:
     assert result.task_class == "general_question"
     assert factory.provider.calls == 2
 
+
 ###############################################################################
 def test_parser_service_retries_schema_correction_on_the_same_model() -> None:
     factory = _SchemaCorrectionFactoryStub()
@@ -196,6 +195,7 @@ def test_parser_service_retries_schema_correction_on_the_same_model() -> None:
 
     assert result.failure_category is None
     assert factory.provider.calls == 2
+
 
 ###############################################################################
 def test_parser_schema_accepts_poi_region_and_street_location_signals() -> None:
@@ -230,9 +230,15 @@ def test_parser_schema_accepts_poi_region_and_street_location_signals() -> None:
         "street",
     ]
 
+
 ###############################################################################
 def test_parser_service_normalizes_recent_messages_to_strings() -> None:
-    parser = ParserService(llm_factory=_FactoryStub(), settings_repo=object(), provider="openai", model="gpt-4.1-mini")
+    parser = ParserService(
+        llm_factory=_FactoryStub(),
+        settings_repo=object(),
+        provider="openai",
+        model="gpt-4.1-mini",
+    )
     result = parser.parse_turn(
         user_message="Where am I?",
         memory_snapshot={"active_location": None},
@@ -254,6 +260,7 @@ def test_parser_service_normalizes_recent_messages_to_strings() -> None:
     assert recent[0]["turn_index"] == "0"
     assert recent[0]["content"] == ""
 
+
 ###############################################################################
 def test_parser_service_does_not_hide_configuration_errors() -> None:
     parser = ParserService(
@@ -270,12 +277,16 @@ def test_parser_service_does_not_hide_configuration_errors() -> None:
             conversation_messages=[],
         )
 
+
 ###############################################################################
 def test_parser_prompt_enforces_multilingual_and_verbatim_location_rules() -> None:
     assert "The user may write in any language" in PARSER_SYSTEM_PROMPT
     assert "raw_value must be a verbatim span" in PARSER_SYSTEM_PROMPT
-    assert "requested_visualizations must use only canonical ids" in PARSER_SYSTEM_PROMPT
+    assert (
+        "requested_visualizations must use only canonical ids" in PARSER_SYSTEM_PROMPT
+    )
     assert "viewport_intent" in PARSER_SYSTEM_PROMPT
+
 
 ###############################################################################
 def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
@@ -321,6 +332,7 @@ def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
     assert [item.raw_value for item in result.location_signals] == ["القاهرة"]
     assert result.ambiguities == []
 
+
 ###############################################################################
 def test_parser_service_does_not_create_heuristic_location_fallbacks() -> None:
     parser = ParserService(
@@ -351,8 +363,11 @@ def test_parser_service_does_not_create_heuristic_location_fallbacks() -> None:
     assert result.location_signals == []
     assert result.ambiguities == ["missing_location"]
 
+
 ###############################################################################
-def test_parser_domain_boundary_preserves_typed_fields_without_prose_inference() -> None:
+def test_parser_domain_boundary_preserves_typed_fields_without_prose_inference() -> (
+    None
+):
     extracted = ParserService._apply_domain_rules(
         "Show an unrelated place with weather and satellite imagery.",
         LLMParserExtraction(
@@ -372,7 +387,9 @@ def test_parser_domain_boundary_preserves_typed_fields_without_prose_inference()
 
     assert extracted.requested_layers == ["openmeteo_weather_forecast"]
     assert extracted.requested_basemap == "esri_world_imagery"
-    assert [item.raw_value for item in extracted.location_signals] == ["unrelated place"]
+    assert [item.raw_value for item in extracted.location_signals] == [
+        "unrelated place"
+    ]
 
 
 ###############################################################################
@@ -388,5 +405,3 @@ def test_parser_domain_boundary_does_not_invent_intent_from_prose() -> None:
     assert extracted.requested_layers == []
     assert extracted.requested_basemap is None
     assert extracted.overlay_commands == []
-
-

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+
 ###############################################################################
 class TaskScopeDecision(BaseModel):
     starts_new_task: bool = False

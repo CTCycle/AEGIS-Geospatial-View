@@ -6,6 +6,7 @@ from server.services.llm.errors import LLMRequestSchemaError
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
+
 ###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
@@ -13,6 +14,7 @@ def _tool() -> LLMToolDefinition:
         description="List catalog",
         parameters_json_schema={"type": "object", "properties": {}},
     )
+
 
 ###############################################################################
 def test_openai_converts_tool_definitions() -> None:
@@ -29,6 +31,7 @@ def test_openai_converts_tool_definitions() -> None:
         },
         "strict": True,
     }
+
 
 ###############################################################################
 def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
@@ -49,7 +52,7 @@ def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
                 "role": "tool",
                 "tool_call_id": "call-1",
                 "name": "list_geospatial_capabilities",
-                "content": "{\"ok\":true}",
+                "content": '{"ok":true}',
             },
         ]
     )
@@ -60,8 +63,9 @@ def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
     assert messages[1] == {
         "type": "function_call_output",
         "call_id": "call-1",
-        "output": "{\"ok\":true}",
+        "output": '{"ok":true}',
     }
+
 
 ###############################################################################
 def test_openai_classifies_tools_plus_response_schema_at_provider_boundary() -> None:
@@ -74,4 +78,3 @@ def test_openai_classifies_tools_plus_response_schema_at_provider_boundary() -> 
     with pytest.raises(LLMRequestSchemaError) as error:
         OpenAIProvider(api_key="test")._validate_request_capabilities(request)
     assert error.value.category == "schema_definition"
-

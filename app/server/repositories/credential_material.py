@@ -11,9 +11,9 @@ from server.repositories.schemas.models import CredentialEncryptionMaterial
 
 DEFAULT_KEY_PURPOSE = "credential_encryption"
 
+
 ###############################################################################
 class CredentialEncryptionMaterialRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
@@ -95,6 +95,7 @@ class CredentialEncryptionMaterialRepository:
             session.commit()
             session.refresh(material)
         return material
+
 
 ###############################################################################
 def seed_credential_encryption_material(

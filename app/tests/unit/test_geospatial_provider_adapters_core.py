@@ -6,7 +6,10 @@ import pytest
 
 from server.services.geospatial.cache import GeospatialCache
 from server.services.geospatial.provider_registry import ProviderRegistry
-from server.services.geospatial.overpass import OverpassRateLimitError, OverpassRequestError
+from server.services.geospatial.overpass import (
+    OverpassRateLimitError,
+    OverpassRequestError,
+)
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
     ProviderRateLimitError,
@@ -23,9 +26,9 @@ from server.services.geospatial.providers.pvgis import PVGISProvider
 from server.services.geospatial.providers.tomtom import TomTomProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
+
 ###############################################################################
 class _OpenMeteoService:
-
     # -------------------------------------------------------------------------
     async def get_weather_forecast(self, *, latitude: float, longitude: float):
         return {
@@ -72,6 +75,7 @@ class _OpenMeteoService:
             "attribution": "Data from Open-Meteo",
         }
 
+
 ###############################################################################
 class _OverpassService:
     default_radius_m = 1000.0
@@ -97,6 +101,7 @@ class _OverpassService:
             "resolved_at": "2026-05-11T00:00:00+00:00",
             "attribution": "OSM",
         }
+
 
 ###############################################################################
 class _OpenAQService:
@@ -128,9 +133,9 @@ class _OpenAQService:
             "attribution": "OpenAQ",
         }
 
+
 ###############################################################################
 class _PVGISService:
-
     # -------------------------------------------------------------------------
     async def get_point_estimate(self, latitude: float, longitude: float):
         return {
@@ -179,10 +184,12 @@ GIBS_WMS_XML = """<?xml version="1.0"?>
 </WMS_Capabilities>
 """
 
+
 ###############################################################################
 async def _gibs_capabilities_fetcher(url: str, headers: dict[str, str] | None = None):
     del headers
     return GIBS_WMTS_XML if "wmts" in url else GIBS_WMS_XML
+
 
 ###############################################################################
 def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
@@ -211,6 +218,7 @@ def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
     assert air.payload["renderingMode"] == "clustered-points"
     assert air.payload["features"][0]["metadata"]["pollutantSymbols"]["pm25"] == 8
 
+
 ###############################################################################
 def test_openmeteo_provider_returns_wind_arrow_features() -> None:
     provider = OpenMeteoProvider(service=_OpenMeteoService())  # type: ignore[arg-type]
@@ -230,6 +238,7 @@ def test_openmeteo_provider_returns_wind_arrow_features() -> None:
     assert feature["metadata"]["windArrow"] == {"speed": 7, "direction": 270}
     assert feature["metadata"]["pressure"] == 1008
 
+
 ###############################################################################
 def test_overpass_provider_normalizes_poi_features_from_bbox() -> None:
     service = _OverpassService()
@@ -247,6 +256,7 @@ def test_overpass_provider_normalizes_poi_features_from_bbox() -> None:
     assert response.payload["renderingMode"] == "clustered-points"
     assert response.payload["features"][0]["category"] == "clinic"
     assert service.calls[0]["amenity_tags"] is None
+
 
 ###############################################################################
 def test_overpass_provider_maps_supported_amenity_groups() -> None:
@@ -270,19 +280,18 @@ def test_overpass_provider_maps_supported_amenity_groups() -> None:
         "doctors",
     ]
 
+
 ###############################################################################
 def test_overpass_provider_propagates_rate_limits_and_timeouts() -> None:
 
     ###############################################################################
     class _RateLimitedService(_OverpassService):
-
         # -------------------------------------------------------------------------
         async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
             raise OverpassRateLimitError("limited")
 
     ###############################################################################
     class _TimeoutService(_OverpassService):
-
         # -------------------------------------------------------------------------
         async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
             raise OverpassRequestError("timed out")
@@ -306,12 +315,12 @@ def test_overpass_provider_propagates_rate_limits_and_timeouts() -> None:
             )
         )
 
+
 ###############################################################################
 def test_overpass_provider_returns_empty_result() -> None:
 
     ###############################################################################
     class _EmptyService(_OverpassService):
-
         # -------------------------------------------------------------------------
         async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
             return {"items": [], "attribution": "OSM"}
@@ -327,6 +336,7 @@ def test_overpass_provider_returns_empty_result() -> None:
 
     assert response.payload["features"] == []
     assert response.payload["totalResults"] == 0
+
 
 ###############################################################################
 def test_openaq_provider_returns_station_features() -> None:
@@ -344,6 +354,7 @@ def test_openaq_provider_returns_station_features() -> None:
     assert response.payload["features"][0]["measurements"]["pm25"]["value"] == 8.0
     assert response.payload["summary"]["pm25"]["mean"] == 8.0
 
+
 ###############################################################################
 def test_openaq_provider_requires_key() -> None:
     with pytest.raises(ProviderAuthError):
@@ -352,6 +363,7 @@ def test_openaq_provider_requires_key() -> None:
                 ProviderRequest(capability_id="openaq_air_quality")
             )
         )
+
 
 ###############################################################################
 def test_openaq_provider_filters_pollutants() -> None:
@@ -368,12 +380,12 @@ def test_openaq_provider_filters_pollutants() -> None:
     assert set(response.payload["summary"]) == {"pm25"}
     assert set(response.payload["features"][0]["measurements"]) == {"pm25"}
 
+
 ###############################################################################
 def test_openaq_provider_returns_empty_bbox_result() -> None:
 
     ###############################################################################
     class _EmptyOpenAQService(_OpenAQService):
-
         # -------------------------------------------------------------------------
         async def get_nearby_measurements(
             self, *, lat: float, lon: float, radius_m: float
@@ -393,12 +405,12 @@ def test_openaq_provider_returns_empty_bbox_result() -> None:
     assert response.payload["features"] == []
     assert response.payload["summary"] == {}
 
+
 ###############################################################################
 def test_openaq_provider_uses_cache_and_stale_fallback() -> None:
 
     ###############################################################################
     class _FailingOpenAQService(_OpenAQService):
-
         # -------------------------------------------------------------------------
         async def get_nearby_measurements(
             self, *, lat: float, lon: float, radius_m: float
@@ -436,6 +448,7 @@ def test_openaq_provider_uses_cache_and_stale_fallback() -> None:
     assert stale.payload["features"][0]["name"] == "Station"
     assert stale.warnings
 
+
 ###############################################################################
 def test_pvgis_provider_returns_metadata_only_analysis() -> None:
     provider = PVGISProvider(service=_PVGISService())  # type: ignore[arg-type]
@@ -452,14 +465,14 @@ def test_pvgis_provider_returns_metadata_only_analysis() -> None:
     assert response.payload["renderingMode"] == "metadata-only"
     assert response.payload["yearlyKwhPerKwpEstimate"] == 1234.5
 
+
 ###############################################################################
 def test_tomtom_requires_keys_before_emitting_urls() -> None:
     with pytest.raises(ProviderAuthError):
         run_async_in_thread(
-            TomTomProvider().fetch(
-                ProviderRequest(capability_id="tomtom_traffic_flow")
-            )
+            TomTomProvider().fetch(ProviderRequest(capability_id="tomtom_traffic_flow"))
         )
+
 
 ###############################################################################
 def test_tomtom_provider_normalizes_live_incidents() -> None:
@@ -502,6 +515,7 @@ def test_tomtom_provider_normalizes_live_incidents() -> None:
     assert response.payload["features"][0]["name"] == "Lane closed"
     assert response.payload["features"][0]["metadata"]["roadNumbers"] == ["A1"]
 
+
 ###############################################################################
 def test_tomtom_provider_emits_proxy_tile_payload_without_secret() -> None:
     response = run_async_in_thread(
@@ -516,8 +530,11 @@ def test_tomtom_provider_emits_proxy_tile_payload_without_secret() -> None:
     assert response.payload["credentialPolicy"] == "server-side-only"
     assert "tomtom-test" not in str(response.payload)
 
+
 ###############################################################################
-def test_provider_registry_passes_environment_keys_to_gated_adapters(monkeypatch) -> None:
+def test_provider_registry_passes_environment_keys_to_gated_adapters(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-test")
     registry = ProviderRegistry()
     registry.build_from_manifests()
@@ -529,6 +546,7 @@ def test_provider_registry_passes_environment_keys_to_gated_adapters(monkeypatch
         "/api/geospatial/proxy/tomtom/traffic-flow/{z}/{x}/{y}.png"
     )
     assert "tomtom-test" not in str(tomtom.payload)
+
 
 ###############################################################################
 def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
@@ -543,8 +561,11 @@ def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
 
     assert response.payload["layer"]["rendering_mode"] == "wmts"
     assert response.payload["render"]["rendering_mode"] == "wmts"
-    assert response.payload["render"]["tile_matrix_set"] == "GoogleMapsCompatible_Level9"
+    assert (
+        response.payload["render"]["tile_matrix_set"] == "GoogleMapsCompatible_Level9"
+    )
     assert response.attribution
+
 
 ###############################################################################
 def test_arcgis_rest_provider_builds_geojson_query_url() -> None:
@@ -562,6 +583,7 @@ def test_arcgis_rest_provider_builds_geojson_query_url() -> None:
     assert "f=geojson" in response.payload["featuresUrl"]
     assert "geometry=-1.0%2C2.0%2C3.0%2C4.0" in response.payload["featuresUrl"]
 
+
 ###############################################################################
 def test_census_provider_selects_demographic_choropleth() -> None:
     response = run_async_in_thread(
@@ -577,6 +599,7 @@ def test_census_provider_selects_demographic_choropleth() -> None:
     assert response.payload["renderingMode"] == "choropleth"
     assert response.payload["status"] == "server-side-only"
     assert "featuresUrl" not in response.payload
+
 
 ###############################################################################
 def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
@@ -613,6 +636,7 @@ def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
     assert response.payload["features"][0]["preview_image_url"].endswith("preview.jpg")
     assert response.payload["features"][0]["embedding_allowed"] is False
 
+
 ###############################################################################
 def test_windy_webcams_requires_key() -> None:
     with pytest.raises(ProviderAuthError):
@@ -621,6 +645,7 @@ def test_windy_webcams_requires_key() -> None:
                 ProviderRequest(capability_id="windy_webcams", params={"live": True})
             )
         )
+
 
 ###############################################################################
 def test_windy_webcams_omits_expired_preview_and_detects_stale_camera() -> None:
@@ -653,6 +678,7 @@ def test_windy_webcams_omits_expired_preview_and_detects_stale_camera() -> None:
     assert feature["preview_image_url"] is None
     assert feature["stale"] is True
     assert feature["metadata"]["preview_expired"] is True
+
 
 ###############################################################################
 def test_windy_webcams_embeds_only_when_explicitly_allowed() -> None:
@@ -690,6 +716,7 @@ def test_windy_webcams_embeds_only_when_explicitly_allowed() -> None:
     assert allowed["embed_url"] == "https://example.test/player"
     assert denied["embedding_allowed"] is False
     assert denied["embed_url"] is None
+
 
 ###############################################################################
 def test_windy_webcams_returns_stale_cache_after_live_failure() -> None:

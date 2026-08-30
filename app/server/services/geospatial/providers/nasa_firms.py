@@ -17,6 +17,7 @@ from server.services.geospatial.providers.http import fetch_text_url
 
 TextFetcher = Callable[[str], Awaitable[str] | str]
 
+
 ###############################################################################
 class NASAFIRMSProvider(GeospatialProvider):
     provider_id = "nasa_firms"
@@ -32,7 +33,9 @@ class NASAFIRMSProvider(GeospatialProvider):
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         api_key = (self.api_key or "").strip()
         if not api_key:
-            raise ProviderAuthError("NASA_API_KEY is required for NASA FIRMS active fire access.")
+            raise ProviderAuthError(
+                "NASA_API_KEY is required for NASA FIRMS active fire access."
+            )
         west, south, east, north = request.bbox or (-180.0, -90.0, 180.0, 90.0)
         features_url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{api_key}/VIIRS_SNPP_NRT/{west},{south},{east},{north}/1"
         if request.params.get("live"):
@@ -66,6 +69,7 @@ class NASAFIRMSProvider(GeospatialProvider):
             result_type="metadata",
         )
 
+
 ###############################################################################
 async def _call_text_fetcher(fetcher: TextFetcher, url: str) -> str:
     value = fetcher(url)
@@ -73,9 +77,11 @@ async def _call_text_fetcher(fetcher: TextFetcher, url: str) -> str:
         return await value
     return value
 
+
 ###############################################################################
 async def _fetch_text_url(url: str) -> str:
     return await fetch_text_url(url)
+
 
 ###############################################################################
 def _normalize_firms_csv(csv_text: str) -> list[dict[str, Any]]:
@@ -97,7 +103,9 @@ def _normalize_firms_csv(csv_text: str) -> list[dict[str, Any]]:
                 "category": "active_fire",
                 "latitude": latitude,
                 "longitude": longitude,
-                "brightness": _float_or_none(row.get("bright_ti4") or row.get("brightness")),
+                "brightness": _float_or_none(
+                    row.get("bright_ti4") or row.get("brightness")
+                ),
                 "confidence": row.get("confidence"),
                 "timestamp": _firms_timestamp(row),
                 "metadata": {
@@ -110,6 +118,7 @@ def _normalize_firms_csv(csv_text: str) -> list[dict[str, Any]]:
         )
     return features
 
+
 ###############################################################################
 def _firms_timestamp(row: dict[str, str]) -> str | None:
     date = (row.get("acq_date") or "").strip()
@@ -119,6 +128,7 @@ def _firms_timestamp(row: dict[str, str]) -> str | None:
     if len(time) != 4:
         return date
     return f"{date}T{time[:2]}:{time[2:]}:00Z"
+
 
 ###############################################################################
 def _float_or_none(value: str | None) -> float | None:

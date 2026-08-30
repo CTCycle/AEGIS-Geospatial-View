@@ -4,10 +4,14 @@ from tests.conftest import run_async_in_thread
 import pytest
 
 from server.services.geospatial.cache import GeospatialCache
-from server.services.geospatial.providers.base import ProviderRequest, ProviderUnavailableError
+from server.services.geospatial.providers.base import (
+    ProviderRequest,
+    ProviderUnavailableError,
+)
 from server.services.geospatial.providers.eea import EEAProvider
 from server.services.geospatial.providers.esa import ESAProvider
 from server.services.geospatial.providers.eurostat import EurostatProvider
+
 
 ###############################################################################
 def test_eea_provider_returns_wms_descriptor() -> None:
@@ -30,6 +34,7 @@ def test_eea_provider_returns_wms_descriptor() -> None:
     assert response.payload["serviceUrl"] == "https://example.test/wms"
     assert response.payload["layers"] == ["0"]
     assert response.attribution == ["EEA"]
+
 
 ###############################################################################
 def test_eea_provider_live_validation_uses_stale_cache_after_failure() -> None:
@@ -65,6 +70,7 @@ def test_eea_provider_live_validation_uses_stale_cache_after_failure() -> None:
     assert stale.payload["liveValidation"]["layers"] == ["0"]
     assert stale.warnings
 
+
 ###############################################################################
 def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
     async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
@@ -75,10 +81,14 @@ def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
             EEAProvider(fetcher=malformed_fetcher).fetch(
                 ProviderRequest(
                     capability_id="eea_noise_2019",
-                    params={"live_validate": True, "metadata": {"url": "https://example.test/wms"}},
+                    params={
+                        "live_validate": True,
+                        "metadata": {"url": "https://example.test/wms"},
+                    },
                 )
             )
         )
+
 
 ###############################################################################
 def test_esa_provider_returns_wmts_descriptor() -> None:
@@ -102,6 +112,7 @@ def test_esa_provider_returns_wmts_descriptor() -> None:
     assert response.payload["serviceUrl"] == "https://example.test/wmts"
     assert response.attribution == ["ESA"]
 
+
 ###############################################################################
 def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
     clock = 0.0
@@ -120,7 +131,10 @@ def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
     )
     request = ProviderRequest(
         capability_id="esa_worldcover",
-        params={"live_validate": True, "metadata": {"url": "https://example.test/wmts"}},
+        params={
+            "live_validate": True,
+            "metadata": {"url": "https://example.test/wmts"},
+        },
     )
     run_async_in_thread(provider.fetch(request))
 
@@ -133,6 +147,7 @@ def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
 
     assert stale.stale is True
     assert stale.payload["liveValidation"]["service"] == "WMTS"
+
 
 ###############################################################################
 def test_eurostat_provider_keeps_statistics_metadata_only_until_joined() -> None:
@@ -148,6 +163,7 @@ def test_eurostat_provider_keeps_statistics_metadata_only_until_joined() -> None
     assert response.payload["renderingMode"] == "metadata-only"
     assert response.payload["joinRequired"] is True
     assert response.payload["joinKey"] == "NUTS_ID"
+
 
 ###############################################################################
 def test_eurostat_provider_validates_jsonstat_metadata_and_stale_cache() -> None:
@@ -173,7 +189,10 @@ def test_eurostat_provider_validates_jsonstat_metadata_and_stale_cache() -> None
     )
     request = ProviderRequest(
         capability_id="eurostat_regional_demographics",
-        params={"live_validate": True, "metadata": {"url": "https://example.test/jsonstat"}},
+        params={
+            "live_validate": True,
+            "metadata": {"url": "https://example.test/jsonstat"},
+        },
     )
     first = run_async_in_thread(provider.fetch(request))
 
@@ -188,6 +207,7 @@ def test_eurostat_provider_validates_jsonstat_metadata_and_stale_cache() -> None
     assert stale.stale is True
     assert stale.payload["jsonStatMetadata"]["label"] == "Population density"
 
+
 ###############################################################################
 def test_eurostat_provider_rejects_malformed_jsonstat_without_cache() -> None:
     async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
@@ -198,10 +218,14 @@ def test_eurostat_provider_rejects_malformed_jsonstat_without_cache() -> None:
             EurostatProvider(fetcher=malformed_fetcher).fetch(
                 ProviderRequest(
                     capability_id="eurostat_regional_demographics",
-                    params={"live_validate": True, "metadata": {"url": "https://example.test/jsonstat"}},
+                    params={
+                        "live_validate": True,
+                        "metadata": {"url": "https://example.test/jsonstat"},
+                    },
                 )
             )
         )
+
 
 ###############################################################################
 def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
@@ -219,7 +243,14 @@ def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
                             "properties": {"NUTS_ID": "IT", "value": 201.2},
                             "geometry": {
                                 "type": "Polygon",
-                                "coordinates": [[[12.0, 41.0], [13.0, 41.0], [13.0, 42.0], [12.0, 41.0]]],
+                                "coordinates": [
+                                    [
+                                        [12.0, 41.0],
+                                        [13.0, 41.0],
+                                        [13.0, 42.0],
+                                        [12.0, 41.0],
+                                    ]
+                                ],
                             },
                         },
                         {
@@ -227,7 +258,9 @@ def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
                             "properties": {"NUTS_ID": "FR", "value": 123.4},
                             "geometry": {
                                 "type": "Polygon",
-                                "coordinates": [[[2.0, 48.0], [3.0, 48.0], [3.0, 49.0], [2.0, 48.0]]],
+                                "coordinates": [
+                                    [[2.0, 48.0], [3.0, 48.0], [3.0, 49.0], [2.0, 48.0]]
+                                ],
                             },
                         },
                     ],
@@ -246,6 +279,7 @@ def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
     assert feature["properties"]["metric"] == "population_density"
     assert feature["properties"]["marginOfError"] == 1.5
 
+
 ###############################################################################
 def test_eurostat_provider_describes_nuts_ingestion_payload() -> None:
     response = run_async_in_thread(
@@ -260,5 +294,3 @@ def test_eurostat_provider_describes_nuts_ingestion_payload() -> None:
     assert response.payload["renderingMode"] == "vector-tile"
     assert response.payload["status"] == "dataset-ingestion"
     assert response.payload["joinKey"] == "NUTS_ID"
-
-

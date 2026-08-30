@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 from server.domain.geospatial.providers import ProviderRequest
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class CapabilityRegistrySnapshot:
@@ -17,11 +18,13 @@ class CapabilityRegistrySnapshot:
     transit: list[dict[str, Any]]
     tools: list[dict[str, Any]]
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RuntimeRegistrySnapshot:
     profiles: dict[str, dict[str, Any]]
     manifests: dict[str, dict[str, Any]]
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -31,6 +34,7 @@ class AttributionEntry:
     label: str
     url: str
     required: bool
+
 
 ###############################################################################
 class LiveValidationCheckResult(BaseModel):
@@ -43,6 +47,7 @@ class LiveValidationCheckResult(BaseModel):
     feature_count: int | None = None
     checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
+
 ###############################################################################
 class LiveValidationReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -50,12 +55,15 @@ class LiveValidationReport(BaseModel):
     checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     error_count: int = 0
     skipped_count: int = 0
-    results: list[LiveValidationCheckResult] = Field(default_factory=lambda: list[LiveValidationCheckResult]())
+    results: list[LiveValidationCheckResult] = Field(
+        default_factory=lambda: list[LiveValidationCheckResult]()
+    )
 
     # -------------------------------------------------------------------------
     @property
     def ok(self) -> bool:
         return self.error_count == 0
+
 
 ###############################################################################
 @dataclass(frozen=True)

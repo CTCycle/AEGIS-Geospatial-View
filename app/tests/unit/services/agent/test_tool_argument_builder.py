@@ -9,6 +9,7 @@ from server.contracts.extraction import (
 )
 from server.services.agent.tool_argument_builder import ToolArgumentBuilder
 
+
 ###############################################################################
 def _turn(temporal: TemporalSignal) -> TurnParseResult:
     return TurnParseResult(
@@ -33,6 +34,7 @@ def _turn(temporal: TemporalSignal) -> TurnParseResult:
         temporal_signal=temporal,
     )
 
+
 ###############################################################################
 def test_current_mode_does_not_forward_non_temporal_parser_text() -> None:
     arguments = ToolArgumentBuilder.build_temporal_arguments(
@@ -40,6 +42,7 @@ def test_current_mode_does_not_forward_non_temporal_parser_text() -> None:
     )
 
     assert arguments == {"temporal_mode": "current"}
+
 
 ###############################################################################
 def test_forecast_mode_preserves_temporal_phrase_for_selection() -> None:
@@ -49,9 +52,12 @@ def test_forecast_mode_preserves_temporal_phrase_for_selection() -> None:
 
     assert arguments == {"temporal_mode": "forecast", "time": "tomorrow"}
 
+
 ###############################################################################
 def test_explicit_correction_location_precedes_remembered_bbox() -> None:
-    turn = _turn(TemporalSignal(mode="current"),)
+    turn = _turn(
+        TemporalSignal(mode="current"),
+    )
     turn = turn.model_copy(
         update={
             "user_text": "Actually use Zurich instead.",

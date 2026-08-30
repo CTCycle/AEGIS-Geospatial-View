@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from server.common.time import utc_now
 
+
 ###############################################################################
 class ConversationDirective(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -19,16 +20,23 @@ class ConversationDirective(BaseModel):
     superseding_directive_id: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
 
+
 ###############################################################################
 class AgentContextPackage(BaseModel):
     model_config = ConfigDict(extra="forbid")
     current_user_message: str
-    active_instructions: list[ConversationDirective] = Field(default_factory=lambda: list[ConversationDirective]())
+    active_instructions: list[ConversationDirective] = Field(
+        default_factory=lambda: list[ConversationDirective]()
+    )
     task_state: dict[str, Any] | None = None
     map_memory: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     conversation_summary: dict[str, Any] | None = None
-    recent_messages: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
-    relevant_tool_outcomes: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
+    recent_messages: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
+    relevant_tool_outcomes: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     policy_constraints: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     included_message_ids: list[int] = Field(default_factory=lambda: list[int]())
     summarized_through_turn_index: int = 0

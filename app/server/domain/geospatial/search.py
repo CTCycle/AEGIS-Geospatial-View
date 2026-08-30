@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class IndexedFeature:
@@ -13,6 +14,7 @@ class IndexedFeature:
     latitude: float | None = None
     longitude: float | None = None
     metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+
 
 ###############################################################################
 @dataclass(frozen=True)

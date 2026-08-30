@@ -8,6 +8,7 @@ from typing import Any
 
 from server.domain.geospatial.search import IndexedFeature, SearchIndex
 
+
 ###############################################################################
 def build_feature_search_index(features: list[IndexedFeature]) -> SearchIndex:
     terms: dict[str, list[str]] = {}
@@ -15,6 +16,7 @@ def build_feature_search_index(features: list[IndexedFeature]) -> SearchIndex:
         for term in _terms_for_feature(feature):
             terms.setdefault(term, []).append(feature.id)
     return SearchIndex(features=features, terms=terms)
+
 
 ###############################################################################
 def deduplicate_features(features: list[IndexedFeature]) -> list[IndexedFeature]:
@@ -33,6 +35,7 @@ def deduplicate_features(features: list[IndexedFeature]) -> list[IndexedFeature]
         deduped.append(feature)
     return deduped
 
+
 ###############################################################################
 def build_geojson_search_index(path: str | Path) -> SearchIndex:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -45,7 +48,12 @@ def build_geojson_search_index(path: str | Path) -> SearchIndex:
         indexed.append(
             IndexedFeature(
                 id=str(feature.get("id") or properties.get("id") or index),
-                label=str(properties.get("name") or properties.get("label") or properties.get("title") or ""),
+                label=str(
+                    properties.get("name")
+                    or properties.get("label")
+                    or properties.get("title")
+                    or ""
+                ),
                 category=str(properties.get("category") or "") or None,
                 source=str(properties.get("source") or "") or None,
                 longitude=coordinates[0] if coordinates else None,
@@ -55,8 +63,11 @@ def build_geojson_search_index(path: str | Path) -> SearchIndex:
         )
     return build_feature_search_index(indexed)
 
+
 ###############################################################################
-def query_search_index(index: SearchIndex, query: str, *, limit: int = 20) -> list[IndexedFeature]:
+def query_search_index(
+    index: SearchIndex, query: str, *, limit: int = 20
+) -> list[IndexedFeature]:
     wanted = {term for term in _tokenize(query) if term}
     if not wanted:
         return []
@@ -66,21 +77,30 @@ def query_search_index(index: SearchIndex, query: str, *, limit: int = 20) -> li
             score_by_id[feature_id] = score_by_id.get(feature_id, 0) + 1
     feature_by_id = {feature.id: feature for feature in index.features}
     ranked_ids = sorted(score_by_id, key=lambda item: (-score_by_id[item], item))
-    return [feature_by_id[feature_id] for feature_id in ranked_ids[:limit] if feature_id in feature_by_id]
+    return [
+        feature_by_id[feature_id]
+        for feature_id in ranked_ids[:limit]
+        if feature_id in feature_by_id
+    ]
+
 
 ###############################################################################
 def _terms_for_feature(feature: IndexedFeature) -> set[str]:
     values = [feature.label, feature.category or "", feature.source or ""]
-    values.extend(str(value) for value in feature.metadata.values() if isinstance(value, str))
+    values.extend(
+        str(value) for value in feature.metadata.values() if isinstance(value, str)
+    )
     terms: set[str] = set()
     for value in values:
         terms.update(_tokenize(value))
     return terms
 
+
 ###############################################################################
 def _tokenize(value: str) -> list[str]:
     cleaned = "".join(char.lower() if char.isalnum() else " " for char in value)
     return [term for term in cleaned.split() if len(term) >= 2]
+
 
 ###############################################################################
 def _point_coordinates(geometry: Any) -> tuple[float, float] | None:

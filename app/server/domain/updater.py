@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+
 ###############################################################################
 class LayerAggregate(BaseModel):
     layer_id: str

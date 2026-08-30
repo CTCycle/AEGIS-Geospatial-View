@@ -6,7 +6,12 @@ from server.contracts.extraction import (
     OverlayScope,
     OverlayStateReference,
 )
-from server.contracts.geospatial import MapSession, OverlayCollectionState, OverlayInstance, ViewportPolicy
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    OverlayInstance,
+    ViewportPolicy,
+)
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.agent.turn_state_assembler import AgentTurnStateAssembler
@@ -77,7 +82,9 @@ def test_hide_one_instance_preserves_unrelated_descriptor() -> None:
 
 
 ###############################################################################
-def test_identity_resolution_falls_through_unmatched_instance_alias_to_capability() -> None:
+def test_identity_resolution_falls_through_unmatched_instance_alias_to_capability() -> (
+    None
+):
     weather = _instance(
         "weather-zurich",
         "openmeteo_weather_forecast",
@@ -140,8 +147,22 @@ def test_location_scoped_remove_does_not_remove_other_scope() -> None:
 def test_keep_only_removes_nonmatching_instances() -> None:
     collection = OverlayCollectionState(
         instances=[
-            _instance("weather", "openmeteo_weather_forecast", label="Weather", scope_key="global", latitude=0, longitude=0),
-            _instance("traffic", "tomtom_traffic_flow", label="Traffic", scope_key="global", latitude=0, longitude=0),
+            _instance(
+                "weather",
+                "openmeteo_weather_forecast",
+                label="Weather",
+                scope_key="global",
+                latitude=0,
+                longitude=0,
+            ),
+            _instance(
+                "traffic",
+                "tomtom_traffic_flow",
+                label="Traffic",
+                scope_key="global",
+                latitude=0,
+                longitude=0,
+            ),
         ]
     )
     command = OverlayCommand(
@@ -178,7 +199,10 @@ def test_add_reuses_same_capability_and_scope_identity() -> None:
     command = OverlayCommand(
         action="add",
         selector=OverlaySelector(capability_ids=["openmeteo_weather_forecast"]),
-        scope=OverlayScope(kind="location", location={"label": "Zurich", "latitude": 47.37, "longitude": 8.54}),
+        scope=OverlayScope(
+            kind="location",
+            location={"label": "Zurich", "latitude": 47.37, "longitude": 8.54},
+        ),
         state_reference=OverlayStateReference(revision=0),
     )
     catalog = [
@@ -192,7 +216,9 @@ def test_add_reuses_same_capability_and_scope_identity() -> None:
         }
     ]
 
-    first, first_result = OverlayCollectionService.apply(collection, command, catalog=catalog)
+    first, first_result = OverlayCollectionService.apply(
+        collection, command, catalog=catalog
+    )
     second, second_result = OverlayCollectionService.apply(
         first,
         command.model_copy(
@@ -243,7 +269,9 @@ def test_catalog_selector_filters_provider_type_and_tags() -> None:
         },
     ]
 
-    updated, result = OverlayCollectionService.apply(collection=OverlayCollectionState(), command=command, catalog=catalog)
+    updated, result = OverlayCollectionService.apply(
+        collection=OverlayCollectionState(), command=command, catalog=catalog
+    )
 
     assert result.added_instance_ids == [updated.instances[0].instance_id]
     assert updated.instances[0].capability_id == "weather-official"
@@ -281,7 +309,9 @@ def test_catalog_selector_accepts_redundant_alias_fields_for_capability() -> Non
 
 
 ###############################################################################
-def test_unmatched_selector_that_targets_active_basemap_is_explained_without_mutation() -> None:
+def test_unmatched_selector_that_targets_active_basemap_is_explained_without_mutation() -> (
+    None
+):
     command = OverlayCommand(
         action="hide",
         selector=OverlaySelector(labels=["imagery"]),
@@ -331,14 +361,20 @@ def test_ambiguous_catalog_selector_and_no_match_preserve_state() -> None:
         selector=OverlaySelector(instance_ids=["missing"]),
         state_reference=OverlayStateReference(revision=0),
     )
-    still_unchanged, no_match_result = OverlayCollectionService.apply(unchanged, no_match)
+    still_unchanged, no_match_result = OverlayCollectionService.apply(
+        unchanged, no_match
+    )
     assert still_unchanged == unchanged
     assert no_match_result.unmatched_selectors == ["missing"]
 
 
 ###############################################################################
-def test_provider_candidate_is_committed_against_active_revision_without_dropping_state() -> None:
-    location = ResolvedLocation(label="Zurich", latitude=47.37, longitude=8.54, country="Switzerland")
+def test_provider_candidate_is_committed_against_active_revision_without_dropping_state() -> (
+    None
+):
+    location = ResolvedLocation(
+        label="Zurich", latitude=47.37, longitude=8.54, country="Switzerland"
+    )
     viewport = ViewportPolicy(center_latitude=47.37, center_longitude=8.54)
     active = MapSession(
         session_id="active",
@@ -366,7 +402,10 @@ def test_provider_candidate_is_committed_against_active_revision_without_droppin
     command = OverlayCommand(
         action="show",
         selector=OverlaySelector(capability_ids=["openmeteo_weather_forecast"]),
-        scope=OverlayScope(kind="location", location={"label": "Zurich", "latitude": 47.37, "longitude": 8.54}),
+        scope=OverlayScope(
+            kind="location",
+            location={"label": "Zurich", "latitude": 47.37, "longitude": 8.54},
+        ),
         state_reference=OverlayStateReference(revision=1),
     )
 
@@ -378,11 +417,15 @@ def test_provider_candidate_is_committed_against_active_revision_without_droppin
 
     assert updated.overlay_collection_revision == 2
     assert len(updated.overlay_collection.instances) == 1
-    assert results[0].added_instance_ids == [updated.overlay_collection.instances[0].instance_id]
+    assert results[0].added_instance_ids == [
+        updated.overlay_collection.instances[0].instance_id
+    ]
 
 
 ###############################################################################
-def test_merge_clears_failure_for_instance_resolved_in_authoritative_collection() -> None:
+def test_merge_clears_failure_for_instance_resolved_in_authoritative_collection() -> (
+    None
+):
     weather = _instance(
         "weather-zurich",
         "openmeteo_weather_forecast",
@@ -393,13 +436,18 @@ def test_merge_clears_failure_for_instance_resolved_in_authoritative_collection(
     )
     session = MapSession(
         session_id="fetched",
-        resolved_location=ResolvedLocation(label="Zurich", latitude=47.37, longitude=8.54),
+        resolved_location=ResolvedLocation(
+            label="Zurich", latitude=47.37, longitude=8.54
+        ),
         basemap_id="osm_default",
         viewport=ViewportPolicy(center_latitude=47.37, center_longitude=8.54),
         overlays=[dict(weather.descriptor)],
         overlay_ids=[weather.instance_id],
         failed_overlays=[
-            {"id": weather.instance_id, "reason": "not available in the capability catalog"},
+            {
+                "id": weather.instance_id,
+                "reason": "not available in the capability catalog",
+            },
             {"id": "unrelated-layer", "reason": "provider unavailable"},
         ],
     )

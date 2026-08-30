@@ -9,7 +9,11 @@ from server.domain.agent.catalog import (
     CapabilityCatalogFilter,
     GeospatialCapabilityExecutionResult,
 )
-from server.domain.agent.decision import ClarificationRequest, ExecutionPlan, ResolvedLocation
+from server.domain.agent.decision import (
+    ClarificationRequest,
+    ExecutionPlan,
+    ResolvedLocation,
+)
 from server.domain.agent.execution import AgentExecutionContext
 from server.contracts.extraction import LocationSignal, TurnParseResult
 from server.contracts.geospatial import MapSession, ProviderLayerSelection
@@ -25,9 +29,9 @@ from server.services.llm.types import LLMToolDefinition
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
+
 ###############################################################################
 class AgentToolCatalogService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -216,7 +220,9 @@ class AgentToolCatalogService:
         ]
         if allowed_capability_ids:
             execute = next(
-                item for item in definitions if item.name == "execute_geospatial_capability"
+                item
+                for item in definitions
+                if item.name == "execute_geospatial_capability"
             )
             execute.parameters_json_schema["properties"]["capability_id"]["enum"] = (
                 allowed_capability_ids
@@ -235,9 +241,13 @@ class AgentToolCatalogService:
             elif definition.name == "execute_geospatial_capability":
                 registry.register_native_tool(definition, self._execute_tool_handler)
             elif definition.name == "fetch_geospatial_provider_layers":
-                registry.register_native_tool(definition, self._provider_layers_tool_handler)
+                registry.register_native_tool(
+                    definition, self._provider_layers_tool_handler
+                )
             elif definition.name == "render_geospatial_provider_layer":
-                registry.register_native_tool(definition, self._render_provider_layer_tool_handler)
+                registry.register_native_tool(
+                    definition, self._render_provider_layer_tool_handler
+                )
 
     # -------------------------------------------------------------------------
     async def _list_tool_handler(
@@ -263,11 +273,13 @@ class AgentToolCatalogService:
         arguments: dict[str, Any],
         context: AgentExecutionContext,
     ) -> dict[str, Any]:
-        return dict(await self.execute_geospatial_capability(
-            str(arguments["capability_id"]),
-            dict(arguments.get("arguments") or {}),
-            context=context,
-        ))
+        return dict(
+            await self.execute_geospatial_capability(
+                str(arguments["capability_id"]),
+                dict(arguments.get("arguments") or {}),
+                context=context,
+            )
+        )
 
     # -------------------------------------------------------------------------
     async def _provider_layers_tool_handler(
@@ -278,7 +290,9 @@ class AgentToolCatalogService:
         _ = context
         response = await self.geospatial_api_service.list_provider_layers(
             str(arguments["provider_id"]),
-            query=arguments.get("query") if isinstance(arguments.get("query"), str) else None,
+            query=arguments.get("query")
+            if isinstance(arguments.get("query"), str)
+            else None,
             limit=int(arguments.get("limit") or 50),
             refresh=bool(arguments.get("refresh", False)),
         )
@@ -324,7 +338,9 @@ class AgentToolCatalogService:
                 if parsed_request is not None
                 else "provider_layer_render"
             ),
-            basemap_id=parsed_request.requested_basemap if parsed_request is not None else None,
+            basemap_id=parsed_request.requested_basemap
+            if parsed_request is not None
+            else None,
             overlay_ids=[],
         )
         request = self.request_builder.build_location_search_request(
@@ -340,9 +356,15 @@ class AgentToolCatalogService:
                 ProviderLayerSelection(
                     provider_id=provider_id,
                     layer_id=layer_id,
-                    time=arguments.get("time") if isinstance(arguments.get("time"), str) else None,
-                    style=arguments.get("style") if isinstance(arguments.get("style"), str) else None,
-                    format=arguments.get("format") if isinstance(arguments.get("format"), str) else None,
+                    time=arguments.get("time")
+                    if isinstance(arguments.get("time"), str)
+                    else None,
+                    style=arguments.get("style")
+                    if isinstance(arguments.get("style"), str)
+                    else None,
+                    format=arguments.get("format")
+                    if isinstance(arguments.get("format"), str)
+                    else None,
                 )
             ],
         )
@@ -368,8 +390,7 @@ class AgentToolCatalogService:
             if code not in supported_codes:
                 code = "provider_unavailable"
             reason = str(
-                provider_failure.get("reason")
-                or "provider layer could not be rendered"
+                provider_failure.get("reason") or "provider layer could not be rendered"
             )
             return self._error_result(
                 capability_id=capability_id,
@@ -421,7 +442,9 @@ class AgentToolCatalogService:
                 item
                 for item in items
                 if geometry_type
-                        == str(json_object(item.get("metadata")).get("geometry_type") or "").casefold()
+                == str(
+                    json_object(item.get("metadata")).get("geometry_type") or ""
+                ).casefold()
             ]
         items = sorted(items, key=lambda item: str(item.get("id") or ""))
         offset = self._decode_cursor(filters.cursor)
@@ -487,9 +510,13 @@ class AgentToolCatalogService:
         if self._is_basemap_capability(manifest):
             if self.search_orchestrator is not None:
                 resolved_location = await self._resolve_location(arguments, context)
-                if not (is_json_object(resolved_location) and resolved_location.get("error")):
+                if not (
+                    is_json_object(resolved_location) and resolved_location.get("error")
+                ):
                     if not isinstance(resolved_location, ResolvedLocation):
-                        return cast(GeospatialCapabilityExecutionResult, resolved_location)
+                        return cast(
+                            GeospatialCapabilityExecutionResult, resolved_location
+                        )
                     plan = self._build_map_execution_plan(
                         capability_id=capability_id,
                         manifest=manifest,
@@ -541,7 +568,9 @@ class AgentToolCatalogService:
                 return cast(GeospatialCapabilityExecutionResult, resolved_location)
             if not isinstance(resolved_location, ResolvedLocation):
                 return cast(GeospatialCapabilityExecutionResult, resolved_location)
-            plan = self._build_map_execution_plan(capability_id=capability_id, manifest=manifest, context=context)
+            plan = self._build_map_execution_plan(
+                capability_id=capability_id, manifest=manifest, context=context
+            )
             request = self.request_builder.build_location_search_request(
                 plan,
                 resolved_location,
@@ -602,7 +631,9 @@ class AgentToolCatalogService:
     @staticmethod
     def _argument_schema_for(capability: dict[str, Any]) -> dict[str, Any]:
         metadata = json_object(capability.get("metadata"))
-        schema = metadata.get("parameters_json_schema") or metadata.get("argument_schema")
+        schema = metadata.get("parameters_json_schema") or metadata.get(
+            "argument_schema"
+        )
         if is_json_object(schema):
             return schema
         return {"type": "object", "properties": {}}
@@ -620,18 +651,28 @@ class AgentToolCatalogService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _is_basemap_capability(manifest: dict[str, Any]) -> bool:
-        return str(manifest.get("capabilityKind") or manifest.get("type") or "").strip().lower() == "basemap"
+        return (
+            str(manifest.get("capabilityKind") or manifest.get("type") or "")
+            .strip()
+            .lower()
+            == "basemap"
+        )
 
     # -------------------------------------------------------------------------
-    def _supports_direct_execution(self, capability_id: str, manifest: dict[str, Any]) -> bool:
+    def _supports_direct_execution(
+        self, capability_id: str, manifest: dict[str, Any]
+    ) -> bool:
         if self.tool_registry is None:
             return False
-        return self.runtime_registry.supports_mode(capability_id, "direct_text") and self.tool_registry.get_handler(
-            capability_id
-        ) is not None
+        return (
+            self.runtime_registry.supports_mode(capability_id, "direct_text")
+            and self.tool_registry.get_handler(capability_id) is not None
+        )
 
     # -------------------------------------------------------------------------
-    def _supports_map_execution(self, capability_id: str, manifest: dict[str, Any]) -> bool:
+    def _supports_map_execution(
+        self, capability_id: str, manifest: dict[str, Any]
+    ) -> bool:
         if self._is_basemap_capability(manifest):
             return False
         return self.runtime_registry.supports_mode(capability_id, "map")
@@ -653,7 +694,11 @@ class AgentToolCatalogService:
             "unsupported_capability": "unsupported_capability",
         }
         operation = operation_by_code.get(code, "unsupported_capability")
-        warnings = [authorization.reason] if code == "missing_credentials" and authorization.reason else []
+        warnings = (
+            [authorization.reason]
+            if code == "missing_credentials" and authorization.reason
+            else []
+        )
         return {
             "ok": False,
             "operation": operation,
@@ -692,8 +737,12 @@ class AgentToolCatalogService:
             return cast(GeospatialCapabilityExecutionResult, resolved_location)
         if not isinstance(resolved_location, ResolvedLocation):
             return cast(GeospatialCapabilityExecutionResult, resolved_location)
-        plan = self._build_direct_execution_plan(capability_id=capability_id, context=context)
-        direct_result = await self.tool_registry.execute(capability_id, plan, resolved_location)
+        plan = self._build_direct_execution_plan(
+            capability_id=capability_id, context=context
+        )
+        direct_result = await self.tool_registry.execute(
+            capability_id, plan, resolved_location
+        )
         if is_json_object(direct_result) and direct_result.get("error"):
             return self._error_result(
                 capability_id=capability_id,
@@ -724,7 +773,9 @@ class AgentToolCatalogService:
     ) -> ResolvedLocation | GeospatialCapabilityExecutionResult:
         argument_signals = self._build_argument_location_signals(arguments)
         parsed_request = self._parsed_request_from_context(context)
-        parsed_signals = parsed_request.location_signals if parsed_request is not None else []
+        parsed_signals = (
+            parsed_request.location_signals if parsed_request is not None else []
+        )
         memory_snapshot = context.map_state if context is not None else {}
         resolved = await self.location_resolver.resolve_location_signals(
             [*argument_signals, *parsed_signals],
@@ -755,7 +806,12 @@ class AgentToolCatalogService:
             else str(manifest.get("id") or capability_id)
         )
         if self._is_basemap_capability(manifest):
-            return ExecutionPlan(state="map_search", mode="map", action_id=action_id, basemap_id=capability_id)
+            return ExecutionPlan(
+                state="map_search",
+                mode="map",
+                action_id=action_id,
+                basemap_id=capability_id,
+            )
         return ExecutionPlan(
             state="map_search",
             mode="map",
@@ -772,9 +828,19 @@ class AgentToolCatalogService:
         context: AgentExecutionContext | None,
     ) -> ExecutionPlan:
         parsed_request = self._parsed_request_from_context(context)
-        action_id = parsed_request.normalized_action.action_id if parsed_request is not None else capability_id
-        temporal_mode = parsed_request.temporal_signal.mode if parsed_request is not None else None
-        temporal_text = parsed_request.temporal_signal.raw_text if parsed_request is not None else None
+        action_id = (
+            parsed_request.normalized_action.action_id
+            if parsed_request is not None
+            else capability_id
+        )
+        temporal_mode = (
+            parsed_request.temporal_signal.mode if parsed_request is not None else None
+        )
+        temporal_text = (
+            parsed_request.temporal_signal.raw_text
+            if parsed_request is not None
+            else None
+        )
         temporal_reference_time_iso = (
             parsed_request.temporal_signal.reference_time_iso
             if parsed_request is not None
@@ -795,7 +861,11 @@ class AgentToolCatalogService:
         self, arguments: dict[str, Any]
     ) -> list[LocationSignal]:
         signals: list[LocationSignal] = []
-        location_text = arguments.get("location") or arguments.get("location_text") or arguments.get("query")
+        location_text = (
+            arguments.get("location")
+            or arguments.get("location_text")
+            or arguments.get("query")
+        )
         if isinstance(location_text, str) and location_text.strip():
             signals.append(
                 LocationSignal(
@@ -835,7 +905,9 @@ class AgentToolCatalogService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _parsed_request_from_context(context: AgentExecutionContext | None) -> TurnParseResult | None:
+    def _parsed_request_from_context(
+        context: AgentExecutionContext | None,
+    ) -> TurnParseResult | None:
         if context is None or not is_json_object(context.parsed_request):
             return None
         try:

@@ -5,6 +5,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+
 ###############################################################################
 class AgentRunState(StrEnum):
     PENDING = "pending"
@@ -22,11 +23,13 @@ TERMINAL_RUN_STATES = {
     AgentRunState.CANCELLED,
 }
 
+
 ###############################################################################
 class ConversationCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str | None = None
+
 
 ###############################################################################
 class ConversationCreateResponse(BaseModel):
@@ -34,6 +37,7 @@ class ConversationCreateResponse(BaseModel):
 
     conversation_id: str
     title: str | None = None
+
 
 ###############################################################################
 class AgentRunCreateRequest(BaseModel):
@@ -66,6 +70,7 @@ class AgentRunCreateRequest(BaseModel):
             raise ValueError("client_request_id is too long")
         return normalized
 
+
 ###############################################################################
 class AgentRunCreateResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -74,6 +79,7 @@ class AgentRunCreateResult(BaseModel):
     run_id: str
     run_version: int
     state: AgentRunState
+
 
 ###############################################################################
 class AgentRunSnapshot(BaseModel):
@@ -92,6 +98,7 @@ class AgentRunSnapshot(BaseModel):
     error_code: str | None = None
     error_message: str | None = None
 
+
 ###############################################################################
 class AgentRunCancelResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -100,6 +107,7 @@ class AgentRunCancelResponse(BaseModel):
     run_id: str
     state: AgentRunState
     cancel_requested_at: datetime | None = None
+
 
 ###############################################################################
 class ActiveRunContext(BaseModel):

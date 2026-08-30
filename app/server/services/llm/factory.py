@@ -16,9 +16,9 @@ from server.services.llm.opencode_provider import (
 )
 from server.services.llm.openai_provider import OpenAIProvider
 
+
 ###############################################################################
 class LLMFactory:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -41,7 +41,9 @@ class LLMFactory:
 
     # -------------------------------------------------------------------------
     def _resolve_provider_api_key(self, provider: str) -> str:
-        credential = self.credentials_repo.get_active(provider=provider, label="api_key")
+        credential = self.credentials_repo.get_active(
+            provider=provider, label="api_key"
+        )
         if credential is None:
             provider_labels = {
                 "openai": ("OpenAI", "OpenAI"),

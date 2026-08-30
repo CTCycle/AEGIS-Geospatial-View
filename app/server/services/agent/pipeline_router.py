@@ -3,16 +3,19 @@ from __future__ import annotations
 from server.domain.agent.pipeline import SpecialistGroup
 from server.contracts.extraction import TurnParseResult
 
+
 ###############################################################################
 class DeterministicAgentRouter:
-
     # -------------------------------------------------------------------------
     def select_specialist(self, turn: TurnParseResult) -> SpecialistGroup:
         if turn.relationship == "failure_inquiry":
             return "failure_diagnostics"
         if turn.task_class == "general_question":
             return "direct_chat"
-        if turn.clarification_plan is not None and turn.required_tool_category == "environmental_data":
+        if (
+            turn.clarification_plan is not None
+            and turn.required_tool_category == "environmental_data"
+        ):
             return "environmental_data"
         if turn.relationship in {"follow_up", "correction"} and turn.requested_basemap:
             return "visualization_update"

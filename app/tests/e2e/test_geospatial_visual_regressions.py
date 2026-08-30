@@ -17,11 +17,15 @@ PNG_1X1_TRANSPARENT = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 BASELINE_ROOT = Path(__file__).with_name("visual_baselines")
-DIFF_ROOT = Path(__file__).resolve().parents[3] / "assets" / "QA" / "e2e" / "visual_diffs"
+DIFF_ROOT = (
+    Path(__file__).resolve().parents[3] / "assets" / "QA" / "e2e" / "visual_diffs"
+)
+
 
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
 
 ###############################################################################
 def _models_payload() -> dict[str, Any]:
@@ -38,6 +42,7 @@ def _models_payload() -> dict[str, Any]:
         ],
         "local": [],
     }
+
 
 ###############################################################################
 def _turn_payload() -> dict[str, Any]:
@@ -118,6 +123,7 @@ def _turn_payload() -> dict[str, Any]:
         },
     }
 
+
 ###############################################################################
 def _setup_stubs(page: Page) -> None:
     register_realtime_stub(page, lambda _message, _run_number: _turn_payload())
@@ -168,6 +174,7 @@ def _setup_stubs(page: Page) -> None:
         ),
     )
 
+
 ###############################################################################
 def _assert_visual_baseline(actual_bytes: bytes, baseline_name: str) -> None:
     BASELINE_ROOT.mkdir(parents=True, exist_ok=True)
@@ -203,6 +210,7 @@ def _assert_visual_baseline(actual_bytes: bytes, baseline_name: str) -> None:
             f"Visual regression for {baseline_name}: {diff_pixels} pixels differ. See {diff_path}."
         )
 
+
 ###############################################################################
 def test_map_canvas_matches_visual_baseline(page: Page, base_url: str) -> None:
     _setup_stubs(page)
@@ -213,6 +221,7 @@ def test_map_canvas_matches_visual_baseline(page: Page, base_url: str) -> None:
     map_canvas = page.locator(".maplibregl-canvas")
     expect(map_canvas).to_be_visible(timeout=15000)
     _assert_visual_baseline(map_canvas.screenshot(), "map-canvas.png")
+
 
 ###############################################################################
 def test_overlay_panel_matches_visual_baseline(page: Page, base_url: str) -> None:

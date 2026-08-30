@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from server.repositories.credential_material import CredentialEncryptionMaterialRepository
+from server.repositories.credential_material import (
+    CredentialEncryptionMaterialRepository,
+)
 from server.repositories.credentials import CredentialRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from server.services.geospatial.api_service import GeospatialApiService
@@ -13,6 +15,7 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.cryptography import CredentialEncryptionService
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -26,6 +29,7 @@ class GeospatialRuntime:
     credential_resolver: GeospatialCredentialResolver
     credentials_repo: CredentialRepository
     crypto_service: CredentialEncryptionService
+
 
 ###############################################################################
 def build_geospatial_runtime(database: SQLiteRepository) -> GeospatialRuntime:

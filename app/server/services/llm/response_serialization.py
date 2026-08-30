@@ -4,6 +4,7 @@ from server.common.typing import is_json_object, json_object
 
 from typing import Any
 
+
 ###############################################################################
 def dump_response_payload(response: object) -> dict[str, Any]:
     model_dump = getattr(response, "model_dump", None)

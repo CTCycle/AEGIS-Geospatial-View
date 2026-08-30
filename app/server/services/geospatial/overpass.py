@@ -15,17 +15,21 @@ from urllib.request import Request, urlopen
 
 from server.configurations import get_server_settings
 
+
 ###############################################################################
 class OverpassServiceError(Exception):
     """Base exception for Overpass failures."""
+
 
 ###############################################################################
 class OverpassRequestError(OverpassServiceError):
     """Raised when Overpass cannot fulfill a request."""
 
+
 ###############################################################################
 class OverpassRateLimitError(OverpassServiceError):
     """Raised when Overpass rejects a request due to rate limits."""
+
 
 ###############################################################################
 class OverpassService:
@@ -136,9 +140,7 @@ class OverpassService:
             selectors=selectors,
             limit=resolved_limit,
         )
-        elements = (
-            json_array(payload.get("elements"))
-        )
+        elements = json_array(payload.get("elements"))
         points: list[dict[str, Any]] = []
         for raw in elements:
             if not is_json_object(raw):
@@ -157,15 +159,13 @@ class OverpassService:
             lat = raw.get("lat")
             lon = raw.get("lon")
             if lat is None or lon is None:
-                center = (
-                    json_object(raw.get("center"))
-                )
+                center = json_object(raw.get("center"))
                 lat = center.get("lat")
                 lon = center.get("lon")
             try:
                 lat_value = float(str(lat))
                 lon_value = float(str(lon))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             distance_m = self._haversine_distance_m(
                 latitude, longitude, lat_value, lon_value
@@ -320,9 +320,7 @@ class OverpassService:
         radius_m: float,
         limit: int,
     ) -> dict[str, Any]:
-        cache_key = (
-            f"buildings:{latitude:.5f}:{longitude:.5f}:{radius_m:.0f}:{limit}"
-        )
+        cache_key = f"buildings:{latitude:.5f}:{longitude:.5f}:{radius_m:.0f}:{limit}"
         cached = self._cache_get(cache_key)
         if cached is not None:
             return cached

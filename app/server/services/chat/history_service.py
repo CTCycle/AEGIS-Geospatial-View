@@ -6,9 +6,9 @@ from typing import Any
 
 from server.repositories.chat_history import ChatHistoryRepository
 
+
 ###############################################################################
 class ChatHistoryService:
-
     # -------------------------------------------------------------------------
     def __init__(self, repo: ChatHistoryRepository) -> None:
         self.repo = repo
@@ -18,7 +18,9 @@ class ChatHistoryService:
         self.repo.append_message(**kwargs)
 
     # -------------------------------------------------------------------------
-    def list_recent_messages(self, conversation_id: str, limit: int) -> list[dict[str, Any]]:
+    def list_recent_messages(
+        self, conversation_id: str, limit: int
+    ) -> list[dict[str, Any]]:
         return self.repo.list_recent_messages(conversation_id, limit)
 
     # -------------------------------------------------------------------------
@@ -37,7 +39,11 @@ class ChatHistoryService:
         last = self.repo.get_last_assistant_message(conversation_id)
         payload = last.get("structured_payload") if last else None
         snapshot = payload.get("memory_snapshot") if is_json_object(payload) else None
-        return snapshot if is_json_object(snapshot) else {"location_slots": [], "active_location": None}
+        return (
+            snapshot
+            if is_json_object(snapshot)
+            else {"location_slots": [], "active_location": None}
+        )
 
     # -------------------------------------------------------------------------
     def find_message_by_request_id(

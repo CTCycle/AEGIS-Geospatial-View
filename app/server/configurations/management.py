@@ -14,11 +14,13 @@ from server.configurations.settings import (
     ServerSettings,
 )
 
+
 ###############################################################################
 def _ensure_mapping(value: Any) -> dict[str, Any]:
     if is_json_object(value):
         return dict(value)
     return {}
+
 
 ###############################################################################
 def _build_settings_payload(raw_payload: dict[str, Any]) -> dict[str, Any]:
@@ -34,9 +36,9 @@ def _build_settings_payload(raw_payload: dict[str, Any]) -> dict[str, Any]:
         "gibs": _ensure_mapping(raw_payload.get("gibs")),
     }
 
+
 ###############################################################################
 class ConfigurationManager:
-
     # -------------------------------------------------------------------------
     def __init__(self, config_path: str | Path = CONFIGURATIONS_FILE) -> None:
         self.config_path = Path(config_path)

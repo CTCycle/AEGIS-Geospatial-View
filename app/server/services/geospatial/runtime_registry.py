@@ -12,6 +12,7 @@ from server.services.geospatial.credential_resolver import (
 )
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
+
 ###############################################################################
 class RuntimeRegistry:
     CREDENTIAL_ENV_BY_PROVIDER = GEOSPATIAL_CREDENTIAL_ENV_BY_PROVIDER
@@ -50,7 +51,14 @@ class RuntimeRegistry:
             if str(item.get("capability_id") or "").strip()
         }
         manifests: dict[str, dict[str, Any]] = {}
-        for collection_name in ("providers", "basemaps", "overlays", "cameras", "transit", "tools"):
+        for collection_name in (
+            "providers",
+            "basemaps",
+            "overlays",
+            "cameras",
+            "transit",
+            "tools",
+        ):
             for item in list(manifest.get(collection_name) or []):
                 capability_id = str(item.get("id") or "").strip()
                 if capability_id:

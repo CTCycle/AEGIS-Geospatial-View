@@ -22,9 +22,9 @@ GEOSPATIAL_CREDENTIAL_ENV_BY_PROVIDER: dict[str, str] = {
     "windy_webcams": "WINDY_WEBCAMS_API_KEY",
 }
 
+
 ###############################################################################
 class CredentialStore(Protocol):
-
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str) -> Any:
         """Return the active encrypted credential record, if present."""
@@ -33,17 +33,19 @@ class CredentialStore(Protocol):
     def mark_used(self, *, provider: str, label: str) -> None:
         """Record that a stored credential was used."""
 
+
 ###############################################################################
 class CredentialDecryptor(Protocol):
-
     # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:
         """Decrypt a stored credential value."""
         ...
 
+
 ###############################################################################
 class GeospatialCredentialResolutionError(RuntimeError):
     """Raised when a saved geospatial credential cannot be used."""
+
 
 ###############################################################################
 class GeospatialCredentialResolver:
@@ -140,11 +142,14 @@ class GeospatialCredentialResolver:
                 )
             except GeospatialCredentialResolutionError:
                 return False
-        return self.resolve(
-            normalized_provider,
-            label=normalized_label,
-            mark_used=False,
-        ) is not None
+        return (
+            self.resolve(
+                normalized_provider,
+                label=normalized_label,
+                mark_used=False,
+            )
+            is not None
+        )
 
     # -------------------------------------------------------------------------
     def _get_saved_credential(self, *, provider: str, label: str) -> Any | None:

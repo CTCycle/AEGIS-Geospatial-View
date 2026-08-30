@@ -27,6 +27,7 @@ from server.services.llm.types import (
 
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
+
 ###############################################################################
 class DeepSeekProvider(LLMProvider):
     provider_name = "deepseek"
@@ -78,14 +79,18 @@ class DeepSeekProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def supports_tools(self, model: str) -> bool | None:
-        declared = self._declared_model_capabilities.get(model, {}).get("supports_tools")
+        declared = self._declared_model_capabilities.get(model, {}).get(
+            "supports_tools"
+        )
         if isinstance(declared, bool):
             return declared
         return True if model.strip().lower().startswith("deepseek-") else None
 
     # -------------------------------------------------------------------------
     def supports_structured_output(self, model: str) -> bool | None:
-        declared = self._declared_model_capabilities.get(model, {}).get("supports_structured_output")
+        declared = self._declared_model_capabilities.get(model, {}).get(
+            "supports_structured_output"
+        )
         if isinstance(declared, bool):
             return declared
         return True if model.strip().lower().startswith("deepseek-") else None
@@ -190,7 +195,9 @@ class DeepSeekProvider(LLMProvider):
             request, provider=self.provider_name
         ).to_dict()
         model_json_schema = getattr(schema, "model_json_schema", None)
-        json_schema = json_object(model_json_schema()) if callable(model_json_schema) else {}
+        json_schema = (
+            json_object(model_json_schema()) if callable(model_json_schema) else {}
+        )
         self._validate_request_capabilities(
             replace(request, response_json_schema=json_schema)
         )
@@ -205,7 +212,10 @@ class DeepSeekProvider(LLMProvider):
             )
         except Exception as exc:
             raise LLMProviderRequestError.from_exception(
-                exc, provider=self.provider_name, model=request.model, stage="structured_output"
+                exc,
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
             ) from exc
         content, _ = self._parse_choice(response)
         try:
@@ -346,7 +356,9 @@ class DeepSeekProvider(LLMProvider):
         if "pro" in normalized:
             return "DeepSeek reasoning model for complex planning, coding, and tool-driven workflows."
         if "flash" in normalized:
-            return "Fast DeepSeek model for responsive chat, extraction, and agent tasks."
+            return (
+                "Fast DeepSeek model for responsive chat, extraction, and agent tasks."
+            )
         if "reasoner" in normalized:
             return "DeepSeek reasoning model compatible with structured outputs and native tool use."
         if "chat" in normalized:

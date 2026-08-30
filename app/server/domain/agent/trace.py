@@ -23,6 +23,7 @@ TraceKind = Literal[
     "completion",
 ]
 
+
 ###############################################################################
 class AgentTraceEvent(BaseModel):
     """Operational trace metadata; never a chain-of-thought transcript."""
@@ -37,6 +38,7 @@ class AgentTraceEvent(BaseModel):
     task_id: str | None = None
     tool_name: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
+
 
 ###############################################################################
 class AgentCheckpoint(BaseModel):

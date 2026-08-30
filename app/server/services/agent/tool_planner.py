@@ -7,9 +7,9 @@ from server.domain.agent.pipeline import SpecialistGroup, ToolPlan, ToolPlanStep
 from server.contracts.extraction import TurnParseResult
 from server.services.agent.tool_argument_builder import ToolArgumentBuilder
 
+
 ###############################################################################
 class DeterministicToolPlanner:
-
     # -------------------------------------------------------------------------
     def __init__(self, argument_builder: ToolArgumentBuilder | None = None) -> None:
         self.argument_builder = argument_builder or ToolArgumentBuilder()
@@ -123,7 +123,9 @@ class DeterministicToolPlanner:
             command.action in {"add", "show", "update"}
             for command in turn.overlay_commands
         )
-        if turn.requested_layers and (not turn.overlay_commands or has_fetching_command):
+        if turn.requested_layers and (
+            not turn.overlay_commands or has_fetching_command
+        ):
             update["add_layer_ids"] = list(dict.fromkeys(turn.requested_layers))
         if turn.viewport_intent is not None:
             # A viewport-only follow-up still belongs to the deterministic map

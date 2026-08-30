@@ -28,6 +28,7 @@ from server.services.geospatial.providers.base import (
     ProviderUnavailableError,
 )
 
+
 ###############################################################################
 class OpenAQProvider(GeospatialProvider):
     provider_id = "openaq"
@@ -72,27 +73,41 @@ class OpenAQProvider(GeospatialProvider):
         except OpenAQAuthError as exc:
             raise ProviderAuthError("OpenAQ rejected the configured API key.") from exc
         except OpenAQInvalidQueryError as exc:
-            raise ProviderInvalidQueryError("OpenAQ rejected the requested query.") from exc
+            raise ProviderInvalidQueryError(
+                "OpenAQ rejected the requested query."
+            ) from exc
         except OpenAQRateLimitError as exc:
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     cached.value,
                     stale=True,
-                    warnings=["OpenAQ rate limit reached; using stale cached station data."],
+                    warnings=[
+                        "OpenAQ rate limit reached; using stale cached station data."
+                    ],
                 )
             raise ProviderRateLimitError("OpenAQ rate limit exceeded.") from exc
         except OpenAQMalformedPayloadError as exc:
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     cached.value,
                     stale=True,
-                    warnings=["OpenAQ returned malformed data; using stale cached station data."],
+                    warnings=[
+                        "OpenAQ returned malformed data; using stale cached station data."
+                    ],
                 )
-            raise ProviderMalformedPayloadError("OpenAQ returned malformed data.") from exc
+            raise ProviderMalformedPayloadError(
+                "OpenAQ returned malformed data."
+            ) from exc
         except (OpenAQServiceError, ValueError) as exc:
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     cached.value,
@@ -109,7 +124,9 @@ class OpenAQProvider(GeospatialProvider):
         normalized = {
             "renderingMode": "clustered-points",
             "features": self._features(payload, pollutants=pollutants),
-            "summary": self._filter_measurements(payload.get("summary") or {}, pollutants),
+            "summary": self._filter_measurements(
+                payload.get("summary") or {}, pollutants
+            ),
             "center": payload.get("center")
             or {"latitude": latitude, "longitude": longitude},
             "radiusM": radius_m,

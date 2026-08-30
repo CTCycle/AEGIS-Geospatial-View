@@ -4,6 +4,7 @@ from typing import Any
 
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
 
+
 ###############################################################################
 class AgentTurnSupport:
     # -------------------------------------------------------------------------
@@ -60,7 +61,11 @@ class AgentTurnSupport:
                         ),
                         None,
                     )
-                    label = description.get("label") if isinstance(description, dict) else None
+                    label = (
+                        description.get("label")
+                        if isinstance(description, dict)
+                        else None
+                    )
                     labels.append(str(label or cls.humanize_identifier(overlay_id)))
             else:
                 labels = [cls.humanize_identifier(item) for item in overlay_ids]
@@ -79,7 +84,9 @@ class AgentTurnSupport:
             basemap_label = (
                 str(basemap.get("label") or "the current basemap")
                 if isinstance(basemap, dict)
-                else cls.humanize_identifier(str(active_visualization.get("basemap_id") or "current basemap"))
+                else cls.humanize_identifier(
+                    str(active_visualization.get("basemap_id") or "current basemap")
+                )
             )
             overlay_message = cls.compose_context_query_message(
                 "active_overlays",
@@ -153,7 +160,9 @@ class AgentTurnSupport:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _active_visualization(memory_snapshot: dict[str, Any] | None) -> dict[str, Any] | None:
+    def _active_visualization(
+        memory_snapshot: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
         memory = memory_snapshot or {}
         visualization = memory.get("active_visualization")
         if isinstance(visualization, dict):
@@ -163,7 +172,9 @@ class AgentTurnSupport:
     # -------------------------------------------------------------------------
     @staticmethod
     def humanize_identifier(value: str) -> str:
-        return " ".join(str(value or "").replace("_", " ").replace("-", " ").split()).title()
+        return " ".join(
+            str(value or "").replace("_", " ").replace("-", " ").split()
+        ).title()
 
     # -------------------------------------------------------------------------
     @staticmethod

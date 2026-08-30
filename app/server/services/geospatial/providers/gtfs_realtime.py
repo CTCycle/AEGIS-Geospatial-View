@@ -20,6 +20,7 @@ from server.services.geospatial.providers.http import (
     fetch_bytes_url,
 )
 
+
 ###############################################################################
 class GTFSRealtimeProvider(GeospatialProvider):
     provider_id = "gtfs_realtime"
@@ -80,7 +81,9 @@ class GTFSRealtimeProvider(GeospatialProvider):
             return payload
         except ProviderError:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 stale_payload = json_object(cached.value)
                 stale_payload["stale"] = True
                 warnings = json_array(stale_payload.get("warnings"))
@@ -125,7 +128,9 @@ class GTFSRealtimeProvider(GeospatialProvider):
         self, feed: dict[str, Any], *, request: ProviderRequest | None = None
     ) -> dict[str, Any]:
         entities = [
-            entity for entity in json_array(feed.get("entities")) if is_json_object(entity)
+            entity
+            for entity in json_array(feed.get("entities"))
+            if is_json_object(entity)
         ]
         vehicles = [
             entity["vehicle"]
@@ -168,9 +173,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     def _vehicle_feature(self, vehicle: dict[str, Any]) -> dict[str, Any]:
-        position = (
-            json_object(vehicle.get("position"))
-        )
+        position = json_object(vehicle.get("position"))
         return {
             "id": vehicle.get("id") or vehicle.get("vehicleId") or vehicle.get("label"),
             "tripId": vehicle.get("tripId"),
@@ -204,7 +207,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
         try:
             max_age = float(freshness_seconds)
             timestamp = datetime.fromisoformat(feed_timestamp)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
         return (datetime.now(UTC) - timestamp).total_seconds() <= max_age
 

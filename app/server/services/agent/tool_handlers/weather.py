@@ -7,10 +7,13 @@ from datetime import datetime
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.services.geospatial.openmeteo import OpenMeteoService
 
+
 ###############################################################################
 async def execute(plan: ExecutionPlan, location: ResolvedLocation) -> dict[str, object]:
     service = OpenMeteoService()
-    result = await service.get_weather_forecast(latitude=location.latitude, longitude=location.longitude)
+    result = await service.get_weather_forecast(
+        latitude=location.latitude, longitude=location.longitude
+    )
     selected = _select_requested_forecast(result, plan)
     if selected is not None:
         result["selected_forecast"] = selected
@@ -19,6 +22,7 @@ async def execute(plan: ExecutionPlan, location: ResolvedLocation) -> dict[str, 
         "location": location.label,
         "result": result,
     }
+
 
 ###############################################################################
 def _select_requested_forecast(
@@ -51,6 +55,10 @@ def _select_requested_forecast(
         except ValueError:
             continue
         fallback = fallback or row
-        if target_date is not None and row_time.date() == target_date and row_time.hour >= 12:
+        if (
+            target_date is not None
+            and row_time.date() == target_date
+            and row_time.hour >= 12
+        ):
             return row
     return fallback

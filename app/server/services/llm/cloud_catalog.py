@@ -3,20 +3,93 @@ from __future__ import annotations
 from server.services.llm.types import ModelContextProfile, ModelDescriptor
 
 MODEL_CONTEXT_PROFILES = {
-    ("openai", "gpt-5-mini"): ModelContextProfile("openai", "gpt-5-mini", 400_000, 128_000, 8_192, supports_context_caching=True, metadata_source="openai_model_catalog"),
-    ("openai", "gpt-5-nano"): ModelContextProfile("openai", "gpt-5-nano", 400_000, 128_000, 8_192, supports_context_caching=True, metadata_source="openai_model_catalog"),
-    ("openai", "gpt-5.2"): ModelContextProfile("openai", "gpt-5.2", 400_000, 128_000, 16_384, supports_context_caching=True, metadata_source="openai_model_catalog"),
-    ("openai", "gpt-4.1"): ModelContextProfile("openai", "gpt-4.1", 1_047_576, 32_768, 8_192, supports_context_caching=True, metadata_source="openai_model_catalog"),
-    ("openai", "gpt-4.1-mini"): ModelContextProfile("openai", "gpt-4.1-mini", 1_047_576, 32_768, 8_192, supports_context_caching=True, metadata_source="openai_model_catalog"),
-    ("google", "gemini-2.5-pro"): ModelContextProfile("google", "gemini-2.5-pro", 1_048_576, 65_536, 8_192, supports_context_caching=True, metadata_source="google_models_api"),
-    ("google", "gemini-2.5-flash"): ModelContextProfile("google", "gemini-2.5-flash", 1_048_576, 65_536, 8_192, supports_context_caching=True, metadata_source="google_models_api"),
-    ("google", "gemini-2.5-flash-lite"): ModelContextProfile("google", "gemini-2.5-flash-lite", 1_048_576, 65_536, 8_192, supports_context_caching=True, metadata_source="google_models_api"),
-    ("google", "gemini-2.0-flash"): ModelContextProfile("google", "gemini-2.0-flash", 1_048_576, 8_192, 4_096, metadata_source="google_models_api"),
+    ("openai", "gpt-5-mini"): ModelContextProfile(
+        "openai",
+        "gpt-5-mini",
+        400_000,
+        128_000,
+        8_192,
+        supports_context_caching=True,
+        metadata_source="openai_model_catalog",
+    ),
+    ("openai", "gpt-5-nano"): ModelContextProfile(
+        "openai",
+        "gpt-5-nano",
+        400_000,
+        128_000,
+        8_192,
+        supports_context_caching=True,
+        metadata_source="openai_model_catalog",
+    ),
+    ("openai", "gpt-5.2"): ModelContextProfile(
+        "openai",
+        "gpt-5.2",
+        400_000,
+        128_000,
+        16_384,
+        supports_context_caching=True,
+        metadata_source="openai_model_catalog",
+    ),
+    ("openai", "gpt-4.1"): ModelContextProfile(
+        "openai",
+        "gpt-4.1",
+        1_047_576,
+        32_768,
+        8_192,
+        supports_context_caching=True,
+        metadata_source="openai_model_catalog",
+    ),
+    ("openai", "gpt-4.1-mini"): ModelContextProfile(
+        "openai",
+        "gpt-4.1-mini",
+        1_047_576,
+        32_768,
+        8_192,
+        supports_context_caching=True,
+        metadata_source="openai_model_catalog",
+    ),
+    ("google", "gemini-2.5-pro"): ModelContextProfile(
+        "google",
+        "gemini-2.5-pro",
+        1_048_576,
+        65_536,
+        8_192,
+        supports_context_caching=True,
+        metadata_source="google_models_api",
+    ),
+    ("google", "gemini-2.5-flash"): ModelContextProfile(
+        "google",
+        "gemini-2.5-flash",
+        1_048_576,
+        65_536,
+        8_192,
+        supports_context_caching=True,
+        metadata_source="google_models_api",
+    ),
+    ("google", "gemini-2.5-flash-lite"): ModelContextProfile(
+        "google",
+        "gemini-2.5-flash-lite",
+        1_048_576,
+        65_536,
+        8_192,
+        supports_context_caching=True,
+        metadata_source="google_models_api",
+    ),
+    ("google", "gemini-2.0-flash"): ModelContextProfile(
+        "google",
+        "gemini-2.0-flash",
+        1_048_576,
+        8_192,
+        4_096,
+        metadata_source="google_models_api",
+    ),
 }
+
 
 ###############################################################################
 def get_model_context_profile(provider: str, model: str) -> ModelContextProfile | None:
     return MODEL_CONTEXT_PROFILES.get((provider.strip().lower(), model.strip().lower()))
+
 
 ###############################################################################
 def get_cloud_model_catalog() -> list[ModelDescriptor]:

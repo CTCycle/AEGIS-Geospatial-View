@@ -15,9 +15,9 @@ from server.repositories.schemas import (
     ReferenceGibsTileMatrixSetRecord,
 )
 
+
 ###############################################################################
 class ReferenceCatalogRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self.database = database

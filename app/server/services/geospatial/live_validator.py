@@ -145,6 +145,7 @@ CREDENTIAL_LIVE_CHECKS = (
     ),
 )
 
+
 ###############################################################################
 async def validate_live_geospatial_sources(
     *,
@@ -165,6 +166,7 @@ async def validate_live_geospatial_sources(
         if result.status == "skipped":
             report.skipped_count += 1
     return report
+
 
 ###############################################################################
 async def _run_check(
@@ -189,7 +191,10 @@ async def _run_check(
                 message=f"Provider returned an error payload: {payload_error}",
                 feature_count=count,
             )
-        if check.required_feature_count is not None and count < check.required_feature_count:
+        if (
+            check.required_feature_count is not None
+            and count < check.required_feature_count
+        ):
             return LiveValidationCheckResult(
                 provider_id=check.provider_id,
                 capability_id=check.request.capability_id,
@@ -220,6 +225,7 @@ async def _run_check(
             message=str(exc),
         )
 
+
 ###############################################################################
 def _feature_count(payload: dict[str, Any]) -> int:
     if is_json_array(payload.get("features")):
@@ -242,9 +248,11 @@ def _feature_count(payload: dict[str, Any]) -> int:
         return 1
     return 0
 
+
 ###############################################################################
 def _format_report(report: LiveValidationReport) -> str:
     return json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True)
+
 
 ###############################################################################
 def main(argv: list[str] | None = None) -> int:

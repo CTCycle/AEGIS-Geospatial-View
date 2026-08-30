@@ -6,9 +6,9 @@ from server.common.time import utc_now_naive
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ModelCredentialRecord
 
+
 ###############################################################################
 class CredentialRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session

@@ -6,6 +6,7 @@ from server.services.geospatial.providers.base import (
     ProviderResponse,
 )
 
+
 ###############################################################################
 class MapillaryProvider:
     provider_id = "mapillary"
@@ -23,5 +24,7 @@ class MapillaryProvider:
             provider_id=self.provider_id,
             payload={"type": "metadata-only", "status": "not-enabled"},
             attribution=["Mapillary"],
-            warnings=["Mapillary is registered as an optional camera/street-level imagery provider."],
+            warnings=[
+                "Mapillary is registered as an optional camera/street-level imagery provider."
+            ],
         )

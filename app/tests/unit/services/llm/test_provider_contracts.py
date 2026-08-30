@@ -10,6 +10,7 @@ from server.services.llm.ollama import OllamaProvider
 from server.services.llm.opencode_provider import OPENCODE_GO_PROVIDER, OpenCodeProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
+
 ###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
@@ -22,6 +23,7 @@ def _tool() -> LLMToolDefinition:
         },
     )
 
+
 ###############################################################################
 def _request(provider: str, model: str) -> LLMRequest:
     return LLMRequest(
@@ -31,9 +33,9 @@ def _request(provider: str, model: str) -> LLMRequest:
         tools=[_tool()],
     )
 
+
 ###############################################################################
 class _Completions:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
@@ -58,19 +60,23 @@ class _Completions:
             model_dump=lambda mode="json": {"choices": []},
         )
 
+
 ###############################################################################
 class _OpenAICompatibleClient:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.completions = _Completions()
         self.chat = SimpleNamespace(completions=self.completions)
 
+
 ###############################################################################
 def test_google_native_tool_contract_uses_function_declarations() -> None:
     contents = GoogleProvider._contents_from_messages(
         [
-            {"role": "assistant", "tool_calls": [{"name": "resolve_location", "arguments": {}}]},
+            {
+                "role": "assistant",
+                "tool_calls": [{"name": "resolve_location", "arguments": {}}],
+            },
             {"role": "tool", "name": "resolve_location", "content": '{"ok":true}'},
         ]
     )
@@ -79,11 +85,20 @@ def test_google_native_tool_contract_uses_function_declarations() -> None:
     assert contents[0]["role"] == "model"
     assert contents[1]["parts"][0]["function_response"]["name"] == "resolve_location"
 
+
 ###############################################################################
-def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(monkeypatch) -> None:
+def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(
+    monkeypatch,
+) -> None:
     for provider, model in (
-        (DeepSeekProvider(api_key="test", base_url="https://deepseek.test"), "deepseek-chat"),
-        (OpenCodeProvider(api_key="test", provider_name=OPENCODE_GO_PROVIDER), "deepseek-v4-flash"),
+        (
+            DeepSeekProvider(api_key="test", base_url="https://deepseek.test"),
+            "deepseek-chat",
+        ),
+        (
+            OpenCodeProvider(api_key="test", provider_name=OPENCODE_GO_PROVIDER),
+            "deepseek-v4-flash",
+        ),
     ):
         client = _OpenAICompatibleClient()
         monkeypatch.setattr(provider, "_client", lambda client=client: client)
@@ -93,13 +108,13 @@ def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(monkey
         assert call["tool_choice"] == "auto"
         assert result.tool_calls[0].arguments == {"query": "Zurich"}
 
+
 ###############################################################################
 def test_ollama_chat_contract_emits_native_tools_and_parses_results() -> None:
     captured: dict[str, object] = {}
 
     ###############################################################################
     class _Provider(OllamaProvider):
-
         # -------------------------------------------------------------------------
         def supports_tools(self, model: str) -> bool:
             _ = model
@@ -129,6 +144,7 @@ def test_ollama_chat_contract_emits_native_tools_and_parses_results() -> None:
     assert captured["path"] == "/api/chat"
     assert captured["payload"]["tools"][0]["function"]["name"] == "resolve_location"
     assert result.tool_calls[0].arguments == {"query": "Zurich"}
+
 
 ###############################################################################
 def test_provider_contract_envelope_error_remains_structured() -> None:

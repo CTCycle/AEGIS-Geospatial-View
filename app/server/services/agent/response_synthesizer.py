@@ -18,26 +18,29 @@ from server.services.llm.types import LLMRequest
 
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 class GroundedSynthesisResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     content: str = Field(min_length=1, max_length=4000)
-    used_evidence_keys: list[Literal[
-        "user_request",
-        "verified_outcome",
-        "map",
-        "direct_result",
-        "clarification",
-        "task_status",
-        "active_conversation_instructions",
-        "task_snapshot",
-    ]] = Field(min_length=1, max_length=20)
+    used_evidence_keys: list[
+        Literal[
+            "user_request",
+            "verified_outcome",
+            "map",
+            "direct_result",
+            "clarification",
+            "task_status",
+            "active_conversation_instructions",
+            "task_snapshot",
+        ]
+    ] = Field(min_length=1, max_length=20)
     warnings: list[str] = Field(default_factory=list, max_length=20)
+
 
 ###############################################################################
 class GroundedResponseSynthesizer:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -93,9 +96,7 @@ class GroundedResponseSynthesizer:
         self.last_failure_category = None
         self.last_failure_detail = None
         try:
-            provider = self.llm_factory.get_provider(
-                settings.agent_model_provider
-            )
+            provider = self.llm_factory.get_provider(settings.agent_model_provider)
             payload = provider.structured_output(
                 LLMRequest(
                     model=settings.agent_model_name,
@@ -109,7 +110,9 @@ class GroundedResponseSynthesizer:
             usage = getattr(provider, "last_context_usage", None)
             self.last_context_usage = dict(usage) if is_json_object(usage) else None
             if any(key not in evidence for key in result.used_evidence_keys):
-                raise ValueError("Synthesis referenced evidence keys outside the verified payload.")
+                raise ValueError(
+                    "Synthesis referenced evidence keys outside the verified payload."
+                )
             if not self._content_matches_verified_state(
                 result.content,
                 operation=operation,
@@ -119,17 +122,30 @@ class GroundedResponseSynthesizer:
         except LLMStructuredOutputError as exc:
             self.last_failure_category = exc.category
             self.last_failure_detail = exc.detail
-            LOGGER.warning("Grounded response synthesis failed category=%s", exc.category, exc_info=True)
+            LOGGER.warning(
+                "Grounded response synthesis failed category=%s",
+                exc.category,
+                exc_info=True,
+            )
             return fallback_text
         except LLMProviderRequestError as exc:
             self.last_failure_category = exc.category
             self.last_failure_detail = f"Provider request failed with code {exc.code}."
-            LOGGER.warning("Grounded response synthesis failed category=%s", exc.category, exc_info=True)
+            LOGGER.warning(
+                "Grounded response synthesis failed category=%s",
+                exc.category,
+                exc_info=True,
+            )
             return fallback_text
         except Exception:
             self.last_failure_category = "response_parsing"
-            self.last_failure_detail = "The grounded response did not match verified evidence."
-            LOGGER.warning("Grounded response synthesis failed category=response_parsing", exc_info=True)
+            self.last_failure_detail = (
+                "The grounded response did not match verified evidence."
+            )
+            LOGGER.warning(
+                "Grounded response synthesis failed category=response_parsing",
+                exc_info=True,
+            )
             return fallback_text
         return result.content.strip() or fallback_text
 

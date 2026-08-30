@@ -20,6 +20,7 @@ from server.services.agent_runs.steering import RunSteeringService
 router = APIRouter(prefix=CONVERSATIONS_ROUTER_PREFIX, tags=["realtime"])
 metrics_router = APIRouter(prefix="/realtime", tags=["realtime"])
 
+
 ###############################################################################
 @router.websocket(CONVERSATION_REALTIME_ROUTE)
 async def realtime_socket(
@@ -38,7 +39,9 @@ async def realtime_socket(
         await websocket.close(code=1002, reason="unsupported_subprotocol")
         return
 
-    conversation_repository: ConversationRepository = websocket.app.state.conversation_repository
+    conversation_repository: ConversationRepository = (
+        websocket.app.state.conversation_repository
+    )
     run_repository: AgentRunRepository = websocket.app.state.run_repository
     lifecycle_service: RunLifecycleService = websocket.app.state.run_lifecycle_service
     steering_service: RunSteeringService = websocket.app.state.run_steering_service
@@ -46,7 +49,7 @@ async def realtime_socket(
     registry: RealtimeConnectionRegistry = websocket.app.state.realtime_connections
     try:
         conversation_repository.verify_conversation_access(conversation_id, None)
-    except (ValueError, PermissionError):
+    except ValueError, PermissionError:
         await websocket.close(code=4404, reason="conversation_not_found")
         return
 
@@ -62,6 +65,7 @@ async def realtime_socket(
         metrics=websocket.app.state.realtime_metrics,
     )
     await connection.run()
+
 
 ###############################################################################
 @metrics_router.get("/metrics", include_in_schema=False)

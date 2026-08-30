@@ -38,11 +38,17 @@ from server.services.llm.types import LLMRequest
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 class ParserService:
-
     _FAILURE_CATEGORIES = frozenset(
-        {"model_capability", "provider_api", "schema_definition", "response_parsing", "context_limit"}
+        {
+            "model_capability",
+            "provider_api",
+            "schema_definition",
+            "response_parsing",
+            "context_limit",
+        }
     )
 
     # -------------------------------------------------------------------------
@@ -74,7 +80,7 @@ class ParserService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _normalize_recent_messages(
-        conversation_messages: list[dict[str, Any]]
+        conversation_messages: list[dict[str, Any]],
     ) -> list[dict[str, str]]:
         normalized: list[dict[str, str]] = []
         for item in conversation_messages[-8:]:
@@ -84,7 +90,9 @@ class ParserService:
             normalized.append(
                 {
                     "id": ParserService._to_text(item.get("id")),
-                    "conversation_id": ParserService._to_text(item.get("conversation_id")),
+                    "conversation_id": ParserService._to_text(
+                        item.get("conversation_id")
+                    ),
                     "turn_index": ParserService._to_text(item.get("turn_index")),
                     "role": ParserService._to_text(item.get("role")),
                     "content": ParserService._to_text(item.get("content")),
@@ -124,8 +132,9 @@ class ParserService:
                 capability_id = str(capability.get("id") or "").strip()
                 if not capability_id:
                     continue
-                if self.runtime_registry is not None and not self.runtime_registry.is_enabled(
-                    capability_id
+                if (
+                    self.runtime_registry is not None
+                    and not self.runtime_registry.is_enabled(capability_id)
                 ):
                     continue
                 metadata = capability.get("metadata")
@@ -148,12 +157,32 @@ class ParserService:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _normalize_failure_category(cls, value: object) -> Literal[
-        "model_capability", "provider_api", "schema_definition", "response_parsing", "context_limit"
-    ] | None:
-        return cast(Literal[
-            "model_capability", "provider_api", "schema_definition", "response_parsing", "context_limit"
-        ], value) if value in cls._FAILURE_CATEGORIES else None
+    def _normalize_failure_category(
+        cls, value: object
+    ) -> (
+        Literal[
+            "model_capability",
+            "provider_api",
+            "schema_definition",
+            "response_parsing",
+            "context_limit",
+        ]
+        | None
+    ):
+        return (
+            cast(
+                Literal[
+                    "model_capability",
+                    "provider_api",
+                    "schema_definition",
+                    "response_parsing",
+                    "context_limit",
+                ],
+                value,
+            )
+            if value in cls._FAILURE_CATEGORIES
+            else None
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -162,10 +191,16 @@ class ParserService:
         commands: list[OverlayCommand] = []
         for value in values:
             try:
-                payload = value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+                payload = (
+                    value.model_dump(mode="json")
+                    if hasattr(value, "model_dump")
+                    else value
+                )
                 commands.append(OverlayCommand.model_validate(payload))
             except Exception:
-                LOGGER.warning("Ignoring invalid overlay command from parser extraction")
+                LOGGER.warning(
+                    "Ignoring invalid overlay command from parser extraction"
+                )
         return commands
 
     # -------------------------------------------------------------------------
@@ -194,7 +229,9 @@ class ParserService:
         quoted_terms = [item.strip() for item in re.findall(r"'([^']+)'", normalized)]
         if not quoted_terms:
             return True
-        return any(self._contains_verbatim_span(user_message, term) for term in quoted_terms)
+        return any(
+            self._contains_verbatim_span(user_message, term) for term in quoted_terms
+        )
 
     # -------------------------------------------------------------------------
     def _extract_turn(
@@ -217,7 +254,9 @@ class ParserService:
             provider_name = self.provider or settings.agent_model_provider
             model_name = self.model or settings.agent_model_name
         if provider_name is None or model_name is None:
-            raise LLMConfigurationError("Agent provider and model must be configured for structured extraction.")
+            raise LLMConfigurationError(
+                "Agent provider and model must be configured for structured extraction."
+            )
         parser_provider = self.llm_factory.get_provider(provider_name)
         self.last_context_usage = None
         prompt_payload = {
@@ -274,7 +313,9 @@ class ParserService:
             extracted.task_class,
             extracted.action_id,
             extracted.relationship,
-            extracted.viewport_intent.scope if extracted.viewport_intent is not None else None,
+            extracted.viewport_intent.scope
+            if extracted.viewport_intent is not None
+            else None,
         )
         return extracted
 
@@ -353,7 +394,9 @@ class ParserService:
             task_class=extracted.task_class,
             location_signals=locations,
             normalized_action=NormalizedAction(
-                action_id=cls._normalize_action_id(extracted.action_id, extracted.parser_confidence),
+                action_id=cls._normalize_action_id(
+                    extracted.action_id, extracted.parser_confidence
+                ),
                 action_label=extracted.action_label.strip() or "General map request",
                 task_tags=list(extracted.task_tags),
                 action_tags=list(extracted.action_tags),
@@ -387,20 +430,26 @@ class ParserService:
             requires_reparse=False,
             capability_limitations=cls._dedupe(extracted.capability_limitations),
             expected_frontend_update=extracted.expected_frontend_update,
-            atomic_tasks=[item.model_dump(mode="json") for item in extracted.atomic_tasks],
+            atomic_tasks=[
+                item.model_dump(mode="json") for item in extracted.atomic_tasks
+            ],
             clarification_plan=(
                 extracted.clarification_plan.model_dump(mode="json")
                 if extracted.clarification_plan is not None
                 else None
             ),
             viewport_intent=(
-                ViewportIntent.model_validate(extracted.viewport_intent.model_dump(mode="json"))
+                ViewportIntent.model_validate(
+                    extracted.viewport_intent.model_dump(mode="json")
+                )
                 if extracted.viewport_intent is not None
                 else None
             ),
             provider_error=provider_error,
             failure_category=cls._normalize_failure_category(
-                provider_error.get("category") if is_json_object(provider_error) else None
+                provider_error.get("category")
+                if is_json_object(provider_error)
+                else None
             ),
         )
 
@@ -506,7 +555,9 @@ class ParserService:
             if item.raw_value.strip()
         ]
         normalized_action = NormalizedAction(
-            action_id=self._normalize_action_id(extracted.action_id, extracted.parser_confidence),
+            action_id=self._normalize_action_id(
+                extracted.action_id, extracted.parser_confidence
+            ),
             action_label=extracted.action_label.strip() or "General map request",
             task_tags=[tag for tag in extracted.task_tags if str(tag).strip()],
             action_tags=[tag for tag in extracted.action_tags if str(tag).strip()],
@@ -585,7 +636,9 @@ class ParserService:
             requires_reparse=extracted.requires_reparse,
             capability_limitations=self._dedupe(extracted.capability_limitations),
             expected_frontend_update=extracted.expected_frontend_update,
-            atomic_tasks=[item.model_dump(mode="json") for item in extracted.atomic_tasks],
+            atomic_tasks=[
+                item.model_dump(mode="json") for item in extracted.atomic_tasks
+            ],
             clarification_plan=(
                 extracted.clarification_plan.model_dump(mode="json")
                 if extracted.clarification_plan is not None
@@ -609,7 +662,9 @@ class ParserService:
             len(result.location_signals),
             result.requested_basemap,
             len(result.requested_layers),
-            result.viewport_intent.scope if result.viewport_intent is not None else None,
+            result.viewport_intent.scope
+            if result.viewport_intent is not None
+            else None,
             (
                 result.viewport_intent.tighten_relative_to_active
                 if result.viewport_intent is not None
@@ -656,7 +711,9 @@ class ParserService:
             update={
                 "task_tags": cls._dedupe(extracted.task_tags),
                 "action_tags": cls._dedupe(extracted.action_tags),
-                "requested_visualizations": cls._dedupe(extracted.requested_visualizations),
+                "requested_visualizations": cls._dedupe(
+                    extracted.requested_visualizations
+                ),
                 "requested_layers": cls._dedupe(extracted.requested_layers),
                 "requested_attributes": cls._dedupe(extracted.requested_attributes),
                 "required_data_sources": cls._dedupe(extracted.required_data_sources),

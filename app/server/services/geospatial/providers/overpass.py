@@ -34,6 +34,7 @@ AMENITY_GROUPS = {
     "fuel": ["fuel", "charging_station"],
 }
 
+
 ###############################################################################
 class OverpassProvider(GeospatialProvider):
     provider_id = "overpass"
@@ -67,7 +68,11 @@ class OverpassProvider(GeospatialProvider):
         tags = request.params.get("amenity_tags")
         amenity_tags = [str(tag) for tag in tags] if is_json_array(tags) else None
         categories_value = request.params.get("poi_categories")
-        categories = [str(item) for item in categories_value] if is_json_array(categories_value) else None
+        categories = (
+            [str(item) for item in categories_value]
+            if is_json_array(categories_value)
+            else None
+        )
         if amenity_tags is None:
             category = str(request.params.get("category") or "").strip().lower()
             amenity_tags = AMENITY_GROUPS.get(category)
@@ -117,11 +122,12 @@ class OverpassProvider(GeospatialProvider):
             ],
         )
 
+
 ###############################################################################
 def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None

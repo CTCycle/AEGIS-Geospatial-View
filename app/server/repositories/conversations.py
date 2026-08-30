@@ -9,9 +9,9 @@ from sqlalchemy import select, update
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ConversationRecord
 
+
 ###############################################################################
 class ConversationRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
@@ -24,7 +24,9 @@ class ConversationRepository:
             record = ConversationRecord(
                 id=f"conv_{uuid4().hex}",
                 owner_user_id=owner_user_id,
-                title=title.strip() if isinstance(title, str) and title.strip() else None,
+                title=title.strip()
+                if isinstance(title, str) and title.strip()
+                else None,
             )
             session.add(record)
             session.commit()

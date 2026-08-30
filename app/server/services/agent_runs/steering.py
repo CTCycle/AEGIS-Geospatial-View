@@ -17,9 +17,9 @@ from server.services.agent.conversation_state import ConversationTaskStateServic
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.exceptions import RunConflictError, RunNotFoundError
 
+
 ###############################################################################
 class RunSteeringService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -108,7 +108,9 @@ class RunSteeringService:
             raise RunConflictError("Concurrent run update could not be applied.")
         state_delta_applied = self._apply_state_delta(conversation_id, delta)
         if state_delta_applied:
-            steering = self.steering_repository.mark_state_delta_applied(steering.steering_id)
+            steering = self.steering_repository.mark_state_delta_applied(
+                steering.steering_id
+            )
         await self.event_publisher.publish(
             conversation_id=conversation_id,
             run_id=run_id,
@@ -147,7 +149,9 @@ class RunSteeringService:
         ):
             return False
         try:
-            persisted: dict[str, Any] = self.conversation_repository.read_state(conversation_id)
+            persisted: dict[str, Any] = self.conversation_repository.read_state(
+                conversation_id
+            )
             task_snapshot_value: Any = persisted.get("task_snapshot")
             if not isinstance(task_snapshot_value, dict):
                 return False
@@ -163,5 +167,5 @@ class RunSteeringService:
                 task_snapshot=self.task_state_service.serialize(conversation_id),
             )
             return True
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return False

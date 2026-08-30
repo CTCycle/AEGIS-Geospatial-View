@@ -20,6 +20,7 @@ SteeringDeltaKind = Literal[
     "instruction",
 ]
 
+
 ###############################################################################
 class SteeringDelta(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -30,32 +31,41 @@ class SteeringDelta(BaseModel):
     preserve_evidence: bool = True
     invalidates_scope_dependent_evidence: bool = False
 
+
 ###############################################################################
 def classify_steering_delta(message: str) -> SteeringDelta:
     normalized = message.strip()
     lowered = normalized.lower()
     radius = re.search(r"\b(\d+(?:\.\d+)?)\s*(km|mi|miles?)\b", lowered)
-    if radius or any(token in lowered for token in ("expand the area", "radius", "zoom")):
+    if radius or any(
+        token in lowered for token in ("expand the area", "radius", "zoom")
+    ):
         return SteeringDelta(
             kind="scope_change",
             text=normalized,
             parameters={"radius_text": radius.group(0) if radius else None},
             invalidates_scope_dependent_evidence=True,
         )
-    if any(token in lowered for token in ("exclude", "remove", "west of", "western side")):
+    if any(
+        token in lowered for token in ("exclude", "remove", "west of", "western side")
+    ):
         return SteeringDelta(
             kind="exclusion",
             text=normalized,
             parameters={"filter": normalized},
             invalidates_scope_dependent_evidence=True,
         )
-    if any(token in lowered for token in ("add ", "include ", "air-quality", "weather", "environment")):
+    if any(
+        token in lowered
+        for token in ("add ", "include ", "air-quality", "weather", "environment")
+    ):
         return SteeringDelta(kind="add_dataset", text=normalized)
     if any(token in lowered for token in ("compare", "comparison", "summarize")):
         return SteeringDelta(kind="comparison", text=normalized)
     if "?" in normalized:
         return SteeringDelta(kind="clarification", text=normalized)
     return SteeringDelta(kind="instruction", text=normalized)
+
 
 ###############################################################################
 class SteeringMessageRequest(BaseModel):
@@ -88,6 +98,7 @@ class SteeringMessageRequest(BaseModel):
             raise ValueError("client_mutation_id is too long")
         return normalized
 
+
 ###############################################################################
 class SteeringMessageResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -101,6 +112,7 @@ class SteeringMessageResponse(BaseModel):
     duplicate: bool = False
     delta: SteeringDelta | None = None
     state_delta_applied: bool = False
+
 
 ###############################################################################
 class SteeringMessageRecord(BaseModel):

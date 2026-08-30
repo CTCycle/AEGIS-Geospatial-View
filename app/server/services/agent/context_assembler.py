@@ -3,13 +3,16 @@ from __future__ import annotations
 from typing import Any
 
 from server.domain.agent.context import AgentContextPackage, ConversationDirective
-from server.services.llm.context_budget import estimate_json_tokens, resolve_model_context_profile
+from server.services.llm.context_budget import (
+    estimate_json_tokens,
+    resolve_model_context_profile,
+)
 from server.services.llm.errors import LLMContextLimitError
 from server.domain.agent.runtime import compact_task_context
 
+
 ###############################################################################
 class AgentContextAssembler:
-
     # -------------------------------------------------------------------------
     def assemble(
         self,
@@ -32,7 +35,9 @@ class AgentContextAssembler:
         )
         mandatory = {
             "current_user_message": current_user_message,
-            "active_instructions": [item.model_dump(mode="json") for item in directives],
+            "active_instructions": [
+                item.model_dump(mode="json") for item in directives
+            ],
             "task_state": compact_task_context(task_state),
             "map_memory": map_memory,
         }
@@ -56,14 +61,22 @@ class AgentContextAssembler:
         included_tokens = 0
         for message in reversed(messages):
             cost = estimate_json_tokens(message)
-            if raw_budget is not None and included and included_tokens + cost > raw_budget:
+            if (
+                raw_budget is not None
+                and included
+                and included_tokens + cost > raw_budget
+            ):
                 break
             included.append(message)
             included_tokens += cost
         included.reverse()
-        included_ids = [int(item["id"]) for item in included if isinstance(item.get("id"), int)]
+        included_ids = [
+            int(item["id"]) for item in included if isinstance(item.get("id"), int)
+        ]
         omitted = [item for item in messages if item not in included]
-        omitted_ids = [int(item["id"]) for item in omitted if isinstance(item.get("id"), int)]
+        omitted_ids = [
+            int(item["id"]) for item in omitted if isinstance(item.get("id"), int)
+        ]
         summary = prior_summary
         summary_through = 0
         if omitted:

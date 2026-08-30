@@ -8,9 +8,9 @@ from fastapi import HTTPException
 from server.api.chat import get_models, pull_ollama_model
 from server.contracts.chat import OllamaPullRequest
 
+
 ###############################################################################
 class _FailingModelLibrary:
-
     # -------------------------------------------------------------------------
     def list_models(self, **kwargs):  # noqa: ANN003
         _ = kwargs
@@ -18,9 +18,9 @@ class _FailingModelLibrary:
             "api-key=sk-test https://provider.invalid/v1 C:\\private\\models.json"
         )
 
+
 ###############################################################################
 class _FailingMaintenance:
-
     # -------------------------------------------------------------------------
     def pull_ollama_model(self, payload):  # noqa: ANN001
         _ = payload
@@ -28,11 +28,14 @@ class _FailingMaintenance:
             "api-key=sk-test https://ollama.invalid/api C:\\private\\ollama.log"
         )
 
+
 ###############################################################################
 def test_model_catalog_exception_has_stable_public_message() -> None:
     runtime = SimpleNamespace(
         model_library_service=_FailingModelLibrary(),
-        settings_service=SimpleNamespace(get_ollama_url=lambda: "http://ollama.invalid"),
+        settings_service=SimpleNamespace(
+            get_ollama_url=lambda: "http://ollama.invalid"
+        ),
     )
 
     with pytest.raises(HTTPException) as raised:
@@ -42,6 +45,7 @@ def test_model_catalog_exception_has_stable_public_message() -> None:
     assert "sk-test" not in str(raised.value.detail)
     assert "provider.invalid" not in str(raised.value.detail)
     assert "models.json" not in str(raised.value.detail)
+
 
 ###############################################################################
 def test_ollama_pull_exception_has_stable_public_message() -> None:

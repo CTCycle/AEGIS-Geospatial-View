@@ -16,12 +16,12 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class USGSProvider(GeospatialProvider):
     provider_id = "usgs"
     WATER_DATA_ITEMS_URL = (
-        "https://api.waterdata.usgs.gov/ogcapi/v0/collections/"
-        "latest-continuous/items"
+        "https://api.waterdata.usgs.gov/ogcapi/v0/collections/latest-continuous/items"
     )
 
     # -------------------------------------------------------------------------
@@ -37,7 +37,9 @@ class USGSProvider(GeospatialProvider):
     # -------------------------------------------------------------------------
     async def _earthquakes(self, request: ProviderRequest) -> ProviderResponse:
         feed = str(request.params.get("feed") or "all_day").strip()
-        features_url = f"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/{feed}.geojson"
+        features_url = (
+            f"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/{feed}.geojson"
+        )
         if request.params.get("live"):
             payload = await call_json_fetcher(self.fetcher, features_url)
             features = _normalize_earthquake_features(payload)
@@ -92,7 +94,10 @@ class USGSProvider(GeospatialProvider):
                     "features": features,
                     "totalResults": len(features),
                     "format": "geojson",
-                    "legend": {"type": "water-level", "label": "Latest gauge observation"},
+                    "legend": {
+                        "type": "water-level",
+                        "label": "Latest gauge observation",
+                    },
                     "freshnessLabel": "USGS latest-continuous observations",
                 },
                 attribution=["U.S. Geological Survey"],
@@ -113,13 +118,18 @@ class USGSProvider(GeospatialProvider):
             result_type="metadata",
         )
 
+
 ###############################################################################
 def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
     if not is_json_object(payload):
-        raise ProviderMalformedPayloadError("USGS earthquake payload must be a GeoJSON object.")
+        raise ProviderMalformedPayloadError(
+            "USGS earthquake payload must be a GeoJSON object."
+        )
     raw_features = payload.get("features")
     if not is_json_array(raw_features):
-        raise ProviderMalformedPayloadError("USGS earthquake payload is missing features.")
+        raise ProviderMalformedPayloadError(
+            "USGS earthquake payload is missing features."
+        )
     features: list[dict[str, object]] = []
     for item in raw_features:
         if not is_json_object(item):
@@ -130,7 +140,9 @@ def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
         if not is_json_array(coordinates) or len(coordinates) < 2:
             continue
         longitude, latitude = coordinates[0], coordinates[1]
-        if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
+        if not isinstance(latitude, int | float) or not isinstance(
+            longitude, int | float
+        ):
             continue
         features.append(
             {
@@ -150,6 +162,7 @@ def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
             }
         )
     return features
+
 
 ###############################################################################
 def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
@@ -205,11 +218,12 @@ def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
         )
     return features
 
+
 ###############################################################################
 def _float_or_none(value: object) -> float | None:
     if not isinstance(value, int | float | str):
         return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None

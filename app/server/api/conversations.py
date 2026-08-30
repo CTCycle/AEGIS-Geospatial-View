@@ -14,9 +14,11 @@ from server.services.agent_runs.lifecycle import RunLifecycleService
 
 router = APIRouter(prefix=CONVERSATIONS_ROUTER_PREFIX, tags=["conversations"])
 
+
 ###############################################################################
 def get_run_lifecycle_service(request: Request) -> RunLifecycleService:
     return request.app.state.run_lifecycle_service
+
 
 ###############################################################################
 @router.post(

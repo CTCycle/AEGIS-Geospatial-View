@@ -11,22 +11,23 @@ from server.prompts.response import (
 )
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
 
+
 ###############################################################################
 @dataclass
 class _Settings:
     agent_model_provider: str = "test"
     agent_model_name: str = "test-model"
 
+
 ###############################################################################
 class _SettingsRepo:
-
     # -------------------------------------------------------------------------
     def get_or_create(self) -> _Settings:
         return _Settings()
 
+
 ###############################################################################
 class _Provider:
-
     # -------------------------------------------------------------------------
     def __init__(self, content: str = "**Map ready.**") -> None:
         self.content = content
@@ -42,9 +43,9 @@ class _Provider:
             "warnings": [],
         }
 
+
 ###############################################################################
 class _Factory:
-
     # -------------------------------------------------------------------------
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
@@ -53,6 +54,7 @@ class _Factory:
     def get_provider(self, provider: str) -> _Provider:
         assert provider == "test"
         return self.provider
+
 
 ###############################################################################
 def test_synthesizer_returns_grounded_markdown_and_bounded_evidence() -> None:
@@ -83,8 +85,14 @@ def test_synthesizer_returns_grounded_markdown_and_bounded_evidence() -> None:
     assert "Verified fallback." in request_text
     assert "Current data only." in request_text
     assert "How much rain is there?" in request_text
-    assert provider.requests[0].messages[0]["content"] == build_grounded_response_system_prompt()
-    assert request_text.startswith(VERIFIED_EVIDENCE_USER_TEMPLATE.split("{", maxsplit=1)[0])
+    assert (
+        provider.requests[0].messages[0]["content"]
+        == build_grounded_response_system_prompt()
+    )
+    assert request_text.startswith(
+        VERIFIED_EVIDENCE_USER_TEMPLATE.split("{", maxsplit=1)[0]
+    )
+
 
 ###############################################################################
 def test_synthesizer_evidence_marks_metadata_only_overlays() -> None:
@@ -138,12 +146,12 @@ def test_synthesizer_evidence_marks_metadata_only_overlays() -> None:
     assert '"status":"metadata_only"' in request_text
     assert "not a live rendered map layer" in system_text
 
+
 ###############################################################################
 def test_synthesizer_falls_back_when_model_fails() -> None:
 
     ###############################################################################
     class _FailingProvider(_Provider):
-
         # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             _ = request, schema
@@ -160,11 +168,15 @@ def test_synthesizer_falls_back_when_model_fails() -> None:
         message="Choose a supported time basis.",
     )
 
-    assert synthesizer.synthesize(
-        user_text="October mean",
-        fallback_text="Choose a supported time basis.",
-        operation=operation,
-    ) == "Choose a supported time basis."
+    assert (
+        synthesizer.synthesize(
+            user_text="October mean",
+            fallback_text="Choose a supported time basis.",
+            operation=operation,
+        )
+        == "Choose a supported time basis."
+    )
+
 
 ###############################################################################
 def test_synthesizer_does_not_rewrite_failed_or_policy_responses() -> None:
@@ -189,12 +201,12 @@ def test_synthesizer_does_not_rewrite_failed_or_policy_responses() -> None:
     assert result == "Credential rejected."
     assert provider.requests == []
 
+
 ###############################################################################
 def test_synthesizer_falls_back_on_invalid_structured_output() -> None:
 
     ###############################################################################
     class _InvalidProvider(_Provider):
-
         # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             self.requests.append(request)
@@ -211,11 +223,15 @@ def test_synthesizer_falls_back_on_invalid_structured_output() -> None:
         message="Verified fallback.",
     )
 
-    assert synthesizer.synthesize(
-        user_text="Answer",
-        fallback_text="Verified fallback.",
-        operation=operation,
-    ) == "Verified fallback."
+    assert (
+        synthesizer.synthesize(
+            user_text="Answer",
+            fallback_text="Verified fallback.",
+            operation=operation,
+        )
+        == "Verified fallback."
+    )
+
 
 ###############################################################################
 def test_synthesizer_falls_back_when_successful_overlay_is_called_failed() -> None:
@@ -227,17 +243,31 @@ def test_synthesizer_falls_back_when_successful_overlay_is_called_failed() -> No
     )
     map_session = MapSession(
         session_id="map-1",
-        resolved_location=ResolvedLocation(label="Tokyo", latitude=35.6, longitude=139.7),
+        resolved_location=ResolvedLocation(
+            label="Tokyo", latitude=35.6, longitude=139.7
+        ),
         basemap_id="osm_default",
         overlay_ids=["overpass_poi_amenities"],
-        viewport=ViewportPolicy(center_latitude=35.6, center_longitude=139.7, radius_m=4000.0),
-        overlays=[{"id": "overpass_poi_amenities", "rendering_mode": "clustered-points"}],
+        viewport=ViewportPolicy(
+            center_latitude=35.6, center_longitude=139.7, radius_m=4000.0
+        ),
+        overlays=[
+            {"id": "overpass_poi_amenities", "rendering_mode": "clustered-points"}
+        ],
     )
-    operation = ChatOperationResult(kind="map_session", status="success", message="Verified.", map_session=map_session)
-
-    assert synthesizer.synthesize(
-        user_text="Show rail stations in Tokyo.",
-        fallback_text="Map ready with the verified POI overlay.",
-        operation=operation,
+    operation = ChatOperationResult(
+        kind="map_session",
+        status="success",
+        message="Verified.",
         map_session=map_session,
-    ) == "Map ready with the verified POI overlay."
+    )
+
+    assert (
+        synthesizer.synthesize(
+            user_text="Show rail stations in Tokyo.",
+            fallback_text="Map ready with the verified POI overlay.",
+            operation=operation,
+            map_session=map_session,
+        )
+        == "Map ready with the verified POI overlay."
+    )

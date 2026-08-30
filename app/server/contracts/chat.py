@@ -20,6 +20,7 @@ from server.contracts.geospatial import MapSession
 ChatRole = Literal["user", "assistant", "system", "tool"]
 ModelProviderMode = Literal["local", "cloud"]
 
+
 ###############################################################################
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -27,6 +28,7 @@ class ChatMessage(BaseModel):
     role: ChatRole
     content: str
     created_at: datetime = Field(default_factory=utc_now)
+
 
 ###############################################################################
 class ChatTurnRequest(BaseModel):
@@ -37,6 +39,7 @@ class ChatTurnRequest(BaseModel):
     datetime: str | None = None
     request_id: str | None = None
     conversation_id: str
+
 
 ###############################################################################
 class ContextUsageResponse(BaseModel):
@@ -58,10 +61,13 @@ class ContextUsageResponse(BaseModel):
     expected_output_tokens: int | None = None
     context_profile_source: str = "unknown"
     compaction_applied: bool = False
-    phases: dict[str, dict[str, Any]] = Field(default_factory=lambda: dict[str, dict[str, Any]]())
+    phases: dict[str, dict[str, Any]] = Field(
+        default_factory=lambda: dict[str, dict[str, Any]]()
+    )
     peak_request_tokens: int | None = None
     total_input_tokens: int | None = None
     total_output_tokens: int | None = None
+
 
 ###############################################################################
 class ChatOperationResult(BaseModel):
@@ -82,13 +88,17 @@ class ChatOperationResult(BaseModel):
     map_session: MapSession | None = None
     direct_result: dict[str, Any] | None = None
     provider_error: dict[str, Any] | None = None
-    failure_category: Literal[
-        "model_capability",
-        "provider_api",
-        "schema_definition",
-        "response_parsing",
-        "context_limit",
-    ] | None = None
+    failure_category: (
+        Literal[
+            "model_capability",
+            "provider_api",
+            "schema_definition",
+            "response_parsing",
+            "context_limit",
+        ]
+        | None
+    ) = None
+
 
 ###############################################################################
 class ChatTurnResponse(BaseModel):
@@ -110,6 +120,7 @@ class ChatTurnResponse(BaseModel):
     visualization_update: VisualizationUpdate | None = None
     context_revision: int | None = None
 
+
 ###############################################################################
 class ChatStreamEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -125,6 +136,7 @@ class ChatStreamEvent(BaseModel):
         "error",
     ]
     data: dict[str, Any]
+
 
 ###############################################################################
 class ModelCardDescriptor(BaseModel):
@@ -145,6 +157,7 @@ class ModelCardDescriptor(BaseModel):
     context_profile_source: str = "unknown"
     metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
+
 ###############################################################################
 class ModelLibrarySourceStatus(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -153,6 +166,7 @@ class ModelLibrarySourceStatus(BaseModel):
     reachable: bool | None = None
     message: str | None = None
     model_count: int | None = None
+
 
 ###############################################################################
 class ModelSettingsResponse(BaseModel):
@@ -166,8 +180,13 @@ class ModelSettingsResponse(BaseModel):
     google_base_url: str | None = None
     deepseek_base_url: str | None = None
     credentials: dict[str, dict[str, bool]]
-    credential_health: dict[str, dict[str, str]] = Field(default_factory=lambda: dict[str, dict[str, str]]())
-    selected_model_context: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    credential_health: dict[str, dict[str, str]] = Field(
+        default_factory=lambda: dict[str, dict[str, str]]()
+    )
+    selected_model_context: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]()
+    )
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -187,6 +206,7 @@ class ModelSettingsSnapshot:
     supports_structured_output: bool
     tool_support_source: str
 
+
 ###############################################################################
 class ModelSettingsUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -198,7 +218,9 @@ class ModelSettingsUpdateRequest(BaseModel):
     openai_base_url: str | None = None
     google_base_url: str | None = None
     deepseek_base_url: str | None = None
-    credentials: dict[str, dict[str, str]] = Field(default_factory=lambda: dict[str, dict[str, str]]())
+    credentials: dict[str, dict[str, str]] = Field(
+        default_factory=lambda: dict[str, dict[str, str]]()
+    )
 
     # -------------------------------------------------------------------------
     @field_validator(
@@ -227,13 +249,21 @@ class ModelSettingsUpdateRequest(BaseModel):
             raise ValueError("Base URL must start with http:// or https://")
         return normalized
 
+
 ###############################################################################
 class ModelLibraryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    cloud: list[ModelCardDescriptor] = Field(default_factory=lambda: list[ModelCardDescriptor]())
-    local: list[ModelCardDescriptor] = Field(default_factory=lambda: list[ModelCardDescriptor]())
-    sources: dict[str, ModelLibrarySourceStatus] = Field(default_factory=lambda: dict[str, ModelLibrarySourceStatus]())
+    cloud: list[ModelCardDescriptor] = Field(
+        default_factory=lambda: list[ModelCardDescriptor]()
+    )
+    local: list[ModelCardDescriptor] = Field(
+        default_factory=lambda: list[ModelCardDescriptor]()
+    )
+    sources: dict[str, ModelLibrarySourceStatus] = Field(
+        default_factory=lambda: dict[str, ModelLibrarySourceStatus]()
+    )
+
 
 ###############################################################################
 class OllamaRefreshResponse(BaseModel):
@@ -242,7 +272,10 @@ class OllamaRefreshResponse(BaseModel):
     status: str
     library_models: list[str] = Field(default_factory=lambda: list[str]())
     local_models: list[str] = Field(default_factory=lambda: list[str]())
-    local_model_capabilities: list[ModelCardDescriptor] = Field(default_factory=lambda: list[ModelCardDescriptor]())
+    local_model_capabilities: list[ModelCardDescriptor] = Field(
+        default_factory=lambda: list[ModelCardDescriptor]()
+    )
+
 
 ###############################################################################
 class OllamaPullRequest(BaseModel):
@@ -250,9 +283,11 @@ class OllamaPullRequest(BaseModel):
 
     model: str
 
+
 ###############################################################################
 class OllamaPullResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
+
 
 ###############################################################################
 class OllamaHealthResponse(BaseModel):

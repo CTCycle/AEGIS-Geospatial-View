@@ -8,9 +8,9 @@ from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDec
 from server.contracts.chat import ChatOperationResult
 from server.contracts.geospatial import MapSession
 
+
 ###############################################################################
 class AgentResponseBuilder:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def build_final_decision(
@@ -32,7 +32,11 @@ class AgentResponseBuilder:
             state = "direct_response"
             mode = None
         else:
-            state = "direct_tool" if operation.direct_result is not None else "direct_response"
+            state = (
+                "direct_tool"
+                if operation.direct_result is not None
+                else "direct_response"
+            )
             mode = "direct_text"
         return PolicyDecision(
             plan=ExecutionPlan(
@@ -151,7 +155,8 @@ class AgentResponseBuilder:
             return ChatOperationResult(
                 kind="error",
                 status="failed",
-                message=assistant_message or "I could not verify a map result for this request.",
+                message=assistant_message
+                or "I could not verify a map result for this request.",
                 warnings=warnings,
             )
         _ = user_text
@@ -164,7 +169,9 @@ class AgentResponseBuilder:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _map_session_status(map_session: MapSession) -> Literal["success", "partial", "failed"]:
+    def _map_session_status(
+        map_session: MapSession,
+    ) -> Literal["success", "partial", "failed"]:
         requested = list(map_session.requested_overlay_ids or map_session.overlay_ids)
         if map_session.failed_overlays and not map_session.overlay_ids:
             return "failed"
@@ -251,7 +258,9 @@ class AgentResponseBuilder:
                 if isinstance(latitude, (int, float)) and isinstance(
                     longitude, (int, float)
                 ):
-                    return f"Coordinates for {location}: {latitude:.6f}, {longitude:.6f}."
+                    return (
+                        f"Coordinates for {location}: {latitude:.6f}, {longitude:.6f}."
+                    )
         if tool_id == "get_weather_forecast" and is_json_object(nested_result):
             current = nested_result.get("selected_forecast") or nested_result.get(
                 "current"
@@ -283,9 +292,9 @@ class AgentResponseBuilder:
         location = cls.extract_label(map_payload.get("resolved_location"))
         if location is None:
             location = "the requested location"
-        basemap = cls.extract_label(map_payload.get("basemap")) or cls.humanize_identifier(
-            map_payload.get("basemap_id")
-        )
+        basemap = cls.extract_label(
+            map_payload.get("basemap")
+        ) or cls.humanize_identifier(map_payload.get("basemap_id"))
         overlay_labels = cls.extract_overlay_labels(map_payload)
         warnings = [
             cls.humanize_warning(warning)
@@ -294,8 +303,14 @@ class AgentResponseBuilder:
         ]
 
         parts = [f"Map ready for {location} using {basemap}."]
-        overlays = [item for item in json_array(map_payload.get("overlays")) if is_json_object(item)]
-        has_explicit_visibility = any(isinstance(item.get("visible"), bool) for item in overlays)
+        overlays = [
+            item
+            for item in json_array(map_payload.get("overlays"))
+            if is_json_object(item)
+        ]
+        has_explicit_visibility = any(
+            isinstance(item.get("visible"), bool) for item in overlays
+        )
         if has_explicit_visibility:
             visible_labels = [
                 label
@@ -312,9 +327,13 @@ class AgentResponseBuilder:
                 if label
             ]
             if visible_labels:
-                parts.append(f"Visible overlays: {cls.format_label_list(visible_labels)}.")
+                parts.append(
+                    f"Visible overlays: {cls.format_label_list(visible_labels)}."
+                )
             if hidden_labels:
-                parts.append(f"Hidden overlays: {cls.format_label_list(hidden_labels)}.")
+                parts.append(
+                    f"Hidden overlays: {cls.format_label_list(hidden_labels)}."
+                )
             if not visible_labels and not hidden_labels:
                 parts.append("No overlays are currently active.")
         elif overlay_labels:
@@ -322,7 +341,9 @@ class AgentResponseBuilder:
         else:
             parts.append("No overlays were added.")
         if warnings:
-            parts.append(f"Some requested map data needs attention: {' '.join(warnings)}")
+            parts.append(
+                f"Some requested map data needs attention: {' '.join(warnings)}"
+            )
         return " ".join(parts)
 
     # -------------------------------------------------------------------------

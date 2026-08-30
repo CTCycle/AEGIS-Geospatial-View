@@ -46,6 +46,7 @@ NATIVE_AGENT_CONTEXT_TEMPLATE = (
 
 WORKING_STATE_TEMPLATE = "WORKING_STATE (replaceable): {state_json}"
 
+
 ###############################################################################
 def build_native_agent_system_prompt() -> str:
     return "\n\n".join(
@@ -57,6 +58,7 @@ def build_native_agent_system_prompt() -> str:
             INTERNAL_INFORMATION_RESTRICTIONS,
         ]
     )
+
 
 ###############################################################################
 def build_native_agent_messages(
@@ -83,6 +85,7 @@ def build_native_agent_messages(
         {"role": "system", "content": build_native_agent_system_prompt()},
         {"role": "user", "content": context},
     ]
+
 
 ###############################################################################
 def build_working_state_message(

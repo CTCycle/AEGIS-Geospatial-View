@@ -26,6 +26,7 @@ from server.services.llm.types import (
     ModelDescriptor,
 )
 
+
 ###############################################################################
 class OpenAIProvider(LLMProvider):
     provider_name = "openai"
@@ -62,7 +63,9 @@ class OpenAIProvider(LLMProvider):
     def supports_structured_output(self, model: str) -> bool | None:
         for entry in self.list_models():
             if entry.name == model:
-                return bool({"structured", "structured_output"} & set(entry.capabilities))
+                return bool(
+                    {"structured", "structured_output"} & set(entry.capabilities)
+                )
         return None
 
     # -------------------------------------------------------------------------
@@ -79,7 +82,9 @@ class OpenAIProvider(LLMProvider):
             "type": "function",
             "name": tool.name,
             "description": tool.description,
-            "parameters": OpenAIProvider._strict_parameters(tool.parameters_json_schema),
+            "parameters": OpenAIProvider._strict_parameters(
+                tool.parameters_json_schema
+            ),
             "strict": True,
         }
 
@@ -109,7 +114,11 @@ class OpenAIProvider(LLMProvider):
     def normalize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized: list[dict[str, Any]] = []
         for message in messages:
-            if message.get("type") in {"function_call", "function_call_output", "reasoning"}:
+            if message.get("type") in {
+                "function_call",
+                "function_call_output",
+                "reasoning",
+            }:
                 normalized.append(message)
                 continue
             if message.get("type") == "message":
@@ -141,7 +150,9 @@ class OpenAIProvider(LLMProvider):
                             "id": call_id or None,
                             "call_id": call_id,
                             "name": str(call.get("name") or ""),
-                            "arguments": json.dumps(call.get("arguments") or {}, separators=(",", ":")),
+                            "arguments": json.dumps(
+                                call.get("arguments") or {}, separators=(",", ":")
+                            ),
                         }
                     )
                 continue
@@ -211,7 +222,9 @@ class OpenAIProvider(LLMProvider):
         self._validate_request_capabilities(effective_request)
         kwargs: dict[str, Any] = {}
         if native_tools:
-            kwargs["tools"] = [self.tool_to_openai_schema(tool) for tool in native_tools]
+            kwargs["tools"] = [
+                self.tool_to_openai_schema(tool) for tool in native_tools
+            ]
             kwargs["tool_choice"] = tool_choice or request.tool_choice or "auto"
         if schema and not native_tools:
             kwargs["text"] = {

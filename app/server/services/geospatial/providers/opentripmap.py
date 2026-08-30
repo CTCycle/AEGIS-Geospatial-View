@@ -24,6 +24,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class OpenTripMapProvider(GeospatialProvider):
     provider_id = "opentripmap"
@@ -44,7 +45,9 @@ class OpenTripMapProvider(GeospatialProvider):
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         api_key = (self.api_key or "").strip()
         if not api_key:
-            raise ProviderAuthError("OPENTRIPMAP_API_KEY is required for OpenTripMap tourism POIs.")
+            raise ProviderAuthError(
+                "OPENTRIPMAP_API_KEY is required for OpenTripMap tourism POIs."
+            )
         latitude, longitude = request_center(request)
         radius_m = request_radius_m(request, 2500.0)
         params = {
@@ -80,7 +83,12 @@ class OpenTripMapProvider(GeospatialProvider):
                 "center": {"latitude": latitude, "longitude": longitude},
                 "radiusM": radius_m,
             }
-            self.cache.set(cache_key, normalized, ttl_seconds=900, stale_while_revalidate_seconds=86400)
+            self.cache.set(
+                cache_key,
+                normalized,
+                ttl_seconds=900,
+                stale_while_revalidate_seconds=86400,
+            )
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -91,7 +99,9 @@ class OpenTripMapProvider(GeospatialProvider):
             )
         except (ProviderError, ValueError) as exc:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return ProviderResponse(
                     capability_id=request.capability_id,
                     provider_id=self.provider_id,
@@ -124,7 +134,9 @@ class OpenTripMapProvider(GeospatialProvider):
             coordinates = geometry.get("coordinates")
             if not is_json_array(coordinates) or len(coordinates) < 2:
                 continue
-            category = normalize_poi_category(str(properties.get("kinds") or "tourism").split(",")[0])
+            category = normalize_poi_category(
+                str(properties.get("kinds") or "tourism").split(",")[0]
+            )
             features.append(
                 {
                     "id": str(properties.get("xid") or properties.get("id") or ""),

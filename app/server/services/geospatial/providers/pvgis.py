@@ -9,6 +9,7 @@ from server.services.geospatial.providers.base import (
 )
 from server.services.geospatial.pvgis import PVGISError, PVGISService
 
+
 ###############################################################################
 class PVGISProvider(GeospatialProvider):
     provider_id = "pvgis"
@@ -35,9 +36,7 @@ class PVGISProvider(GeospatialProvider):
                 "provider": self.provider_id,
                 "latitude": payload.get("latitude", latitude),
                 "longitude": payload.get("longitude", longitude),
-                "yearlyKwhPerKwpEstimate": payload.get(
-                    "yearly_kwh_per_kwp_estimate"
-                ),
+                "yearlyKwhPerKwpEstimate": payload.get("yearly_kwh_per_kwp_estimate"),
                 "raw": payload.get("raw") or {},
             },
             attribution=[

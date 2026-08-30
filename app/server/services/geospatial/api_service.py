@@ -42,29 +42,36 @@ CAMERA_PROVIDER_ALIASES = {
     "windy": "windy_webcams",
 }
 
+
 ###############################################################################
 class GeospatialApiServiceError(Exception):
     """Base exception for geospatial API service failures."""
+
 
 ###############################################################################
 class GeospatialCapabilityNotFoundError(GeospatialApiServiceError):
     """Raised when a requested manifest capability does not exist."""
 
+
 ###############################################################################
 class GeospatialInvalidRequestError(GeospatialApiServiceError):
     """Raised when query parameters cannot be parsed safely."""
+
 
 ###############################################################################
 class GeospatialTileCredentialError(GeospatialApiServiceError):
     """Raised when a tile provider credential is missing or rejected."""
 
+
 ###############################################################################
 class GeospatialTileRequestError(GeospatialApiServiceError):
     """Raised when a tile provider request fails."""
 
+
 ###############################################################################
 class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
+
 
 ###############################################################################
 class GeospatialProviderResponseError(GeospatialApiServiceError):
@@ -75,6 +82,7 @@ class GeospatialProviderResponseError(GeospatialApiServiceError):
         super().__init__(message)
         self.error_code = error_code
         self.status_code = status_code
+
 
 ###############################################################################
 def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
@@ -100,6 +108,7 @@ def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
         "type": "FeatureCollection",
         "features": [_normalize_geojson_feature(item) for item in json_array(features)],
     }
+
 
 ###############################################################################
 def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
@@ -142,8 +151,11 @@ def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
         "properties": properties,
     }
 
+
 ###############################################################################
-def _provider_response_error(payload: dict[str, Any]) -> GeospatialProviderResponseError:
+def _provider_response_error(
+    payload: dict[str, Any],
+) -> GeospatialProviderResponseError:
     error_code = str(payload.get("error_code") or "provider_unavailable")
     error_status = {
         "auth_required": 401,
@@ -160,9 +172,9 @@ def _provider_response_error(payload: dict[str, Any]) -> GeospatialProviderRespo
         status_code=error_status[error_code],
     )
 
+
 ###############################################################################
 class GeospatialApiService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -177,7 +189,9 @@ class GeospatialApiService:
         self.manifest_loader = manifest_loader
         self.runtime_registry = runtime_registry
         self.provider_registry = provider_registry
-        self.credential_resolver = credential_resolver or runtime_registry.credential_resolver
+        self.credential_resolver = (
+            credential_resolver or runtime_registry.credential_resolver
+        )
 
     # -------------------------------------------------------------------------
     def list_capabilities(self) -> dict[str, list[dict[str, Any]]]:
@@ -223,7 +237,12 @@ class GeospatialApiService:
             )
         except ProviderNotRegisteredError as exc:
             raise GeospatialCapabilityNotFoundError(str(exc)) from exc
-        except (ProviderUnavailableError, ProviderTimeoutError, ProviderCircuitOpenError, ProviderError) as exc:
+        except (
+            ProviderUnavailableError,
+            ProviderTimeoutError,
+            ProviderCircuitOpenError,
+            ProviderError,
+        ) as exc:
             raise GeospatialTileRequestError(str(exc)) from exc
         return GeospatialProviderLayersResponse(provider=provider_id, layers=layers)
 
@@ -244,7 +263,12 @@ class GeospatialApiService:
             )
         except ProviderNotRegisteredError as exc:
             raise GeospatialCapabilityNotFoundError(str(exc)) from exc
-        except (ProviderUnavailableError, ProviderTimeoutError, ProviderCircuitOpenError, ProviderError) as exc:
+        except (
+            ProviderUnavailableError,
+            ProviderTimeoutError,
+            ProviderCircuitOpenError,
+            ProviderError,
+        ) as exc:
             raise GeospatialTileRequestError(str(exc)) from exc
         return GeospatialProviderLayerResponse(provider=provider_id, layer=layer)
 
@@ -338,7 +362,9 @@ class GeospatialApiService:
             or ""
         ).strip()
         if not template:
-            raise GeospatialUnsupportedTileError("Tile URL is missing from provider metadata.")
+            raise GeospatialUnsupportedTileError(
+                "Tile URL is missing from provider metadata."
+            )
         provider = str(manifest.get("provider") or "").strip().lower()
         upstream_url = self._resolve_credentialed_tile_template(
             template=template,
@@ -655,9 +681,7 @@ class GeospatialApiService:
             env_name=env_name,
             required=True,
         )
-        metadata = (
-            json_object(payload.get("metadata"))
-        )
+        metadata = json_object(payload.get("metadata"))
         return {
             "provider_id": provider_key,
             "name": str(metadata.get("label") or payload.get("name") or provider_key),
@@ -824,8 +848,8 @@ class GeospatialApiService:
                 return value.strip()
         docs = json_array(provider.get("sourceOfficialDocs"))
         for item in docs:
-                if isinstance(item, str) and item.strip():
-                    return item.strip()
+            if isinstance(item, str) and item.strip():
+                return item.strip()
         return None
 
     # -------------------------------------------------------------------------
@@ -892,7 +916,9 @@ class GeospatialApiService:
             .replace("{x}", str(x))
             .replace("{y}", str(y))
         )
-        if resolved == template and all(token not in template for token in ("{z}", "{x}", "{y}")):
+        if resolved == template and all(
+            token not in template for token in ("{z}", "{x}", "{y}")
+        ):
             raise GeospatialUnsupportedTileError(
                 f"Capability '{capability_id}' does not expose a tile template."
             )

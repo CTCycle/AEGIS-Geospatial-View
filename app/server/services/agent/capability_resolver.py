@@ -9,6 +9,7 @@ from server.contracts.extraction import TurnParseResult
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 class CapabilityResolver:
     """Resolve parser concepts against the executable catalog.
@@ -31,9 +32,7 @@ class CapabilityResolver:
     # -------------------------------------------------------------------------
     def resolve(self, turn: TurnParseResult) -> TurnParseResult:
         requested = [
-            str(item).strip()
-            for item in turn.requested_layers
-            if str(item).strip()
+            str(item).strip() for item in turn.requested_layers if str(item).strip()
         ]
         for task in turn.atomic_tasks:
             required_layers = task.get("required_layers")
@@ -161,10 +160,7 @@ class CapabilityResolver:
                 (self._score(query, item), str(item.get("id") or ""))
                 for item in capabilities
                 if self._is_usable(item, turn)
-                and (
-                    "_" not in query
-                    or self._query_token_coverage(query, item) == 1.0
-                )
+                and ("_" not in query or self._query_token_coverage(query, item) == 1.0)
             ),
             key=lambda value: (-value[0], value[1]),
         )
@@ -322,7 +318,9 @@ class CapabilityResolver:
     def _normalize_text(value: str) -> str:
         normalized = unicodedata.normalize("NFKC", str(value or "")).casefold()
         return " ".join(
-            "".join(character if character.isalnum() else " " for character in normalized).split()
+            "".join(
+                character if character.isalnum() else " " for character in normalized
+            ).split()
         )
 
     # -------------------------------------------------------------------------
@@ -333,4 +331,6 @@ class CapabilityResolver:
     # -------------------------------------------------------------------------
     @staticmethod
     def _dedupe(values: list[str]) -> list[str]:
-        return list(dict.fromkeys(value.strip() for value in values if value and value.strip()))
+        return list(
+            dict.fromkeys(value.strip() for value in values if value and value.strip())
+        )

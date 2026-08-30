@@ -9,9 +9,9 @@ from server.contracts.chat import ChatStreamEvent, ChatTurnRequest, ChatTurnResp
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.llm.errors import LLMConfigurationError
 
+
 ###############################################################################
 class ChatStreamingService:
-
     # -------------------------------------------------------------------------
     def __init__(self, agent_orchestrator: AgentOrchestrator) -> None:
         self.agent_orchestrator = agent_orchestrator
@@ -23,10 +23,29 @@ class ChatStreamingService:
         event: str,
         data: dict[str, Any],
     ) -> None:
-        queue.put_nowait(ChatStreamEvent(event=cast(Literal["status", "parsed", "policy", "tool_call_started", "tool_call_completed", "map_session_created", "final", "error"], event), data=data))
+        queue.put_nowait(
+            ChatStreamEvent(
+                event=cast(
+                    Literal[
+                        "status",
+                        "parsed",
+                        "policy",
+                        "tool_call_started",
+                        "tool_call_completed",
+                        "map_session_created",
+                        "final",
+                        "error",
+                    ],
+                    event,
+                ),
+                data=data,
+            )
+        )
 
     # -------------------------------------------------------------------------
-    async def stream_turn(self, payload: ChatTurnRequest) -> AsyncIterator[ChatStreamEvent]:
+    async def stream_turn(
+        self, payload: ChatTurnRequest
+    ) -> AsyncIterator[ChatStreamEvent]:
         request_id = payload.request_id or ""
         yield ChatStreamEvent(
             event="status",
@@ -77,7 +96,8 @@ class ChatStreamingService:
             yield ChatStreamEvent(
                 event="error",
                 data={
-                    "message": str(exc) or "Unexpected server error while streaming response.",
+                    "message": str(exc)
+                    or "Unexpected server error while streaming response.",
                     "status": int(HTTPStatus.INTERNAL_SERVER_ERROR),
                     "request_id": request_id,
                 },

@@ -5,6 +5,7 @@ from tests.conftest import run_async_in_thread
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.census import CensusProvider
 
+
 ###############################################################################
 def test_census_demographic_payload_uses_choropleth_contract() -> None:
     response = run_async_in_thread(

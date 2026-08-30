@@ -10,6 +10,7 @@ from server.repositories.database.migration_runner import (
 )
 from server.repositories.database.sqlite import SQLiteRepository
 
+
 ###############################################################################
 def initialize_database(
     database: SQLiteRepository,
@@ -28,5 +29,6 @@ def initialize_database(
         result.migrations_applied,
     )
     return result
+
 
 ###############################################################################

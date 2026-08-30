@@ -56,6 +56,7 @@ OUTBOUND_QUEUE_SIZE = 256
 OUTBOUND_ENQUEUE_TIMEOUT_SECONDS = 5.0
 MAX_COMMANDS_PER_MINUTE = 60
 
+
 ###############################################################################
 class RealtimeConnectionRegistry:
     """Tracks live sockets so shutdown can close them deterministically."""
@@ -80,7 +81,10 @@ class RealtimeConnectionRegistry:
         async with self._lock:
             connections = list(self._connections)
         await asyncio.gather(
-            *(connection.close(code=1012, reason="server_shutdown") for connection in connections),
+            *(
+                connection.close(code=1012, reason="server_shutdown")
+                for connection in connections
+            ),
             return_exceptions=True,
         )
 
@@ -89,9 +93,9 @@ class RealtimeConnectionRegistry:
         async with self._lock:
             return len(self._connections)
 
+
 ###############################################################################
 class RealtimeConnection:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -214,7 +218,9 @@ class RealtimeConnection:
                 return
             text = message.get("text")
             if text is None:
-                await self._protocol_error(None, "binary_messages_not_supported", fatal=True)
+                await self._protocol_error(
+                    None, "binary_messages_not_supported", fatal=True
+                )
                 return
             if len(text.encode("utf-8")) > MAX_REALTIME_MESSAGE_BYTES:
                 await self._protocol_error(None, "message_too_large", fatal=True)
@@ -229,7 +235,7 @@ class RealtimeConnection:
         try:
             raw = json.loads(text)
             message = RealtimeClientMessage.model_validate(raw)
-        except (json.JSONDecodeError, ValidationError, TypeError):
+        except json.JSONDecodeError, ValidationError, TypeError:
             self.metrics.command_rejected()
             self.metrics.observe_command_latency((time.monotonic() - started) * 1000)
             await self._protocol_error(None, "invalid_message", fatal=False)
@@ -237,11 +243,17 @@ class RealtimeConnection:
 
         if message.type not in {"heartbeat.ping", "heartbeat.pong"}:
             now = time.monotonic()
-            self._command_times = [item for item in self._command_times if now - item < 60]
+            self._command_times = [
+                item for item in self._command_times if now - item < 60
+            ]
             if len(self._command_times) >= MAX_COMMANDS_PER_MINUTE:
                 self.metrics.command_rejected()
-                self.metrics.observe_command_latency((time.monotonic() - started) * 1000)
-                await self._protocol_error(message.message_id, "rate_limited", fatal=True)
+                self.metrics.observe_command_latency(
+                    (time.monotonic() - started) * 1000
+                )
+                await self._protocol_error(
+                    message.message_id, "rate_limited", fatal=True
+                )
                 return
             self._command_times.append(now)
 
@@ -351,7 +363,9 @@ class RealtimeConnection:
     async def _steer_run(self, message: RealtimeClientMessage) -> None:
         payload = RealtimeSteerPayload.model_validate(message.payload)
         if self._active_run_id is not None and payload.run_id != self._active_run_id:
-            raise RunConflictError("A different run is already active on this connection.")
+            raise RunConflictError(
+                "A different run is already active on this connection."
+            )
         response = await self.steering_service.steer(
             self.conversation_id,
             payload.run_id,
@@ -458,7 +472,10 @@ class RealtimeConnection:
     async def _heartbeat(self) -> None:
         while not self._closed.is_set():
             await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
-            if time.monotonic() - self._last_pong > HEARTBEAT_INTERVAL_SECONDS + HEARTBEAT_TIMEOUT_SECONDS:
+            if (
+                time.monotonic() - self._last_pong
+                > HEARTBEAT_INTERVAL_SECONDS + HEARTBEAT_TIMEOUT_SECONDS
+            ):
                 await self.close(code=4408, reason="heartbeat_timeout")
                 return
             nonce = uuid4().hex
@@ -528,12 +545,15 @@ class RealtimeConnection:
             return "run_conflict"
         return "run_service_failure"
 
+
 ###############################################################################
 def is_realtime_origin_allowed(websocket: WebSocket) -> bool:
     """Restrict the unauthenticated local mode to the configured UI origin."""
     configured_host = os.getenv("FASTAPI_HOST", "127.0.0.1").strip().lower()
     try:
-        if not ipaddress.ip_address(configured_host).is_loopback and configured_host not in {
+        if not ipaddress.ip_address(
+            configured_host
+        ).is_loopback and configured_host not in {
             "localhost",
         }:
             return False

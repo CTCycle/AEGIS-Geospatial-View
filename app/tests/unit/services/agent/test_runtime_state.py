@@ -22,6 +22,7 @@ from server.domain.agent.runtime import (
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.conversation_state import ConversationTaskStateService
 
+
 ###############################################################################
 def test_task_graph_requires_successful_predecessors() -> None:
     tasks = [
@@ -32,9 +33,15 @@ def test_task_graph_requires_successful_predecessors() -> None:
     assert runnable_tasks(tasks) == []
     assert block_tasks_with_failed_dependencies(tasks) == 1
     assert tasks[1].status == "blocked"
-    assert evaluate_completion(
-        AgentThreadState(conversation_id="c", goal=AgentGoal(id="g", text="x"), tasks=tasks)
-    ) == "required_task_failed"
+    assert (
+        evaluate_completion(
+            AgentThreadState(
+                conversation_id="c", goal=AgentGoal(id="g", text="x"), tasks=tasks
+            )
+        )
+        == "required_task_failed"
+    )
+
 
 ###############################################################################
 def test_task_graph_rejects_cycles() -> None:
@@ -45,11 +52,12 @@ def test_task_graph_rejects_cycles() -> None:
     with pytest.raises(RuntimeValidationError, match="cycle"):
         validate_task_graph(tasks)
 
+
 ###############################################################################
 def test_fingerprints_are_canonical_and_scope_invalidation_is_selective() -> None:
-    assert canonical_call_fingerprint("search", {"b": 2, "a": 1}) == canonical_call_fingerprint(
-        "search", {"a": 1, "b": 2}
-    )
+    assert canonical_call_fingerprint(
+        "search", {"b": 2, "a": 1}
+    ) == canonical_call_fingerprint("search", {"a": 1, "b": 2})
     state = AgentThreadState(
         conversation_id="c",
         evidence_refs=["location", "weather", "air"],
@@ -62,6 +70,7 @@ def test_fingerprints_are_canonical_and_scope_invalidation_is_selective() -> Non
     assert change.invalidated_evidence_refs == ("weather",)
     assert state.evidence_refs == ["location", "air"]
     assert state_fingerprint(state)
+
 
 ###############################################################################
 def test_tool_selection_is_deterministic() -> None:
@@ -79,14 +88,20 @@ def test_tool_selection_is_deterministic() -> None:
             supports_rendering=True,
         ),
     ]
-    assert [item.name for item in select_tools(profiles, require_rendering=True)] == ["render"]
+    assert [item.name for item in select_tools(profiles, require_rendering=True)] == [
+        "render"
+    ]
+
 
 ###############################################################################
 def test_domain_validation_rejects_invalid_bounds_and_temporal_ranges() -> None:
-    assert "between -90" in (ToolRegistry._validate_domain_arguments({"latitude": 91}) or "")
+    assert "between -90" in (
+        ToolRegistry._validate_domain_arguments({"latitude": 91}) or ""
+    )
     assert "ordered" in (
         ToolRegistry._validate_domain_arguments({"bbox": [10, 1, -10, 2]}) or ""
     )
+
 
 ###############################################################################
 def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
@@ -95,7 +110,12 @@ def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
         active_task_id="resolve",
         evidence_refs=["weather-layer"],
         tasks=[
-            AgentTask(id="resolve", description="Resolve", kind="location_resolution", status="completed"),
+            AgentTask(
+                id="resolve",
+                description="Resolve",
+                kind="location_resolution",
+                status="completed",
+            ),
             AgentTask(
                 id="weather",
                 description="Weather",
@@ -110,6 +130,7 @@ def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
     class Delta:
         kind = "exclusion"
         text = "Exclude the western side"
+
     apply_steering_delta(state, Delta())
     assert state.tasks[0].status == "completed"
     assert state.tasks[1].status == "superseded"
@@ -119,6 +140,7 @@ def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
     class Add:
         kind = "add_dataset"
         text = "Add recent air quality"
+
     apply_steering_delta(state, Add())
     assert state.tasks[-1].kind == "dataset_enrichment"
     assert "reverse" in (
@@ -127,6 +149,7 @@ def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
         )
         or ""
     )
+
 
 ###############################################################################
 def test_hydration_accepts_v3_only_and_restores_active_task() -> None:
@@ -162,5 +185,8 @@ def test_hydration_accepts_v3_only_and_restores_active_task() -> None:
         },
     )
     assert service.snapshot("conversation").current_task_id == "task-1"
-    service.hydrate("conversation", {"schema_version": 2, "conversation_key": "conversation", "tasks": []})
+    service.hydrate(
+        "conversation",
+        {"schema_version": 2, "conversation_key": "conversation", "tasks": []},
+    )
     assert service.snapshot("conversation").current_task_id is None

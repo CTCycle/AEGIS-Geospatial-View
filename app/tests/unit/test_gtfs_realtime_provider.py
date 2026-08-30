@@ -7,6 +7,7 @@ from google.transit import gtfs_realtime_pb2
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 
+
 ###############################################################################
 def test_gtfs_realtime_provider_normalizes_trip_updates_alerts_and_vehicles() -> None:
     now = int(datetime.now(UTC).timestamp())
@@ -39,6 +40,7 @@ def test_gtfs_realtime_provider_normalizes_trip_updates_alerts_and_vehicles() ->
     assert response.payload["summary"]["alertCount"] == 1
     assert response.payload["summary"]["vehicleCount"] == 1
     assert response.payload["vehicleRenderingAllowed"] is True
+
 
 ###############################################################################
 def test_gtfs_realtime_provider_fetches_configured_protobuf_feed_url() -> None:

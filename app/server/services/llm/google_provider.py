@@ -29,6 +29,7 @@ from server.services.llm.types import (
 
 DEFAULT_GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
+
 ###############################################################################
 class GoogleProvider(LLMProvider):
     provider_name = "google"
@@ -69,7 +70,9 @@ class GoogleProvider(LLMProvider):
     def supports_structured_output(self, model: str) -> bool | None:
         for entry in self.list_models():
             if entry.name == model:
-                return bool({"structured", "structured_output"} & set(entry.capabilities))
+                return bool(
+                    {"structured", "structured_output"} & set(entry.capabilities)
+                )
         return None
 
     # -------------------------------------------------------------------------
@@ -98,7 +101,9 @@ class GoogleProvider(LLMProvider):
             content = json_object(candidate_object.get("content"))
             for part in json_array(content.get("parts")):
                 part_object = json_object(part)
-                function_call = part_object.get("functionCall") or part_object.get("function_call")
+                function_call = part_object.get("functionCall") or part_object.get(
+                    "function_call"
+                )
                 if not is_json_object(function_call):
                     continue
                 args: dict[str, Any] = json_object(function_call.get("args"))
@@ -140,10 +145,20 @@ class GoogleProvider(LLMProvider):
         self._validate_request_capabilities(effective_request)
         if native_tools:
             config["tools"] = [
-                {"function_declarations": [self.tool_to_google_schema(tool) for tool in native_tools]}
+                {
+                    "function_declarations": [
+                        self.tool_to_google_schema(tool) for tool in native_tools
+                    ]
+                }
             ]
             choice = tool_choice or request.tool_choice or "auto"
-            mode = "ANY" if choice == "required" else "NONE" if choice == "none" else "AUTO"
+            mode = (
+                "ANY"
+                if choice == "required"
+                else "NONE"
+                if choice == "none"
+                else "AUTO"
+            )
             config["tool_config"] = {"function_calling_config": {"mode": mode}}
         if schema and not native_tools:
             config["response_mime_type"] = "application/json"
@@ -193,7 +208,9 @@ class GoogleProvider(LLMProvider):
             request, provider=self.provider_name
         ).to_dict()
         model_json_schema = getattr(schema, "model_json_schema", None)
-        json_schema = json_object(model_json_schema()) if callable(model_json_schema) else {}
+        json_schema = (
+            json_object(model_json_schema()) if callable(model_json_schema) else {}
+        )
         self._validate_request_capabilities(
             replace(request, response_json_schema=json_schema)
         )

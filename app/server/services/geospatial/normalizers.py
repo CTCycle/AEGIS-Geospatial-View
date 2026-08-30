@@ -4,9 +4,11 @@ from typing import Any
 
 from server.contracts.geospatial import CameraFeature, PoiFeature
 
+
 ###############################################################################
 class NormalizationError(ValueError):
     """Raised when a provider payload cannot be normalized."""
+
 
 ###############################################################################
 def normalize_poi_feature(
@@ -30,13 +32,17 @@ def normalize_poi_feature(
         opening_hours=_optional_string(payload.get("opening_hours")),
         website=_optional_string(payload.get("website")),
         phone=_optional_string(payload.get("phone")),
-        metadata={key: value for key, value in payload.items() if key not in _POI_FIELDS},
+        metadata={
+            key: value for key, value in payload.items() if key not in _POI_FIELDS
+        },
     )
+
 
 ###############################################################################
 def normalize_poi_category(raw_category: str | None) -> str:
     value = _category_key(raw_category)
     return POI_CATEGORY_MAP.get(value, value or "unknown")
+
 
 ###############################################################################
 def deduplicate_poi_features(features: list[PoiFeature]) -> list[PoiFeature]:
@@ -61,6 +67,7 @@ def deduplicate_poi_features(features: list[PoiFeature]) -> list[PoiFeature]:
         seen.add(fallback_key)
         deduplicated.append(feature)
     return deduplicated
+
 
 ###############################################################################
 def normalize_camera_feature(
@@ -94,6 +101,7 @@ def normalize_camera_feature(
         },
     )
 
+
 ###############################################################################
 def _first_number(payload: dict[str, Any], *keys: str) -> float | None:
     for key in keys:
@@ -107,12 +115,14 @@ def _first_number(payload: dict[str, Any], *keys: str) -> float | None:
                 continue
     return None
 
+
 ###############################################################################
 def _optional_string(value: Any) -> str | None:
     if value is None:
         return None
     normalized = str(value).strip()
     return normalized or None
+
 
 ###############################################################################
 def _category_key(value: str | None) -> str:

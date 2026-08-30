@@ -6,9 +6,9 @@ import re
 
 from playwright.sync_api import Page, expect
 
+
 ###############################################################################
 class TestAppShell:
-
     # -------------------------------------------------------------------------
     def test_homepage_loads_chat_and_map_layout(self, page: Page, base_url: str):
         page.goto(base_url)
@@ -17,9 +17,9 @@ class TestAppShell:
         expect(page.get_by_label("Agent Chat")).to_be_visible()
         expect(page.locator(".map-canvas")).to_be_visible()
 
+
 ###############################################################################
 class TestChatFlow:
-
     # -------------------------------------------------------------------------
     def test_chat_composer_visible_and_send_prompt(self, page: Page, base_url: str):
         page.goto(base_url)

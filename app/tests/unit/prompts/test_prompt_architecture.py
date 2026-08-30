@@ -41,7 +41,10 @@ from server.prompts.response import (
     build_response_prompt,
     build_verified_evidence_prompt,
 )
-from server.services.llm.context_budget import compute_context_usage, estimate_message_tokens
+from server.services.llm.context_budget import (
+    compute_context_usage,
+    estimate_message_tokens,
+)
 from server.services.llm.types import LLMRequest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
@@ -57,10 +60,12 @@ PROMPT_MODULES = (
     "server.prompts.providers",
 )
 
+
 ###############################################################################
 @pytest.mark.parametrize("module_name", PROMPT_MODULES)
 def test_prompt_modules_are_importable(module_name: str) -> None:
     assert import_module(module_name)
+
 
 ###############################################################################
 def _template_fields(template: str) -> set[str]:
@@ -70,17 +75,21 @@ def _template_fields(template: str) -> set[str]:
         if field_name is not None
     }
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("template", "expected_fields"),
     [
-        (NATIVE_AGENT_CONTEXT_TEMPLATE, {
-            "active_instructions",
-            "memory_snapshot",
-            "parsed_request",
-            "policy_constraints",
-            "task_snapshot",
-        }),
+        (
+            NATIVE_AGENT_CONTEXT_TEMPLATE,
+            {
+                "active_instructions",
+                "memory_snapshot",
+                "parsed_request",
+                "policy_constraints",
+                "task_snapshot",
+            },
+        ),
         (WORKING_STATE_TEMPLATE, {"state_json"}),
         (VERIFIED_EVIDENCE_USER_TEMPLATE, {"evidence_json"}),
         (DEEPSEEK_JSON_SCHEMA_TEMPLATE, {"schema_json"}),
@@ -92,6 +101,7 @@ def test_prompt_templates_expose_only_their_intended_variables(
     expected_fields: set[str],
 ) -> None:
     assert _template_fields(template) == expected_fields
+
 
 ###############################################################################
 def test_prompt_builders_substitute_every_template_variable() -> None:
@@ -109,7 +119,9 @@ def test_prompt_builders_substitute_every_template_variable() -> None:
         policy_constraints={},
         completed_tool_results=[],
     )
-    response_messages = build_response_prompt({"verified_outcome": {"status": "success"}})
+    response_messages = build_response_prompt(
+        {"verified_outcome": {"status": "success"}}
+    )
 
     assert "{schema_correction}" not in parser_prompt
     assert "{parsed_request}" not in native_messages[1]["content"]
@@ -126,6 +138,7 @@ def test_prompt_builders_substitute_every_template_variable() -> None:
     assert build_verified_evidence_prompt({"verified": True}).startswith(
         "Write the final response using only this verified evidence:"
     )
+
 
 ###############################################################################
 def _prompt_constant_assignments(tree: ast.Module) -> list[tuple[str, ast.expr]]:
@@ -144,9 +157,20 @@ def _prompt_constant_assignments(tree: ast.Module) -> list[tuple[str, ast.expr]]
         for target in targets:
             if not isinstance(target, ast.Name) or not target.id.isupper():
                 continue
-            if any(marker in target.id for marker in ("PROMPT", "TEMPLATE", "FRAGMENT", "RULE", "SCOPE", "RESTRICTION")):
+            if any(
+                marker in target.id
+                for marker in (
+                    "PROMPT",
+                    "TEMPLATE",
+                    "FRAGMENT",
+                    "RULE",
+                    "SCOPE",
+                    "RESTRICTION",
+                )
+            ):
                 assignments.append((target.id, value))
     return assignments
+
 
 ###############################################################################
 def test_prompt_constants_are_literal_module_level_strings() -> None:
@@ -155,6 +179,7 @@ def test_prompt_constants_are_literal_module_level_strings() -> None:
         for name, value in _prompt_constant_assignments(tree):
             assert isinstance(value, ast.Constant), f"{path.name}:{name} is not literal"
             assert isinstance(value.value, str), f"{path.name}:{name} is not a string"
+
 
 ###############################################################################
 def test_backend_has_no_obsolete_prompt_api_references() -> None:
@@ -172,6 +197,7 @@ def test_backend_has_no_obsolete_prompt_api_references() -> None:
             continue
         contents = path.read_text(encoding="utf-8")
         assert not any(marker in contents for marker in obsolete_markers), path
+
 
 ###############################################################################
 def test_model_instructions_are_not_fragmented_outside_prompt_package() -> None:
@@ -192,6 +218,7 @@ def test_model_instructions_are_not_fragmented_outside_prompt_package() -> None:
     }
     assert not findings
 
+
 ###############################################################################
 def test_composed_prompts_include_shared_rules_once() -> None:
     parser_prompt = build_parser_prompt()
@@ -204,9 +231,12 @@ def test_composed_prompts_include_shared_rules_once() -> None:
         assert prompt.count(INTERNAL_INFORMATION_RESTRICTIONS) == 1
     for prompt in (native_prompt, response_prompt):
         assert prompt.count(GROUNDING_REQUIREMENTS) == 1
-    assert build_parser_prompt(schema_correction=True).count(PARSER_SCHEMA_CORRECTION) == 1
+    assert (
+        build_parser_prompt(schema_correction=True).count(PARSER_SCHEMA_CORRECTION) == 1
+    )
     assert PARSER_SYSTEM_PROMPT in parser_prompt
     assert GROUNDED_RESPONSE_SYSTEM_PROMPT in response_prompt
+
 
 ###############################################################################
 def test_prompt_budget_uses_runtime_context_budget_estimator() -> None:

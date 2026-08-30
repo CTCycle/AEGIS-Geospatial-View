@@ -24,25 +24,31 @@ __all__ = [
     "OpenAQMalformedPayloadError",
 ]
 
+
 ###############################################################################
 class OpenAQServiceError(Exception):
     """Base exception for OpenAQ service failures."""
+
 
 ###############################################################################
 class OpenAQRequestError(OpenAQServiceError):
     """Raised when OpenAQ API cannot fulfill the request."""
 
+
 ###############################################################################
 class OpenAQAuthError(OpenAQServiceError):
     """Raised when OpenAQ rejects the configured API key."""
+
 
 ###############################################################################
 class OpenAQRateLimitError(OpenAQServiceError):
     """Raised when OpenAQ applies a rate limit."""
 
+
 ###############################################################################
 class OpenAQInvalidQueryError(OpenAQServiceError):
     """Raised when OpenAQ rejects a deterministic query."""
+
 
 ###############################################################################
 class OpenAQMalformedPayloadError(OpenAQServiceError):
@@ -50,6 +56,7 @@ class OpenAQMalformedPayloadError(OpenAQServiceError):
 
 
 JsonRequester = Callable[[str, dict[str, str]], Any]
+
 
 ###############################################################################
 class OpenAQService:
@@ -194,7 +201,9 @@ class OpenAQService:
         }
 
     # -------------------------------------------------------------------------
-    def _sensor_metadata_from_response(self, payload: object) -> dict[str, dict[str, Any]]:
+    def _sensor_metadata_from_response(
+        self, payload: object
+    ) -> dict[str, dict[str, Any]]:
         sensors: dict[str, dict[str, Any]] = {}
         for raw_sensor in self._response_results(payload, endpoint="sensors"):
             sensor = json_object(raw_sensor)
@@ -216,9 +225,7 @@ class OpenAQService:
             if not measurement:
                 continue
             sensor_id = str(
-                measurement.get("sensorsId")
-                or measurement.get("sensorId")
-                or ""
+                measurement.get("sensorsId") or measurement.get("sensorId") or ""
             )
             metadata = json_object(sensor_metadata.get(sensor_id))
             raw_parameter = measurement.get("parameter")
@@ -237,7 +244,9 @@ class OpenAQService:
             if location.get("latitude") is None:
                 location["latitude"] = self._float_or_none(coordinates.get("latitude"))
             if location.get("longitude") is None:
-                location["longitude"] = self._float_or_none(coordinates.get("longitude"))
+                location["longitude"] = self._float_or_none(
+                    coordinates.get("longitude")
+                )
             measurements[normalized_name] = {
                 "value": value,
                 "unit": metadata.get("units") or parameter.get("units") or "µg/m³",
@@ -276,7 +285,7 @@ class OpenAQService:
             return None
         try:
             return float(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------
@@ -304,18 +313,24 @@ class OpenAQService:
                 return json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
             if exc.code in {401, 403}:
-                raise OpenAQAuthError("OpenAQ rejected the configured API key.") from exc
+                raise OpenAQAuthError(
+                    "OpenAQ rejected the configured API key."
+                ) from exc
             if exc.code == 429:
                 raise OpenAQRateLimitError("OpenAQ rate limit exceeded.") from exc
             if exc.code in {400, 404, 409, 410, 422}:
-                raise OpenAQInvalidQueryError("OpenAQ rejected the requested query.") from exc
+                raise OpenAQInvalidQueryError(
+                    "OpenAQ rejected the requested query."
+                ) from exc
             raise OpenAQRequestError("OpenAQ request failed.") from exc
         except (URLError, TimeoutError, OSError) as exc:
             logger.warning("OpenAQ request failed.")
             raise OpenAQRequestError("OpenAQ request failed.") from exc
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             logger.warning("OpenAQ response parse failed.")
-            raise OpenAQMalformedPayloadError("OpenAQ returned malformed JSON.") from exc
+            raise OpenAQMalformedPayloadError(
+                "OpenAQ returned malformed JSON."
+            ) from exc
 
     # -------------------------------------------------------------------------
     def _aggregate_measurements(

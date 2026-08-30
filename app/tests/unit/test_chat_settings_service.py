@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 from server.services.chat.settings_service import ChatSettingsService
 
+
 ###############################################################################
 class _SettingsRepo:
-
     # -------------------------------------------------------------------------
     def get_or_create(self):  # noqa: ANN201
         return SimpleNamespace(
@@ -19,9 +19,9 @@ class _SettingsRepo:
             deepseek_base_url=None,
         )
 
+
 ###############################################################################
 class _CredentialsRepo:
-
     # -------------------------------------------------------------------------
     def list_active(self):  # noqa: ANN201
         return [
@@ -37,14 +37,15 @@ class _CredentialsRepo:
             ),
         ]
 
+
 ###############################################################################
 class _Crypto:
-
     # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:
         if encrypted_value == "broken":
             raise ValueError("bad key")
         return "secret"
+
 
 ###############################################################################
 def test_settings_response_reports_credential_health() -> None:

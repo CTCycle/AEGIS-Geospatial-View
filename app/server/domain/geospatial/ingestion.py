@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class DatasetIngestionPlan:
@@ -23,6 +24,7 @@ class DatasetIngestionPlan:
     id_field: str | None = None
     field_map: dict[str, str] | None = None
     validation: dict[str, Any] | None = None
+
 
 ###############################################################################
 @dataclass(frozen=True)

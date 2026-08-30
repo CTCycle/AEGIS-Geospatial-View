@@ -40,6 +40,7 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.llm.types import LLMToolDefinition
 from server.services.search.request_builder import RequestBuilder
 
+
 ###############################################################################
 def _turn(
     text: str,
@@ -92,6 +93,7 @@ def _turn(
         viewport_intent=viewport_intent,
     )
 
+
 ###############################################################################
 class _SequenceParser:
     last_context_usage = None
@@ -101,7 +103,9 @@ class _SequenceParser:
         self.turns = turns
 
     # -------------------------------------------------------------------------
-    def parse_turn(self, user_message, memory_snapshot, conversation_messages, **_kwargs):  # noqa: ANN001
+    def parse_turn(
+        self, user_message, memory_snapshot, conversation_messages, **_kwargs
+    ):  # noqa: ANN001
         turn = self.turns.pop(0)
         return turn.model_copy(
             update={
@@ -113,9 +117,9 @@ class _SequenceParser:
             }
         )
 
+
 ###############################################################################
 class _Resolver:
-
     # -------------------------------------------------------------------------
     async def resolve_location_signals(self, signals, memory):  # noqa: ANN001
         if signals:
@@ -130,9 +134,9 @@ class _Resolver:
         active = memory["active_location"]
         return ResolvedLocation.model_validate(active)
 
+
 ###############################################################################
 class _Search:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.capability_registry = CapabilityRegistry()
@@ -161,9 +165,9 @@ class _Search:
             ],
         )
 
+
 ###############################################################################
 class _History:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.messages: list[dict[str, Any]] = []
@@ -202,40 +206,44 @@ class _History:
         _ = conversation_id
         return {}
 
+
 ###############################################################################
 @dataclass
 class _Settings:
     agent_model_provider: str = "test"
     agent_model_name: str = "test"
 
+
 ###############################################################################
 class _SettingsRepo:
-
     # -------------------------------------------------------------------------
     def get_or_create(self):
         return _Settings()
 
+
 ###############################################################################
 class _Credentials:
-
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN001
         _ = provider, label
         return None
 
+
 ###############################################################################
 class _NativeLoop:
-
     # -------------------------------------------------------------------------
     async def run(self, request):  # noqa: ANN001
-        raise AssertionError("deterministic business tests must not use the native loop")
+        raise AssertionError(
+            "deterministic business tests must not use the native loop"
+        )
+
 
 ###############################################################################
 class _ResponseSynthesizer:
-
     # -------------------------------------------------------------------------
     def synthesize(self, *, fallback_text: str, **_: Any) -> str:
         return fallback_text
+
 
 ###############################################################################
 def _runtime() -> RuntimeRegistry:
@@ -244,9 +252,9 @@ def _runtime() -> RuntimeRegistry:
         credentials_repo=_Credentials(),  # type: ignore[arg-type]
     )
 
+
 ###############################################################################
 class _ConversationRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._state: dict[str, dict[str, object]] = {}
@@ -264,6 +272,7 @@ class _ConversationRepository:
         current.update(kwargs)
         current["context_revision"] = int(current["context_revision"]) + 1
         return current["context_revision"]
+
 
 ###############################################################################
 def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
@@ -318,6 +327,7 @@ def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
         ),
     )
 
+
 ###############################################################################
 def test_domain_rules_do_not_infer_layers_from_example_prose() -> None:
     extracted = ParserService._apply_domain_rules(
@@ -342,6 +352,7 @@ def test_domain_rules_do_not_infer_layers_from_example_prose() -> None:
     assert typed.requested_layers == ["overpass_residential_buildings"]
     assert typed.requested_basemap == "esri_world_imagery"
     assert typed.entity_target == "residential_buildings"
+
 
 ###############################################################################
 def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() -> None:
@@ -396,10 +407,13 @@ def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() ->
         assert second.map_session.resolved_location.label == "Colosseum, Rome"
         assert second.map_session.basemap_id == "osm_default"
         assert second.map_session.overlay_ids == ["overpass_residential_buildings"]
-        assert second.map_session.viewport.radius_m == first.map_session.viewport.radius_m
+        assert (
+            second.map_session.viewport.radius_m == first.map_session.viewport.radius_m
+        )
         assert "Which temperature metric should I use?" in second.assistant_message
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_location_ambiguity_precedes_unsupported_layer_clarification() -> None:
@@ -409,7 +423,9 @@ def test_location_ambiguity_precedes_unsupported_layer_clarification() -> None:
                 _turn(
                     "Find Springfield and show protected areas.",
                     requested_layers=["protected_areas"],
-                    ambiguities=["Multiple potential Springfield locations; disambiguation required."],
+                    ambiguities=[
+                        "Multiple potential Springfield locations; disambiguation required."
+                    ],
                     clarification_plan={
                         "question": "I could not match protected areas to an enabled map layer.",
                         "reason": "No compatible executable catalog capability was found.",
@@ -435,6 +451,7 @@ def test_location_ambiguity_precedes_unsupported_layer_clarification() -> None:
         assert response.tool_payload is None
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_partial_clarification_retains_verified_location_memory() -> None:
@@ -464,9 +481,15 @@ def test_partial_clarification_retains_verified_location_memory() -> None:
         )
 
         assert response.memory_snapshot["active_location"]["label"] == "Colosseum, Rome"
-        assert orchestrator.task_state_service.snapshot("conv-partial-location").active_map_session is None
+        assert (
+            orchestrator.task_state_service.snapshot(
+                "conv-partial-location"
+            ).active_map_session
+            is None
+        )
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_partial_capability_plan_executes_resolved_layers_before_clarifying() -> None:
@@ -475,7 +498,10 @@ def test_partial_capability_plan_executes_resolved_layers_before_clarifying() ->
             [
                 _turn(
                     "Show supported and unsupported data around Rome.",
-                    requested_layers=["overpass_residential_buildings", "unsupported_layer"],
+                    requested_layers=[
+                        "overpass_residential_buildings",
+                        "unsupported_layer",
+                    ],
                     clarification_plan={
                         "question": "The unsupported layer is unavailable.",
                         "reason": "No compatible executable catalog capability was found.",
@@ -502,6 +528,7 @@ def test_partial_capability_plan_executes_resolved_layers_before_clarifying() ->
         assert response.operation.status == "partial"
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_follow_up_zoom_refinement_tightens_existing_viewport() -> None:
@@ -537,16 +564,26 @@ def test_follow_up_zoom_refinement_tightens_existing_viewport() -> None:
         )
         assert first.map_session is not None
         assert second.map_session is not None
-        assert second.map_session.resolved_location.label == first.map_session.resolved_location.label
-        assert second.map_session.viewport.radius_m < first.map_session.viewport.radius_m
+        assert (
+            second.map_session.resolved_location.label
+            == first.map_session.resolved_location.label
+        )
+        assert (
+            second.map_session.viewport.radius_m < first.map_session.viewport.radius_m
+        )
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_failure_inquiry_uses_structured_failure_without_tools() -> None:
     async def _run() -> None:
         orchestrator = _orchestrator(
-            [_turn("why", relationship="failure_inquiry", task_class="general_question")]
+            [
+                _turn(
+                    "why", relationship="failure_inquiry", task_class="general_question"
+                )
+            ]
         )
         state = orchestrator.task_state_service
         failed = state.start_task(
@@ -579,6 +616,7 @@ def test_failure_inquiry_uses_structured_failure_without_tools() -> None:
 
     run_async_in_thread(_run())
 
+
 ###############################################################################
 def test_tool_planner_deduplicates_semantically_identical_calls() -> None:
     turn = _turn(
@@ -590,6 +628,7 @@ def test_tool_planner_deduplicates_semantically_identical_calls() -> None:
     )
     plan = DeterministicToolPlanner().build_plan(turn, "geospatial_features")
     assert len(plan.steps) == 1
+
 
 ###############################################################################
 def test_tool_plan_executor_orders_dependencies_and_retains_partial_success() -> None:
@@ -643,6 +682,7 @@ def test_tool_plan_executor_orders_dependencies_and_retains_partial_success() ->
         assert results[1].ok is False
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_tool_output_validation_rejects_wrong_capability() -> None:

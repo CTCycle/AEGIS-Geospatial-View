@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from server.services.geospatial.ecosystem_audit import build_inventory
 
+
 ###############################################################################
 def test_ecosystem_inventory_covers_catalog_runtime_and_native_tools() -> None:
     report = build_inventory(
@@ -22,7 +23,9 @@ def test_ecosystem_inventory_covers_catalog_runtime_and_native_tools() -> None:
     providers = {item["id"]: item for item in report["providers"]}
     assert providers["openmeteo"]["operational_status"] == "active"
     assert providers["openfreemap"]["operational_status"] == "active_rendering_only"
-    assert providers["arcgis"]["internal_components"]["adapter"].endswith("arcgis_rest.py")
+    assert providers["arcgis"]["internal_components"]["adapter"].endswith(
+        "arcgis_rest.py"
+    )
 
     tool_ids = {item["id"] for item in report["tools"]}
     assert "render_geospatial_provider_layer" in tool_ids

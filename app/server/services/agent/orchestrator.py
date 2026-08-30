@@ -8,7 +8,11 @@ from typing import Any
 from uuid import uuid4
 
 from server.common.logger import logger as LOGGER
-from server.contracts.chat import ChatTurnRequest, ChatTurnResponse, ContextUsageResponse
+from server.contracts.chat import (
+    ChatTurnRequest,
+    ChatTurnResponse,
+    ContextUsageResponse,
+)
 from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
@@ -45,12 +49,21 @@ from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 from server.contracts.geospatial import MapSession
 
+
 ###############################################################################
 class AgentOrchestrator:
-    _compose_map_session_message = staticmethod(AgentResponseBuilder.compose_map_session_message)
-    _compose_direct_tool_message = staticmethod(AgentResponseBuilder.compose_direct_tool_message)
-    _compose_general_question_message = staticmethod(AgentTurnSupport.compose_general_question_message)
-    _has_parser_runtime_failure = staticmethod(AgentTurnSupport.has_parser_runtime_failure)
+    _compose_map_session_message = staticmethod(
+        AgentResponseBuilder.compose_map_session_message
+    )
+    _compose_direct_tool_message = staticmethod(
+        AgentResponseBuilder.compose_direct_tool_message
+    )
+    _compose_general_question_message = staticmethod(
+        AgentTurnSupport.compose_general_question_message
+    )
+    _has_parser_runtime_failure = staticmethod(
+        AgentTurnSupport.has_parser_runtime_failure
+    )
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -100,7 +113,8 @@ class AgentOrchestrator:
         self.response_synthesizer = response_synthesizer
         self.direct_turn_response_service = direct_turn_response_service
         self.turn_history_service = AgentTurnHistoryService(
-            history_service=self.history_service, location_memory_service=self.location_memory_service
+            history_service=self.history_service,
+            location_memory_service=self.location_memory_service,
         )
         self.turn_state_assembler = AgentTurnStateAssembler(
             search_orchestrator=self.search_orchestrator,
@@ -141,7 +155,10 @@ class AgentOrchestrator:
         directives = self.instruction_state_service.apply_user_message(
             directives,
             payload.message,
-            len(self.history_service.list_recent_messages(conversation_id, limit=10_000)) + 1,
+            len(
+                self.history_service.list_recent_messages(conversation_id, limit=10_000)
+            )
+            + 1,
         )
         self._active_directives[conversation_id] = directives
         response = await self._run_turn(payload, progress_callback)
@@ -170,12 +187,16 @@ class AgentOrchestrator:
     def _with_phase_usage(self, response: ChatTurnResponse) -> ChatTurnResponse:
         phases: dict[str, dict[str, Any]] = {}
         if response.context_usage is not None:
-            phases["parser"] = response.context_usage.model_dump(mode="json", exclude={"phases"})
+            phases["parser"] = response.context_usage.model_dump(
+                mode="json", exclude={"phases"}
+            )
         loop_usages = getattr(self.native_tool_loop, "last_context_usages", [])
         if loop_usages:
             phases["native_loop"] = {
                 "iterations": loop_usages,
-                "estimated_input_tokens": sum(int(item.get("estimated_input_tokens") or 0) for item in loop_usages),
+                "estimated_input_tokens": sum(
+                    int(item.get("estimated_input_tokens") or 0) for item in loop_usages
+                ),
             }
         synthesis = getattr(self.response_synthesizer, "last_context_usage", None)
         if is_json_object(synthesis):
@@ -211,14 +232,19 @@ class AgentOrchestrator:
             len(payload.message),
         )
         conversation_id = payload.conversation_id
-        existing_response = self.turn_history_service.load_existing_response(conversation_id, request_id)
+        existing_response = self.turn_history_service.load_existing_response(
+            conversation_id, request_id
+        )
         if existing_response is not None:
             return existing_response
-        if self.history_service.find_message_by_request_id(
-            conversation_id=conversation_id,
-            role="user",
-            request_id=request_id,
-        ) is None:
+        if (
+            self.history_service.find_message_by_request_id(
+                conversation_id=conversation_id,
+                role="user",
+                request_id=request_id,
+            )
+            is None
+        ):
             self.history_service.append_message(
                 conversation_id=conversation_id,
                 role="user",
@@ -226,10 +252,15 @@ class AgentOrchestrator:
                 request_id=request_id,
             )
 
-        recent_messages = self.history_service.list_recent_messages(conversation_id, limit=200)
+        recent_messages = self.history_service.list_recent_messages(
+            conversation_id, limit=200
+        )
         for index in range(len(recent_messages) - 1, -1, -1):
             message = recent_messages[index]
-            if message.get("role") == "user" and message.get("content") == payload.message:
+            if (
+                message.get("role") == "user"
+                and message.get("content") == payload.message
+            ):
                 recent_messages.pop(index)
                 break
         latest_contract = self.history_service.get_latest_turn_contract(conversation_id)
@@ -310,9 +341,13 @@ class AgentOrchestrator:
             turn_contract.normalized_action.action_id,
             turn_contract.relationship,
             self.pipeline_router.select_specialist(turn_contract),
-            turn_contract.viewport_intent.scope if turn_contract.viewport_intent is not None else None,
+            turn_contract.viewport_intent.scope
+            if turn_contract.viewport_intent is not None
+            else None,
             turn_contract.requested_basemap,
-            ",".join(turn_contract.requested_layers) if turn_contract.requested_layers else "-",
+            ",".join(turn_contract.requested_layers)
+            if turn_contract.requested_layers
+            else "-",
         )
         if progress_callback is not None:
             progress_callback(
@@ -338,7 +373,9 @@ class AgentOrchestrator:
             request_id,
             conversation_key,
             specialist,
-            bool(latest_memory.get("active_visualization")) if is_json_object(latest_memory) else False,
+            bool(latest_memory.get("active_visualization"))
+            if is_json_object(latest_memory)
+            else False,
         )
         context_usage = (
             ContextUsageResponse.model_validate(self.parser_service.last_context_usage)
@@ -445,11 +482,10 @@ class AgentOrchestrator:
             },
         )
         deterministic_tools_available = (
-            (bool(tool_plan.steps) or bool(tool_plan.visualization_update))
-            and all(
-                self.tool_registry.has_native_tool(step.tool_name)
-                for step in tool_plan.steps
-            )
+            bool(tool_plan.steps) or bool(tool_plan.visualization_update)
+        ) and all(
+            self.tool_registry.has_native_tool(step.tool_name)
+            for step in tool_plan.steps
         )
         if deterministic_tools_available:
             return await self.planned_turn_execution_service.execute(
@@ -465,7 +501,9 @@ class AgentOrchestrator:
                 tool_plan=tool_plan,
                 progress_callback=progress_callback,
             )
-        build_native_tools = getattr(self.agent_tool_catalog_service, "build_native_tools", None)
+        build_native_tools = getattr(
+            self.agent_tool_catalog_service, "build_native_tools", None
+        )
         native_tools = (
             build_native_tools(native_context)
             if callable(build_native_tools)
@@ -539,24 +577,43 @@ class AgentOrchestrator:
             active_raw = latest_memory.get("active_visualization")
             if is_json_object(active_raw):
                 try:
-                    map_session, overlay_mutation_results = self.turn_state_assembler.apply_overlay_commands(
-                        MapSession.model_validate(active_raw),
-                        list(turn_contract.overlay_commands),
+                    map_session, overlay_mutation_results = (
+                        self.turn_state_assembler.apply_overlay_commands(
+                            MapSession.model_validate(active_raw),
+                            list(turn_contract.overlay_commands),
+                        )
                     )
                 except Exception:
-                    LOGGER.warning("Could not apply native-loop overlay mutation to active map", exc_info=True)
-        direct_result = self.turn_state_assembler.extract_direct_result_from_tool_results(tool_payload)
-        capability_selection = self.turn_state_assembler.extract_capability_selection_from_tool_results(tool_payload)
+                    LOGGER.warning(
+                        "Could not apply native-loop overlay mutation to active map",
+                        exc_info=True,
+                    )
+        direct_result = (
+            self.turn_state_assembler.extract_direct_result_from_tool_results(
+                tool_payload
+            )
+        )
+        capability_selection = (
+            self.turn_state_assembler.extract_capability_selection_from_tool_results(
+                tool_payload
+            )
+        )
         if map_session is None and capability_selection is not None:
             map_session = await self.turn_state_assembler.build_map_session_from_capability_selection(
                 capability_selection=capability_selection,
                 turn_contract=turn_contract,
                 latest_memory=latest_memory,
             )
-        if map_session is not None and turn_contract.overlay_commands and not overlay_mutation_results:
-            map_session, overlay_mutation_results = self.turn_state_assembler.apply_overlay_commands(
-                map_session,
-                list(turn_contract.overlay_commands),
+        if (
+            map_session is not None
+            and turn_contract.overlay_commands
+            and not overlay_mutation_results
+        ):
+            map_session, overlay_mutation_results = (
+                self.turn_state_assembler.apply_overlay_commands(
+                    map_session,
+                    list(turn_contract.overlay_commands),
+                )
             )
         memory_snapshot = await self.turn_state_assembler.build_updated_memory_snapshot(
             turn_contract=turn_contract,
@@ -615,7 +672,9 @@ class AgentOrchestrator:
             ],
             task_snapshot=self.task_state_service.serialize(conversation_key),
         )
-        synthesis_category = getattr(self.response_synthesizer, "last_failure_category", None)
+        synthesis_category = getattr(
+            self.response_synthesizer, "last_failure_category", None
+        )
         operation = operation.model_copy(
             update={
                 "message": assistant_message,
@@ -638,7 +697,9 @@ class AgentOrchestrator:
             operation=operation,
             trace_steps=decision_trace_steps,
         )
-        failure = self.turn_state_assembler.failure_from_operation(operation, tool_payload)
+        failure = self.turn_state_assembler.failure_from_operation(
+            operation, tool_payload
+        )
         self.task_state_service.update_task(
             conversation_key,
             task.task_id,
@@ -664,11 +725,13 @@ class AgentOrchestrator:
             for result in overlay_mutation_results
             for instance_id in result.removed_instance_ids
         ]
-        mutation_updated = sorted({
-            instance_id
-            for result in overlay_mutation_results
-            for instance_id in result.updated_instance_ids
-        })
+        mutation_updated = sorted(
+            {
+                instance_id
+                for result in overlay_mutation_results
+                for instance_id in result.updated_instance_ids
+            }
+        )
         mutation_unmatched = [
             selector
             for result in overlay_mutation_results
@@ -680,10 +743,14 @@ class AgentOrchestrator:
             for selector in result.ambiguous_selectors
         ]
         visualization_update = VisualizationUpdate(
-            add_layer_ids=mutation_added if turn_contract.overlay_commands else list(turn_contract.requested_layers),
+            add_layer_ids=mutation_added
+            if turn_contract.overlay_commands
+            else list(turn_contract.requested_layers),
             remove_layer_ids=mutation_removed,
             collection_revision=(
-                map_session.overlay_collection_revision if map_session is not None else None
+                map_session.overlay_collection_revision
+                if map_session is not None
+                else None
             ),
             added_instance_ids=mutation_added,
             removed_instance_ids=mutation_removed,
@@ -691,7 +758,11 @@ class AgentOrchestrator:
             unmatched_selectors=mutation_unmatched,
             ambiguous_selectors=mutation_ambiguous,
             clarification=next(
-                (result.clarification for result in overlay_mutation_results if result.clarification),
+                (
+                    result.clarification
+                    for result in overlay_mutation_results
+                    if result.clarification
+                ),
                 None,
             ),
         )
@@ -710,7 +781,9 @@ class AgentOrchestrator:
                 "request_id": request_id,
             },
             tool_payload=tool_payload,
-            map_session=map_session.model_dump(mode="json") if map_session is not None else None,
+            map_session=map_session.model_dump(mode="json")
+            if map_session is not None
+            else None,
         )
 
         LOGGER.info(
