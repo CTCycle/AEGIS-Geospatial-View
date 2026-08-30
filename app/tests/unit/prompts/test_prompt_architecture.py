@@ -159,13 +159,13 @@ def test_prompt_constants_are_literal_module_level_strings() -> None:
 ###############################################################################
 def test_backend_has_no_obsolete_prompt_api_references() -> None:
     obsolete_markers = (
-        "server.services.llm.prompts",
-        "get_agent_extraction_prompt",
-        "get_agent_enrichment_prompt",
-        "get_agent_decision_system_prompt",
-        "get_agent_response_prompt",
-        "get_parser_system_prompt",
-        "prompt_within_budget",
+        "server.services.llm." + "prompts",
+        "get_agent_" + "extraction_prompt",
+        "get_agent_" + "enrichment_prompt",
+        "get_agent_" + "decision_system_prompt",
+        "get_agent_" + "response_prompt",
+        "get_parser_" + "system_prompt",
+        "prompt_" + "within_budget",
     )
     for path in SERVER_ROOT.rglob("*.py"):
         if PROMPTS_ROOT in path.parents:
