@@ -30,6 +30,7 @@ from server.services.agent_runs.metrics import RealtimeMetrics
 from server.services.agent_runs.realtime import RealtimeConnectionRegistry
 from server.services.agent_runs.steering import RunSteeringService
 
+
 ###############################################################################
 class _Backend:
     db_path = None
@@ -44,9 +45,9 @@ class _Backend:
         )
         self.session = sessionmaker(bind=self.engine, future=True)
 
+
 ###############################################################################
 class _Agent:
-
     # -------------------------------------------------------------------------
     def __init__(self, runs: AgentRunRepository, publisher: RunEventPublisher) -> None:
         self.runs = runs
@@ -79,9 +80,12 @@ class _Agent:
         )
         self.runs.mark_completed(run_id)
 
+
 ###############################################################################
 @pytest.fixture()
-def realtime_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, FastAPI]]:
+def realtime_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[TestClient, FastAPI]]:
     monkeypatch.setenv("FASTAPI_HOST", "127.0.0.1")
     monkeypatch.setenv("UI_HOST", "127.0.0.1")
     monkeypatch.setenv("UI_PORT", "8001")
@@ -120,14 +124,19 @@ def realtime_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClien
     finally:
         client.close()
 
+
 ###############################################################################
 def _receive_until_terminal(socket) -> list[dict]:
     messages: list[dict] = []
     while True:
         message = socket.receive_json()
         messages.append(message)
-        if message.get("type") == "run.event" and message.get("payload", {}).get("type") == "completed":
+        if (
+            message.get("type") == "run.event"
+            and message.get("payload", {}).get("type") == "completed"
+        ):
             return messages
+
 
 ###############################################################################
 def test_websocket_start_replays_ordered_events_and_deduplicates_retry(
@@ -183,6 +192,7 @@ def test_websocket_start_replays_ordered_events_and_deduplicates_retry(
         assert duplicate_ack["type"] == "run.ack"
         assert duplicate_ack["payload"]["duplicate"] is True
 
+
 ###############################################################################
 def test_websocket_route_rejects_wrong_origin(
     realtime_client: tuple[TestClient, FastAPI],
@@ -198,6 +208,7 @@ def test_websocket_route_rejects_wrong_origin(
         ):
             pass
 
+
 ###############################################################################
 def test_websocket_reconnect_replays_only_events_after_sequence(
     realtime_client: tuple[TestClient, FastAPI],
@@ -207,33 +218,44 @@ def test_websocket_reconnect_replays_only_events_after_sequence(
     conversation_id = conversation.json()["conversation_id"]
     path = f"/api/conversations/{conversation_id}/realtime"
     headers = {"origin": "http://127.0.0.1:8001"}
-    with client.websocket_connect(path, subprotocols=[REALTIME_SUBPROTOCOL], headers=headers) as socket:
+    with client.websocket_connect(
+        path, subprotocols=[REALTIME_SUBPROTOCOL], headers=headers
+    ) as socket:
         assert socket.receive_json()["type"] == "connection.ready"
-        socket.send_json({
-            "protocol_version": 1,
-            "type": "run.start",
-            "message_id": "replay-start",
-            "payload": {"message": "Replay this", "client_request_id": "replay-1"},
-        })
+        socket.send_json(
+            {
+                "protocol_version": 1,
+                "type": "run.start",
+                "message_id": "replay-start",
+                "payload": {"message": "Replay this", "client_request_id": "replay-1"},
+            }
+        )
         first_event = None
         run_id = None
         while first_event is None:
             message = socket.receive_json()
             if message["type"] == "run.ack":
                 run_id = message["payload"]["run_id"]
-            if message["type"] == "run.event" and message["payload"]["type"] == "progress":
+            if (
+                message["type"] == "run.event"
+                and message["payload"]["type"] == "progress"
+            ):
                 first_event = message["payload"]
         assert first_event["sequence"] == 1
         assert run_id
 
-    with client.websocket_connect(path, subprotocols=[REALTIME_SUBPROTOCOL], headers=headers) as socket:
+    with client.websocket_connect(
+        path, subprotocols=[REALTIME_SUBPROTOCOL], headers=headers
+    ) as socket:
         assert socket.receive_json()["type"] == "connection.ready"
-        socket.send_json({
-            "protocol_version": 1,
-            "type": "session.resume",
-            "message_id": "replay-resume",
-            "payload": {"run_id": run_id, "after_sequence": 1},
-        })
+        socket.send_json(
+            {
+                "protocol_version": 1,
+                "type": "session.resume",
+                "message_id": "replay-resume",
+                "payload": {"run_id": run_id, "after_sequence": 1},
+            }
+        )
         messages = [socket.receive_json()]
         while not any(
             item["type"] == "run.event" and item["payload"]["type"] == "completed"
@@ -244,13 +266,18 @@ def test_websocket_reconnect_replays_only_events_after_sequence(
         assert [item["sequence"] for item in replayed] == [2, 3]
         assert all(item["conversation_id"] == conversation_id for item in replayed)
 
+
 ###############################################################################
 async def _assert_concurrent_conversations_keep_event_routing_isolated(
     realtime_client: tuple[TestClient, FastAPI],
 ) -> None:
     client, _app = realtime_client
-    first = client.post("/api/conversations", json={"title": "First"}).json()["conversation_id"]
-    second = client.post("/api/conversations", json={"title": "Second"}).json()["conversation_id"]
+    first = client.post("/api/conversations", json={"title": "First"}).json()[
+        "conversation_id"
+    ]
+    second = client.post("/api/conversations", json={"title": "Second"}).json()[
+        "conversation_id"
+    ]
     runs = _app.state.run_repository
     publisher = _app.state.run_event_publisher
     first_run = runs.create_run(first, "first", "first")
@@ -284,6 +311,7 @@ async def _assert_concurrent_conversations_keep_event_routing_isolated(
     assert first_events == [(first, 1), (first, 2), (first, 3)]
     assert second_events == [(second, 1), (second, 2), (second, 3)]
 
+
 ###############################################################################
 def test_concurrent_conversations_keep_event_routing_isolated(
     realtime_client: tuple[TestClient, FastAPI],
@@ -291,6 +319,7 @@ def test_concurrent_conversations_keep_event_routing_isolated(
     run_async_in_thread(
         _assert_concurrent_conversations_keep_event_routing_isolated(realtime_client)
     )
+
 
 ###############################################################################
 def test_realtime_metrics_are_loopback_only(

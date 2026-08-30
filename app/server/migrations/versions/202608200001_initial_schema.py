@@ -15,6 +15,7 @@ down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+
 ###############################################################################
 def upgrade() -> None:
     op.create_table(
@@ -294,7 +295,9 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(["run_id"], ["agent_runs.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("run_id", "client_mutation_id", name="ux_agent_steering_mutation"),
+        sa.UniqueConstraint(
+            "run_id", "client_mutation_id", name="ux_agent_steering_mutation"
+        ),
         sa.UniqueConstraint("run_id", "run_version", name="ux_agent_steering_version"),
     )
     op.create_table(
@@ -341,9 +344,7 @@ def upgrade() -> None:
         "chat_messages",
         ["conversation_id", "role", "turn_index"],
     )
-    op.create_index(
-        "ix_agent_runs_conversation_id", "agent_runs", ["conversation_id"]
-    )
+    op.create_index("ix_agent_runs_conversation_id", "agent_runs", ["conversation_id"])
     op.create_index(
         "ix_agent_steering_messages_run_id",
         "agent_steering_messages",
@@ -355,10 +356,13 @@ def upgrade() -> None:
         ["run_id", "sequence"],
     )
 
+
 ###############################################################################
 def downgrade() -> None:
     op.drop_index("ix_agent_run_events_run_id_sequence", table_name="agent_run_events")
-    op.drop_index("ix_agent_steering_messages_run_id", table_name="agent_steering_messages")
+    op.drop_index(
+        "ix_agent_steering_messages_run_id", table_name="agent_steering_messages"
+    )
     op.drop_index("ix_agent_runs_conversation_id", table_name="agent_runs")
     op.drop_index(
         "ix_chat_messages_conversation_role_sequence", table_name="chat_messages"

@@ -19,7 +19,10 @@ from server.services.geospatial.overpass import (
     OverpassService,
     OverpassServiceError,
 )
-from server.services.geospatial.providers._request import request_center, request_radius_m
+from server.services.geospatial.providers._request import (
+    request_center,
+    request_radius_m,
+)
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderRateLimitError,
@@ -27,6 +30,7 @@ from server.services.geospatial.providers.base import (
     ProviderResponse,
     ProviderUnavailableError,
 )
+
 
 ###############################################################################
 class OvertureProvider(GeospatialProvider):
@@ -45,14 +49,21 @@ class OvertureProvider(GeospatialProvider):
             places_path
             or os.getenv(
                 "AEGIS_OVERTURE_PLACES_INDEX",
-                str(resolve_runtime_data_root() / "geospatial" / "overture" / "places.geojson"),
+                str(
+                    resolve_runtime_data_root()
+                    / "geospatial"
+                    / "overture"
+                    / "places.geojson"
+                ),
             )
         ).expanduser()
         self.overpass_service = overpass_service or OverpassService()
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
-        source = Path(str(request.params.get("index_path") or self.places_path)).expanduser()
+        source = Path(
+            str(request.params.get("index_path") or self.places_path)
+        ).expanduser()
         if not source.is_file():
             return ProviderResponse(
                 capability_id=request.capability_id,
@@ -73,9 +84,13 @@ class OvertureProvider(GeospatialProvider):
         try:
             payload = json.loads(source.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-            raise ProviderUnavailableError("Overture Places index is unavailable or malformed.") from exc
+            raise ProviderUnavailableError(
+                "Overture Places index is unavailable or malformed."
+            ) from exc
         if not is_json_object(payload) or not is_json_array(payload.get("features")):
-            raise ProviderUnavailableError("Overture Places index must be a GeoJSON FeatureCollection.")
+            raise ProviderUnavailableError(
+                "Overture Places index must be a GeoJSON FeatureCollection."
+            )
 
         features = self._features(payload["features"], request)
         warnings: list[str] = []
@@ -96,11 +111,15 @@ class OvertureProvider(GeospatialProvider):
                 "indexPath": str(source),
                 "features": [item.model_dump(mode="json") for item in deduplicated],
                 "totalResults": len(deduplicated),
-                "augmentation": "overpass" if _is_true(request.params.get("augment_overpass")) else "none",
+                "augmentation": "overpass"
+                if _is_true(request.params.get("augment_overpass"))
+                else "none",
             },
             attribution=[
                 "Overture Maps Foundation",
-                "© OpenStreetMap contributors (ODbL)" if _is_true(request.params.get("augment_overpass")) else "",
+                "© OpenStreetMap contributors (ODbL)"
+                if _is_true(request.params.get("augment_overpass"))
+                else "",
             ],
             warnings=[item for item in warnings if item],
         )
@@ -125,7 +144,9 @@ class OvertureProvider(GeospatialProvider):
                     normalize_poi_feature(
                         {**item, "category": item.get("amenity")},
                         source="overpass",
-                        category=normalize_poi_category(str(item.get("amenity") or "amenity")),
+                        category=normalize_poi_category(
+                            str(item.get("amenity") or "amenity")
+                        ),
                     )
                 )
             except NormalizationError:
@@ -133,7 +154,9 @@ class OvertureProvider(GeospatialProvider):
         return features
 
     # -------------------------------------------------------------------------
-    def _features(self, raw_features: list[object], request: ProviderRequest) -> list[Any]:
+    def _features(
+        self, raw_features: list[object], request: ProviderRequest
+    ) -> list[Any]:
         query = str(request.params.get("query") or "").strip().casefold()
         category = str(request.params.get("category") or "").strip().casefold()
         limit = max(1, min(500, _optional_int(request.params.get("limit")) or 100))
@@ -148,17 +171,29 @@ class OvertureProvider(GeospatialProvider):
             if not is_json_array(coordinates) or len(coordinates) < 2:
                 continue
             try:
-                longitude, latitude = float(str(coordinates[0])), float(str(coordinates[1]))
-            except (TypeError, ValueError):
+                longitude, latitude = (
+                    float(str(coordinates[0])),
+                    float(str(coordinates[1])),
+                )
+            except TypeError, ValueError:
                 continue
             if request.bbox and not _in_bbox(longitude, latitude, request.bbox):
                 continue
-            name = str(properties.get("name") or properties.get("names.primary") or "").strip()
-            raw_category = str(properties.get("category") or properties.get("categories.primary") or "amenity")
+            name = str(
+                properties.get("name") or properties.get("names.primary") or ""
+            ).strip()
+            raw_category = str(
+                properties.get("category")
+                or properties.get("categories.primary")
+                or "amenity"
+            )
             normalized_category = normalize_poi_category(raw_category)
             if query and query not in f"{name} {raw_category}".casefold():
                 continue
-            if category and category not in {raw_category.casefold(), normalized_category.casefold()}:
+            if category and category not in {
+                raw_category.casefold(),
+                normalized_category.casefold(),
+            }:
                 continue
             candidate = {
                 "id": raw.get("id") or properties.get("id"),
@@ -166,8 +201,10 @@ class OvertureProvider(GeospatialProvider):
                 "latitude": latitude,
                 "longitude": longitude,
                 "category": normalized_category,
-                "address": properties.get("address") or properties.get("addresses.primary"),
-                "website": properties.get("website") or properties.get("websites.primary"),
+                "address": properties.get("address")
+                or properties.get("addresses.primary"),
+                "website": properties.get("website")
+                or properties.get("websites.primary"),
                 "phone": properties.get("phone"),
                 "metadata": {
                     "confidence": properties.get("confidence"),
@@ -176,29 +213,39 @@ class OvertureProvider(GeospatialProvider):
                 },
             }
             try:
-                features.append(normalize_poi_feature(candidate, source=self.provider_id, category=normalized_category))
+                features.append(
+                    normalize_poi_feature(
+                        candidate, source=self.provider_id, category=normalized_category
+                    )
+                )
             except NormalizationError:
                 continue
             if len(features) >= limit:
                 break
         return features
 
+
 ###############################################################################
-def _in_bbox(longitude: float, latitude: float, bbox: tuple[float, float, float, float]) -> bool:
+def _in_bbox(
+    longitude: float, latitude: float, bbox: tuple[float, float, float, float]
+) -> bool:
     west, south, east, north = bbox
     return west <= longitude <= east and south <= latitude <= north
+
 
 ###############################################################################
 def _amenity_tags(request: ProviderRequest) -> list[str] | None:
     value = request.params.get("amenity_tags")
     return [str(item) for item in value] if is_json_array(value) else None
 
+
 ###############################################################################
 def _optional_int(value: object) -> int | None:
     try:
         return int(str(value)) if value is not None else None
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
+
 
 ###############################################################################
 def _is_true(value: object) -> bool:

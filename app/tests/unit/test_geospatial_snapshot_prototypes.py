@@ -6,6 +6,7 @@ import json
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
 
+
 ###############################################################################
 def test_openchargemap_requires_key_for_hosted_access() -> None:
     try:
@@ -22,16 +23,31 @@ def test_openchargemap_requires_key_for_hosted_access() -> None:
     else:
         raise AssertionError("Hosted Open Charge Map access must not be anonymous.")
 
+
 ###############################################################################
 def test_openchargemap_reads_local_snapshot(tmp_path) -> None:
     snapshot = tmp_path / "ocm.json"
     snapshot.write_text(
-        json.dumps([{"ID": 1, "AddressInfo": {"Title": "Charger", "Latitude": 41.9, "Longitude": 12.5}}]),
+        json.dumps(
+            [
+                {
+                    "ID": 1,
+                    "AddressInfo": {
+                        "Title": "Charger",
+                        "Latitude": 41.9,
+                        "Longitude": 12.5,
+                    },
+                }
+            ]
+        ),
         encoding="utf-8",
     )
     response = run_async_in_thread(
         OpenChargeMapProvider(snapshot_path=snapshot).fetch(
-            ProviderRequest(capability_id="openchargemap_ev_charging", params={"live": True, "latitude": 41.9, "longitude": 12.5})
+            ProviderRequest(
+                capability_id="openchargemap_ev_charging",
+                params={"live": True, "latitude": 41.9, "longitude": 12.5},
+            )
         )
     )
     assert response.payload["sourceMode"] == "local-snapshot"

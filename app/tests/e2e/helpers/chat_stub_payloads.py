@@ -7,12 +7,20 @@ E2E_CONVERSATION_ID = "conversation-e2e"
 
 ROME_MAP_SESSION = {
     "session_id": "rome-map-session",
-    "resolved_location": {"label": "Rome, Italy", "latitude": 41.9028, "longitude": 12.4964},
+    "resolved_location": {
+        "label": "Rome, Italy",
+        "latitude": 41.9028,
+        "longitude": 12.4964,
+    },
     "center": {"latitude": 41.9028, "longitude": 12.4964},
     "bounds": [12.3, 41.8, 12.7, 42.0],
     "basemap_id": "osm_default",
     "overlay_ids": ["openaq_air_quality"],
-    "viewport": {"center_latitude": 41.9028, "center_longitude": 12.4964, "radius_m": 5000},
+    "viewport": {
+        "center_latitude": 41.9028,
+        "center_longitude": 12.4964,
+        "radius_m": 5000,
+    },
     "basemap": {
         "id": "osm_default",
         "label": "OpenStreetMap",
@@ -35,6 +43,7 @@ ROME_MAP_SESSION = {
     "compliance_warnings": ["Demo alert summary for documented session."],
 }
 
+
 ###############################################################################
 def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
     return {
@@ -55,6 +64,7 @@ def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
         "parser_confidence": 1.0,
     }
 
+
 ###############################################################################
 def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
     return {
@@ -65,6 +75,7 @@ def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
         },
         "trace": {"steps": ["stub"]},
     }
+
 
 ###############################################################################
 def chat_completion_map_payload(
@@ -85,8 +96,11 @@ def chat_completion_map_payload(
         },
     }
 
+
 ###############################################################################
-def chat_completion_clarification_payload(turn_number: int, message: str) -> dict[str, Any]:
+def chat_completion_clarification_payload(
+    turn_number: int, message: str
+) -> dict[str, Any]:
     return {
         "request_id": f"chat-stub-{turn_number}",
         "conversation_id": E2E_CONVERSATION_ID,
@@ -98,6 +112,7 @@ def chat_completion_clarification_payload(turn_number: int, message: str) -> dic
             "execution": "follow_up",
         },
     }
+
 
 ###############################################################################
 def chat_completion_text_payload(turn_number: int, message: str) -> dict[str, Any]:
@@ -111,6 +126,7 @@ def chat_completion_text_payload(turn_number: int, message: str) -> dict[str, An
         "tool_payload": {"execution": "location_to_coordinates"},
     }
 
+
 ###############################################################################
 def model_settings_payload() -> dict[str, Any]:
     return {
@@ -122,6 +138,7 @@ def model_settings_payload() -> dict[str, Any]:
         "google_base_url": None,
         "credentials": {"openai": {"api_key": False}, "google": {"api_key": False}},
     }
+
 
 ###############################################################################
 def model_catalog_payload() -> dict[str, Any]:
@@ -174,6 +191,7 @@ def model_catalog_payload() -> dict[str, Any]:
         ],
     }
 
+
 ###############################################################################
 def selected_agent_settings_payload() -> dict[str, Any]:
     return {
@@ -185,5 +203,6 @@ def selected_agent_settings_payload() -> dict[str, Any]:
         "google_base_url": "https://generativelanguage.googleapis.com/v1beta",
         "credentials": {"openai": {"api_key": False}, "google": {"api_key": True}},
     }
+
 
 ###############################################################################

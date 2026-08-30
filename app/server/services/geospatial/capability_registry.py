@@ -5,11 +5,13 @@ from typing import Any
 from server.domain.geospatial.registry import CapabilityRegistrySnapshot
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
+
 ###############################################################################
 class CapabilityRegistry:
-
     # -------------------------------------------------------------------------
-    def __init__(self, *, manifest_loader: GeospatialManifestLoader | None = None) -> None:
+    def __init__(
+        self, *, manifest_loader: GeospatialManifestLoader | None = None
+    ) -> None:
         self.manifest_loader = manifest_loader or GeospatialManifestLoader()
         self._snapshot: CapabilityRegistrySnapshot | None = None
 

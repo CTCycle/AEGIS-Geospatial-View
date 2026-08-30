@@ -11,6 +11,7 @@ from server.services.geospatial.providers.base import (
     provider_cache_key,
 )
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class _CacheEntry:
@@ -18,9 +19,9 @@ class _CacheEntry:
     expires_at: float
     stale_expires_at: float
 
+
 ###############################################################################
 class GeospatialCache:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, clock: Any | None = None) -> None:
         self._clock = clock or time.monotonic
@@ -80,6 +81,7 @@ class GeospatialCache:
         if not normalized:
             raise ValueError("Cache key is required.")
         return normalized
+
 
 ###############################################################################
 def cache_key_for_request(provider_id: str, request: ProviderRequest) -> str:

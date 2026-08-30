@@ -31,9 +31,9 @@ def _provider_failure_code(error: Exception) -> str:
         return "malformed_response"
     return "provider_unavailable"
 
+
 ###############################################################################
 class LocationSearchOrchestrator:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -44,15 +44,20 @@ class LocationSearchOrchestrator:
     ) -> None:
         self.capability_registry = capability_registry or CapabilityRegistry()
         self.rainviewer_service = rainviewer_service or RainViewerService()
-        self.render_descriptor_service = render_descriptor_service or RenderDescriptorService(
-            capability_registry=self.capability_registry,
-            rainviewer_service=self.rainviewer_service,
+        self.render_descriptor_service = (
+            render_descriptor_service
+            or RenderDescriptorService(
+                capability_registry=self.capability_registry,
+                rainviewer_service=self.rainviewer_service,
+            )
         )
 
     # -------------------------------------------------------------------------
     async def execute(self, payload: LocationSearchRequest) -> MapSession:
         self.capability_registry.load_capabilities()
-        basemap: dict[str, object] | None = await self.render_descriptor_service.build_basemap_descriptor(
+        basemap: (
+            dict[str, object] | None
+        ) = await self.render_descriptor_service.build_basemap_descriptor(
             payload.basemap_id
         )
         overlays: list[dict[str, object]] = []
@@ -78,16 +83,16 @@ class LocationSearchOrchestrator:
             else payload.basemap_id
         )
         for overlay_id in payload.overlay_ids:
-            overlay_result = await self.render_descriptor_service.build_overlay_descriptor(
-                overlay_id,
-                request=payload,
+            overlay_result = (
+                await self.render_descriptor_service.build_overlay_descriptor(
+                    overlay_id,
+                    request=payload,
+                )
             )
             if overlay_result is None:
                 reason = "not available in the capability catalog"
                 failed_overlays.append({"id": overlay_id, "reason": reason})
-                warnings.append(
-                    f"Overlay '{overlay_id}' is {reason}."
-                )
+                warnings.append(f"Overlay '{overlay_id}' is {reason}.")
                 continue
             descriptor, overlay_warnings = overlay_result
             descriptor = MapInspectionService.attach_to_descriptor(descriptor)
@@ -96,7 +101,10 @@ class LocationSearchOrchestrator:
         for selection in payload.provider_layer_selections:
             selection_id = f"{selection.provider_id}:{selection.layer_id}"
             try:
-                descriptor, overlay_warnings = await self.render_descriptor_service.build_provider_layer_overlay(
+                (
+                    descriptor,
+                    overlay_warnings,
+                ) = await self.render_descriptor_service.build_provider_layer_overlay(
                     provider_id=selection.provider_id,
                     layer_id=selection.layer_id,
                     request=payload,
@@ -154,7 +162,8 @@ class LocationSearchOrchestrator:
                 "latitude": payload.viewport.center_latitude,
                 "longitude": payload.viewport.center_longitude,
             },
-            bounds=payload.viewport.bbox or self._bounds_from_viewport(payload.viewport),
+            bounds=payload.viewport.bbox
+            or self._bounds_from_viewport(payload.viewport),
             basemap=basemap,
             overlays=overlays,
             requested_overlay_ids=[

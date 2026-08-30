@@ -22,9 +22,11 @@ from server.repositories.database.sqlite import SQLiteRepository
 ALEMBIC_CONFIG_PATH = Path(__file__).resolve().parents[2] / "alembic.ini"
 ALEMBIC_VERSION_TABLE = "alembic_version"
 
+
 ###############################################################################
 class DatabaseMigrationError(RuntimeError):
     """Raised when the application cannot safely synchronize its schema."""
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -34,6 +36,7 @@ class MigrationResult:
     final_revisions: tuple[str, ...]
     fresh_database: bool
     migrations_applied: bool
+
 
 ###############################################################################
 def synchronize_database(
@@ -76,6 +79,7 @@ def synchronize_database(
             f"Timed out after {timeout_seconds}s waiting for the SQLite migration lock "
             f"at {lock.lock_file}."
         ) from exc
+
 
 ###############################################################################
 def _synchronize_locked(engine: Engine) -> MigrationResult:
@@ -131,6 +135,7 @@ def _synchronize_locked(engine: Engine) -> MigrationResult:
             migrations_applied=current != final,
         )
 
+
 ###############################################################################
 def _alembic_config() -> Config:
     if not ALEMBIC_CONFIG_PATH.is_file():
@@ -138,6 +143,7 @@ def _alembic_config() -> Config:
             f"Alembic configuration was not found at {ALEMBIC_CONFIG_PATH}."
         )
     return Config(str(ALEMBIC_CONFIG_PATH))
+
 
 ###############################################################################
 def _run_alembic_command(
@@ -151,10 +157,12 @@ def _run_alembic_command(
     # Commit before the migration connection is returned to the pool.
     connection.commit()
 
+
 ###############################################################################
 def _current_revisions(connection: Connection) -> tuple[str, ...]:
     context = MigrationContext.configure(connection)
     return tuple(context.get_current_heads())
+
 
 ###############################################################################
 def _validate_current_revisions(
@@ -169,9 +177,11 @@ def _validate_current_revisions(
                 f"Database references unknown Alembic revision {revision!r}."
             ) from exc
 
+
 ###############################################################################
 def migration_lock_timeout(database: SQLiteRepository) -> int:
     return max(1, int(database.settings.sqlite_lock_timeout_seconds))
+
 
 ###############################################################################
 def _create_sqlite_backup(
@@ -203,6 +213,7 @@ def _create_sqlite_backup(
         if target is not None:
             target.close()
 
+
 ###############################################################################
 def _restore_sqlite_backup(
     database: SQLiteRepository,
@@ -221,7 +232,9 @@ def _restore_sqlite_backup(
     if backup_path is not None and backup_path.exists():
         shutil.copy2(backup_path, database_path)
         backup_path.unlink(missing_ok=True)
-        logger.error("Restored SQLite database from migration backup: %s", database_path)
+        logger.error(
+            "Restored SQLite database from migration backup: %s", database_path
+        )
     elif not original_exists:
         database_path.unlink(missing_ok=True)
         logger.error(

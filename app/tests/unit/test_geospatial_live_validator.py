@@ -9,15 +9,17 @@ from server.services.geospatial.live_validator import (
 )
 from server.services.geospatial.providers.base import ProviderRequest, ProviderResponse
 
+
 ###############################################################################
 class _LiveValidationRegistry:
-
     # -------------------------------------------------------------------------
     def build_from_manifests(self) -> None:
         return None
 
     # -------------------------------------------------------------------------
-    async def fetch(self, provider_id: str, request: ProviderRequest) -> ProviderResponse:
+    async def fetch(
+        self, provider_id: str, request: ProviderRequest
+    ) -> ProviderResponse:
         if provider_id == "nominatim":
             payload = {"results": [{"latitude": 41.9, "longitude": 12.5}]}
         elif provider_id == "usgs":
@@ -27,7 +29,10 @@ class _LiveValidationRegistry:
         elif provider_id == "overpass":
             payload = {"features": [{"id": "poi-1"}]}
         elif provider_id == "rainviewer":
-            payload = {"frameCount": 5, "tileUrl": "https://example.test/{z}/{x}/{y}.png"}
+            payload = {
+                "frameCount": 5,
+                "tileUrl": "https://example.test/{z}/{x}/{y}.png",
+            }
         elif provider_id == "pvgis":
             payload = {"yearlyKwhPerKwpEstimate": 1200.0}
         else:
@@ -37,6 +42,7 @@ class _LiveValidationRegistry:
             provider_id=provider_id,
             payload=payload,
         )
+
 
 ###############################################################################
 def test_live_validator_runs_public_provider_checks_with_injected_registry() -> None:
@@ -62,23 +68,28 @@ def test_live_validator_runs_public_provider_checks_with_injected_registry() -> 
         "pvgis",
     }
 
+
 ###############################################################################
 def test_live_validator_skips_whitespace_only_credentials(monkeypatch) -> None:
     monkeypatch.setenv("TOMTOM_API_KEY", "   ")
 
-    result = run_async_in_thread(_run_check(_LiveValidationRegistry(), CREDENTIAL_LIVE_CHECKS[0]))
+    result = run_async_in_thread(
+        _run_check(_LiveValidationRegistry(), CREDENTIAL_LIVE_CHECKS[0])
+    )
 
     assert result.status == "skipped"
     assert "TOMTOM_API_KEY" in (result.message or "")
+
 
 ###############################################################################
 def test_live_validator_rejects_error_payloads() -> None:
 
     ###############################################################################
     class _ErrorRegistry(_LiveValidationRegistry):
-
         # -------------------------------------------------------------------------
-        async def fetch(self, provider_id: str, request: ProviderRequest) -> ProviderResponse:
+        async def fetch(
+            self, provider_id: str, request: ProviderRequest
+        ) -> ProviderResponse:
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=provider_id,

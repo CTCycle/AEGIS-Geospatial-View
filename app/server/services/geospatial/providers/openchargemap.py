@@ -27,6 +27,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class OpenChargeMapProvider(GeospatialProvider):
     provider_id = "openchargemap"
@@ -43,7 +44,11 @@ class OpenChargeMapProvider(GeospatialProvider):
         self.api_key = api_key
         self.fetcher = fetcher or fetch_json_url
         self.cache = cache or GeospatialCache()
-        self.snapshot_path = Path(snapshot_path or os.getenv("AEGIS_OCM_SNAPSHOT_PATH", "")).expanduser() if (snapshot_path or os.getenv("AEGIS_OCM_SNAPSHOT_PATH", "").strip()) else None
+        self.snapshot_path = (
+            Path(snapshot_path or os.getenv("AEGIS_OCM_SNAPSHOT_PATH", "")).expanduser()
+            if (snapshot_path or os.getenv("AEGIS_OCM_SNAPSHOT_PATH", "").strip())
+            else None
+        )
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
@@ -65,9 +70,13 @@ class OpenChargeMapProvider(GeospatialProvider):
                 try:
                     payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
                 except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-                    raise ProviderUnavailableError("Open Charge Map snapshot is unavailable or malformed.") from exc
+                    raise ProviderUnavailableError(
+                        "Open Charge Map snapshot is unavailable or malformed."
+                    ) from exc
                 features = self._features(payload)
-                filtered = _filter_features(features, request, latitude, longitude, radius_m)
+                filtered = _filter_features(
+                    features, request, latitude, longitude, radius_m
+                )
                 return ProviderResponse(
                     capability_id=request.capability_id,
                     provider_id=self.provider_id,
@@ -84,7 +93,9 @@ class OpenChargeMapProvider(GeospatialProvider):
                     result_status="valid_empty" if not filtered else "ok",
                     result_type="features",
                 )
-            raise ProviderUnavailableError("Configured Open Charge Map snapshot does not exist.")
+            raise ProviderUnavailableError(
+                "Configured Open Charge Map snapshot does not exist."
+            )
         if not api_key:
             raise ProviderAuthError(
                 "Open Charge Map hosted API access requires OPENCHARGEMAP_API_KEY; configure a local snapshot for anonymous operation."
@@ -114,7 +125,12 @@ class OpenChargeMapProvider(GeospatialProvider):
                 "center": {"latitude": latitude, "longitude": longitude},
                 "radiusM": radius_m,
             }
-            self.cache.set(cache_key, normalized, ttl_seconds=900, stale_while_revalidate_seconds=86400)
+            self.cache.set(
+                cache_key,
+                normalized,
+                ttl_seconds=900,
+                stale_while_revalidate_seconds=86400,
+            )
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -125,13 +141,17 @@ class OpenChargeMapProvider(GeospatialProvider):
             )
         except (ProviderError, ValueError) as exc:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return ProviderResponse(
                     capability_id=request.capability_id,
                     provider_id=self.provider_id,
                     payload=cached.value,
                     attribution=["Open Charge Map"],
-                    warnings=["Open Charge Map request failed; serving stale cached stations."],
+                    warnings=[
+                        "Open Charge Map request failed; serving stale cached stations."
+                    ],
                     stale=True,
                     result_status="stale",
                     result_type="features",
@@ -156,7 +176,9 @@ class OpenChargeMapProvider(GeospatialProvider):
                 continue
             latitude = address.get("Latitude")
             longitude = address.get("Longitude")
-            if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
+            if not isinstance(latitude, int | float) or not isinstance(
+                longitude, int | float
+            ):
                 continue
             features.append(
                 {
@@ -168,12 +190,13 @@ class OpenChargeMapProvider(GeospatialProvider):
                     "longitude": float(str(longitude)),
                     "address": address.get("AddressLine1"),
                     "metadata": {
-                    "status": json_object(item.get("StatusType")).get("Title"),
+                        "status": json_object(item.get("StatusType")).get("Title"),
                         "connections": item.get("Connections") or [],
                     },
                 }
             )
         return features
+
 
 ###############################################################################
 def _filter_features(
@@ -190,8 +213,10 @@ def _filter_features(
     return [
         item
         for item in features
-        if west <= float(str(item["longitude"])) <= east and south <= float(str(item["latitude"])) <= north
+        if west <= float(str(item["longitude"])) <= east
+        and south <= float(str(item["latitude"])) <= north
     ][: int(request.params.get("maxresults") or 100)]
+
 
 ###############################################################################
 def _geojson_features(payload: dict[str, object]) -> list[dict[str, object]]:
@@ -205,14 +230,16 @@ def _geojson_features(payload: dict[str, object]) -> list[dict[str, object]]:
         coordinates = geometry.get("coordinates")
         if not is_json_array(coordinates) or len(coordinates) < 2:
             continue
-        features.append({
-            "id": str(feature.get("id") or properties.get("id") or ""),
-            "name": properties.get("name"),
-            "category": normalize_poi_category("ev_charging"),
-            "source": "openchargemap",
-            "latitude": float(str(coordinates[1])),
-            "longitude": float(str(coordinates[0])),
-            "address": properties.get("address"),
-            "metadata": properties,
-        })
+        features.append(
+            {
+                "id": str(feature.get("id") or properties.get("id") or ""),
+                "name": properties.get("name"),
+                "category": normalize_poi_category("ev_charging"),
+                "source": "openchargemap",
+                "latitude": float(str(coordinates[1])),
+                "longitude": float(str(coordinates[0])),
+                "address": properties.get("address"),
+                "metadata": properties,
+            }
+        )
     return features

@@ -20,9 +20,9 @@ from server.services.agent.tool_registry import ToolRegistry
 
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 class ToolPlanExecutor:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, tool_registry: ToolRegistry) -> None:
         self.tool_registry = tool_registry
@@ -141,7 +141,10 @@ class ToolPlanExecutor:
                 payload = {
                     "ok": False,
                     "data": None,
-                    "error": {"code": "tool_timeout", "message": "Tool execution timed out."},
+                    "error": {
+                        "code": "tool_timeout",
+                        "message": "Tool execution timed out.",
+                    },
                 }
             elapsed_ms = int((time.perf_counter() - started) * 1000)
             error = json_object(payload.get("error"))

@@ -11,6 +11,7 @@ from server.repositories.credential_material import (
     CredentialEncryptionMaterialRepository,
 )
 
+
 ###############################################################################
 def _load_fernet_from_material(key_material: str) -> Fernet:
     normalized = str(key_material or "").strip()
@@ -18,14 +19,15 @@ def _load_fernet_from_material(key_material: str) -> Fernet:
         raise RuntimeError("Encryption key material is missing")
     return Fernet(normalized.encode("utf-8"))
 
+
 ###############################################################################
 def _derive_fernet_key(master_key: str) -> str:
     digest = hashlib.sha256(master_key.encode("utf-8")).digest()
     return base64.urlsafe_b64encode(digest).decode("utf-8")
 
+
 ###############################################################################
 class CredentialEncryptionService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

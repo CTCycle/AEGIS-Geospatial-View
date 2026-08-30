@@ -37,6 +37,7 @@ CompletionReason = Literal[
     "superseded_by_steering",
 ]
 
+
 ###############################################################################
 class AgentGoal(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -46,6 +47,7 @@ class AgentGoal(BaseModel):
     status: Literal["active", "completed", "partial", "superseded"] = "active"
     revision: int = Field(default=0, ge=0)
 
+
 ###############################################################################
 class GeographicScope(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -53,14 +55,19 @@ class GeographicScope(BaseModel):
     bbox: list[float] | None = None
     radius_m: float | None = Field(default=None, gt=0)
     geometry_ref: str | None = None
-    exclusions: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
+    exclusions: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     crs: str = "EPSG:4326"
+
 
 ###############################################################################
 class GeospatialWorkingState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    resolved_locations: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
+    resolved_locations: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     geographic_scope: GeographicScope = Field(default_factory=GeographicScope)
     candidate_place_refs: list[str] = Field(default_factory=list)
     selected_place_ids: list[str] = Field(default_factory=list)
@@ -69,6 +76,7 @@ class GeospatialWorkingState(BaseModel):
     feature_refs: list[str] = Field(default_factory=list)
     temporal_constraints: dict[str, Any] = Field(default_factory=dict)
     renderable_refs: list[str] = Field(default_factory=list)
+
 
 ###############################################################################
 class AgentTask(BaseModel):
@@ -86,6 +94,7 @@ class AgentTask(BaseModel):
     last_failure: dict[str, Any] | None = None
     scope_revision: int = Field(default=0, ge=0)
 
+
 ###############################################################################
 class AgentThreadState(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -96,12 +105,15 @@ class AgentThreadState(BaseModel):
     active_task_id: str | None = None
     goal: AgentGoal | None = None
     tasks: list[AgentTask] = Field(default_factory=lambda: list[AgentTask]())
-    geospatial_state: GeospatialWorkingState = Field(default_factory=GeospatialWorkingState)
+    geospatial_state: GeospatialWorkingState = Field(
+        default_factory=GeospatialWorkingState
+    )
     evidence_refs: list[str] = Field(default_factory=list)
     active_map_session: dict[str, Any] | None = None
     assumptions: list[str] = Field(default_factory=list)
     unresolved_questions: list[str] = Field(default_factory=list)
     conversation_summary: dict[str, Any] | None = None
+
 
 ###############################################################################
 class AgentBudgets(BaseModel):
@@ -112,6 +124,7 @@ class AgentBudgets(BaseModel):
     state_transitions: int
     plan_revisions: int = 0
     wall_clock_seconds: float
+
 
 ###############################################################################
 class AgentRunState(BaseModel):
@@ -130,6 +143,7 @@ class AgentRunState(BaseModel):
     consecutive_no_progress_steps: int = Field(default=0, ge=0)
     completion_reason: CompletionReason | None = None
 
+
 ###############################################################################
 class ToolCapabilityProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -146,9 +160,11 @@ class ToolCapabilityProfile(BaseModel):
     expected_latency_seconds: float = Field(default=1.0, ge=0)
     healthy: bool = True
 
+
 ###############################################################################
 class RuntimeValidationError(ValueError):
     """Raised when an application-owned runtime invariant is violated."""
+
 
 ###############################################################################
 def validate_task_graph(tasks: list[AgentTask]) -> None:
@@ -160,7 +176,9 @@ def validate_task_graph(tasks: list[AgentTask]) -> None:
     for task in tasks:
         if task.id in task.depends_on:
             raise RuntimeValidationError(f"Task '{task.id}' cannot depend on itself.")
-        missing = [dependency for dependency in task.depends_on if dependency not in by_id]
+        missing = [
+            dependency for dependency in task.depends_on if dependency not in by_id
+        ]
         if missing:
             raise RuntimeValidationError(
                 f"Task '{task.id}' has missing dependencies: {', '.join(missing)}."
@@ -182,6 +200,7 @@ def validate_task_graph(tasks: list[AgentTask]) -> None:
     for task in tasks:
         visit(task.id)
 
+
 ###############################################################################
 def runnable_tasks(tasks: list[AgentTask]) -> list[AgentTask]:
     """Return pending tasks whose required dependencies completed successfully."""
@@ -191,8 +210,11 @@ def runnable_tasks(tasks: list[AgentTask]) -> list[AgentTask]:
         task
         for task in tasks
         if task.status == "pending"
-        and all(by_id[dependency].status == "completed" for dependency in task.depends_on)
+        and all(
+            by_id[dependency].status == "completed" for dependency in task.depends_on
+        )
     ]
+
 
 ###############################################################################
 def block_tasks_with_failed_dependencies(tasks: list[AgentTask]) -> int:
@@ -215,6 +237,7 @@ def block_tasks_with_failed_dependencies(tasks: list[AgentTask]) -> int:
             changed += 1
     return changed
 
+
 ###############################################################################
 def canonical_call_fingerprint(tool_name: str, arguments: dict[str, Any]) -> str:
     payload = json.dumps(
@@ -225,6 +248,7 @@ def canonical_call_fingerprint(tool_name: str, arguments: dict[str, Any]) -> str
         default=str,
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
 
 ###############################################################################
 def select_tools(
@@ -246,15 +270,21 @@ def select_tools(
         and (not require_rendering or profile.supports_rendering)
     ]
 
+
 ###############################################################################
 def state_fingerprint(state: AgentThreadState) -> str:
     payload = state.model_dump(mode="json", exclude={"conversation_summary"})
     return hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode(
+            "utf-8"
+        )
     ).hexdigest()
 
+
 ###############################################################################
-def compact_task_context(task_state: dict[str, Any], *, completed_limit: int = 6) -> dict[str, Any]:
+def compact_task_context(
+    task_state: dict[str, Any], *, completed_limit: int = 6
+) -> dict[str, Any]:
     """Keep active dependencies and a small completed window in model context."""
 
     raw_tasks: Any = task_state.get("tasks")
@@ -293,6 +323,7 @@ def compact_task_context(task_state: dict[str, Any], *, completed_limit: int = 6
     compact["completed_tasks_omitted"] = max(0, len(completed) - completed_limit)
     return compact
 
+
 ###############################################################################
 def evaluate_completion(state: AgentThreadState) -> CompletionReason | None:
     """Return a completion reason only when required tasks are terminal."""
@@ -310,11 +341,13 @@ def evaluate_completion(state: AgentThreadState) -> CompletionReason | None:
         return "partial"
     return "completed"
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ScopeInvalidation:
     invalidated_evidence_refs: tuple[str, ...]
     retained_evidence_refs: tuple[str, ...]
+
 
 ###############################################################################
 def invalidate_scope_evidence(
@@ -340,6 +373,7 @@ def invalidate_scope_evidence(
     state.revision += 1
     return ScopeInvalidation(invalidated, retained)
 
+
 ###############################################################################
 def apply_steering_delta(state: AgentThreadState, delta: Any) -> AgentThreadState:
     """Apply a classified follow-up without rebuilding unrelated evidence."""
@@ -351,7 +385,10 @@ def apply_steering_delta(state: AgentThreadState, delta: Any) -> AgentThreadStat
     if kind in {"scope_change", "exclusion"}:
         invalidated_refs: set[str] = set()
         for task in state.tasks:
-            if task.status == "completed" and task.kind not in {"location_resolution", "comparison"}:
+            if task.status == "completed" and task.kind not in {
+                "location_resolution",
+                "comparison",
+            }:
                 task.scope_revision = state.revision
                 task.status = "superseded"
                 invalidated_refs.update(task.output_refs)
@@ -359,10 +396,15 @@ def apply_steering_delta(state: AgentThreadState, delta: Any) -> AgentThreadStat
             invalidate_scope_evidence(state, invalidated_refs=invalidated_refs)
         radius_text: Any = parameters.get("radius_text")
         if isinstance(radius_text, str):
-            match = re.search(r"(?P<value>\d+(?:\.\d+)?)\s*(?P<unit>km|mi|miles?)", radius_text.lower())
+            match = re.search(
+                r"(?P<value>\d+(?:\.\d+)?)\s*(?P<unit>km|mi|miles?)",
+                radius_text.lower(),
+            )
             if match is not None:
                 value = float(match.group("value"))
-                multiplier = 1_609.344 if match.group("unit").startswith("mi") else 1_000.0
+                multiplier = (
+                    1_609.344 if match.group("unit").startswith("mi") else 1_000.0
+                )
                 state.geospatial_state.geographic_scope.radius_m = value * multiplier
         state.geospatial_state.geographic_scope.exclusions.extend(
             [{"text": text}] if kind == "exclusion" else []
@@ -378,13 +420,20 @@ def apply_steering_delta(state: AgentThreadState, delta: Any) -> AgentThreadStat
             )
         )
     elif kind == "comparison":
-        if not any(task.kind == "comparison" and task.status == "pending" for task in state.tasks):
+        if not any(
+            task.kind == "comparison" and task.status == "pending"
+            for task in state.tasks
+        ):
             state.tasks.append(
                 AgentTask(
                     id=f"comparison-{state.revision}",
                     description=text or "Compare retained candidate evidence.",
                     kind="comparison",
-                    depends_on=[task.id for task in state.tasks if task.required and task.status == "completed"],
+                    depends_on=[
+                        task.id
+                        for task in state.tasks
+                        if task.required and task.status == "completed"
+                    ],
                     scope_revision=state.revision,
                 )
             )

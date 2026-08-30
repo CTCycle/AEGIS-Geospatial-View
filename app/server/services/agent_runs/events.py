@@ -5,8 +5,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator
 
-from server.contracts.events import RunEvent, RunEventCreate, RunEventType, RunEventVisibility
+from server.contracts.events import (
+    RunEvent,
+    RunEventCreate,
+    RunEventType,
+    RunEventVisibility,
+)
 from server.repositories.agent_run_events import AgentRunEventRepository
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -14,9 +20,9 @@ class RunEventSubscription:
     run_id: str
     queue: asyncio.Queue[RunEvent | None]
 
+
 ###############################################################################
 class RunEventPublisher:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -26,7 +32,9 @@ class RunEventPublisher:
     ) -> None:
         self.event_repository = event_repository
         self.subscriber_queue_size = subscriber_queue_size
-        self._subscribers: dict[str, set[asyncio.Queue[RunEvent | None]]] = defaultdict(set)
+        self._subscribers: dict[str, set[asyncio.Queue[RunEvent | None]]] = defaultdict(
+            set
+        )
         self._lock = asyncio.Lock()
 
     # -------------------------------------------------------------------------
@@ -77,7 +85,9 @@ class RunEventPublisher:
         run_id: str,
         after_sequence: int | None = None,
     ) -> tuple[RunEventSubscription, list[RunEvent]]:
-        queue: asyncio.Queue[RunEvent | None] = asyncio.Queue(maxsize=self.subscriber_queue_size)
+        queue: asyncio.Queue[RunEvent | None] = asyncio.Queue(
+            maxsize=self.subscriber_queue_size
+        )
         subscription = RunEventSubscription(run_id=run_id, queue=queue)
         async with self._lock:
             self._subscribers[run_id].add(queue)

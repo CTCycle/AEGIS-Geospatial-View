@@ -32,7 +32,9 @@ class OverlayCollectionService:
     def _norm(value: object) -> str:
         text = unicodedata.normalize("NFKC", str(value or "")).casefold()
         return " ".join(
-            "".join(character if character.isalnum() else " " for character in text).split()
+            "".join(
+                character if character.isalnum() else " " for character in text
+            ).split()
         )
 
     # -------------------------------------------------------------------------
@@ -126,9 +128,12 @@ class OverlayCollectionService:
             "aliases",
             "keywords",
         )
-        semantic_haystack = {cls._norm(value) for value in semantic_values if cls._norm(value)}
+        semantic_haystack = {
+            cls._norm(value) for value in semantic_values if cls._norm(value)
+        }
         if selector.concepts and not any(
-            cls._concept_matches(semantic_haystack, value) for value in selector.concepts
+            cls._concept_matches(semantic_haystack, value)
+            for value in selector.concepts
         ):
             return False
         if selector.labels and not any(
@@ -140,26 +145,38 @@ class OverlayCollectionService:
                 cls._norm(value)
                 for value in cls._metadata_values(metadata, "provider", "provider_id")
             }
-            if not providers.intersection(cls._norm(value) for value in selector.providers):
+            if not providers.intersection(
+                cls._norm(value) for value in selector.providers
+            ):
                 return False
         if selector.overlay_types:
             types = {
                 cls._norm(value)
-                for value in cls._metadata_values(metadata, "type", "overlay_type", "kind")
+                for value in cls._metadata_values(
+                    metadata, "type", "overlay_type", "kind"
+                )
             }
-            if not types.intersection(cls._norm(value) for value in selector.overlay_types):
+            if not types.intersection(
+                cls._norm(value) for value in selector.overlay_types
+            ):
                 return False
         if selector.rendering_modes:
             modes = {
                 cls._norm(value)
-                for value in cls._metadata_values(metadata, "rendering_mode", "renderingMode")
+                for value in cls._metadata_values(
+                    metadata, "rendering_mode", "renderingMode"
+                )
             }
-            if not modes.intersection(cls._norm(value) for value in selector.rendering_modes):
+            if not modes.intersection(
+                cls._norm(value) for value in selector.rendering_modes
+            ):
                 return False
         if selector.tags:
             tags = {
                 cls._norm(value)
-                for value in cls._metadata_values(metadata, "tags", "map_type_tags", "action_tags")
+                for value in cls._metadata_values(
+                    metadata, "tags", "map_type_tags", "action_tags"
+                )
             }
             if not any(cls._concept_matches(tags, value) for value in selector.tags):
                 return False
@@ -183,23 +200,32 @@ class OverlayCollectionService:
         flattened: list[object] = []
         for value in values:
             if isinstance(value, list):
-                flattened.extend(item for item in cast(list[Any], value) if isinstance(item, str))
+                flattened.extend(
+                    item for item in cast(list[Any], value) if isinstance(item, str)
+                )
             else:
                 flattened.append(value)
         return {cls._norm(item) for item in flattened if cls._norm(item)}
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _matches_identity(cls, instance: OverlayInstance, selector: OverlaySelector) -> bool:
+    def _matches_identity(
+        cls, instance: OverlayInstance, selector: OverlaySelector
+    ) -> bool:
         if selector.instance_ids and instance.instance_id in selector.instance_ids:
             return True
         if selector.instance_ids:
             return False
-        if selector.capability_ids and instance.capability_id in selector.capability_ids:
+        if (
+            selector.capability_ids
+            and instance.capability_id in selector.capability_ids
+        ):
             return True
         if selector.capability_ids:
             return False
-        if selector.labels and cls._norm(instance.label) in {cls._norm(item) for item in selector.labels}:
+        if selector.labels and cls._norm(instance.label) in {
+            cls._norm(item) for item in selector.labels
+        }:
             return True
         if selector.labels:
             return False
@@ -207,10 +233,14 @@ class OverlayCollectionService:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _matches_filters(cls, instance: OverlayInstance, selector: OverlaySelector) -> bool:
+    def _matches_filters(
+        cls, instance: OverlayInstance, selector: OverlaySelector
+    ) -> bool:
         concepts = cls._instance_concepts(instance)
         if selector.concepts:
-            if not any(cls._concept_matches(concepts, value) for value in selector.concepts):
+            if not any(
+                cls._concept_matches(concepts, value) for value in selector.concepts
+            ):
                 return False
         if selector.providers and cls._norm(instance.provider) not in {
             cls._norm(item) for item in selector.providers
@@ -317,11 +347,17 @@ class OverlayCollectionService:
         target_point = cls._location_point(target)
         if target_point is not None and instance_point is not None:
             target_radius = target.get("radius_m")
-            instance_radius = instance.viewport.get("radius_m") if instance.viewport else None
+            instance_radius = (
+                instance.viewport.get("radius_m") if instance.viewport else None
+            )
             if isinstance(target_radius, (int, float)) and target_radius > 0:
-                return cls._distance_m(target_point, instance_point) <= float(target_radius)
+                return cls._distance_m(target_point, instance_point) <= float(
+                    target_radius
+                )
             if isinstance(instance_radius, (int, float)) and instance_radius > 0:
-                return cls._distance_m(target_point, instance_point) <= float(instance_radius)
+                return cls._distance_m(target_point, instance_point) <= float(
+                    instance_radius
+                )
             return target_point == instance_point
         target_label_value = scope.label
         if not target_label_value:
@@ -332,9 +368,15 @@ class OverlayCollectionService:
         instance_labels = {
             cls._norm(instance.scope_key),
             cls._norm(instance.scope.get("label")),
-            cls._norm(instance.resolved_location.label if instance.resolved_location else ""),
-            cls._norm(instance.resolved_location.country if instance.resolved_location else ""),
-            cls._norm(instance.resolved_location.city if instance.resolved_location else ""),
+            cls._norm(
+                instance.resolved_location.label if instance.resolved_location else ""
+            ),
+            cls._norm(
+                instance.resolved_location.country if instance.resolved_location else ""
+            ),
+            cls._norm(
+                instance.resolved_location.city if instance.resolved_location else ""
+            ),
         }
         return target_label in instance_labels
 
@@ -397,13 +439,17 @@ class OverlayCollectionService:
             ),
             (
                 selector.labels,
-                lambda instance: cls._norm(instance.label)
-                in {cls._norm(value) for value in selector.labels},
+                lambda instance: (
+                    cls._norm(instance.label)
+                    in {cls._norm(value) for value in selector.labels}
+                ),
             ),
         ):
             if not values:
                 continue
-            matches = [instance for instance in identity_candidates if matcher(instance)]
+            matches = [
+                instance for instance in identity_candidates if matcher(instance)
+            ]
             if matches:
                 identity_candidates = matches
                 break
@@ -432,7 +478,9 @@ class OverlayCollectionService:
         if command.scope.kind == "current_view":
             return "current_view"
         location = command.scope.location or {}
-        label = location.get("label") or location.get("raw_value") or command.scope.label
+        label = (
+            location.get("label") or location.get("raw_value") or command.scope.label
+        )
         point = cls._location_point(location)
         if point is not None:
             return f"location:{cls._norm(label)}:{point[0]:.4f}:{point[1]:.4f}"
@@ -440,9 +488,15 @@ class OverlayCollectionService:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _stable_id(cls, capability_id: str, scope_key: str, variant: dict[str, str | None]) -> str:
+    def _stable_id(
+        cls, capability_id: str, scope_key: str, variant: dict[str, str | None]
+    ) -> str:
         seed = "|".join(
-            [capability_id, scope_key, *(f"{key}={variant.get(key) or ''}" for key in sorted(variant))]
+            [
+                capability_id,
+                scope_key,
+                *(f"{key}={variant.get(key) or ''}" for key in sorted(variant)),
+            ]
         )
         return f"overlay-{sha256(seed.encode('utf-8')).hexdigest()[:16]}"
 
@@ -458,11 +512,24 @@ class OverlayCollectionService:
             capability_id = str(item.get("capability_id") or item.get("id") or "")
             label = str(item.get("label") or item.get("name") or capability_id)
             provider = str(item.get("provider") or "")
-            overlay_type = str(item.get("overlay_type") or item.get("type") or item.get("kind") or "overlay")
-            rendering_mode = str(item.get("rendering_mode") or item.get("renderingMode") or "metadata-only")
+            overlay_type = str(
+                item.get("overlay_type")
+                or item.get("type")
+                or item.get("kind")
+                or "overlay"
+            )
+            rendering_mode = str(
+                item.get("rendering_mode")
+                or item.get("renderingMode")
+                or "metadata-only"
+            )
             concepts_raw = item.get("concepts")
             concepts = (
-                [value for value in cast(list[Any], concepts_raw) if isinstance(value, str)]
+                [
+                    value
+                    for value in cast(list[Any], concepts_raw)
+                    if isinstance(value, str)
+                ]
                 if isinstance(concepts_raw, list)
                 else []
             )
@@ -472,7 +539,11 @@ class OverlayCollectionService:
             for key in ("tags", "action_tags", "map_type_tags"):
                 raw_values = item.get(key)
                 if isinstance(raw_values, list):
-                    tag_values.extend(value for value in cast(list[Any], raw_values) if isinstance(value, str))
+                    tag_values.extend(
+                        value
+                        for value in cast(list[Any], raw_values)
+                        if isinstance(value, str)
+                    )
                 raw_descriptor_values = descriptor_values.get(key)
                 if isinstance(raw_descriptor_values, list):
                     tag_values.extend(
@@ -482,7 +553,12 @@ class OverlayCollectionService:
                     )
             raw_metadata = item.get("metadata")
             if isinstance(raw_metadata, dict):
-                for metadata_key in ("keywords", "action_tags", "task_tags", "capabilities"):
+                for metadata_key in (
+                    "keywords",
+                    "action_tags",
+                    "task_tags",
+                    "capabilities",
+                ):
                     raw_values = raw_metadata.get(metadata_key)
                     if isinstance(raw_values, list):
                         tag_values.extend(
@@ -493,7 +569,9 @@ class OverlayCollectionService:
             descriptor_concepts = descriptor_values.get("concepts")
             if isinstance(descriptor_concepts, list):
                 concepts.extend(
-                    value for value in cast(list[Any], descriptor_concepts) if isinstance(value, str)
+                    value
+                    for value in cast(list[Any], descriptor_concepts)
+                    if isinstance(value, str)
                 )
             concepts.extend(tag_values)
             concepts = list(dict.fromkeys(concepts))
@@ -514,7 +592,9 @@ class OverlayCollectionService:
                 cls._norm(value) for value in selector.capability_ids
             }:
                 continue
-            if selector.providers and cls._norm(provider) not in {cls._norm(value) for value in selector.providers}:
+            if selector.providers and cls._norm(provider) not in {
+                cls._norm(value) for value in selector.providers
+            }:
                 continue
             if selector.overlay_types and cls._norm(overlay_type) not in {
                 cls._norm(value) for value in selector.overlay_types
@@ -531,7 +611,8 @@ class OverlayCollectionService:
                     if cls._norm(value)
                 }
                 if not any(
-                    cls._concept_matches(candidate_tags, value) for value in selector.tags
+                    cls._concept_matches(candidate_tags, value)
+                    for value in selector.tags
                 ):
                     continue
             if selector.concepts and not any(
@@ -563,7 +644,9 @@ class OverlayCollectionService:
     ) -> OverlayInstance:
         scope_key = cls._scope_key(command)
         variant = cls._variant(command)
-        instance_id = cls._stable_id(str(candidate["capability_id"]), scope_key, variant)
+        instance_id = cls._stable_id(
+            str(candidate["capability_id"]), scope_key, variant
+        )
         descriptor = dict(candidate.get("descriptor") or {})
         descriptor.setdefault("id", instance_id)
         descriptor.setdefault("capability_id", candidate["capability_id"])
@@ -574,7 +657,9 @@ class OverlayCollectionService:
         for key in ("concepts", "tags", "aliases"):
             if key in candidate:
                 descriptor.setdefault(key, candidate[key])
-        descriptor.update({key: value for key, value in variant.items() if value is not None})
+        descriptor.update(
+            {key: value for key, value in variant.items() if value is not None}
+        )
         resolved_location = candidate.get("resolved_location")
         return OverlayInstance(
             instance_id=instance_id,
@@ -586,7 +671,9 @@ class OverlayCollectionService:
             scope_key=scope_key,
             scope=dict(command.scope.model_dump(mode="json")),
             resolved_location=resolved_location,
-            viewport=candidate.get("viewport") if isinstance(candidate.get("viewport"), dict) else None,
+            viewport=candidate.get("viewport")
+            if isinstance(candidate.get("viewport"), dict)
+            else None,
             opacity=command.patch.opacity if command.patch.opacity is not None else 1.0,
             render_variant=variant,
             descriptor=descriptor,
@@ -629,7 +716,9 @@ class OverlayCollectionService:
         unmatched: list[str] = []
         ambiguous: list[str] = []
 
-        matches = cls._matching_instances(collection, command, current_view=current_view)
+        matches = cls._matching_instances(
+            collection, command, current_view=current_view
+        )
         # A global command without an independent overlay selector is not
         # deterministic: its scope would otherwise turn into "all overlays".
         # An explicit geographic/current-view scope is meaningful because the
@@ -682,7 +771,10 @@ class OverlayCollectionService:
                 match_ids = {item.instance_id for item in matches}
                 kept: list[OverlayInstance] = []
                 for instance in instances:
-                    if cls._scope_matches(instance, command, current_view=current_view) and instance.instance_id not in match_ids:
+                    if (
+                        cls._scope_matches(instance, command, current_view=current_view)
+                        and instance.instance_id not in match_ids
+                    ):
                         removed.append(instance.instance_id)
                     else:
                         kept.append(instance)
@@ -717,7 +809,10 @@ class OverlayCollectionService:
                         changed = True
                     variant = cls._variant(command)
                     for key, value in variant.items():
-                        if value is not None and instance.render_variant.get(key) != value:
+                        if (
+                            value is not None
+                            and instance.render_variant.get(key) != value
+                        ):
                             instance.render_variant[key] = value
                             instance.descriptor[key] = value
                             changed = True
@@ -791,31 +886,50 @@ class OverlayCollectionService:
         current_view: dict[str, Any] | None = None,
     ) -> bool:
         """Return whether a command can be satisfied from active state alone."""
-        return bool(cls._matching_instances(collection, command, current_view=current_view))
+        return bool(
+            cls._matching_instances(collection, command, current_view=current_view)
+        )
 
     # -------------------------------------------------------------------------
     @classmethod
-    def from_map_session(cls, session: MapSession | dict[str, Any] | None) -> OverlayCollectionState:
+    def from_map_session(
+        cls, session: MapSession | dict[str, Any] | None
+    ) -> OverlayCollectionState:
         if session is None:
             return OverlayCollectionState()
-        model = session if isinstance(session, MapSession) else MapSession.model_validate(session)
+        model = (
+            session
+            if isinstance(session, MapSession)
+            else MapSession.model_validate(session)
+        )
         if model.overlay_collection is not None:
             return model.overlay_collection.model_copy(deep=True)
         instances: list[OverlayInstance] = []
         location_label = model.resolved_location.label.strip() or "map"
         point = (model.resolved_location.latitude, model.resolved_location.longitude)
-        session_scope_key = f"location:{cls._norm(location_label)}:{point[0]:.4f}:{point[1]:.4f}"
+        session_scope_key = (
+            f"location:{cls._norm(location_label)}:{point[0]:.4f}:{point[1]:.4f}"
+        )
         for descriptor in model.overlays:
             overlay_id = str(descriptor.get("id") or descriptor.get("layer_id") or "")
             if not overlay_id:
                 continue
             capability_id = str(descriptor.get("capability_id") or overlay_id)
             variant = {
-                "time": str(descriptor.get("time")) if descriptor.get("time") is not None else None,
-                "style": str(descriptor.get("style")) if descriptor.get("style") is not None else None,
-                "format": str(descriptor.get("format")) if descriptor.get("format") is not None else None,
+                "time": str(descriptor.get("time"))
+                if descriptor.get("time") is not None
+                else None,
+                "style": str(descriptor.get("style"))
+                if descriptor.get("style") is not None
+                else None,
+                "format": str(descriptor.get("format"))
+                if descriptor.get("format") is not None
+                else None,
             }
-            instance_id = str(descriptor.get("instance_id") or cls._stable_id(capability_id, session_scope_key, variant))
+            instance_id = str(
+                descriptor.get("instance_id")
+                or cls._stable_id(capability_id, session_scope_key, variant)
+            )
             raw_inspections = descriptor.get("inspections")
             inspections: list[MapInspection] = []
             if isinstance(raw_inspections, list):
@@ -833,7 +947,9 @@ class OverlayCollectionService:
                     label=str(descriptor.get("label") or overlay_id),
                     provider=str(descriptor.get("provider") or "unknown"),
                     overlay_type=str(descriptor.get("type") or "overlay"),
-                    rendering_mode=str(descriptor.get("rendering_mode") or "metadata-only"),
+                    rendering_mode=str(
+                        descriptor.get("rendering_mode") or "metadata-only"
+                    ),
                     scope_key=session_scope_key,
                     scope={"kind": "location", "label": location_label},
                     resolved_location=model.resolved_location,
@@ -841,7 +957,10 @@ class OverlayCollectionService:
                     visible=descriptor.get("visible") is not False,
                     opacity=(
                         float(default_opacity)
-                        if isinstance(default_opacity := descriptor.get("default_opacity"), (int, float))
+                        if isinstance(
+                            default_opacity := descriptor.get("default_opacity"),
+                            (int, float),
+                        )
                         else 1.0
                     ),
                     render_variant=variant,
@@ -904,10 +1023,16 @@ class OverlayCollectionService:
         ]
         return session.model_copy(
             update={
-                "overlay_ids": [instance.instance_id for instance in collection.instances],
-                "requested_overlay_ids": [instance.instance_id for instance in collection.instances],
+                "overlay_ids": [
+                    instance.instance_id for instance in collection.instances
+                ],
+                "requested_overlay_ids": [
+                    instance.instance_id for instance in collection.instances
+                ],
                 "rendered_overlay_ids": [
-                    instance.instance_id for instance in collection.instances if instance.visible
+                    instance.instance_id
+                    for instance in collection.instances
+                    if instance.visible
                 ],
                 "overlays": overlays,
                 "overlay_collection_revision": collection.revision,

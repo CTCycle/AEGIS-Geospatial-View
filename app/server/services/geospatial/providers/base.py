@@ -16,17 +16,21 @@ from server.domain.geospatial.providers import (
     ProviderResult,
 )
 
+
 ###############################################################################
 class ProviderError(Exception):
     """Base error for geospatial provider execution failures."""
+
 
 ###############################################################################
 class ProviderAuthError(ProviderError):
     """Raised when a provider needs credentials that are unavailable or invalid."""
 
+
 ###############################################################################
 class ProviderCircuitOpenError(ProviderError):
     """Raised when a provider circuit is open after repeated failures."""
+
 
 ###############################################################################
 class ProviderRateLimitError(ProviderError):
@@ -39,17 +43,21 @@ class ProviderRateLimitError(ProviderError):
         super().__init__(message)
         self.retry_after_seconds = retry_after_seconds
 
+
 ###############################################################################
 class ProviderTimeoutError(ProviderError):
     """Raised when a provider request exceeds its timeout."""
+
 
 ###############################################################################
 class ProviderUnavailableError(ProviderError):
     """Raised when a provider cannot be reached or is temporarily unhealthy."""
 
+
 ###############################################################################
 class ProviderMalformedPayloadError(ProviderError):
     """Raised when a provider returns a payload that cannot be normalized."""
+
 
 ###############################################################################
 class ProviderInvalidQueryError(ProviderError):
@@ -57,6 +65,7 @@ class ProviderInvalidQueryError(ProviderError):
 
 
 SENSITIVE_PARAM_MARKERS = ("key", "secret", "token", "password", "authorization")
+
 
 ###############################################################################
 def safe_request_params(params: dict[str, Any]) -> dict[str, Any]:
@@ -68,6 +77,7 @@ def safe_request_params(params: dict[str, Any]) -> dict[str, Any]:
         else:
             safe[key_text] = value
     return safe
+
 
 ###############################################################################
 def provider_cache_key(provider_id: str, request: ProviderRequest) -> str:
@@ -83,6 +93,7 @@ def provider_cache_key(provider_id: str, request: ProviderRequest) -> str:
     digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
     return f"{payload['provider']}:{request.capability_id}:{digest}"
 
+
 ###############################################################################
 def response_without_credentials(response: ProviderResponse) -> ProviderResponse:
     return ProviderResponse(
@@ -96,6 +107,7 @@ def response_without_credentials(response: ProviderResponse) -> ProviderResponse
         result_status="stale" if response.stale else response.result_status,
         result_type=response.result_type,
     )
+
 
 ###############################################################################
 def _redact_secrets(value: Any) -> Any:
@@ -114,6 +126,7 @@ def _redact_secrets(value: Any) -> Any:
         return _redact_url_query(value)
     return value
 
+
 ###############################################################################
 def _redact_url_query(value: str) -> str:
     try:
@@ -131,6 +144,7 @@ def _redact_url_query(value: str) -> str:
     return urlunsplit(
         (parsed.scheme, parsed.netloc, parsed.path, urlencode(query), parsed.fragment)
     )
+
 
 ###############################################################################
 class GeospatialProvider(Protocol):
@@ -153,6 +167,7 @@ class GeospatialProvider(Protocol):
     ) -> ProviderCredentialValidationResult:
         """Validate provider credentials without persisting them."""
         return await unsupported_credential_validation(self.provider_id)
+
 
 ###############################################################################
 async def unsupported_credential_validation(

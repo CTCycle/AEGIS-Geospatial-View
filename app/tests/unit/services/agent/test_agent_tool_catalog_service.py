@@ -25,9 +25,9 @@ from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.search.request_builder import RequestBuilder
 
+
 ###############################################################################
 class _CapabilityRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.load_calls = 0
@@ -83,7 +83,11 @@ class _CapabilityRegistry:
                 "capabilityKind": "raster-overlay",
                 "metadata": {
                     "geometry_type": "raster-grid",
-                    "argument_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+                    "argument_schema": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False,
+                    },
                 },
                 "auth": {"required": True, "providerKey": "tomtom"},
             },
@@ -106,11 +110,13 @@ class _CapabilityRegistry:
 
     # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str):
-        return next((item for item in self.capabilities if item["id"] == capability_id), None)
+        return next(
+            (item for item in self.capabilities if item["id"] == capability_id), None
+        )
+
 
 ###############################################################################
 class _RuntimeRegistry:
-
     # -------------------------------------------------------------------------
     def is_enabled(self, capability_id: str) -> bool:
         return capability_id != "disabled_capability"
@@ -130,9 +136,9 @@ class _RuntimeRegistry:
         }
         return mode in supported.get(capability_id, set())
 
+
 ###############################################################################
 class _LocationResolver:
-
     # -------------------------------------------------------------------------
     async def resolve_location_signals(self, location_signals, memory_snapshot):  # noqa: ANN001
         signal = location_signals[0] if location_signals else None
@@ -153,9 +159,9 @@ class _LocationResolver:
             confidence=signal.confidence or 0.9,
         )
 
+
 ###############################################################################
 class _SearchOrchestrator:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.requests: list[Any] = []
@@ -170,7 +176,10 @@ class _SearchOrchestrator:
             overlay_ids=payload.overlay_ids,
             viewport=payload.viewport,
             basemap={"id": payload.basemap_id, "label": payload.basemap_id},
-            overlays=[{"id": overlay_id, "label": overlay_id} for overlay_id in payload.overlay_ids],
+            overlays=[
+                {"id": overlay_id, "label": overlay_id}
+                for overlay_id in payload.overlay_ids
+            ],
             payload={"action_id": payload.action_id},
             center={
                 "latitude": payload.viewport.center_latitude,
@@ -179,21 +188,27 @@ class _SearchOrchestrator:
             bounds=[12.0, 41.0, 13.0, 42.0],
         )
 
+
 ###############################################################################
 class _ToolRegistry:
-
     # -------------------------------------------------------------------------
     async def execute(self, tool_id, plan, location):  # noqa: ANN001
         return {
             "tool_id": tool_id,
             "plan_state": plan.state,
             "location": {"label": location.label},
-            "result": {"coordinates": {"latitude": location.latitude, "longitude": location.longitude}},
+            "result": {
+                "coordinates": {
+                    "latitude": location.latitude,
+                    "longitude": location.longitude,
+                }
+            },
         }
 
     # -------------------------------------------------------------------------
     def get_handler(self, tool_id: str):  # noqa: ARG002
         return object()
+
 
 ###############################################################################
 def _context() -> AgentExecutionContext:
@@ -236,6 +251,7 @@ def _context() -> AgentExecutionContext:
         },
     )
 
+
 ###############################################################################
 def _direct_context() -> AgentExecutionContext:
     return AgentExecutionContext(
@@ -277,6 +293,7 @@ def _direct_context() -> AgentExecutionContext:
         },
     )
 
+
 ###############################################################################
 def _service() -> AgentToolCatalogService:
     runtime_registry = _RuntimeRegistry()
@@ -296,6 +313,7 @@ def _service() -> AgentToolCatalogService:
         geospatial_api_service=SimpleNamespace(),  # type: ignore[arg-type]
     )
 
+
 ###############################################################################
 def test_catalog_builds_stable_native_tools() -> None:
     service = _service()
@@ -308,31 +326,45 @@ def test_catalog_builds_stable_native_tools() -> None:
         "render_geospatial_provider_layer",
     ]
 
+
 ###############################################################################
 def test_native_tool_descriptions_define_discovery_selection_boundaries() -> None:
     definitions = {
         item.name: item.description for item in _service().build_native_tools()
     }
 
-    assert "does not execute a capability" in definitions["list_geospatial_capabilities"]
+    assert (
+        "does not execute a capability" in definitions["list_geospatial_capabilities"]
+    )
     assert "Do not guess an ID" in definitions["describe_geospatial_capability"]
     assert "policy-allowlisted" in definitions["execute_geospatial_capability"]
-    assert "explicitly routed and policy-allowlisted" in definitions["fetch_geospatial_provider_layers"]
-    assert "exact provider_id and layer_id" in definitions["render_geospatial_provider_layer"]
+    assert (
+        "explicitly routed and policy-allowlisted"
+        in definitions["fetch_geospatial_provider_layers"]
+    )
+    assert (
+        "exact provider_id and layer_id"
+        in definitions["render_geospatial_provider_layer"]
+    )
+
 
 ###############################################################################
 def test_catalog_pagination_is_deterministic() -> None:
     service = _service()
     first = service.list_geospatial_capabilities(CapabilityCatalogFilter(limit=1))
-    second = service.list_geospatial_capabilities(CapabilityCatalogFilter(limit=1, cursor=first["next_cursor"]))
+    second = service.list_geospatial_capabilities(
+        CapabilityCatalogFilter(limit=1, cursor=first["next_cursor"])
+    )
     assert first["items"][0]["id"] == "coordinates_tool"
     assert second["items"][0]["id"] == "tomtom_traffic_flow"
+
 
 ###############################################################################
 def test_capability_description_includes_executable_schema() -> None:
     service = _service()
     descriptor = service.describe_geospatial_capability("coordinates_tool")
     assert descriptor["argument_schema"]["required"] == ["location"]
+
 
 ###############################################################################
 def test_execute_rejects_invalid_nested_arguments() -> None:
@@ -349,6 +381,7 @@ def test_execute_rejects_invalid_nested_arguments() -> None:
     assert result["error"] is not None
     assert "bbox" in result["error"]["message"]
 
+
 ###############################################################################
 def test_execute_map_capability_returns_real_map_session() -> None:
     result = run_async_in_thread(
@@ -363,6 +396,7 @@ def test_execute_map_capability_returns_real_map_session() -> None:
     assert result["operation"] == "map_session_created"
     assert result["map_session"] is not None
     assert result["map_session"]["resolved_location"]["label"] == "Rome"
+
 
 ###############################################################################
 def test_execute_direct_capability_returns_direct_result() -> None:
@@ -379,6 +413,7 @@ def test_execute_direct_capability_returns_direct_result() -> None:
     assert result["direct_result"] is not None
     assert result["direct_result"]["tool_id"] == "coordinates_tool"
 
+
 ###############################################################################
 def test_execute_returns_missing_credentials_without_fake_success() -> None:
     result = run_async_in_thread(
@@ -393,6 +428,7 @@ def test_execute_returns_missing_credentials_without_fake_success() -> None:
     assert result["operation"] == "missing_credentials"
     assert result["error"] is not None
     assert result["error"]["code"] == "missing_credentials"
+
 
 ###############################################################################
 def test_execute_rejects_direct_only_capability_for_map_request() -> None:
@@ -409,6 +445,7 @@ def test_execute_rejects_direct_only_capability_for_map_request() -> None:
     assert result["error"] is not None
     assert result["error"]["code"] == "unsupported_capability"
 
+
 ###############################################################################
 def test_catalog_tools_register_with_tool_registry() -> None:
     registry = ToolRegistry(runtime_registry=_RuntimeRegistry())  # type: ignore[arg-type]
@@ -417,6 +454,7 @@ def test_catalog_tools_register_with_tool_registry() -> None:
     assert registry.has_native_tool("fetch_geospatial_provider_layers")
     assert registry.has_native_tool("render_geospatial_provider_layer")
     assert len(registry.list_native_tools()) == 5
+
 
 ###############################################################################
 def test_provider_layer_listing_does_not_render_first_layer_implicitly() -> None:
@@ -453,13 +491,15 @@ def test_provider_layer_listing_does_not_render_first_layer_implicitly() -> None
     assert service.search_orchestrator is not None
     assert service.search_orchestrator.requests == []  # type: ignore[attr-defined]
 
+
 ###############################################################################
-def test_provider_layer_rendering_surfaces_failed_provider_without_map_success() -> None:
+def test_provider_layer_rendering_surfaces_failed_provider_without_map_success() -> (
+    None
+):
     service = _service()
 
     ###############################################################################
     class _FailedSearchOrchestrator:
-
         # -------------------------------------------------------------------------
         async def execute(self, payload):  # noqa: ANN001
             return MapSession(

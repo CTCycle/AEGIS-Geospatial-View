@@ -17,13 +17,15 @@ UNKNOWN_OUTPUT_ALLOWANCE_TOKENS = 2048
 # initialize to their full supported cap instead of this minimum.
 MIN_OLLAMA_CONTEXT_WINDOW = 2048
 
+
 ###############################################################################
 def _positive_int(value: object) -> int | None:
     try:
         number = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return number if number > 0 else None
+
 
 ###############################################################################
 def estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
@@ -37,11 +39,15 @@ def estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
         total += estimate_json_tokens(message.get("tool_calls"))
     return max(total, 1)
 
+
 ###############################################################################
 def estimate_json_tokens(value: object) -> int:
     if value is None:
         return 0
-    return max(1, math.ceil(len(json.dumps(value, default=str, separators=(",", ":"))) / 4))
+    return max(
+        1, math.ceil(len(json.dumps(value, default=str, separators=(",", ":"))) / 4)
+    )
+
 
 ###############################################################################
 def resolve_model_context_limit(model: str) -> int | None:
@@ -68,12 +74,16 @@ def resolve_model_context_limit(model: str) -> int | None:
             return limit
     return None
 
+
 ###############################################################################
 def _request_metadata(request: LLMRequest) -> dict[str, Any]:
     return request.metadata if isinstance(request.metadata, dict) else {}
 
+
 ###############################################################################
-def _profile_for_request(provider: str, request: LLMRequest) -> ModelContextProfile | None:
+def _profile_for_request(
+    provider: str, request: LLMRequest
+) -> ModelContextProfile | None:
     normalized_provider = provider.strip().lower()
     metadata = _request_metadata(request)
     static_profile = get_model_context_profile(normalized_provider, request.model)
@@ -111,8 +121,11 @@ def _profile_for_request(provider: str, request: LLMRequest) -> ModelContextProf
         context_window_tokens=context_limit,
         maximum_output_tokens=maximum_output,
         default_output_reserve=maximum_output or UNKNOWN_OUTPUT_ALLOWANCE_TOKENS,
-        metadata_source=str(metadata.get("context_profile_source") or "provider_metadata"),
+        metadata_source=str(
+            metadata.get("context_profile_source") or "provider_metadata"
+        ),
     )
+
 
 ###############################################################################
 def resolve_model_context_profile(
@@ -133,8 +146,11 @@ def resolve_model_context_profile(
         LLMRequest(model=model, messages=[], metadata=dict(metadata or {})),
     )
 
+
 ###############################################################################
-def _expected_output_tokens(request: LLMRequest, profile: ModelContextProfile | None) -> int:
+def _expected_output_tokens(
+    request: LLMRequest, profile: ModelContextProfile | None
+) -> int:
     metadata = _request_metadata(request)
     configured = _positive_int(
         metadata.get("max_tokens")
@@ -149,6 +165,7 @@ def _expected_output_tokens(request: LLMRequest, profile: ModelContextProfile | 
         return profile.maximum_output_tokens or profile.default_output_reserve
     return UNKNOWN_OUTPUT_ALLOWANCE_TOKENS
 
+
 ###############################################################################
 def _context_components(
     request: LLMRequest,
@@ -159,25 +176,31 @@ def _context_components(
     schema_tokens = estimate_json_tokens(request.response_json_schema)
     limit = profile.context_window_tokens if profile is not None else None
     usable = (
-        max(0, limit - expected_output - tool_tokens - schema_tokens - CONTEXT_HEADROOM_TOKENS)
+        max(
+            0,
+            limit
+            - expected_output
+            - tool_tokens
+            - schema_tokens
+            - CONTEXT_HEADROOM_TOKENS,
+        )
         if limit is not None
         else None
     )
     return expected_output, tool_tokens, schema_tokens, CONTEXT_HEADROOM_TOKENS, usable
+
 
 ###############################################################################
 def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage:
     normalized = provider.strip().lower()
     profile = _profile_for_request(normalized, request)
     estimated = estimate_message_tokens(request.messages)
-    expected_output, tool_tokens, schema_tokens, safety_margin, usable = _context_components(
-        request, profile
+    expected_output, tool_tokens, schema_tokens, safety_margin, usable = (
+        _context_components(request, profile)
     )
     limit = profile.context_window_tokens if profile is not None else None
     percent = (
-        round((estimated / max(usable, 1)) * 100, 1)
-        if usable is not None
-        else None
+        round((estimated / max(usable, 1)) * 100, 1) if usable is not None else None
     )
     return ContextUsage(
         estimated_input_tokens=estimated,
@@ -193,9 +216,14 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
         safety_margin_tokens=safety_margin,
         usable_prompt_budget_tokens=usable,
         current_conversation_tokens=estimated,
-        context_profile_source=profile.metadata_source if profile is not None else "unknown",
-        compaction_applied=bool(_request_metadata(request).get("_context_compaction_applied")),
+        context_profile_source=profile.metadata_source
+        if profile is not None
+        else "unknown",
+        compaction_applied=bool(
+            _request_metadata(request).get("_context_compaction_applied")
+        ),
     )
+
 
 ###############################################################################
 def compute_ollama_context_usage(
@@ -210,8 +238,11 @@ def compute_ollama_context_usage(
     )
     return compute_context_usage(effective, provider="ollama")
 
+
 ###############################################################################
-def _message_blocks(messages: list[dict[str, Any]]) -> list[tuple[list[int], list[dict[str, Any]]]]:
+def _message_blocks(
+    messages: list[dict[str, Any]],
+) -> list[tuple[list[int], list[dict[str, Any]]]]:
     """Group tool-call/result pairs so compaction never leaves a broken pair."""
 
     blocks: list[tuple[list[int], list[dict[str, Any]]]] = []
@@ -221,7 +252,9 @@ def _message_blocks(messages: list[dict[str, Any]]) -> list[tuple[list[int], lis
         role = str(message.get("role") or "")
         if role == "assistant" and message.get("tool_calls"):
             end = index + 1
-            while end < len(messages) and str(messages[end].get("role") or "") == "tool":
+            while (
+                end < len(messages) and str(messages[end].get("role") or "") == "tool"
+            ):
                 end += 1
             blocks.append((list(range(index, end)), messages[index:end]))
             index = end
@@ -230,14 +263,21 @@ def _message_blocks(messages: list[dict[str, Any]]) -> list[tuple[list[int], lis
         index += 1
     return blocks
 
+
 ###############################################################################
-def _compact_messages(messages: list[dict[str, Any]], budget: int) -> tuple[list[dict[str, Any]], bool]:
+def _compact_messages(
+    messages: list[dict[str, Any]], budget: int
+) -> tuple[list[dict[str, Any]], bool]:
     if estimate_message_tokens(messages) <= budget:
         return list(messages), False
 
     blocks = _message_blocks(messages)
     last_user_index = next(
-        (index for index in range(len(messages) - 1, -1, -1) if messages[index].get("role") == "user"),
+        (
+            index
+            for index in range(len(messages) - 1, -1, -1)
+            if messages[index].get("role") == "user"
+        ),
         len(messages) - 1,
     )
     pinned_indices = {
@@ -255,7 +295,9 @@ def _compact_messages(messages: list[dict[str, Any]], budget: int) -> tuple[list
     for indices, block in reversed(blocks):
         if set(indices) & selected_indices:
             continue
-        candidate = [messages[index] for index in sorted(selected_indices | set(indices))]
+        candidate = [
+            messages[index] for index in sorted(selected_indices | set(indices))
+        ]
         if estimate_message_tokens(candidate) <= budget:
             selected_indices.update(indices)
         else:
@@ -272,16 +314,26 @@ def _compact_messages(messages: list[dict[str, Any]], budget: int) -> tuple[list
                 content = str(message.get("content") or "").strip()
                 if content:
                     snippet_limit = min(320, summary_char_limit)
-                    snippets.append(f"{message.get('role', 'message')}: {content[:snippet_limit]}")
+                    snippets.append(
+                        f"{message.get('role', 'message')}: {content[:snippet_limit]}"
+                    )
                 if sum(len(item) for item in snippets) >= summary_char_limit:
                     break
             summary = {
                 "role": "system",
-                "content": build_compacted_history_summary(" | ".join(reversed(snippets))),
+                "content": build_compacted_history_summary(
+                    " | ".join(reversed(snippets))
+                ),
             }
-            selected = [messages[index] for index in range(len(messages)) if index in selected_indices]
+            selected = [
+                messages[index]
+                for index in range(len(messages))
+                if index in selected_indices
+            ]
             system_count = sum(
-                1 for message in selected if str(message.get("role") or "") in {"system", "developer"}
+                1
+                for message in selected
+                if str(message.get("role") or "") in {"system", "developer"}
             )
             candidate = list(selected)
             candidate.insert(system_count, summary)
@@ -313,6 +365,7 @@ def _compact_messages(messages: list[dict[str, Any]], budget: int) -> tuple[list
         return [], True
     return selected, True
 
+
 ###############################################################################
 def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:
     profile = _profile_for_request(provider, request)
@@ -340,7 +393,8 @@ def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:
     prepared = replace(request, messages=messages, metadata=metadata)
     prepared_usage = compute_context_usage(prepared, provider=provider)
     if prepared_usage.usable_prompt_budget_tokens is not None and (
-        prepared_usage.estimated_input_tokens > prepared_usage.usable_prompt_budget_tokens
+        prepared_usage.estimated_input_tokens
+        > prepared_usage.usable_prompt_budget_tokens
     ):
         raise LLMContextLimitError(
             provider=provider,

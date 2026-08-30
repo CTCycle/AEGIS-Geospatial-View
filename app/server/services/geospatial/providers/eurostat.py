@@ -17,6 +17,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class EurostatProvider(GeospatialProvider):
     provider_id = "eurostat"
@@ -84,30 +85,42 @@ class EurostatProvider(GeospatialProvider):
         cache_key = f"{self.provider_id}:{request.capability_id}:{dataset_url}"
         cached = self.cache.get(cache_key)
         if cached.status == CacheLookupStatus.HIT and is_json_object(cached.value):
-            return _response(request, metadata, {**payload, "jsonStatMetadata": cached.value})
+            return _response(
+                request, metadata, {**payload, "jsonStatMetadata": cached.value}
+            )
         try:
             metadata_payload = await call_json_fetcher(self.fetcher, dataset_url, None)
         except Exception as exc:
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return _response(
                     request,
                     metadata,
                     {**payload, "jsonStatMetadata": cached.value},
                     stale=True,
-                    warnings=["Eurostat JSON-stat metadata refresh failed; using stale metadata."],
+                    warnings=[
+                        "Eurostat JSON-stat metadata refresh failed; using stale metadata."
+                    ],
                 )
             if isinstance(exc, ProviderUnavailableError):
                 raise
-            raise ProviderUnavailableError("Eurostat JSON-stat metadata fetch failed.") from exc
+            raise ProviderUnavailableError(
+                "Eurostat JSON-stat metadata fetch failed."
+            ) from exc
         normalized = _normalize_jsonstat_metadata(metadata_payload)
         if normalized is None:
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return _response(
                     request,
                     metadata,
                     {**payload, "jsonStatMetadata": cached.value},
                     stale=True,
-                    warnings=["Eurostat JSON-stat metadata was malformed; using stale metadata."],
+                    warnings=[
+                        "Eurostat JSON-stat metadata was malformed; using stale metadata."
+                    ],
                 )
             raise ProviderUnavailableError("Eurostat JSON-stat metadata was malformed.")
         self.cache.set(
@@ -118,10 +131,12 @@ class EurostatProvider(GeospatialProvider):
         )
         return _response(request, metadata, {**payload, "jsonStatMetadata": normalized})
 
+
 ###############################################################################
 def _metadata(request: ProviderRequest) -> dict[str, Any]:
     value = request.params.get("metadata")
     return dict(value) if is_json_object(value) else {}
+
 
 ###############################################################################
 def _response(
@@ -141,6 +156,7 @@ def _response(
         stale=stale,
     )
 
+
 ###############################################################################
 def _normalize_jsonstat_metadata(value: Any) -> dict[str, Any] | None:
     if not is_json_object(value):
@@ -157,6 +173,7 @@ def _normalize_jsonstat_metadata(value: Any) -> dict[str, Any] | None:
         "label": value.get("label"),
         "updated": value.get("updated"),
     }
+
 
 ###############################################################################
 def _build_choropleth_payload(
@@ -179,7 +196,9 @@ def _build_choropleth_payload(
             continue
         properties = json_object(feature.get("properties"))
         properties.setdefault("metric", metric)
-        properties.setdefault("vintage", request.params.get("vintage") or metadata.get("vintage"))
+        properties.setdefault(
+            "vintage", request.params.get("vintage") or metadata.get("vintage")
+        )
         properties.setdefault("source", "Eurostat")
         if request.params.get("margin_of_error") is not None:
             properties.setdefault("marginOfError", request.params["margin_of_error"])
@@ -193,8 +212,12 @@ def _build_choropleth_payload(
         "source": "Eurostat",
         "joinKey": "NUTS_ID",
         "legendBins": bins,
-        "featureCollection": {"type": "FeatureCollection", "features": enriched_features},
+        "featureCollection": {
+            "type": "FeatureCollection",
+            "features": enriched_features,
+        },
     }
+
 
 ###############################################################################
 def _legend_bins(values: list[float]) -> list[dict[str, float]]:

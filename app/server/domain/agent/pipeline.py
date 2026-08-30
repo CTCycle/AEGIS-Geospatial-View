@@ -40,6 +40,7 @@ SpecialistGroup = Literal[
     "visualization_update",
 ]
 
+
 ###############################################################################
 class TaskFailureDetail(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -54,13 +55,17 @@ class TaskFailureDetail(BaseModel):
     recovery_suggestion: str | None = None
     user_explanation: str
     provider_error: dict[str, object] | None = None
-    failure_category: Literal[
-        "model_capability",
-        "provider_api",
-        "schema_definition",
-        "response_parsing",
-        "context_limit",
-    ] | None = None
+    failure_category: (
+        Literal[
+            "model_capability",
+            "provider_api",
+            "schema_definition",
+            "response_parsing",
+            "context_limit",
+        ]
+        | None
+    ) = None
+
 
 ###############################################################################
 class ToolRetryPolicy(BaseModel):
@@ -75,6 +80,7 @@ class ToolRetryPolicy(BaseModel):
             "provider_unavailable",
         ]
     )
+
 
 ###############################################################################
 class ToolPlanStep(BaseModel):
@@ -95,6 +101,7 @@ class ToolPlanStep(BaseModel):
     merge_policy: str = "merge_verified_map_or_direct_result"
     required: bool = True
 
+
 ###############################################################################
 class ToolPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -103,9 +110,12 @@ class ToolPlan(BaseModel):
     candidate_tools: list[str] = Field(default_factory=lambda: list[str]())
     selected_tools: list[str] = Field(default_factory=lambda: list[str]())
     steps: list[ToolPlanStep] = Field(default_factory=lambda: list[ToolPlanStep]())
-    visualization_update: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    visualization_update: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]()
+    )
     frontend_derivation: str = "derive_from_validated_results"
     partial_failure_policy: str = "retain_successful_required_results"
+
 
 ###############################################################################
 class ConversationTaskRecord(BaseModel):
@@ -121,7 +131,9 @@ class ConversationTaskRecord(BaseModel):
     required_entities: list[str] = Field(default_factory=lambda: list[str]())
     geographic_scope: dict[str, Any] | None = None
     required_data_layers: list[str] = Field(default_factory=lambda: list[str]())
-    visualization_changes: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    visualization_changes: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]()
+    )
     specialist: SpecialistGroup
     tool_plan: ToolPlan | None = None
     tool_result_refs: list[str] = Field(default_factory=lambda: list[str]())
@@ -134,6 +146,7 @@ class ConversationTaskRecord(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
+
 ###############################################################################
 class ToolResultProvenance(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -144,6 +157,7 @@ class ToolResultProvenance(BaseModel):
     attempt: int = 1
     elapsed_ms: int = 0
     call_fingerprint: str | None = None
+
 
 ###############################################################################
 class PlannedToolResult(BaseModel):
@@ -156,6 +170,7 @@ class PlannedToolResult(BaseModel):
     error_message: str | None = None
     validation_error: str | None = None
     provenance: ToolResultProvenance
+
 
 ###############################################################################
 class VisualizationUpdate(BaseModel):
@@ -174,6 +189,7 @@ class VisualizationUpdate(BaseModel):
     ambiguous_selectors: list[str] = Field(default_factory=lambda: list[str]())
     clarification: str | None = None
 
+
 ###############################################################################
 class ConversationTaskSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -183,7 +199,9 @@ class ConversationTaskSnapshot(BaseModel):
     current_task_id: str | None = None
     goal: AgentGoal | None = None
     tasks: list[AgentTask] = Field(default_factory=lambda: list[AgentTask]())
-    geospatial_state: GeospatialWorkingState = Field(default_factory=GeospatialWorkingState)
+    geospatial_state: GeospatialWorkingState = Field(
+        default_factory=GeospatialWorkingState
+    )
     evidence_refs: list[str] = Field(default_factory=list)
     active_map_session: dict[str, Any] | None = None
     assumptions: list[str] = Field(default_factory=list)

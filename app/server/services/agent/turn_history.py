@@ -9,9 +9,9 @@ from server.contracts.extraction import LocationSignal
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.chat.history_service import ChatHistoryService
 
+
 ###############################################################################
 class AgentTurnHistoryService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

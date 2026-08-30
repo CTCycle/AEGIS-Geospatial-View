@@ -11,13 +11,14 @@ from server.services.llm.ollama import OllamaProvider
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMResult
 
+
 ###############################################################################
 class _StructuredPayload(BaseModel):
     answer: str = "structured"
 
+
 ###############################################################################
 class _Message:
-
     # -------------------------------------------------------------------------
     def __init__(self, content) -> None:  # noqa: ANN001
         self.content = content
@@ -25,9 +26,9 @@ class _Message:
         self.usage_metadata = {"total_tokens": 3}
         self.additional_kwargs = {}
 
+
 ###############################################################################
 class _StructuredModel:
-
     # -------------------------------------------------------------------------
     def __init__(self, schema: type[object]) -> None:
         self._schema = schema
@@ -38,6 +39,7 @@ class _StructuredModel:
         if callable(validator):
             return validator({"answer": "structured"})
         return {"answer": "structured"}
+
 
 ###############################################################################
 class _FakeChatModel:
@@ -61,9 +63,9 @@ class _FakeChatModel:
     def with_structured_output(self, schema: type[object]) -> _StructuredModel:
         return _StructuredModel(schema)
 
+
 ###############################################################################
 class _FakeEmbeddings:
-
     # -------------------------------------------------------------------------
     def __init__(self, **_kwargs) -> None:
         pass
@@ -71,6 +73,7 @@ class _FakeEmbeddings:
     # -------------------------------------------------------------------------
     def embed_query(self, _input_text: str) -> list[float]:
         return [0.1, 0.2, 0.3]
+
 
 ###############################################################################
 class _FakeOpenAIResponse:
@@ -80,9 +83,9 @@ class _FakeOpenAIResponse:
     def model_dump(self, *, mode: str) -> dict[str, object]:
         return {"mode": mode, "id": "resp-test"}
 
+
 ###############################################################################
 class _FakeOpenAIResponses:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.create_calls: list[dict[str, object]] = []
@@ -107,9 +110,9 @@ class _FakeOpenAIResponses:
             output_text="",
         )
 
+
 ###############################################################################
 class _FakeOpenAIEmbeddingEndpoint:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.create_calls: list[dict[str, object]] = []
@@ -118,6 +121,7 @@ class _FakeOpenAIEmbeddingEndpoint:
     def create(self, **kwargs):  # noqa: ANN001, ANN202
         self.create_calls.append(kwargs)
         return SimpleNamespace(data=[SimpleNamespace(embedding=[0.1, 0.2, 0.3])])
+
 
 ###############################################################################
 class _FakeOpenAIClient:
@@ -130,9 +134,9 @@ class _FakeOpenAIClient:
         self.embeddings = _FakeOpenAIEmbeddingEndpoint()
         self.instances.append(self)
 
+
 ###############################################################################
 class _FakeGoogleModels:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.generate_content_calls: list[dict[str, object]] = []
@@ -155,9 +159,8 @@ class _FakeGoogleModels:
     # -------------------------------------------------------------------------
     def embed_content(self, **kwargs):  # noqa: ANN001, ANN202
         self.embed_content_calls.append(kwargs)
-        return SimpleNamespace(
-            embeddings=[SimpleNamespace(values=[0.1, 0.2, 0.3])]
-        )
+        return SimpleNamespace(embeddings=[SimpleNamespace(values=[0.1, 0.2, 0.3])])
+
 
 ###############################################################################
 class _FakeGoogleClient:
@@ -169,12 +172,13 @@ class _FakeGoogleClient:
         self.models = _FakeGoogleModels()
         self.instances.append(self)
 
+
 ###############################################################################
 class _FakeHttpOptions:
-
     # -------------------------------------------------------------------------
     def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
+
 
 ###############################################################################
 def _request() -> LLMRequest:
@@ -185,6 +189,7 @@ def _request() -> LLMRequest:
             {"role": "user", "content": "Hello"},
         ],
     )
+
 
 ###############################################################################
 def test_openai_provider_uses_responses_api(monkeypatch) -> None:
@@ -214,14 +219,20 @@ def test_openai_provider_uses_responses_api(monkeypatch) -> None:
     }
     assert first_client.responses.create_calls[0]["model"] == "test-model"
     assert first_client.responses.create_calls[0]["input"] == _request().messages
-    assert _FakeOpenAIClient.instances[2].responses.parse_calls[0]["text_format"] is _StructuredPayload
+    assert (
+        _FakeOpenAIClient.instances[2].responses.parse_calls[0]["text_format"]
+        is _StructuredPayload
+    )
     assert _FakeOpenAIClient.instances[3].embeddings.create_calls[0] == {
         "model": "embed-model",
         "input": "hello",
     }
 
+
 ###############################################################################
-def test_openai_structured_output_rejects_unsupported_model_before_api_call(monkeypatch) -> None:
+def test_openai_structured_output_rejects_unsupported_model_before_api_call(
+    monkeypatch,
+) -> None:
     _FakeOpenAIClient.instances = []
     monkeypatch.setattr("server.services.llm.openai_provider.OpenAI", _FakeOpenAIClient)
     provider = OpenAIProvider(api_key="k")
@@ -241,10 +252,13 @@ def test_openai_structured_output_rejects_unsupported_model_before_api_call(monk
 
     assert _FakeOpenAIClient.instances == []
 
+
 ###############################################################################
 def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
     _FakeGoogleClient.instances = []
-    monkeypatch.setattr("server.services.llm.google_provider.genai.Client", _FakeGoogleClient)
+    monkeypatch.setattr(
+        "server.services.llm.google_provider.genai.Client", _FakeGoogleClient
+    )
     monkeypatch.setattr(
         "server.services.llm.google_provider.genai_types.HttpOptions",
         _FakeHttpOptions,
@@ -286,6 +300,7 @@ def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
         "model": "embed-model",
         "contents": "hello",
     }
+
 
 ###############################################################################
 def test_ollama_provider_http_paths(monkeypatch) -> None:
@@ -329,7 +344,9 @@ def test_ollama_provider_http_paths(monkeypatch) -> None:
     chat_payload = next(payload for path, payload in post_calls if path == "/api/chat")
     assert stream_calls[0][0] == "/api/chat"
     assert "num_ctx" not in chat_payload.get("options", {})
-    structured_payload = next(payload for _, payload in post_calls if payload.get("format"))
+    structured_payload = next(
+        payload for _, payload in post_calls if payload.get("format")
+    )
     assert structured_payload["think"] is False
     assert provider.last_context_usage is not None
     assert provider.last_context_usage["provider"] == "ollama"

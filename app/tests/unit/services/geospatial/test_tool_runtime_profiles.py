@@ -4,12 +4,13 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 class _NoCredentials:
-
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN201
         return None
+
 
 ###############################################################################
 def test_tool_runtime_profiles_complete() -> None:

@@ -5,6 +5,7 @@ from tests.conftest import run_async_in_thread
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
+
 ###############################################################################
 def test_webcam_embedding_requires_explicit_provider_permission() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None = None):

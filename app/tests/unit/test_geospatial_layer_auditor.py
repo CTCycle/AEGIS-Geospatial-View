@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from server.services.geospatial.layer_auditor import audit_all_manifests
 
+
 ###############################################################################
 def test_layer_auditor_blocks_broken_manual_toggles() -> None:
     report = audit_all_manifests(strict=True)
@@ -13,14 +14,19 @@ def test_layer_auditor_blocks_broken_manual_toggles() -> None:
 
     assert not issues
 
+
 ###############################################################################
 def test_layer_auditor_production_gate_has_no_placeholder_or_visual_gaps() -> None:
     report = audit_all_manifests(strict=True, production=True)
     payload = report.model_dump()
 
     assert report.ok, payload
-    assert all(not status.placeholder_statuses for status in report.implementation_statuses)
-    assert all(status.provider_fetch_implemented for status in report.implementation_statuses)
+    assert all(
+        not status.placeholder_statuses for status in report.implementation_statuses
+    )
+    assert all(
+        status.provider_fetch_implemented for status in report.implementation_statuses
+    )
     assert all(
         status.visual_tested
         for status in report.implementation_statuses

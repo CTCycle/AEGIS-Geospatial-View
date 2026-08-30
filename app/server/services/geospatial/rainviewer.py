@@ -16,17 +16,19 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class RainViewerServiceError(Exception):
     """Base exception for RainViewer failures."""
+
 
 ###############################################################################
 class RainViewerRequestError(RainViewerServiceError):
     """Raised when RainViewer metadata cannot be fetched."""
 
+
 ###############################################################################
 class RainViewerService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

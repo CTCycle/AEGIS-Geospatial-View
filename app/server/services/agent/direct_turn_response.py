@@ -13,9 +13,9 @@ from server.services.agent.response_synthesizer import GroundedResponseSynthesiz
 from server.services.agent.turn_support import AgentTurnSupport
 from server.services.chat.history_service import ChatHistoryService
 
+
 ###############################################################################
 class DirectTurnResponseService:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def _parser_failure_message(
@@ -86,9 +86,7 @@ class DirectTurnResponseService:
             "kind",
             "none",
         )
-        if (
-            AgentTurnSupport.has_parser_authentication_failure(turn_contract)
-        ):
+        if AgentTurnSupport.has_parser_authentication_failure(turn_contract):
             assistant_message = (
                 "I could not use the configured agent model because the saved API key was rejected. "
                 "Open Model Settings and replace the key before using that cloud model."
@@ -116,11 +114,11 @@ class DirectTurnResponseService:
                 progress_summary="Intent extraction failed.",
             )
 
-        if (
-            AgentTurnSupport.has_parser_runtime_failure(turn_contract)
-        ):
+        if AgentTurnSupport.has_parser_runtime_failure(turn_contract):
             provider_error = getattr(turn_contract, "provider_error", None)
-            provider_error_object = provider_error if is_json_object(provider_error) else None
+            provider_error_object = (
+                provider_error if is_json_object(provider_error) else None
+            )
             assistant_message, failure_category = self._parser_failure_message(
                 turn_contract,
                 provider_error_object,
@@ -129,7 +127,10 @@ class DirectTurnResponseService:
                 stage="structured_intent_extraction",
                 component="agent_model",
                 sanitized_error=(
-                    str((provider_error_object or {}).get("detail") or "Structured extraction failed.")
+                    str(
+                        (provider_error_object or {}).get("detail")
+                        or "Structured extraction failed."
+                    )
                 ),
                 recovery_suggestion=(
                     "Review the categorized diagnostic and retry the same model after correcting the provider, schema, or context issue."
@@ -152,7 +153,10 @@ class DirectTurnResponseService:
                 progress_summary="Intent extraction failed.",
             )
 
-        if turn_contract.relationship == "failure_inquiry" or context_query_kind == "failure":
+        if (
+            turn_contract.relationship == "failure_inquiry"
+            or context_query_kind == "failure"
+        ):
             failure = self.task_state_service.latest_failure(conversation_key)
             if failure is None:
                 assistant_message = (

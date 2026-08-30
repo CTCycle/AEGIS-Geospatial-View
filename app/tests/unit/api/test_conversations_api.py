@@ -17,6 +17,7 @@ from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.lifecycle import RunLifecycleService
 
+
 ###############################################################################
 class _InMemoryBackend:
     db_path = None
@@ -30,6 +31,7 @@ class _InMemoryBackend:
             future=True,
         )
         self.session = sessionmaker(bind=self.engine, future=True)
+
 
 ###############################################################################
 @pytest.fixture()
@@ -50,6 +52,7 @@ def conversations_api_client() -> TestClient:
     client = TestClient(app)
     yield client
     client.close()
+
 
 ###############################################################################
 def test_create_conversation_returns_persisted_conversation(

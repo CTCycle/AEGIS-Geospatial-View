@@ -5,9 +5,9 @@ from tests.conftest import run_async_in_thread
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
 
+
 ###############################################################################
 class _OpenMeteoService:
-
     # -------------------------------------------------------------------------
     async def get_weather_forecast(self, *, latitude: float, longitude: float):
         return {
@@ -33,6 +33,7 @@ class _OpenMeteoService:
             "hourly_preview": [{"pm2_5": 8, "pm10": 12}],
             "attribution": "Data from Open-Meteo",
         }
+
 
 ###############################################################################
 def test_openmeteo_wind_sampling_emits_arrow_metadata() -> None:

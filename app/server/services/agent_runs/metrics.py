@@ -3,6 +3,7 @@ from __future__ import annotations
 from threading import Lock
 from typing import Any
 
+
 ###############################################################################
 class RealtimeMetrics:
     """Small dependency-free metrics collector for the local realtime process.
@@ -69,7 +70,9 @@ class RealtimeMetrics:
         with self._lock:
             self._command_count += 1
             self._command_latency_ms_sum += max(0.0, milliseconds)
-            self._command_latency_ms_max = max(self._command_latency_ms_max, milliseconds)
+            self._command_latency_ms_max = max(
+                self._command_latency_ms_max, milliseconds
+            )
 
     # -------------------------------------------------------------------------
     def increment(self, name: str) -> None:

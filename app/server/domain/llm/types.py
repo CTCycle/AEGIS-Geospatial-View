@@ -12,6 +12,7 @@ FailureCategory = Literal[
     "context_limit",
 ]
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ModelDescriptor:
@@ -20,6 +21,7 @@ class ModelDescriptor:
     provider: str
     capabilities: list[str] = field(default_factory=lambda: list[str]())
     metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -33,6 +35,7 @@ class ModelContextProfile:
     supports_context_caching: bool = False
     supports_server_compaction: bool = False
     metadata_source: str = "catalog"
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -52,13 +55,17 @@ class LLMRequest:
         # can be reported with a categorized diagnostic at the LLM boundary.
         return None
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class LLMResult:
     content: str
     raw: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
-    tool_calls: list["LLMToolCall"] = field(default_factory=lambda: list["LLMToolCall"]())
+    tool_calls: list["LLMToolCall"] = field(
+        default_factory=lambda: list["LLMToolCall"]()
+    )
     finish_reason: str | None = None
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -67,12 +74,14 @@ class LLMToolDefinition:
     description: str
     parameters_json_schema: dict[str, Any]
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class LLMToolCall:
     id: str | None = None
     name: str = ""
     arguments: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -85,12 +94,14 @@ class LLMToolResult:
     error: str | None = None
     is_error: bool = False
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class LLMAssistantToolCallMessage:
     role: Literal["assistant"] = "assistant"
     content: str | None = None
     tool_calls: list[LLMToolCall] = field(default_factory=lambda: list[LLMToolCall]())
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -99,6 +110,7 @@ class LLMToolResultMessage:
     tool_call_id: str | None = None
     name: str = ""
     content: str = ""
+
 
 ###############################################################################
 @dataclass(frozen=True)

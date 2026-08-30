@@ -18,9 +18,11 @@ PNG_1X1_TRANSPARENT = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 
+
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
 
 ###############################################################################
 def _stub_ui_api(page: Page) -> None:
@@ -33,9 +35,7 @@ def _stub_ui_api(page: Page) -> None:
             return chat_completion_clarification_payload(
                 turn_number, "Please clarify location and time."
             )
-        return chat_completion_map_payload(
-            turn_number, "Search executed successfully."
-        )
+        return chat_completion_map_payload(turn_number, "Search executed successfully.")
 
     register_realtime_stub(page, lambda message, _run_number: build_payload(message))
     page.route(
@@ -74,6 +74,7 @@ def _stub_ui_api(page: Page) -> None:
         ),
     )
 
+
 ###############################################################################
 def test_25_sequential_turns_mixed_with_new_chat_resets(
     page: Page, base_url: str
@@ -85,11 +86,14 @@ def test_25_sequential_turns_mixed_with_new_chat_resets(
         text = "ambiguous weather only" if idx % 7 == 0 else f"show map turn {idx}"
         composer.fill(text)
         page.get_by_role("button", name="Send").click()
-        expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
+        expect(page.locator(".chat-message--assistant").last).to_be_visible(
+            timeout=15000
+        )
         if idx in {9, 18}:
             page.get_by_role("button", name="Start new chat").click()
             expect(page.get_by_text("Map Workspace")).to_be_visible()
     expect(page.get_by_label("Chat message")).to_be_visible()
+
 
 ###############################################################################
 def test_rapid_double_submit_does_not_duplicate_assistant_state(
@@ -103,6 +107,7 @@ def test_rapid_double_submit_does_not_duplicate_assistant_state(
     send.dispatch_event("click")
     expect(page.locator(".chat-message--assistant")).to_have_count(1, timeout=10000)
 
+
 ###############################################################################
 def test_repeated_refresh_loop_preserves_state(page: Page, base_url: str) -> None:
     _stub_ui_api(page)
@@ -114,6 +119,7 @@ def test_repeated_refresh_loop_preserves_state(page: Page, base_url: str) -> Non
         page.reload()
         expect(page.get_by_text("show map for refresh loop")).to_be_visible()
         expect(page.locator(".chat-message").first).to_be_visible()
+
 
 ###############################################################################
 def test_route_switching_20_cycles_preserves_query_and_chat_state(
@@ -136,6 +142,7 @@ def test_route_switching_20_cycles_preserves_query_and_chat_state(
     page.get_by_role("link", name="Model Settings").click()
     expect(page.get_by_placeholder("Search models")).to_have_value("gpt")
 
+
 ###############################################################################
 def test_large_composer_input_does_not_freeze_ui(page: Page, base_url: str) -> None:
     _stub_ui_api(page)
@@ -145,6 +152,7 @@ def test_large_composer_input_does_not_freeze_ui(page: Page, base_url: str) -> N
     page.get_by_role("button", name="Send").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     expect(page.get_by_label("Chat message")).to_be_visible()
+
 
 ###############################################################################
 def test_overlay_toggle_and_opacity_restore_after_refresh(

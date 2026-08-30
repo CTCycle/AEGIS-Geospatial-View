@@ -13,9 +13,11 @@ from server.contracts.geospatial import CapabilityManifestV2
 
 type JsonDict = dict[str, Any]
 
+
 ###############################################################################
 class ManifestValidationError(ValueError):
     pass
+
 
 ###############################################################################
 class GeospatialManifestLoader:
@@ -120,14 +122,20 @@ class GeospatialManifestLoader:
             raise ManifestValidationError("Runtime profiles must be an object.")
         profiles = payload.get("profiles")
         if not is_json_array(profiles):
-            raise ManifestValidationError("Runtime profiles must contain a profiles list.")
+            raise ManifestValidationError(
+                "Runtime profiles must contain a profiles list."
+            )
         normalized: list[JsonDict] = []
         for item in profiles:
             if not is_json_object(item):
-                raise ManifestValidationError("Runtime profile entries must be objects.")
+                raise ManifestValidationError(
+                    "Runtime profile entries must be objects."
+                )
             capability_id = str(item.get("capability_id") or "").strip()
             if not capability_id:
-                raise ManifestValidationError("Runtime profile entry missing capability_id.")
+                raise ManifestValidationError(
+                    "Runtime profile entry missing capability_id."
+                )
             normalized.append(dict(item))
         return normalized
 

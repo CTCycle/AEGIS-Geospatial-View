@@ -1,19 +1,22 @@
 from __future__ import annotations
 
+
 ###############################################################################
 class AggregatedRequestService:
-
     # -------------------------------------------------------------------------
     def build_aggregated_request(
         self,
         original_request: str,
         steering_messages: list[str],
     ) -> str:
-        normalized_messages = [item.strip() for item in steering_messages if item.strip()]
+        normalized_messages = [
+            item.strip() for item in steering_messages if item.strip()
+        ]
         if not normalized_messages:
             return original_request
         steering_block = "\n".join(
-            f"{index}. {message}" for index, message in enumerate(normalized_messages, start=1)
+            f"{index}. {message}"
+            for index, message in enumerate(normalized_messages, start=1)
         )
         return (
             "Original request:\n"

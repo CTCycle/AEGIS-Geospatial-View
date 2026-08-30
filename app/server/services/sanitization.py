@@ -6,9 +6,9 @@ from collections.abc import Mapping
 from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
 from server.repositories.database.sqlite import SQLiteRepository
 
+
 ###############################################################################
 class LocationSanitizationService:
-
     # -------------------------------------------------------------------------
     def __init__(self, country_alias_to_iso2: Mapping[str, str]) -> None:
         self._country_alias_to_iso2 = dict(country_alias_to_iso2)
@@ -74,6 +74,7 @@ class LocationSanitizationService:
             "classification": classification,
             "query": query,
         }
+
 
 ###############################################################################
 def build_location_sanitization_service(

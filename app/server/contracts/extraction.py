@@ -17,7 +17,9 @@ LocationSignalType = Literal[
     "street",
 ]
 TemporalMode = Literal["current", "historical", "forecast", "none"]
-TemporalGranularity = Literal["instant", "hour", "day", "month", "year", "custom", "none"]
+TemporalGranularity = Literal[
+    "instant", "hour", "day", "month", "year", "custom", "none"
+]
 TemporalAggregation = Literal["none", "instant", "sum", "mean", "min", "max", "count"]
 ContextQueryKind = Literal[
     "none",
@@ -32,12 +34,18 @@ OverlayAction = Literal["add", "remove", "keep_only", "show", "hide", "update"]
 OverlayScopeKind = Literal["global", "current_view", "location"]
 OverlayVisibility = Literal["any", "visible", "hidden"]
 
+
 ###############################################################################
 class ConversationContextSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    recent_messages: list[dict[str, str]] = Field(default_factory=lambda: list[dict[str, str]]())
-    memory_snapshot: dict[str, object] = Field(default_factory=lambda: dict[str, object]())
+    recent_messages: list[dict[str, str]] = Field(
+        default_factory=lambda: list[dict[str, str]]()
+    )
+    memory_snapshot: dict[str, object] = Field(
+        default_factory=lambda: dict[str, object]()
+    )
+
 
 ###############################################################################
 class LocationSignal(BaseModel):
@@ -51,6 +59,7 @@ class LocationSignal(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     source: Literal["text", "memory", "model"] = "text"
 
+
 ###############################################################################
 class TemporalSignal(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -63,11 +72,13 @@ class TemporalSignal(BaseModel):
     granularity: TemporalGranularity = "none"
     aggregation: TemporalAggregation = "none"
 
+
 ###############################################################################
 class ContextQuery(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: ContextQueryKind = "none"
+
 
 ###############################################################################
 class NormalizedAction(BaseModel):
@@ -80,6 +91,7 @@ class NormalizedAction(BaseModel):
     requested_visualizations: list[str] = Field(default_factory=lambda: list[str]())
     requires_location: bool = True
 
+
 ###############################################################################
 class DisallowedPattern(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -87,6 +99,7 @@ class DisallowedPattern(BaseModel):
     pattern_id: str
     reason: str
     matched_text: str
+
 
 ###############################################################################
 class ViewportIntent(BaseModel):
@@ -106,6 +119,7 @@ class ViewportIntent(BaseModel):
     tighten_relative_to_active: bool = False
     radius_hint_m: float | None = Field(default=None, gt=0.0)
     reason: str | None = None
+
 
 ###############################################################################
 class OverlaySelector(BaseModel):
@@ -128,6 +142,7 @@ class OverlaySelector(BaseModel):
     tags: list[str] = Field(default_factory=lambda: list[str]())
     visibility: OverlayVisibility = "any"
 
+
 ###############################################################################
 class OverlayScope(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -138,6 +153,7 @@ class OverlayScope(BaseModel):
     location: dict[str, Any] | None = None
     label: str | None = None
 
+
 ###############################################################################
 class OverlayPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -147,12 +163,14 @@ class OverlayPatch(BaseModel):
     style: str | None = None
     format: str | None = None
 
+
 ###############################################################################
 class OverlayStateReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     collection_id: str = "active-map"
     revision: int = Field(default=0, ge=0)
+
 
 ###############################################################################
 class OverlayCommand(BaseModel):
@@ -162,7 +180,10 @@ class OverlayCommand(BaseModel):
     selector: OverlaySelector = Field(default_factory=OverlaySelector)
     scope: OverlayScope = Field(default_factory=OverlayScope)
     patch: OverlayPatch = Field(default_factory=OverlayPatch)
-    state_reference: OverlayStateReference = Field(default_factory=OverlayStateReference)
+    state_reference: OverlayStateReference = Field(
+        default_factory=OverlayStateReference
+    )
+
 
 ###############################################################################
 class TurnParseResult(BaseModel):
@@ -171,12 +192,16 @@ class TurnParseResult(BaseModel):
     user_text: str
     conversation_context: ConversationContextSnapshot
     task_class: TaskClass
-    location_signals: list[LocationSignal] = Field(default_factory=lambda: list[LocationSignal]())
+    location_signals: list[LocationSignal] = Field(
+        default_factory=lambda: list[LocationSignal]()
+    )
     normalized_action: NormalizedAction
     temporal_signal: TemporalSignal = Field(default_factory=TemporalSignal)
     context_query: ContextQuery = Field(default_factory=ContextQuery)
     ambiguities: list[str] = Field(default_factory=lambda: list[str]())
-    disallowed_patterns: list[DisallowedPattern] = Field(default_factory=lambda: list[DisallowedPattern]())
+    disallowed_patterns: list[DisallowedPattern] = Field(
+        default_factory=lambda: list[DisallowedPattern]()
+    )
     parser_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     relationship: Literal[
         "new_task",
@@ -190,8 +215,12 @@ class TurnParseResult(BaseModel):
     map_target: str | None = None
     entity_target: str | None = None
     requested_layers: list[str] = Field(default_factory=lambda: list[str]())
-    overlay_commands: list[OverlayCommand] = Field(default_factory=lambda: list[OverlayCommand]())
-    poi_categories: list[PoiCategory] = Field(default_factory=lambda: list[PoiCategory]())
+    overlay_commands: list[OverlayCommand] = Field(
+        default_factory=lambda: list[OverlayCommand]()
+    )
+    poi_categories: list[PoiCategory] = Field(
+        default_factory=lambda: list[PoiCategory]()
+    )
     requested_basemap: str | None = None
     requested_attributes: list[str] = Field(default_factory=lambda: list[str]())
     required_data_sources: list[str] = Field(default_factory=lambda: list[str]())
@@ -201,14 +230,19 @@ class TurnParseResult(BaseModel):
     requires_reparse: bool = False
     capability_limitations: list[str] = Field(default_factory=lambda: list[str]())
     expected_frontend_update: str = "assistant_message"
-    atomic_tasks: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
+    atomic_tasks: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     clarification_plan: dict[str, Any] | None = None
     viewport_intent: ViewportIntent | None = None
     provider_error: dict[str, Any] | None = None
-    failure_category: Literal[
-        "model_capability",
-        "provider_api",
-        "schema_definition",
-        "response_parsing",
-        "context_limit",
-    ] | None = None
+    failure_category: (
+        Literal[
+            "model_capability",
+            "provider_api",
+            "schema_definition",
+            "response_parsing",
+            "context_limit",
+        ]
+        | None
+    ) = None

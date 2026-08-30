@@ -3,9 +3,9 @@ from __future__ import annotations
 from server.api.chat import get_models, refresh_ollama_models
 from server.contracts.chat import OllamaRefreshResponse
 
+
 ###############################################################################
 class _ModelLibraryService:
-
     # -------------------------------------------------------------------------
     def list_models(self, *, ollama_url: str, cloud_provider: str | None = None):
         assert ollama_url == "http://ollama.test"
@@ -46,42 +46,46 @@ class _ModelLibraryService:
             },
         }
 
+
 ###############################################################################
 class _SettingsService:
-
     # -------------------------------------------------------------------------
     def get_ollama_url(self) -> str:
         return "http://ollama.test"
 
+
 ###############################################################################
 class _MaintenanceService:
-
     # -------------------------------------------------------------------------
     def refresh_ollama_models(self):
-        return OllamaRefreshResponse.model_validate({
-            "status": "ok",
-            "library_models": [],
-            "local_models": ["llama"],
-            "local_model_capabilities": [
-                {
-                    "id": "llama",
-                    "name": "llama",
-                    "description": "local",
-                    "provider": "ollama",
-                    "capabilities": ["chat", "structured_output", "tools"],
-                    "supports_tools": True,
-                    "supports_structured_output": True,
-                    "tool_support_source": "ollama_probe",
-                    "metadata": {},
-                }
-            ],
-        })
+        return OllamaRefreshResponse.model_validate(
+            {
+                "status": "ok",
+                "library_models": [],
+                "local_models": ["llama"],
+                "local_model_capabilities": [
+                    {
+                        "id": "llama",
+                        "name": "llama",
+                        "description": "local",
+                        "provider": "ollama",
+                        "capabilities": ["chat", "structured_output", "tools"],
+                        "supports_tools": True,
+                        "supports_structured_output": True,
+                        "tool_support_source": "ollama_probe",
+                        "metadata": {},
+                    }
+                ],
+            }
+        )
+
 
 ###############################################################################
 class _Runtime:
     model_library_service = _ModelLibraryService()
     settings_service = _SettingsService()
     maintenance_service = _MaintenanceService()
+
 
 ###############################################################################
 def test_models_endpoint_returns_capability_metadata() -> None:
@@ -92,6 +96,7 @@ def test_models_endpoint_returns_capability_metadata() -> None:
     assert response.local[0].supports_structured_output is True
     assert response.local[0].tool_support_source == "ollama_probe"
     assert response.sources["ollama"].reachable is True
+
 
 ###############################################################################
 def test_ollama_refresh_returns_capability_metadata() -> None:

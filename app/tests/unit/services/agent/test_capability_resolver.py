@@ -13,6 +13,7 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 def _turn(
     text: str,
@@ -41,20 +42,19 @@ def _turn(
         parser_confidence=0.9,
         requested_layers=[layer],
         atomic_tasks=(
-            [{"required_layers": atomic_layers}]
-            if atomic_layers is not None
-            else []
+            [{"required_layers": atomic_layers}] if atomic_layers is not None else []
         ),
         tools_needed=True,
     )
 
+
 ###############################################################################
 class _Credentials:
-
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN001
         _ = provider, label
         return None
+
 
 ###############################################################################
 def _runtime() -> RuntimeRegistry:
@@ -63,12 +63,14 @@ def _runtime() -> RuntimeRegistry:
         credentials_repo=_Credentials(),  # type: ignore[arg-type]
     )
 
+
 ###############################################################################
 def _resolver() -> CapabilityResolver:
     return CapabilityResolver(
         capability_registry=CapabilityRegistry(),
         runtime_registry=_runtime(),
     )
+
 
 ###############################################################################
 def test_preserves_enabled_exact_capability_id() -> None:
@@ -78,6 +80,7 @@ def test_preserves_enabled_exact_capability_id() -> None:
     assert resolved.requested_layers == ["IMERG_Precipitation_Rate"]
     assert resolved.clarification_plan is None
 
+
 ###############################################################################
 def test_resolves_precipitation_radar_semantics() -> None:
     resolved = _resolver().resolve(
@@ -85,12 +88,14 @@ def test_resolves_precipitation_radar_semantics() -> None:
     )
     assert resolved.requested_layers == ["rainviewer_precipitation_radar"]
 
+
 ###############################################################################
 def test_resolves_precipitation_rate_semantics() -> None:
     resolved = _resolver().resolve(
         _turn("Show precipitation intensity over Paris", "precipitation rate")
     )
     assert resolved.requested_layers == ["IMERG_Precipitation_Rate"]
+
 
 ###############################################################################
 def test_resolves_forecast_semantics() -> None:
@@ -143,17 +148,20 @@ def test_preserves_unmatched_capability_ids_for_focused_clarification() -> None:
 
     resolved = _resolver().resolve(turn)
 
-    assert resolved.overlay_commands[0].selector.capability_ids == [
-        "fictional_overlay"
-    ]
+    assert resolved.overlay_commands[0].selector.capability_ids == ["fictional_overlay"]
+
 
 ###############################################################################
 def test_resolves_air_quality_underscore_semantics_to_enabled_capability() -> None:
     resolved = _resolver().resolve(
-        _turn("Show air quality forecast overlay for Paris", "openmeteo_air_quality_forecast")
+        _turn(
+            "Show air quality forecast overlay for Paris",
+            "openmeteo_air_quality_forecast",
+        )
     )
     assert resolved.requested_layers == ["openmeteo_air_quality_forecast"]
     assert resolved.clarification_plan is None
+
 
 ###############################################################################
 def test_resolves_all_supported_atomic_task_layers() -> None:
@@ -173,6 +181,7 @@ def test_resolves_all_supported_atomic_task_layers() -> None:
         "openmeteo_weather_forecast",
     ]
     assert resolved.clarification_plan is None
+
 
 ###############################################################################
 def test_resolves_generic_poi_transit_and_radar_atomic_layers() -> None:
@@ -195,6 +204,7 @@ def test_resolves_generic_poi_transit_and_radar_atomic_layers() -> None:
     ]
     assert resolved.clarification_plan is None
 
+
 ###############################################################################
 def test_resolves_traffic_semantics_to_enabled_capability() -> None:
     resolved = _resolver().resolve(
@@ -203,8 +213,11 @@ def test_resolves_traffic_semantics_to_enabled_capability() -> None:
     assert resolved.requested_layers == ["tomtom_traffic_flow"]
     assert resolved.clarification_plan is None
 
+
 ###############################################################################
-def test_unsupported_historical_aggregation_is_reported_without_date_special_cases() -> None:
+def test_unsupported_historical_aggregation_is_reported_without_date_special_cases() -> (
+    None
+):
     resolved = _resolver().resolve(
         _turn(
             "Can you now show Tour Eiffel area with rain level in October (mean value)",
@@ -220,12 +233,13 @@ def test_unsupported_historical_aggregation_is_reported_without_date_special_cas
     assert "structured layer request" in resolved.clarification_plan["reason"]
     assert "unresolved_geospatial_capability" in resolved.ambiguities
 
+
 ###############################################################################
 class _DisabledRuntimeRegistry:
-
     # -------------------------------------------------------------------------
     def is_enabled(self, capability_id: str) -> bool:
         return capability_id != "IMERG_Precipitation_Rate"
+
 
 ###############################################################################
 def test_disabled_exact_capability_is_not_planned() -> None:
@@ -239,6 +253,7 @@ def test_disabled_exact_capability_is_not_planned() -> None:
     assert resolved.requested_layers == []
     assert resolved.clarification_plan is not None
 
+
 ###############################################################################
 def test_unmatched_semantic_layer_returns_clarification() -> None:
     resolved = _resolver().resolve(
@@ -247,6 +262,7 @@ def test_unmatched_semantic_layer_returns_clarification() -> None:
     assert resolved.requested_layers == []
     assert resolved.clarification_plan is not None
     assert "unresolved_geospatial_capability" in resolved.ambiguities
+
 
 ###############################################################################
 def test_unknown_underscore_identifier_is_not_treated_as_resolved() -> None:

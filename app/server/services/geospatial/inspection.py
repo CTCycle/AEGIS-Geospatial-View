@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import Any, cast
 from urllib.parse import urlsplit
 
-from server.contracts.geospatial import InspectionAssociation, InspectionField, MapInspection
+from server.contracts.geospatial import (
+    InspectionAssociation,
+    InspectionField,
+    MapInspection,
+)
 
 
 ###############################################################################
@@ -53,14 +57,56 @@ class MapInspectionService:
     }
 
     _MEASUREMENT_KEYS = {
-        "metric", "value", "unit", "units", "observation_time", "observationTime",
-        "forecast_time", "forecastTime", "time", "freshness",
+        "metric",
+        "value",
+        "unit",
+        "units",
+        "observation_time",
+        "observationTime",
+        "forecast_time",
+        "forecastTime",
+        "time",
+        "freshness",
     }
     _PLACE_KEYS = {"name", "label", "category", "address", "status", "provider"}
-    _HAZARD_KEYS = {"event", "severity", "effective", "effective_time", "expiry", "expiry_time"}
-    _TRANSIT_KEYS = {"feed", "feed_id", "station", "station_id", "camera", "camera_id", "freshness", "status"}
-    _DATASET_KEYS = {"metric", "period", "geography", "source", "license", "update_time", "updated_at", "updatedAt"}
-    _URL_KEYS = {"source_url", "sourceUrl", "official_url", "officialUrl", "dataset_url", "datasetUrl", "license_url", "licenseUrl"}
+    _HAZARD_KEYS = {
+        "event",
+        "severity",
+        "effective",
+        "effective_time",
+        "expiry",
+        "expiry_time",
+    }
+    _TRANSIT_KEYS = {
+        "feed",
+        "feed_id",
+        "station",
+        "station_id",
+        "camera",
+        "camera_id",
+        "freshness",
+        "status",
+    }
+    _DATASET_KEYS = {
+        "metric",
+        "period",
+        "geography",
+        "source",
+        "license",
+        "update_time",
+        "updated_at",
+        "updatedAt",
+    }
+    _URL_KEYS = {
+        "source_url",
+        "sourceUrl",
+        "official_url",
+        "officialUrl",
+        "dataset_url",
+        "datasetUrl",
+        "license_url",
+        "licenseUrl",
+    }
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -109,7 +155,9 @@ class MapInspectionService:
         fields: list[InspectionField] = []
         source_url: str | None = None
         freshness: str | None = None
-        effective_keys = allow_keys if allow_keys is not None else set(cls._FIELD_LABELS)
+        effective_keys = (
+            allow_keys if allow_keys is not None else set(cls._FIELD_LABELS)
+        )
         for key, raw_value in payload.items():
             if key in cls._URL_KEYS:
                 source_url = source_url or cls._safe_url(raw_value)
@@ -119,7 +167,12 @@ class MapInspectionService:
             value = cls._bounded_scalar(raw_value)
             if value is None:
                 continue
-            if key.casefold() in {"freshness", "updated_at", "updatedat", "update_time"}:
+            if key.casefold() in {
+                "freshness",
+                "updated_at",
+                "updatedat",
+                "update_time",
+            }:
                 freshness = str(value)
             fields.append(
                 InspectionField(
@@ -172,23 +225,40 @@ class MapInspectionService:
     @classmethod
     def build_for_descriptor(cls, descriptor: dict[str, Any]) -> list[MapInspection]:
         provider = str(descriptor.get("provider") or "") or None
-        overlay_id = str(descriptor.get("id") or descriptor.get("layer_id") or "overlay")
+        overlay_id = str(
+            descriptor.get("id") or descriptor.get("layer_id") or "overlay"
+        )
         results: list[MapInspection] = []
         data = descriptor.get("data")
         data_object = cast(dict[str, Any], data) if isinstance(data, dict) else None
         if data_object is not None and data_object.get("type") == "FeatureCollection":
             features = data_object.get("features")
-            feature_values = cast(list[Any], features) if isinstance(features, list) else []
+            feature_values = (
+                cast(list[Any], features) if isinstance(features, list) else []
+            )
             for index, raw_feature in enumerate(feature_values):
-                feature = cast(dict[str, Any], raw_feature) if isinstance(raw_feature, dict) else None
+                feature = (
+                    cast(dict[str, Any], raw_feature)
+                    if isinstance(raw_feature, dict)
+                    else None
+                )
                 if feature is None:
                     continue
                 raw_properties = feature.get("properties")
-                properties = cast(dict[str, Any], raw_properties) if isinstance(raw_properties, dict) else None
+                properties = (
+                    cast(dict[str, Any], raw_properties)
+                    if isinstance(raw_properties, dict)
+                    else None
+                )
                 if properties is None:
                     continue
                 feature_id = str(feature.get("id") or properties.get("id") or index)
-                title = str(properties.get("name") or properties.get("label") or descriptor.get("label") or overlay_id)
+                title = str(
+                    properties.get("name")
+                    or properties.get("label")
+                    or descriptor.get("label")
+                    or overlay_id
+                )
                 inspection = cls._inspection(
                     inspection_id=f"{overlay_id}:feature:{feature_id}",
                     title=title,
@@ -213,10 +283,16 @@ class MapInspectionService:
             metadata = cast(dict[str, Any], metadata)
             latitude = metadata.get("latitude")
             longitude = metadata.get("longitude")
-            latitude_number = float(latitude) if isinstance(latitude, (int, float)) else None
-            longitude_number = float(longitude) if isinstance(longitude, (int, float)) else None
+            latitude_number = (
+                float(latitude) if isinstance(latitude, (int, float)) else None
+            )
+            longitude_number = (
+                float(longitude) if isinstance(longitude, (int, float)) else None
+            )
             spatial = latitude_number is not None and longitude_number is not None
-            association: InspectionAssociation = "location" if spatial else "non_spatial"
+            association: InspectionAssociation = (
+                "location" if spatial else "non_spatial"
+            )
             geometry = (
                 {"type": "Point", "coordinates": [longitude_number, latitude_number]}
                 if spatial
@@ -224,25 +300,45 @@ class MapInspectionService:
             )
             inspection = cls._inspection(
                 inspection_id=f"{overlay_id}:metadata",
-                title=str(metadata.get("name") or descriptor.get("label") or overlay_id),
+                title=str(
+                    metadata.get("name") or descriptor.get("label") or overlay_id
+                ),
                 association=association,
                 provider=provider,
                 feature_id=None,
                 payload=metadata,
                 geometry=geometry,
-                warnings=[str(item) for item in descriptor.get("warnings", []) if isinstance(item, str)],
+                warnings=[
+                    str(item)
+                    for item in descriptor.get("warnings", [])
+                    if isinstance(item, str)
+                ],
                 stale=bool(descriptor.get("stale")),
             )
             if inspection is not None:
                 results.append(inspection)
 
         rendering_mode = str(descriptor.get("rendering_mode") or "").casefold()
-        if rendering_mode in {"raster-tile", "xyz", "wmts", "wms", "raster-overlay", "choropleth"}:
+        if rendering_mode in {
+            "raster-tile",
+            "xyz",
+            "wmts",
+            "wms",
+            "raster-overlay",
+            "choropleth",
+        }:
             raster_payload = {
                 key: descriptor.get(key)
                 for key in (
-                    "time", "default_time", "format", "units", "legend", "attribution",
-                    "freshness", "source_url", "official_url",
+                    "time",
+                    "default_time",
+                    "format",
+                    "units",
+                    "legend",
+                    "attribution",
+                    "freshness",
+                    "source_url",
+                    "official_url",
                 )
                 if descriptor.get(key) is not None
             }
@@ -253,9 +349,15 @@ class MapInspectionService:
                 provider=provider,
                 feature_id=None,
                 payload=raster_payload,
-                warnings=[str(item) for item in descriptor.get("warnings", []) if isinstance(item, str)],
+                warnings=[
+                    str(item)
+                    for item in descriptor.get("warnings", [])
+                    if isinstance(item, str)
+                ],
                 stale=bool(descriptor.get("stale")),
-                allow_keys=cls._MEASUREMENT_KEYS | cls._DATASET_KEYS | {"format", "attribution", "legend", "default_time"},
+                allow_keys=cls._MEASUREMENT_KEYS
+                | cls._DATASET_KEYS
+                | {"format", "attribution", "legend", "default_time"},
             )
             if raster is not None:
                 results.append(raster)
@@ -268,5 +370,7 @@ class MapInspectionService:
         if not inspections:
             return descriptor
         descriptor = dict(descriptor)
-        descriptor["inspections"] = [item.model_dump(mode="json") for item in inspections]
+        descriptor["inspections"] = [
+            item.model_dump(mode="json") for item in inspections
+        ]
         return descriptor

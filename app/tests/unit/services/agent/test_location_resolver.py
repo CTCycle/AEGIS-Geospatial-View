@@ -5,6 +5,7 @@ from tests.conftest import run_async_in_thread
 from server.services.agent.location_resolver import LocationResolver
 from server.contracts.extraction import LocationSignal
 
+
 ###############################################################################
 def test_location_resolver_uses_coordinates_without_geocoder() -> None:
     resolver = LocationResolver()
@@ -27,12 +28,12 @@ def test_location_resolver_uses_coordinates_without_geocoder() -> None:
 
     run_async_in_thread(_run())
 
+
 ###############################################################################
 def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
 
     ###############################################################################
     class _FakeNominatim:
-
         # -------------------------------------------------------------------------
         async def extract_coordinates(
             self,
@@ -44,8 +45,18 @@ def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
         ) -> dict[str, object] | None:
             _ = (city, country_name, country_code)
             lookup = {
-                "Rome": {"display_name": "Rome, Lazio, Italy", "lat": 41.9028, "lon": 12.4964, "confidence": 0.62},
-                "Italy": {"display_name": "Italy", "lat": 41.8719, "lon": 12.5674, "confidence": 0.61},
+                "Rome": {
+                    "display_name": "Rome, Lazio, Italy",
+                    "lat": 41.9028,
+                    "lon": 12.4964,
+                    "confidence": 0.62,
+                },
+                "Italy": {
+                    "display_name": "Italy",
+                    "lat": 41.8719,
+                    "lon": 12.5674,
+                    "confidence": 0.61,
+                },
             }
             return lookup.get(address)
 

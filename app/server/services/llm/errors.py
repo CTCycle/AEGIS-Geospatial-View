@@ -4,9 +4,11 @@ from typing import Any
 
 from server.services.llm.types import FailureCategory
 
+
 ###############################################################################
 class LLMConfigurationError(ValueError):
     """Raised when a selected LLM provider cannot be used due to local settings."""
+
 
 ###############################################################################
 class LLMStructuredOutputError(RuntimeError):
@@ -37,6 +39,7 @@ class LLMStructuredOutputError(RuntimeError):
         self.metadata = dict(metadata or {})
         super().__init__(detail)
 
+
 ###############################################################################
 class LLMContextLimitError(LLMStructuredOutputError):
     """Raised when the selected model cannot accept the prepared context."""
@@ -51,6 +54,7 @@ class LLMContextLimitError(LLMStructuredOutputError):
             code="context_limit_exceeded",
             detail=detail,
         )
+
 
 ###############################################################################
 class LLMRequestSchemaError(LLMStructuredOutputError):
@@ -67,6 +71,7 @@ class LLMRequestSchemaError(LLMStructuredOutputError):
             detail=detail,
         )
 
+
 ###############################################################################
 class LLMResponseParsingError(LLMStructuredOutputError):
     """Raised when a provider response cannot satisfy the requested schema."""
@@ -81,6 +86,7 @@ class LLMResponseParsingError(LLMStructuredOutputError):
             code="response_parsing_failed",
             detail=detail,
         )
+
 
 ###############################################################################
 class LLMProviderRequestError(RuntimeError):
@@ -112,7 +118,9 @@ class LLMProviderRequestError(RuntimeError):
 
     # -------------------------------------------------------------------------
     @classmethod
-    def from_exception(cls, exc: Exception, *, provider: str, model: str, stage: str) -> "LLMProviderRequestError":
+    def from_exception(
+        cls, exc: Exception, *, provider: str, model: str, stage: str
+    ) -> "LLMProviderRequestError":
         status = getattr(getattr(exc, "response", None), "status_code", None)
         if not isinstance(status, int):
             status = getattr(exc, "status_code", None)
@@ -205,4 +213,3 @@ class LLMProviderRequestError(RuntimeError):
                 return True
             current = current.__cause__ or current.__context__
         return False
-

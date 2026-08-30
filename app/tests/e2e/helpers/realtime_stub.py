@@ -11,6 +11,7 @@ from playwright.sync_api import Page, WebSocketRoute
 
 TurnPayloadFactory = Callable[[str, int], dict[str, Any]]
 
+
 ###############################################################################
 def _envelope(
     *,
@@ -30,6 +31,7 @@ def _envelope(
     if correlation_id is not None:
         envelope["correlation_id"] = correlation_id
     return json.dumps(envelope)
+
 
 ###############################################################################
 def register_realtime_stub(
@@ -59,7 +61,7 @@ def register_realtime_stub(
             nonlocal run_number
             try:
                 request = json.loads(raw_message)
-            except (TypeError, json.JSONDecodeError):
+            except TypeError, json.JSONDecodeError:
                 return
             if not isinstance(request, dict):
                 return
@@ -138,11 +140,16 @@ def register_realtime_stub(
             send_event(
                 1,
                 "progress",
-                {"stage": "understanding_request", "label": "Understanding the request"},
+                {
+                    "stage": "understanding_request",
+                    "label": "Understanding the request",
+                },
             )
             assistant_message = str(turn_payload.get("assistant_message") or "")
             if assistant_message:
-                send_event(2, "assistant_text_completed", {"content": assistant_message})
+                send_event(
+                    2, "assistant_text_completed", {"content": assistant_message}
+                )
 
             completion_payload = {
                 key: turn_payload[key]

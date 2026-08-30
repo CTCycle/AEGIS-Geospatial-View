@@ -47,13 +47,16 @@ from server.services.search.composition import build_search_runtime
 from server.services.catalog.startup import seed_reference_catalog
 from server.services.startup_validation import run_startup_validations
 
+
 ###############################################################################
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
+
 ###############################################################################
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
+
 
 ###############################################################################
 def _dispose_sqlite_engine(database: object) -> None:
@@ -61,6 +64,7 @@ def _dispose_sqlite_engine(database: object) -> None:
     dispose = getattr(engine, "dispose", None)
     if callable(dispose):
         dispose()
+
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
@@ -75,9 +79,11 @@ def _resolve_client_file(full_path: str) -> Path | None:
 
     return None
 
+
 ###############################################################################
 def serve_client_root() -> FileResponse:
     return FileResponse(CLIENT_INDEX_FILE_PATH)
+
 
 ###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
@@ -86,9 +92,11 @@ def serve_client_path(full_path: str) -> FileResponse:
         return FileResponse(client_file)
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
+
 ###############################################################################
 def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_ENDPOINT)
+
 
 ###############################################################################
 @asynccontextmanager
@@ -176,6 +184,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         job_service.stop()
         await run_lifecycle_service.shutdown()
         _dispose_sqlite_engine(database)
+
 
 ###############################################################################
 def create_app() -> FastAPI:

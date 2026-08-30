@@ -19,19 +19,42 @@ DEFAULT_OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
 OPENCODE_COMPATIBLE_MODELS: dict[str, frozenset[str]] = {
     OPENCODE_PROVIDER: frozenset(
         {
-            "grok-4.5", "grok-build-0.1", "deepseek-v4-pro", "deepseek-v4-flash",
-            "minimax-m3", "minimax-m2.7", "minimax-m2.5", "glm-5.2", "glm-5.1",
-            "glm-5", "kimi-k2.5", "kimi-k2.6", "kimi-k2.7-code", "kimi-k3",
-            "big-pickle", "mimo-v2.5-free", "laguna-s-2.1-free",
-            "ling-3.0-flash-free", "north-mini-code-free", "nemotron-3-ultra-free",
+            "grok-4.5",
+            "grok-build-0.1",
+            "deepseek-v4-pro",
+            "deepseek-v4-flash",
+            "minimax-m3",
+            "minimax-m2.7",
+            "minimax-m2.5",
+            "glm-5.2",
+            "glm-5.1",
+            "glm-5",
+            "kimi-k2.5",
+            "kimi-k2.6",
+            "kimi-k2.7-code",
+            "kimi-k3",
+            "big-pickle",
+            "mimo-v2.5-free",
+            "laguna-s-2.1-free",
+            "ling-3.0-flash-free",
+            "north-mini-code-free",
+            "nemotron-3-ultra-free",
             "deepseek-v4-flash-free",
         }
     ),
     OPENCODE_GO_PROVIDER: frozenset(
         {
-            "grok-4.5", "glm-5.2", "glm-5.1", "kimi-k3", "kimi-k2.7-code",
-            "kimi-k2.6", "deepseek-v4-pro", "deepseek-v4-flash", "mimo-v2.5",
-            "mimo-v2.5-pro", "hy3",
+            "grok-4.5",
+            "glm-5.2",
+            "glm-5.1",
+            "kimi-k3",
+            "kimi-k2.7-code",
+            "kimi-k2.6",
+            "deepseek-v4-pro",
+            "deepseek-v4-flash",
+            "mimo-v2.5",
+            "mimo-v2.5-pro",
+            "hy3",
         }
     ),
 }
@@ -40,6 +63,7 @@ OPENCODE_BASE_URLS = {
     OPENCODE_PROVIDER: DEFAULT_OPENCODE_BASE_URL,
     OPENCODE_GO_PROVIDER: DEFAULT_OPENCODE_GO_BASE_URL,
 }
+
 
 ###############################################################################
 class OpenCodeProvider(DeepSeekProvider):

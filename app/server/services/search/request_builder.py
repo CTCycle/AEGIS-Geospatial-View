@@ -7,7 +7,11 @@ from typing import Any
 
 from server.common.logger import logger as LOGGER
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
-from server.contracts.extraction import NormalizedAction, TurnParseResult, ViewportIntent
+from server.contracts.extraction import (
+    NormalizedAction,
+    TurnParseResult,
+    ViewportIntent,
+)
 from server.contracts.geospatial import (
     LocationSearchRequest,
     PresentationPolicy,
@@ -15,6 +19,7 @@ from server.contracts.geospatial import (
     ViewportPolicy,
 )
 from server.services.geospatial.capability_registry import CapabilityRegistry
+
 
 ###############################################################################
 class RequestBuilder:
@@ -56,7 +61,9 @@ class RequestBuilder:
                 action_tags=[],
             )
         )
-        viewport_intent = turn_contract.viewport_intent if turn_contract is not None else None
+        viewport_intent = (
+            turn_contract.viewport_intent if turn_contract is not None else None
+        )
         overlays = list(plan.overlay_ids)
         request = LocationSearchRequest(
             resolved_location=location,
@@ -73,7 +80,9 @@ class RequestBuilder:
             ),
             presentation=self.build_presentation(overlays),
             viewport_intent=viewport_intent,
-            poi_categories=list(turn_contract.poi_categories) if turn_contract is not None else [],
+            poi_categories=list(turn_contract.poi_categories)
+            if turn_contract is not None
+            else [],
         )
         LOGGER.info(
             "map_request_built action=%s basemap=%s overlays=%d viewport_scope=%s tighten=%s radius_m=%.1f bbox=%s location_type=%s",
@@ -81,7 +90,9 @@ class RequestBuilder:
             request.basemap_id,
             len(request.overlay_ids),
             viewport_intent.scope if viewport_intent is not None else None,
-            viewport_intent.tighten_relative_to_active if viewport_intent is not None else None,
+            viewport_intent.tighten_relative_to_active
+            if viewport_intent is not None
+            else None,
             request.viewport.radius_m,
             request.viewport.bbox,
             location.location_type,
@@ -133,7 +144,8 @@ class RequestBuilder:
 
         explicit_scope = (
             viewport_intent.scope
-            if viewport_intent is not None and viewport_intent.scope != "preserve_current"
+            if viewport_intent is not None
+            and viewport_intent.scope != "preserve_current"
             else None
         )
         if (
@@ -151,7 +163,11 @@ class RequestBuilder:
                 return tightened
 
         scope = explicit_scope or self._scope_from_resolved_location(location) or "auto"
-        radius_m = viewport_intent.radius_hint_m if viewport_intent and viewport_intent.radius_hint_m else self.SCOPE_RADII_M.get(scope, self.DEFAULT_RADIUS_M)
+        radius_m = (
+            viewport_intent.radius_hint_m
+            if viewport_intent and viewport_intent.radius_hint_m
+            else self.SCOPE_RADII_M.get(scope, self.DEFAULT_RADIUS_M)
+        )
         radius_m = self._clamp_radius(radius_m)
         bbox = self._padded_bbox_for_scope(location.bbox, scope)
         if bbox is not None:
@@ -193,7 +209,16 @@ class RequestBuilder:
     def _scope_from_resolved_location(location: ResolvedLocation) -> str | None:
         location_type = str(location.location_type or "").lower()
         location_class = str(location.location_class or "").lower()
-        if location_type in {"house", "building", "residential", "commercial", "address", "street", "road", "pedestrian"}:
+        if location_type in {
+            "house",
+            "building",
+            "residential",
+            "commercial",
+            "address",
+            "street",
+            "road",
+            "pedestrian",
+        }:
             return "street"
         if location_class == "highway":
             return "street"
@@ -214,8 +239,15 @@ class RequestBuilder:
         radius_hint_m: float | None,
         scope: str,
     ) -> ViewportPolicy | None:
-        target_radius = radius_hint_m if radius_hint_m is not None else self.SCOPE_RADII_M.get(scope, self.SCOPE_RADII_M["street"])
-        radius_m = min(self._clamp_radius(target_radius), self._clamp_radius(viewport.radius_m * 0.35))
+        target_radius = (
+            radius_hint_m
+            if radius_hint_m is not None
+            else self.SCOPE_RADII_M.get(scope, self.SCOPE_RADII_M["street"])
+        )
+        radius_m = min(
+            self._clamp_radius(target_radius),
+            self._clamp_radius(viewport.radius_m * 0.35),
+        )
         if radius_m >= viewport.radius_m:
             radius_m = self._clamp_radius(viewport.radius_m * 0.5)
         if radius_m >= viewport.radius_m:
@@ -228,7 +260,9 @@ class RequestBuilder:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _coerce_active_viewport(active_visualization: dict[str, Any] | None) -> ViewportPolicy | None:
+    def _coerce_active_viewport(
+        active_visualization: dict[str, Any] | None,
+    ) -> ViewportPolicy | None:
         if not is_json_object(active_visualization):
             return None
         viewport = active_visualization.get("viewport")
@@ -257,7 +291,7 @@ class RequestBuilder:
                 abs(active_latitude - float(location.latitude)) > 1e-6
                 or abs(active_longitude - float(location.longitude)) > 1e-6
             )
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return False
 
     # -------------------------------------------------------------------------
@@ -274,8 +308,12 @@ class RequestBuilder:
         min_lon, min_lat, max_lon, max_lat = [float(str(item)) for item in bbox]
         lon_pad_factor = 0.2 if scope in {"building", "street"} else 0.35
         lat_pad_factor = lon_pad_factor
-        lon_span = max(max_lon - min_lon, 0.0004 if scope in {"building", "street"} else 0.002)
-        lat_span = max(max_lat - min_lat, 0.0003 if scope in {"building", "street"} else 0.0015)
+        lon_span = max(
+            max_lon - min_lon, 0.0004 if scope in {"building", "street"} else 0.002
+        )
+        lat_span = max(
+            max_lat - min_lat, 0.0003 if scope in {"building", "street"} else 0.0015
+        )
         lon_pad = lon_span * lon_pad_factor
         lat_pad = lat_span * lat_pad_factor
         return [
@@ -290,7 +328,11 @@ class RequestBuilder:
         min_lon, min_lat, max_lon, max_lat = [float(item) for item in bbox]
         center_lat = (min_lat + max_lat) / 2.0
         lat_radius = ((max_lat - min_lat) / 2.0) * 111_320.0
-        lon_radius = ((max_lon - min_lon) / 2.0) * 111_320.0 * max(abs(math.cos(math.radians(center_lat))), 0.01)
+        lon_radius = (
+            ((max_lon - min_lon) / 2.0)
+            * 111_320.0
+            * max(abs(math.cos(math.radians(center_lat))), 0.01)
+        )
         return self._clamp_radius(max(lat_radius, lon_radius))
 
     # -------------------------------------------------------------------------

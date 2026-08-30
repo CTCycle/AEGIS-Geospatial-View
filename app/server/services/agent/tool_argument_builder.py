@@ -7,9 +7,9 @@ from typing import Any
 from server.contracts.extraction import TurnParseResult
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
+
 ###############################################################################
 class ToolArgumentBuilder:
-
     # -------------------------------------------------------------------------
     def __init__(self, capability_registry: CapabilityRegistry | None = None) -> None:
         self.capability_registry = capability_registry

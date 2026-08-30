@@ -36,8 +36,16 @@ def test_feature_metadata_is_bounded_and_allowlisted() -> None:
     inspection = inspections[0]
     assert inspection.association == "feature"
     assert inspection.feature_id == "station-1"
-    assert {field.key for field in inspection.fields} == {"name", "metric", "value", "unit"}
-    assert all(len(str(field.value)) <= MapInspectionService.MAX_TEXT for field in inspection.fields)
+    assert {field.key for field in inspection.fields} == {
+        "name",
+        "metric",
+        "value",
+        "unit",
+    }
+    assert all(
+        len(str(field.value)) <= MapInspectionService.MAX_TEXT
+        for field in inspection.fields
+    )
 
 
 ###############################################################################
@@ -111,5 +119,10 @@ def test_non_spatial_dataset_metadata_remains_inspectable() -> None:
     assert len(inspections) == 1
     assert inspections[0].association == "non_spatial"
     assert {field.key for field in inspections[0].fields} == {
-        "metric", "period", "geography", "source", "license", "update_time"
+        "metric",
+        "period",
+        "geography",
+        "source",
+        "license",
+        "update_time",
     }

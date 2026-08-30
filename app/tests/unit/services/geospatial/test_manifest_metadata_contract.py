@@ -4,9 +4,9 @@ from server.services.geospatial.endpoint_validation import EndpointValidationSer
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 class _NoCredentials:
-
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN201
         return None
@@ -22,6 +22,7 @@ REQUIRED_TRAIT_FIELDS = {
     "rate_limit_notes",
 }
 
+
 ###############################################################################
 def test_all_manifest_entries_expose_source_traits() -> None:
     payload = GeospatialManifestLoader().load_all()
@@ -34,8 +35,11 @@ def test_all_manifest_entries_expose_source_traits() -> None:
                     missing.append(f"{collection_name}:{item['id']}:metadata.{field}")
     assert not missing
 
+
 ###############################################################################
-def test_credentialed_capabilities_are_not_healthy_without_credentials(monkeypatch) -> None:
+def test_credentialed_capabilities_are_not_healthy_without_credentials(
+    monkeypatch,
+) -> None:
     monkeypatch.delenv("OPENAQ_API_KEY", raising=False)
     runtime = RuntimeRegistry(
         manifest_loader=GeospatialManifestLoader(),
@@ -44,6 +48,7 @@ def test_credentialed_capabilities_are_not_healthy_without_credentials(monkeypat
     runtime.build_snapshot()
 
     assert runtime.provider_health("openaq_air_quality") == "missing_credentials"
+
 
 ###############################################################################
 def test_endpoint_validation_builds_sampled_urls_without_network_calls() -> None:

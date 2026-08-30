@@ -17,6 +17,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class ESAProvider(GeospatialProvider):
     provider_id = "esa"
@@ -72,38 +73,52 @@ class ESAProvider(GeospatialProvider):
         cache_key = f"{self.provider_id}:{request.capability_id}:{service_url}"
         cached = self.cache.get(cache_key)
         if cached.status == CacheLookupStatus.HIT and is_json_object(cached.value):
-            return self._response(request, metadata, {**payload, "liveValidation": cached.value})
+            return self._response(
+                request, metadata, {**payload, "liveValidation": cached.value}
+            )
         try:
             validation = await call_json_fetcher(self.fetcher, service_url, None)
         except Exception as exc:
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     metadata,
                     {**payload, "liveValidation": cached.value},
                     stale=True,
-                    warnings=["ESA WMTS validation failed; using stale validation metadata."],
+                    warnings=[
+                        "ESA WMTS validation failed; using stale validation metadata."
+                    ],
                 )
             if isinstance(exc, ProviderUnavailableError):
                 raise
             raise ProviderUnavailableError("ESA WMTS validation failed.") from exc
         if not is_json_object(validation):
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     metadata,
                     {**payload, "liveValidation": cached.value},
                     stale=True,
-                    warnings=["ESA WMTS validation was malformed; using stale validation metadata."],
+                    warnings=[
+                        "ESA WMTS validation was malformed; using stale validation metadata."
+                    ],
                 )
-            raise ProviderUnavailableError("ESA WMTS validation returned malformed metadata.")
+            raise ProviderUnavailableError(
+                "ESA WMTS validation returned malformed metadata."
+            )
         self.cache.set(
             cache_key,
             validation,
             ttl_seconds=self.cache_ttl_seconds,
             stale_while_revalidate_seconds=self.stale_while_revalidate_seconds,
         )
-        return self._response(request, metadata, {**payload, "liveValidation": validation})
+        return self._response(
+            request, metadata, {**payload, "liveValidation": validation}
+        )
 
     # -------------------------------------------------------------------------
     def _response(
@@ -123,6 +138,7 @@ class ESAProvider(GeospatialProvider):
             warnings=warnings or [],
             stale=stale,
         )
+
 
 ###############################################################################
 def _metadata(request: ProviderRequest) -> dict[str, Any]:

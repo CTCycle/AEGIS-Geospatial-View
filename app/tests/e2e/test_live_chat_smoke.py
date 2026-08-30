@@ -16,6 +16,7 @@ from tests.e2e.helpers.artifacts import (
 )
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
+
 ###############################################################################
 def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
     conversation_response = page.request.post(
@@ -41,18 +42,23 @@ def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
     if response.status == 200:
         body = response.json()
         assistant = str(body.get("assistant_message") or "").lower()
-        if "configured agent model" in assistant and "structured extraction" in assistant:
+        if (
+            "configured agent model" in assistant
+            and "structured extraction" in assistant
+        ):
             return False, "Configured agent model cannot perform structured extraction"
         return True, ""
     if response.status in {400, 502, 503}:
         return False, f"Live provider precondition failed with status {response.status}"
     return False, f"Unexpected provider precondition status {response.status}"
 
+
 ###############################################################################
 def _assert_clean_backend_tail(tail: str) -> None:
     normalized = tail.lower()
     assert "traceback" not in normalized
     assert "unhandled exception" not in normalized
+
 
 ###############################################################################
 def _read_conversation_id(page: Page) -> str | None:
@@ -63,7 +69,12 @@ def _read_conversation_id(page: Page) -> str | None:
     chat_page = data.get("chatPage", {})
     chat_panel = chat_page.get("chatPanel", {}) if isinstance(chat_page, dict) else {}
     conversation_id = chat_panel.get("conversationId")
-    return conversation_id if isinstance(conversation_id, str) and conversation_id else None
+    return (
+        conversation_id
+        if isinstance(conversation_id, str) and conversation_id
+        else None
+    )
+
 
 ###############################################################################
 def test_live_chat_happy_path(
@@ -94,7 +105,10 @@ def test_live_chat_happy_path(
     write_log_tail(dirs["logs"], test_id, tail)
     _assert_clean_backend_tail(tail)
     write_http_capture(
-        dirs["http"], "turn-01", {"message": "Show me Rome"}, {"conversation_id": conversation_id}
+        dirs["http"],
+        "turn-01",
+        {"message": "Show me Rome"},
+        {"conversation_id": conversation_id},
     )
     write_report(
         dirs["reports"],
@@ -107,6 +121,7 @@ def test_live_chat_happy_path(
         ],
         backend_log_status="clean" if tail.strip() else "empty",
     )
+
 
 ###############################################################################
 def test_live_follow_up_same_conversation(
@@ -154,6 +169,7 @@ def test_live_follow_up_same_conversation(
         backend_log_status="clean" if tail.strip() else "empty",
     )
 
+
 ###############################################################################
 def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> None:
     ready, reason = _check_live_provider(page, api_base_url)
@@ -166,6 +182,7 @@ def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> No
     page.get_by_role("button", name="Start new chat").click()
     expect(page.get_by_text("Map Workspace")).to_be_visible()
     expect(page.locator(".overlay-controls")).not_to_be_visible()
+
 
 ###############################################################################
 def test_live_degraded_path_shows_user_failure_without_crash(
@@ -180,7 +197,9 @@ def test_live_degraded_path_shows_user_failure_without_crash(
     page.get_by_label("Chat message").fill("Show me Rome")
     page.get_by_role("button", name="Send").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
-    assistant_text = page.locator(".chat-message--assistant .chat-message__content").last
+    assistant_text = page.locator(
+        ".chat-message--assistant .chat-message__content"
+    ).last
     expect(assistant_text).to_contain_text(
         re.compile(r"provider unavailable|request failed|503", re.IGNORECASE)
     )

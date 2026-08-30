@@ -26,17 +26,20 @@ from server.domain.agent.runtime import (
 from server.contracts.extraction import TurnParseResult
 from server.contracts.geospatial import MapSession
 
+
 ###############################################################################
 @dataclass
 class _ConversationState:
     sequence: int = 0
-    tasks: list[ConversationTaskRecord] = field(default_factory=lambda: list[ConversationTaskRecord]())
+    tasks: list[ConversationTaskRecord] = field(
+        default_factory=lambda: list[ConversationTaskRecord]()
+    )
     runtime_state: AgentThreadState | None = None
     updated_at: datetime = field(default_factory=utc_now)
 
+
 ###############################################################################
 class ConversationTaskStateService:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, ttl: timedelta = timedelta(hours=6)) -> None:
         self.ttl = ttl
@@ -49,7 +52,9 @@ class ConversationTaskStateService:
             state = self._get_state(conversation_key)
             return ConversationTaskSnapshot(
                 conversation_key=conversation_key,
-                current_task_id=runtime.active_task_id if (runtime := self._runtime_state(state, conversation_key)) else None,
+                current_task_id=runtime.active_task_id
+                if (runtime := self._runtime_state(state, conversation_key))
+                else None,
                 goal=runtime.goal,
                 tasks=[task.model_copy(deep=True) for task in runtime.tasks],
                 geospatial_state=runtime.geospatial_state.model_copy(deep=True),
@@ -67,7 +72,9 @@ class ConversationTaskStateService:
             return state is not None and state.runtime_state is not None
 
     # -------------------------------------------------------------------------
-    def apply_steering_delta(self, conversation_key: str, delta: Any) -> ConversationTaskSnapshot:
+    def apply_steering_delta(
+        self, conversation_key: str, delta: Any
+    ) -> ConversationTaskSnapshot:
         """Apply a safe steering mutation to the live v3 state in place."""
 
         with self._lock:
@@ -98,11 +105,17 @@ class ConversationTaskStateService:
                     default=0,
                 ),
             )
-            parent = next((task for task in reversed(state.tasks) if task.is_current), None)
+            parent = next(
+                (task for task in reversed(state.tasks) if task.is_current), None
+            )
             for task in state.tasks:
                 task.is_current = False
             state.sequence += 1
-            location = turn.location_signals[0].model_dump(mode="json") if turn.location_signals else None
+            location = (
+                turn.location_signals[0].model_dump(mode="json")
+                if turn.location_signals
+                else None
+            )
             task = ConversationTaskRecord(
                 task_id=f"task-{state.sequence}",
                 raw_user_text=turn.user_text,
@@ -121,7 +134,9 @@ class ConversationTaskStateService:
                 specialist=specialist,
                 parent_task_id=(
                     parent.task_id
-                    if parent is not None and turn.relationship in {"follow_up", "correction", "clarification"}
+                    if parent is not None
+                    and turn.relationship
+                    in {"follow_up", "correction", "clarification"}
                     else None
                 ),
             )
@@ -139,7 +154,9 @@ class ConversationTaskStateService:
                 generated_ids: list[str] = []
                 for index, item in enumerate(atomic_items, start=1):
                     raw_id = str(item.get("id") or "").strip()
-                    generated_id = task.task_id if index == 1 else f"{task.task_id}-a{index}"
+                    generated_id = (
+                        task.task_id if index == 1 else f"{task.task_id}-a{index}"
+                    )
                     generated_ids.append(raw_id or generated_id)
                 for index, item in enumerate(atomic_items, start=1):
                     raw_id = str(item.get("id") or "").strip()
@@ -217,17 +234,21 @@ class ConversationTaskStateService:
                 task.tool_result_refs = list(tool_result_refs)
             task.updated_at = utc_now()
             runtime = self._runtime_state(state, conversation_key)
-            runtime_task = next((item for item in runtime.tasks if item.id == task_id), None)
+            runtime_task = next(
+                (item for item in runtime.tasks if item.id == task_id), None
+            )
             if runtime_task is not None:
                 runtime_status = cast(
                     AgentTaskStatus,
                     {
-                    "routed": "pending",
-                    "needs_clarification": "blocked",
+                        "routed": "pending",
+                        "needs_clarification": "blocked",
                     }.get(status, status),
                 )
                 runtime_task.status = runtime_status
-                runtime_task.attempt_count = max(runtime_task.attempt_count, 1 if status == "in_progress" else 0)
+                runtime_task.attempt_count = max(
+                    runtime_task.attempt_count, 1 if status == "in_progress" else 0
+                )
                 if failure is not None:
                     runtime_task.last_failure = failure.model_dump(mode="json")
             runtime.revision += 1
@@ -246,9 +267,11 @@ class ConversationTaskStateService:
             state = self._get_state(conversation_key)
             runtime = self._runtime_state(state, conversation_key)
             runtime.active_map_session = map_session.model_dump(mode="json")
-            runtime.geospatial_state.renderable_refs = [
-                str(map_session.session_id)
-            ] if getattr(map_session, "session_id", None) else runtime.geospatial_state.renderable_refs
+            runtime.geospatial_state.renderable_refs = (
+                [str(map_session.session_id)]
+                if getattr(map_session, "session_id", None)
+                else runtime.geospatial_state.renderable_refs
+            )
             runtime.revision += 1
             state.updated_at = utc_now()
 
@@ -302,7 +325,9 @@ class ConversationTaskStateService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _runtime_state(state: _ConversationState, conversation_key: str) -> AgentThreadState:
+    def _runtime_state(
+        state: _ConversationState, conversation_key: str
+    ) -> AgentThreadState:
         if state.runtime_state is None:
             state.runtime_state = AgentThreadState(
                 conversation_id=conversation_key,
@@ -323,5 +348,3 @@ class ConversationTaskStateService:
         state = self._states.setdefault(conversation_key, _ConversationState())
         state.updated_at = now
         return state
-
-

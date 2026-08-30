@@ -5,9 +5,9 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 class _CredentialRepo:
-
     # -------------------------------------------------------------------------
     def __init__(self, present: bool) -> None:
         self.present = present
@@ -17,6 +17,7 @@ class _CredentialRepo:
         if self.present and provider == "tomtom" and label == "api_key":
             return object()
         return None
+
 
 ###############################################################################
 def _service_with_credentials(present: bool) -> GeospatialCatalogService:
@@ -28,6 +29,7 @@ def _service_with_credentials(present: bool) -> GeospatialCatalogService:
             credentials_repo=_CredentialRepo(present),  # type: ignore[arg-type]
         ),
     )
+
 
 ###############################################################################
 def test_catalog_contains_grouped_capability_sections() -> None:
@@ -41,6 +43,7 @@ def test_catalog_contains_grouped_capability_sections() -> None:
     assert any(item["id"] == "openaq_air_quality" for item in catalog["overlays"])
     assert any(item["id"] == "get_weather_forecast" for item in catalog["tools"])
 
+
 ###############################################################################
 def test_catalog_exposes_a_renderable_public_satellite_basemap() -> None:
     catalog = _service_with_credentials(False).list_catalog()
@@ -53,8 +56,11 @@ def test_catalog_exposes_a_renderable_public_satellite_basemap() -> None:
     assert "World_Imagery/MapServer/tile" in render["tile_url"]
     assert render["attribution"]
 
+
 ###############################################################################
-def test_catalog_marks_key_required_capabilities_unavailable_without_credentials(monkeypatch) -> None:
+def test_catalog_marks_key_required_capabilities_unavailable_without_credentials(
+    monkeypatch,
+) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
 
     catalog = _service_with_credentials(False).list_catalog()
@@ -65,8 +71,11 @@ def test_catalog_marks_key_required_capabilities_unavailable_without_credentials
     assert lookup["tomtom_traffic_flow"]["is_available"] is False
     assert providers["tomtom"]["is_available"] is False
 
+
 ###############################################################################
-def test_catalog_marks_key_required_capabilities_available_with_saved_credentials(monkeypatch) -> None:
+def test_catalog_marks_key_required_capabilities_available_with_saved_credentials(
+    monkeypatch,
+) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
 
     catalog = _service_with_credentials(True).list_catalog()

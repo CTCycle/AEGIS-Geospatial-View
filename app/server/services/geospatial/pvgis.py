@@ -13,13 +13,14 @@ from server.common.logger import logger
 
 PVGIS_BASE_URL = "https://re.jrc.ec.europa.eu/api/v5_3"
 
+
 ###############################################################################
 class PVGISError(Exception):
     """Exception for PVGIS API failures."""
 
+
 ###############################################################################
 class PVGISService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -74,7 +75,7 @@ class PVGISService:
             for entry in fixed:
                 try:
                     yearly_kwh += float(entry.get("E_m", 0.0) or 0.0)
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     continue
         return {
             "provider": "pvgis",
@@ -84,4 +85,3 @@ class PVGISService:
             "raw": outputs,
             "attribution": "PVGIS (European Commission JRC)",
         }
-

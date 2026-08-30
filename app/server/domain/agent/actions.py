@@ -4,6 +4,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
 
+
 ###############################################################################
 class AgentAction(str, Enum):
     MAP_SEARCH = "map_search"
@@ -17,6 +18,7 @@ class AgentAction(str, Enum):
     CHAT_RESPONSE = "chat_response"
     UNKNOWN = "unknown"
 
+
 ###############################################################################
 class ActionDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -27,6 +29,7 @@ class ActionDefinition(BaseModel):
     tool_groups: list[str]
     requires_map_context: bool = False
     allows_external_sources: bool = False
+
 
 ###############################################################################
 ACTION_CATALOG: dict[AgentAction, ActionDefinition] = {

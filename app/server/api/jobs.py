@@ -17,20 +17,29 @@ from server.services.jobs import BackgroundJobService
 
 router = APIRouter(prefix=JOBS_ROUTER_PREFIX, tags=["jobs"])
 
+
 ###############################################################################
 def get_job_service(request: Request) -> BackgroundJobService:
     return request.app.state.job_service
 
+
 ###############################################################################
-@router.get(JOBS_JOB_ROUTE, response_model=BackgroundJobStatusResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    JOBS_JOB_ROUTE,
+    response_model=BackgroundJobStatusResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def get_job(
     job_id: str,
     job_service: BackgroundJobService = Depends(get_job_service),
 ) -> BackgroundJobStatusResponse:
     job = job_service.get_job(job_id)
     if job is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Job not found: {job_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Job not found: {job_id}"
+        )
     return job
+
 
 ###############################################################################
 @router.get(
@@ -44,8 +53,11 @@ async def get_job_events(
 ) -> BackgroundJobEventsResponse:
     events = job_service.list_events(job_id)
     if events is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Job not found: {job_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Job not found: {job_id}"
+        )
     return events
+
 
 ###############################################################################
 @router.post(
@@ -59,5 +71,7 @@ async def cancel_job(
 ) -> JobCancelResponse:
     response = job_service.cancel_job(job_id)
     if response is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Job not found: {job_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Job not found: {job_id}"
+        )
     return response

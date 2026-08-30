@@ -33,6 +33,7 @@ GIBS_WMTS_REST_BASE_URL = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best"
 GIBS_WMS_BASE_URL = "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi"
 GIBS_USER_AGENT = {"User-Agent": "AEGIS/1.0"}
 
+
 ###############################################################################
 @dataclass
 class ParsedGIBSLayer:
@@ -46,6 +47,7 @@ class ParsedGIBSLayer:
     time_extent: str | None = None
     default_time: str | None = None
     tile_matrix_sets: set[str] = field(default_factory=lambda: set[str]())
+
 
 ###############################################################################
 class NASAGIBSProvider(GeospatialProvider):
@@ -73,7 +75,9 @@ class NASAGIBSProvider(GeospatialProvider):
         limit: int = 100,
         refresh: bool = False,
     ) -> list[GeospatialProviderLayerDescriptor]:
-        wmts = self._parse_wmts_layers(await self._load_wmts_capabilities(refresh=refresh))
+        wmts = self._parse_wmts_layers(
+            await self._load_wmts_capabilities(refresh=refresh)
+        )
         wms = self._parse_wms_layers(await self._load_wms_capabilities(refresh=refresh))
         layers = self._merge_layer_descriptors(wmts, wms)
         query_text = str(query or "").strip().casefold()
@@ -81,7 +85,8 @@ class NASAGIBSProvider(GeospatialProvider):
             layers = [
                 layer
                 for layer in layers
-                if query_text in f"{layer.layer_id} {layer.title} {layer.abstract or ''}".casefold()
+                if query_text
+                in f"{layer.layer_id} {layer.title} {layer.abstract or ''}".casefold()
             ]
         return layers[: max(1, min(int(limit), 250))]
 
@@ -100,7 +105,11 @@ class NASAGIBSProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
-        layer_id = str(request.params.get("layer_id") or request.params.get("layer") or request.capability_id)
+        layer_id = str(
+            request.params.get("layer_id")
+            or request.params.get("layer")
+            or request.capability_id
+        )
         layer = await self.describe_layer(layer_id)
         render = layer.render
         if render is not None and request.time is not None:
@@ -125,23 +134,35 @@ class NASAGIBSProvider(GeospatialProvider):
         return await self._load_xml("wms", GIBS_WMS_CAPABILITIES_URL, refresh=refresh)
 
     # -------------------------------------------------------------------------
-    async def _load_xml(self, cache_key: str, url: str, *, refresh: bool) -> ElementTree.Element:
+    async def _load_xml(
+        self, cache_key: str, url: str, *, refresh: bool
+    ) -> ElementTree.Element:
         full_cache_key = f"{self.provider_id}:capabilities:{cache_key}"
         cached = self.cache.get(full_cache_key)
-        if not refresh and cached.status in {CacheLookupStatus.HIT, CacheLookupStatus.STALE} and isinstance(cached.value, str):
+        if (
+            not refresh
+            and cached.status in {CacheLookupStatus.HIT, CacheLookupStatus.STALE}
+            and isinstance(cached.value, str)
+        ):
             return ElementTree.fromstring(cached.value)
         try:
             xml_text = await call_text_fetcher(self.fetcher, url, GIBS_USER_AGENT)
         except Exception as exc:
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, str):
+            if cached.status == CacheLookupStatus.STALE and isinstance(
+                cached.value, str
+            ):
                 return ElementTree.fromstring(cached.value)
             if isinstance(exc, ProviderUnavailableError):
                 raise
-            raise ProviderUnavailableError("NASA GIBS capabilities could not be fetched.") from exc
+            raise ProviderUnavailableError(
+                "NASA GIBS capabilities could not be fetched."
+            ) from exc
         try:
             root = ElementTree.fromstring(xml_text)
         except ElementTree.ParseError as exc:
-            raise ProviderUnavailableError("NASA GIBS capabilities returned malformed XML.") from exc
+            raise ProviderUnavailableError(
+                "NASA GIBS capabilities returned malformed XML."
+            ) from exc
         self.cache.set(
             full_cache_key,
             xml_text,
@@ -151,7 +172,9 @@ class NASAGIBSProvider(GeospatialProvider):
         return root
 
     # -------------------------------------------------------------------------
-    def _parse_wmts_layers(self, root: ElementTree.Element) -> dict[str, ParsedGIBSLayer]:
+    def _parse_wmts_layers(
+        self, root: ElementTree.Element
+    ) -> dict[str, ParsedGIBSLayer]:
         layers: dict[str, ParsedGIBSLayer] = {}
         for element in root.findall(".//{*}Contents/{*}Layer"):
             layer_id = self._child_text(element, "Identifier")
@@ -183,13 +206,17 @@ class NASAGIBSProvider(GeospatialProvider):
                         for value in dimension.findall("{*}Value")
                         if value.text and value.text.strip()
                     ]
-                    layer.default_time = default or self._default_time_from_values(values)
+                    layer.default_time = default or self._default_time_from_values(
+                        values
+                    )
                     layer.time_extent = ",".join(values) if values else None
             layers[layer_id] = layer
         return layers
 
     # -------------------------------------------------------------------------
-    def _parse_wms_layers(self, root: ElementTree.Element) -> dict[str, ParsedGIBSLayer]:
+    def _parse_wms_layers(
+        self, root: ElementTree.Element
+    ) -> dict[str, ParsedGIBSLayer]:
         layers: dict[str, ParsedGIBSLayer] = {}
         request = root.find(".//{*}Request/{*}GetMap")
         get_map_formats = [
@@ -219,7 +246,9 @@ class NASAGIBSProvider(GeospatialProvider):
                 if str(dimension.attrib.get("name") or "").lower() == "time":
                     value = str(dimension.text or "").strip()
                     layer.time_extent = value or None
-                    layer.default_time = str(dimension.attrib.get("default") or "").strip() or self._default_time_from_extent(value)
+                    layer.default_time = str(
+                        dimension.attrib.get("default") or ""
+                    ).strip() or self._default_time_from_extent(value)
             layers[layer_id] = layer
         return layers
 
@@ -233,7 +262,9 @@ class NASAGIBSProvider(GeospatialProvider):
         for layer_id in sorted({*wmts_layers, *wms_layers}):
             parsed = wmts_layers.get(layer_id) or wms_layers[layer_id]
             if layer_id in wmts_layers and layer_id in wms_layers:
-                parsed = self._merge_parsed_layers(wmts_layers[layer_id], wms_layers[layer_id])
+                parsed = self._merge_parsed_layers(
+                    wmts_layers[layer_id], wms_layers[layer_id]
+                )
             render = self._build_render_descriptor(parsed)
             descriptors.append(
                 GeospatialProviderLayerDescriptor(
@@ -242,7 +273,9 @@ class NASAGIBSProvider(GeospatialProvider):
                     title=parsed.title,
                     abstract=parsed.abstract,
                     rendering_mode=render.rendering_mode if render else "metadata-only",
-                    source_protocol=render.source_protocol if render else "provider-api",
+                    source_protocol=render.source_protocol
+                    if render
+                    else "provider-api",
                     data_format=next(iter(sorted(parsed.formats)), "image/png"),
                     geometry_type="raster-grid",
                     queryable=False,
@@ -254,7 +287,11 @@ class NASAGIBSProvider(GeospatialProvider):
                     tile_matrix_sets=sorted(parsed.tile_matrix_sets),
                     render=render,
                     attribution=[NASA_ATTRIBUTION],
-                    warnings=[] if render else ["Layer capabilities do not include renderable WMS or WMTS metadata."],
+                    warnings=[]
+                    if render
+                    else [
+                        "Layer capabilities do not include renderable WMS or WMTS metadata."
+                    ],
                 )
             )
         return descriptors
@@ -267,10 +304,18 @@ class NASAGIBSProvider(GeospatialProvider):
         preferred_mode: Literal["wmts", "wms"] = "wmts",
     ) -> GeospatialLayerRenderDescriptor | None:
         formats = sorted(layer.formats)
-        image_format = "image/png" if "image/png" in formats else next(iter(formats), "image/png")
-        style = "default" if "default" in layer.styles else next(iter(sorted(layer.styles)), "default")
+        image_format = (
+            "image/png" if "image/png" in formats else next(iter(formats), "image/png")
+        )
+        style = (
+            "default"
+            if "default" in layer.styles
+            else next(iter(sorted(layer.styles)), "default")
+        )
         matrix_sets = sorted(layer.tile_matrix_sets)
-        matrix_set = next((item for item in matrix_sets if "GoogleMapsCompatible" in item), None) or next(iter(matrix_sets), None)
+        matrix_set = next(
+            (item for item in matrix_sets if "GoogleMapsCompatible" in item), None
+        ) or next(iter(matrix_sets), None)
         if preferred_mode == "wmts" and "wmts" in layer.protocols and matrix_set:
             return GeospatialLayerRenderDescriptor(
                 provider=self.provider_id,
@@ -294,7 +339,11 @@ class NASAGIBSProvider(GeospatialProvider):
                 attribution=[NASA_ATTRIBUTION],
             )
         if "wms" in layer.protocols:
-            crs = "EPSG:3857" if "EPSG:3857" in layer.crs else next(iter(sorted(layer.crs)), "EPSG:3857")
+            crs = (
+                "EPSG:3857"
+                if "EPSG:3857" in layer.crs
+                else next(iter(sorted(layer.crs)), "EPSG:3857")
+            )
             return GeospatialLayerRenderDescriptor(
                 provider=self.provider_id,
                 layer_id=layer.layer_id,
@@ -312,7 +361,9 @@ class NASAGIBSProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _merge_parsed_layers(primary: ParsedGIBSLayer, secondary: ParsedGIBSLayer) -> ParsedGIBSLayer:
+    def _merge_parsed_layers(
+        primary: ParsedGIBSLayer, secondary: ParsedGIBSLayer
+    ) -> ParsedGIBSLayer:
         return ParsedGIBSLayer(
             layer_id=primary.layer_id,
             title=primary.title or secondary.title,
@@ -347,7 +398,9 @@ class NASAGIBSProvider(GeospatialProvider):
     def _default_time_from_extent(cls, value: str | None) -> str | None:
         if not value:
             return None
-        return cls._default_time_from_values([part.strip() for part in value.split(",") if part.strip()])
+        return cls._default_time_from_values(
+            [part.strip() for part in value.split(",") if part.strip()]
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

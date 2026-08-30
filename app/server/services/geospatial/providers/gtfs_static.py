@@ -21,6 +21,7 @@ from server.services.geospatial.providers.http import (
     fetch_bytes_url,
 )
 
+
 ###############################################################################
 class GTFSStaticProvider(GeospatialProvider):
     provider_id = "gtfs_static"
@@ -76,7 +77,9 @@ class GTFSStaticProvider(GeospatialProvider):
             return payload
         except ProviderError:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 stale_payload = dict(cached.value)
                 stale_payload["stale"] = True
                 stale_payload.setdefault("warnings", []).append(
@@ -123,7 +126,9 @@ class GTFSStaticProvider(GeospatialProvider):
         }
 
     # -------------------------------------------------------------------------
-    def _read_csv(self, archive: zipfile.ZipFile, filename: str) -> list[dict[str, str]]:
+    def _read_csv(
+        self, archive: zipfile.ZipFile, filename: str
+    ) -> list[dict[str, str]]:
         try:
             raw = archive.read(filename)
         except KeyError:

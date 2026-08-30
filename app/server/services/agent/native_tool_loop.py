@@ -28,9 +28,9 @@ from server.services.llm.types import (
 
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 class NativeToolLoop:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -77,7 +77,9 @@ class NativeToolLoop:
         duplicate_tool_calls = 0
         no_progress_steps = 0
         started_run = time.perf_counter()
-        simple_run = str(request.context.metadata.get("complexity") or "").lower() == "simple"
+        simple_run = (
+            str(request.context.metadata.get("complexity") or "").lower() == "simple"
+        )
         model_budget = 2 if simple_run else self.max_model_calls
         tool_budget = 2 if simple_run else self.max_tool_calls
         transition_budget = 6 if simple_run else self.max_state_transitions
@@ -88,7 +90,8 @@ class NativeToolLoop:
                 iteration > model_budget
                 or len(all_calls) >= tool_budget
                 or iteration + len(all_results) > transition_budget
-                or time.perf_counter() - started_run > (45.0 if simple_run else self.max_run_seconds)
+                or time.perf_counter() - started_run
+                > (45.0 if simple_run else self.max_run_seconds)
             ):
                 return AgentToolLoopResult(
                     final_text="The agent reached its execution budget before completing the request.",
@@ -106,7 +109,11 @@ class NativeToolLoop:
                 map_state=request.context.map_state,
                 policy_constraints=request.context.policy_constraints,
                 completed_tool_results=[
-                    {"tool": result.name, "ok": not result.is_error, "error": result.error}
+                    {
+                        "tool": result.name,
+                        "ok": not result.is_error,
+                        "error": result.error,
+                    }
                     for result in all_results
                 ],
             )
@@ -139,7 +146,11 @@ class NativeToolLoop:
                 if is_json_object(usage):
                     self.last_context_usages.append(dict(usage))
             except Exception as exc:
-                LOGGER.exception("tool_loop_failed provider=%s model=%s", request.provider, request.model)
+                LOGGER.exception(
+                    "tool_loop_failed provider=%s model=%s",
+                    request.provider,
+                    request.model,
+                )
                 category = getattr(exc, "category", None)
                 detail = str(getattr(exc, "detail", None) or exc)
                 if category == "context_limit":
@@ -191,17 +202,19 @@ class NativeToolLoop:
                     no_progress_steps=no_progress_steps,
                 )
 
-            tool_calls = response.tool_calls[: min(self.max_parallel_tool_calls, tool_budget - len(all_calls))]
+            tool_calls = response.tool_calls[
+                : min(self.max_parallel_tool_calls, tool_budget - len(all_calls))
+            ]
             all_calls.extend(tool_calls)
-            raw_output = response.raw.get("output") if is_json_object(response.raw) else None
+            raw_output = (
+                response.raw.get("output") if is_json_object(response.raw) else None
+            )
             if is_json_array(raw_output):
                 # Responses providers require every output item (including
                 # reasoning/function-call items) to be retained on the next
                 # request.  Other providers continue using the portable
                 # assistant/tool-message representation below.
-                messages.extend(
-                    item for item in raw_output if is_json_object(item)
-                )
+                messages.extend(item for item in raw_output if is_json_object(item))
             else:
                 messages.append(
                     {
@@ -241,7 +254,9 @@ class NativeToolLoop:
                     )
                     continue
                 fingerprints.add(fingerprint)
-                results_list.append(await self._execute_tool_call(call, request.context, iteration))
+                results_list.append(
+                    await self._execute_tool_call(call, request.context, iteration)
+                )
             results = results_list
             all_results.extend(results)
             if results and all(result.is_error for result in results):
@@ -302,7 +317,9 @@ class NativeToolLoop:
                 try:
                     return MapSession.model_validate(ms_raw)
                 except Exception:
-                    LOGGER.warning("Failed to validate MapSession from tool result", exc_info=True)
+                    LOGGER.warning(
+                        "Failed to validate MapSession from tool result", exc_info=True
+                    )
         return None
 
     # -------------------------------------------------------------------------
@@ -335,7 +352,9 @@ class NativeToolLoop:
             )
         try:
             envelope = await asyncio.wait_for(
-                self.tool_registry.execute_native_tool(call.name, call.arguments, context),
+                self.tool_registry.execute_native_tool(
+                    call.name, call.arguments, context
+                ),
                 timeout=self.tool_timeout_seconds,
             )
         except TimeoutError:
@@ -366,7 +385,9 @@ class NativeToolLoop:
             name=call.name,
             content=content,
             is_error=not ok,
-            error=str(error_payload.get("message")) if error_payload.get("message") else None,
+            error=str(error_payload.get("message"))
+            if error_payload.get("message")
+            else None,
         )
 
     # -------------------------------------------------------------------------
@@ -412,7 +433,11 @@ class NativeToolLoop:
         if blocked_patterns:
             return "Request contains blocked policy patterns."
         allowed = constraints.get("allowed_tool_names")
-        if is_json_array(allowed) and allowed and call.name not in set(map(str, allowed)):
+        if (
+            is_json_array(allowed)
+            and allowed
+            and call.name not in set(map(str, allowed))
+        ):
             return f"Tool '{call.name}' is not allowed by policy constraints."
         if call.name == "execute_geospatial_capability":
             capability_id = str(call.arguments.get("capability_id") or "")
@@ -426,9 +451,8 @@ class NativeToolLoop:
         if call.name == "fetch_geospatial_provider_layers":
             provider_id = str(call.arguments.get("provider_id") or "").lower()
             allowed_providers = constraints.get("allowed_provider_ids")
-            if (
-                not is_json_array(allowed_providers)
-                or provider_id not in set(map(str, allowed_providers))
+            if not is_json_array(allowed_providers) or provider_id not in set(
+                map(str, allowed_providers)
             ):
                 return f"Provider '{provider_id}' is not allowed by policy constraints."
         return None

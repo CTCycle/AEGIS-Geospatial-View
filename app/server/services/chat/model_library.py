@@ -17,11 +17,13 @@ from server.services.llm.opencode_provider import (
 from server.services.llm.context_budget import resolve_model_context_profile
 from server.services.llm.types import ModelDescriptor
 
+
 ###############################################################################
 @dataclass
 class _CachedOllamaFailure:
     expires_at: float
     message: str
+
 
 ###############################################################################
 class ModelLibrarySourceError(RuntimeError):
@@ -30,9 +32,9 @@ class ModelLibrarySourceError(RuntimeError):
 
 DYNAMIC_CLOUD_PROVIDERS = ("deepseek", OPENCODE_PROVIDER, OPENCODE_GO_PROVIDER)
 
+
 ###############################################################################
 class ChatModelLibraryService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -144,7 +146,7 @@ class ChatModelLibraryService:
     def _positive_int(value: object) -> int | None:
         try:
             parsed = int(value) if value is not None else 0
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return parsed if parsed > 0 else None
 
@@ -175,8 +177,7 @@ class ChatModelLibraryService:
             except Exception as exc:
                 sources[cloud_provider] = {
                     "ok": False,
-                    "message": str(exc)
-                    or f"Could not load {cloud_provider} models.",
+                    "message": str(exc) or f"Could not load {cloud_provider} models.",
                     "model_count": 0,
                 }
         deduped_cloud: dict[tuple[str, str], dict[str, object]] = {}
@@ -222,7 +223,10 @@ class ChatModelLibraryService:
         for bucket in ("cloud", "local"):
             for item in json_array(library.get(bucket, [])):
                 item_object = json_object(item)
-                if item_object.get("provider") == provider and item_object.get("name") == model_name:
+                if (
+                    item_object.get("provider") == provider
+                    and item_object.get("name") == model_name
+                ):
                     return item_object
         return None
 

@@ -6,6 +6,7 @@ from server.services.geospatial.overpass import OverpassService
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.overpass import OverpassProvider
 
+
 ###############################################################################
 class _BuildingService:
     default_radius_m = 1500.0
@@ -22,12 +23,15 @@ class _BuildingService:
                     "id": "way/1",
                     "geometry": {
                         "type": "Polygon",
-                        "coordinates": [[[12.49, 41.89], [12.50, 41.89], [12.49, 41.89]]],
+                        "coordinates": [
+                            [[12.49, 41.89], [12.50, 41.89], [12.49, 41.89]]
+                        ],
                     },
                     "properties": {"building": "apartments"},
                 }
             ],
         }
+
 
 ###############################################################################
 def test_overpass_provider_routes_residential_capability_separately() -> None:
@@ -43,6 +47,7 @@ def test_overpass_provider_routes_residential_capability_separately() -> None:
         assert "OpenStreetMap" in response.attribution[0]
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_residential_building_normalization_rejects_non_polygons() -> None:
@@ -70,4 +75,3 @@ def test_residential_building_normalization_rejects_non_polygons() -> None:
         )
     )
     assert payload["features"] == []
-

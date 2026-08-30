@@ -12,6 +12,7 @@ from server.services.llm.types import (
 )
 from server.services.llm.errors import LLMRequestSchemaError, LLMStructuredOutputError
 
+
 ###############################################################################
 class LLMProvider(ABC):
     provider_name: str
@@ -118,7 +119,10 @@ class LLMProvider(ABC):
             if isinstance(request_structured_state, bool)
             else self.supports_structured_output(request.model)
         )
-        if request.response_json_schema is not None and supports_structured_output is False:
+        if (
+            request.response_json_schema is not None
+            and supports_structured_output is False
+        ):
             raise LLMStructuredOutputError(
                 category="model_capability",
                 provider=self.provider_name,

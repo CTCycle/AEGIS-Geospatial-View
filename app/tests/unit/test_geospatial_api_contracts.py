@@ -26,18 +26,20 @@ from server.services.geospatial.providers.base import (
     ProviderTimeoutError,
 )
 
+
 ###############################################################################
 def create_started_client() -> TestClient:
     client = TestClient(create_app())
     client.__enter__()
     return client
 
+
 ###############################################################################
 class _NoCredentials:
-
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN201
         return None
+
 
 ###############################################################################
 def _build_api_service(provider_registry) -> GeospatialApiService:  # noqa: ANN001
@@ -56,6 +58,7 @@ def _build_api_service(provider_registry) -> GeospatialApiService:  # noqa: ANN0
         provider_registry=provider_registry,
     )
 
+
 ###############################################################################
 def test_geospatial_transit_features_return_metadata_until_feed_configured() -> None:
     client = create_started_client()
@@ -67,6 +70,7 @@ def test_geospatial_transit_features_return_metadata_until_feed_configured() -> 
     assert payload["status"] == "ok"
     assert payload["payload"]["renderingMode"] == "metadata-only"
 
+
 ###############################################################################
 def test_geospatial_features_reports_missing_credentials_without_500() -> None:
     client = create_started_client()
@@ -75,6 +79,7 @@ def test_geospatial_features_reports_missing_credentials_without_500() -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] in {"missing-credential", "ok"}
+
 
 ###############################################################################
 def test_geospatial_features_render_contract_still_uses_provider_envelope() -> None:
@@ -87,12 +92,12 @@ def test_geospatial_features_render_contract_still_uses_provider_envelope() -> N
     assert payload["status"] in {"ok", "unavailable"}
     assert "payload" in payload
 
+
 ###############################################################################
 def test_geospatial_geojson_render_endpoint_returns_raw_feature_collection() -> None:
 
     ###############################################################################
     class GeoJsonRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -136,12 +141,12 @@ def test_geospatial_geojson_render_endpoint_returns_raw_feature_collection() -> 
     assert payload["type"] == "FeatureCollection"
     assert payload["features"][0]["id"] == "quake-1"
 
+
 ###############################################################################
 def test_geospatial_geojson_render_endpoint_wraps_single_feature() -> None:
 
     ###############################################################################
     class SingleFeatureRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -181,12 +186,12 @@ def test_geospatial_geojson_render_endpoint_wraps_single_feature() -> None:
     assert len(payload["features"]) == 1
     assert payload["features"][0]["id"] == "quake-1"
 
+
 ###############################################################################
 def test_geospatial_geojson_render_endpoint_converts_normalized_point_records() -> None:
 
     ###############################################################################
     class NormalizedPointRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -228,12 +233,14 @@ def test_geospatial_geojson_render_endpoint_converts_normalized_point_records() 
     assert feature["geometry"] == {"type": "Point", "coordinates": [12.5, 41.9]}
     assert feature["properties"] == {"name": "Gauge 1", "value": 1.25}
 
+
 ###############################################################################
-def test_geospatial_cameras_geojson_render_endpoint_returns_raw_feature_collection() -> None:
+def test_geospatial_cameras_geojson_render_endpoint_returns_raw_feature_collection() -> (
+    None
+):
 
     ###############################################################################
     class CameraRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -277,12 +284,12 @@ def test_geospatial_cameras_geojson_render_endpoint_returns_raw_feature_collecti
     assert payload["type"] == "FeatureCollection"
     assert payload["features"][0]["id"] == "cam-1"
 
+
 ###############################################################################
 def test_geospatial_geojson_render_endpoint_rejects_malformed_payload() -> None:
 
     ###############################################################################
     class MalformedRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -311,8 +318,11 @@ def test_geospatial_geojson_render_endpoint_rejects_malformed_payload() -> None:
     assert response.status_code == 502
     assert response.json()["detail"]["error_code"] == "malformed_response"
 
+
 ###############################################################################
-def test_geospatial_tile_proxy_rejects_missing_credentials_without_leaking_secret(monkeypatch) -> None:
+def test_geospatial_tile_proxy_rejects_missing_credentials_without_leaking_secret(
+    monkeypatch,
+) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
     client = create_started_client()
 
@@ -321,8 +331,11 @@ def test_geospatial_tile_proxy_rejects_missing_credentials_without_leaking_secre
     assert response.status_code == 401
     assert "TOMTOM_API_KEY" not in response.text
 
+
 ###############################################################################
-def test_geospatial_tile_proxy_fetches_manifest_backed_credentialed_tile(monkeypatch) -> None:
+def test_geospatial_tile_proxy_fetches_manifest_backed_credentialed_tile(
+    monkeypatch,
+) -> None:
     captured: dict[str, str] = {}
 
     async def fake_fetch_binary_url(url: str) -> bytes:
@@ -330,10 +343,14 @@ def test_geospatial_tile_proxy_fetches_manifest_backed_credentialed_tile(monkeyp
         return b"tile-binary"
 
     monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-secret-forbidden")
-    service = _build_api_service(ProviderRegistry(manifest_loader=GeospatialManifestLoader()))
+    service = _build_api_service(
+        ProviderRegistry(manifest_loader=GeospatialManifestLoader())
+    )
     service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
     client = create_started_client()
-    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: service
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
 
     response = client.get("/api/geospatial/tiles/tomtom_traffic_flow/4/5/6.png")
 
@@ -341,6 +358,7 @@ def test_geospatial_tile_proxy_fetches_manifest_backed_credentialed_tile(monkeyp
     assert response.content == b"tile-binary"
     assert "tomtom-secret-forbidden" in captured["url"]
     assert "tomtom-secret-forbidden" not in response.text
+
 
 ###############################################################################
 def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
@@ -353,6 +371,7 @@ def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] in {"missing-credential", "ok", "unavailable"}
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -368,7 +387,6 @@ def test_geospatial_features_map_provider_failures_without_500(
 
     ###############################################################################
     class FailingRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -390,6 +408,7 @@ def test_geospatial_features_map_provider_failures_without_500(
     assert payload["status"] == expected_status
     assert payload["provider"] == "usgs"
 
+
 ###############################################################################
 def test_geospatial_cameras_report_missing_windy_key_without_500(monkeypatch) -> None:
     monkeypatch.delenv("WINDY_WEBCAMS_API_KEY", raising=False)
@@ -399,6 +418,7 @@ def test_geospatial_cameras_report_missing_windy_key_without_500(monkeypatch) ->
 
     assert response.status_code == 200
     assert response.json()["status"] == "missing-credential"
+
 
 ###############################################################################
 def test_geospatial_camera_detail_returns_provider_payload_shape() -> None:
@@ -412,6 +432,7 @@ def test_geospatial_camera_detail_returns_provider_payload_shape() -> None:
     assert payload["status"] in {"missing-credential", "metadata-unavailable", "ok"}
     assert payload["provider"] == "windy_webcams"
 
+
 ###############################################################################
 def test_geospatial_credential_status_uses_existing_env_pattern(monkeypatch) -> None:
     monkeypatch.setenv("WINDY_WEBCAMS_API_KEY", "test-key")
@@ -424,6 +445,7 @@ def test_geospatial_credential_status_uses_existing_env_pattern(monkeypatch) -> 
     assert payload["required"] is True
     assert payload["configured"] is True
     assert payload["environmentVariable"] == "WINDY_WEBCAMS_API_KEY"
+
 
 ###############################################################################
 def test_geospatial_provider_account_setup_detail_reports_env(monkeypatch) -> None:
@@ -439,6 +461,7 @@ def test_geospatial_provider_account_setup_detail_reports_env(monkeypatch) -> No
     assert payload["environment_variable"] == "TOMTOM_API_KEY"
     assert payload["configured"] is False
     assert payload["instructions"]
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -464,6 +487,7 @@ def test_optional_provider_credential_status_uses_provider_environment(
     assert configured.status_code == 200
     assert configured.json()["configured"] is True
 
+
 ###############################################################################
 def test_account_setup_lists_all_credential_gated_manifest_providers() -> None:
     client = create_started_client()
@@ -483,6 +507,7 @@ def test_account_setup_lists_all_credential_gated_manifest_providers() -> None:
         "windy_webcams",
     }
 
+
 ###############################################################################
 def test_account_setup_includes_experimental_automation_support() -> None:
     client = create_started_client()
@@ -495,6 +520,7 @@ def test_account_setup_includes_experimental_automation_support() -> None:
         assert item["automation"]["support"] in supported
         assert item["automation"]["experimental"] is True
         assert item["automation"]["experimental_label"] == "Experimental guided setup"
+
 
 ###############################################################################
 def test_google_maps_is_manual_only_and_billing_aware() -> None:
@@ -513,6 +539,7 @@ def test_google_maps_is_manual_only_and_billing_aware() -> None:
         "billing" in note.lower() for note in google_maps["automation"]["safety_notes"]
     )
 
+
 ###############################################################################
 def test_opentripmap_is_unsupported() -> None:
     client = create_started_client()
@@ -527,6 +554,7 @@ def test_opentripmap_is_unsupported() -> None:
     )
     assert opentripmap["automation"]["support"] == "unsupported"
 
+
 ###############################################################################
 def test_account_setup_response_excludes_secret_values(monkeypatch) -> None:
     monkeypatch.setenv("TOMTOM_API_KEY", "secret-tomtom-value")
@@ -537,6 +565,7 @@ def test_account_setup_response_excludes_secret_values(monkeypatch) -> None:
     assert response.status_code == 200
     assert "secret-tomtom-value" not in str(response.json())
 
+
 ###############################################################################
 def test_geospatial_audit_endpoint_passes() -> None:
     client = create_started_client()
@@ -545,6 +574,7 @@ def test_geospatial_audit_endpoint_passes() -> None:
 
     assert response.status_code == 200
     assert response.json()["error_count"] == 0
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -587,6 +617,7 @@ def test_raise_service_http_error_maps_expected_statuses(
 
     assert exc_info.value.status_code == expected_status
     assert exc_info.value.detail == expected_detail
+
 
 ###############################################################################
 def test_raise_service_http_error_uses_generic_fallback_for_unknown_error() -> None:

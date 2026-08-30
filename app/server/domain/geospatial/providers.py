@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ProviderRequest:
@@ -12,6 +13,7 @@ class ProviderRequest:
     zoom: int | None = None
     time: datetime | None = None
     params: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -25,6 +27,7 @@ class ProviderResponse:
     fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     result_status: Literal["ok", "valid_empty", "stale"] = "ok"
     result_type: Literal["features", "raster", "metadata", "unknown"] = "unknown"
+
 
 ###############################################################################
 @dataclass(frozen=True)

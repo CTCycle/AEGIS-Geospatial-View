@@ -7,6 +7,7 @@ from server.contracts.geospatial import CapabilityKind, CapabilityManifestV2
 from server.services.geospatial.layer_auditor import audit_all_manifests
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
+
 ###############################################################################
 def test_all_geospatial_manifests_pass_schema_v2_audit() -> None:
     report = audit_all_manifests(strict=True)
@@ -20,9 +21,12 @@ def test_all_geospatial_manifests_pass_schema_v2_audit() -> None:
         if issue.message == "Metadata-only manifest cannot claim map geometry."
     ]
 
+
 ###############################################################################
 def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
-    manifests = Path(__file__).resolve().parents[2] / "artifacts" / "tmp_manifest_schema_v2"
+    manifests = (
+        Path(__file__).resolve().parents[2] / "artifacts" / "tmp_manifest_schema_v2"
+    )
     if manifests.exists():
         shutil.rmtree(manifests)
     basemaps = manifests / "basemaps"
@@ -84,6 +88,7 @@ def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
             raise AssertionError("Invalid schema v2 manifest unexpectedly loaded.")
     finally:
         shutil.rmtree(manifests, ignore_errors=True)
+
 
 ###############################################################################
 def test_loaded_manifests_expose_v2_capability_kinds() -> None:

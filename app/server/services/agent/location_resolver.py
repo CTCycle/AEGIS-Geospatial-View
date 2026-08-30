@@ -11,6 +11,7 @@ from server.domain.agent.decision import ClarificationRequest, ResolvedLocation
 from server.contracts.extraction import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
 
+
 ###############################################################################
 class LocationResolver:
     SPECIFICITY_BY_SIGNAL_TYPE = {
@@ -38,15 +39,27 @@ class LocationResolver:
                     label=str(active.get("label") or ""),
                     latitude=float(active.get("latitude") or 0.0),
                     longitude=float(active.get("longitude") or 0.0),
-                    country=active.get("country") if isinstance(active.get("country"), str) else None,
-                    city=active.get("city") if isinstance(active.get("city"), str) else None,
-                    address=active.get("address") if isinstance(active.get("address"), str) else None,
+                    country=active.get("country")
+                    if isinstance(active.get("country"), str)
+                    else None,
+                    city=active.get("city")
+                    if isinstance(active.get("city"), str)
+                    else None,
+                    address=active.get("address")
+                    if isinstance(active.get("address"), str)
+                    else None,
                     source=str(active.get("source") or "memory"),
                     confidence=float(active.get("confidence") or 0.85),
-                    location_type=active.get("location_type") if isinstance(active.get("location_type"), str) else None,
-                    location_class=active.get("location_class") if isinstance(active.get("location_class"), str) else None,
+                    location_type=active.get("location_type")
+                    if isinstance(active.get("location_type"), str)
+                    else None,
+                    location_class=active.get("location_class")
+                    if isinstance(active.get("location_class"), str)
+                    else None,
                     bbox=json_array(active.get("bbox")) or None,
-                    bbox_source=active.get("bbox_source") if isinstance(active.get("bbox_source"), str) else None,
+                    bbox_source=active.get("bbox_source")
+                    if isinstance(active.get("bbox_source"), str)
+                    else None,
                 )
             return ClarificationRequest(
                 question="Which location should I use?",
@@ -73,9 +86,16 @@ class LocationResolver:
 
         if (
             len(resolved_candidates) > 1
-            and abs(resolved_candidates[0].confidence - resolved_candidates[1].confidence) < 0.12
-            and self._specificity_gap_is_small(ranked_candidates[0], ranked_candidates[1])
-            and not self._same_resolved_location(resolved_candidates[0], resolved_candidates[1])
+            and abs(
+                resolved_candidates[0].confidence - resolved_candidates[1].confidence
+            )
+            < 0.12
+            and self._specificity_gap_is_small(
+                ranked_candidates[0], ranked_candidates[1]
+            )
+            and not self._same_resolved_location(
+                resolved_candidates[0], resolved_candidates[1]
+            )
         ):
             return self.build_ambiguity_question(ranked_candidates[:2])
 
@@ -91,7 +111,9 @@ class LocationResolver:
         return resolved_candidates[0]
 
     # -------------------------------------------------------------------------
-    def score_location_matches(self, location_signals: Sequence[LocationSignal]) -> list[LocationSignal]:
+    def score_location_matches(
+        self, location_signals: Sequence[LocationSignal]
+    ) -> list[LocationSignal]:
         return sorted(
             location_signals,
             key=lambda item: (
@@ -102,14 +124,24 @@ class LocationResolver:
         )
 
     # -------------------------------------------------------------------------
-    def _specificity_gap_is_small(self, left: LocationSignal, right: LocationSignal) -> bool:
+    def _specificity_gap_is_small(
+        self, left: LocationSignal, right: LocationSignal
+    ) -> bool:
         left_specificity = self.SPECIFICITY_BY_SIGNAL_TYPE.get(left.signal_type, 0)
         right_specificity = self.SPECIFICITY_BY_SIGNAL_TYPE.get(right.signal_type, 0)
         return left_specificity == right_specificity
 
     # -------------------------------------------------------------------------
     def _same_resolved_point(self, left: LocationSignal, right: LocationSignal) -> bool:
-        if any(value is None for value in (left.latitude, left.longitude, right.latitude, right.longitude)):
+        if any(
+            value is None
+            for value in (
+                left.latitude,
+                left.longitude,
+                right.latitude,
+                right.longitude,
+            )
+        ):
             return False
         left_latitude = left.latitude
         left_longitude = left.longitude
@@ -123,7 +155,9 @@ class LocationResolver:
         )
 
     # -------------------------------------------------------------------------
-    def _same_resolved_location(self, left: ResolvedLocation, right: ResolvedLocation) -> bool:
+    def _same_resolved_location(
+        self, left: ResolvedLocation, right: ResolvedLocation
+    ) -> bool:
         return (
             abs(float(left.latitude) - float(right.latitude)) < 0.01
             and abs(float(left.longitude) - float(right.longitude)) < 0.01
@@ -162,7 +196,9 @@ class LocationResolver:
         )
 
     # -------------------------------------------------------------------------
-    def build_ambiguity_question(self, candidates: Sequence[LocationSignal]) -> ClarificationRequest:
+    def build_ambiguity_question(
+        self, candidates: Sequence[LocationSignal]
+    ) -> ClarificationRequest:
         options: list[str] = []
         for candidate in candidates:
             label = str(candidate.normalized_value or candidate.raw_value or "").strip()

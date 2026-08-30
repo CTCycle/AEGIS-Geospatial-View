@@ -14,17 +14,19 @@ from urllib.request import Request, urlopen
 
 from server.configurations import get_server_settings
 
+
 ###############################################################################
 class OpenMeteoServiceError(Exception):
     """Base exception for Open-Meteo failures."""
+
 
 ###############################################################################
 class OpenMeteoRequestError(OpenMeteoServiceError):
     """Raised when Open-Meteo cannot fulfill a request."""
 
+
 ###############################################################################
 class OpenMeteoService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -74,9 +76,7 @@ class OpenMeteoService:
             params=params,
             provider_key="openmeteo_weather",
         )
-        hourly = (
-            json_object(payload.get("hourly"))
-        )
+        hourly = json_object(payload.get("hourly"))
         timeline = list(hourly.get("time") or [])
         temperature = list(hourly.get("temperature_2m") or [])
         precipitation = list(hourly.get("precipitation") or [])
@@ -99,9 +99,7 @@ class OpenMeteoService:
             hourly_forecast.append(row)
             if len(preview) >= 6:
                 continue
-            preview.append(
-                row
-            )
+            preview.append(row)
         return {
             "provider": "openmeteo",
             "kind": "weather_forecast",
@@ -134,9 +132,7 @@ class OpenMeteoService:
             params=params,
             provider_key="openmeteo_air_quality",
         )
-        hourly = (
-            json_object(payload.get("hourly"))
-        )
+        hourly = json_object(payload.get("hourly"))
         timeline = list(hourly.get("time") or [])
         pollutants = {
             "pm2_5": list(hourly.get("pm2_5") or []),

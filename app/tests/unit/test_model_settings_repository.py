@@ -4,6 +4,7 @@ import json
 
 from server.repositories.model_settings import ModelSettingsRepository
 
+
 ###############################################################################
 def test_update_persists_selected_agent_model(sqlite_backend) -> None:
     repo = ModelSettingsRepository(sqlite_backend)
@@ -19,6 +20,7 @@ def test_update_persists_selected_agent_model(sqlite_backend) -> None:
     current = repo.get_or_create()
     assert current.agent_model_provider == "ollama"
     assert current.agent_model_name == "llama3.2"
+
 
 ###############################################################################
 def test_get_or_create_uses_current_schema_defaults(sqlite_backend) -> None:

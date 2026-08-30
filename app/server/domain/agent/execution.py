@@ -6,6 +6,7 @@ from typing import Any, Literal
 from server.contracts.geospatial import MapSession
 from server.domain.llm.types import LLMToolCall, LLMToolDefinition, LLMToolResult
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class AgentExecutionContext:
@@ -15,6 +16,7 @@ class AgentExecutionContext:
     map_state: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
     policy_constraints: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
     metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -26,6 +28,7 @@ class AgentToolLoopRequest:
     temperature: float
     max_tokens: int | None = None
     context: AgentExecutionContext = field(default_factory=AgentExecutionContext)
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -46,11 +49,14 @@ class AgentToolLoopResult:
     model_calls: int = 0
     duplicate_tool_calls: int = 0
     no_progress_steps: int = 0
-    failure_category: Literal[
-        "model_capability",
-        "provider_api",
-        "schema_definition",
-        "response_parsing",
-        "context_limit",
-    ] | None = None
+    failure_category: (
+        Literal[
+            "model_capability",
+            "provider_api",
+            "schema_definition",
+            "response_parsing",
+            "context_limit",
+        ]
+        | None
+    ) = None
     failure_detail: str | None = None

@@ -23,11 +23,13 @@ from server.contracts.geospatial import MapSession
 from server.services.chat.streaming import ChatStreamingService
 from server.services.llm.errors import LLMConfigurationError
 
+
 ###############################################################################
 async def collect_stream_events(
     stream: AsyncIterator[ChatStreamEvent],
 ) -> list[ChatStreamEvent]:
     return [event async for event in stream]
+
 
 ###############################################################################
 def turn_contract() -> TurnParseResult:
@@ -52,6 +54,7 @@ def turn_contract() -> TurnParseResult:
         ),
     )
 
+
 ###############################################################################
 def policy_decision() -> PolicyDecision:
     return PolicyDecision(
@@ -62,6 +65,7 @@ def policy_decision() -> PolicyDecision:
         ),
         trace=DecisionTrace(steps=["test"]),
     )
+
 
 ###############################################################################
 def chat_response(
@@ -83,9 +87,9 @@ def chat_response(
         memory_snapshot={"k": "v"},
     )
 
+
 ###############################################################################
 class ToolStatusAgentOrchestrator:
-
     # -------------------------------------------------------------------------
     async def run_turn(
         self,
@@ -94,14 +98,25 @@ class ToolStatusAgentOrchestrator:
     ) -> ChatTurnResponse:
         progress_callback("parsed", {"request_id": payload.request_id})
         progress_callback("policy", {"request_id": payload.request_id})
-        progress_callback("tool_call_started", {"name": "execute_geospatial_capability"})
-        progress_callback("tool_call_completed", {"name": "execute_geospatial_capability", "ok": True})
-        progress_callback("map_session_created", {"map_session": {"resolved_location": {"label": "Rome"}}})
+        progress_callback(
+            "tool_call_started", {"name": "execute_geospatial_capability"}
+        )
+        progress_callback(
+            "tool_call_completed", {"name": "execute_geospatial_capability", "ok": True}
+        )
+        progress_callback(
+            "map_session_created",
+            {"map_session": {"resolved_location": {"label": "Rome"}}},
+        )
         return chat_response(
             payload,
             tool_payload={
                 "tool_calls": [
-                    {"id": "tool-1", "name": "execute_geospatial_capability", "arguments": {"capability_id": "weather_overlay"}},
+                    {
+                        "id": "tool-1",
+                        "name": "execute_geospatial_capability",
+                        "arguments": {"capability_id": "weather_overlay"},
+                    },
                 ],
                 "tool_results": [
                     {
@@ -109,7 +124,9 @@ class ToolStatusAgentOrchestrator:
                         "name": "execute_geospatial_capability",
                         "content": {
                             "ok": True,
-                            "data": {"map_session": {"overlay_ids": ["weather_overlay"]}},
+                            "data": {
+                                "map_session": {"overlay_ids": ["weather_overlay"]}
+                            },
                             "error": None,
                             "metadata": {},
                         },
@@ -146,9 +163,9 @@ class ToolStatusAgentOrchestrator:
             ),
         )
 
+
 ###############################################################################
 class FinalMessageAgentOrchestrator:
-
     # -------------------------------------------------------------------------
     async def run_turn(
         self,
@@ -166,9 +183,9 @@ class FinalMessageAgentOrchestrator:
             ),
         )
 
+
 ###############################################################################
 class ConfigurationErrorAgentOrchestrator:
-
     # -------------------------------------------------------------------------
     async def run_turn(
         self,
@@ -177,9 +194,9 @@ class ConfigurationErrorAgentOrchestrator:
     ) -> ChatTurnResponse:
         raise LLMConfigurationError("provider unavailable")
 
+
 ###############################################################################
 class UnexpectedErrorAgentOrchestrator:
-
     # -------------------------------------------------------------------------
     async def run_turn(
         self,
@@ -188,11 +205,15 @@ class UnexpectedErrorAgentOrchestrator:
     ) -> ChatTurnResponse:
         raise RuntimeError("boom")
 
+
 ###############################################################################
 def stream_events(agent_orchestrator: object) -> list[ChatStreamEvent]:
     service = ChatStreamingService(agent_orchestrator)  # type: ignore[arg-type]
-    payload = ChatTurnRequest(conversation_id="test-conversation", message="hi", request_id="chat-123")
+    payload = ChatTurnRequest(
+        conversation_id="test-conversation", message="hi", request_id="chat-123"
+    )
     return run_async_in_thread(collect_stream_events(service.stream_turn(payload)))
+
 
 ###############################################################################
 def test_stream_turn_emits_lifecycle_and_map_events() -> None:
@@ -211,6 +232,7 @@ def test_stream_turn_emits_lifecycle_and_map_events() -> None:
     assert events[4].data["ok"] is True
     assert events[5].data["map_session"]["resolved_location"]["label"] == "Rome"
 
+
 ###############################################################################
 def test_stream_turn_final_assistant_event_emits_final_payload() -> None:
     events = stream_events(FinalMessageAgentOrchestrator())
@@ -228,6 +250,7 @@ def test_stream_turn_final_assistant_event_emits_final_payload() -> None:
     assert events[-1].data["decision"]["plan"]["state"] == "direct_response"
     assert events[-1].data["operation"]["kind"] == "direct_answer"
 
+
 ###############################################################################
 def test_stream_turn_llm_configuration_error_maps_to_error_event() -> None:
     events = stream_events(ConfigurationErrorAgentOrchestrator())
@@ -235,12 +258,14 @@ def test_stream_turn_llm_configuration_error_maps_to_error_event() -> None:
     assert events[-1].event == "error"
     assert events[-1].data["status"] == 503
 
+
 ###############################################################################
 def test_stream_turn_unexpected_exception_maps_to_500_error_event() -> None:
     events = stream_events(UnexpectedErrorAgentOrchestrator())
 
     assert events[-1].event == "error"
     assert events[-1].data["status"] == 500
+
 
 ###############################################################################
 def test_streaming_service_test_file_contains_no_nested_functions() -> None:

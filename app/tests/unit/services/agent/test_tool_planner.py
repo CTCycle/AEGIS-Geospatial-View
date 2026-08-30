@@ -9,6 +9,7 @@ from server.contracts.extraction import (
 )
 from server.services.agent.tool_planner import DeterministicToolPlanner
 
+
 ###############################################################################
 def _turn(
     text: str,
@@ -44,11 +45,13 @@ def _turn(
         tools_needed=True,
     )
 
+
 ###############################################################################
 def test_location_only_map_does_not_invent_a_basemap_in_the_planner() -> None:
     plan = DeterministicToolPlanner().build_plan(_turn("Show Rome"), "place_resolution")
     assert plan.steps == []
     assert plan.visualization_update == {}
+
 
 ###############################################################################
 def test_layer_plan_contains_location_arguments() -> None:
@@ -59,18 +62,25 @@ def test_layer_plan_contains_location_arguments() -> None:
     assert plan.steps[0].arguments["capability_id"] == "rainviewer_precipitation_radar"
     assert plan.steps[0].arguments["arguments"]["location"] == "Rome"
 
+
 ###############################################################################
 def test_provider_layer_selection_uses_provider_render_tool() -> None:
     plan = DeterministicToolPlanner().build_plan(
-        _turn("Render the selected GIBS layer over Rome", layers=["gibs:MODIS_Terra_CorrectedReflectance_TrueColor"]),
+        _turn(
+            "Render the selected GIBS layer over Rome",
+            layers=["gibs:MODIS_Terra_CorrectedReflectance_TrueColor"],
+        ),
         "map_layers",
     )
 
-    assert [step.tool_name for step in plan.steps] == ["render_geospatial_provider_layer"]
+    assert [step.tool_name for step in plan.steps] == [
+        "render_geospatial_provider_layer"
+    ]
     assert plan.steps[0].arguments == {
         "provider_id": "gibs",
         "layer_id": "MODIS_Terra_CorrectedReflectance_TrueColor",
     }
+
 
 ###############################################################################
 def test_typed_capability_is_selected_without_prose_keyword_inference() -> None:
@@ -85,6 +95,7 @@ def test_typed_capability_is_selected_without_prose_keyword_inference() -> None:
     assert [step.capability_id for step in plan.steps] == [
         "openmeteo_air_quality_forecast"
     ]
+
 
 ###############################################################################
 def test_basemap_replacement_is_deterministic() -> None:

@@ -23,6 +23,7 @@ from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.steering import RunSteeringService
 from server.services.agent.conversation_state import ConversationTaskStateService
 
+
 ###############################################################################
 class _InMemoryBackend:
     db_path = None
@@ -37,9 +38,9 @@ class _InMemoryBackend:
         )
         self.session = sessionmaker(bind=self.engine, future=True)
 
+
 ###############################################################################
 class _FakeRunOrchestrator:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.started: list[str] = []
@@ -47,6 +48,7 @@ class _FakeRunOrchestrator:
     # -------------------------------------------------------------------------
     async def execute_run(self, run_id: str) -> None:
         self.started.append(run_id)
+
 
 ###############################################################################
 @pytest.fixture()
@@ -59,6 +61,7 @@ def run_repositories() -> dict[str, object]:
         "steering": AgentSteeringRepository(backend),
         "events": AgentRunEventRepository(backend),
     }
+
 
 ###############################################################################
 def _services(run_repositories):
@@ -80,6 +83,7 @@ def _services(run_repositories):
     )
     return lifecycle, steering, publisher, fake_orchestrator
 
+
 ###############################################################################
 def test_aggregated_request_is_deterministic_and_preserves_order() -> None:
     service = AggregatedRequestService()
@@ -92,6 +96,7 @@ def test_aggregated_request_is_deterministic_and_preserves_order() -> None:
     )
     assert "1. focus parks" in aggregate
     assert "2. use satellite" in aggregate
+
 
 ###############################################################################
 def test_event_repository_replay_orders_and_filters_visibility(
@@ -135,8 +140,11 @@ def test_event_repository_replay_orders_and_filters_visibility(
     assert [event.event_id for event in replay] == [second.event_id]
     assert all(event.visibility == RunEventVisibility.USER for event in replay)
 
+
 ###############################################################################
-def test_event_repository_rejects_run_and_conversation_mismatch(run_repositories) -> None:
+def test_event_repository_rejects_run_and_conversation_mismatch(
+    run_repositories,
+) -> None:
     repo = run_repositories["events"]
     with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
         session.add(ConversationRecord(id="conv_1", title="Events"))
@@ -164,6 +172,7 @@ def test_event_repository_rejects_run_and_conversation_mismatch(run_repositories
 
     assert repo.get_last_sequence("run_1") == 0
 
+
 ###############################################################################
 def test_create_run_rejects_second_active_run(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
@@ -184,6 +193,7 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
             )
         )
     assert first.state == "pending"
+
 
 ###############################################################################
 def test_duplicate_run_start_is_idempotent_while_active(run_repositories) -> None:
@@ -207,6 +217,7 @@ def test_duplicate_run_start_is_idempotent_while_active(run_repositories) -> Non
     assert duplicate_created is False
     assert duplicate.run_id == first.run_id
     assert duplicate.state == first.state
+
 
 ###############################################################################
 def test_conversation_context_state_survives_repository_restart(
@@ -232,6 +243,7 @@ def test_conversation_context_state_survives_repository_restart(
             expected_revision=initial["context_revision"],
             task_snapshot={"conversation_key": conversation.id, "tasks": []},
         )
+
 
 ###############################################################################
 def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
@@ -269,6 +281,7 @@ def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
     assert duplicate.steering_id == first.steering_id
     assert duplicate.run_version == 2
     assert duplicate.duplicate is True
+
 
 ###############################################################################
 def test_safe_steering_persists_a_v2_state_delta(run_repositories) -> None:
@@ -340,7 +353,13 @@ def test_safe_steering_persists_a_v2_state_delta(run_repositories) -> None:
     assert snapshot["tasks"][0]["status"] == "superseded"
     assert snapshot["evidence_refs"] == []
     assert snapshot["geospatial_state"]["renderable_refs"] == []
-    assert run_repositories["steering"].list_steering_messages(run.run_id)[0].state_delta_applied is True
+    assert (
+        run_repositories["steering"]
+        .list_steering_messages(run.run_id)[0]
+        .state_delta_applied
+        is True
+    )
+
 
 ###############################################################################
 def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) -> None:
@@ -353,7 +372,9 @@ def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) ->
         )
     )
 
-    cancel = run_async_in_thread(lifecycle.cancel_run(conversation.conversation_id, run.run_id))
+    cancel = run_async_in_thread(
+        lifecycle.cancel_run(conversation.conversation_id, run.run_id)
+    )
     duplicate_cancel = run_async_in_thread(
         lifecycle.cancel_run(conversation.conversation_id, run.run_id)
     )
@@ -361,9 +382,9 @@ def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) ->
     assert cancel.state == "cancelled"
     assert duplicate_cancel.state == "cancelled"
     assert len(publisher.replay(run.run_id)) == 1
-    cancelled_snapshot, transitioned = run_repositories["runs"].mark_completed_if_current(
-        run.run_id, run.run_version
-    )
+    cancelled_snapshot, transitioned = run_repositories[
+        "runs"
+    ].mark_completed_if_current(run.run_id, run.run_version)
     assert transitioned is False
     assert cancelled_snapshot.state == "cancelled"
     with pytest.raises(RunConflictError):
@@ -374,6 +395,7 @@ def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) ->
                 SteeringMessageRequest(message="No, map Milan."),
             )
         )
+
 
 ###############################################################################
 def test_shutdown_cancels_in_flight_tasks_and_clears_task_registry(

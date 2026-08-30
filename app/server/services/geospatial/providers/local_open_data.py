@@ -22,6 +22,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class LocalOpenDataProvider:
     provider_id = "local_open_data"
@@ -35,9 +36,7 @@ class LocalOpenDataProvider:
         allowed_hosts: set[str] | None = None,
     ) -> None:
         self.source_map = (
-            dict(source_map)
-            if source_map is not None
-            else self._source_map_from_env()
+            dict(source_map) if source_map is not None else self._source_map_from_env()
         )
         self.fetcher = fetcher or fetch_json_url
         self.allowed_hosts = self._allowed_hosts(allowed_hosts)
@@ -63,9 +62,7 @@ class LocalOpenDataProvider:
             payload=payload,
             attribution=["Local open data provider"],
             result_type="features" if payload.get("features") else "metadata",
-            result_status="valid_empty"
-            if payload.get("features") == []
-            else "ok",
+            result_status="valid_empty" if payload.get("features") == [] else "ok",
         )
 
     # -------------------------------------------------------------------------
@@ -91,7 +88,9 @@ class LocalOpenDataProvider:
     # -------------------------------------------------------------------------
     def _normalize_payload(self, payload: object, *, source_id: str) -> dict[str, Any]:
         if not is_json_object(payload):
-            raise ProviderMalformedPayloadError("Local open-data source must be a JSON object.")
+            raise ProviderMalformedPayloadError(
+                "Local open-data source must be a JSON object."
+            )
         if payload.get("type") == "FeatureCollection":
             features = payload.get("features")
             if not is_json_array(features):
@@ -111,7 +110,11 @@ class LocalOpenDataProvider:
             return {
                 "renderingMode": "camera-points",
                 "type": "FeatureCollection",
-                "features": [self._camera_feature(item) for item in cameras if is_json_object(item)],
+                "features": [
+                    self._camera_feature(item)
+                    for item in cameras
+                    if is_json_object(item)
+                ],
                 "sourceId": source_id,
             }
         return payload | {"sourceId": source_id}
@@ -152,7 +155,9 @@ class LocalOpenDataProvider:
                     break
         source_id = str(requested or request.capability_id).strip()
         if not source_id:
-            raise ProviderInvalidQueryError("A configured local open-data source id is required.")
+            raise ProviderInvalidQueryError(
+                "A configured local open-data source id is required."
+            )
         if explicitly_selected and source_id not in self.source_map:
             raise ProviderInvalidQueryError(
                 "Local open-data sources must be selected by a configured source id."
@@ -162,9 +167,17 @@ class LocalOpenDataProvider:
     # -------------------------------------------------------------------------
     def _allowed_hosts(self, allowed_hosts: set[str] | None) -> set[str]:
         if allowed_hosts is not None:
-            return {str(host).strip().lower().rstrip(".") for host in allowed_hosts if host.strip()}
+            return {
+                str(host).strip().lower().rstrip(".")
+                for host in allowed_hosts
+                if host.strip()
+            }
         configured = os.getenv("LOCAL_OPEN_DATA_ALLOWED_HOSTS", "")
-        explicit = {item.strip().lower().rstrip(".") for item in configured.split(",") if item.strip()}
+        explicit = {
+            item.strip().lower().rstrip(".")
+            for item in configured.split(",")
+            if item.strip()
+        }
         if explicit:
             return explicit
         hosts: set[str] = set()
@@ -176,7 +189,12 @@ class LocalOpenDataProvider:
 
     # -------------------------------------------------------------------------
     def _validate_remote_source(self, parsed: Any, *, source_id: str) -> None:
-        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+        ):
             raise ProviderInvalidQueryError(
                 f"Configured local source '{source_id}' must use an HTTPS URL without embedded credentials."
             )
@@ -191,6 +209,7 @@ class LocalOpenDataProvider:
     def _is_camera_source(source_id: str) -> bool:
         normalized = source_id.casefold()
         return "camera" in normalized or "webcam" in normalized
+
 
 ###############################################################################
 def _is_private_host(host: str) -> bool:

@@ -8,9 +8,9 @@ from server.repositories.database.engine import configure_sqlite_connection
 from server.repositories.database.sqlite import SQLiteRepository
 from server.configurations import DatabaseSettings
 
+
 ###############################################################################
 class _Cursor:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.statements: list[str] = []
@@ -23,9 +23,9 @@ class _Cursor:
     def close(self) -> None:
         return None
 
+
 ###############################################################################
 class _Connection:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.cursor_instance = _Cursor()
@@ -33,6 +33,7 @@ class _Connection:
     # -------------------------------------------------------------------------
     def cursor(self) -> _Cursor:
         return self.cursor_instance
+
 
 ###############################################################################
 def test_sqlite_connection_listener_applies_expected_pragmas() -> None:
@@ -46,6 +47,7 @@ def test_sqlite_connection_listener_applies_expected_pragmas() -> None:
         "PRAGMA busy_timeout=5000",
         "PRAGMA synchronous=NORMAL",
     ]
+
 
 ###############################################################################
 def test_sqlite_engine_applies_pragmas_to_live_connections(tmp_path: Path) -> None:

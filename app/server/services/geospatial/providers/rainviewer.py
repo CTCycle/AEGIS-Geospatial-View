@@ -15,6 +15,7 @@ from server.services.geospatial.rainviewer import (
     RainViewerServiceError,
 )
 
+
 ###############################################################################
 class RainViewerProvider(GeospatialProvider):
     provider_id = "rainviewer"
@@ -42,7 +43,9 @@ class RainViewerProvider(GeospatialProvider):
         try:
             metadata = await self.service.get_latest_radar_metadata()
         except RainViewerServiceError as exc:
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     cached.value,
@@ -56,7 +59,9 @@ class RainViewerProvider(GeospatialProvider):
                 warning=f"RainViewer metadata could not be fetched: {exc}",
             )
         if not self._is_usable_metadata(metadata):
-            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     cached.value,
@@ -102,7 +107,9 @@ class RainViewerProvider(GeospatialProvider):
         )
 
     # -------------------------------------------------------------------------
-    def _empty_response(self, request: ProviderRequest, *, warning: str) -> ProviderResponse:
+    def _empty_response(
+        self, request: ProviderRequest, *, warning: str
+    ) -> ProviderResponse:
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,

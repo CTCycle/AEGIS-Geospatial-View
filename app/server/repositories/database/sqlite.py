@@ -12,9 +12,9 @@ from server.repositories.schemas import Base
 
 # [SQLITE DATABASE]
 
+
 ###############################################################################
 class SQLiteRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, settings: DatabaseSettings | None = None) -> None:
         self.settings = settings or get_server_settings().database

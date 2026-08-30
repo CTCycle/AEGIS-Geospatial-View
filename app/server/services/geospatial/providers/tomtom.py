@@ -19,12 +19,11 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class TomTomProvider(GeospatialProvider):
     provider_id = "tomtom"
-    flow_proxy_template = (
-        "/api/geospatial/proxy/tomtom/traffic-flow/{z}/{x}/{y}.png"
-    )
+    flow_proxy_template = "/api/geospatial/proxy/tomtom/traffic-flow/{z}/{x}/{y}.png"
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -106,12 +105,14 @@ class TomTomProvider(GeospatialProvider):
             message="TomTom accepted the supplied API key.",
         )
 
+
 ###############################################################################
 def build_tomtom_tile_url(kind: str, z: int, x: int, y: int, api_key: str) -> str:
     return (
         "https://api.tomtom.com/traffic/map/4/tile/flow/"
         f"absolute/relative0/{z}/{x}/{y}.png?key={api_key}"
     )
+
 
 ###############################################################################
 def _build_incidents_url(request: ProviderRequest, api_key: str) -> str:
@@ -126,9 +127,14 @@ def _build_incidents_url(request: ProviderRequest, api_key: str) -> str:
             "startTime,endTime,from,to,roadNumbers,length,delay}}}"
         ),
         "language": str(request.params.get("language") or "en-US"),
-        "timeValidityFilter": str(request.params.get("timeValidityFilter") or "present"),
+        "timeValidityFilter": str(
+            request.params.get("timeValidityFilter") or "present"
+        ),
     }
-    return f"https://api.tomtom.com/traffic/services/5/incidentDetails?{urlencode(params)}"
+    return (
+        f"https://api.tomtom.com/traffic/services/5/incidentDetails?{urlencode(params)}"
+    )
+
 
 ###############################################################################
 def _normalize_incidents(payload: object) -> list[dict[str, object]]:
@@ -150,7 +156,9 @@ def _normalize_incidents(payload: object) -> list[dict[str, object]]:
         description = _first_event_description(events)
         features.append(
             {
-                "id": str(properties.get("id") or f"tomtom:{latitude:.6f}:{longitude:.6f}"),
+                "id": str(
+                    properties.get("id") or f"tomtom:{latitude:.6f}:{longitude:.6f}"
+                ),
                 "name": description or "Traffic incident",
                 "category": _incident_category(properties.get("iconCategory")),
                 "source": "tomtom",
@@ -173,6 +181,7 @@ def _normalize_incidents(payload: object) -> list[dict[str, object]]:
         )
     return features
 
+
 ###############################################################################
 def _representative_coordinate(geometry: object) -> tuple[float, float] | None:
     if not is_json_object(geometry):
@@ -184,9 +193,12 @@ def _representative_coordinate(geometry: object) -> tuple[float, float] | None:
     if point is None:
         return None
     longitude, latitude = point
-    if not isinstance(longitude, (int, float)) or not isinstance(latitude, (int, float)):
+    if not isinstance(longitude, (int, float)) or not isinstance(
+        latitude, (int, float)
+    ):
         return None
     return float(longitude), float(latitude)
+
 
 ###############################################################################
 def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
@@ -196,12 +208,14 @@ def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
         return value[0], value[1]
     return _first_coordinate_pair(value[0])
 
+
 ###############################################################################
 def _first_event_description(events: list[object]) -> str | None:
     for event in events:
         if is_json_object(event) and event.get("description"):
             return str(event["description"])
     return None
+
 
 ###############################################################################
 def _incident_category(value: object) -> str:

@@ -26,6 +26,7 @@ from server.services.geospatial.providers.census import CensusProvider
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
 from server.services.geospatial.providers.noaa import NOAAProvider
 
+
 ###############################################################################
 def test_shared_http_rejects_redirects_and_limits_response_bytes(monkeypatch) -> None:
 
@@ -48,25 +49,32 @@ def test_shared_http_rejects_redirects_and_limits_response_bytes(monkeypatch) ->
 
     ###############################################################################
     class _Client:
-
         # -------------------------------------------------------------------------
         def stream(self, *args, **kwargs):
             return _Response()
 
     monkeypatch.setattr(provider_http, "_ASYNC_HTTP_CLIENT", _Client())
     with pytest.raises(ProviderUnavailableError, match="size limit"):
-        run_async_in_thread(provider_http.fetch_bytes_url("https://example.test/data", max_bytes=3))
+        run_async_in_thread(
+            provider_http.fetch_bytes_url("https://example.test/data", max_bytes=3)
+        )
 
     with pytest.raises(ProviderUnavailableError, match="redirect"):
-        provider_http._raise_for_status(httpx.Response(302, headers={"location": "/next"}))
+        provider_http._raise_for_status(
+            httpx.Response(302, headers={"location": "/next"})
+        )
+
 
 ###############################################################################
 def test_shared_http_preserves_retry_after_without_exposing_headers() -> None:
     with pytest.raises(ProviderRateLimitError) as error:
-        provider_http._raise_for_status(httpx.Response(429, headers={"retry-after": "7"}))
+        provider_http._raise_for_status(
+            httpx.Response(429, headers={"retry-after": "7"})
+        )
 
     assert error.value.retry_after_seconds == 7.0
     assert "retry-after" not in str(error.value).lower()
+
 
 ###############################################################################
 def test_openaq_v3_joins_location_sensors_to_latest_measurements() -> None:
@@ -119,6 +127,7 @@ def test_openaq_v3_joins_location_sensors_to_latest_measurements() -> None:
     assert all("secret" not in url for url, _ in calls)
     assert all(headers["X-API-Key"] == "secret" for _, headers in calls)
 
+
 ###############################################################################
 def test_openaq_request_failure_is_not_converted_to_empty_data() -> None:
     def requester(url: str, headers: dict[str, str]):
@@ -126,10 +135,11 @@ def test_openaq_request_failure_is_not_converted_to_empty_data() -> None:
 
     with pytest.raises(OpenAQRequestError):
         run_async_in_thread(
-            OpenAQService(api_key="secret", requester=requester).get_nearby_measurements(
-                41.9, 12.5
-            )
+            OpenAQService(
+                api_key="secret", requester=requester
+            ).get_nearby_measurements(41.9, 12.5)
         )
+
 
 ###############################################################################
 def test_noaa_coops_discovers_stations_and_requests_station_observations() -> None:
@@ -140,7 +150,12 @@ def test_noaa_coops_discovers_stations_and_requests_station_observations() -> No
         if "stations.json" in url:
             return {
                 "stations": [
-                    {"id": "9414290", "name": "San Francisco", "lat": 37.8, "lng": -122.5}
+                    {
+                        "id": "9414290",
+                        "name": "San Francisco",
+                        "lat": 37.8,
+                        "lng": -122.5,
+                    }
                 ]
             }
         query = parse_qs(urlsplit(url).query)
@@ -162,6 +177,7 @@ def test_noaa_coops_discovers_stations_and_requests_station_observations() -> No
     assert len(calls) == 2
     assert response.payload["features"][0]["id"] == "9414290"
     assert response.payload["features"][0]["value"] == 1.25
+
 
 ###############################################################################
 def test_census_demographics_discovers_boundary_layer_and_joins_acs() -> None:
@@ -212,8 +228,11 @@ def test_census_demographics_discovers_boundary_layer_and_joins_acs() -> None:
     assert feature["properties"]["population"] == 1234
     assert any("api.census.gov/data/2024" in url for url in calls)
 
+
 ###############################################################################
-def test_local_open_data_requires_configured_source_id_and_preserves_geojson_mode() -> None:
+def test_local_open_data_requires_configured_source_id_and_preserves_geojson_mode() -> (
+    None
+):
     async def fetcher(url: str, headers=None):  # noqa: ANN001
         return {
             "type": "FeatureCollection",
@@ -239,6 +258,7 @@ def test_local_open_data_requires_configured_source_id_and_preserves_geojson_mod
     )
     assert response.payload["renderingMode"] == "geojson"
     assert response.payload["sourceId"] == "local_parcels"
+
 
 ###############################################################################
 @pytest.mark.parametrize(

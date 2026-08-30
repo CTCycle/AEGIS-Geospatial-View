@@ -10,9 +10,11 @@ from server.services.catalog.loader import (
     load_reference_catalog,
 )
 
+
 ###############################################################################
 def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
 
 ###############################################################################
 def _build_reference_root(tmp_path: Path) -> Path:
@@ -67,6 +69,7 @@ def _build_reference_root(tmp_path: Path) -> Path:
     )
     return tmp_path / "catalog"
 
+
 ###############################################################################
 def test_loads_all_reference_files_from_catalog_root() -> None:
     catalog = load_reference_catalog(get_catalog_root())
@@ -76,6 +79,7 @@ def test_loads_all_reference_files_from_catalog_root() -> None:
     assert catalog.geospatial_layers
     assert catalog.gibs_tile_matrix_sets
     assert catalog.gibs_layer_defaults
+
 
 ###############################################################################
 def test_country_aliases_must_resolve_to_existing_iso2(tmp_path: Path) -> None:
@@ -91,6 +95,7 @@ def test_country_aliases_must_resolve_to_existing_iso2(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="unknown ISO2"):
         load_reference_catalog(root)
+
 
 ###############################################################################
 def test_duplicate_country_alias_keys_fail(tmp_path: Path) -> None:
@@ -109,6 +114,7 @@ def test_duplicate_country_alias_keys_fail(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Duplicate country alias key"):
         load_reference_catalog(root)
+
 
 ###############################################################################
 def test_duplicate_layer_ids_fail(tmp_path: Path) -> None:
@@ -141,6 +147,7 @@ def test_duplicate_layer_ids_fail(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Duplicate geospatial layer ID"):
         load_reference_catalog(root)
 
+
 ###############################################################################
 def test_gibs_layer_defaults_require_a_populated_value(tmp_path: Path) -> None:
     root = _build_reference_root(tmp_path)
@@ -160,6 +167,7 @@ def test_gibs_layer_defaults_require_a_populated_value(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="must define at least one value"):
         load_reference_catalog(root)
+
 
 ###############################################################################
 def test_macau_alias_resolves_to_mo() -> None:

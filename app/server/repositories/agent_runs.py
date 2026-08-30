@@ -13,9 +13,9 @@ from sqlalchemy.orm import Session
 
 from server.repositories.schemas.models import AgentRunRecord, ConversationRecord
 
+
 ###############################################################################
 class AgentRunRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
@@ -175,27 +175,30 @@ class AgentRunRepository:
     ) -> tuple[AgentRunSnapshot, bool]:
         """Complete only the still-current, non-cancelled run version."""
         with self._session_factory() as session:
-            updated = cast(CursorResult[Any], session.execute(
-                update(AgentRunRecord)
-                .where(
-                    AgentRunRecord.id == run_id,
-                    AgentRunRecord.active_run_version == expected_run_version,
-                    AgentRunRecord.active_slot == 1,
-                    AgentRunRecord.cancel_requested_at.is_(None),
-                    AgentRunRecord.state.notin_(
-                        [
-                            AgentRunState.COMPLETED.value,
-                            AgentRunState.FAILED.value,
-                            AgentRunState.CANCELLED.value,
-                        ]
-                    ),
-                )
-                .values(
-                    state=AgentRunState.COMPLETED.value,
-                    active_slot=None,
-                    completed_at=datetime.now(UTC),
-                )
-            ))
+            updated = cast(
+                CursorResult[Any],
+                session.execute(
+                    update(AgentRunRecord)
+                    .where(
+                        AgentRunRecord.id == run_id,
+                        AgentRunRecord.active_run_version == expected_run_version,
+                        AgentRunRecord.active_slot == 1,
+                        AgentRunRecord.cancel_requested_at.is_(None),
+                        AgentRunRecord.state.notin_(
+                            [
+                                AgentRunState.COMPLETED.value,
+                                AgentRunState.FAILED.value,
+                                AgentRunState.CANCELLED.value,
+                            ]
+                        ),
+                    )
+                    .values(
+                        state=AgentRunState.COMPLETED.value,
+                        active_slot=None,
+                        completed_at=datetime.now(UTC),
+                    )
+                ),
+            )
             session.commit()
             record = self._require_run(session, run_id)
             return self._to_snapshot(record), int(updated.rowcount) == 1
@@ -206,29 +209,32 @@ class AgentRunRepository:
     ) -> tuple[AgentRunSnapshot, bool]:
         """Fail only the still-current, non-cancelled run version."""
         with self._session_factory() as session:
-            updated = cast(CursorResult[Any], session.execute(
-                update(AgentRunRecord)
-                .where(
-                    AgentRunRecord.id == run_id,
-                    AgentRunRecord.active_run_version == expected_run_version,
-                    AgentRunRecord.active_slot == 1,
-                    AgentRunRecord.cancel_requested_at.is_(None),
-                    AgentRunRecord.state.notin_(
-                        [
-                            AgentRunState.COMPLETED.value,
-                            AgentRunState.FAILED.value,
-                            AgentRunState.CANCELLED.value,
-                        ]
-                    ),
-                )
-                .values(
-                    state=AgentRunState.FAILED.value,
-                    active_slot=None,
-                    error_code=code,
-                    error_message=message,
-                    completed_at=datetime.now(UTC),
-                )
-            ))
+            updated = cast(
+                CursorResult[Any],
+                session.execute(
+                    update(AgentRunRecord)
+                    .where(
+                        AgentRunRecord.id == run_id,
+                        AgentRunRecord.active_run_version == expected_run_version,
+                        AgentRunRecord.active_slot == 1,
+                        AgentRunRecord.cancel_requested_at.is_(None),
+                        AgentRunRecord.state.notin_(
+                            [
+                                AgentRunState.COMPLETED.value,
+                                AgentRunState.FAILED.value,
+                                AgentRunState.CANCELLED.value,
+                            ]
+                        ),
+                    )
+                    .values(
+                        state=AgentRunState.FAILED.value,
+                        active_slot=None,
+                        error_code=code,
+                        error_message=message,
+                        completed_at=datetime.now(UTC),
+                    )
+                ),
+            )
             session.commit()
             record = self._require_run(session, run_id)
             return self._to_snapshot(record), int(updated.rowcount) == 1

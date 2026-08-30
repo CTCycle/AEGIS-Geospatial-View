@@ -18,6 +18,7 @@ RealtimeClientMessageType = Literal[
     "heartbeat.ping",
 ]
 
+
 ###############################################################################
 class RealtimeClientMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -27,12 +28,14 @@ class RealtimeClientMessage(BaseModel):
     message_id: str = Field(min_length=1, max_length=MAX_REALTIME_MESSAGE_ID_LENGTH)
     payload: dict[str, Any] = Field(default_factory=dict)
 
+
 ###############################################################################
 class RealtimeResumePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_id: str | None = Field(default=None, max_length=160)
     after_sequence: int = Field(default=0, ge=0)
+
 
 ###############################################################################
 class RealtimeStartPayload(BaseModel):
@@ -58,6 +61,7 @@ class RealtimeStartPayload(BaseModel):
         if not normalized:
             raise ValueError("client_request_id must not be empty")
         return normalized
+
 
 ###############################################################################
 class RealtimeSteerPayload(BaseModel):
@@ -85,6 +89,7 @@ class RealtimeSteerPayload(BaseModel):
             raise ValueError("message must not be empty")
         return normalized
 
+
 ###############################################################################
 class RealtimeCancelPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -92,13 +97,18 @@ class RealtimeCancelPayload(BaseModel):
     run_id: str = Field(min_length=1, max_length=160)
     reason: str | None = Field(default=None, max_length=400)
 
+
 ###############################################################################
 class RealtimeServerMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     protocol_version: Literal[1] = REALTIME_PROTOCOL_VERSION
     type: str = Field(min_length=1, max_length=80)
-    message_id: str | None = Field(default=None, max_length=MAX_REALTIME_MESSAGE_ID_LENGTH)
-    correlation_id: str | None = Field(default=None, max_length=MAX_REALTIME_MESSAGE_ID_LENGTH)
+    message_id: str | None = Field(
+        default=None, max_length=MAX_REALTIME_MESSAGE_ID_LENGTH
+    )
+    correlation_id: str | None = Field(
+        default=None, max_length=MAX_REALTIME_MESSAGE_ID_LENGTH
+    )
     conversation_id: str
     payload: dict[str, Any] = Field(default_factory=dict)

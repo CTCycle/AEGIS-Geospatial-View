@@ -8,12 +8,14 @@ from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.search.orchestrator import LocationSearchOrchestrator
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class SearchRuntime:
     search_orchestrator: LocationSearchOrchestrator
     capability_registry: CapabilityRegistry
     provider_registry: ProviderRegistry
+
 
 ###############################################################################
 def build_search_runtime(

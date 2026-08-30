@@ -48,7 +48,9 @@ from server.services.geospatial.providers.overture import OvertureProvider
 from server.services.geospatial.providers.pvgis import PVGISProvider
 from server.services.geospatial.providers.rainviewer import RainViewerProvider
 from server.services.geospatial.providers.tomtom import TomTomProvider
-from server.services.geospatial.providers.mobility_database import MobilityDatabaseProvider
+from server.services.geospatial.providers.mobility_database import (
+    MobilityDatabaseProvider,
+)
 from server.services.geospatial.providers.usgs import USGSProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
@@ -87,17 +89,19 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "mapillary": lambda credential: MapillaryProvider(access_token=credential),
 }
 
+
 ###############################################################################
 class ProviderRegistryError(Exception):
     """Base provider registry error."""
+
 
 ###############################################################################
 class ProviderNotRegisteredError(ProviderRegistryError):
     """Raised when no provider is registered for a provider id."""
 
+
 ###############################################################################
 class ProviderRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -166,12 +170,15 @@ class ProviderRegistry:
                     items.append((collection_name, item_object))
         for collection_name, item in items:
             capability_kind = str(item.get("capabilityKind") or "").strip().lower()
-            if (
-                collection_name != "providers"
-                and capability_kind in {"basemap", "metadata", "metadata-only"}
-            ):
+            if collection_name != "providers" and capability_kind in {
+                "basemap",
+                "metadata",
+                "metadata-only",
+            }:
                 continue
-            fallback_provider_id = item.get("id") if collection_name == "providers" else ""
+            fallback_provider_id = (
+                item.get("id") if collection_name == "providers" else ""
+            )
             provider_id = str(item.get("provider") or fallback_provider_id).strip()
             if not provider_id:
                 continue
@@ -203,9 +210,7 @@ class ProviderRegistry:
             except ProviderAuthError:
                 raise
             except TimeoutError as exc:
-                last_error = ProviderTimeoutError(
-                    f"Provider '{normalized}' timed out."
-                )
+                last_error = ProviderTimeoutError(f"Provider '{normalized}' timed out.")
                 self._record_failure(normalized)
                 if attempt + 1 >= attempts:
                     raise last_error from exc
@@ -262,7 +267,9 @@ class ProviderRegistry:
     ) -> GeospatialProviderLayerDescriptor:
         normalized = self._normalize_provider_id(provider_id)
         provider = self.get(normalized)
-        describe_layer = cast(Callable[..., Any], getattr(provider, "describe_layer", None))
+        describe_layer = cast(
+            Callable[..., Any], getattr(provider, "describe_layer", None)
+        )
         if not callable(describe_layer):
             raise ProviderUnavailableError(
                 f"Provider '{normalized}' does not support live layer discovery."
@@ -282,7 +289,9 @@ class ProviderRegistry:
     async def _fetch_provider(
         self, provider: GeospatialProvider, request: ProviderRequest
     ) -> ProviderResponse:
-        fetch_features = cast(Callable[..., Any], getattr(provider, "fetch_features", None))
+        fetch_features = cast(
+            Callable[..., Any], getattr(provider, "fetch_features", None)
+        )
         if callable(fetch_features):
             response = await fetch_features(request)
             if isinstance(response, ProviderResponse):

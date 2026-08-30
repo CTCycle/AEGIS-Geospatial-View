@@ -5,9 +5,9 @@ from server.common.typing import is_json_object
 from server.contracts.geospatial import LayerHealthStatus
 from server.domain.geospatial.health import SourceHealthRecord
 
+
 ###############################################################################
 class SourceHealthMonitor:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._records: dict[str, SourceHealthRecord] = {}
@@ -23,7 +23,9 @@ class SourceHealthMonitor:
     ) -> SourceHealthRecord:
         normalized_provider = self._normalize_provider_id(provider_id)
         normalized_status = (
-            status if isinstance(status, LayerHealthStatus) else LayerHealthStatus(status)
+            status
+            if isinstance(status, LayerHealthStatus)
+            else LayerHealthStatus(status)
         )
         record = SourceHealthRecord(
             provider_id=normalized_provider,

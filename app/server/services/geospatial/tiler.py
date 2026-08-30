@@ -8,9 +8,11 @@ from typing import Any
 
 from server.domain.geospatial.tiler import TileBuildResult
 
+
 ###############################################################################
 class TileBuildError(RuntimeError):
     """Raised when a geospatial dataset cannot be prepared for tile delivery."""
+
 
 ###############################################################################
 def build_vector_tile_manifest(
@@ -26,7 +28,9 @@ def build_vector_tile_manifest(
     feature_count = _feature_count(source_path) if source_path else 0
     warnings: list[str] = []
     if source_path is None:
-        warnings.append("No normalized source was supplied; wrote an empty tile manifest.")
+        warnings.append(
+            "No normalized source was supplied; wrote an empty tile manifest."
+        )
     elif not source_path.exists():
         raise TileBuildError(f"Normalized source does not exist: {source_path}")
     manifest_path = output_dir / "tile_manifest.json"
@@ -37,7 +41,9 @@ def build_vector_tile_manifest(
         "featureCount": feature_count,
         "requiresOptionalTiler": True,
     }
-    manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
     return TileBuildResult(
         capability_id=capability_id,
         tile_manifest_file=str(manifest_path),
@@ -46,6 +52,7 @@ def build_vector_tile_manifest(
         feature_count=feature_count,
         warnings=warnings,
     )
+
 
 ###############################################################################
 def build_raster_tile_manifest(
@@ -60,7 +67,9 @@ def build_raster_tile_manifest(
     source_path = Path(source_raster) if source_raster else None
     if source_path is not None and not source_path.exists():
         raise TileBuildError(f"Raster source does not exist: {source_path}")
-    warnings = [] if source_path else ["No raster source was supplied; wrote metadata only."]
+    warnings = (
+        [] if source_path else ["No raster source was supplied; wrote metadata only."]
+    )
     manifest_path = output_dir / "tile_manifest.json"
     payload = {
         "capabilityId": capability_id,
@@ -69,7 +78,9 @@ def build_raster_tile_manifest(
         "featureCount": 0,
         "requiresOptionalTiler": True,
     }
-    manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
     return TileBuildResult(
         capability_id=capability_id,
         tile_manifest_file=str(manifest_path),
@@ -78,6 +89,7 @@ def build_raster_tile_manifest(
         feature_count=0,
         warnings=warnings,
     )
+
 
 ###############################################################################
 def _feature_count(source_path: Path | None) -> int:

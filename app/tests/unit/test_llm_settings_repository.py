@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from server.repositories.model_settings import ModelSettingsRepository
 
+
 ###############################################################################
 def test_model_settings_repository_creates_and_updates_record(sqlite_backend) -> None:
     repository = ModelSettingsRepository(sqlite_backend)

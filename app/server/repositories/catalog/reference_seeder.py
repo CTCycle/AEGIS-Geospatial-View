@@ -14,6 +14,7 @@ from server.repositories.schemas import (
     ReferenceGibsTileMatrixSetRecord,
 )
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ReferenceSeedResult:
@@ -22,9 +23,9 @@ class ReferenceSeedResult:
     gibs_tile_matrix_sets_seeded: bool
     gibs_layer_defaults_seeded: bool
 
+
 ###############################################################################
 class ReferenceCatalogSeeder:
-
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self.database = database
