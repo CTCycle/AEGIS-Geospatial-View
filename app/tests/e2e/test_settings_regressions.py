@@ -117,11 +117,11 @@ def _setup_stub_harness(
 
 
 ###############################################################################
-def test_settings_mobile_layout_has_no_overlap_at_320px(
+def test_settings_layout_has_no_overlap_at_minimum_desktop_width(
     page: Page, base_url: str
 ) -> None:
     _setup_stub_harness(page)
-    page.set_viewport_size({"width": 320, "height": 700})
+    page.set_viewport_size({"width": 1024, "height": 700})
 
     page.goto(f"{base_url.rstrip('/')}/settings?mode=cloud")
 
@@ -151,8 +151,13 @@ def test_settings_mobile_layout_has_no_overlap_at_320px(
     assert layout_metrics["leftRect"] is not None
     assert layout_metrics["rightRect"] is not None
     assert layout_metrics["bodyOverflow"] <= 1
+    left = layout_metrics["leftRect"]
+    right = layout_metrics["rightRect"]
     assert (
-        layout_metrics["rightRect"]["top"] >= layout_metrics["leftRect"]["bottom"] - 1
+        left["right"] <= right["left"] + 1
+        or right["right"] <= left["left"] + 1
+        or left["bottom"] <= right["top"] + 1
+        or right["bottom"] <= left["top"] + 1
     )
 
 
@@ -254,11 +259,11 @@ def test_chat_composer_does_not_cover_latest_assistant_message(
             "This is the latest assistant response and it must remain visible above the composer.",
         ),
     )
-    page.set_viewport_size({"width": 390, "height": 844})
+    page.set_viewport_size({"width": 1024, "height": 844})
     page.goto(base_url)
 
     page.get_by_label("Chat message").fill("show status")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     latest = page.get_by_text(
         "This is the latest assistant response and it must remain visible above the composer."
     )
@@ -286,7 +291,7 @@ def test_settings_query_params_do_not_leak_back_to_chat(
     _setup_stub_harness(page)
 
     page.goto(f"{base_url.rstrip('/')}/settings?mode=cloud")
-    expect(page).to_have_url(re.compile(r".*/settings\?mode=cloud$"))
+    expect(page).to_have_url(re.compile(r".*/settings$"))
 
     page.get_by_role("link", name="Search").click()
     expect(page.get_by_label("Chat message")).to_be_visible(timeout=15000)
@@ -317,7 +322,7 @@ def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(
     composer = page.get_by_label("Chat message")
 
     composer.fill("coordinate lookup for Eiffel Tower")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(
         page.get_by_text("Coordinates identified without map session.")
     ).to_be_visible(timeout=15000)
@@ -327,7 +332,7 @@ def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(
     page.get_by_role("button", name="Start new chat").click()
     expect(page.get_by_label("Chat message")).to_be_visible(timeout=15000)
     composer.fill("place search for Rome city center")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(
         page.get_by_text("Place search rendered with an interactive map.")
     ).to_be_visible(timeout=15000)

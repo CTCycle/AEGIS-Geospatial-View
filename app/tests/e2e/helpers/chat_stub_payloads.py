@@ -1,9 +1,39 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 
 E2E_CONVERSATION_ID = "conversation-e2e"
+
+
+def map_overlay_instance(
+    *,
+    instance_id: str,
+    capability_id: str,
+    label: str,
+    provider: str,
+    overlay_type: str,
+    rendering_mode: str,
+    descriptor: dict[str, Any],
+    opacity: float = 1.0,
+) -> dict[str, Any]:
+    return {
+        "instance_id": instance_id,
+        "capability_id": capability_id,
+        "label": label,
+        "provider": provider,
+        "overlay_type": overlay_type,
+        "rendering_mode": rendering_mode,
+        "scope_key": "location",
+        "scope": {"kind": "location", "label": "Rome, Italy"},
+        "visible": True,
+        "opacity": opacity,
+        "render_variant": {},
+        "descriptor": descriptor,
+        "inspections": [],
+    }
+
 
 ROME_MAP_SESSION = {
     "session_id": "rome-map-session",
@@ -15,7 +45,6 @@ ROME_MAP_SESSION = {
     "center": {"latitude": 41.9028, "longitude": 12.4964},
     "bounds": [12.3, 41.8, 12.7, 42.0],
     "basemap_id": "osm_default",
-    "overlay_ids": ["openaq_air_quality"],
     "viewport": {
         "center_latitude": 41.9028,
         "center_longitude": 12.4964,
@@ -25,22 +54,35 @@ ROME_MAP_SESSION = {
         "id": "osm_default",
         "label": "OpenStreetMap",
         "provider": "osm",
-        "type": "tile",
         "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "requires_key": False,
+        "attribution": "OpenStreetMap contributors",
+        "render_status": "available",
+        "unavailable_reason": None,
     },
-    "overlays": [
-        {
-            "id": "openaq_air_quality",
-            "label": "OpenAQ Air Quality",
-            "provider": "openaq",
-            "type": "tile",
-            "url": "https://example.test/openaq/{z}/{x}/{y}.png",
-            "default_opacity": 0.65,
-            "requires_key": False,
-        }
-    ],
     "compliance_warnings": ["Demo alert summary for documented session."],
+    "overlay_collection": {
+        "collection_id": "rome-map-overlays",
+        "revision": 1,
+        "instances": [
+            map_overlay_instance(
+                instance_id="openaq_air_quality",
+                capability_id="openaq_air_quality",
+                label="OpenAQ Air Quality",
+                provider="openaq",
+                overlay_type="tile",
+                rendering_mode="xyz",
+                opacity=0.65,
+                descriptor={
+                    "layer_id": "openaq_air_quality",
+                    "provider": "openaq",
+                    "rendering_mode": "xyz",
+                    "source_protocol": "xyz",
+                    "tile_url_template": "https://example.test/openaq/{z}/{x}/{y}.png",
+                    "attribution": ["OpenAQ"],
+                },
+            )
+        ],
+    },
 }
 
 
@@ -81,7 +123,7 @@ def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
 def chat_completion_map_payload(
     turn_number: int, assistant_message: str, basemap_id: str = "osm_default"
 ) -> dict[str, Any]:
-    payload = dict(ROME_MAP_SESSION)
+    payload = deepcopy(ROME_MAP_SESSION)
     payload["basemap"] = {**ROME_MAP_SESSION["basemap"], "id": basemap_id}
     return {
         "request_id": f"chat-stub-{turn_number}",
@@ -235,12 +277,165 @@ def selected_agent_settings_payload() -> dict[str, Any]:
 
 
 ###############################################################################
+def _catalog_capability(
+    *,
+    capability_id: str,
+    name: str,
+    kind: str,
+    capability_type: str,
+    description: str,
+    provider: str,
+    supports_map: bool,
+    supports_direct_text: bool,
+    source_protocol: str,
+    data_format: str,
+    geometry_type: str,
+    queryable: bool,
+    rendering_mode: str,
+    render: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "id": capability_id,
+        "name": name,
+        "kind": kind,
+        "type": capability_type,
+        "description": description,
+        "provider": provider,
+        "requires_credentials": False,
+        "is_available": True,
+        "supports_map": supports_map,
+        "supports_direct_text": supports_direct_text,
+        "coverage": "global",
+        "source_protocol": source_protocol,
+        "data_format": data_format,
+        "geometry_type": geometry_type,
+        "queryable": queryable,
+        "endpoint_health": "healthy",
+        "auth_mode": "none",
+        "official_docs_url": "https://example.test/aegis-fixture",
+        "capability_kind": kind,
+        "rendering_mode": rendering_mode,
+        "reliability": {
+            "status": "verified",
+            "last_audited": "2026-08-31",
+            "known_limitations": [],
+        },
+        "auth": {
+            "type": "none",
+            "required": False,
+            "provider_key": None,
+            "access_page_provider_id": None,
+        },
+        "action_tags": [],
+        "task_tags": [],
+        "metadata": {},
+    }
+    if render is not None:
+        payload["render"] = render
+    return payload
+
+
+###############################################################################
 def geospatial_catalog_payload() -> dict[str, Any]:
     return {
-        "capabilities": [],
-        "providers": [],
-        "basemaps": [],
-        "overlays": [],
+        "capabilities": [
+            _catalog_capability(
+                capability_id="openmeteo_weather_forecast",
+                name="Open-Meteo Weather Forecast",
+                kind="tool",
+                capability_type="direct-tool",
+                description="Fixture weather forecast capability.",
+                provider="openmeteo",
+                supports_map=False,
+                supports_direct_text=True,
+                source_protocol="https",
+                data_format="json",
+                geometry_type="point",
+                queryable=True,
+                rendering_mode="metadata-only",
+            )
+        ],
+        "providers": [
+            _catalog_capability(
+                capability_id="osm",
+                name="OpenStreetMap",
+                kind="provider",
+                capability_type="map-provider",
+                description="Fixture map provider.",
+                provider="osm",
+                supports_map=True,
+                supports_direct_text=False,
+                source_protocol="xyz",
+                data_format="raster",
+                geometry_type="none",
+                queryable=False,
+                rendering_mode="xyz",
+            )
+        ],
+        "basemaps": [
+            _catalog_capability(
+                capability_id="osm_default",
+                name="OpenStreetMap",
+                kind="basemap",
+                capability_type="tile",
+                description="Fixture street basemap.",
+                provider="osm",
+                supports_map=True,
+                supports_direct_text=False,
+                source_protocol="xyz",
+                data_format="raster",
+                geometry_type="none",
+                queryable=False,
+                rendering_mode="xyz",
+                render={
+                    "status": "available",
+                    "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    "attribution": "OpenStreetMap contributors",
+                },
+            ),
+            _catalog_capability(
+                capability_id="esri_world_imagery",
+                name="Esri World Imagery",
+                kind="basemap",
+                capability_type="tile",
+                description="Fixture satellite basemap.",
+                provider="esri",
+                supports_map=True,
+                supports_direct_text=False,
+                source_protocol="xyz",
+                data_format="raster",
+                geometry_type="none",
+                queryable=False,
+                rendering_mode="xyz",
+                render={
+                    "status": "available",
+                    "tile_url": "https://example.test/esri/{z}/{y}/{x}.jpg",
+                    "attribution": "Esri",
+                },
+            ),
+        ],
+        "overlays": [
+            _catalog_capability(
+                capability_id="openaq_air_quality",
+                name="OpenAQ Air Quality",
+                kind="overlay",
+                capability_type="tile",
+                description="Fixture air quality overlay.",
+                provider="openaq",
+                supports_map=True,
+                supports_direct_text=False,
+                source_protocol="xyz",
+                data_format="raster",
+                geometry_type="none",
+                queryable=False,
+                rendering_mode="xyz",
+                render={
+                    "status": "available",
+                    "tile_url": "https://example.test/openaq/{z}/{x}/{y}.png",
+                    "attribution": "OpenAQ",
+                },
+            )
+        ],
         "cameras": [],
         "transit": [],
         "tools": [],
@@ -248,3 +443,29 @@ def geospatial_catalog_payload() -> dict[str, Any]:
 
 
 ###############################################################################
+def conversation_snapshot_payload(
+    user_message: str = "show map at 41.9028, 12.4964",
+    assistant_message: str = "Search executed successfully.",
+    map_session: dict[str, Any] | None = ROME_MAP_SESSION,
+) -> dict[str, Any]:
+    return {
+        "conversation_id": E2E_CONVERSATION_ID,
+        "title": "E2E conversation",
+        "context_revision": 5,
+        "messages": [
+            {
+                "role": "user",
+                "content": user_message,
+                "created_at": "2026-08-31T00:00:00Z",
+            },
+            {
+                "role": "assistant",
+                "content": assistant_message,
+                "created_at": "2026-08-31T00:00:01Z",
+            },
+        ],
+        "memory_snapshot": {},
+        "map_session": deepcopy(map_session) if map_session is not None else None,
+        "active_run": None,
+        "task_snapshot": None,
+    }

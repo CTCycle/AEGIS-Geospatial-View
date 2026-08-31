@@ -10,6 +10,7 @@ from playwright.sync_api import Page, Route, expect
 from tests.e2e.helpers.chat_stub_payloads import (
     chat_completion_clarification_payload,
     chat_completion_map_payload,
+    conversation_snapshot_payload,
     geospatial_catalog_payload,
     model_settings_payload,
 )
@@ -27,16 +28,35 @@ def _json_ok(route: Route, payload: dict[str, Any]) -> None:
 
 ###############################################################################
 def _stub_ui_api(page: Page) -> None:
-    state = {"turn_number": 777}
+    state: dict[str, Any] = {"turn_number": 777, "last_message": None, "last_payload": None}
 
     def build_payload(message: str) -> dict[str, Any]:
         turn_number = int(state["turn_number"])
         state["turn_number"] = turn_number + 1
         if "ambiguous" in message.lower() or "weather only" in message.lower():
-            return chat_completion_clarification_payload(
+            payload = chat_completion_clarification_payload(
                 turn_number, "Please clarify location and time."
             )
-        return chat_completion_map_payload(turn_number, "Search executed successfully.")
+        else:
+            payload = chat_completion_map_payload(turn_number, "Search executed successfully.")
+        state["last_message"] = message
+        state["last_payload"] = payload
+        return payload
+
+    def handle_snapshot(route: Route) -> None:
+        last_payload = state["last_payload"]
+        if not isinstance(last_payload, dict):
+            _json_ok(route, conversation_snapshot_payload())
+            return
+        map_session = last_payload.get("map_session")
+        _json_ok(
+            route,
+            conversation_snapshot_payload(
+                user_message=str(state["last_message"] or ""),
+                assistant_message=str(last_payload.get("assistant_message") or ""),
+                map_session=map_session if isinstance(map_session, dict) else None,
+            ),
+        )
 
     register_realtime_stub(page, lambda message, _run_number: build_payload(message))
     page.route(
@@ -70,6 +90,13 @@ def _stub_ui_api(page: Page) -> None:
         lambda route: _json_ok(route, geospatial_catalog_payload()),
     )
     page.route(
+        re.compile(r".*/api/conversations$"),
+        lambda route: _json_ok(
+            route, {"conversation_id": "conversation-e2e", "title": "E2E"}
+        ),
+    )
+    page.route(re.compile(r".*/api/conversations/[^/]+$"), handle_snapshot)
+    page.route(
         "**/api/geospatial/tiles/osm_default/**",
         lambda route: route.fulfill(
             status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT
@@ -93,7 +120,7 @@ def test_25_sequential_turns_mixed_with_new_chat_resets(
     for idx in range(25):
         text = "ambiguous weather only" if idx % 7 == 0 else f"show map turn {idx}"
         composer.fill(text)
-        page.get_by_role("button", name="Send").click()
+        page.get_by_role("button", name="Send message").click()
         expect(page.locator(".chat-message--assistant").last).to_be_visible(
             timeout=15000
         )
@@ -110,7 +137,7 @@ def test_rapid_double_submit_does_not_duplicate_assistant_state(
     _stub_ui_api(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map quickly")
-    send = page.get_by_role("button", name="Send")
+    send = page.get_by_role("button", name="Send message")
     send.click()
     send.dispatch_event("click")
     expect(page.locator(".chat-message--assistant")).to_have_count(1, timeout=10000)
@@ -121,7 +148,7 @@ def test_repeated_refresh_loop_preserves_state(page: Page, base_url: str) -> Non
     _stub_ui_api(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map for refresh loop")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     for _ in range(10):
         page.reload()
@@ -136,7 +163,7 @@ def test_route_switching_20_cycles_preserves_query_and_chat_state(
     _stub_ui_api(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map state before route cycles")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").first).to_be_visible(timeout=15000)
 
     for _ in range(20):
@@ -157,19 +184,19 @@ def test_large_composer_input_does_not_freeze_ui(page: Page, base_url: str) -> N
     page.goto(base_url)
     large_text = "Rome overlay " * 1200
     page.get_by_label("Chat message").fill(large_text)
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     expect(page.get_by_label("Chat message")).to_be_visible()
 
 
 ###############################################################################
-def test_overlay_toggle_and_opacity_restore_after_refresh(
+def test_backend_overlay_state_wins_after_refresh(
     page: Page, base_url: str
 ) -> None:
     _stub_ui_api(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map with overlays")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     expect(page.locator(".overlay-controls")).to_be_visible(timeout=15000)
 
@@ -179,12 +206,15 @@ def test_overlay_toggle_and_opacity_restore_after_refresh(
     first_range.evaluate(
         "(node) => { node.value = '25'; node.dispatchEvent(new Event('input', { bubbles: true })); }"
     )
+    assert int(first_range.input_value()) == 25
     page.reload()
     expect(page.locator(".overlay-controls")).to_be_visible()
+    # The canonical backend collection owns explicit visibility values. Local
+    # preferences remain a fallback for payloads without that field.
     expect(
         page.locator(".overlay-control-row input[type='checkbox']").first
-    ).not_to_be_checked()
+    ).to_be_checked()
     restored = page.locator(
         ".overlay-control-row input[type='range']"
     ).first.input_value()
-    assert int(restored) == 25
+    assert int(restored) == 65

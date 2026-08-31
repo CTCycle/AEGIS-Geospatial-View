@@ -26,7 +26,7 @@ class TestChatFlow:
         composer = page.get_by_label("Chat message")
         expect(composer).to_be_visible()
         composer.fill("show map at 41.9028, 12.4964")
-        page.get_by_role("button", name="Send").click()
+        page.get_by_role("button", name="Send message").click()
         expect(page.get_by_text("show map at 41.9028, 12.4964")).to_be_visible()
         expect(page.locator(".chat-message--assistant").last).to_be_visible(
             timeout=45000
@@ -80,7 +80,7 @@ class TestChatFlow:
     ):
         page.goto(f"{base_url.rstrip('/')}/settings?q=gpt&mode=cloud")
         expect(page.get_by_placeholder("Search models")).to_have_value("gpt")
-        expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?q=gpt&mode=cloud")
+        expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?q=gpt")
 
     # -------------------------------------------------------------------------
     def test_model_selection_persists(self, page: Page, base_url: str):

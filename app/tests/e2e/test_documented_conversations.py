@@ -17,6 +17,7 @@ from tests.e2e.helpers.chat_stub_payloads import (
     chat_completion_clarification_payload,
     chat_completion_map_payload,
     chat_completion_text_payload,
+    conversation_snapshot_payload,
     geospatial_catalog_payload,
     model_settings_payload,
 )
@@ -66,7 +67,24 @@ def _setup_common_stubs(page: Page, turn_seed: int = 101) -> dict[str, object]:
                 turn_number, "Search executed successfully."
             )
         state["conversation_id"] = payload["conversation_id"]
+        state["last_message"] = message
+        state["last_payload"] = payload
         return payload
+
+    def handle_snapshot(route: Route) -> None:
+        last_payload = state.get("last_payload")
+        if not isinstance(last_payload, dict):
+            _json_ok(route, conversation_snapshot_payload())
+            return
+        map_session = last_payload.get("map_session")
+        _json_ok(
+            route,
+            conversation_snapshot_payload(
+                user_message=str(state.get("last_message") or ""),
+                assistant_message=str(last_payload.get("assistant_message") or ""),
+                map_session=map_session if isinstance(map_session, dict) else None,
+            ),
+        )
 
     models_payload = {
         "cloud": [
@@ -108,6 +126,13 @@ def _setup_common_stubs(page: Page, turn_seed: int = 101) -> dict[str, object]:
         re.compile(r".*/api/geospatial/capabilities$"),
         lambda route: _json_ok(route, geospatial_catalog_payload()),
     )
+    page.route(
+        re.compile(r".*/api/conversations$"),
+        lambda route: _json_ok(
+            route, {"conversation_id": E2E_CONVERSATION_ID, "title": "E2E"}
+        ),
+    )
+    page.route(re.compile(r".*/api/conversations/[^/]+$"), handle_snapshot)
     register_realtime_stub(page, lambda message, _run_number: build_payload(message))
     return state
 
@@ -130,7 +155,7 @@ def test_documented_conversation_map_search_happy_path(
 
     composer = page.get_by_label("Chat message")
     composer.fill("Show me a map of Rome with air quality")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     write_snapshot(page, dirs["screenshots"], "01-user-message")
 
     expect(
@@ -187,12 +212,12 @@ def test_documented_conversation_follow_up_reuses_conversation(
     page.goto(base_url)
     composer = page.get_by_label("Chat message")
     composer.fill("Show me a map of Rome with air quality")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     write_snapshot(page, dirs["screenshots"], "00-before-followup")
 
     composer.fill("Now switch to satellite imagery")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     write_snapshot(page, dirs["screenshots"], "01-followup-sent")
     expect(
         page.get_by_text("Updated to satellite imagery while preserving prior context.")
@@ -232,7 +257,7 @@ def test_documented_conversation_ambiguity_requires_clarification(
     page.goto(base_url)
     write_snapshot(page, dirs["screenshots"], "00-ambiguous-prompt")
     page.get_by_label("Chat message").fill("Show me weather")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     clarification = page.locator(".chat-message--assistant").last
     expect(clarification).to_be_visible()
     expect(clarification).to_contain_text("location")
@@ -263,7 +288,7 @@ def test_documented_conversation_direct_coordinates_no_map_session(
     page.get_by_label("Chat message").fill(
         "Give me the coordinates of the Eiffel Tower"
     )
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     write_snapshot(page, dirs["screenshots"], "00-coordinate-request")
     expect(
         page.get_by_text(
@@ -296,7 +321,7 @@ def test_documented_conversation_settings_roundtrip_and_restore(
 
     page.goto(base_url)
     page.get_by_label("Chat message").fill("Show me a map of Rome with air quality")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     expect(page.locator(".overlay-controls")).to_be_visible(timeout=15000)
 

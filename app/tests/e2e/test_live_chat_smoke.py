@@ -62,7 +62,7 @@ def _assert_clean_backend_tail(tail: str) -> None:
 
 ###############################################################################
 def _read_conversation_id(page: Page) -> str | None:
-    raw = page.evaluate("() => window.sessionStorage.getItem('aegis:webapp-state:v4')")
+    raw = page.evaluate("() => window.sessionStorage.getItem('aegis:webapp-ui-state:v1')")
     if not raw:
         return None
     data = json.loads(raw)
@@ -93,7 +93,7 @@ def test_live_chat_happy_path(
     page.goto(base_url)
     write_snapshot(page, dirs["screenshots"], "00-live-landing")
     page.get_by_label("Chat message").fill("Show me Rome")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     write_snapshot(page, dirs["screenshots"], "01-live-request")
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=60000)
     write_snapshot(page, dirs["screenshots"], "02-live-response")
@@ -139,14 +139,14 @@ def test_live_follow_up_same_conversation(
 
     page.goto(base_url)
     page.get_by_label("Chat message").fill("Show me Rome")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=60000)
     first_conversation_id = _read_conversation_id(page)
     assert first_conversation_id
     write_snapshot(page, dirs["screenshots"], "00-before-followup")
 
     page.get_by_label("Chat message").fill("Now zoom to nearby neighborhoods")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     write_snapshot(page, dirs["screenshots"], "01-live-followup")
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=60000)
     write_snapshot(page, dirs["screenshots"], "02-live-followup-response")
@@ -177,7 +177,7 @@ def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> No
         pytest.skip(reason)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("Show me Rome")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=60000)
     page.get_by_role("button", name="Start new chat").click()
     expect(page.get_by_text("Map Workspace")).to_be_visible()
@@ -195,7 +195,7 @@ def test_live_degraded_path_shows_user_failure_without_crash(
     )
     page.goto(base_url)
     page.get_by_label("Chat message").fill("Show me Rome")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     assistant_text = page.locator(
         ".chat-message--assistant .chat-message__content"
