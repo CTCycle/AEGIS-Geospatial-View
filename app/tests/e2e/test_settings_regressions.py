@@ -52,7 +52,7 @@ def _setup_stub_harness(
     settings_payload: dict[str, Any] | None = None,
     models_payload: dict[str, Any] | None = None,
     turn_payload_factory: Callable[[str], dict[str, Any]] | None = None,
-    put_payloads: list[dict[str, Any]] | None = None,
+    patch_payloads: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     page.add_init_script(
         """
@@ -65,17 +65,17 @@ def _setup_stub_harness(
 
     active_settings = dict(settings_payload or selected_agent_settings_payload())
     active_models = models_payload or model_catalog_payload()
-    captured_put_payloads = put_payloads if put_payloads is not None else []
+    captured_patch_payloads = patch_payloads if patch_payloads is not None else []
 
     def handle_settings(route: Route) -> None:
         method = route.request.method.upper()
         if method == "GET":
             _json_ok(route, active_settings)
             return
-        if method == "PUT":
+        if method == "PATCH":
             payload = _request_json(route)
             if payload:
-                captured_put_payloads.append(payload)
+                captured_patch_payloads.append(payload)
             active_settings.update(payload)
             _json_ok(route, active_settings)
             return
@@ -163,7 +163,7 @@ def _setup_stub_harness(
             else chat_completion_map_payload(9001, "Search executed successfully.")
         ),
     )
-    return captured_put_payloads
+    return captured_patch_payloads
 
 
 ###############################################################################
@@ -208,10 +208,10 @@ def test_settings_mobile_layout_has_no_overlap_at_320px(
 
 ###############################################################################
 def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) -> None:
-    put_payloads: list[dict[str, Any]] = []
+    patch_payloads: list[dict[str, Any]] = []
     expected_initial = selected_agent_settings_payload()
     _setup_stub_harness(
-        page, settings_payload=expected_initial, put_payloads=put_payloads
+        page, settings_payload=expected_initial, patch_payloads=patch_payloads
     )
 
     page.goto(f"{base_url.rstrip('/')}/settings")
@@ -237,13 +237,13 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
     summary = page.get_by_role("complementary", name="Selected agent model")
     expect(summary.get_by_role("heading", name="gpt-5-mini")).to_be_visible()
 
-    assert put_payloads, "Expected PUT /api/chat/settings payload to be captured."
-    payload = put_payloads[-1]
+    assert patch_payloads, "Expected PATCH /api/chat/settings payload to be captured."
+    payload = patch_payloads[-1]
     if "agent_model_provider" not in payload:
         matching_payloads = [
-            item for item in put_payloads if "agent_model_provider" in item
+            item for item in patch_payloads if "agent_model_provider" in item
         ]
-        assert matching_payloads, f"No model settings payload captured: {put_payloads}"
+        assert matching_payloads, f"No model settings payload captured: {patch_payloads}"
         payload = matching_payloads[-1]
 
     assert payload["agent_model_provider"] == "openai"

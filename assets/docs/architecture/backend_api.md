@@ -82,7 +82,7 @@ Defined in `app/server/api/chat.py`:
   usable empty catalog.
 - `GET /api/chat/settings`
   Reads persisted settings.
-- `PUT /api/chat/settings`
+- `PATCH /api/chat/settings`
   Updates settings and credentials.
 - `POST /api/chat/models/ollama/refresh`
   Refreshes local Ollama models.
