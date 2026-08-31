@@ -66,12 +66,14 @@ remain escaped plain text.
 
 `MapPreviewComponent` renders only normalized `MapSession` payloads through MapLibre. It does not render embedded HTML map payloads. Raster overlays should prefer `overlay.render` descriptors from the backend, including WMS/WMTS time, format, CRS, style, and tile matrix metadata.
 
-The backend collection is authoritative for overlay identity and revisions.
-The component uses stable instance IDs for visibility/opacity state and drops
-stale presentation entries when instances disappear. Feature-backed layers bind
-click listeners only for the current map instance; listeners are removed when
-the map or overlay set changes. Safe text nodes, bounded fields, approved
-HTTP(S) links, focus handoff, and Escape dismissal protect the inspection UI.
+The backend `overlay_collection.instances` is authoritative for overlay
+identity, descriptors, inspections, and revisions. The component derives its
+render entries from those instances, uses stable instance IDs for
+visibility/opacity state, and drops stale presentation entries when instances
+disappear. Feature-backed layers bind click listeners only for the current map
+instance; listeners are removed when the map or overlay set changes. Safe text
+nodes, bounded fields, approved HTTP(S) links, focus handoff, and Escape
+dismissal protect the inspection UI.
 
 Basemap changes are prepared in candidate containers. A generation token and
 destroyed guard dispose pending candidates and ignore late load/error or queued

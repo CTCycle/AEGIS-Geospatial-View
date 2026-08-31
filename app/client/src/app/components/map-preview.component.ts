@@ -33,6 +33,7 @@ import {
   buildStyle,
   getOverlayLayerIds,
   isGeoJsonOverlay,
+  mapSessionOverlayEntries,
   normalizeBounds,
   recordBooleanEqual,
   recordNumberEqual,
@@ -117,7 +118,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   get overlays(): OverlayEntry[] {
-    return this.mapSession?.overlays || [];
+    return mapSessionOverlayEntries(this.mapSession);
   }
 
   get complianceWarnings(): string[] {
@@ -186,10 +187,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   get inspectionEntries(): MapInspection[] {
-    const entries = [
-      ...(this.mapSession?.inspections || []),
-      ...this.overlays.flatMap((overlay) => overlay.inspections || []),
-    ];
+    const entries = this.overlays.flatMap((overlay) => overlay.inspections || []);
     return entries.filter((entry, index, all) => (
       all.findIndex((candidate) => candidate.inspection_id === entry.inspection_id) === index
     ));
@@ -276,15 +274,6 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.overlayRenderStatuses = [];
       return;
     }
-    const overlayIds = next.overlay_ids ?? [];
-    const overlays = Array.isArray(next.overlays) && next.overlays.length > 0
-      ? next.overlays
-      : overlayIds.map((overlayId) => ({
-        id: overlayId,
-        label: overlayId,
-        provider: 'manifest',
-        type: 'tile',
-      }));
     this.mapSession = {
       ...next,
       center: next.center ?? {
@@ -300,16 +289,15 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
           ? null
           : 'render_descriptor_missing',
       },
-      overlays,
     };
-    this.overlayRenderStatuses = overlays.map((overlay) => ({
+    this.overlayRenderStatuses = this.overlays.map((overlay) => ({
       overlayId: overlay.id,
       status: 'pending',
     }));
   }
 
   private rebuildOverlayStateFromSession(): void {
-    const overlays = this.mapSession?.overlays || [];
+    const overlays = this.overlays;
     const overlayIds = new Set(overlays.map((overlay) => overlay.id));
     const staleVisibilityKeys = Object.keys(this.initialOverlayVisibility).filter((key) => !overlayIds.has(key));
     const staleOpacityKeys = Object.keys(this.initialOverlayOpacity).filter((key) => !overlayIds.has(key));
@@ -528,11 +516,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   private applyOverlayStateToMap(): void {
     const map = this.mapRef;
-    if (!map || !this.mapSession?.overlays?.length) {
+    const overlays = this.overlays;
+    if (!map || !overlays.length) {
       return;
     }
 
-    this.mapSession.overlays.forEach((overlay) => {
+    overlays.forEach((overlay) => {
       const layerIds = getOverlayLayerIds(overlay);
       if (!layerIds.some((layerId) => map.getLayer(layerId))) {
         return;

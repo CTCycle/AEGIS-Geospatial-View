@@ -28,6 +28,7 @@ from server.services.agent.capability_resolver import CapabilityResolver
 from server.services.agent.direct_turn_response import DirectTurnResponseService
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.orchestrator import AgentOrchestrator
+from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.agent.parser_service import ParserService
 from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.policy_engine import PolicyEngine
@@ -149,20 +150,23 @@ class _Search:
             session_id=f"map-{len(self.requests)}",
             resolved_location=request.resolved_location,
             basemap_id=request.basemap_id,
-            overlay_ids=list(request.overlay_ids),
             viewport=request.viewport,
             basemap={"id": request.basemap_id, "label": request.basemap_id},
-            overlays=[
-                {
-                    "id": layer_id,
-                    "label": layer_id,
-                    "provider": "overpass",
-                    "type": "geojson",
-                    "rendering_mode": "geojson",
-                    "url": f"/api/geospatial/layers/{layer_id}/geojson",
-                }
-                for layer_id in request.overlay_ids
-            ],
+            overlay_collection=OverlayCollectionService.from_rendered_descriptors(
+                [
+                    {
+                        "id": layer_id,
+                        "label": layer_id,
+                        "provider": "overpass",
+                        "type": "geojson",
+                        "rendering_mode": "geojson",
+                        "url": f"/api/geospatial/layers/{layer_id}/geojson",
+                    }
+                    for layer_id in request.overlay_ids
+                ],
+                resolved_location=request.resolved_location,
+                viewport=request.viewport,
+            ),
         )
 
 
@@ -390,7 +394,10 @@ def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() ->
         )
         assert first.map_session is not None
         assert first.map_session.basemap_id == "esri_world_imagery"
-        assert first.map_session.overlay_ids == ["overpass_residential_buildings"]
+        assert [
+            instance.capability_id
+            for instance in first.map_session.overlay_collection.instances
+        ] == ["overpass_residential_buildings"]
         assert first.tool_plan is not None
         assert first.tool_plan.selected_tools == ["execute_geospatial_capability"]
 
@@ -406,7 +413,10 @@ def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() ->
         assert second.map_session is not None
         assert second.map_session.resolved_location.label == "Colosseum, Rome"
         assert second.map_session.basemap_id == "osm_default"
-        assert second.map_session.overlay_ids == ["overpass_residential_buildings"]
+        assert [
+            instance.capability_id
+            for instance in second.map_session.overlay_collection.instances
+        ] == ["overpass_residential_buildings"]
         assert (
             second.map_session.viewport.radius_m == first.map_session.viewport.radius_m
         )

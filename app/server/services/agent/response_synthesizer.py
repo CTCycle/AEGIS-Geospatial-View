@@ -158,7 +158,11 @@ class GroundedResponseSynthesizer:
         map_session: MapSession | None,
     ) -> bool:
         """Reject obvious model claims that contradict a successful payload."""
-        if operation.status != "success" or not map_session or not map_session.overlays:
+        if (
+            operation.status != "success"
+            or not map_session
+            or not map_session.overlay_collection.instances
+        ):
             return True
         if map_session.compliance_warnings:
             return True
@@ -180,9 +184,24 @@ class GroundedResponseSynthesizer:
             "location": resolved.label,
             "basemap": map_session.basemap_id,
             "overlays": [
-                GroundedResponseSynthesizer._overlay_summary(overlay)
-                for overlay in map_session.overlays
-                if is_json_object(overlay)
+                GroundedResponseSynthesizer._overlay_summary(
+                    {
+                        **instance.descriptor,
+                        "id": instance.instance_id,
+                        "capability_id": instance.capability_id,
+                        "label": instance.label,
+                        "provider": instance.provider,
+                        "type": instance.overlay_type,
+                        "rendering_mode": instance.rendering_mode,
+                        "visible": instance.visible,
+                        "default_opacity": instance.opacity,
+                        "inspections": [
+                            inspection.model_dump(mode="json")
+                            for inspection in instance.inspections
+                        ],
+                    }
+                )
+                for instance in map_session.overlay_collection.instances
             ],
             "warnings": list(map_session.compliance_warnings),
         }

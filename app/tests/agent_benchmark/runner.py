@@ -124,16 +124,16 @@ def _overlay_ids(traces: list[dict[str, Any]]) -> set[str]:
     for trace in traces:
         map_session = _map_session(trace)
         if map_session is not None:
-            overlays.update(
-                item
-                for item in map_session.get("overlay_ids", [])
-                if isinstance(item, str)
-            )
-            overlays.update(
-                item
-                for item in map_session.get("rendered_overlay_ids", [])
-                if isinstance(item, str)
-            )
+            collection = map_session.get("overlay_collection")
+            if isinstance(collection, dict):
+                instances = collection.get("instances")
+                if isinstance(instances, list):
+                    overlays.update(
+                        str(instance.get("capability_id"))
+                        for instance in instances
+                        if isinstance(instance, dict)
+                        and isinstance(instance.get("capability_id"), str)
+                    )
     return overlays
 
 
@@ -216,7 +216,6 @@ def _evaluate_model_assertion(
     map_available = any(_map_has_location(map_session) for map_session in maps)
     answer_text = " ".join(_answer(trace).casefold() for trace in traces)
     last_trace = traces[-1] if traces else {}
-    last_contract = contracts[-1] if contracts else {}
     last_response = _response(last_trace)
     last_map = maps[-1] if maps else None
 

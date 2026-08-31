@@ -618,27 +618,14 @@ class MapSession(BaseModel):
     session_id: str
     resolved_location: ResolvedLocation
     basemap_id: str
-    overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
     viewport: ViewportPolicy
     generated_at: datetime = Field(default_factory=utc_now)
     payload: dict[str, object] = Field(default_factory=lambda: dict[str, object]())
     center: dict[str, float | None] | None = None
     bounds: list[float] | None = None
     basemap: dict[str, object] | None = None
-    overlays: list[dict[str, object]] = Field(
-        default_factory=lambda: list[dict[str, object]]()
-    )
-    requested_overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
-    rendered_overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
-    failed_overlays: list[dict[str, str]] = Field(
-        default_factory=lambda: list[dict[str, str]]()
-    )
     compliance_warnings: list[str] = Field(default_factory=lambda: list[str]())
-    overlay_collection_revision: int = Field(default=0, ge=0)
-    overlay_collection: OverlayCollectionState | None = None
-    inspections: list[MapInspection] = Field(
-        default_factory=lambda: list[MapInspection]()
-    )
+    overlay_collection: OverlayCollectionState
 
 
 ###############################################################################

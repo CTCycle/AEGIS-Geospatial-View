@@ -11,6 +11,32 @@ import {
 } from './map-preview-rendering';
 
 describe('map-preview-rendering', () => {
+  const makeMapSession = (overlays: MapOverlayEntry[]): MapSession => ({
+    session_id: 'map-1',
+    resolved_location: { label: 'Test', latitude: 0, longitude: 0 },
+    basemap_id: 'osm_default',
+    viewport: { center_latitude: 0, center_longitude: 0, radius_m: 2500 },
+    overlay_collection: {
+      collection_id: 'active-map',
+      revision: 0,
+      instances: overlays.map((overlay) => ({
+        instance_id: overlay.id,
+        capability_id: overlay.capability_id || overlay.id,
+        label: overlay.label,
+        provider: overlay.provider,
+        overlay_type: overlay.type,
+        rendering_mode: overlay.rendering_mode || overlay.type,
+        scope_key: 'global',
+        scope: { kind: 'global' },
+        visible: overlay.visible !== false,
+        opacity: overlay.default_opacity ?? 1,
+        render_variant: {},
+        descriptor: overlay as never,
+        inspections: overlay.inspections || [],
+      })),
+    },
+  });
+
   it('compares boolean records by keys and values', () => {
     expect(recordBooleanEqual({ a: true }, { a: true })).toBeTrue();
     expect(recordBooleanEqual({ a: true }, { a: false })).toBeFalse();
@@ -168,15 +194,13 @@ describe('map-preview-rendering', () => {
         addSource: (_id: string, source: unknown) => sources.push(source),
         addLayer: (layer: unknown) => layers.push(layer),
       };
-      const session = {
-        overlays: [{
+      const session = makeMapSession([{
           id: `test-${mode}`,
           label: mode,
           provider: 'test',
           rendering_mode: mode,
           ...overlay,
-        }],
-      } as unknown as MapSession;
+        } as MapOverlayEntry]);
 
       const result = addOverlayLayers(map as never, session);
 
@@ -197,8 +221,7 @@ describe('map-preview-rendering', () => {
       addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
       addLayer: () => undefined,
     };
-    const session = {
-      overlays: [{
+    const session = makeMapSession([{
         id: 'canonical-wms',
         label: 'WMS',
         provider: 'test',
@@ -213,8 +236,7 @@ describe('map-preview-rendering', () => {
           min_zoom: 2,
           max_zoom: 9,
         },
-      }],
-    } as unknown as MapSession;
+      } as MapOverlayEntry]);
 
     expect(addOverlayLayers(map as never, session)[0].status).toBe('loaded');
     expect(sources[0]['minzoom']).toBe(2);
@@ -229,8 +251,7 @@ describe('map-preview-rendering', () => {
       addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
       addLayer: (layer: Record<string, unknown>) => layers.push(layer),
     };
-    const session = {
-      overlays: [{
+    const session = makeMapSession([{
         id: 'overpass_poi',
         label: 'Rail stations',
         provider: 'overpass',
@@ -244,8 +265,7 @@ describe('map-preview-rendering', () => {
             properties: { category: 'station' },
           }],
         },
-      }],
-    } as unknown as MapSession;
+      } as MapOverlayEntry]);
 
     expect(addOverlayLayers(map as never, session)[0].status).toBe('loaded');
     expect(sources[0].type).toBe('geojson');
@@ -277,7 +297,7 @@ describe('map-preview-rendering', () => {
       'overlay-layer-clustered-pois-cluster-count',
       'overlay-layer-clustered-pois-points',
     ]);
-    expect(addOverlayLayers(map as never, { overlays: [overlay] } as unknown as MapSession)[0].status)
+    expect(addOverlayLayers(map as never, makeMapSession([overlay]))[0].status)
       .toBe('loaded');
     expect(sources[0]).toEqual(jasmine.objectContaining({
       type: 'geojson',

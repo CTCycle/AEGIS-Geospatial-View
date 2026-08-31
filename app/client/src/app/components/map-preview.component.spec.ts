@@ -7,16 +7,59 @@ import { MapPreviewComponent } from './map-preview.component';
 describe('components/map-preview.component', () => {
   let fixture: ComponentFixture<MapPreviewComponent>;
   let component: MapPreviewComponent;
-  const makeMapSession = (overrides: Record<string, unknown> = {}) => ({
-    session_id: 'map-1',
-    resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
-    basemap_id: 'osm_default',
-    overlay_ids: [],
-    viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
-    center: { latitude: 41.9, longitude: 12.5 },
-    overlays: [],
-    ...overrides,
-  });
+  const makeOverlayInstance = (overlay: Record<string, unknown>) => {
+    const id = String(overlay.id ?? overlay.instance_id ?? 'overlay');
+    return {
+      instance_id: String(overlay.instance_id ?? id),
+      capability_id: String(overlay.capability_id ?? id),
+      label: String(overlay.label ?? id),
+      provider: String(overlay.provider ?? 'fixture'),
+      overlay_type: String(overlay.type ?? 'overlay'),
+      rendering_mode: String(overlay.rendering_mode ?? overlay.type ?? 'metadata-only'),
+      scope_key: 'global',
+      scope: { kind: 'global' },
+      visible: typeof overlay.visible === 'boolean' ? overlay.visible : true,
+      opacity: typeof overlay.default_opacity === 'number' ? overlay.default_opacity : 1,
+      render_variant: {},
+      descriptor: { ...overlay, id },
+      inspections: Array.isArray(overlay.inspections) ? overlay.inspections : [],
+    };
+  };
+  const makeMapSession = (overrides: Record<string, unknown> = {}) => {
+    const overlayFixtures = Array.isArray(overrides.overlays)
+      ? overrides.overlays.filter((item): item is Record<string, unknown> => (
+        item !== null && typeof item === 'object'
+      ))
+      : [];
+    const overlayIds = Array.isArray(overrides.overlay_ids)
+      ? overrides.overlay_ids.filter((item): item is string => typeof item === 'string')
+      : [];
+    const explicitCollection = overrides.overlay_collection;
+    const overlayCollection = explicitCollection && typeof explicitCollection === 'object'
+      ? explicitCollection
+      : {
+        collection_id: 'active-map',
+        revision: 0,
+        instances: overlayFixtures.length > 0
+          ? overlayFixtures.map(makeOverlayInstance)
+          : overlayIds.map((id) => makeOverlayInstance({ id })),
+      };
+    const {
+      overlays: _legacyOverlays,
+      overlay_ids: _legacyOverlayIds,
+      overlay_collection: _explicitCollection,
+      ...canonicalOverrides
+    } = overrides;
+    return {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      center: { latitude: 41.9, longitude: 12.5 },
+      overlay_collection: overlayCollection,
+      ...canonicalOverrides,
+    };
+  };
   let fakeMap: {
     addSource: jasmine.Spy;
     addLayer: jasmine.Spy;
@@ -497,23 +540,64 @@ describe('components/map-preview.component', () => {
     expect(fixture.nativeElement.outerHTML).not.toContain('api_key=');
   });
 
-  it('maps overlay ids directly when overlay descriptors are absent', () => {
+  it('renders overlays from the canonical collection state', () => {
     component.payload = {
       map_session: {
         ...makeMapSession(),
         center: { latitude: 45.4642, longitude: 9.19 },
         basemap_id: 'osm_default',
-        overlay_ids: ['openmeteo_weather_forecast', 'rainviewer_precipitation_radar'],
+        overlay_collection: {
+          collection_id: 'active-map',
+          revision: 2,
+          instances: [
+            {
+              instance_id: 'weather-instance',
+              capability_id: 'openmeteo_weather_forecast',
+              label: 'Weather',
+              provider: 'openmeteo',
+              overlay_type: 'tile',
+              rendering_mode: 'xyz',
+              scope_key: 'global',
+              scope: { kind: 'global' },
+              visible: true,
+              opacity: 1,
+              render_variant: {},
+              descriptor: {
+                id: 'weather-instance',
+                url: 'https://weather.example/{z}/{x}/{y}.png',
+              },
+              inspections: [],
+            },
+            {
+              instance_id: 'radar-instance',
+              capability_id: 'rainviewer_precipitation_radar',
+              label: 'Radar',
+              provider: 'rainviewer',
+              overlay_type: 'tile',
+              rendering_mode: 'xyz',
+              scope_key: 'global',
+              scope: { kind: 'global' },
+              visible: true,
+              opacity: 1,
+              render_variant: {},
+              descriptor: {
+                id: 'radar-instance',
+                url: 'https://radar.example/{z}/{x}/{y}.png',
+              },
+              inspections: [],
+            },
+          ],
+        },
       } as never,
     };
     fixture.detectChanges();
-    expect(component.mapSession?.overlay_ids).toEqual([
+    expect(component.mapSession?.overlay_collection.instances.map((instance) => instance.capability_id)).toEqual([
       'openmeteo_weather_forecast',
       'rainviewer_precipitation_radar',
     ]);
     expect(component.overlays.map((overlay) => overlay.id)).toEqual([
-      'openmeteo_weather_forecast',
-      'rainviewer_precipitation_radar',
+      'weather-instance',
+      'radar-instance',
     ]);
     expect(component.mapSession?.basemap?.id).toBe('osm_default');
   });

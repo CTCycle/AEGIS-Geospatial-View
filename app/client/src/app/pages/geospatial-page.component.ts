@@ -39,6 +39,7 @@ import {
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
+import { mapSessionOverlayEntries } from '../components/map-preview-rendering';
 
 @Component({
   selector: 'app-geospatial-page',
@@ -815,7 +816,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private synchronizeOverlayState(session: MapSession): void {
-    const overlays = session.overlays || [];
+    const overlays = mapSessionOverlayEntries(session);
     const ids = new Set(overlays.map((overlay) => overlay.id));
     const visibility = Object.fromEntries(
       Object.entries(this.mapState.overlayVisibility).filter(([id]) => ids.has(id)),

@@ -748,7 +748,7 @@ class AgentOrchestrator:
             else list(turn_contract.requested_layers),
             remove_layer_ids=mutation_removed,
             collection_revision=(
-                map_session.overlay_collection_revision
+                map_session.overlay_collection.revision
                 if map_session is not None
                 else None
             ),

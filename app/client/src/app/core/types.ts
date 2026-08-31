@@ -204,6 +204,8 @@ export interface OverlayInstance {
   rendering_mode: string;
   scope_key: string;
   scope: Record<string, JsonValue>;
+  resolved_location?: ResolvedLocation | null;
+  viewport?: ViewportPolicy | Record<string, JsonValue> | null;
   visible: boolean;
   opacity: number;
   render_variant: Record<string, string | null>;
@@ -293,11 +295,45 @@ export interface GeospatialProviderPayload {
   message?: string;
 }
 
+export interface MapOverlayEntry {
+  id: string;
+  instance_id?: string;
+  capability_id?: string;
+  label: string;
+  provider: string;
+  type: string;
+  rendering_mode?: RenderingMode | string;
+  default_opacity?: number;
+  visible?: boolean;
+  url?: string | null;
+  tile_url_template?: string;
+  layers?: string;
+  layer_id?: string;
+  source_layer?: string;
+  tile_matrix_set?: string;
+  tile_size?: number;
+  min_zoom?: number;
+  max_zoom?: number;
+  bounds?: [number, number, number, number];
+  attribution?: string;
+  source_protocol?: string;
+  data_format?: string;
+  geometry_type?: string;
+  crs?: string | null;
+  format?: string | null;
+  style?: string | null;
+  time?: string | null;
+  default_time?: string | null;
+  warnings?: string[];
+  render?: GeospatialLayerRenderDescriptor | null;
+  data?: GeoJsonFeatureCollection;
+  inspections?: MapInspection[];
+}
+
 export interface MapSession {
   session_id: string;
   resolved_location: ResolvedLocation;
   basemap_id: string;
-  overlay_ids: string[];
   viewport: ViewportPolicy;
   generated_at?: string;
   payload?: Record<string, JsonValue>;
@@ -313,47 +349,8 @@ export interface MapSession {
     render_status?: 'available' | 'unavailable' | 'checking' | string;
     unavailable_reason?: string | null;
   };
-  overlays?: Array<{
-    id: string;
-    instance_id?: string;
-    capability_id?: string;
-    label: string;
-    provider: string;
-    type: string;
-    rendering_mode?: RenderingMode | string;
-    default_opacity?: number;
-    visible?: boolean;
-    url?: string | null;
-    tile_url_template?: string;
-    layers?: string;
-    layer_id?: string;
-    source_layer?: string;
-    tile_matrix_set?: string;
-    tile_size?: number;
-    min_zoom?: number;
-    max_zoom?: number;
-    bounds?: [number, number, number, number];
-    attribution?: string;
-    source_protocol?: string;
-    data_format?: string;
-    geometry_type?: string;
-    crs?: string | null;
-    format?: string | null;
-    style?: string | null;
-    time?: string | null;
-    default_time?: string | null;
-    warnings?: string[];
-    render?: GeospatialLayerRenderDescriptor | null;
-    data?: GeoJsonFeatureCollection;
-    inspections?: MapInspection[];
-  }>;
-  requested_overlay_ids?: string[];
-  rendered_overlay_ids?: string[];
-  failed_overlays?: Array<{ id: string; reason: string; code?: string }>;
   compliance_warnings?: string[];
-  overlay_collection_revision?: number;
-  overlay_collection?: OverlayCollectionState | null;
-  inspections?: MapInspection[];
+  overlay_collection: OverlayCollectionState;
 }
 
 export interface GeoJsonFeatureCollection {
@@ -365,8 +362,6 @@ export interface GeoJsonFeatureCollection {
     properties?: JsonObject | null;
   }>;
 }
-
-export type MapOverlayEntry = NonNullable<MapSession['overlays']>[number];
 
 export interface SearchResponsePayload {
   map_session?: MapSession;

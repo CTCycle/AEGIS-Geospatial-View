@@ -88,7 +88,9 @@ class AgentTurnStateAssembler:
         collection, results = OverlayCollectionService.apply_commands(
             collection,
             bound_commands,
-            catalog=[dict(item) for item in session.overlays],
+            catalog=OverlayCollectionService.catalog_from_collection(
+                OverlayCollectionService.from_map_session(session)
+            ),
             current_view=session.viewport.model_dump(mode="json"),
             basemap=collection_session.basemap,
         )
@@ -125,9 +127,10 @@ class AgentTurnStateAssembler:
         ):
             try:
                 previous = MapSession.model_validate(previous_raw)
+                previous_overlay_ids = self._overlay_capability_ids(previous)
                 removed_layers = [
                     layer_id
-                    for layer_id in previous.overlay_ids
+                    for layer_id in previous_overlay_ids
                     if layer_id
                     in {
                         "VIIRS_SNPP_CorrectedReflectance_TrueColor",
@@ -136,7 +139,7 @@ class AgentTurnStateAssembler:
                 ]
                 retained = [
                     layer_id
-                    for layer_id in previous.overlay_ids
+                    for layer_id in previous_overlay_ids
                     if layer_id not in removed_layers
                 ]
                 plan = ExecutionPlan(
@@ -216,7 +219,9 @@ class AgentTurnStateAssembler:
                 mode="map",
                 action_id=turn_contract.normalized_action.action_id,
                 basemap_id=map_session.basemap_id if map_session else None,
-                overlay_ids=list(map_session.overlay_ids) if map_session else [],
+                overlay_ids=(
+                    self._overlay_capability_ids(map_session) if map_session else []
+                ),
             ),
             trace=DecisionTrace(
                 steps=[
@@ -372,12 +377,11 @@ class AgentTurnStateAssembler:
             if is_json_object(latest_memory)
             else None
         )
-        active_visualization_object = json_object(active_visualization)
-        active_overlay_ids = [
-            item
-            for item in json_array(active_visualization_object.get("overlay_ids"))
-            if isinstance(item, str)
-        ]
+        active_map_session = self._map_session_from_memory(active_visualization)
+        active_visualization_object = (
+            active_map_session.model_dump(mode="json") if active_map_session else {}
+        )
+        active_overlay_ids = self._overlay_capability_ids(active_map_session)
         inferred_overlay_ids = self.infer_overlay_ids(
             turn_contract=turn_contract,
             resolved_location=resolved_location,
@@ -434,15 +438,8 @@ class AgentTurnStateAssembler:
             if is_json_object(latest_memory)
             else None
         )
-        existing_overlay_ids = (
-            [
-                item
-                for item in json_array(active_visualization.get("overlay_ids"))
-                if isinstance(item, str)
-            ]
-            if is_json_object(active_visualization)
-            else []
-        )
+        active_map_session = self._map_session_from_memory(active_visualization)
+        existing_overlay_ids = self._overlay_capability_ids(active_map_session)
         inferred_overlay_ids = self.infer_overlay_ids(
             turn_contract=turn_contract,
             resolved_location=resolved_location,
@@ -528,12 +525,11 @@ class AgentTurnStateAssembler:
             if is_json_object(latest_memory)
             else None
         )
-        active_visualization_object = json_object(active_visualization)
-        overlay_ids = [
-            item
-            for item in json_array(active_visualization_object.get("overlay_ids"))
-            if isinstance(item, str)
-        ]
+        active_map_session = self._map_session_from_memory(active_visualization)
+        active_visualization_object = (
+            active_map_session.model_dump(mode="json") if active_map_session else {}
+        )
+        overlay_ids = self._overlay_capability_ids(active_map_session)
         basemap_id = (
             str(active_visualization_object.get("basemap_id"))
             if isinstance(active_visualization_object.get("basemap_id"), str)
@@ -551,16 +547,13 @@ class AgentTurnStateAssembler:
                 continue
             map_payload = data.get("map_session")
             if is_json_object(map_payload):
-                candidate_basemap = map_payload.get("basemap_id")
-                if (
-                    isinstance(candidate_basemap, str)
-                    and candidate_basemap.strip()
-                    and basemap_id is None
-                ):
-                    basemap_id = candidate_basemap
-                for overlay_id in json_array(map_payload.get("overlay_ids")):
-                    if isinstance(overlay_id, str) and overlay_id not in overlay_ids:
-                        overlay_ids.append(overlay_id)
+                map_session = self._map_session_from_memory(map_payload)
+                if map_session is not None:
+                    if basemap_id is None:
+                        basemap_id = map_session.basemap_id
+                    for overlay_id in self._overlay_capability_ids(map_session):
+                        if overlay_id not in overlay_ids:
+                            overlay_ids.append(overlay_id)
             selection = data.get("capability_selection")
             if is_json_object(selection):
                 candidate_basemap = selection.get("basemap_id")
@@ -643,3 +636,23 @@ class AgentTurnStateAssembler:
             if isinstance(requested_basemap, str) and requested_basemap.strip()
             else None
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _map_session_from_memory(raw: object) -> MapSession | None:
+        if not is_json_object(raw):
+            return None
+        try:
+            return MapSession.model_validate(raw)
+        except Exception:  # noqa: BLE001
+            return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _overlay_capability_ids(map_session: MapSession | None) -> list[str]:
+        if map_session is None:
+            return []
+        return [
+            instance.capability_id
+            for instance in map_session.overlay_collection.instances
+        ]

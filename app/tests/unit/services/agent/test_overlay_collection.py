@@ -382,21 +382,30 @@ def test_provider_candidate_is_committed_against_active_revision_without_droppin
         basemap_id="osm_default",
         viewport=viewport,
         overlay_collection=OverlayCollectionState(revision=1),
-        overlay_collection_revision=1,
     )
     fetched = active.model_copy(
         update={
             "session_id": "fetched",
-            "overlays": [
-                {
-                    "id": "catalog-weather",
-                    "capability_id": "openmeteo_weather_forecast",
-                    "label": "Weather",
-                    "provider": "openmeteo",
-                    "type": "raster",
-                    "rendering_mode": "metadata-only",
-                }
-            ],
+            "overlay_collection": OverlayCollectionState(
+                instances=[
+                    OverlayInstance(
+                        instance_id="catalog-weather",
+                        capability_id="openmeteo_weather_forecast",
+                        label="Weather",
+                        provider="openmeteo",
+                        overlay_type="raster",
+                        rendering_mode="metadata-only",
+                        descriptor={
+                            "id": "catalog-weather",
+                            "capability_id": "openmeteo_weather_forecast",
+                            "label": "Weather",
+                            "provider": "openmeteo",
+                            "type": "raster",
+                            "rendering_mode": "metadata-only",
+                        },
+                    )
+                ]
+            ),
         }
     )
     command = OverlayCommand(
@@ -415,7 +424,7 @@ def test_provider_candidate_is_committed_against_active_revision_without_droppin
         state_session=active,
     )
 
-    assert updated.overlay_collection_revision == 2
+    assert updated.overlay_collection.revision == 2
     assert len(updated.overlay_collection.instances) == 1
     assert results[0].added_instance_ids == [
         updated.overlay_collection.instances[0].instance_id
@@ -423,9 +432,7 @@ def test_provider_candidate_is_committed_against_active_revision_without_droppin
 
 
 ###############################################################################
-def test_merge_clears_failure_for_instance_resolved_in_authoritative_collection() -> (
-    None
-):
+def test_merge_replaces_only_the_authoritative_collection() -> None:
     weather = _instance(
         "weather-zurich",
         "openmeteo_weather_forecast",
@@ -441,15 +448,7 @@ def test_merge_clears_failure_for_instance_resolved_in_authoritative_collection(
         ),
         basemap_id="osm_default",
         viewport=ViewportPolicy(center_latitude=47.37, center_longitude=8.54),
-        overlays=[dict(weather.descriptor)],
-        overlay_ids=[weather.instance_id],
-        failed_overlays=[
-            {
-                "id": weather.instance_id,
-                "reason": "not available in the capability catalog",
-            },
-            {"id": "unrelated-layer", "reason": "provider unavailable"},
-        ],
+        overlay_collection=OverlayCollectionState(),
     )
 
     merged = OverlayCollectionService.merge_into_map_session(
@@ -457,6 +456,8 @@ def test_merge_clears_failure_for_instance_resolved_in_authoritative_collection(
         OverlayCollectionState(instances=[weather]),
     )
 
-    assert merged.failed_overlays == [
-        {"id": "unrelated-layer", "reason": "provider unavailable"}
-    ]
+    assert merged.overlay_collection.instances == [weather]
+    serialized = merged.model_dump(mode="json")
+    assert "overlay_ids" not in serialized
+    assert "overlays" not in serialized
+    assert "failed_overlays" not in serialized

@@ -4,9 +4,10 @@ from server.common.typing import is_json_object, json_object
 
 import math
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
-from server.contracts.geospatial import LocationSearchRequest, MapInspection, MapSession
+from server.contracts.geospatial import LocationSearchRequest, MapSession
+from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.geospatial.inspection import MapInspectionService
@@ -61,7 +62,6 @@ class LocationSearchOrchestrator:
             payload.basemap_id
         )
         overlays: list[dict[str, object]] = []
-        failed_overlays: list[dict[str, str]] = []
         warnings: list[str] = []
         if basemap is None:
             basemap = {
@@ -91,7 +91,6 @@ class LocationSearchOrchestrator:
             )
             if overlay_result is None:
                 reason = "not available in the capability catalog"
-                failed_overlays.append({"id": overlay_id, "reason": reason})
                 warnings.append(f"Overlay '{overlay_id}' is {reason}.")
                 continue
             descriptor, overlay_warnings = overlay_result
@@ -111,14 +110,10 @@ class LocationSearchOrchestrator:
                 )
             except Exception as exc:  # noqa: BLE001
                 reason = str(exc) or "provider layer could not be rendered"
-                failed_overlays.append(
-                    {
-                        "id": selection_id,
-                        "reason": reason,
-                        "code": _provider_failure_code(exc),
-                    }
+                warnings.append(
+                    f"Provider layer '{selection_id}' failed "
+                    f"({_provider_failure_code(exc)}): {reason}."
                 )
-                warnings.append(f"Provider layer '{selection_id}' failed: {reason}.")
                 continue
             render = json_object(descriptor.get("render"))
             if selection.time and render:
@@ -135,28 +130,15 @@ class LocationSearchOrchestrator:
             descriptor = MapInspectionService.attach_to_descriptor(descriptor)
             overlays.append(descriptor)
             warnings.extend(overlay_warnings)
-        rendered_overlay_ids = [
-            str(overlay["id"])
-            for overlay in overlays
-            if isinstance(overlay.get("id"), str)
-        ]
-        inspections: list[MapInspection] = []
-        for descriptor in overlays:
-            raw_inspections = descriptor.get("inspections")
-            if not isinstance(raw_inspections, list):
-                continue
-            for raw_inspection in cast(list[Any], raw_inspections):
-                if not isinstance(raw_inspection, dict):
-                    continue
-                try:
-                    inspections.append(MapInspection.model_validate(raw_inspection))
-                except Exception:  # noqa: BLE001
-                    continue
+        overlay_collection = OverlayCollectionService.from_rendered_descriptors(
+            overlays,
+            resolved_location=payload.resolved_location,
+            viewport=payload.viewport,
+        )
         return MapSession(
             session_id=f"map-{int(datetime.now(UTC).timestamp())}",
             resolved_location=payload.resolved_location,
             basemap_id=effective_basemap_id,
-            overlay_ids=rendered_overlay_ids,
             viewport=payload.viewport,
             center={
                 "latitude": payload.viewport.center_latitude,
@@ -165,19 +147,8 @@ class LocationSearchOrchestrator:
             bounds=payload.viewport.bbox
             or self._bounds_from_viewport(payload.viewport),
             basemap=basemap,
-            overlays=overlays,
-            requested_overlay_ids=[
-                *list(payload.overlay_ids),
-                *[
-                    f"{selection.provider_id}:{selection.layer_id}"
-                    for selection in payload.provider_layer_selections
-                ],
-            ],
-            rendered_overlay_ids=rendered_overlay_ids,
-            failed_overlays=failed_overlays,
             compliance_warnings=warnings,
-            overlay_collection_revision=0,
-            inspections=inspections,
+            overlay_collection=overlay_collection,
             payload={
                 "action_id": payload.action_id,
                 "time_mode": payload.time_mode,
