@@ -156,8 +156,7 @@ class GeospatialCatalogService:
 
     # -------------------------------------------------------------------------
     def list_catalog(self) -> dict[str, list[dict[str, Any]]]:
-        snapshot = self.capability_registry.load_capabilities()
-        self.runtime_registry.build_snapshot()
+        snapshot = self.capability_registry.snapshot
 
         providers = [self._provider_descriptor(item) for item in snapshot.providers]
         basemaps = [

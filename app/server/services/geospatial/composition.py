@@ -7,6 +7,7 @@ from server.repositories.credential_material import (
 )
 from server.repositories.credentials import CredentialRepository
 from server.repositories.database.sqlite import SQLiteRepository
+from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.api_service import GeospatialApiService
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.catalog import GeospatialCatalogService
@@ -21,6 +22,7 @@ from server.services.cryptography import CredentialEncryptionService
 @dataclass(frozen=True)
 class GeospatialRuntime:
     manifest_loader: GeospatialManifestLoader
+    catalog_snapshot: GeospatialManifestSnapshot
     capability_registry: CapabilityRegistry
     runtime_registry: RuntimeRegistry
     provider_registry: ProviderRegistry
@@ -34,6 +36,9 @@ class GeospatialRuntime:
 ###############################################################################
 def build_geospatial_runtime(database: SQLiteRepository) -> GeospatialRuntime:
     manifest_loader = GeospatialManifestLoader()
+    catalog_snapshot = GeospatialManifestSnapshot.from_payload(
+        manifest_loader.load_all()
+    )
     credentials_repo = CredentialRepository(database)
     crypto_service = CredentialEncryptionService(
         material_repo=CredentialEncryptionMaterialRepository(database)
@@ -43,28 +48,29 @@ def build_geospatial_runtime(database: SQLiteRepository) -> GeospatialRuntime:
         crypto_service=crypto_service,
     )
     runtime_registry = RuntimeRegistry(
-        manifest_loader=manifest_loader,
+        catalog_snapshot=catalog_snapshot,
         credentials_repo=credentials_repo,
         credential_resolver=credential_resolver,
     )
-    capability_registry = CapabilityRegistry(manifest_loader=manifest_loader)
+    capability_registry = CapabilityRegistry.from_catalog_snapshot(catalog_snapshot)
     catalog_service = GeospatialCatalogService(
         capability_registry=capability_registry,
         runtime_registry=runtime_registry,
     )
     provider_registry = ProviderRegistry(
-        manifest_loader=manifest_loader,
+        catalog_snapshot=catalog_snapshot,
         credential_resolver=credential_resolver,
     )
     api_service = GeospatialApiService(
         catalog_service=catalog_service,
-        manifest_loader=manifest_loader,
+        catalog_snapshot=catalog_snapshot,
         runtime_registry=runtime_registry,
         provider_registry=provider_registry,
         credential_resolver=credential_resolver,
     )
     return GeospatialRuntime(
         manifest_loader=manifest_loader,
+        catalog_snapshot=catalog_snapshot,
         capability_registry=capability_registry,
         runtime_registry=runtime_registry,
         provider_registry=provider_registry,

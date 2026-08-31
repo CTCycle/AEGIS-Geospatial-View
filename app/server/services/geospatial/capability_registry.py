@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from server.domain.geospatial.registry import CapabilityRegistrySnapshot
+from server.domain.geospatial.registry import (
+    CapabilityRegistrySnapshot,
+    GeospatialManifestSnapshot,
+)
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
 
@@ -12,25 +15,48 @@ class CapabilityRegistry:
     def __init__(
         self, *, manifest_loader: GeospatialManifestLoader | None = None
     ) -> None:
-        self.manifest_loader = manifest_loader or GeospatialManifestLoader()
-        self._snapshot: CapabilityRegistrySnapshot | None = None
+        loader = manifest_loader or GeospatialManifestLoader()
+        self.catalog_snapshot = GeospatialManifestSnapshot.from_payload(
+            loader.load_all()
+        )
+        self._snapshot = CapabilityRegistrySnapshot(
+            providers=list(self.catalog_snapshot.providers),
+            basemaps=list(self.catalog_snapshot.basemaps),
+            overlays=list(self.catalog_snapshot.overlays),
+            cameras=list(self.catalog_snapshot.cameras),
+            transit=list(self.catalog_snapshot.transit),
+            tools=list(self.catalog_snapshot.tools),
+        )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def from_catalog_snapshot(
+        cls, snapshot: GeospatialManifestSnapshot
+    ) -> "CapabilityRegistry":
+        registry = cls.__new__(cls)
+        registry.catalog_snapshot = snapshot
+        registry._snapshot = CapabilityRegistrySnapshot(
+            providers=list(snapshot.providers),
+            basemaps=list(snapshot.basemaps),
+            overlays=list(snapshot.overlays),
+            cameras=list(snapshot.cameras),
+            transit=list(snapshot.transit),
+            tools=list(snapshot.tools),
+        )
+        return registry
 
     # -------------------------------------------------------------------------
     def load_capabilities(self) -> CapabilityRegistrySnapshot:
-        manifest = self.manifest_loader.load_all()
-        self._snapshot = CapabilityRegistrySnapshot(
-            providers=list(manifest.get("providers") or []),
-            basemaps=list(manifest.get("basemaps") or []),
-            overlays=list(manifest.get("overlays") or []),
-            cameras=list(manifest.get("cameras") or []),
-            transit=list(manifest.get("transit") or []),
-            tools=list(manifest.get("tools") or []),
-        )
+        return self._snapshot
+
+    # -------------------------------------------------------------------------
+    @property
+    def snapshot(self) -> CapabilityRegistrySnapshot:
         return self._snapshot
 
     # -------------------------------------------------------------------------
     def _ensure_snapshot(self) -> CapabilityRegistrySnapshot:
-        return self._snapshot or self.load_capabilities()
+        return self._snapshot
 
     # -------------------------------------------------------------------------
     def list_basemaps(self) -> list[dict[str, Any]]:

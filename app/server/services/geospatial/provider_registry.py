@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from server.common.typing import json_array, json_object
-
 import asyncio
 from collections.abc import Callable
 from time import monotonic
@@ -9,6 +7,7 @@ from typing import Any, cast
 
 from server.contracts.geospatial import GeospatialProviderLayerDescriptor
 from server.domain.geospatial.providers import ProviderExecutionPolicy
+from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
@@ -106,12 +105,17 @@ class ProviderRegistry:
     def __init__(
         self,
         *,
+        catalog_snapshot: GeospatialManifestSnapshot | None = None,
         manifest_loader: GeospatialManifestLoader | None = None,
         providers: list[GeospatialProvider] | None = None,
         execution_policy: ProviderExecutionPolicy | None = None,
         credential_resolver: GeospatialCredentialResolver | None = None,
     ) -> None:
-        self.manifest_loader = manifest_loader or GeospatialManifestLoader()
+        loader = manifest_loader or GeospatialManifestLoader()
+        self.catalog_snapshot = (
+            catalog_snapshot
+            or GeospatialManifestSnapshot.from_payload(loader.load_all())
+        )
         self.execution_policy = execution_policy or ProviderExecutionPolicy()
         self.credential_resolver = credential_resolver or GeospatialCredentialResolver()
         self._providers: dict[str, GeospatialProvider] = {}
@@ -121,6 +125,11 @@ class ProviderRegistry:
         self._min_call_interval_s: dict[str, float] = {}
         for provider in providers or []:
             self.register(provider)
+        self._manifest_providers_built = False
+        if providers is None and (
+            catalog_snapshot is not None or manifest_loader is None
+        ):
+            self._build_from_catalog_snapshot()
 
     # -------------------------------------------------------------------------
     def register(self, provider: GeospatialProvider) -> None:
@@ -154,7 +163,12 @@ class ProviderRegistry:
 
     # -------------------------------------------------------------------------
     def build_from_manifests(self) -> None:
-        payload = self.manifest_loader.load_all()
+        if self._manifest_providers_built:
+            return
+        self._build_from_catalog_snapshot()
+
+    # -------------------------------------------------------------------------
+    def _build_from_catalog_snapshot(self) -> None:
         items: list[tuple[str, dict[str, Any]]] = []
         for collection_name in (
             "providers",
@@ -164,10 +178,8 @@ class ProviderRegistry:
             "transit",
             "tools",
         ):
-            for item in json_array(payload.get(collection_name)):
-                item_object = json_object(item)
-                if item_object:
-                    items.append((collection_name, item_object))
+            for item in getattr(self.catalog_snapshot, collection_name):
+                items.append((collection_name, dict(item)))
         for collection_name, item in items:
             capability_kind = str(item.get("capabilityKind") or "").strip().lower()
             if collection_name != "providers" and capability_kind in {
@@ -190,6 +202,7 @@ class ProviderRegistry:
             ):
                 continue
             self.register(self._provider_for_manifest(provider_id.lower(), dict(item)))
+        self._manifest_providers_built = True
 
     # -------------------------------------------------------------------------
     async def fetch(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from server.services.agent.tool_registry import ToolRegistry
+from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
@@ -10,16 +11,14 @@ from server.repositories.credentials import CredentialRepository
 ###############################################################################
 def run_startup_validations(credentials_repo: CredentialRepository) -> None:
     loader = GeospatialManifestLoader()
-    loader.load_all()
+    catalog_snapshot = GeospatialManifestSnapshot.from_payload(loader.load_all())
 
-    capability_registry = CapabilityRegistry(manifest_loader=loader)
-    capability_registry.load_capabilities()
+    capability_registry = CapabilityRegistry.from_catalog_snapshot(catalog_snapshot)
 
     runtime_registry = RuntimeRegistry(
-        manifest_loader=loader,
+        catalog_snapshot=catalog_snapshot,
         credentials_repo=credentials_repo,
     )
-    runtime_registry.build_snapshot()
 
     tool_registry = ToolRegistry(runtime_registry=runtime_registry)
     bindings = tool_registry.load_tool_bindings()

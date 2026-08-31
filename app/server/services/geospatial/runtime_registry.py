@@ -4,7 +4,10 @@ from server.common.typing import is_json_object, json_object
 
 from typing import Any
 
-from server.domain.geospatial.registry import RuntimeRegistrySnapshot
+from server.domain.geospatial.registry import (
+    GeospatialManifestSnapshot,
+    RuntimeRegistrySnapshot,
+)
 from server.services.geospatial.credential_resolver import (
     GEOSPATIAL_CREDENTIAL_ENV_BY_PROVIDER,
     CredentialStore,
@@ -21,16 +24,21 @@ class RuntimeRegistry:
     def __init__(
         self,
         *,
-        manifest_loader: GeospatialManifestLoader,
+        catalog_snapshot: GeospatialManifestSnapshot | None = None,
+        manifest_loader: GeospatialManifestLoader | None = None,
         credentials_repo: CredentialStore | None = None,
         credential_resolver: GeospatialCredentialResolver | None = None,
     ) -> None:
-        self.manifest_loader = manifest_loader
+        loader = manifest_loader or GeospatialManifestLoader()
+        self.catalog_snapshot = (
+            catalog_snapshot
+            or GeospatialManifestSnapshot.from_payload(loader.load_all())
+        )
         self._credentials_repo = credentials_repo
         self._credential_resolver = credential_resolver or GeospatialCredentialResolver(
             credentials_repo=credentials_repo,
         )
-        self._snapshot: RuntimeRegistrySnapshot | None = None
+        self._snapshot = self._build_snapshot(self.catalog_snapshot)
 
     # -------------------------------------------------------------------------
     @property
@@ -44,10 +52,21 @@ class RuntimeRegistry:
 
     # -------------------------------------------------------------------------
     def build_snapshot(self) -> RuntimeRegistrySnapshot:
-        manifest = self.manifest_loader.load_all()
+        return self._snapshot
+
+    # -------------------------------------------------------------------------
+    @property
+    def snapshot(self) -> RuntimeRegistrySnapshot:
+        return self._snapshot
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _build_snapshot(
+        catalog_snapshot: GeospatialManifestSnapshot,
+    ) -> RuntimeRegistrySnapshot:
         profiles = {
             str(item.get("capability_id")): dict(item)
-            for item in list(manifest.get("runtime_profiles") or [])
+            for item in catalog_snapshot.runtime_profiles
             if str(item.get("capability_id") or "").strip()
         }
         manifests: dict[str, dict[str, Any]] = {}
@@ -59,16 +78,15 @@ class RuntimeRegistry:
             "transit",
             "tools",
         ):
-            for item in list(manifest.get(collection_name) or []):
+            for item in getattr(catalog_snapshot, collection_name):
                 capability_id = str(item.get("id") or "").strip()
                 if capability_id:
                     manifests[capability_id] = dict(item)
-        self._snapshot = RuntimeRegistrySnapshot(profiles=profiles, manifests=manifests)
-        return self._snapshot
+        return RuntimeRegistrySnapshot(profiles=profiles, manifests=manifests)
 
     # -------------------------------------------------------------------------
     def _ensure(self) -> RuntimeRegistrySnapshot:
-        return self._snapshot or self.build_snapshot()
+        return self._snapshot
 
     # -------------------------------------------------------------------------
     def _profile(self, capability_id: str) -> dict[str, Any] | None:
