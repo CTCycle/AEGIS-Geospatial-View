@@ -15,14 +15,19 @@ import {
   API_OLLAMA_REFRESH_PATH,
 } from './constants';
 import {
-  normalizeCapabilities,
-  normalizeModelCards,
   parseCatalogResponse,
   parseChatTurnResponse,
+  parseConversationCreateResponse,
   parseConversationSnapshotResponse,
+  parseGenericObjectResponse,
+  parseGeospatialCredentialStatus,
+  parseGeospatialLayersResponse,
+  parseGeospatialProviderPayload,
   parseGeospatialProviderAccountSetups,
-  parseModelLibrarySources,
+  parseModelLibraryResponse,
   parseModelSettingsResponse,
+  parseOllamaHealthResponse,
+  parseOllamaRefreshResponse,
 } from './api-parsers';
 import {
   CatalogResponse,
@@ -40,21 +45,9 @@ import {
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
 } from './types';
-import { isRecord } from './type-guards';
+import { ApiRequestError } from './api-errors';
 
-export class ApiRequestError extends Error {
-  detail?: unknown;
-  status?: number;
-  raw?: unknown;
-
-  constructor(message: string, options?: { detail?: unknown; status?: number; raw?: unknown }) {
-    super(message);
-    this.name = 'ApiRequestError';
-    this.detail = options?.detail;
-    this.status = options?.status;
-    this.raw = options?.raw;
-  }
-}
+export { ApiContractError, ApiRequestError } from './api-errors';
 
 const buildQuerySuffix = (params: Record<string, string | number | boolean | undefined>): string => {
   const query = new URLSearchParams();
@@ -67,9 +60,6 @@ const buildQuerySuffix = (params: Record<string, string | number | boolean | und
   const serialized = query.toString();
   return serialized ? `?${serialized}` : '';
 };
-
-const asProviderPayload = (data: unknown): GeospatialProviderPayload =>
-  isRecord(data) ? data as unknown as GeospatialProviderPayload : { status: 'unavailable', provider: 'unknown' };
 
 export const executeApiRequest = async (url: string, init: RequestInit): Promise<unknown> => {
   let response: Response;
@@ -113,13 +103,7 @@ export const fetchGeospatialLayers = async (): Promise<Pick<CatalogResponse, 'ba
   const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_LAYERS_PATH}`, {
     method: 'GET',
   });
-  const value = isRecord(data) ? data : {};
-  return {
-    basemaps: normalizeCapabilities(value.basemaps),
-    overlays: normalizeCapabilities(value.overlays),
-    cameras: normalizeCapabilities(value.cameras),
-    transit: normalizeCapabilities(value.transit),
-  };
+  return parseGeospatialLayersResponse(data);
 };
 
 export const fetchGeospatialLayerFeatures = async (
@@ -131,7 +115,7 @@ export const fetchGeospatialLayerFeatures = async (
     `${API_BASE_URL}${API_GEOSPATIAL_LAYERS_PATH}/${encodeURIComponent(layerId)}/features${suffix}`,
     { method: 'GET' },
   );
-  return asProviderPayload(data);
+  return parseGeospatialProviderPayload(data, 'geospatial layer features');
 };
 
 export const fetchGeospatialCameras = async (
@@ -141,21 +125,14 @@ export const fetchGeospatialCameras = async (
   const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAMERAS_PATH}${suffix}`, {
     method: 'GET',
   });
-  return asProviderPayload(data);
+  return parseGeospatialProviderPayload(data, 'geospatial cameras');
 };
 
 export const fetchGeospatialCredentialStatus = async (providerId: string): Promise<GeospatialCredentialStatus> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH(providerId)}`, {
     method: 'GET',
   });
-  if (!isRecord(data)) {
-    return { provider: providerId, required: false, configured: false };
-  }
-  return {
-    provider: String(data.provider ?? providerId),
-    required: Boolean(data.required),
-    configured: Boolean(data.configured),
-  };
+  return parseGeospatialCredentialStatus(data);
 };
 
 export const fetchGeospatialProviderAccountSetups = async (): Promise<GeospatialProviderAccountSetupListResponse> => {
@@ -180,7 +157,7 @@ export const createConversation = async (
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return data as ConversationCreateResponse;
+  return parseConversationCreateResponse(data);
 };
 
 export const fetchConversationSnapshot = async (
@@ -201,13 +178,7 @@ export const fetchChatModels = async (
     method: 'GET',
     cache: 'no-store',
   });
-  const value = isRecord(data) ? data : {};
-
-  return {
-    cloud: normalizeModelCards(value.cloud),
-    local: normalizeModelCards(value.local),
-    sources: parseModelLibrarySources(value.sources),
-  };
+  return parseModelLibraryResponse(data);
 };
 
 export const fetchChatSettings = async (): Promise<ModelSettingsResponse> => {
@@ -229,7 +200,7 @@ export const updateChatSettings = async (payload: ModelSettingsUpdateRequest): P
 
 export const refreshOllamaModels = async (): Promise<GenericObjectResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_REFRESH_PATH}`, { method: 'POST' });
-  return isRecord(data) ? data : {};
+  return parseOllamaRefreshResponse(data);
 };
 
 export const pullOllamaModel = async (model: string): Promise<GenericObjectResponse> => {
@@ -238,17 +209,10 @@ export const pullOllamaModel = async (model: string): Promise<GenericObjectRespo
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model }),
   });
-  return isRecord(data) ? data : {};
+  return parseGenericObjectResponse(data, 'Ollama model pull');
 };
 
 export const checkOllamaHealth = async (): Promise<OllamaHealthResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_HEALTH_PATH}`, { method: 'GET' });
-  if (!isRecord(data)) {
-    return { ok: null, detail: null };
-  }
-  return {
-    ...data,
-    ok: data.ok === true || data.ok === false ? data.ok : null,
-    detail: typeof data.detail === 'string' ? data.detail : null,
-  };
+  return parseOllamaHealthResponse(data);
 };
