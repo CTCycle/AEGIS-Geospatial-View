@@ -76,10 +76,22 @@ class ToolRetryPolicy(BaseModel):
         default_factory=lambda: [
             "tool_timeout",
             "provider_timeout",
-            "provider_rate_limited",
+            "rate_limited",
             "provider_unavailable",
         ]
     )
+
+
+###############################################################################
+class ToolInputBinding(BaseModel):
+    """Bind a value produced by a predecessor into a later tool call."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target: str = Field(min_length=1)
+    source_step_id: str = Field(min_length=1)
+    source_path: str = "data"
+    required: bool = True
 
 
 ###############################################################################
@@ -92,6 +104,10 @@ class ToolPlanStep(BaseModel):
     reason: str
     arguments: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     depends_on: list[str] = Field(default_factory=lambda: list[str]())
+    input_bindings: list[ToolInputBinding] = Field(
+        default_factory=lambda: list[ToolInputBinding]()
+    )
+    output_refs: list[str] = Field(default_factory=lambda: list[str]())
     parallel_group: str | None = None
     timeout_seconds: int = Field(default=30, ge=1, le=120)
     retry_policy: ToolRetryPolicy = Field(default_factory=ToolRetryPolicy)
@@ -157,6 +173,16 @@ class ToolResultProvenance(BaseModel):
     attempt: int = 1
     elapsed_ms: int = 0
     call_fingerprint: str | None = None
+    fetched_at: datetime = Field(default_factory=utc_now)
+    observation_time: str | None = None
+    coverage: dict[str, Any] | None = None
+    spatial_resolution: str | None = None
+    units: dict[str, str] = Field(default_factory=lambda: dict[str, str]())
+    source_url: str | None = None
+    result_status: str = "unknown"
+    result_type: str = "unknown"
+    partial: bool = False
+    warnings: list[str] = Field(default_factory=lambda: list[str]())
 
 
 ###############################################################################

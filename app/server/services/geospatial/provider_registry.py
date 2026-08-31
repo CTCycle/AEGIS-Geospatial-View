@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 from time import monotonic
 from typing import Any, cast
@@ -87,6 +88,8 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "nominatim": lambda _credential: NominatimProvider(),
     "mapillary": lambda credential: MapillaryProvider(access_token=credential),
 }
+
+LOGGER = logging.getLogger(__name__)
 
 
 ###############################################################################
@@ -215,6 +218,17 @@ class ProviderRegistry:
         attempts = max(1, int(self.execution_policy.max_attempts))
         last_error: ProviderError | None = None
         for attempt in range(attempts):
+            started = monotonic()
+            LOGGER.info(
+                "provider_request provider=%s capability=%s attempt=%s bbox=%s zoom=%s time=%s params=%s",
+                normalized,
+                request.capability_id,
+                attempt + 1,
+                request.bbox,
+                request.zoom,
+                request.time.isoformat() if request.time else None,
+                safe_request_params(request.params),
+            )
             try:
                 response = await asyncio.wait_for(
                     self._fetch_provider(provider, request),
@@ -238,6 +252,17 @@ class ProviderRegistry:
             else:
                 self._failures[normalized] = 0
                 self._circuit_opened_at.pop(normalized, None)
+                LOGGER.info(
+                    "provider_response provider=%s capability=%s attempt=%s status=%s type=%s stale=%s partial=%s elapsed_ms=%s",
+                    normalized,
+                    request.capability_id,
+                    attempt + 1,
+                    response.result_status,
+                    response.result_type,
+                    response.stale,
+                    response.partial,
+                    int((monotonic() - started) * 1000),
+                )
                 return response_without_credentials(response)
         if last_error is not None:
             raise last_error

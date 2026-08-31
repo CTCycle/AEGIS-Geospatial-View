@@ -14,20 +14,25 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from server.configurations import get_server_settings
+from server.services.geospatial.providers.base import (
+    ProviderError,
+    ProviderInvalidQueryError,
+    ProviderRateLimitError,
+)
 
 
 ###############################################################################
-class OverpassServiceError(Exception):
+class OverpassServiceError(ProviderError):
     """Base exception for Overpass failures."""
 
 
 ###############################################################################
-class OverpassRequestError(OverpassServiceError):
+class OverpassRequestError(OverpassServiceError, ProviderInvalidQueryError):
     """Raised when Overpass cannot fulfill a request."""
 
 
 ###############################################################################
-class OverpassRateLimitError(OverpassServiceError):
+class OverpassRateLimitError(OverpassServiceError, ProviderRateLimitError):
     """Raised when Overpass rejects a request due to rate limits."""
 
 

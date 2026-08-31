@@ -10,6 +10,7 @@ from server.services.geospatial.normalizers import (
 )
 from server.services.geospatial.overpass import (
     OverpassRateLimitError,
+    OverpassRequestError,
     OverpassService,
     OverpassServiceError,
 )
@@ -19,8 +20,9 @@ from server.services.geospatial.providers._request import (
 )
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
-    ProviderRateLimitError,
+    ProviderInvalidQueryError,
     ProviderRequest,
+    ProviderRateLimitError,
     ProviderResponse,
     ProviderUnavailableError,
 )
@@ -57,6 +59,8 @@ class OverpassProvider(GeospatialProvider):
                 )
             except OverpassRateLimitError as exc:
                 raise ProviderRateLimitError(str(exc)) from exc
+            except OverpassRequestError as exc:
+                raise ProviderInvalidQueryError(str(exc)) from exc
             except (OverpassServiceError, ValueError) as exc:
                 raise ProviderUnavailableError(str(exc)) from exc
             return ProviderResponse(
@@ -64,6 +68,19 @@ class OverpassProvider(GeospatialProvider):
                 provider_id=self.provider_id,
                 payload=payload,
                 attribution=["© OpenStreetMap contributors (ODbL)"],
+                coverage={
+                    "type": "circle",
+                    "center": {"latitude": latitude, "longitude": longitude},
+                    "radius_m": radius_m,
+                },
+                spatial_resolution="building footprints",
+                source_url=getattr(self.service, "base_url", None),
+                result_type="features",
+                result_status=(
+                    "valid_empty"
+                    if not json_array(payload.get("features"))
+                    else "ok"
+                ),
             )
         tags = request.params.get("amenity_tags")
         amenity_tags = [str(tag) for tag in tags] if is_json_array(tags) else None
@@ -87,6 +104,8 @@ class OverpassProvider(GeospatialProvider):
             )
         except OverpassRateLimitError as exc:
             raise ProviderRateLimitError(str(exc)) from exc
+        except OverpassRequestError as exc:
+            raise ProviderInvalidQueryError(str(exc)) from exc
         except (OverpassServiceError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
         features: list[dict[str, Any]] = []
@@ -120,6 +139,16 @@ class OverpassProvider(GeospatialProvider):
             attribution=[
                 str(payload.get("attribution") or "© OpenStreetMap contributors (ODbL)")
             ],
+            coverage={
+                "type": "circle",
+                "center": {"latitude": latitude, "longitude": longitude},
+                "radius_m": radius_m,
+            },
+            spatial_resolution="point features",
+            units={"distance_m": "m", "radius_m": "m"},
+            source_url=getattr(self.service, "base_url", None),
+            result_type="features",
+            result_status="valid_empty" if not features else "ok",
         )
 
 

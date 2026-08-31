@@ -25,8 +25,14 @@ class ProviderResponse:
     warnings: list[str] = field(default_factory=lambda: list[str]())
     stale: bool = False
     fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    result_status: Literal["ok", "valid_empty", "stale"] = "ok"
+    result_status: Literal["ok", "valid_empty", "partial", "stale"] = "ok"
     result_type: Literal["features", "raster", "metadata", "unknown"] = "unknown"
+    observation_time: str | None = None
+    coverage: dict[str, Any] | None = None
+    spatial_resolution: str | None = None
+    units: dict[str, str] = field(default_factory=lambda: dict[str, str]())
+    source_url: str | None = None
+    partial: bool = False
 
 
 ###############################################################################

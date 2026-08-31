@@ -112,6 +112,14 @@ class OpenMeteoService:
             "hourly_preview": preview,
             "hourly_forecast": hourly_forecast,
             "resolved_at": datetime.now(UTC).isoformat(),
+            "observation_time": json_object(payload.get("current")).get("time"),
+            "units": self._units(payload),
+            "spatial_resolution": "point forecast",
+            "coverage": {
+                "type": "point",
+                "latitude": latitude,
+                "longitude": longitude,
+            },
             "attribution": "Data from Open-Meteo",
         }
 
@@ -156,8 +164,27 @@ class OpenMeteoService:
             "timezone": payload.get("timezone"),
             "hourly_preview": preview,
             "resolved_at": datetime.now(UTC).isoformat(),
+            "observation_time": preview[0].get("time") if preview else None,
+            "units": self._units(payload),
+            "spatial_resolution": "point forecast",
+            "coverage": {
+                "type": "point",
+                "latitude": latitude,
+                "longitude": longitude,
+            },
             "attribution": "Data from Open-Meteo",
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _units(payload: dict[str, Any]) -> dict[str, str]:
+        units: dict[str, str] = {}
+        for key in ("current_units", "hourly_units"):
+            declared = json_object(payload.get(key))
+            for name, unit in declared.items():
+                if isinstance(name, str) and isinstance(unit, str) and unit.strip():
+                    units.setdefault(name, unit.strip())
+        return units
 
     # -------------------------------------------------------------------------
     def _get_json(
