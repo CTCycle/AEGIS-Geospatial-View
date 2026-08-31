@@ -175,6 +175,7 @@ function Write-Status {
         [string]$Message
     )
 
+    Clear-LauncherProgress
     $color = switch ($Level) {
         'STEP' { 'Cyan' }
         'OK' { 'Green' }
@@ -189,7 +190,7 @@ function Write-Status {
 }
 
 function Start-LauncherProgress {
-    param([Parameter(Mandatory)][string]$Activity, [string]$Status = 'Starting')
+    param([Parameter(Mandatory)][string]$Activity, [Parameter(Mandatory)][string]$Status)
     $id = $script:NextProgressId++
     [void]$script:ActiveProgressIds.Add($id)
     Write-Progress -Id $id -Activity $Activity -Status $Status
@@ -228,20 +229,14 @@ function Invoke-TrackedLauncherAction {
         [Parameter(Mandatory)][string]$Name,
         [Parameter(Mandatory)][scriptblock]$Action
     )
-    $activity = "AEGIS: $Name"
-    $progressId = Start-LauncherProgress -Activity $activity -Status 'Starting'
     Write-Status RUN "Starting $Name"
     try {
-        Update-LauncherProgress -Id $progressId -Activity $activity -Status 'Running'
         & $Action
         Write-Status SUCCESS "$Name completed"
     }
     catch {
         Write-Status FATAL "$Name failed: $($_.Exception.Message)"
         throw
-    }
-    finally {
-        Complete-LauncherProgress $progressId
     }
 }
 
@@ -655,16 +650,9 @@ function Invoke-GitCommand {
 
     $gitExecutable = Get-GitExecutable
     $display = "git $($Arguments -join ' ')"
-    $activity = "AEGIS: $display"
-    $progressId = Start-LauncherProgress -Activity $activity -Status 'Running Git command'
     Write-Status RUN $display
-    try {
-        $output = @(& $gitExecutable -C $RootDir @Arguments)
-        $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
-    }
-    finally {
-        Complete-LauncherProgress $progressId
-    }
+    $output = @(& $gitExecutable -C $RootDir @Arguments)
+    $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
     if ($exitCode -ne 0) {
         throw "Git command failed: $display (exit code $exitCode)."
     }
@@ -791,7 +779,8 @@ function Remove-DirectoryContents {
     }
 
     try {
-        $children = @(Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop)
+        $children = @(Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop |
+            Sort-Object @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
     }
     catch {
         Write-Status WARN "Skipped inaccessible data directory: $Path ($($_.Exception.Message))"
@@ -838,8 +827,8 @@ function Invoke-RemoveAllData {
     Write-Host '  This permanently deletes the SQLite database, runtime data, ingested files, generated vectors, and logs.' -ForegroundColor Yellow
     Write-Host '  Application source files, catalogs, settings templates, dependencies, and lockfiles are preserved.' -ForegroundColor DarkGray
     Write-Host "  Runtime data path: $configuredDataDir" -ForegroundColor DarkGray
-    $confirmation = (Read-Host '  Type REMOVE ALL DATA to continue').Trim()
-    if ($confirmation -cne 'REMOVE ALL DATA') {
+    $confirmation = ([string](Read-Host '  Continue removing all user-generated application data? [y/N]')).Trim()
+    if ($confirmation -notmatch '^(?i:y|yes)$') {
         Write-Status INFO 'Remove all data cancelled.'
         return
     }
@@ -878,7 +867,8 @@ function Remove-ApplicationLogs {
         Write-Status INFO "Log directory does not exist: $LogsDir"
         return
     }
-    $logs = @(Get-ChildItem -LiteralPath $LogsDir -Filter '*.log' -File -ErrorAction SilentlyContinue)
+    $logs = @(Get-ChildItem -LiteralPath $LogsDir -Filter '*.log' -File -ErrorAction SilentlyContinue |
+        Sort-Object @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
     if ($logs.Count -eq 0) {
         Write-Status INFO 'No log files found.'
         return
@@ -915,45 +905,19 @@ function Remove-PathBestEffort {
 
     try {
         $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
-    }
-    catch {
+    } catch {
+        if ($_.CategoryInfo.Category -eq [System.Management.Automation.ErrorCategory]::ObjectNotFound) {
+            return $true
+        }
         Write-Status WARN "Skipped inaccessible path: $Path ($($_.Exception.Message))"
         return $false
-    }
-
-    if ($Recurse -and $item.PSIsContainer) {
-        try {
-            $children = @(Get-ChildItem -LiteralPath $item.FullName -Force -ErrorAction Stop)
-        }
-        catch {
-            Write-Status WARN "Skipped inaccessible directory: $Path ($($_.Exception.Message))"
-            return $false
-        }
-
-        $childFailure = $false
-        $progressId = Start-LauncherProgress -Activity "AEGIS: remove $($item.Name)" -Status "0 of $($children.Count) items"
-        try {
-            for ($index = 0; $index -lt $children.Count; $index++) {
-                $child = $children[$index]
-                $percent = if ($children.Count -eq 0) { 100 } else { [int](($index + 1) * 100 / $children.Count) }
-                Update-LauncherProgress -Id $progressId -Activity "AEGIS: remove $($item.Name)" -Status "$($index + 1) of $($children.Count): $($child.Name)" -PercentComplete $percent
-                if (-not (Remove-PathBestEffort -Path $child.FullName -Recurse)) {
-                    $childFailure = $true
-                }
-            }
-        }
-        finally {
-            Complete-LauncherProgress $progressId
-        }
-        if ($childFailure) {
-            return $false
-        }
     }
 
     try {
         $removeParameters = @{
             LiteralPath = $item.FullName
             Force = $true
+            Confirm = $false
             ErrorAction = 'Stop'
         }
         if ($Recurse) {
@@ -963,9 +927,44 @@ function Remove-PathBestEffort {
         return $true
     }
     catch {
-        Write-Status WARN "Skipped locked or protected path: $($item.FullName) ($($_.Exception.Message))"
-        return $false
+        if (-not ($Recurse -and $item.PSIsContainer)) {
+            Write-Status WARN "Skipped locked or protected path: $($item.FullName) ($($_.Exception.Message))"
+            return $false
+        }
     }
+
+    $enumerationErrors = @()
+    $entries = @(Get-ChildItem -LiteralPath $item.FullName -Force -Recurse -ErrorAction SilentlyContinue -ErrorVariable enumerationErrors |
+        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
+    $success = $enumerationErrors.Count -eq 0
+    $failureMessages = [Collections.Generic.List[string]]::new()
+    foreach ($enumerationError in $enumerationErrors) {
+        $success = $false
+        [void]$failureMessages.Add("Skipped inaccessible path below $Path ($($enumerationError.Exception.Message))")
+    }
+    $progressId = Start-LauncherProgress -Activity "AEGIS: recover removal of $($item.Name)" -Status "0 of $($entries.Count + 1) items"
+    try {
+        $removalItems = @($entries) + @($item)
+        for ($index = 0; $index -lt $removalItems.Count; $index++) {
+            $entry = $removalItems[$index]
+            $percent = [int](($index + 1) * 100 / [Math]::Max(1, $removalItems.Count))
+            Update-LauncherProgress -Id $progressId -Activity "AEGIS: recover removal of $($item.Name)" -Status "$($index + 1) of $($removalItems.Count): $($entry.Name)" -PercentComplete $percent
+            try {
+                Remove-Item -LiteralPath $entry.FullName -Force -Confirm:$false -ErrorAction Stop
+            }
+            catch {
+                $success = $false
+                [void]$failureMessages.Add("Skipped locked or protected path: $($entry.FullName) ($($_.Exception.Message))")
+            }
+        }
+    }
+    finally {
+        Complete-LauncherProgress $progressId
+    }
+    foreach ($failureMessage in @($failureMessages | Sort-Object -Unique)) {
+        Write-Status WARN $failureMessage
+    }
+    return $success -and -not (Test-Path -LiteralPath $item.FullName -ErrorAction SilentlyContinue)
 }
 
 function Remove-PythonCaches {
@@ -984,7 +983,7 @@ function Remove-PythonCaches {
                 Get-ChildItem -LiteralPath $searchRoot -Directory -Filter '__pycache__' -Recurse -Force -ErrorAction SilentlyContinue
             }
         }
-    ) | Sort-Object FullName -Descending
+    ) | Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false }
     foreach ($cacheDirectory in $cacheDirectories) {
         [void](Remove-PathBestEffort -Path $cacheDirectory.FullName -Recurse)
     }
@@ -1012,7 +1011,8 @@ function Clear-ApplicationCache {
             continue
         }
         try {
-            $children = @(Get-ChildItem -LiteralPath $cacheRoot -Force -ErrorAction Stop)
+            $children = @(Get-ChildItem -LiteralPath $cacheRoot -Force -ErrorAction Stop |
+                Sort-Object @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
         }
         catch {
             Write-Status WARN "Skipped inaccessible cache directory: $cacheRoot ($($_.Exception.Message))"
