@@ -8,7 +8,7 @@ from server.services.chat.settings_service import ChatSettingsService
 ###############################################################################
 class _SettingsRepo:
     # -------------------------------------------------------------------------
-    def get_or_create(self):  # noqa: ANN201
+    def get_required(self):  # noqa: ANN201
         return SimpleNamespace(
             active_provider_mode="cloud",
             agent_model_provider="openai",

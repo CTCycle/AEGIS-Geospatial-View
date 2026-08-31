@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from sqlalchemy import select
 
 from server.common.constants import (
@@ -23,29 +21,35 @@ class ModelSettingsRepository:
         self._session_factory = database.session
 
     # -------------------------------------------------------------------------
-    def get_or_create(self) -> ModelSettingsSnapshot:
+    def get_required(self) -> ModelSettingsSnapshot:
         with self._session_factory() as session:
             statement = select(ModelProviderSettingsRecord).order_by(
                 ModelProviderSettingsRecord.id.asc()
             )
             record = session.execute(statement).scalars().first()
-            if record is not None:
-                return self._to_snapshot(record)
-
-            record = ModelProviderSettingsRecord(
-                active_provider_mode=DEFAULT_MODEL_PROVIDER_MODE,
-                agent_model_provider=DEFAULT_MODEL_PROVIDER,
-                agent_model_name=DEFAULT_MODEL_NAME,
-                ollama_url=OLLAMA_DEFAULT_HOST,
-                capabilities_json=json.dumps([]),
-                supports_tools=False,
-                supports_structured_output=False,
-                tool_support_source="unknown",
-            )
-            session.add(record)
-            session.commit()
-            session.refresh(record)
+            if record is None:
+                raise RuntimeError(
+                    "The model settings record is missing; database initialization must seed it."
+                )
             return self._to_snapshot(record)
+
+    # -------------------------------------------------------------------------
+    def seed_required(self) -> None:
+        with self._session_factory() as session:
+            statement = select(ModelProviderSettingsRecord).order_by(
+                ModelProviderSettingsRecord.id.asc()
+            )
+            if session.execute(statement).scalars().first() is not None:
+                return
+            session.add(
+                ModelProviderSettingsRecord(
+                    active_provider_mode=DEFAULT_MODEL_PROVIDER_MODE,
+                    agent_model_provider=DEFAULT_MODEL_PROVIDER,
+                    agent_model_name=DEFAULT_MODEL_NAME,
+                    ollama_url=OLLAMA_DEFAULT_HOST,
+                )
+            )
+            session.commit()
 
     # -------------------------------------------------------------------------
     def update(
@@ -65,8 +69,9 @@ class ModelSettingsRepository:
             )
             record = session.execute(statement).scalars().first()
             if record is None:
-                record = ModelProviderSettingsRecord()
-                session.add(record)
+                raise RuntimeError(
+                    "The model settings record is missing; database initialization must seed it."
+                )
 
             record.active_provider_mode = active_provider_mode
             record.agent_model_provider = agent_model_provider
@@ -92,8 +97,4 @@ class ModelSettingsRepository:
             openai_base_url=record.openai_base_url,
             google_base_url=record.google_base_url,
             deepseek_base_url=record.deepseek_base_url,
-            capabilities_json=record.capabilities_json,
-            supports_tools=record.supports_tools,
-            supports_structured_output=record.supports_structured_output,
-            tool_support_source=record.tool_support_source,
         )

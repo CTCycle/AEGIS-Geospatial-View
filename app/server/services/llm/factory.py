@@ -77,7 +77,7 @@ class LLMFactory:
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> LLMProvider:
         normalized = provider.strip().lower()
-        settings = self.settings_repo.get_or_create()
+        settings = self.settings_repo.get_required()
         if normalized == "ollama":
             return OllamaProvider(
                 base_url=settings.ollama_url,

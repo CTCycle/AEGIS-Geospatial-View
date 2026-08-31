@@ -9,6 +9,7 @@ from server.repositories.database.migration_runner import (
     synchronize_database,
 )
 from server.repositories.database.sqlite import SQLiteRepository
+from server.repositories.model_settings import ModelSettingsRepository
 
 
 ###############################################################################
@@ -19,6 +20,7 @@ def initialize_database(
 ) -> MigrationResult:
     def seed_required_data() -> None:
         seed_credential_encryption_material(database)
+        ModelSettingsRepository(database).seed_required()
         if on_ready is not None:
             on_ready()
 

@@ -246,7 +246,7 @@ class ParserService:
     ) -> LLMParserExtraction:
         settings = None
         if self.provider is None or self.model is None:
-            settings = self.settings_repo.get_or_create()
+            settings = self.settings_repo.get_required()
         if settings is None:
             provider_name = self.provider
             model_name = self.model

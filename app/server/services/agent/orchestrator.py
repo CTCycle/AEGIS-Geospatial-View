@@ -272,7 +272,7 @@ class AgentOrchestrator:
             state_before.active_map_session,
         )
 
-        settings = self.settings_repo.get_or_create()
+        settings = self.settings_repo.get_required()
         context_package = self.context_assembler.assemble(
             provider=settings.agent_model_provider,
             model=settings.agent_model_name,
@@ -412,7 +412,7 @@ class AgentOrchestrator:
                 context_usage=context_usage,
             )
 
-        settings = self.settings_repo.get_or_create()
+        settings = self.settings_repo.get_required()
         tool_plan = self.tool_planner.build_plan(
             turn_contract,
             specialist,
