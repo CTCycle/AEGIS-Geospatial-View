@@ -129,7 +129,6 @@ def test_synthesizer_evidence_marks_metadata_only_overlays() -> None:
         kind="map_session",
         status="success",
         message="Map ready.",
-        map_session=map_session,
     )
 
     synthesizer.synthesize(
@@ -259,7 +258,6 @@ def test_synthesizer_falls_back_when_successful_overlay_is_called_failed() -> No
         kind="map_session",
         status="success",
         message="Verified.",
-        map_session=map_session,
     )
 
     assert (

@@ -628,9 +628,6 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     throw new Error('Unexpected chat response format');
   }
   const operation = isRecord(value.operation) ? { ...value.operation } as Record<string, unknown> : undefined;
-  if (operation && isRecord(operation.map_session)) {
-    operation.map_session = normalizeMapSession(operation.map_session);
-  }
   const toolPayload = isRecord(value.tool_payload) ? { ...value.tool_payload } as Record<string, unknown> : undefined;
   if (toolPayload && isRecord(toolPayload.map_session)) {
     toolPayload.map_session = normalizeMapSession(toolPayload.map_session);

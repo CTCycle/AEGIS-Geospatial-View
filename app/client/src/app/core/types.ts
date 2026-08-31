@@ -627,7 +627,6 @@ export interface ChatOperationResult {
   status: 'success' | 'partial' | 'failed';
   message: string;
   warnings?: string[];
-  map_session?: MapSession | null;
   direct_result?: Record<string, JsonValue> | null;
   provider_error?: Record<string, JsonValue> | null;
   failure_category?: 'model_capability' | 'provider_api' | 'schema_definition' | 'response_parsing' | 'context_limit' | null;

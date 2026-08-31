@@ -200,7 +200,6 @@ class AgentTurnStateAssembler:
             kind="clarification",
             status="partial",
             message=assistant_message,
-            map_session=map_session,
         )
         assistant_message = self.response_synthesizer.synthesize(
             user_text=turn_contract.user_text,
