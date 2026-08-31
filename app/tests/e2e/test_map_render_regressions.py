@@ -10,6 +10,7 @@ from playwright.sync_api import ConsoleMessage, Page, Route, expect
 
 from tests.e2e.helpers.chat_stub_payloads import (
     chat_completion_map_payload,
+    conversation_snapshot_payload,
     geospatial_catalog_payload,
     model_settings_payload,
 )
@@ -49,8 +50,7 @@ def _models_payload() -> dict[str, Any]:
 def _turn_payload() -> dict[str, Any]:
     payload = chat_completion_map_payload(7001, "Search executed successfully.")
     payload["map_session"]["bounds"] = [12.4963044, 41.902725, 12.4964044, 41.902825]
-    payload["map_session"]["overlays"] = []
-    payload["map_session"]["overlay_ids"] = []
+    payload["map_session"]["overlay_collection"]["instances"] = []
     payload["tool_payload"] = {"execution": "map_search", "selected_overlay_ids": []}
     return payload
 
@@ -69,6 +69,16 @@ def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
     page.route(
         re.compile(r".*/api/geospatial/capabilities$"),
         lambda route: _json_ok(route, geospatial_catalog_payload()),
+    )
+    page.route(
+        re.compile(r".*/api/conversations/[^/]+$"),
+        lambda route: _json_ok(route, conversation_snapshot_payload()),
+    )
+    page.route(
+        re.compile(r".*/api/conversations$"),
+        lambda route: _json_ok(
+            route, {"conversation_id": "conversation-e2e", "title": "E2E"}
+        ),
     )
 
     def handle_osm_proxy(route: Route) -> None:
@@ -122,7 +132,7 @@ def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
 
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map at 41.9028, 12.4964")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
 
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     expect(page.locator(".maplibregl-canvas")).to_be_visible(timeout=15000)
@@ -142,7 +152,7 @@ def test_refresh_restores_rendered_map_without_console_errors(
 
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map at 41.9028, 12.4964")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(page.locator(".maplibregl-canvas")).to_be_visible(timeout=15000)
     page.wait_for_timeout(500)
 

@@ -12,6 +12,7 @@ from playwright.sync_api import Page, Route, expect
 
 from tests.e2e.helpers.chat_stub_payloads import (
     geospatial_catalog_payload,
+    map_overlay_instance,
     model_settings_payload,
 )
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
@@ -87,7 +88,6 @@ def _turn_payload() -> dict[str, Any]:
                 "longitude": 12.4964,
             },
             "basemap_id": "osm_default",
-            "overlay_ids": ["visual_fixture_points"],
             "viewport": {
                 "center_latitude": 41.9028,
                 "center_longitude": 12.4964,
@@ -105,20 +105,31 @@ def _turn_payload() -> dict[str, Any]:
                 "requires_key": False,
                 "attribution": "OpenStreetMap contributors",
             },
-            "overlays": [
-                {
-                    "id": "visual_fixture_points",
-                    "label": "Visual fixture points",
-                    "provider": "fixture",
-                    "type": "geojson",
-                    "rendering_mode": "clustered-points",
-                    "data_format": "GeoJSON",
-                    "geometry_type": "Point",
-                    "url": "/api/geospatial/layers/visual_fixture_points/geojson",
-                    "attribution": "AEGIS fixture",
-                    "default_opacity": 0.8,
-                }
-            ],
+            "overlay_collection": {
+                "collection_id": "visual-fixture-overlays",
+                "revision": 1,
+                "instances": [
+                    map_overlay_instance(
+                        instance_id="visual_fixture_points",
+                        capability_id="visual_fixture_points",
+                        label="Visual fixture points",
+                        provider="fixture",
+                        overlay_type="geojson",
+                        rendering_mode="clustered-points",
+                        opacity=0.8,
+                        descriptor={
+                            "layer_id": "visual_fixture_points",
+                            "provider": "fixture",
+                            "rendering_mode": "clustered-points",
+                            "source_protocol": "geojson",
+                            "data_format": "GeoJSON",
+                            "geometry_type": "Point",
+                            "url": "/api/geospatial/layers/visual_fixture_points/geojson",
+                            "attribution": ["AEGIS fixture"],
+                        },
+                    )
+                ],
+            },
             "compliance_warnings": [
                 "Fixture warning for deterministic visual snapshot coverage."
             ],
@@ -146,7 +157,13 @@ def _setup_stubs(page: Page) -> None:
         lambda route: _json_ok(route, geospatial_catalog_payload()),
     )
     page.route(
-        re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png(?:\?.*)?$"),
+        re.compile(r".*/api/conversations$"),
+        lambda route: _json_ok(
+            route, {"conversation_id": "conversation-e2e", "title": "E2E"}
+        ),
+    )
+    page.route(
+        "**/api/geospatial/tiles/osm_default/**",
         lambda route: route.fulfill(
             status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT
         ),
@@ -220,10 +237,12 @@ def test_map_canvas_matches_visual_baseline(page: Page, base_url: str) -> None:
     _setup_stubs(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show fixture map")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
 
-    map_canvas = page.locator(".maplibregl-canvas")
+    map_canvas = page.locator(".maplibregl-canvas:visible").last
     expect(map_canvas).to_be_visible(timeout=15000)
+    page.wait_for_timeout(500)
+    map_canvas = page.locator(".maplibregl-canvas:visible").last
     _assert_visual_baseline(map_canvas.screenshot(), "map-canvas.png")
 
 
@@ -232,7 +251,7 @@ def test_overlay_panel_matches_visual_baseline(page: Page, base_url: str) -> Non
     _setup_stubs(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show fixture map")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
 
     page_root = page.locator("body")
     _assert_visual_baseline(page_root.screenshot(), "geospatial-page.png")
