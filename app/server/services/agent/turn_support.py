@@ -42,33 +42,26 @@ class AgentTurnSupport:
             active_visualization = cls._active_visualization(memory_snapshot)
             if active_visualization is None:
                 return "There is no active map visualization in this conversation."
-            overlay_ids = [
-                item
-                for item in active_visualization.get("overlay_ids", [])
-                if isinstance(item, str) and item.strip()
+            overlay_collection = active_visualization.get("overlay_collection")
+            instances = (
+                overlay_collection.get("instances")
+                if isinstance(overlay_collection, dict)
+                else None
+            )
+            overlay_instances = [
+                item for item in instances or [] if isinstance(item, dict)
             ]
-            if not overlay_ids:
+            if not overlay_instances:
                 return "The current map has no overlays requested."
-            descriptions = active_visualization.get("overlays")
-            labels: list[str] = []
-            if isinstance(descriptions, list):
-                for overlay_id in overlay_ids:
-                    description = next(
-                        (
-                            item
-                            for item in descriptions
-                            if isinstance(item, dict) and item.get("id") == overlay_id
-                        ),
-                        None,
+            labels = [
+                str(
+                    item.get("label")
+                    or cls.humanize_identifier(
+                        str(item.get("capability_id") or item.get("instance_id"))
                     )
-                    label = (
-                        description.get("label")
-                        if isinstance(description, dict)
-                        else None
-                    )
-                    labels.append(str(label or cls.humanize_identifier(overlay_id)))
-            else:
-                labels = [cls.humanize_identifier(item) for item in overlay_ids]
+                )
+                for item in overlay_instances
+            ]
             return "The current map includes these overlays: " + ", ".join(labels) + "."
         if query_kind == "active_map_summary":
             active_visualization = cls._active_visualization(memory_snapshot)
@@ -109,21 +102,6 @@ class AgentTurnSupport:
         if query_kind == "failure":
             return "I could not complete the previous operation, and its diagnostic should be shown with this conversation."
         return "I can help with location-based maps, coordinates, weather, rainfall, traffic layers, and related geospatial questions."
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def compose_general_question_message(
-        cls,
-        user_text: str,
-        recent_messages: list[dict[str, Any]] | None = None,
-        memory_snapshot: dict[str, Any] | None = None,
-    ) -> str:
-        _ = user_text
-        return cls.compose_context_query_message(
-            "none",
-            recent_messages=recent_messages,
-            memory_snapshot=memory_snapshot,
-        )
 
     # -------------------------------------------------------------------------
     @staticmethod

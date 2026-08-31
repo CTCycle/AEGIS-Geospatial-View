@@ -11,6 +11,7 @@ from server.domain.agent.decision import (
 )
 from server.domain.agent.pipeline import ConversationTaskRecord, TaskFailureDetail
 from server.contracts.extraction import (
+    ContextQuery,
     ConversationContextSnapshot,
     NormalizedAction,
     TurnParseResult,
@@ -44,6 +45,7 @@ def _turn(
     task_class: str = "general_question",
     relationship: str = "new_task",
     ambiguities: list[str] | None = None,
+    context_query_kind: str = "none",
 ) -> TurnParseResult:
     return TurnParseResult(
         user_text=user_text,
@@ -54,6 +56,7 @@ def _turn(
             action_label="Help",
             requires_location=False,
         ),
+        context_query=ContextQuery(kind=context_query_kind),  # type: ignore[arg-type]
         relationship=relationship,  # type: ignore[arg-type]
         ambiguities=ambiguities or [],
     )
@@ -234,10 +237,13 @@ def test_preflight_clarification_is_persisted_as_partial_response() -> None:
 
 
 ###############################################################################
-def test_general_question_uses_active_map_location_without_tool_call() -> None:
+def test_typed_context_query_uses_active_map_location_without_tool_call() -> None:
     async def _run() -> None:
         service, state, _ = _service()
-        turn = _turn(user_text="What city is the map centered on?")
+        turn = _turn(
+            user_text="What city is the map centered on?",
+            context_query_kind="active_location",
+        )
         response = await service.handle(
             request_id="request-context-location",
             conversation_id="conversation",
@@ -258,7 +264,7 @@ def test_general_question_uses_active_map_location_without_tool_call() -> None:
 
 
 ###############################################################################
-def test_context_question_bypasses_map_planning_and_parser_failure() -> None:
+def test_parser_failure_is_terminal_for_context_looking_map_request() -> None:
     async def _run() -> None:
         service, state, _ = _service()
         turn = _turn(
@@ -272,13 +278,7 @@ def test_context_question_bypasses_map_planning_and_parser_failure() -> None:
             conversation_key="conversation",
             task=_task(state, turn),
             turn_contract=turn,
-            latest_memory={
-                "active_location": {"label": "Lugano"},
-                "active_visualization": {
-                    "resolved_location": {"label": "Lugano"},
-                    "overlay_ids": [],
-                },
-            },
+            latest_memory={"active_location": {"label": "Lugano"}},
             latest_contract=None,
             recent_messages=[],
             context_usage=None,
@@ -286,15 +286,17 @@ def test_context_question_bypasses_map_planning_and_parser_failure() -> None:
 
         assert response is not None
         assert response.tool_payload is None
-        assert "Lugano" in response.assistant_message
+        assert "Lugano" not in response.assistant_message
         assert response.operation is not None
-        assert response.operation.kind == "direct_answer"
+        assert response.operation.kind == "error"
+        assert response.operation.status == "failed"
+        assert response.failure_diagnostic is not None
 
     run_async_in_thread(_run())
 
 
 ###############################################################################
-def test_map_summary_bypasses_parser_failure_without_inventing_areas() -> None:
+def test_parser_failure_is_terminal_for_context_looking_summary_request() -> None:
     async def _run() -> None:
         service, state, _ = _service()
         turn = _turn(
@@ -311,8 +313,6 @@ def test_map_summary_bypasses_parser_failure_without_inventing_areas() -> None:
             latest_memory={
                 "active_visualization": {
                     "resolved_location": {"label": "Athens, Greece"},
-                    "basemap": {"label": "OpenStreetMap"},
-                    "overlay_ids": [],
                 }
             },
             latest_contract=None,
@@ -322,8 +322,10 @@ def test_map_summary_bypasses_parser_failure_without_inventing_areas() -> None:
 
         assert response is not None
         assert response.tool_payload is None
-        assert "Athens, Greece" in response.assistant_message
+        assert "Athens, Greece" not in response.assistant_message
         assert response.operation is not None
-        assert response.operation.kind == "direct_answer"
+        assert response.operation.kind == "error"
+        assert response.operation.status == "failed"
+        assert response.failure_diagnostic is not None
 
     run_async_in_thread(_run())
