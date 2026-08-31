@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from server.contracts.extraction import LocationSignal
 from server.services.agent.location_memory import LocationMemoryService
 
 
@@ -13,7 +14,10 @@ def test_resolve_explicit_reference_with_memory() -> None:
             "longitude": 12.4922,
         }
     }
-    signals = service.resolve_explicit_references("show traffic there now", snapshot)
+    signals = service.resolve_explicit_references(
+        [LocationSignal(signal_type="deictic", raw_value="there")],
+        snapshot,
+    )
     assert len(signals) == 1
     assert signals[0].signal_type == "deictic"
 
