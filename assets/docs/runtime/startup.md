@@ -18,7 +18,9 @@ creates the local file without overwriting an existing file.
 The menu is grouped into clear sections. Application options launch the
 application, install or update dependencies, rebuild the frontend independently,
 and initialize the database explicitly. Maintenance options run the test suite,
-remove logs, clear caches, and uninstall local dependencies. The update action
+remove logs, clear caches, and uninstall local dependencies. Cache and data
+removal attempts one bulk operation per target and uses deterministic,
+deepest-first item recovery only when the bulk operation fails. The update action
 requires a non-detached, clean checkout of `main` and pulls it with
 `git pull --ff-only origin main`; it never switches branches or modifies local
 changes. The check action reports `origin/main` status without downloading or
