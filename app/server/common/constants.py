@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org"
 NOMINATIM_SEARCH_PATH = "/search"
 NOMINATIM_REVERSE_PATH = "/reverse"
-NOMINATIM_SEARCH_URL = f"{NOMINATIM_BASE_URL}{NOMINATIM_SEARCH_PATH}"
-NOMINATIM_REVERSE_URL = f"{NOMINATIM_BASE_URL}{NOMINATIM_REVERSE_PATH}"
 OPENAQ_API_BASE_URL = "https://api.openaq.org/v3"
 OPEN_ELEVATION_API_BASE_URL = "https://api.open-elevation.com/api/v1"
 OLLAMA_DEFAULT_HOST = "http://127.0.0.1:11434"
@@ -13,18 +10,6 @@ DEFAULT_MODEL_PROVIDER = ""
 DEFAULT_MODEL_NAME = ""
 AEGIS_VERSION = "1.0.0"
 
-
-GIBS_WMS_BASE_ENDPOINTS = {
-    "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
-    "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi",
-}
-GIBS_CAPABILITIES_ENDPOINTS = {
-    "EPSG:4326": "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/1.0.0/WMTSCapabilities.xml",
-    "EPSG:3857": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml",
-    "EPSG:3413": "https://gibs.earthdata.nasa.gov/wmts/epsg3413/best/1.0.0/WMTSCapabilities.xml",
-    "EPSG:3031": "https://gibs.earthdata.nasa.gov/wmts/epsg3031/best/1.0.0/WMTSCapabilities.xml",
-}
-GIBS_OWS_NAMESPACES = {"ows": "http://www.opengis.net/ows/1.1"}
 
 NASA_ATTRIBUTION = (
     "Imagery courtesy of NASA's Global Imagery Browse Services (GIBS), "
@@ -71,7 +56,3 @@ JOB_STATUS_CANCELLED = "cancelled"
 
 
 DEFAULT_SQLITE_LOCK_TIMEOUT_SECONDS = 60
-DEFAULT_NOMINATIM_USER_AGENT = "AEGIS-Geographics/1.0 (contact: support@aegis.local)"
-DEFAULT_GIBS_USER_AGENT = "AEGIS-GIBS/1.0"
-DEFAULT_GIBS_LAYER_SYNC_USER_AGENT = "AEGIS-GIBS-LayerSync/1.0"
-DEFAULT_GIBS_DEFAULT_LAYER = "VIIRS_SNPP_CorrectedReflectance_TrueColor"

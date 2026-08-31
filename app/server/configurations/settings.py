@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_object
-
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -11,17 +9,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from server.common.constants import (
     DEFAULT_SQLITE_LOCK_TIMEOUT_SECONDS,
-    DEFAULT_GIBS_DEFAULT_LAYER,
-    DEFAULT_GIBS_LAYER_SYNC_USER_AGENT,
-    DEFAULT_GIBS_USER_AGENT,
-    DEFAULT_NOMINATIM_USER_AGENT,
-    GIBS_CAPABILITIES_ENDPOINTS,
     GIBS_MAX_IMAGE_DIMENSION,
     GIBS_MIN_IMAGE_DIMENSION,
-    GIBS_OWS_NAMESPACES,
-    GIBS_WMS_BASE_ENDPOINTS,
     NASA_ATTRIBUTION,
-    NOMINATIM_SEARCH_URL,
 )
 from server.common.paths import resolve_database_file_path
 
@@ -147,84 +137,87 @@ class ServerSettings:
 
 
 ###############################################################################
-class JsonNominatimSettings(BaseModel):
-    base_url: str = NOMINATIM_SEARCH_URL
-    user_agent: str = DEFAULT_NOMINATIM_USER_AGENT
-    timeout: float = Field(default=10.0, ge=1.0)
+class StrictJsonSettings(BaseModel):
+    model_config = SettingsConfigDict(extra="forbid")
 
 
 ###############################################################################
-class JsonGeospatialSettings(BaseModel):
-    min_timeline_year: int = 1900
-    max_lat: float = 90.0
-    min_lat: float = -90.0
-    max_lon: float = 180.0
-    min_lon: float = -180.0
-    max_mercator_extent: float = 20037508.3427892
+class JsonNominatimSettings(StrictJsonSettings):
+    base_url: str
+    user_agent: str
+    timeout: float = Field(ge=1.0)
 
 
 ###############################################################################
-class JsonMapSettings(BaseModel):
-    default_size_m: float = Field(default=500.0, ge=1.0)
-    render_delay_s: float = Field(default=1.0, ge=0.0)
-    tiles: str = "OpenStreetMap"
+class JsonGeospatialSettings(StrictJsonSettings):
+    min_timeline_year: int
+    max_lat: float
+    min_lat: float
+    max_lon: float
+    min_lon: float
+    max_mercator_extent: float
 
 
 ###############################################################################
-class JsonJobsSettings(BaseModel):
-    polling_interval: float = 1.0
+class JsonMapSettings(StrictJsonSettings):
+    default_size_m: float = Field(ge=1.0)
+    render_delay_s: float = Field(ge=0.0)
+    tiles: str
 
 
 ###############################################################################
-class JsonChatRuntimeSettings(BaseModel):
-    max_history_messages: int = Field(default=12, ge=1, le=100)
-    parser_certainty_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
-    parser_max_retries: int = Field(default=2, ge=0, le=5)
+class JsonJobsSettings(StrictJsonSettings):
+    polling_interval: float
 
 
 ###############################################################################
-class JsonOpenMeteoSettings(BaseModel):
-    weather_base_url: str = "https://api.open-meteo.com/v1/forecast"
-    air_quality_base_url: str = "https://air-quality-api.open-meteo.com/v1/air-quality"
-    user_agent: str = "AEGIS-OpenMeteo/1.0"
-    timeout: float = Field(default=15.0, ge=1.0)
-    cache_ttl_s: float = Field(default=600.0, ge=30.0)
-    min_call_interval_s: float = Field(default=0.15, ge=0.05)
+class JsonChatRuntimeSettings(StrictJsonSettings):
+    max_history_messages: int = Field(ge=1, le=100)
+    parser_certainty_threshold: float = Field(ge=0.0, le=1.0)
+    parser_max_retries: int = Field(ge=0, le=5)
 
 
 ###############################################################################
-class JsonOverpassSettings(BaseModel):
-    base_url: str = "https://overpass-api.de/api/interpreter"
-    user_agent: str = "AEGIS-Overpass/1.0"
-    timeout: float = Field(default=20.0, ge=1.0)
-    cache_ttl_s: float = Field(default=600.0, ge=30.0)
-    min_call_interval_s: float = Field(default=0.2, ge=0.05)
-    default_radius_m: float = Field(default=2500.0, ge=100.0)
-    default_limit: int = Field(default=30, ge=1, le=200)
+class JsonOpenMeteoSettings(StrictJsonSettings):
+    weather_base_url: str
+    air_quality_base_url: str
+    user_agent: str
+    timeout: float = Field(ge=1.0)
+    cache_ttl_s: float = Field(ge=30.0)
+    min_call_interval_s: float = Field(ge=0.05)
 
 
 ###############################################################################
-class JsonRainViewerSettings(BaseModel):
-    metadata_url: str = "https://api.rainviewer.com/public/weather-maps.json"
-    user_agent: str = "AEGIS-RainViewer/1.0"
-    timeout: float = Field(default=15.0, ge=1.0)
-    cache_ttl_s: float = Field(default=300.0, ge=30.0)
-    min_call_interval_s: float = Field(default=0.2, ge=0.05)
-    tile_color_scheme: int = Field(default=2, ge=0, le=6)
-    tile_smooth: int = Field(default=1, ge=0, le=1)
-    tile_snow: int = Field(default=1, ge=0, le=1)
+class JsonOverpassSettings(StrictJsonSettings):
+    base_url: str
+    user_agent: str
+    timeout: float = Field(ge=1.0)
+    cache_ttl_s: float = Field(ge=30.0)
+    min_call_interval_s: float = Field(ge=0.05)
+    default_radius_m: float = Field(ge=100.0)
+    default_limit: int = Field(ge=1, le=200)
 
 
 ###############################################################################
-class JsonGIBSSettings(BaseModel):
-    user_agent: str = DEFAULT_GIBS_USER_AGENT
-    timeout: float = Field(default=20.0, ge=1.0)
-    capabilities_ttl_s: float = Field(default=6 * 60 * 60, ge=60.0)
-    max_cache_entries: int = Field(default=24, ge=1)
-    bbox_precision: int = Field(default=6, ge=0)
-    wms_base_endpoints: dict[str, str] = Field(
-        default_factory=lambda: dict(GIBS_WMS_BASE_ENDPOINTS)
-    )
+class JsonRainViewerSettings(StrictJsonSettings):
+    metadata_url: str
+    user_agent: str
+    timeout: float = Field(ge=1.0)
+    cache_ttl_s: float = Field(ge=30.0)
+    min_call_interval_s: float = Field(ge=0.05)
+    tile_color_scheme: int = Field(ge=0, le=6)
+    tile_smooth: int = Field(ge=0, le=1)
+    tile_snow: int = Field(ge=0, le=1)
+
+
+###############################################################################
+class JsonGIBSSettings(StrictJsonSettings):
+    user_agent: str
+    timeout: float = Field(ge=1.0)
+    capabilities_ttl_s: float = Field(ge=60.0)
+    max_cache_entries: int = Field(ge=1)
+    bbox_precision: int = Field(ge=0)
+    wms_base_endpoints: dict[str, str] = Field(min_length=1)
     retry_backoff_s: float = Field(default=2.0, ge=0.1)
     min_visual_radius_m: float = Field(default=20000.0, ge=1000.0)
     image_width: int = Field(
@@ -237,31 +230,11 @@ class JsonGIBSSettings(BaseModel):
         ge=GIBS_MIN_IMAGE_DIMENSION,
         le=GIBS_MAX_IMAGE_DIMENSION,
     )
-    default_layer: str = DEFAULT_GIBS_DEFAULT_LAYER
-    capabilities_endpoints: dict[str, str] = Field(
-        default_factory=lambda: dict(GIBS_CAPABILITIES_ENDPOINTS)
-    )
-    ows_namespaces: dict[str, str] = Field(
-        default_factory=lambda: dict(GIBS_OWS_NAMESPACES)
-    )
-    layer_sync_user_agent: str = DEFAULT_GIBS_LAYER_SYNC_USER_AGENT
-    layer_sync_timeout: float = Field(default=30.0, ge=1.0)
-
-    # -------------------------------------------------------------------------
-    @field_validator(
-        "wms_base_endpoints", "capabilities_endpoints", "ows_namespaces", mode="before"
-    )
-    @classmethod
-    def normalize_string_mapping(cls, value: Any) -> dict[str, str]:
-        if not is_json_object(value):
-            return {}
-        normalized: dict[str, str] = {}
-        for key, raw in value.items():
-            k = str(key).strip()
-            v = str(raw).strip() if raw is not None else ""
-            if k and v:
-                normalized[k] = v
-        return normalized
+    default_layer: str
+    capabilities_endpoints: dict[str, str] = Field(min_length=1)
+    ows_namespaces: dict[str, str] = Field(min_length=1)
+    layer_sync_user_agent: str
+    layer_sync_timeout: float = Field(ge=1.0)
 
 
 ###############################################################################
@@ -302,18 +275,18 @@ class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="",
         case_sensitive=False,
-        extra="ignore",
+        extra="forbid",
     )
 
-    nominatim: JsonNominatimSettings = Field(default_factory=JsonNominatimSettings)
-    geospatial: JsonGeospatialSettings = Field(default_factory=JsonGeospatialSettings)
-    map: JsonMapSettings = Field(default_factory=JsonMapSettings)
-    jobs: JsonJobsSettings = Field(default_factory=JsonJobsSettings)
-    chat: JsonChatRuntimeSettings = Field(default_factory=JsonChatRuntimeSettings)
-    openmeteo: JsonOpenMeteoSettings = Field(default_factory=JsonOpenMeteoSettings)
-    overpass: JsonOverpassSettings = Field(default_factory=JsonOverpassSettings)
-    rainviewer: JsonRainViewerSettings = Field(default_factory=JsonRainViewerSettings)
-    gibs: JsonGIBSSettings = Field(default_factory=JsonGIBSSettings)
+    nominatim: JsonNominatimSettings
+    geospatial: JsonGeospatialSettings
+    map: JsonMapSettings
+    jobs: JsonJobsSettings
+    chat: JsonChatRuntimeSettings
+    openmeteo: JsonOpenMeteoSettings
+    overpass: JsonOverpassSettings
+    rainviewer: JsonRainViewerSettings
+    gibs: JsonGIBSSettings
 
     fastapi_host: str = "127.0.0.1"
     fastapi_port: int = Field(default=8000, ge=1, le=65535)
@@ -333,16 +306,11 @@ class AppSettings(BaseSettings):
     def to_server_settings(self) -> ServerSettings:
         gibs_wms_base_endpoints = _normalize_upper_key_mapping(
             self.gibs.wms_base_endpoints,
-            fallback=GIBS_WMS_BASE_ENDPOINTS,
         )
         gibs_capabilities_endpoints = _normalize_upper_key_mapping(
             self.gibs.capabilities_endpoints,
-            fallback=GIBS_CAPABILITIES_ENDPOINTS,
         )
-        gibs_namespaces = _normalize_key_mapping(
-            self.gibs.ows_namespaces,
-            fallback=GIBS_OWS_NAMESPACES,
-        )
+        gibs_namespaces = _normalize_key_mapping(self.gibs.ows_namespaces)
 
         return ServerSettings(
             database=build_database_settings(),
@@ -423,8 +391,6 @@ class AppSettings(BaseSettings):
 ###############################################################################
 def _normalize_upper_key_mapping(
     mapping: dict[str, str],
-    *,
-    fallback: dict[str, str],
 ) -> dict[str, str]:
     normalized: dict[str, str] = {}
     for key, value in mapping.items():
@@ -432,14 +398,12 @@ def _normalize_upper_key_mapping(
         v = str(value).strip()
         if k and v:
             normalized[k] = v
-    return normalized or dict(fallback)
+    return normalized
 
 
 ###############################################################################
 def _normalize_key_mapping(
     mapping: dict[str, str],
-    *,
-    fallback: dict[str, str],
 ) -> dict[str, str]:
     normalized: dict[str, str] = {}
     for key, value in mapping.items():
@@ -447,4 +411,4 @@ def _normalize_key_mapping(
         v = str(value).strip()
         if k and v:
             normalized[k] = v
-    return normalized or dict(fallback)
+    return normalized

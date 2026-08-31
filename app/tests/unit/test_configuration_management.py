@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from server import configurations
+from server.common.paths import CONFIGURATIONS_FILE
 from server.configurations.environment import (
     ensure_environment_loaded,
     reset_environment_bootstrap_for_tests,
@@ -23,16 +24,17 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def _base_configuration() -> dict:
+    return json.loads(CONFIGURATIONS_FILE.read_text(encoding="utf-8"))
+
+
 ###############################################################################
 def test_configuration_manager_loads_blocks_and_values(tmp_path: Path) -> None:
     config_file = tmp_path / "configurations.json"
-    _write_json(
-        config_file,
-        {
-            "map": {"tiles": "CartoDB Positron"},
-            "jobs": {"polling_interval": 2.5},
-        },
-    )
+    payload = _base_configuration()
+    payload["map"]["tiles"] = "CartoDB Positron"
+    payload["jobs"]["polling_interval"] = 2.5
+    _write_json(config_file, payload)
 
     manager = ConfigurationManager(config_path=config_file)
     manager.load()
@@ -47,17 +49,14 @@ def test_configuration_manager_loads_blocks_and_values(tmp_path: Path) -> None:
 ###############################################################################
 def test_configuration_manager_reload_updates_values(tmp_path: Path) -> None:
     config_file = tmp_path / "configurations.json"
-    _write_json(
-        config_file,
-        {"jobs": {"polling_interval": 1.0}},
-    )
+    payload = _base_configuration()
+    payload["jobs"]["polling_interval"] = 1.0
+    _write_json(config_file, payload)
     manager = ConfigurationManager(config_path=config_file)
     manager.load()
 
-    _write_json(
-        config_file,
-        {"jobs": {"polling_interval": 3.0}},
-    )
+    payload["jobs"]["polling_interval"] = 3.0
+    _write_json(config_file, payload)
     manager.reload()
     app_settings = manager.configuration
 
@@ -66,32 +65,51 @@ def test_configuration_manager_reload_updates_values(tmp_path: Path) -> None:
 
 
 ###############################################################################
-def test_configuration_manager_does_not_persist_database_block(tmp_path: Path) -> None:
+def test_configuration_manager_rejects_database_block_on_update(tmp_path: Path) -> None:
     config_file = tmp_path / "configurations.json"
-    _write_json(config_file, {})
+    _write_json(config_file, _base_configuration())
     manager = ConfigurationManager(config_path=config_file)
 
-    manager.update(
-        {
-            "database": {"path": "should-not-persist"},
-            "jobs": {"polling_interval": 1.5},
-        }
-    )
-
-    persisted = json.loads(config_file.read_text(encoding="utf-8"))
-    assert "database" not in persisted
-    assert persisted["jobs"]["polling_interval"] == 1.5
+    payload = _base_configuration()
+    payload["database"] = {"path": "should-not-persist"}
+    with pytest.raises(RuntimeError, match="Unsupported configuration blocks: database"):
+        manager.update(payload)
 
 
 ###############################################################################
-def test_configuration_manager_does_not_expose_database_block(tmp_path: Path) -> None:
+def test_configuration_manager_rejects_database_block_on_load(tmp_path: Path) -> None:
     config_file = tmp_path / "configurations.json"
-    _write_json(config_file, {"database": {"path": "ignored"}})
+    payload = _base_configuration()
+    payload["database"] = {"path": "ignored"}
+    _write_json(config_file, payload)
 
     manager = ConfigurationManager(config_path=config_file)
-    manager.load()
+    with pytest.raises(RuntimeError, match="Unsupported configuration blocks: database"):
+        manager.load()
 
-    assert manager.get_block("database") == {}
+
+###############################################################################
+def test_configuration_manager_rejects_missing_application_block(
+    tmp_path: Path,
+) -> None:
+    config_file = tmp_path / "configurations.json"
+    payload = _base_configuration()
+    del payload["gibs"]
+    _write_json(config_file, payload)
+
+    with pytest.raises(RuntimeError, match="Missing required configuration blocks: gibs"):
+        ConfigurationManager(config_path=config_file).load()
+
+
+###############################################################################
+def test_configuration_manager_rejects_unknown_nested_setting(tmp_path: Path) -> None:
+    config_file = tmp_path / "configurations.json"
+    payload = _base_configuration()
+    payload["map"]["legacy_tiles"] = "ignored"
+    _write_json(config_file, payload)
+
+    with pytest.raises(RuntimeError, match="Invalid application settings"):
+        ConfigurationManager(config_path=config_file).load()
 
 
 ###############################################################################
@@ -106,7 +124,7 @@ def test_startup_loads_environment_before_settings(monkeypatch, tmp_path: Path) 
     env_file = tmp_path / ".env"
     env_file.write_text("FASTAPI_PORT=6100\n", encoding="utf-8")
     config_file = tmp_path / "configurations.json"
-    _write_json(config_file, {})
+    _write_json(config_file, _base_configuration())
 
     monkeypatch.delenv("FASTAPI_PORT", raising=False)
     monkeypatch.setattr(
@@ -128,7 +146,7 @@ def test_environment_loader_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     config_file = tmp_path / "configurations.json"
     env_file.write_text("UI_PORT=4555\n", encoding="utf-8")
-    _write_json(config_file, {})
+    _write_json(config_file, _base_configuration())
     monkeypatch.delenv("UI_PORT", raising=False)
     reset_environment_bootstrap_for_tests()
     monkeypatch.setattr(
@@ -152,10 +170,9 @@ def test_get_server_settings_returns_runtime_settings(
     monkeypatch, tmp_path: Path
 ) -> None:
     config_file = tmp_path / "configurations.json"
-    _write_json(
-        config_file,
-        {"jobs": {"polling_interval": 4.0}},
-    )
+    payload = _base_configuration()
+    payload["jobs"]["polling_interval"] = 4.0
+    _write_json(config_file, payload)
     reset_environment_bootstrap_for_tests()
     monkeypatch.setattr(
         "server.configurations.environment.ENV_FILE_PATH", str(tmp_path / ".env")
