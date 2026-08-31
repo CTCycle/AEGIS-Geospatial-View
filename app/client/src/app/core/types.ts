@@ -291,6 +291,15 @@ export interface GeospatialProviderPayload {
   warnings?: string[];
   stale?: boolean;
   message?: string;
+  result_status?: string | null;
+  result_type?: string | null;
+  fetched_at?: string | null;
+  observation_time?: string | null;
+  coverage?: Record<string, JsonValue> | null;
+  spatial_resolution?: string | null;
+  units?: Record<string, string>;
+  source_url?: string | null;
+  partial?: boolean;
 }
 
 export interface MapOverlayEntry {

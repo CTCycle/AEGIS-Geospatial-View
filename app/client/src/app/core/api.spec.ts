@@ -13,9 +13,12 @@ import {
 } from './api';
 import {
   buildModelDescription,
+  normalizeMapOverlayEntry,
+  normalizeMapSession,
   parseCatalogResponse,
   parseChatTurnResponse,
   parseConversationSnapshotResponse,
+  parseGeospatialProviderPayload,
   parseModelSettingsResponse,
 } from './api-parsers';
 
@@ -189,6 +192,71 @@ describe('core/api', () => {
     expect(parsed.assistant_message).toBe('done');
     expect(parsed.operation?.kind).toBe('direct_answer');
     expect(parsed.context_usage?.selected_context_window).toBe(2048);
+  });
+
+  it('preserves provider provenance metadata instead of dropping it at the API boundary', () => {
+    const parsed = parseGeospatialProviderPayload({
+      status: 'ok',
+      provider: 'openmeteo',
+      result_status: 'ok',
+      result_type: 'weather_current',
+      fetched_at: '2026-09-01T00:00:00Z',
+      observation_time: '2026-09-01T00:00:00Z',
+      coverage: { kind: 'point', latitude: 41.9, longitude: 12.5 },
+      spatial_resolution: 'point forecast',
+      units: { temperature: '°C', precipitation: 'mm' },
+      source_url: 'https://api.open-meteo.com/v1/forecast',
+      partial: false,
+      payload: { temperature: 20 },
+    });
+
+    expect(parsed.result_status).toBe('ok');
+    expect(parsed.result_type).toBe('weather_current');
+    expect(parsed.fetched_at).toBe('2026-09-01T00:00:00Z');
+    expect((parsed.coverage as Record<string, unknown> | null | undefined)?.kind).toBe('point');
+    expect(parsed.units).toEqual({ temperature: '°C', precipitation: 'mm' });
+    expect(parsed.source_url).toBe('https://api.open-meteo.com/v1/forecast');
+  });
+
+  it('rejects map payloads that lack a verified basemap or contain invalid geographic data', () => {
+    const validSession = {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      basemap: {
+        id: 'osm_default',
+        label: 'OpenStreetMap',
+        provider: 'openstreetmap',
+        tile_url: '/api/geospatial/tiles/osm_default/{z}/{x}/{y}.png',
+        render_status: 'available',
+      },
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      center: { latitude: 41.9, longitude: 12.5 },
+      bounds: [12.4, 41.8, 12.6, 42],
+      overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
+    };
+
+    expect(normalizeMapSession(validSession)?.basemap?.id).toBe('osm_default');
+    expect(normalizeMapSession({ ...validSession, basemap: undefined })).toBeNull();
+    expect(normalizeMapSession({
+      ...validSession,
+      resolved_location: { label: 'Rome', latitude: 141.9, longitude: 12.5 },
+    })).toBeNull();
+    expect(normalizeMapSession({ ...validSession, bounds: [12.6, 41.8, 12.4, 42] })).toBeNull();
+    expect(normalizeMapOverlayEntry({
+      id: 'broken',
+      label: 'Broken',
+      provider: 'fixture',
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [181, 41] },
+          properties: {},
+        }],
+      },
+    })).toBeNull();
   });
 
   it('parseConversationSnapshotResponse accepts the current durable contract', () => {

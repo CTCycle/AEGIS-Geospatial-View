@@ -44,6 +44,12 @@
           </div>
         }
 
+        @if (!mapSession?.basemap || mapSession?.basemap?.render_status === 'unavailable') {
+          <div class="metadata-panel metadata-panel--errors" role="status" aria-live="polite">
+            <p><strong>Basemap unavailable.</strong> The geographic data cannot be shown on a verified base layer.</p>
+          </div>
+        }
+
         <div class="map-zoom-controls" aria-label="Map zoom controls">
           <button type="button" aria-label="Zoom in" title="Zoom in" (click)="zoomIn()">+</button>
           <button type="button" aria-label="Zoom out" title="Zoom out" (click)="zoomOut()">&minus;</button>

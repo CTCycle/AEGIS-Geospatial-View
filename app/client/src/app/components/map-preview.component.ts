@@ -280,15 +280,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         latitude: next.resolved_location?.latitude ?? null,
         longitude: next.resolved_location?.longitude ?? null,
       },
-      basemap: next.basemap ?? {
-        id: next.basemap_id,
-        label: next.basemap_id,
-        provider: 'manifest',
-        render_status: next.basemap_id === 'osm_default' ? 'available' : 'unavailable',
-        unavailable_reason: next.basemap_id === 'osm_default'
-          ? null
-          : 'render_descriptor_missing',
-      },
+      basemap: next.basemap,
     };
     this.overlayRenderStatuses = this.overlays.map((overlay) => ({
       overlayId: overlay.id,

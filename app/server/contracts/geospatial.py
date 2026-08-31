@@ -157,6 +157,13 @@ class GeospatialProviderPayloadResponse(BaseModel):
     stale: bool = False
     result_status: str | None = None
     result_type: str | None = None
+    fetched_at: str | None = None
+    observation_time: str | None = None
+    coverage: dict[str, Any] | None = None
+    spatial_resolution: str | None = None
+    units: dict[str, str] = Field(default_factory=lambda: dict[str, str]())
+    source_url: str | None = None
+    partial: bool = False
     error_code: str | None = None
 
 

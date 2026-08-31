@@ -54,6 +54,13 @@ describe('components/map-preview.component', () => {
       session_id: 'map-1',
       resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
       basemap_id: 'osm_default',
+      basemap: {
+        id: 'osm_default',
+        label: 'OpenStreetMap',
+        provider: 'openstreetmap',
+        tile_url: DEFAULT_BASE_TILE_PROXY_URL,
+        render_status: 'available',
+      },
       viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
       center: { latitude: 41.9, longitude: 12.5 },
       overlay_collection: overlayCollection,
@@ -100,7 +107,7 @@ describe('components/map-preview.component', () => {
     component = fixture.componentInstance;
   });
 
-  it('builds basemap style with defaults when basemap not provided', () => {
+  it('uses the backend basemap descriptor when rendering the base map', () => {
     component.payload = { map_session: makeMapSession() as never };
     fixture.detectChanges();
     expect(maplibregl.Map).toHaveBeenCalled();
