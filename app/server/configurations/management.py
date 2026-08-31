@@ -14,26 +14,42 @@ from server.configurations.settings import (
     ServerSettings,
 )
 
+APPLICATION_SETTING_BLOCKS = (
+    "nominatim",
+    "geospatial",
+    "map",
+    "jobs",
+    "chat",
+    "openmeteo",
+    "overpass",
+    "rainviewer",
+    "gibs",
+)
+
 
 ###############################################################################
 def _ensure_mapping(value: Any) -> dict[str, Any]:
     if is_json_object(value):
         return dict(value)
-    return {}
+    raise RuntimeError("Configuration setting blocks must be JSON objects.")
 
 
 ###############################################################################
 def _build_settings_payload(raw_payload: dict[str, Any]) -> dict[str, Any]:
+    expected = set(APPLICATION_SETTING_BLOCKS)
+    unknown = sorted(set(raw_payload) - expected)
+    if unknown:
+        raise RuntimeError(
+            "Unsupported configuration blocks: " + ", ".join(unknown)
+        )
+    missing = [block for block in APPLICATION_SETTING_BLOCKS if block not in raw_payload]
+    if missing:
+        raise RuntimeError(
+            "Missing required configuration blocks: " + ", ".join(missing)
+        )
     return {
-        "nominatim": _ensure_mapping(raw_payload.get("nominatim")),
-        "geospatial": _ensure_mapping(raw_payload.get("geospatial")),
-        "map": _ensure_mapping(raw_payload.get("map")),
-        "jobs": _ensure_mapping(raw_payload.get("jobs")),
-        "chat": _ensure_mapping(raw_payload.get("chat")),
-        "openmeteo": _ensure_mapping(raw_payload.get("openmeteo")),
-        "overpass": _ensure_mapping(raw_payload.get("overpass")),
-        "rainviewer": _ensure_mapping(raw_payload.get("rainviewer")),
-        "gibs": _ensure_mapping(raw_payload.get("gibs")),
+        block: _ensure_mapping(raw_payload[block])
+        for block in APPLICATION_SETTING_BLOCKS
     }
 
 
@@ -43,8 +59,8 @@ class ConfigurationManager:
     def __init__(self, config_path: str | Path = CONFIGURATIONS_FILE) -> None:
         self.config_path = Path(config_path)
         self._payload: dict[str, Any] = {}
-        self._configuration = AppSettings()
-        self._server_settings = self._configuration.to_server_settings()
+        self._configuration: AppSettings | None = None
+        self._server_settings: ServerSettings | None = None
         self._loaded = False
 
     # -------------------------------------------------------------------------
@@ -56,12 +72,16 @@ class ConfigurationManager:
     @property
     def configuration(self) -> AppSettings:
         self._ensure_loaded()
+        if self._configuration is None:
+            raise RuntimeError("Configuration is not loaded.")
         return self._configuration
 
     # -------------------------------------------------------------------------
     @property
     def server_settings(self) -> ServerSettings:
         self._ensure_loaded()
+        if self._server_settings is None:
+            raise RuntimeError("Configuration is not loaded.")
         return self._server_settings
 
     # -------------------------------------------------------------------------
@@ -69,7 +89,6 @@ class ConfigurationManager:
         payload = self._read_payload()
         configuration = self._validate_configuration(payload)
         self._payload = dict(payload)
-        self._payload.pop("database", None)
         self._configuration = configuration
         self._server_settings = configuration.to_server_settings()
         self._loaded = True
@@ -88,7 +107,6 @@ class ConfigurationManager:
 
         configuration = self._validate_configuration(payload)
         persisted_payload = dict(payload)
-        persisted_payload.pop("database", None)
         self._payload = persisted_payload
         self._configuration = configuration
         self._server_settings = configuration.to_server_settings()
@@ -135,5 +153,7 @@ class ConfigurationManager:
     def _validate_configuration(self, payload: dict[str, Any]) -> AppSettings:
         try:
             return AppSettings(**_build_settings_payload(payload))
+        except RuntimeError:
+            raise
         except ValidationError as exc:
             raise RuntimeError(f"Invalid application settings: {exc}") from exc
