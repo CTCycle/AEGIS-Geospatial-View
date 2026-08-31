@@ -32,9 +32,6 @@ def resolve_database_file_path() -> Path:
     return resolve_runtime_data_root() / DATABASE_FILENAME
 
 
-RUNTIME_DATA_PATH = resolve_runtime_data_root()
-DATABASE_FILE_PATH = resolve_database_file_path()
-
 ROOT_ROUTE = "/"
 DOCS_ROUTE = "/docs"
 FASTAPI_ROOT_ENDPOINT = ROOT_ROUTE

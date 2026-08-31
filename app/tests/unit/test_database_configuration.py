@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from server.common.paths import DATABASE_FILE_PATH
+from server.common.paths import resolve_database_file_path
 from server.configurations import build_database_settings
 
 
@@ -15,7 +15,7 @@ def test_database_settings_use_default_sqlite_path(monkeypatch) -> None:
 
     settings = build_database_settings()
 
-    assert settings.database_path == str(DATABASE_FILE_PATH)
+    assert settings.database_path == str(resolve_database_file_path())
     assert settings.sqlite_lock_timeout_seconds == 60
 
 
