@@ -4,13 +4,9 @@ from typing import cast
 
 from server.common.typing import is_json_object, json_array
 
-from server.common.constants import (
-    DEFAULT_MODEL_PROVIDER_MODE,
-)
 from server.contracts.chat import (
     ModelProviderMode,
     ModelSettingsResponse,
-    ModelSettingsSnapshot,
     ModelSettingsUpdateRequest,
 )
 from server.repositories.credentials import CredentialRepository
@@ -47,12 +43,13 @@ class ChatSettingsService:
 
     # -------------------------------------------------------------------------
     def get_settings(self) -> ModelSettingsResponse:
-        record = self.settings_repo.get_or_create()
-        record = self._repair_incomplete_agent_assignment(record)
-        active_provider_mode: ModelProviderMode = (
-            cast(ModelProviderMode, record.active_provider_mode)
-            if record.active_provider_mode in {"local", "cloud"}
-            else DEFAULT_MODEL_PROVIDER_MODE
+        record = self.settings_repo.get_required()
+        if record.active_provider_mode not in {"local", "cloud"}:
+            raise ChatSettingsValidationError(
+                "Stored model settings contain an invalid provider mode."
+            )
+        active_provider_mode: ModelProviderMode = cast(
+            ModelProviderMode, record.active_provider_mode
         )
         active_credentials = self.credentials_repo.list_active()
         credential_presence: dict[str, dict[str, bool]] = {}
@@ -127,7 +124,7 @@ class ChatSettingsService:
 
     # -------------------------------------------------------------------------
     def get_ollama_url(self) -> str:
-        record = self.settings_repo.get_or_create()
+        record = self.settings_repo.get_required()
         return self.model_library_service.normalize_ollama_url(record.ollama_url)
 
     # -------------------------------------------------------------------------
@@ -226,117 +223,6 @@ class ChatSettingsService:
         return self.get_settings()
 
     # -------------------------------------------------------------------------
-    def _available_models(
-        self, *, ollama_url: str
-    ) -> dict[str, list[dict[str, object]]]:
-        available: dict[str, list[dict[str, object]]] = {}
-        libraries = [
-            self.model_library_service.list_models(ollama_url=ollama_url),
-            *[
-                self.model_library_service.list_models(
-                    ollama_url=ollama_url,
-                    cloud_provider=provider,
-                )
-                for provider in DYNAMIC_CLOUD_PROVIDERS
-            ],
-        ]
-        active_credentials = self.credentials_repo.list_active()
-        configured_cloud_providers: set[str] = set()
-        for item in active_credentials:
-            if item.label != "api_key":
-                continue
-            try:
-                self.crypto_service.decrypt(item.encrypted_value)
-            except ValueError:
-                continue
-            configured_cloud_providers.add(item.provider)
-        for library in libraries:
-            for entry in json_array(library.get("cloud")):
-                if not is_json_object(entry):
-                    continue
-                provider = str(entry.get("provider") or "").strip()
-                if provider not in configured_cloud_providers:
-                    continue
-                available.setdefault(provider, []).append(entry)
-            local_models = [
-                item
-                for item in json_array(library.get("local"))
-                if is_json_object(item)
-            ]
-            if local_models:
-                available["ollama"] = local_models
-        return available
-
-    # -------------------------------------------------------------------------
-    def _repair_incomplete_agent_assignment(
-        self, record: ModelSettingsSnapshot
-    ) -> ModelSettingsSnapshot:
-        assignment = self._normalized_agent_assignment(record)
-        if assignment["provider"] and assignment["model"]:
-            return record
-
-        available_models = self._available_models(
-            ollama_url=self.model_library_service.normalize_ollama_url(
-                record.ollama_url
-            )
-        )
-        repaired = self._select_agent_assignment(
-            current_provider=assignment["provider"],
-            current_model=assignment["model"],
-            active_provider_mode=str(getattr(record, "active_provider_mode", "") or ""),
-            available_models=available_models,
-        )
-        if repaired is None:
-            return record
-        self._validate_agent_assignment(
-            agent_model_provider=repaired["provider"],
-            agent_model_name=repaired["model"],
-        )
-        self._validate_local_model_selection(
-            agent_model_provider=repaired["provider"],
-            agent_model_name=repaired["model"],
-            ollama_url=self.model_library_service.normalize_ollama_url(
-                record.ollama_url
-            ),
-        )
-        self._validate_agent_capabilities(
-            agent_model_provider=repaired["provider"],
-            agent_model_name=repaired["model"],
-            ollama_url=self.model_library_service.normalize_ollama_url(
-                record.ollama_url
-            ),
-        )
-        return self._persist_agent_assignment(
-            record,
-            provider=repaired["provider"],
-            model=repaired["model"],
-        )
-
-    # -------------------------------------------------------------------------
-    def _persist_agent_assignment(
-        self,
-        record: ModelSettingsSnapshot,
-        *,
-        provider: str,
-        model: str,
-    ) -> ModelSettingsSnapshot:
-        return self.settings_repo.update(
-            active_provider_mode=(
-                getattr(record, "active_provider_mode", "")
-                if getattr(record, "active_provider_mode", "") in {"local", "cloud"}
-                else DEFAULT_MODEL_PROVIDER_MODE
-            ),
-            agent_model_provider=provider,
-            agent_model_name=model,
-            ollama_url=self.model_library_service.normalize_ollama_url(
-                str(getattr(record, "ollama_url", ""))
-            ),
-            openai_base_url=getattr(record, "openai_base_url", None),
-            google_base_url=getattr(record, "google_base_url", None),
-            deepseek_base_url=getattr(record, "deepseek_base_url", None),
-        )
-
-    # -------------------------------------------------------------------------
     def _validate_local_model_selection(
         self,
         *,
@@ -375,7 +261,7 @@ class ChatSettingsService:
                 ollama_url=ollama_url,
                 require_provider_availability=True,
             )
-        except ModelLibrarySourceError as exc:
+        except ModelLibrarySourceError:
             # A provider catalog outage must not turn missing capability
             # metadata into an explicit capability rejection.  The selected
             # model remains executable; the first request is authoritative.
@@ -399,92 +285,6 @@ class ChatSettingsService:
             raise ChatSettingsValidationError(
                 f"Selected {agent_model_provider} agent model could not be found in the live provider catalog."
             )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _normalized_agent_assignment(record: object) -> dict[str, str]:
-        return {
-            "provider": str(getattr(record, "agent_model_provider", "") or "").strip(),
-            "model": str(getattr(record, "agent_model_name", "") or "").strip(),
-        }
-
-    # -------------------------------------------------------------------------
-    def _select_agent_assignment(
-        self,
-        *,
-        current_provider: str,
-        current_model: str,
-        active_provider_mode: str,
-        available_models: dict[str, list[dict[str, object]]],
-    ) -> dict[str, str] | None:
-        provider_preferences: list[str] = []
-        if current_provider:
-            provider_preferences.append(current_provider)
-        if active_provider_mode == "local":
-            provider_preferences.append("ollama")
-        provider_preferences.extend(
-            ["opencode-go", "opencode", "deepseek", "openai", "google", "ollama"]
-        )
-
-        seen: set[str] = set()
-        deduped_providers = [
-            provider
-            for provider in provider_preferences
-            if provider not in seen and not seen.add(provider)
-        ]
-        for provider in deduped_providers:
-            assignment = self._select_agent_model(
-                provider=provider,
-                current_model=current_model,
-                models=available_models.get(provider, []),
-            )
-            if assignment is not None:
-                return assignment
-        return None
-
-    # -------------------------------------------------------------------------
-    def _select_agent_model(
-        self,
-        *,
-        provider: str,
-        current_model: str,
-        models: list[dict[str, object]],
-    ) -> dict[str, str] | None:
-        if not models:
-            return None
-        preferred_models = [current_model] if current_model else []
-        preferred_models.extend(
-            {
-                "openai": ["gpt-4.1", "gpt-5-mini", "gpt-4.1-mini"],
-                "google": ["gemini-2.5-pro", "gemini-2.5-flash"],
-                "deepseek": ["deepseek-chat", "deepseek-reasoner"],
-            }.get(provider, [])
-        )
-        candidates = [
-            item for item in models if self._agent_requirements_met(model=item)
-        ]
-        if not candidates:
-            return None
-        by_name = {
-            str(item.get("name") or item.get("id") or "").strip(): item
-            for item in candidates
-        }
-        for name in preferred_models:
-            normalized_name = str(name or "").strip()
-            if normalized_name and normalized_name in by_name:
-                return {"provider": provider, "model": normalized_name}
-        fallback_name = str(
-            candidates[0].get("name") or candidates[0].get("id") or ""
-        ).strip()
-        return {"provider": provider, "model": fallback_name} if fallback_name else None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _agent_requirements_met(*, model: dict[str, object]) -> bool:
-        return (
-            model.get("supports_tools") is not False
-            and model.get("supports_structured_output") is not False
-        )
 
     # -------------------------------------------------------------------------
     @staticmethod

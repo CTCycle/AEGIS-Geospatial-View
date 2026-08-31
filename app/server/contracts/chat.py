@@ -200,10 +200,6 @@ class ModelSettingsSnapshot:
     openai_base_url: str | None
     google_base_url: str | None
     deepseek_base_url: str | None
-    capabilities_json: str | None
-    supports_tools: bool
-    supports_structured_output: bool
-    tool_support_source: str
 
 
 ###############################################################################

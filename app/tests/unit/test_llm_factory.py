@@ -15,7 +15,7 @@ from server.services.llm.openai_provider import OpenAIProvider
 ###############################################################################
 class _SettingsRepo:
     # -------------------------------------------------------------------------
-    def get_or_create(self):  # noqa: ANN201
+    def get_required(self):  # noqa: ANN201
         return SimpleNamespace(
             ollama_url="http://localhost:11434",
             openai_base_url="https://api.openai.test",

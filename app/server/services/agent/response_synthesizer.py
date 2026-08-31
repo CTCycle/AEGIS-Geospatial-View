@@ -74,7 +74,7 @@ class GroundedResponseSynthesizer:
             return fallback_text
         if not self.enabled:
             return fallback_text
-        settings = self.settings_repo.get_or_create()
+        settings = self.settings_repo.get_required()
         if not settings.agent_model_provider or not settings.agent_model_name:
             return fallback_text
         evidence = {

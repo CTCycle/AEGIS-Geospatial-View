@@ -47,7 +47,7 @@ class FakeSettingsRepository:
         self.last_update: dict[str, Any] | None = None
 
     # -------------------------------------------------------------------------
-    def get_or_create(self) -> FakeSettingsRecord:
+    def get_required(self) -> FakeSettingsRecord:
         return self.record
 
     # -------------------------------------------------------------------------
@@ -204,41 +204,6 @@ def test_update_settings_rejects_blank_agent_selection() -> None:
         service.update_settings(
             ModelSettingsUpdateRequest(agent_model_provider="", agent_model_name="")
         )
-
-
-###############################################################################
-def test_get_settings_repairs_blank_agent_using_configured_provider_models() -> None:
-    settings_repo = FakeSettingsRepository(
-        FakeSettingsRecord(agent_model_provider="", agent_model_name="")
-    )
-    credentials_repo = FakeCredentialsRepository(
-        [
-            FakeCredentialRecord(
-                provider="deepseek", label="api_key", encrypted_value="enc:deepseek-key"
-            )
-        ]
-    )
-    model_library_service = FakeModelLibraryService(
-        model_overrides={
-            ("deepseek", "deepseek-chat"): {
-                "provider": "deepseek",
-                "name": "deepseek-chat",
-                "id": "deepseek-chat",
-                "supports_tools": True,
-                "supports_structured_output": True,
-            }
-        }
-    )
-    service = build_service(
-        settings_repo=settings_repo,
-        credentials_repo=credentials_repo,
-        model_library_service=model_library_service,
-    )
-
-    response = service.get_settings()
-
-    assert response.agent_model_provider == "deepseek"
-    assert response.agent_model_name == "deepseek-chat"
 
 
 ###############################################################################

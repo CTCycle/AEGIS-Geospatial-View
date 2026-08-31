@@ -693,7 +693,7 @@ class _NativeLoop:
 ###############################################################################
 class _SettingsRepo:
     # -------------------------------------------------------------------------
-    def get_or_create(self) -> _Settings:
+    def get_required(self) -> _Settings:
         return _Settings()
 
 
