@@ -94,11 +94,7 @@ class _CapabilityRegistry:
                 "auth": {"required": True, "providerKey": "tomtom"},
             },
         ]
-
-    # -------------------------------------------------------------------------
-    def load_capabilities(self):
-        self.load_calls += 1
-        return type(
+        self.snapshot = type(
             "Snapshot",
             (),
             {
@@ -109,6 +105,11 @@ class _CapabilityRegistry:
                 "tools": [self.capabilities[1]],
             },
         )()
+
+    # -------------------------------------------------------------------------
+    def load_capabilities(self):
+        self.load_calls += 1
+        return self.snapshot
 
     # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str):

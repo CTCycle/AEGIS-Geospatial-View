@@ -19,25 +19,22 @@ class SearchRuntime:
 
 ###############################################################################
 def build_search_runtime(
-    capability_registry: CapabilityRegistry | None = None,
-    provider_registry: ProviderRegistry | None = None,
-    credential_resolver: GeospatialCredentialResolver | None = None,
+    *,
+    capability_registry: CapabilityRegistry,
+    provider_registry: ProviderRegistry,
+    credential_resolver: GeospatialCredentialResolver,
 ) -> SearchRuntime:
-    resolved_capability_registry = capability_registry or CapabilityRegistry()
-    resolved_provider_registry = provider_registry or ProviderRegistry(
-        credential_resolver=credential_resolver,
-    )
     render_descriptor_service = RenderDescriptorService(
-        capability_registry=resolved_capability_registry,
-        provider_registry=resolved_provider_registry,
+        capability_registry=capability_registry,
+        provider_registry=provider_registry,
         credential_resolver=credential_resolver,
     )
     orchestrator = LocationSearchOrchestrator(
-        capability_registry=resolved_capability_registry,
+        capability_registry=capability_registry,
         render_descriptor_service=render_descriptor_service,
     )
     return SearchRuntime(
         search_orchestrator=orchestrator,
-        capability_registry=resolved_capability_registry,
-        provider_registry=resolved_provider_registry,
+        capability_registry=capability_registry,
+        provider_registry=provider_registry,
     )
