@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_array, is_json_object
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
 import math
 from typing import Any
@@ -104,17 +104,13 @@ class RequestBuilder:
         if plan.basemap_id:
             return plan.basemap_id
         if self.capability_registry is not None:
-            candidates = []
+            candidates: list[tuple[bool, str]] = []
             for basemap in self.capability_registry.list_basemaps():
                 capability_id = str(basemap.get("id") or "").strip()
                 if not capability_id:
                     continue
-                agentic_use = basemap.get("agenticUse")
-                default_enabled = (
-                    bool(agentic_use.get("defaultEnabled"))
-                    if isinstance(agentic_use, dict)
-                    else False
-                )
+                agentic_use = json_object(basemap.get("agenticUse"))
+                default_enabled = bool(agentic_use.get("defaultEnabled"))
                 candidates.append((not default_enabled, capability_id))
             if candidates:
                 return min(candidates)[1]
@@ -189,10 +185,11 @@ class RequestBuilder:
         if self.capability_registry is not None:
             for overlay_id in overlays:
                 capability = self.capability_registry.get_capability(overlay_id)
-                metadata = capability.get("metadata") if capability else None
-                metadata = metadata if isinstance(metadata, dict) else {}
-                map_type_tags = metadata.get("map_type_tags")
-                if isinstance(map_type_tags, list) and any(
+                metadata = (
+                    json_object(capability.get("metadata")) if capability else {}
+                )
+                map_type_tags = json_array(metadata.get("map_type_tags"))
+                if map_type_tags and any(
                     str(tag).casefold() in {"thematic", "operational"}
                     for tag in map_type_tags
                 ):

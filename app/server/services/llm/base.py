@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from typing import Any
 
+from server.common.typing import is_json_array, is_json_object
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
@@ -76,8 +77,7 @@ class LLMProvider(ABC):
             )
         for tool in request.tools or []:
             if (
-                not isinstance(tool.name, str)
-                or not tool.name.strip()
+                not tool.name.strip()
                 or not self._is_json_schema(tool.parameters_json_schema)
             ):
                 raise LLMRequestSchemaError(
@@ -138,7 +138,7 @@ class LLMProvider(ABC):
     # -------------------------------------------------------------------------
     @staticmethod
     def _is_json_schema(value: object) -> bool:
-        if not isinstance(value, dict):
+        if not is_json_object(value):
             return False
         schema_type = value.get("type")
         if schema_type is not None and schema_type not in {
@@ -152,15 +152,15 @@ class LLMProvider(ABC):
         }:
             return False
         properties = value.get("properties")
-        if properties is not None and not isinstance(properties, dict):
+        if properties is not None and not is_json_object(properties):
             return False
         required = value.get("required")
         if required is not None and (
-            not isinstance(required, list)
+            not is_json_array(required)
             or not all(isinstance(item, str) and item.strip() for item in required)
         ):
             return False
         items = value.get("items")
-        if items is not None and not isinstance(items, dict):
+        if items is not None and not is_json_object(items):
             return False
         return True

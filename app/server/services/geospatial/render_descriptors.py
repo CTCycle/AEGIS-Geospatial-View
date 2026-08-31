@@ -488,12 +488,10 @@ class RenderDescriptorService:
         rendering_mode: str,
     ) -> dict[str, object]:
         def string_list(value: object) -> list[str]:
-            if not isinstance(value, list):
-                return []
             return list(
                 dict.fromkeys(
                     item.strip()
-                    for item in value
+                    for item in json_array(value)
                     if isinstance(item, str) and item.strip()
                 )
             )

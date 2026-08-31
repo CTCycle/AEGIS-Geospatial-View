@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 from server.domain.geospatial.providers import ProviderRequest
@@ -28,7 +28,12 @@ class GeospatialManifestSnapshot:
             value = payload.get(name, ())
             if not isinstance(value, (list, tuple)):
                 return ()
-            return tuple(dict(item) for item in value if isinstance(item, dict))
+            items = cast(list[object] | tuple[object, ...], value)
+            return tuple(
+                dict(cast(Mapping[str, Any], item))
+                for item in items
+                if isinstance(item, Mapping)
+            )
 
         return cls(
             providers=collection("providers"),

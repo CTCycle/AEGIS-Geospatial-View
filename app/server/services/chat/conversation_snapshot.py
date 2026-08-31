@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
 from pydantic import ValidationError
 
 from server.contracts.geospatial import MapSession
@@ -55,9 +56,10 @@ class ConversationSnapshotService:
                     conversation_id=conversation_id
                 )
             ]
-            memory_snapshot = persisted.get("memory_snapshot") or {}
-            if not isinstance(memory_snapshot, dict):
+            raw_memory_snapshot: object = persisted.get("memory_snapshot") or {}
+            if not is_json_object(raw_memory_snapshot):
                 raise ValueError("memory_snapshot must be an object")
+            memory_snapshot = raw_memory_snapshot
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
             raise ConversationSnapshotContractError(
                 "Stored conversation state does not match the current contract."

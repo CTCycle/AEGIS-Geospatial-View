@@ -3,7 +3,7 @@ from __future__ import annotations
 import unicodedata
 from typing import Any, cast
 
-from server.common.typing import json_array, json_object
+from server.common.typing import is_json_array, json_array, json_object
 
 from server.contracts.extraction import TurnParseResult
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -204,9 +204,9 @@ class CapabilityResolver:
 
         metadata = json_object(capability.get("metadata"))
         declared_modes = metadata.get("supported_temporal_modes")
-        if not isinstance(declared_modes, list):
+        if not is_json_array(declared_modes):
             declared_modes = capability.get("supported_temporal_modes")
-        if isinstance(declared_modes, list) and declared_modes:
+        if is_json_array(declared_modes) and declared_modes:
             allowed_modes = {
                 str(item).strip().casefold()
                 for item in declared_modes
@@ -216,9 +216,9 @@ class CapabilityResolver:
                 return False
 
         declared_aggregations = metadata.get("supported_aggregations")
-        if not isinstance(declared_aggregations, list):
+        if not is_json_array(declared_aggregations):
             declared_aggregations = capability.get("supported_aggregations")
-        if isinstance(declared_aggregations, list) and declared_aggregations:
+        if is_json_array(declared_aggregations) and declared_aggregations:
             allowed_aggregations = {
                 str(item).strip().casefold()
                 for item in declared_aggregations

@@ -136,7 +136,7 @@ class OpenCodeProvider(DeepSeekProvider):
             if item.get(key) is not None:
                 metadata[key] = item[key]
         raw_capabilities = item.get("capabilities")
-        if isinstance(raw_capabilities, list):
+        if is_json_array(raw_capabilities):
             normalized = {
                 str(value).strip().lower()
                 for value in raw_capabilities

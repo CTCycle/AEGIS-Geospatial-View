@@ -114,8 +114,7 @@ class ToolArgumentBuilder:
             if self.capability_registry is not None
             else {}
         ) or {}
-        metadata = capability.get("metadata")
-        metadata = metadata if isinstance(metadata, dict) else {}
+        metadata = json_object(capability.get("metadata"))
         is_direct = (
             str(capability.get("type") or "").casefold() == "direct-tool"
             or str(metadata.get("retrieval_mode") or "").casefold() == "direct"
