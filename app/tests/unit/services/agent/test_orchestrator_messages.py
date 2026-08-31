@@ -1,23 +1,71 @@
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    OverlayInstance,
+    ViewportPolicy,
+)
+from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent.turn_support import AgentTurnSupport
 
 
 ###############################################################################
+def _map_session(
+    *,
+    location: str,
+    basemap_id: str = "osm_default",
+    basemap_label: str | None = None,
+    overlays: list[tuple[str, str, bool]] | None = None,
+    warnings: list[str] | None = None,
+) -> MapSession:
+    return MapSession(
+        session_id="map-1",
+        resolved_location=ResolvedLocation(
+            label=location,
+            latitude=41.9028,
+            longitude=12.4964,
+        ),
+        basemap_id=basemap_id,
+        viewport=ViewportPolicy(
+            center_latitude=41.9028,
+            center_longitude=12.4964,
+        ),
+        basemap=(
+            {"id": basemap_id, "label": basemap_label}
+            if basemap_label is not None
+            else None
+        ),
+        compliance_warnings=warnings or [],
+        overlay_collection=OverlayCollectionState(
+            instances=[
+                OverlayInstance(
+                    instance_id=f"instance-{index}",
+                    capability_id=capability_id,
+                    label=label,
+                    provider="test",
+                    overlay_type="overlay",
+                    rendering_mode="metadata-only",
+                    visible=visible,
+                )
+                for index, (capability_id, label, visible) in enumerate(overlays or [])
+            ]
+        ),
+    )
+
+
+###############################################################################
 def test_map_session_message_uses_human_readable_labels() -> None:
     message = AgentOrchestrator._compose_map_session_message(
-        {
-            "resolved_location": {"label": "Times Square, New York"},
-            "basemap_id": "osm_default",
-            "basemap": {"id": "osm_default", "label": "OpenStreetMap"},
-            "overlay_ids": ["tomtom_traffic_flow"],
-            "overlays": [{"id": "tomtom_traffic_flow", "label": "TomTom Traffic Flow"}],
-            "compliance_warnings": [],
-        },
+        _map_session(
+            location="Times Square, New York",
+            basemap_label="OpenStreetMap",
+            overlays=[("tomtom_traffic_flow", "TomTom Traffic Flow", True)],
+        )
     )
 
     assert message == (
         "Map ready for Times Square, New York using OpenStreetMap. "
-        "I added the TomTom Traffic Flow overlay."
+        "Visible overlays: the TomTom Traffic Flow overlay."
     )
     assert "osm_default" not in message
     assert "tomtom_traffic_flow" not in message
@@ -26,13 +74,16 @@ def test_map_session_message_uses_human_readable_labels() -> None:
 ###############################################################################
 def test_map_session_message_humanizes_missing_label_fallbacks() -> None:
     message = AgentOrchestrator._compose_map_session_message(
-        {
-            "resolved_location": {"label": "Rome"},
-            "basemap_id": "osm_default",
-            "overlay_ids": ["rainviewer_precipitation_radar"],
-            "overlays": [],
-            "compliance_warnings": [],
-        },
+        _map_session(
+            location="Rome",
+            overlays=[
+                (
+                    "rainviewer_precipitation_radar",
+                    "",
+                    True,
+                )
+            ],
+        )
     )
 
     assert "OpenStreetMap" in message
@@ -44,16 +95,14 @@ def test_map_session_message_humanizes_missing_label_fallbacks() -> None:
 ###############################################################################
 def test_map_session_message_includes_readable_warnings() -> None:
     message = AgentOrchestrator._compose_map_session_message(
-        {
-            "resolved_location": {"label": "Shibuya Crossing"},
-            "basemap_id": "osm_default",
-            "basemap": {"id": "osm_default", "label": "OpenStreetMap"},
-            "overlay_ids": ["tomtom_traffic_flow"],
-            "overlays": [{"id": "tomtom_traffic_flow", "label": "TomTom Traffic Flow"}],
-            "compliance_warnings": [
+        _map_session(
+            location="Shibuya Crossing",
+            basemap_label="OpenStreetMap",
+            overlays=[("tomtom_traffic_flow", "TomTom Traffic Flow", True)],
+            warnings=[
                 "tomtom_traffic_flow: A saved credential for 'tomtom' is required to render this provider tile layer.",
             ],
-        },
+        )
     )
 
     assert "Some requested map data needs attention:" in message
@@ -67,17 +116,14 @@ def test_map_session_message_includes_readable_warnings() -> None:
 ###############################################################################
 def test_map_session_message_reports_current_visibility_state() -> None:
     message = AgentOrchestrator._compose_map_session_message(
-        {
-            "resolved_location": {"label": "Zurich"},
-            "basemap_id": "osm_default",
-            "basemap": {"id": "osm_default", "label": "OpenStreetMap"},
-            "overlay_ids": ["weather-zurich", "traffic-zurich"],
-            "overlays": [
-                {"id": "weather-zurich", "label": "Weather Forecast", "visible": False},
-                {"id": "traffic-zurich", "label": "Traffic", "visible": True},
+        _map_session(
+            location="Zurich",
+            basemap_label="OpenStreetMap",
+            overlays=[
+                ("weather-zurich", "Weather Forecast", False),
+                ("traffic-zurich", "Traffic", True),
             ],
-            "compliance_warnings": [],
-        },
+        )
     )
 
     assert "Visible overlays: the Traffic overlay." in message
