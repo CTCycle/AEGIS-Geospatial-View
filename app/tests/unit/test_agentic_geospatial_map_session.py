@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+from types import SimpleNamespace
 from typing import TypeVar
 
 import pytest
@@ -15,10 +16,33 @@ from server.contracts.geospatial import (
     ViewportPolicy,
 )
 from server.services.geospatial.providers.base import ProviderRateLimitError
+from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
+from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
 T = TypeVar("T")
+
+
+###############################################################################
+class _TomTomCredentialRepository:
+    # -------------------------------------------------------------------------
+    def get_active(self, *, provider: str, label: str) -> object | None:
+        if provider == "tomtom" and label == "api_key":
+            return SimpleNamespace(encrypted_value="encrypted-tomtom-key")
+        return None
+
+    # -------------------------------------------------------------------------
+    def mark_used(self, *, provider: str, label: str) -> None:
+        del provider, label
+
+
+###############################################################################
+class _TomTomCredentialDecryptor:
+    # -------------------------------------------------------------------------
+    def decrypt(self, encrypted_value: str) -> str:
+        assert encrypted_value == "encrypted-tomtom-key"
+        return "tomtom-secret-forbidden"
 
 
 ###############################################################################
@@ -271,10 +295,7 @@ def test_agentic_geospatial_map_session_uses_public_openfreemap_basemap() -> Non
 
 
 ###############################################################################
-def test_agentic_geospatial_map_session_never_serializes_provider_api_keys(
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-secret-forbidden")
+def test_agentic_geospatial_map_session_never_serializes_provider_api_keys() -> None:
     location = ResolvedLocation(
         label="Rome",
         latitude=41.9,
@@ -289,7 +310,18 @@ def test_agentic_geospatial_map_session_never_serializes_provider_api_keys(
     )
     request = RequestBuilder().build_location_search_request(plan, location)
 
-    session = _run_async(LocationSearchOrchestrator().execute(request))
+    credential_resolver = GeospatialCredentialResolver(
+        credentials_repo=_TomTomCredentialRepository(),  # type: ignore[arg-type]
+        crypto_service=_TomTomCredentialDecryptor(),
+    )
+    render_descriptor_service = RenderDescriptorService(
+        credential_resolver=credential_resolver,
+    )
+    session = _run_async(
+        LocationSearchOrchestrator(
+            render_descriptor_service=render_descriptor_service,
+        ).execute(request)
+    )
 
     serialized = json.dumps(session.model_dump(mode="json"))
     assert "tomtom-secret-forbidden" not in serialized

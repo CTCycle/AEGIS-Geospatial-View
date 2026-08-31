@@ -532,20 +532,18 @@ def test_tomtom_provider_emits_proxy_tile_payload_without_secret() -> None:
 
 
 ###############################################################################
-def test_provider_registry_passes_environment_keys_to_gated_adapters(
+def test_provider_registry_ignores_environment_keys_for_gated_adapters(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-test")
     registry = ProviderRegistry()
     registry.build_from_manifests()
 
-    tomtom = run_async_in_thread(
-        registry.fetch("tomtom", ProviderRequest(capability_id="tomtom_traffic_flow"))
-    )
-    assert tomtom.payload["tileUrl"] == (
-        "/api/geospatial/proxy/tomtom/traffic-flow/{z}/{x}/{y}.png"
-    )
-    assert "tomtom-test" not in str(tomtom.payload)
+    assert getattr(registry.get("tomtom"), "api_key") == ""
+    with pytest.raises(ProviderAuthError, match="API key is required"):
+        run_async_in_thread(
+            registry.fetch("tomtom", ProviderRequest(capability_id="tomtom_traffic_flow"))
+        )
 
 
 ###############################################################################

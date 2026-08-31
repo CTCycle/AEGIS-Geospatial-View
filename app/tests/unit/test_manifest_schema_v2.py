@@ -98,8 +98,15 @@ def test_loaded_manifests_expose_v2_capability_kinds() -> None:
     overlays = loaded["overlays"]
     transit = loaded["transit"]
 
+    def without_loader_metadata(item: dict[str, object]) -> dict[str, object]:
+        return {
+            key: value
+            for key, value in item.items()
+            if key not in {"source_filename", "source_path"}
+        }
+
     assert all(
-        CapabilityManifestV2.model_validate(item).capability_kind
+        CapabilityManifestV2.model_validate(without_loader_metadata(item)).capability_kind
         == CapabilityKind.BASEMAP
         for item in basemaps
     )
