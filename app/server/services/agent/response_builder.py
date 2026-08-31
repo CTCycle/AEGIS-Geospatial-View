@@ -307,7 +307,7 @@ class AgentResponseBuilder:
         warnings = [
             cls.humanize_warning(warning)
             for warning in map_session.compliance_warnings
-            if isinstance(warning, str) and warning.strip()
+            if warning.strip()
         ]
 
         parts = [f"Map ready for {location} using {basemap}."]
