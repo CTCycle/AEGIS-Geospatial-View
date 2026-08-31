@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from server.common.typing import is_json_object, json_array, json_object
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
 
 
@@ -24,32 +25,29 @@ class AgentTurnSupport:
         memory_snapshot: dict[str, Any] | None = None,
     ) -> str:
         if query_kind == "active_location":
-            memory = memory_snapshot or {}
-            active_location = memory.get("active_location")
-            if not isinstance(active_location, dict):
-                active_visualization = memory.get("active_visualization")
-                active_location = (
-                    active_visualization.get("resolved_location")
-                    if isinstance(active_visualization, dict)
-                    else None
+            memory = json_object(memory_snapshot)
+            active_location = json_object(memory.get("active_location"))
+            if not active_location:
+                active_visualization = json_object(
+                    memory.get("active_visualization")
                 )
-            if isinstance(active_location, dict):
-                label = str(active_location.get("label") or "").strip()
-                if label:
-                    return f"The map is currently centered on {label}."
+                active_location = json_object(
+                    active_visualization.get("resolved_location")
+                )
+            label = str(active_location.get("label") or "").strip()
+            if label:
+                return f"The map is currently centered on {label}."
             return "There is no active map location in this conversation."
         if query_kind == "active_overlays":
             active_visualization = cls._active_visualization(memory_snapshot)
             if active_visualization is None:
                 return "There is no active map visualization in this conversation."
-            overlay_collection = active_visualization.get("overlay_collection")
-            instances = (
-                overlay_collection.get("instances")
-                if isinstance(overlay_collection, dict)
-                else None
+            overlay_collection = json_object(
+                active_visualization.get("overlay_collection")
             )
+            instances = json_array(overlay_collection.get("instances"))
             overlay_instances = [
-                item for item in instances or [] if isinstance(item, dict)
+                item for item in instances if is_json_object(item)
             ]
             if not overlay_instances:
                 return "The current map has no overlays requested."
@@ -67,16 +65,12 @@ class AgentTurnSupport:
             active_visualization = cls._active_visualization(memory_snapshot)
             if active_visualization is None:
                 return "There is no active map visualization in this conversation."
-            location = active_visualization.get("resolved_location")
-            location_label = (
-                str(location.get("label") or "the active area")
-                if isinstance(location, dict)
-                else "the active area"
-            )
-            basemap = active_visualization.get("basemap")
+            location = json_object(active_visualization.get("resolved_location"))
+            location_label = str(location.get("label") or "the active area")
+            basemap = json_object(active_visualization.get("basemap"))
             basemap_label = (
                 str(basemap.get("label") or "the current basemap")
-                if isinstance(basemap, dict)
+                if basemap
                 else cls.humanize_identifier(
                     str(active_visualization.get("basemap_id") or "current basemap")
                 )
@@ -141,11 +135,8 @@ class AgentTurnSupport:
     def _active_visualization(
         memory_snapshot: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
-        memory = memory_snapshot or {}
-        visualization = memory.get("active_visualization")
-        if isinstance(visualization, dict):
-            return visualization
-        return None
+        visualization = json_object(json_object(memory_snapshot).get("active_visualization"))
+        return visualization or None
 
     # -------------------------------------------------------------------------
     @staticmethod
