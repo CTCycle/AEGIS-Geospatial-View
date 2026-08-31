@@ -75,6 +75,7 @@ def _turn(
             _turn(
                 "Find the coordinates for Rome",
                 task_class="direct_query",
+                layers=["location_to_coordinates"],
             ),
             "place_resolution",
             None,
@@ -97,6 +98,7 @@ def _turn(
             _turn(
                 "Give me the weather forecast for Milan",
                 task_class="direct_query",
+                layers=["get_weather_forecast"],
             ),
             "environmental_data",
             None,
@@ -108,6 +110,7 @@ def _turn(
             _turn(
                 "Give me the air quality forecast for Milan",
                 task_class="direct_query",
+                layers=["get_air_quality_forecast"],
             ),
             "environmental_data",
             None,
@@ -120,6 +123,7 @@ def _turn(
                 "Find nearby hospitals in Rome",
                 task_class="direct_query",
                 entity="hospitals",
+                layers=["get_nearby_poi"],
             ),
             "geospatial_features",
             None,
@@ -155,6 +159,7 @@ def _turn(
                 "Show the weather and nearby cafes in Rome",
                 task_class="direct_query",
                 entity="cafes",
+                layers=["get_weather_forecast", "get_nearby_poi"],
             ),
             "environmental_data",
             None,
@@ -208,6 +213,7 @@ def test_deterministic_geospatial_tool_calling_scenarios(
 def test_bbox_evaluation_preserves_canonical_coordinate_order() -> None:
     turn = _turn(
         "Show demographics in this extent",
+        location="",
         layers=["census_tigerweb_demographics"],
     )
     plan = DeterministicToolPlanner().build_plan(
