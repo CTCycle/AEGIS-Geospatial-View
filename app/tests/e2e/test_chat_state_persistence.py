@@ -7,7 +7,10 @@ from typing import Any
 
 from playwright.sync_api import Page, Route, expect
 
-from tests.e2e.helpers.chat_stub_payloads import model_settings_payload
+from tests.e2e.helpers.chat_stub_payloads import (
+    geospatial_catalog_payload,
+    model_settings_payload,
+)
 
 
 STORAGE_KEY = "aegis:webapp-state:v4"
@@ -38,12 +41,19 @@ def _stub_settings_api(page: Page) -> None:
                         "description": "Cloud model",
                         "provider": "openai",
                         "capabilities": ["chat"],
+                        "tool_support_source": "fixture",
+                        "context_profile_source": "fixture",
                         "metadata": {},
                     }
                 ],
                 "local": [],
+                "sources": {},
             },
         ),
+    )
+    page.route(
+        re.compile(r".*/api/geospatial/capabilities$"),
+        lambda route: _json_ok(route, geospatial_catalog_payload()),
     )
 
 

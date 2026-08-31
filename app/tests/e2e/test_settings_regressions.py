@@ -11,6 +11,7 @@ from playwright.sync_api import Page, Route, expect
 from tests.e2e.helpers.chat_stub_payloads import (
     chat_completion_map_payload,
     chat_completion_text_payload,
+    geospatial_catalog_payload,
     model_catalog_payload,
     selected_agent_settings_payload,
 )
@@ -95,58 +96,7 @@ def _setup_stub_harness(
     )
     page.route(
         re.compile(r".*/api/geospatial/capabilities.*"),
-        lambda route: _json_ok(
-            route,
-            {
-                "providers": [
-                    {
-                        "id": "openstreetmap",
-                        "name": "OpenStreetMap",
-                        "kind": "provider",
-                        "provider": "openstreetmap",
-                        "description": "Public map data provider.",
-                        "requires_credentials": False,
-                        "is_available": True,
-                    }
-                ],
-                "basemaps": [
-                    {
-                        "id": "osm_default",
-                        "name": "OpenStreetMap",
-                        "kind": "basemap",
-                        "provider": "openstreetmap",
-                        "coverage": "global",
-                        "description": "Standard street map tiles.",
-                        "requires_credentials": False,
-                        "is_available": True,
-                    }
-                ],
-                "overlays": [
-                    {
-                        "id": "openaq_air_quality",
-                        "name": "OpenAQ Air Quality",
-                        "kind": "overlay",
-                        "provider": "openaq",
-                        "description": "Air quality overlay fixture.",
-                        "requires_credentials": False,
-                        "is_available": True,
-                    }
-                ],
-                "cameras": [],
-                "transit": [],
-                "tools": [
-                    {
-                        "id": "location_to_coordinates",
-                        "name": "Location to coordinates",
-                        "kind": "tool",
-                        "provider": "aegis",
-                        "description": "Direct coordinate lookup.",
-                        "requires_credentials": False,
-                        "is_available": True,
-                    }
-                ],
-            },
-        ),
+        lambda route: _json_ok(route, geospatial_catalog_payload()),
     )
     page.route(re.compile(r".*/api/conversations$"), handle_create_conversation)
     page.route(

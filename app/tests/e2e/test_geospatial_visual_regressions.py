@@ -10,7 +10,10 @@ from typing import Any
 from PIL import Image, ImageChops
 from playwright.sync_api import Page, Route, expect
 
-from tests.e2e.helpers.chat_stub_payloads import model_settings_payload
+from tests.e2e.helpers.chat_stub_payloads import (
+    geospatial_catalog_payload,
+    model_settings_payload,
+)
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
 PNG_1X1_TRANSPARENT = base64.b64decode(
@@ -37,10 +40,13 @@ def _models_payload() -> dict[str, Any]:
                 "description": "Cloud model",
                 "provider": "openai",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {},
             }
         ],
         "local": [],
+        "sources": {},
     }
 
 
@@ -137,9 +143,7 @@ def _setup_stubs(page: Page) -> None:
     )
     page.route(
         re.compile(r".*/api/geospatial/capabilities$"),
-        lambda route: _json_ok(
-            route, {"providers": [], "basemaps": [], "overlays": []}
-        ),
+        lambda route: _json_ok(route, geospatial_catalog_payload()),
     )
     page.route(
         re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png(?:\?.*)?$"),

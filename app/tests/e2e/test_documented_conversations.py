@@ -17,6 +17,7 @@ from tests.e2e.helpers.chat_stub_payloads import (
     chat_completion_clarification_payload,
     chat_completion_map_payload,
     chat_completion_text_payload,
+    geospatial_catalog_payload,
     model_settings_payload,
 )
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
@@ -75,6 +76,8 @@ def _setup_common_stubs(page: Page, turn_seed: int = 101) -> dict[str, object]:
                 "description": "Cloud model",
                 "provider": "openai",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {},
             }
         ],
@@ -85,9 +88,12 @@ def _setup_common_stubs(page: Page, turn_seed: int = 101) -> dict[str, object]:
                 "description": "Local model",
                 "provider": "ollama",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {},
             }
         ],
+        "sources": {},
     }
 
     page.route(
@@ -100,9 +106,7 @@ def _setup_common_stubs(page: Page, turn_seed: int = 101) -> dict[str, object]:
     )
     page.route(
         re.compile(r".*/api/geospatial/capabilities$"),
-        lambda route: _json_ok(
-            route, {"providers": [], "basemaps": [], "overlays": []}
-        ),
+        lambda route: _json_ok(route, geospatial_catalog_payload()),
     )
     register_realtime_stub(page, lambda message, _run_number: build_payload(message))
     return state
