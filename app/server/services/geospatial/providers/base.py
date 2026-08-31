@@ -106,6 +106,14 @@ def response_without_credentials(response: ProviderResponse) -> ProviderResponse
         fetched_at=response.fetched_at,
         result_status="stale" if response.stale else response.result_status,
         result_type=response.result_type,
+        observation_time=response.observation_time,
+        coverage=dict(response.coverage) if response.coverage is not None else None,
+        spatial_resolution=response.spatial_resolution,
+        units=dict(response.units),
+        source_url=_redact_url_query(response.source_url)
+        if response.source_url
+        else None,
+        partial=response.partial,
     )
 
 

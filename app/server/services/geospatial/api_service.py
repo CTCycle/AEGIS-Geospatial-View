@@ -4,6 +4,7 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 
 from collections.abc import Iterator
 from datetime import datetime
+import math
 from typing import Any
 from urllib.parse import quote
 
@@ -117,7 +118,7 @@ def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
         )
     if value.get("type") == "Feature":
         geometry = value.get("geometry")
-        if geometry is None or is_json_object(geometry):
+        if is_json_object(geometry) and _valid_geojson_geometry(geometry):
             return dict(value)
         raise GeospatialProviderResponseError(
             "Provider returned a feature with invalid geometry.",
@@ -126,7 +127,10 @@ def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
         )
     latitude = value.get("latitude")
     longitude = value.get("longitude")
-    if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
+    if (
+        not _valid_latitude(latitude)
+        or not _valid_longitude(longitude)
+    ):
         raise GeospatialProviderResponseError(
             "Provider feature is missing GeoJSON geometry or numeric coordinates.",
             error_code="malformed_response",
@@ -147,6 +151,63 @@ def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
         },
         "properties": properties,
     }
+
+
+###############################################################################
+def _valid_latitude(value: object) -> bool:
+    return (
+        isinstance(value, int | float)
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+        and -90.0 <= float(value) <= 90.0
+    )
+
+
+###############################################################################
+def _valid_longitude(value: object) -> bool:
+    return (
+        isinstance(value, int | float)
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+        and -180.0 <= float(value) <= 180.0
+    )
+
+
+###############################################################################
+def _valid_geojson_geometry(value: dict[str, Any]) -> bool:
+    geometry_type = value.get("type")
+    if geometry_type == "GeometryCollection":
+        geometries = value.get("geometries")
+        return is_json_array(geometries) and all(
+            is_json_object(item) and _valid_geojson_geometry(item)
+            for item in geometries
+        )
+    if geometry_type not in {
+        "Point",
+        "MultiPoint",
+        "LineString",
+        "MultiLineString",
+        "Polygon",
+        "MultiPolygon",
+    }:
+        return False
+    return _valid_coordinate_array(value.get("coordinates"))
+
+
+###############################################################################
+def _valid_coordinate_array(value: object) -> bool:
+    if not is_json_array(value) or not value:
+        return False
+    if all(
+        isinstance(item, int | float) and not isinstance(item, bool)
+        for item in value
+    ):
+        return (
+            len(value) >= 2
+            and _valid_longitude(value[0])
+            and _valid_latitude(value[1])
+        )
+    return all(_valid_coordinate_array(item) for item in value)
 
 
 ###############################################################################
@@ -572,6 +633,13 @@ class GeospatialApiService:
             "stale": response.stale,
             "result_status": getattr(response, "result_status", "ok"),
             "result_type": getattr(response, "result_type", "unknown"),
+            "fetched_at": response.fetched_at.isoformat(),
+            "observation_time": response.observation_time,
+            "coverage": response.coverage,
+            "spatial_resolution": response.spatial_resolution,
+            "units": dict(response.units),
+            "source_url": response.source_url,
+            "partial": response.partial,
         }
 
     # -------------------------------------------------------------------------
@@ -591,6 +659,21 @@ class GeospatialApiService:
                 "bbox must be four comma-separated numbers."
             )
         min_lon, min_lat, max_lon, max_lat = parts
+        if not all(math.isfinite(value) for value in parts):
+            raise GeospatialInvalidRequestError("bbox must contain finite numbers.")
+        if (
+            not _valid_longitude(min_lon)
+            or not _valid_longitude(max_lon)
+            or not _valid_latitude(min_lat)
+            or not _valid_latitude(max_lat)
+        ):
+            raise GeospatialInvalidRequestError(
+                "bbox coordinates are outside supported geographic ranges."
+            )
+        if min_lon > max_lon or min_lat > max_lat:
+            raise GeospatialInvalidRequestError(
+                "bbox must be ordered west,south,east,north."
+            )
         return min_lon, min_lat, max_lon, max_lat
 
     # -------------------------------------------------------------------------

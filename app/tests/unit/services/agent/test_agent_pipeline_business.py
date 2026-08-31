@@ -10,6 +10,7 @@ from server.domain.agent.execution import AgentExecutionContext
 from server.domain.agent.extraction_schemas import LLMParserExtraction
 from server.domain.agent.pipeline import (
     TaskFailureDetail,
+    ToolInputBinding,
     ToolPlan,
     ToolPlanStep,
 )
@@ -739,5 +740,75 @@ def test_tool_output_validation_rejects_wrong_capability() -> None:
         )[0]
         assert result.ok is False
         assert result.error_code == "invalid_tool_output"
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_tool_plan_executor_binds_verified_predecessor_output() -> None:
+    async def _run() -> None:
+        registry = ToolRegistry(runtime_registry=_runtime())
+        observed: list[str] = []
+
+        async def handler(arguments, context):  # noqa: ANN001
+            value = arguments["value"]
+            observed.append(value)
+            if value == "seed":
+                return {
+                    "token": "derived",
+                    "provider": "test-provider",
+                    "result_status": "ok",
+                    "result_type": "metadata",
+                    "units": {"value": "unit"},
+                }
+            return {"value": value}
+
+        registry.register_native_tool(
+            LLMToolDefinition(
+                name="work",
+                description="work",
+                parameters_json_schema={
+                    "type": "object",
+                    "properties": {"value": {"type": "string"}},
+                    "required": ["value"],
+                },
+            ),
+            handler,
+        )
+        plan = ToolPlan(
+            tool_group="map_layers",
+            candidate_tools=["work"],
+            selected_tools=["work"],
+            steps=[
+                ToolPlanStep(
+                    step_id="source",
+                    tool_name="work",
+                    reason="produce a verified value",
+                    arguments={"value": "seed"},
+                ),
+                ToolPlanStep(
+                    step_id="consumer",
+                    tool_name="work",
+                    reason="consume the verified value",
+                    arguments={"value": "untrusted-placeholder"},
+                    depends_on=["source"],
+                    input_bindings=[
+                        ToolInputBinding(
+                            target="value",
+                            source_step_id="source",
+                            source_path="data.token",
+                        )
+                    ],
+                ),
+            ],
+        )
+        results = await ToolPlanExecutor(tool_registry=registry).execute(
+            plan,
+            AgentExecutionContext(),
+        )
+        assert observed == ["seed", "derived"]
+        assert all(result.ok for result in results)
+        assert results[0].provenance.provider == "test-provider"
+        assert results[0].provenance.units == {"value": "unit"}
 
     run_async_in_thread(_run())

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from urllib.parse import urlencode
 
 from server.common.typing import is_json_array, is_json_object, json_object
@@ -43,6 +44,7 @@ class USGSProvider(GeospatialProvider):
         if request.params.get("live"):
             payload = await call_json_fetcher(self.fetcher, features_url)
             features = _normalize_earthquake_features(payload)
+            features = _filter_features_to_bbox(features, request.bbox)
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -86,6 +88,7 @@ class USGSProvider(GeospatialProvider):
         if request.params.get("live"):
             payload = await call_json_fetcher(self.fetcher, features_url)
             features = _normalize_water_gauge_features(payload)
+            features = _filter_features_to_bbox(features, request.bbox)
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -140,9 +143,7 @@ def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
         if not is_json_array(coordinates) or len(coordinates) < 2:
             continue
         longitude, latitude = coordinates[0], coordinates[1]
-        if not isinstance(latitude, int | float) or not isinstance(
-            longitude, int | float
-        ):
+        if not _valid_coordinates(latitude, longitude):
             continue
         features.append(
             {
@@ -185,11 +186,7 @@ def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
             continue
         longitude, latitude = coordinates[0], coordinates[1]
         value = _float_or_none(properties.get("value"))
-        if (
-            not isinstance(latitude, int | float)
-            or not isinstance(longitude, int | float)
-            or value is None
-        ):
+        if not _valid_coordinates(latitude, longitude) or value is None:
             continue
         station_id = (
             properties.get("monitoring_location_id")
@@ -224,6 +221,37 @@ def _float_or_none(value: object) -> float | None:
     if not isinstance(value, int | float | str):
         return None
     try:
-        return float(value)
+        number = float(value)
     except TypeError, ValueError:
         return None
+    return number if math.isfinite(number) else None
+
+
+###############################################################################
+def _valid_coordinates(latitude: object, longitude: object) -> bool:
+    return (
+        isinstance(latitude, int | float)
+        and not isinstance(latitude, bool)
+        and isinstance(longitude, int | float)
+        and not isinstance(longitude, bool)
+        and math.isfinite(float(latitude))
+        and math.isfinite(float(longitude))
+        and -90.0 <= float(latitude) <= 90.0
+        and -180.0 <= float(longitude) <= 180.0
+    )
+
+
+###############################################################################
+def _filter_features_to_bbox(
+    features: list[dict[str, object]],
+    bbox: tuple[float, float, float, float] | None,
+) -> list[dict[str, object]]:
+    if bbox is None:
+        return features
+    west, south, east, north = bbox
+    return [
+        feature
+        for feature in features
+        if south <= float(feature["latitude"]) <= north
+        and west <= float(feature["longitude"]) <= east
+    ]

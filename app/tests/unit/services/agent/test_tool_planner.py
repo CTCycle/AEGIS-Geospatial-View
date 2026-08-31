@@ -123,3 +123,40 @@ def test_non_additive_overlay_command_does_not_emit_provider_layer_addition() ->
     assert plan.steps == []
     assert "add_layer_ids" not in plan.visualization_update
     assert "overlay_commands" in plan.visualization_update
+
+
+###############################################################################
+def test_atomic_task_dependencies_and_bindings_reach_executable_plan() -> None:
+    first_layer = "openmeteo_air_quality_forecast"
+    second_layer = "openmeteo_weather_forecast"
+    turn = _turn(
+        "Compare the conditions using the first result",
+        layers=[first_layer, second_layer],
+    ).model_copy(
+        update={
+            "atomic_tasks": [
+                {
+                    "id": "fetch-air-quality",
+                    "required_layers": [first_layer],
+                    "output_refs": ["air-quality-result"],
+                },
+                {
+                    "id": "compare-weather",
+                    "required_layers": [second_layer],
+                    "depends_on": ["fetch-air-quality"],
+                    "input_refs": [
+                        "fetch-air-quality:data.direct_result->arguments.reference"
+                    ],
+                },
+            ]
+        }
+    )
+
+    plan = DeterministicToolPlanner().build_plan(turn, "environmental_data")
+
+    first, second = plan.steps
+    assert first.parallel_group == "capability-fetch"
+    assert second.depends_on == [first.step_id]
+    assert second.input_bindings[0].target == "arguments.reference"
+    assert second.input_bindings[0].source_step_id == first.step_id
+    assert first.output_refs == ["air-quality-result"]

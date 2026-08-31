@@ -50,6 +50,28 @@ class OpenMeteoProvider(GeospatialProvider):
             provider_id=self.provider_id,
             payload=normalized,
             attribution=[str(payload.get("attribution") or "Data from Open-Meteo")],
+            observation_time=(
+                str(payload.get("observation_time"))
+                if payload.get("observation_time")
+                else None
+            ),
+            coverage=json_object(payload.get("coverage")) or None,
+            spatial_resolution=(
+                str(payload.get("spatial_resolution"))
+                if payload.get("spatial_resolution")
+                else None
+            ),
+            units={
+                str(key): str(value)
+                for key, value in json_object(payload.get("units")).items()
+                if isinstance(key, str) and isinstance(value, str)
+            },
+            source_url=(
+                self.service.air_quality_base_url
+                if "air_quality" in request.capability_id
+                else self.service.weather_base_url
+            ),
+            result_type="features" if rendering_mode != "metadata-only" else "metadata",
         )
 
     # -------------------------------------------------------------------------
@@ -67,6 +89,10 @@ class OpenMeteoProvider(GeospatialProvider):
             "hourlyPreview": payload.get("hourly_preview") or [],
             "features": self._features(payload, rendering_mode=rendering_mode),
             "resolvedAt": payload.get("resolved_at"),
+            "observation_time": payload.get("observation_time"),
+            "units": payload.get("units") or {},
+            "spatial_resolution": payload.get("spatial_resolution"),
+            "coverage": payload.get("coverage"),
         }
 
     # -------------------------------------------------------------------------
