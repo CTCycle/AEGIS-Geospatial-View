@@ -361,7 +361,6 @@ class ToolRegistry:
 
     # -------------------------------------------------------------------------
     def load_tool_bindings(self) -> dict[str, ToolHandler]:
-        self.runtime_registry.build_snapshot()
         handler_lookup: dict[str, ToolHandler] = {
             "coordinates": coordinates.execute,
             "weather": weather.execute,
@@ -369,7 +368,7 @@ class ToolRegistry:
             "poi": poi.execute,
         }
         bindings: dict[str, ToolHandler] = {}
-        for capability_id, profile in self.runtime_registry._ensure().profiles.items():  # pyright: ignore[reportPrivateUsage]
+        for capability_id, profile in self.runtime_registry.snapshot.profiles.items():
             handler_name = str(profile.get("handler_name") or "").strip()
             if not handler_name:
                 continue

@@ -265,7 +265,6 @@ class RenderDescriptorService:
         request: LocationSearchRequest,
         refresh: bool = False,
     ) -> tuple[dict[str, object], list[str]]:
-        self.provider_registry.build_from_manifests()
         layer = await self.provider_registry.describe_layer(
             provider_id, layer_id, refresh=refresh
         )

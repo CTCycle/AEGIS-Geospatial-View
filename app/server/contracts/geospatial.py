@@ -417,7 +417,7 @@ class NormalizationPolicy(BaseModel):
 
 ###############################################################################
 class CapabilityManifestV2(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
     id: str
     name: str
@@ -438,6 +438,11 @@ class CapabilityManifestV2(BaseModel):
     cache_policy: CachePolicy = Field(alias="cachePolicy")
     normalization: NormalizationPolicy
     metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    account_setup: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    storage: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    indexing: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    download: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    validation: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 
 ###############################################################################

@@ -12,6 +12,7 @@ from server.contracts.geospatial import (
     GeospatialProviderLayersResponse,
     LayerAuditReport,
 )
+from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.catalog import GeospatialCatalogService
 from server.services.geospatial.credential_resolver import (
     GeospatialCredentialResolutionError,
@@ -180,13 +181,18 @@ class GeospatialApiService:
         self,
         *,
         catalog_service: GeospatialCatalogService,
-        manifest_loader: GeospatialManifestLoader,
+        catalog_snapshot: GeospatialManifestSnapshot | None = None,
+        manifest_loader: GeospatialManifestLoader | None = None,
         runtime_registry: RuntimeRegistry,
         provider_registry: ProviderRegistry,
         credential_resolver: GeospatialCredentialResolver | None = None,
     ) -> None:
         self.catalog_service = catalog_service
-        self.manifest_loader = manifest_loader
+        loader = manifest_loader or GeospatialManifestLoader()
+        self.catalog_snapshot = (
+            catalog_snapshot
+            or GeospatialManifestSnapshot.from_payload(loader.load_all())
+        )
         self.runtime_registry = runtime_registry
         self.provider_registry = provider_registry
         self.credential_resolver = (
@@ -227,7 +233,6 @@ class GeospatialApiService:
         limit: int,
         refresh: bool,
     ) -> GeospatialProviderLayersResponse:
-        self.provider_registry.build_from_manifests()
         try:
             layers = await self.provider_registry.list_layers(
                 provider_id,
@@ -254,7 +259,6 @@ class GeospatialApiService:
         *,
         refresh: bool,
     ) -> GeospatialProviderLayerResponse:
-        self.provider_registry.build_from_manifests()
         try:
             layer = await self.provider_registry.describe_layer(
                 provider_id,
@@ -502,7 +506,6 @@ class GeospatialApiService:
 
     # -------------------------------------------------------------------------
     def _manifest_by_id(self, capability_id: str) -> dict[str, Any]:
-        payload = self.manifest_loader.load_all()
         collection_names = (
             "basemaps",
             "overlays",
@@ -512,9 +515,7 @@ class GeospatialApiService:
             "providers",
         )
         for collection_name in collection_names:
-            for item in json_array(payload.get(collection_name)):
-                if not is_json_object(item):
-                    continue
+            for item in getattr(self.catalog_snapshot, collection_name):
                 if str(item.get("id") or "") == capability_id:
                     return dict(item)
         raise GeospatialCapabilityNotFoundError(
@@ -525,7 +526,6 @@ class GeospatialApiService:
     async def _fetch_provider_payload(
         self, provider_id: str, request: ProviderRequest
     ) -> dict[str, Any]:
-        self.provider_registry.build_from_manifests()
         try:
             response = await self.provider_registry.fetch(provider_id, request)
         except ProviderAuthError as exc:
@@ -636,11 +636,8 @@ class GeospatialApiService:
 
     # -------------------------------------------------------------------------
     def _iter_manifest_payloads_for_account_setup(self) -> Iterator[dict[str, Any]]:
-        payload = self.manifest_loader.load_all()
         for collection_name in ("providers", "overlays", "transit", "cameras"):
-            for item in json_array(payload.get(collection_name)):
-                if is_json_object(item):
-                    yield item
+            yield from getattr(self.catalog_snapshot, collection_name)
 
     # -------------------------------------------------------------------------
     def _extract_account_setup_record(

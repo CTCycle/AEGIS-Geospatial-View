@@ -601,7 +601,7 @@ class AgentToolCatalogService:
 
     # -------------------------------------------------------------------------
     def _all_capabilities(self) -> list[dict[str, Any]]:
-        snapshot = self.capability_registry.load_capabilities()
+        snapshot = self.capability_registry.snapshot
         return [
             *snapshot.basemaps,
             *snapshot.overlays,

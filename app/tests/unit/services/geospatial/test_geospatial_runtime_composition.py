@@ -18,17 +18,18 @@ def test_build_geospatial_runtime_reuses_shared_services(sqlite_backend) -> None
     assert isinstance(runtime, GeospatialRuntime)
     assert isinstance(runtime.api_service, GeospatialApiService)
     assert runtime.api_service.catalog_service.capability_registry is not None
-    assert (
-        runtime.api_service.catalog_service.capability_registry.manifest_loader
-        is runtime.api_service.manifest_loader
-    )
+    assert runtime.api_service.catalog_snapshot is runtime.catalog_snapshot
     assert (
         runtime.api_service.catalog_service.runtime_registry
         is runtime.api_service.runtime_registry
     )
     assert (
-        runtime.api_service.provider_registry.manifest_loader
-        is runtime.api_service.manifest_loader
+        runtime.api_service.catalog_service.capability_registry.catalog_snapshot
+        is runtime.catalog_snapshot
+    )
+    assert (
+        runtime.api_service.provider_registry.catalog_snapshot
+        is runtime.catalog_snapshot
     )
 
 

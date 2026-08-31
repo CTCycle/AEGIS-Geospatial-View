@@ -1,17 +1,64 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_array, is_json_object
+from server.common.typing import is_json_object
 
 import json
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from server.common.paths import PROJECT_DIR, ROOT_DIR
 from server.contracts.geospatial import CapabilityManifestV2
 
 type JsonDict = dict[str, Any]
+
+
+###############################################################################
+class CatalogIndex(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
+    providers_dir: str
+    basemaps_dir: str
+    overlays_dir: str
+    cameras_dir: str
+    transit_dir: str
+    tools_dir: str
+    runtime_profiles_file: str
+    manifest_schema_version: int
+    source_catalog_version: str
+    capability_groups: list[str]
+    health_summary: dict[str, int]
+
+
+###############################################################################
+class RuntimeProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    capability_id: str
+    enabled_by_default: bool
+    credential_provider: str | None
+    supports_map: bool
+    supports_direct_text: bool
+    coverage_policy: str
+    health_policy: str
+    handler_name: str | None
+    capability_kind: str
+    rendering_mode: str
+    health_status: str
+    planner_hints: list[str]
+    manual_toggle: bool
+    auth_required: bool
+
+
+###############################################################################
+class RuntimeProfilesDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
+    profiles: list[RuntimeProfile]
+    routing_profiles: list[str]
 
 
 ###############################################################################
@@ -66,7 +113,12 @@ class GeospatialManifestLoader:
         payload = self._load_json(self.index_path)
         if not is_json_object(payload):
             raise ManifestValidationError("Manifest index must be an object.")
-        return payload
+        try:
+            return CatalogIndex.model_validate(payload).model_dump()
+        except ValidationError as exc:
+            raise ManifestValidationError(
+                f"Manifest index failed validation: {exc}"
+            ) from exc
 
     # -------------------------------------------------------------------------
     def _validate_entry(
@@ -99,7 +151,9 @@ class GeospatialManifestLoader:
     def _load_directory_entries(self, relative_dir: str) -> list[JsonDict]:
         folder = Path(self.root_path) / relative_dir
         if not folder.is_dir():
-            return []
+            raise ManifestValidationError(
+                f"Manifest directory '{folder}' does not exist."
+            )
         entries: list[JsonDict] = []
         for path in sorted(folder.iterdir()):
             if path.suffix.lower() != ".json":
@@ -120,47 +174,24 @@ class GeospatialManifestLoader:
         payload = self._load_json(path)
         if not is_json_object(payload):
             raise ManifestValidationError("Runtime profiles must be an object.")
-        profiles = payload.get("profiles")
-        if not is_json_array(profiles):
+        try:
+            document = RuntimeProfilesDocument.model_validate(payload)
+        except ValidationError as exc:
             raise ManifestValidationError(
-                "Runtime profiles must contain a profiles list."
-            )
-        normalized: list[JsonDict] = []
-        for item in profiles:
-            if not is_json_object(item):
-                raise ManifestValidationError(
-                    "Runtime profile entries must be objects."
-                )
-            capability_id = str(item.get("capability_id") or "").strip()
-            if not capability_id:
-                raise ManifestValidationError(
-                    "Runtime profile entry missing capability_id."
-                )
-            normalized.append(dict(item))
-        return normalized
+                f"Runtime profiles failed validation: {exc}"
+            ) from exc
+        return [profile.model_dump() for profile in document.profiles]
 
     # -------------------------------------------------------------------------
     def load_all(self) -> JsonDict:
         index = self.load_index()
-        providers = self._load_directory_entries(
-            str(index.get("providers_dir") or "providers")
-        )
-        basemaps = self._load_directory_entries(
-            str(index.get("basemaps_dir") or "basemaps")
-        )
-        overlays = self._load_directory_entries(
-            str(index.get("overlays_dir") or "overlays")
-        )
-        tools = self._load_directory_entries(str(index.get("tools_dir") or "tools"))
-        cameras = self._load_directory_entries(
-            str(index.get("cameras_dir") or "cameras")
-        )
-        transit = self._load_directory_entries(
-            str(index.get("transit_dir") or "transit")
-        )
-        runtime_profiles = self._load_runtime_profiles(
-            str(index.get("runtime_profiles_file") or "runtime_profiles.json")
-        )
+        providers = self._load_directory_entries(index["providers_dir"])
+        basemaps = self._load_directory_entries(index["basemaps_dir"])
+        overlays = self._load_directory_entries(index["overlays_dir"])
+        tools = self._load_directory_entries(index["tools_dir"])
+        cameras = self._load_directory_entries(index["cameras_dir"])
+        transit = self._load_directory_entries(index["transit_dir"])
+        runtime_profiles = self._load_runtime_profiles(index["runtime_profiles_file"])
         return {
             "providers": providers,
             "basemaps": basemaps,
