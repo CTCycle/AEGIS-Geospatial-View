@@ -39,10 +39,6 @@ from server.services.geospatial.providers.http import fetch_bytes_url
 from server.services.geospatial.providers.tomtom import build_tomtom_tile_url
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-CAMERA_PROVIDER_ALIASES = {
-    "windy": "windy_webcams",
-}
-
 
 ###############################################################################
 class GeospatialApiServiceError(Exception):
@@ -468,13 +464,11 @@ class GeospatialApiService:
 
     # -------------------------------------------------------------------------
     def get_credential_status(self, provider_id: str) -> dict[str, Any]:
-        env_name = self.credential_resolver.environment_name(provider_id)
         configured = self.credential_resolver.is_configured(provider_id)
         return {
             "provider": provider_id,
             "required": self._provider_requires_credentials(provider_id),
             "configured": configured,
-            "environmentVariable": env_name,
         }
 
     # -------------------------------------------------------------------------
@@ -617,10 +611,7 @@ class GeospatialApiService:
                 provider_id = provider_id.strip()
                 provider_camera_id = provider_camera_id.strip()
                 if provider_id and provider_camera_id:
-                    canonical_provider_id = CAMERA_PROVIDER_ALIASES.get(
-                        provider_id, provider_id
-                    )
-                    return canonical_provider_id, provider_camera_id
+                    return provider_id, provider_camera_id
         return None, normalized
 
     # -------------------------------------------------------------------------
@@ -632,7 +623,7 @@ class GeospatialApiService:
             provider_key = str(auth.get("providerKey") or "")
             if provider_id in {manifest_provider, access_id, provider_key}:
                 return bool(auth.get("required"))
-        return self.credential_resolver.environment_name(provider_id) is not None
+        return False
 
     # -------------------------------------------------------------------------
     def _iter_manifest_payloads_for_account_setup(self) -> Iterator[dict[str, Any]]:
@@ -665,7 +656,6 @@ class GeospatialApiService:
         if provider_key in {"census", "openaip", "sentinel_hub"}:
             return None
 
-        env_name = self.credential_resolver.environment_name(provider_key)
         docs_url = self._extract_docs_url(payload)
         automation = self._build_account_setup_automation(
             provider_key=provider_key,
@@ -675,7 +665,6 @@ class GeospatialApiService:
         instructions = self._build_account_setup_instructions(
             provider_id=provider_key,
             docs_url=docs_url,
-            env_name=env_name,
             required=True,
         )
         metadata = json_object(payload.get("metadata"))
@@ -685,7 +674,6 @@ class GeospatialApiService:
             "requires_credentials": True,
             "auth_mode": str(auth.get("type") or "api-key"),
             "docs_url": docs_url,
-            "environment_variable": env_name,
             "configured": self.credential_resolver.is_configured(provider_key),
             "instructions": instructions,
             "automation": automation,
@@ -855,7 +843,6 @@ class GeospatialApiService:
         *,
         provider_id: str,
         docs_url: str | None,
-        env_name: str | None,
         required: bool,
     ) -> list[str]:
         if not required:
@@ -870,14 +857,9 @@ class GeospatialApiService:
         instructions.append(
             "Generate an API key or access token with map/data read permissions."
         )
-        if env_name:
-            instructions.append(
-                f"Set the key in the {env_name} environment variable or save it through Access settings."
-            )
-        else:
-            instructions.append(
-                f"Store the key using the access configuration for {provider_id}."
-            )
+        instructions.append(
+            f"Store the key using the encrypted Access settings for {provider_id}."
+        )
         instructions.append("Refresh AEGIS so the runtime can detect the credential.")
         return instructions
 
@@ -893,10 +875,6 @@ class GeospatialApiService:
         y: int,
     ) -> str:
         if "{api_key}" in template:
-            if self.credential_resolver.environment_name(provider) is None:
-                raise GeospatialUnsupportedTileError(
-                    f"No credential mapping is configured for provider '{provider}'."
-                )
             try:
                 api_key = self.credential_resolver.resolve(provider, mark_used=True)
             except GeospatialCredentialResolutionError as exc:

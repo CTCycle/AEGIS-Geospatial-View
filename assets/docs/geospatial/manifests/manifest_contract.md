@@ -33,7 +33,7 @@ Every metadata object must expose:
 ## Behavior Rules
 
 - Schema v2 is the only accepted manifest contract.
-- Credential-backed providers use encrypted credential storage with environment fallback.
+- Credential-backed providers use encrypted credential storage without environment fallback.
 - Queryable claims are reserved for structured machine-readable sources.
 - `metadata-only` capabilities must not claim renderable geometry.
 - Disabled or broken layers must remain unavailable until manifest, runtime, credentials, and health allow rendering.

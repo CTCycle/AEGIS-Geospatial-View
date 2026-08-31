@@ -12,6 +12,12 @@ from server.services.geospatial.providers.base import ProviderRequest, ProviderR
 
 ###############################################################################
 class _LiveValidationRegistry:
+    credential_resolver = type(
+        "CredentialResolver",
+        (),
+        {"is_configured": staticmethod(lambda provider_id: False)},
+    )()
+
     # -------------------------------------------------------------------------
     def build_from_manifests(self) -> None:
         return None
@@ -70,15 +76,14 @@ def test_live_validator_runs_public_provider_checks_with_injected_registry() -> 
 
 
 ###############################################################################
-def test_live_validator_skips_whitespace_only_credentials(monkeypatch) -> None:
-    monkeypatch.setenv("TOMTOM_API_KEY", "   ")
+def test_live_validator_skips_missing_saved_credentials() -> None:
 
     result = run_async_in_thread(
         _run_check(_LiveValidationRegistry(), CREDENTIAL_LIVE_CHECKS[0])
     )
 
     assert result.status == "skipped"
-    assert "TOMTOM_API_KEY" in (result.message or "")
+    assert "saved credential" in (result.message or "")
 
 
 ###############################################################################

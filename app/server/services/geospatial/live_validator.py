@@ -5,7 +5,6 @@ from server.common.typing import is_json_array, is_json_object
 import argparse
 import asyncio
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any, Callable
@@ -86,7 +85,7 @@ CREDENTIAL_LIVE_CHECKS = (
             bbox=(12.45, 41.88, 12.55, 41.93),
             params={"incidents": True},
         ),
-        credential_env="TOMTOM_API_KEY",
+        requires_credentials=True,
     ),
     LiveCheck(
         provider_id="opentripmap",
@@ -101,7 +100,7 @@ CREDENTIAL_LIVE_CHECKS = (
                 "limit": 10,
             },
         ),
-        credential_env="OPENTRIPMAP_API_KEY",
+        requires_credentials=True,
     ),
     LiveCheck(
         provider_id="windy_webcams",
@@ -110,7 +109,7 @@ CREDENTIAL_LIVE_CHECKS = (
             bbox=(12.45, 41.88, 12.55, 41.92),
             params={"live": True},
         ),
-        credential_env="WINDY_WEBCAMS_API_KEY",
+        requires_credentials=True,
     ),
     LiveCheck(
         provider_id="openaq",
@@ -124,7 +123,7 @@ CREDENTIAL_LIVE_CHECKS = (
                 "pollutants": ["pm25", "pm10", "no2"],
             },
         ),
-        credential_env="OPENAQ_API_KEY",
+        requires_credentials=True,
     ),
     LiveCheck(
         provider_id="nasa_firms",
@@ -133,7 +132,7 @@ CREDENTIAL_LIVE_CHECKS = (
             bbox=(12.0, 41.5, 13.0, 42.2),
             params={"live": True},
         ),
-        credential_env="NASA_API_KEY",
+        requires_credentials=True,
     ),
     LiveCheck(
         provider_id="mobility_database",
@@ -153,7 +152,6 @@ async def validate_live_geospatial_sources(
     registry_factory: Callable[[], ProviderRegistry] = ProviderRegistry,
 ) -> LiveValidationReport:
     registry = registry_factory()
-    registry.build_from_manifests()
     checks = list(PUBLIC_LIVE_CHECKS)
     if include_credentialed:
         checks.extend(CREDENTIAL_LIVE_CHECKS)
@@ -172,12 +170,14 @@ async def validate_live_geospatial_sources(
 async def _run_check(
     registry: ProviderRegistry, check: LiveCheck
 ) -> LiveValidationCheckResult:
-    if check.credential_env and not os.getenv(check.credential_env, "").strip():
+    if check.requires_credentials and not registry.credential_resolver.is_configured(
+        check.provider_id
+    ):
         return LiveValidationCheckResult(
             provider_id=check.provider_id,
             capability_id=check.request.capability_id,
             status="skipped",
-            message=f"Missing optional credential environment variable {check.credential_env}.",
+            message=f"Missing saved credential for provider '{check.provider_id}'.",
         )
     try:
         response = await registry.fetch(check.provider_id, check.request)

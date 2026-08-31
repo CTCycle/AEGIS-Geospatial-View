@@ -9,7 +9,6 @@ from server.domain.geospatial.registry import (
     RuntimeRegistrySnapshot,
 )
 from server.services.geospatial.credential_resolver import (
-    GEOSPATIAL_CREDENTIAL_ENV_BY_PROVIDER,
     CredentialStore,
     GeospatialCredentialResolver,
 )
@@ -18,8 +17,6 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
 ###############################################################################
 class RuntimeRegistry:
-    CREDENTIAL_ENV_BY_PROVIDER = GEOSPATIAL_CREDENTIAL_ENV_BY_PROVIDER
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

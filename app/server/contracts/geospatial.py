@@ -246,7 +246,6 @@ class GeospatialCredentialStatusResponse(BaseModel):
     provider: str
     required: bool
     configured: bool
-    environmentVariable: str | None = None
 
 
 ###############################################################################
@@ -287,7 +286,6 @@ class GeospatialProviderAccountSetupResponse(BaseModel):
     requires_credentials: bool
     auth_mode: str
     docs_url: str | None = None
-    environment_variable: str | None = None
     configured: bool = False
     instructions: list[str] = Field(default_factory=lambda: list[str]())
     automation: GeospatialProviderSignupAutomation

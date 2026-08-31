@@ -58,11 +58,10 @@ Defined in `app/server/api/geospatial.py`:
   Returns `LayerAuditReport`.
 
 Geospatial credential status and provider execution use the same
-`GeospatialCredentialResolver`. An active encrypted database credential is
-decrypted and used first; an environment variable is consulted only when no
-saved credential exists. A saved but undecryptable credential is reported as
-unconfigured or as a structured credential-resolution error rather than being
-silently replaced by a different source.
+`GeospatialCredentialResolver`. It reads the active encrypted SQLite credential,
+decrypts and validates it, and reports a saved but undecryptable credential as
+unconfigured or as a structured credential-resolution error. There is no
+environment-variable fallback.
 
 ## Chat And Model Routes
 

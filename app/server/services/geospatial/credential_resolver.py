@@ -1,26 +1,6 @@
 from __future__ import annotations
 
-import os
 from typing import Any, Protocol
-
-###############################################################################
-GEOSPATIAL_CREDENTIAL_ENV_BY_PROVIDER: dict[str, str] = {
-    "arcgis": "ARCGIS_API_KEY",
-    "census": "CENSUS_API_KEY",
-    "google": "GOOGLE_API_KEY",
-    "google_maps": "GOOGLE_MAPS_API_KEY",
-    "mapillary": "MAPILLARY_ACCESS_TOKEN",
-    "nasa": "NASA_API_KEY",
-    "nasa_firms": "NASA_API_KEY",
-    "openaq": "OPENAQ_API_KEY",
-    "openchargemap": "OPENCHARGEMAP_API_KEY",
-    "openaip": "OPENAIP_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "opentripmap": "OPENTRIPMAP_API_KEY",
-    "sentinel_hub": "SENTINEL_HUB_CLIENT_ID",
-    "tomtom": "TOMTOM_API_KEY",
-    "windy_webcams": "WINDY_WEBCAMS_API_KEY",
-}
 
 
 ###############################################################################
@@ -49,7 +29,7 @@ class GeospatialCredentialResolutionError(RuntimeError):
 
 ###############################################################################
 class GeospatialCredentialResolver:
-    """Resolve saved geospatial credentials before environment fallbacks."""
+    """Resolve credentials exclusively from encrypted SQLite storage."""
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -65,13 +45,6 @@ class GeospatialCredentialResolver:
     @property
     def credentials_repo(self) -> CredentialStore | None:
         return self._credentials_repo
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def environment_name(provider_id: str) -> str | None:
-        return GEOSPATIAL_CREDENTIAL_ENV_BY_PROVIDER.get(
-            str(provider_id).strip().lower()
-        )
 
     # -------------------------------------------------------------------------
     def resolve(
@@ -115,11 +88,7 @@ class GeospatialCredentialResolver:
                 )
             return normalized_value
 
-        environment_name = self.environment_name(normalized_provider)
-        if environment_name is None:
-            return None
-        value = os.getenv(environment_name, "").strip()
-        return value or None
+        return None
 
     # -------------------------------------------------------------------------
     def is_configured(self, provider_id: str, *, label: str = "api_key") -> bool:
@@ -161,7 +130,6 @@ class GeospatialCredentialResolver:
 __all__ = [
     "CredentialDecryptor",
     "CredentialStore",
-    "GEOSPATIAL_CREDENTIAL_ENV_BY_PROVIDER",
     "GeospatialCredentialResolutionError",
     "GeospatialCredentialResolver",
 ]
