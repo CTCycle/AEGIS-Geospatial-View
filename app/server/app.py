@@ -30,6 +30,7 @@ from server.repositories.database.initializer import initialize_database
 from server.repositories.database.sqlite import SQLiteRepository
 from server.services.chat.composition import build_chat_runtime
 from server.services.chat.streaming import ChatStreamingService
+from server.services.chat.conversation_snapshot import ConversationSnapshotService
 from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.lifecycle import RunLifecycleService
@@ -128,6 +129,11 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     run_event_publisher = RunEventPublisher(AgentRunEventRepository(database))
     run_repository = AgentRunRepository(database)
     conversation_repository = chat_runtime.conversation_repository
+    conversation_snapshot_service = ConversationSnapshotService(
+        conversation_repository=conversation_repository,
+        history_service=chat_runtime.history_service,
+        run_repository=run_repository,
+    )
     aggregation_service = AggregatedRequestService()
     run_orchestrator = AgentRunOrchestrator(
         agent_orchestrator=chat_runtime.agent_orchestrator,
@@ -168,6 +174,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     application.state.run_lifecycle_service = run_lifecycle_service
     application.state.run_steering_service = run_steering_service
     application.state.conversation_repository = conversation_repository
+    application.state.conversation_snapshot_service = conversation_snapshot_service
     application.state.run_repository = run_repository
     application.state.run_event_publisher = run_event_publisher
     application.state.realtime_connections = realtime_connections

@@ -46,6 +46,7 @@ describe('pages/geospatial-page.component', () => {
 
     apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', [
       'createConversation',
+      'fetchConversationSnapshot',
       'sendChatTurn',
       'fetchCatalog',
       'fetchChatSettings',
@@ -90,12 +91,48 @@ describe('pages/geospatial-page.component', () => {
   it('loads initial persisted state', () => {
     const seeded = defaultAppState().chatPage;
     seeded.chatPanel.composerDraft = 'seed draft';
-    seeded.chatPanel.messages = [{ role: 'user', content: 'hello' }];
+    seeded.chatPanel.conversationId = undefined;
     store.getChatPage.and.returnValue(seeded);
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     expect(fixture.componentInstance.composerDraft).toBe('seed draft');
-    expect(fixture.componentInstance.messages.length).toBe(1);
+    expect(fixture.componentInstance.messages.length).toBe(0);
+  });
+
+  it('hydrates durable conversation state before connecting realtime', async () => {
+    const seeded = defaultAppState().chatPage;
+    seeded.chatPanel.conversationId = 'conv-restore';
+    seeded.chatPanel.lastRunSequence = 7;
+    store.getChatPage.and.returnValue(seeded);
+    apiClient.fetchConversationSnapshot.and.resolveTo({
+      conversation_id: 'conv-restore',
+      title: 'Restored conversation',
+      context_revision: 3,
+      messages: [
+        { role: 'user', content: 'Show Rome', created_at: '2026-08-31T10:00:00Z' },
+        { role: 'assistant', content: 'Restored', created_at: '2026-08-31T10:00:01Z' },
+      ],
+      task_snapshot: null,
+      memory_snapshot: { location_slots: [] },
+      map_session: null,
+      active_run: { run_id: 'run-restore', run_version: 2, state: 'running' },
+    });
+    const connectSpy = spyOn(realtime, 'connect').and.callThrough();
+
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(apiClient.fetchConversationSnapshot).toHaveBeenCalledWith('conv-restore');
+    expect(fixture.componentInstance.contextRevision).toBe(3);
+    expect(fixture.componentInstance.messages.map((message) => message.content)).toEqual(['Show Rome', 'Restored']);
+    expect(fixture.componentInstance.activeRunId).toBe('run-restore');
+    expect(fixture.componentInstance.isLoading).toBeTrue();
+    expect(connectSpy.calls.mostRecent().args[0]).toBe('conv-restore');
+    expect(connectSpy.calls.mostRecent().args[1]).toEqual({
+      runId: 'run-restore',
+      afterSequence: 7,
+    });
   });
 
   it('sendMessage happy path updates status and appends assistant', async () => {
@@ -574,17 +611,7 @@ describe('pages/geospatial-page.component', () => {
     expect(fixture.nativeElement.querySelector('.rail-context-strip')).toBeNull();
   });
 
-  it('refreshes a persisted context indicator after the selected model changes', async () => {
-    const seeded = defaultAppState().chatPage;
-    seeded.chatPanel.contextUsage = {
-      estimated_input_tokens: 120,
-      selected_context_window: 2048,
-      model_context_limit: 2048,
-      usage_percent: 5.9,
-      provider: 'ollama',
-      model: 'llama3.2',
-    };
-    store.getChatPage.and.returnValue(seeded);
+  it('loads the context indicator from current backend model settings', async () => {
     apiClient.fetchChatSettings.and.resolveTo({
       active_provider_mode: 'local',
       agent_model_provider: 'ollama',

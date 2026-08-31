@@ -3,6 +3,7 @@ import {
   API_CHAT_MODELS_PATH,
   API_CHAT_SETTINGS_PATH,
   API_CHAT_TURN_PATH,
+  API_CONVERSATION_PATH,
   API_CONVERSATIONS_PATH,
   API_GEOSPATIAL_CAMERAS_PATH,
   API_GEOSPATIAL_CAPABILITIES_PATH,
@@ -18,6 +19,7 @@ import {
   normalizeModelCards,
   parseCatalogResponse,
   parseChatTurnResponse,
+  parseConversationSnapshotResponse,
   parseGeospatialProviderAccountSetups,
   parseModelLibrarySources,
   parseModelSettingsResponse,
@@ -28,6 +30,7 @@ import {
   ChatTurnResponse,
   ConversationCreateRequest,
   ConversationCreateResponse,
+  ConversationSnapshotResponse,
   GenericObjectResponse,
   GeospatialCredentialStatus,
   GeospatialProviderAccountSetupListResponse,
@@ -179,6 +182,16 @@ export const createConversation = async (
     body: JSON.stringify(payload),
   });
   return data as ConversationCreateResponse;
+};
+
+export const fetchConversationSnapshot = async (
+  conversationId: string,
+): Promise<ConversationSnapshotResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CONVERSATION_PATH(conversationId)}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  return parseConversationSnapshotResponse(data);
 };
 
 export const fetchChatModels = async (

@@ -35,6 +35,7 @@ import {
   CapabilityDescriptor,
   CatalogResponse,
   RealtimeServerMessage,
+  RealtimeConnectionState,
   RunEvent,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
@@ -66,7 +67,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   taskSnapshot?: ConversationTaskSnapshot;
   activeRunId?: string;
   activeRunVersion?: number;
-  streamState: PersistedChatPageState['chatPanel']['streamState'] = 'idle';
+  streamState: RealtimeConnectionState = 'idle';
   progressStage?: string;
   progressLabel?: string;
   conversationNonce = 1;
@@ -102,7 +103,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   private isDestroyed = false;
   private pendingMapSession?: MapSession;
   private lastRunSequence = 0;
-  private pendingRun?: PersistedChatPageState['chatPanel']['pendingRun'];
+  private pendingRun?: { clientRequestId: string; message: string };
   private removeRealtimeMessageListener?: () => void;
   private removeRealtimeStateListener?: () => void;
   private cancelRequested = false;
@@ -119,31 +120,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     private readonly changeDetectorRef: ChangeDetectorRef,
   ) {
     this.chatPageState = this.appStateStore.getChatPage();
-    this.payload = this.chatPageState.payload;
     this.toolbarWidthState = this.chatPageState.toolbarWidth;
     this.isToolbarCollapsed = this.chatPageState.isToolbarCollapsed;
     this.mapState = this.chatPageState.mapState;
 
     this.conversationId = this.chatPageState.chatPanel.conversationId;
-    this.contextRevision = this.chatPageState.chatPanel.contextRevision;
-    this.taskSnapshot = this.chatPageState.chatPanel.taskSnapshot;
-    this.activeRunId = this.chatPageState.chatPanel.activeRunId;
-    this.activeRunVersion = this.chatPageState.chatPanel.activeRunVersion;
-    this.pendingRun = this.chatPageState.chatPanel.pendingRun;
     this.lastRunSequence = this.chatPageState.chatPanel.lastRunSequence ?? 0;
-    this.streamState = this.chatPageState.chatPanel.streamState ?? 'idle';
-    this.progressStage = this.chatPageState.chatPanel.progressStage;
-    this.progressLabel = this.chatPageState.chatPanel.progressLabel;
-    this.seenEventIds = new Set(this.chatPageState.chatPanel.seenRunEventIds ?? []);
-    this.conversationNonce = this.chatPageState.chatPanel.conversationNonce;
-    this.messages = this.chatPageState.chatPanel.messages;
-    this.lastDecision = this.chatPageState.chatPanel.lastDecision;
-    this.lastOperation = this.chatPageState.chatPanel.lastOperation;
-    this.memorySnapshot = this.chatPageState.chatPanel.memorySnapshot ?? {};
-    this.contextUsage = this.chatPageState.chatPanel.contextUsage;
-    this.mapSession = this.chatPageState.chatPanel.mapSession;
-    this.status = this.chatPageState.chatPanel.status;
-    this.assistantDraft = this.chatPageState.chatPanel.assistantDraft;
     this.composerDraft = this.chatPageState.chatPanel.composerDraft;
     this.transcriptScrollTop = this.chatPageState.chatPanel.transcriptScrollTop;
   }
@@ -158,19 +140,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.changeDetectorRef.detectChanges();
     });
     if (this.conversationId) {
-      this.realtimeService.connect(this.conversationId, {
-        runId: this.activeRunId,
-        afterSequence: this.lastRunSequence,
-      });
-      // If a page reload happened after conversation creation but before the
-      // start acknowledgement, replay the same idempotent command.  The
-      // server's client_request_id prevents an orphaned run or duplicate run.
-      if (!this.activeRunId && this.pendingRun) {
-        this.realtimeService.sendRunStart(
-          this.pendingRun.message,
-          this.pendingRun.clientRequestId,
-        );
-      }
+      void this.hydrateConversation(this.conversationId);
     }
     void this.loadAgentStatus();
     void this.loadCatalog();
@@ -379,6 +349,116 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.composerDraft = value;
     this.composerError = '';
     this.syncState();
+  }
+
+  private async hydrateConversation(conversationId: string): Promise<void> {
+    const requestNonce = this.conversationNonce;
+    this.status = 'Restoring conversation';
+    this.syncState();
+    try {
+      const snapshot = await this.apiClient.fetchConversationSnapshot(conversationId);
+      if (this.isDestroyed
+        || this.conversationNonce !== requestNonce
+        || this.conversationId !== conversationId) {
+        return;
+      }
+      if (snapshot.conversation_id !== conversationId) {
+        throw new Error('Conversation snapshot identity mismatch.');
+      }
+
+      this.realtimeService.disconnect({ discardPending: true });
+      this.contextRevision = snapshot.context_revision;
+      this.taskSnapshot = snapshot.task_snapshot ?? undefined;
+      this.messages = snapshot.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+        created_at: message.created_at,
+        kind: 'normal' as const,
+      }));
+      this.memorySnapshot = snapshot.memory_snapshot;
+      this.contextUsage = undefined;
+      this.lastDecision = undefined;
+      this.lastOperation = undefined;
+      this.assistantDraft = '';
+      this.progressStage = undefined;
+      this.progressLabel = undefined;
+      this.progressPercent = 0;
+      this.pendingRun = undefined;
+      this.cancelRequested = false;
+      this.seenEventIds.clear();
+      this.activeRunId = snapshot.active_run?.run_id;
+      this.activeRunVersion = snapshot.active_run?.run_version;
+      this.isLoading = snapshot.active_run !== null
+        && snapshot.active_run !== undefined
+        && ['pending', 'running', 'updating'].includes(snapshot.active_run.state);
+      this.streamState = 'idle';
+      this.mapSession = undefined;
+      this.pendingMapSession = undefined;
+      this.payload = undefined;
+      if (snapshot.map_session) {
+        this.handleMapSession(snapshot.map_session);
+      }
+      this.status = this.isLoading ? 'Reconnecting to active request' : 'Agent ready';
+      this.realtimeService.connect(conversationId, {
+        runId: this.activeRunId,
+        afterSequence: this.lastRunSequence,
+      });
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
+      this.queueTranscriptScroll();
+    } catch (error: unknown) {
+      if (this.isDestroyed
+        || this.conversationNonce !== requestNonce
+        || this.conversationId !== conversationId) {
+        return;
+      }
+      if (this.readErrorStatus(error) === 404) {
+        this.resetInvalidConversation();
+        return;
+      }
+      this.status = 'Could not restore conversation';
+      this.streamState = 'failed';
+      this.changeDetectorRef.detectChanges();
+      this.syncState();
+    }
+  }
+
+  private resetInvalidConversation(): void {
+    this.realtimeService.disconnect({ discardPending: true });
+    this.conversationId = undefined;
+    this.conversationNonce += 1;
+    this.contextRevision = undefined;
+    this.taskSnapshot = undefined;
+    this.activeRunId = undefined;
+    this.activeRunVersion = undefined;
+    this.pendingRun = undefined;
+    this.lastRunSequence = 0;
+    this.streamState = 'idle';
+    this.progressStage = undefined;
+    this.progressLabel = undefined;
+    this.seenEventIds.clear();
+    this.messages = [];
+    this.lastDecision = undefined;
+    this.lastOperation = undefined;
+    this.memorySnapshot = {};
+    this.contextUsage = undefined;
+    this.mapSession = undefined;
+    this.pendingMapSession = undefined;
+    this.payload = undefined;
+    this.assistantDraft = '';
+    this.status = 'Agent ready';
+    this.isLoading = false;
+    this.progressPercent = 0;
+    this.syncState();
+    this.changeDetectorRef.detectChanges();
+  }
+
+  private readErrorStatus(error: unknown): number | undefined {
+    if (!error || typeof error !== 'object') {
+      return undefined;
+    }
+    const status = (error as { status?: unknown }).status;
+    return typeof status === 'number' ? status : undefined;
   }
 
   onComposerInput(event: Event): void {
@@ -874,28 +954,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     const next: PersistedChatPageState = {
       toolbarWidth: this.toolbarWidthState,
       isToolbarCollapsed: this.isToolbarCollapsed,
-      payload: this.payload,
       chatPanel: {
         conversationId: this.conversationId,
-        contextRevision: this.contextRevision,
-        taskSnapshot: this.taskSnapshot,
-        activeRunId: this.activeRunId,
-        activeRunVersion: this.activeRunVersion,
-        pendingRun: this.pendingRun,
         lastRunSequence: this.lastRunSequence,
-        streamState: this.streamState,
-        progressStage: this.progressStage,
-        progressLabel: this.progressLabel,
-        seenRunEventIds: [...this.seenEventIds].slice(-100),
-        conversationNonce: this.conversationNonce,
-        messages: this.messages,
-        lastDecision: this.lastDecision,
-        lastOperation: this.lastOperation ?? undefined,
-        memorySnapshot: this.memorySnapshot,
-        contextUsage: this.contextUsage,
-        mapSession: this.mapSession,
-        status: this.status,
-        assistantDraft: this.assistantDraft,
         composerDraft: this.composerDraft,
         transcriptScrollTop: this.viewStateSync.captureElementScroll(
           this.transcriptRef?.nativeElement,

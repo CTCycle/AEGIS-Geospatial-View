@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from server.contracts.geospatial import MapSession
+from server.domain.agent.pipeline import ConversationTaskSnapshot
 
 
 ###############################################################################
@@ -37,6 +41,38 @@ class ConversationCreateResponse(BaseModel):
 
     conversation_id: str
     title: str | None = None
+
+
+###############################################################################
+class ConversationMessageSnapshot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant", "system", "tool"]
+    content: str
+    created_at: datetime
+
+
+###############################################################################
+class ActiveConversationRunSnapshot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    run_version: int = Field(..., ge=1)
+    state: AgentRunState
+
+
+###############################################################################
+class ConversationSnapshotResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str
+    title: str | None = None
+    context_revision: int = Field(..., ge=0)
+    messages: list[ConversationMessageSnapshot] = Field(default_factory=list)
+    task_snapshot: ConversationTaskSnapshot | None = None
+    memory_snapshot: dict[str, Any] = Field(default_factory=dict)
+    map_session: MapSession | None = None
+    active_run: ActiveConversationRunSnapshot | None = None
 
 
 ###############################################################################

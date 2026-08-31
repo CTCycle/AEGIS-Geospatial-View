@@ -27,6 +27,7 @@ def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
     return SimpleNamespace(
         agent_orchestrator=object(),
         conversation_repository=object(),
+        history_service=object(),
         settings_service=SimpleNamespace(
             get_settings=lambda: call_order.append("settings_service.get_settings")
         ),

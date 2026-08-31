@@ -39,7 +39,6 @@ import {
   ModelCardDescriptor,
   ModelLibraryResponse,
   ModelLibrarySourceStatus,
-  ModelProviderMode,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
@@ -83,9 +82,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   cloudModels: ModelCardDescriptor[] = [];
   localModels: ModelCardDescriptor[] = [];
 
-  providerMode: ModelProviderMode;
   searchText: string;
-  statusText: string;
+  statusText = 'Ready';
   isLoadingModels = false;
   isRefreshingOllama = false;
   isLoadingDynamicProviderModels = false;
@@ -121,9 +119,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.state = this.appStateStore.getSettingsPage();
     const query = new URLSearchParams(window.location.search);
     this.searchText = query.get('q') ?? this.state.searchText;
-    const queryMode = query.get('mode');
-    this.providerMode = queryMode === 'cloud' || queryMode === 'local' ? queryMode : this.state.providerMode;
-    this.statusText = this.state.statusText;
   }
 
   ngOnInit(): void {
@@ -297,8 +292,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     const payload = buildAgentModelSelectionPayload(this.settings, model);
     const previousSettings = this.settings;
-    const previousProviderMode = this.providerMode;
-    const nextProviderMode: ModelProviderMode = model.provider === 'ollama' ? 'local' : 'cloud';
+    const nextProviderMode = model.provider === 'ollama' ? 'local' : 'cloud';
     try {
       this.settings = {
         ...this.settings,
@@ -306,9 +300,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         agent_model_provider: model.provider,
         agent_model_name: model.name,
       };
-      this.providerMode = nextProviderMode;
       this.statusText = `Selecting ${model.name} as agent model...`;
-      this.syncQueryState();
       this.syncState();
       // Keep the optimistic selected-card state visible while the save is pending.
       this.changeDetectorRef.detectChanges();
@@ -317,18 +309,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.settings = updated;
-      this.providerMode = updated.active_provider_mode;
       this.statusText = `Selected ${model.name} as agent model`;
-      this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
       if (this.isDestroyed) {
         return;
       }
       this.settings = previousSettings;
-      this.providerMode = previousProviderMode;
       this.statusText = this.userFacingErrorService.toUserFacingError(error, `Could not select ${model.name} as agent model.`);
-      this.syncQueryState();
       this.syncState();
       this.changeDetectorRef.detectChanges();
     }
@@ -579,7 +567,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.settings = nextSettings;
-      this.providerMode = nextSettings.active_provider_mode;
       this.ollamaUrlDraft = nextSettings.ollama_url;
       this.applyModelLibrary(modelLibrary);
       const dynamicProviderFailed = dynamicProvider && modelLibrary.sources[dynamicProvider]?.ok === false;
@@ -701,12 +688,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       params.delete('q');
     }
 
-    if (this.providerMode !== 'local') {
-      params.set('mode', this.providerMode);
-    } else {
-      params.delete('mode');
-    }
-
     const queryParams: Record<string, string> = {};
     params.forEach((value, key) => {
       queryParams[key] = value;
@@ -732,8 +713,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private syncState(): void {
     const next: PersistedSettingsPageState = {
       searchText: this.searchText,
-      providerMode: this.providerMode,
-      statusText: this.statusText,
       scrollY: this.viewStateSync.captureWindowScroll(),
       modelGridScrollTop: this.viewStateSync.captureElementScroll(
         this.modelGridRef?.nativeElement,
