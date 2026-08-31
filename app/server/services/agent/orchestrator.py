@@ -58,9 +58,6 @@ class AgentOrchestrator:
     _compose_direct_tool_message = staticmethod(
         AgentResponseBuilder.compose_direct_tool_message
     )
-    _compose_general_question_message = staticmethod(
-        AgentTurnSupport.compose_general_question_message
-    )
     _has_parser_runtime_failure = staticmethod(
         AgentTurnSupport.has_parser_runtime_failure
     )

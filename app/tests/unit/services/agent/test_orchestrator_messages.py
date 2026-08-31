@@ -1,4 +1,5 @@
 from server.services.agent.orchestrator import AgentOrchestrator
+from server.services.agent.turn_support import AgentTurnSupport
 
 
 ###############################################################################
@@ -158,13 +159,12 @@ def test_provider_parser_failure_is_terminal_even_after_heuristic_extraction() -
 
 
 ###############################################################################
-def test_general_question_can_answer_previous_user_request() -> None:
-    message = AgentOrchestrator._compose_general_question_message(
-        "What did I just ask?",
+def test_typed_context_query_can_answer_previous_user_request() -> None:
+    message = AgentTurnSupport.compose_context_query_message(
+        "previous_user_request",
         [
             {"role": "user", "content": "Show me Rome"},
             {"role": "assistant", "content": "Map ready for Rome."},
-            {"role": "user", "content": "What did I just ask?"},
         ],
     )
 
@@ -172,9 +172,9 @@ def test_general_question_can_answer_previous_user_request() -> None:
 
 
 ###############################################################################
-def test_general_question_can_answer_active_map_location() -> None:
-    message = AgentOrchestrator._compose_general_question_message(
-        "What city is the map centered on?",
+def test_typed_context_query_can_answer_active_map_location() -> None:
+    message = AgentTurnSupport.compose_context_query_message(
+        "active_location",
         [],
         {"active_location": {"label": "Lugano"}},
     )
@@ -183,9 +183,9 @@ def test_general_question_can_answer_active_map_location() -> None:
 
 
 ###############################################################################
-def test_general_question_accepts_which_city_variant() -> None:
-    message = AgentOrchestrator._compose_general_question_message(
-        "Which city is the map centered on?",
+def test_typed_context_query_accepts_active_map_location() -> None:
+    message = AgentTurnSupport.compose_context_query_message(
+        "active_location",
         [],
         {"active_location": {"label": "Zurich"}},
     )
@@ -194,19 +194,21 @@ def test_general_question_accepts_which_city_variant() -> None:
 
 
 ###############################################################################
-def test_general_question_can_answer_active_map_overlays() -> None:
-    message = AgentOrchestrator._compose_general_question_message(
-        "What overlays are currently requested?",
+def test_typed_context_query_can_answer_active_map_overlays() -> None:
+    message = AgentTurnSupport.compose_context_query_message(
+        "active_overlays",
         [],
         {
             "active_visualization": {
-                "overlay_ids": ["openmeteo_air_quality_forecast"],
-                "overlays": [
-                    {
-                        "id": "openmeteo_air_quality_forecast",
-                        "label": "Open-Meteo Air Quality Forecast",
-                    }
-                ],
+                "overlay_collection": {
+                    "instances": [
+                        {
+                            "instance_id": "air-quality-1",
+                            "capability_id": "openmeteo_air_quality_forecast",
+                            "label": "Open-Meteo Air Quality Forecast",
+                        },
+                    ],
+                },
             }
         },
     )
@@ -217,15 +219,15 @@ def test_general_question_can_answer_active_map_overlays() -> None:
 
 
 ###############################################################################
-def test_general_question_can_summarize_active_map() -> None:
-    message = AgentOrchestrator._compose_general_question_message(
-        "Summarize the current map.",
+def test_typed_context_query_can_summarize_active_map_with_overlays() -> None:
+    message = AgentTurnSupport.compose_context_query_message(
+        "active_map_summary",
         [],
         {
             "active_visualization": {
                 "resolved_location": {"label": "Zurich"},
                 "basemap": {"label": "Satellite Imagery"},
-                "overlay_ids": [],
+                "overlay_collection": {"instances": []},
             }
         },
     )
@@ -237,21 +239,23 @@ def test_general_question_can_summarize_active_map() -> None:
 
 
 ###############################################################################
-def test_general_question_can_summarize_interesting_areas_from_active_map() -> None:
-    message = AgentOrchestrator._compose_general_question_message(
-        "Now summarize the three most interesting areas.",
+def test_typed_context_query_can_summarize_active_map() -> None:
+    message = AgentTurnSupport.compose_context_query_message(
+        "active_map_summary",
         [],
         {
             "active_visualization": {
                 "resolved_location": {"label": "Athens, Greece"},
                 "basemap": {"label": "OpenStreetMap"},
-                "overlay_ids": ["openmeteo_air_quality_forecast"],
-                "overlays": [
-                    {
-                        "id": "openmeteo_air_quality_forecast",
-                        "label": "Open-Meteo Air Quality Forecast",
-                    }
-                ],
+                "overlay_collection": {
+                    "instances": [
+                        {
+                            "instance_id": "air-quality-1",
+                            "capability_id": "openmeteo_air_quality_forecast",
+                            "label": "Open-Meteo Air Quality Forecast",
+                        },
+                    ],
+                },
             }
         },
     )
