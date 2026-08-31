@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
-from server.configurations import DatabaseSettings, get_server_settings
+from server.configurations import DatabaseSettings
 from server.repositories.database.engine import build_engine, build_session_factory
 from server.repositories.schemas import Base
 
@@ -16,8 +16,8 @@ from server.repositories.schemas import Base
 ###############################################################################
 class SQLiteRepository:
     # -------------------------------------------------------------------------
-    def __init__(self, settings: DatabaseSettings | None = None) -> None:
-        self.settings = settings or get_server_settings().database
+    def __init__(self, settings: DatabaseSettings) -> None:
+        self.settings = settings
         db_path = Path(self.settings.database_path)
         self.db_path = str(db_path)
         self.engine: Engine = build_engine(self.settings)
