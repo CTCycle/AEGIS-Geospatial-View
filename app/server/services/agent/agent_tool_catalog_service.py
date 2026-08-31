@@ -732,7 +732,7 @@ class AgentToolCatalogService:
         if not isinstance(resolved_location, ResolvedLocation):
             return cast(GeospatialCapabilityExecutionResult, resolved_location)
         plan = self._build_direct_execution_plan(
-            capability_id=capability_id, context=context
+            capability_id=capability_id, arguments=arguments, context=context
         )
         direct_result = await self.tool_registry.execute(
             capability_id, plan, resolved_location
@@ -819,6 +819,7 @@ class AgentToolCatalogService:
         self,
         *,
         capability_id: str,
+        arguments: dict[str, Any],
         context: AgentExecutionContext | None,
     ) -> ExecutionPlan:
         parsed_request = self._parsed_request_from_context(context)
@@ -847,6 +848,7 @@ class AgentToolCatalogService:
             temporal_mode=None if temporal_mode == "none" else temporal_mode,
             temporal_text=temporal_text,
             temporal_reference_time_iso=temporal_reference_time_iso,
+            tool_arguments=dict(arguments),
             tool_id=capability_id,
         )
 

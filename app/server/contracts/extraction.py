@@ -5,7 +5,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 TaskClass = Literal["map_search", "direct_query", "general_question", "unclear"]
-PoiCategory = Literal["bicycle_parking", "transit_stops", "rail_stations"]
+# OSM-style POI categories are open-ended. The provider/catalog boundary
+# validates executable values; the language boundary must not reject a valid
+# category merely because it is not in a small enum.
+PoiCategory = str
 LocationSignalType = Literal[
     "address",
     "city",
@@ -15,6 +18,12 @@ LocationSignalType = Literal[
     "poi",
     "region",
     "street",
+    "neighborhood",
+    "district",
+    "municipality",
+    "county",
+    "province",
+    "state",
 ]
 TemporalMode = Literal["current", "historical", "forecast", "none"]
 TemporalGranularity = Literal[
@@ -214,13 +223,15 @@ class TurnParseResult(BaseModel):
     ] = "new_task"
     map_target: str | None = None
     entity_target: str | None = None
+    requested_concepts: list[str] = Field(default_factory=lambda: list[str]())
     requested_layers: list[str] = Field(default_factory=lambda: list[str]())
     overlay_commands: list[OverlayCommand] = Field(
         default_factory=lambda: list[OverlayCommand]()
     )
-    poi_categories: list[PoiCategory] = Field(
-        default_factory=lambda: list[PoiCategory]()
-    )
+    poi_categories: list[PoiCategory] = Field(default_factory=lambda: list[PoiCategory]())
+    radius_m: float | None = Field(default=None, gt=0.0)
+    result_limit: int | None = Field(default=None, ge=1, le=500)
+    presentation_mode: Literal["text", "map", "both"] = "map"
     requested_basemap: str | None = None
     requested_attributes: list[str] = Field(default_factory=lambda: list[str]())
     required_data_sources: list[str] = Field(default_factory=lambda: list[str]())

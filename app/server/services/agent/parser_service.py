@@ -196,6 +196,12 @@ class ParserService:
                     if hasattr(value, "model_dump")
                     else value
                 )
+                if not is_json_object(payload):
+                    raise TypeError("Overlay command must be an object.")
+                payload = dict(payload)
+                for field_name in ("selector", "scope", "patch", "state_reference"):
+                    if payload.get(field_name) is None:
+                        payload[field_name] = {}
                 commands.append(OverlayCommand.model_validate(payload))
             except Exception:
                 LOGGER.warning(
@@ -416,12 +422,16 @@ class ParserService:
             ambiguities=ambiguities,
             parser_confidence=min(0.35, extracted.parser_confidence),
             relationship=extracted.relationship,
-            map_target=extracted.map_target,
-            entity_target=extracted.entity_target,
-            requested_layers=cls._dedupe(extracted.requested_layers),
+                map_target=extracted.map_target,
+                entity_target=extracted.entity_target,
+                requested_concepts=cls._dedupe(extracted.requested_concepts),
+                requested_layers=cls._dedupe(extracted.requested_layers),
             overlay_commands=cls._overlay_commands(extracted.overlay_commands),
-            poi_categories=list(dict.fromkeys(extracted.poi_categories)),
-            requested_basemap=extracted.requested_basemap,
+                poi_categories=list(dict.fromkeys(extracted.poi_categories)),
+                radius_m=extracted.radius_m,
+                result_limit=extracted.result_limit,
+                presentation_mode=extracted.presentation_mode,
+                requested_basemap=extracted.requested_basemap,
             requested_attributes=cls._dedupe(extracted.requested_attributes),
             required_data_sources=cls._dedupe(extracted.required_data_sources),
             required_tool_category=extracted.required_tool_category,
@@ -556,7 +566,14 @@ class ParserService:
         ]
         normalized_action = NormalizedAction(
             action_id=self._normalize_action_id(
-                extracted.action_id, extracted.parser_confidence
+                extracted.action_id,
+                extracted.parser_confidence,
+                task_class=extracted.task_class,
+                requested_concepts=extracted.requested_concepts,
+                requested_layers=extracted.requested_layers,
+                action_tags=extracted.action_tags,
+                required_tool_category=extracted.required_tool_category,
+                entity_target=extracted.entity_target,
             ),
             action_label=extracted.action_label.strip() or "General map request",
             task_tags=[tag for tag in extracted.task_tags if str(tag).strip()],
@@ -624,9 +641,13 @@ class ParserService:
             relationship=extracted.relationship,
             map_target=extracted.map_target,
             entity_target=extracted.entity_target,
+            requested_concepts=self._dedupe(extracted.requested_concepts),
             requested_layers=self._dedupe(extracted.requested_layers),
             overlay_commands=self._overlay_commands(extracted.overlay_commands),
             poi_categories=list(dict.fromkeys(extracted.poi_categories)),
+            radius_m=extracted.radius_m,
+            result_limit=extracted.result_limit,
+            presentation_mode=extracted.presentation_mode,
             requested_basemap=extracted.requested_basemap,
             requested_attributes=self._dedupe(extracted.requested_attributes),
             required_data_sources=self._dedupe(extracted.required_data_sources),
@@ -714,8 +735,10 @@ class ParserService:
                 "requested_visualizations": cls._dedupe(
                     extracted.requested_visualizations
                 ),
+                "requested_concepts": cls._dedupe(extracted.requested_concepts),
                 "requested_layers": cls._dedupe(extracted.requested_layers),
                 "requested_attributes": cls._dedupe(extracted.requested_attributes),
+                "poi_categories": cls._dedupe(extracted.poi_categories),
                 "required_data_sources": cls._dedupe(extracted.required_data_sources),
                 "capability_limitations": cls._dedupe(extracted.capability_limitations),
             }
@@ -723,10 +746,35 @@ class ParserService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _normalize_action_id(action_id: str, confidence: float) -> str:
+    def _normalize_action_id(
+        action_id: str,
+        confidence: float,
+        *,
+        task_class: str = "unclear",
+        requested_concepts: list[str] | None = None,
+        requested_layers: list[str] | None = None,
+        action_tags: list[str] | None = None,
+        required_tool_category: str | None = None,
+        entity_target: str | None = None,
+    ) -> str:
         if confidence < 0.25:
             return AgentAction.UNKNOWN.value
         try:
             return AgentAction(str(action_id).strip()).value
         except ValueError:
+            # Model action labels are not executable identities. When a model
+            # emits an unregistered label but the typed task still contains a
+            # concrete data request, retain the generic executable action and
+            # let capability resolution select the actual catalog item.
+            semantic_evidence = [
+                *(requested_concepts or []),
+                *(requested_layers or []),
+                *(action_tags or []),
+                required_tool_category or "",
+                entity_target or "",
+            ]
+            if task_class in {"map_search", "direct_query"} and any(
+                str(value).strip() for value in semantic_evidence
+            ):
+                return AgentAction.GEOSPATIAL_DATA_RETRIEVAL.value
             return AgentAction.UNKNOWN.value

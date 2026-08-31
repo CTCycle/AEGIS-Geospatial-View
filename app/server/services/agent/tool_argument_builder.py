@@ -125,6 +125,17 @@ class ToolArgumentBuilder:
             else self.build_bbox_arguments(turn, memory_snapshot)
         )
         arguments.update(self.build_temporal_arguments(turn))
+        if turn.poi_categories:
+            categories = list(dict.fromkeys(str(item).strip() for item in turn.poi_categories if str(item).strip()))
+            arguments["poi_categories"] = categories
+            arguments["categories"] = categories
+        radius_m = turn.radius_m
+        if radius_m is None and turn.viewport_intent is not None:
+            radius_m = turn.viewport_intent.radius_hint_m
+        if radius_m is not None:
+            arguments["radius_m"] = radius_m
+        if turn.result_limit is not None:
+            arguments["limit"] = turn.result_limit
         if capability and str(capability.get("type") or "").casefold() == "direct-tool":
             if turn.entity_target:
                 arguments["query"] = turn.entity_target

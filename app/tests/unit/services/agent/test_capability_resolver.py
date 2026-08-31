@@ -271,3 +271,20 @@ def test_unknown_underscore_identifier_is_not_treated_as_resolved() -> None:
     )
     assert resolved.requested_layers == []
     assert resolved.clarification_plan is not None
+
+
+###############################################################################
+def test_resolves_semantic_direct_request_to_direct_tool_capability() -> None:
+    turn = _turn("What is the weather in Rome?", "")
+    turn = turn.model_copy(
+        update={
+            "task_class": "direct_query",
+            "requested_layers": [],
+            "requested_concepts": ["weather"],
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.requested_layers == ["get_weather_forecast"]
+    assert resolved.clarification_plan is None

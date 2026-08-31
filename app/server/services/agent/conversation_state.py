@@ -183,13 +183,28 @@ class ConversationTaskStateService:
                             id=item_id,
                             description=str(
                                 item.get("description")
+                                or item.get("summary")
                                 or item.get("task")
                                 or task.normalized_description
                                 or task.raw_user_text
                             ),
-                            kind=str(item.get("kind") or task.task_type),
+                            kind=str(
+                                item.get("kind")
+                                or item.get("task_type")
+                                or task.task_type
+                            ),
                             depends_on=dependencies,
                             required=bool(item.get("required", True)),
+                            input_refs=[
+                                str(value).strip()
+                                for value in item.get("input_refs", [])
+                                if str(value).strip()
+                            ],
+                            output_refs=[
+                                str(value).strip()
+                                for value in item.get("output_refs", [])
+                                if str(value).strip()
+                            ],
                             scope_revision=runtime.revision,
                         )
                     )

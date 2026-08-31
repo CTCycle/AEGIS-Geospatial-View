@@ -42,8 +42,9 @@ def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
             city: str | None,
             country_name: str | None,
             country_code: str | None,
+            expected_location_type: str | None = None,
         ) -> dict[str, object] | None:
-            _ = (city, country_name, country_code)
+            _ = (city, country_name, country_code, expected_location_type)
             lookup = {
                 "Rome": {
                     "display_name": "Rome, Lazio, Italy",
