@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_array, is_json_object, json_array, json_object
+from server.common.typing import is_json_object, json_array, json_object
 
 from typing import Any, Literal
 
@@ -72,7 +72,7 @@ class AgentResponseBuilder:
         require_verified_result: bool = False,
     ) -> str:
         if map_session is not None:
-            return cls.compose_map_session_message(map_session.model_dump(mode="json"))
+            return cls.compose_map_session_message(map_session)
         if direct_result is not None:
             tool_id = direct_result.get("tool_id") or direct_result.get("tool")
             return cls.compose_direct_tool_message(tool_id, {"result": direct_result})
@@ -288,82 +288,40 @@ class AgentResponseBuilder:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def compose_map_session_message(cls, map_payload: dict[str, Any]) -> str:
-        location = cls.extract_label(map_payload.get("resolved_location"))
-        if location is None:
-            location = "the requested location"
-        basemap = cls.extract_label(
-            map_payload.get("basemap")
-        ) or cls.humanize_identifier(map_payload.get("basemap_id"))
-        overlay_labels = cls.extract_overlay_labels(map_payload)
+    def compose_map_session_message(cls, map_session: MapSession) -> str:
+        location = map_session.resolved_location.label or "the requested location"
+        basemap = cls.extract_label(map_session.basemap) or cls.humanize_identifier(
+            map_session.basemap_id
+        )
+        instances = map_session.overlay_collection.instances
+        visible_labels = [
+            instance.label or cls.humanize_identifier(instance.capability_id)
+            for instance in instances
+            if instance.visible
+        ]
+        hidden_labels = [
+            instance.label or cls.humanize_identifier(instance.capability_id)
+            for instance in instances
+            if not instance.visible
+        ]
         warnings = [
             cls.humanize_warning(warning)
-            for warning in json_array(map_payload.get("compliance_warnings"))
+            for warning in map_session.compliance_warnings
             if isinstance(warning, str) and warning.strip()
         ]
 
         parts = [f"Map ready for {location} using {basemap}."]
-        overlays = [
-            item
-            for item in json_array(map_payload.get("overlays"))
-            if is_json_object(item)
-        ]
-        has_explicit_visibility = any(
-            isinstance(item.get("visible"), bool) for item in overlays
-        )
-        if has_explicit_visibility:
-            visible_labels = [
-                label
-                for item in overlays
-                if item.get("visible") is not False
-                for label in [cls.extract_label(item)]
-                if label
-            ]
-            hidden_labels = [
-                label
-                for item in overlays
-                if item.get("visible") is False
-                for label in [cls.extract_label(item)]
-                if label
-            ]
-            if visible_labels:
-                parts.append(
-                    f"Visible overlays: {cls.format_label_list(visible_labels)}."
-                )
-            if hidden_labels:
-                parts.append(
-                    f"Hidden overlays: {cls.format_label_list(hidden_labels)}."
-                )
-            if not visible_labels and not hidden_labels:
-                parts.append("No overlays are currently active.")
-        elif overlay_labels:
-            parts.append(f"I added {cls.format_label_list(overlay_labels)}.")
-        else:
-            parts.append("No overlays were added.")
+        if visible_labels:
+            parts.append(f"Visible overlays: {cls.format_label_list(visible_labels)}.")
+        if hidden_labels:
+            parts.append(f"Hidden overlays: {cls.format_label_list(hidden_labels)}.")
+        if not visible_labels and not hidden_labels:
+            parts.append("No overlays are currently active.")
         if warnings:
             parts.append(
                 f"Some requested map data needs attention: {' '.join(warnings)}"
             )
         return " ".join(parts)
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def extract_overlay_labels(cls, map_payload: dict[str, Any]) -> list[str]:
-        overlays = map_payload.get("overlays")
-        if is_json_array(overlays):
-            labels = [cls.extract_label(overlay) for overlay in overlays]
-            human_labels = [label for label in labels if label]
-            if human_labels:
-                return human_labels
-
-        overlay_ids = map_payload.get("overlay_ids")
-        if not is_json_array(overlay_ids):
-            return []
-        return [
-            cls.humanize_identifier(overlay_id)
-            for overlay_id in overlay_ids
-            if overlay_id
-        ]
 
     # -------------------------------------------------------------------------
     @staticmethod
