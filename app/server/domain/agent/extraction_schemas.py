@@ -52,6 +52,12 @@ class LLMLocationSignal(BaseModel):
         "poi",
         "region",
         "street",
+        "neighborhood",
+        "district",
+        "municipality",
+        "county",
+        "province",
+        "state",
     ] = "address"
     raw_value: str = ""
     normalized_value: str | None = None
@@ -74,8 +80,14 @@ class LLMAtomicTask(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     summary: str
+    id: str | None = None
     task_type: str = "unknown"
     intent: str = "unknown"
+    kind: str = "research"
+    depends_on: list[str] = Field(default_factory=lambda: list[str]())
+    required: bool = True
+    input_refs: list[str] = Field(default_factory=lambda: list[str]())
+    output_refs: list[str] = Field(default_factory=lambda: list[str]())
     required_entities: list[str] = Field(default_factory=lambda: list[str]())
     required_layers: list[str] = Field(default_factory=lambda: list[str]())
     visualization_changes: dict[str, Any] = Field(
@@ -175,7 +187,9 @@ class LLMOverlayCommand(BaseModel):
     action: Literal["add", "remove", "keep_only", "show", "hide", "update"]
     selector: LLMOverlaySelector = Field(default_factory=LLMOverlaySelector)
     scope: LLMOverlayScope = Field(default_factory=LLMOverlayScope)
-    patch: LLMOverlayPatch = Field(default_factory=LLMOverlayPatch)
+    # Providers may emit an explicit null for commands without a patch. The
+    # parser boundary normalizes that representation to an empty patch.
+    patch: LLMOverlayPatch | None = None
     state_reference: LLMOverlayStateReference = Field(
         default_factory=LLMOverlayStateReference
     )
@@ -215,17 +229,15 @@ class LLMParserExtraction(BaseModel):
     ] = "new_task"
     map_target: str | None = None
     entity_target: str | None = None
+    requested_concepts: list[str] = Field(default_factory=lambda: list[str]())
     requested_layers: list[str] = Field(default_factory=lambda: list[str]())
     overlay_commands: list[LLMOverlayCommand] = Field(
         default_factory=lambda: list[LLMOverlayCommand]()
     )
-    poi_categories: list[
-        Literal["bicycle_parking", "transit_stops", "rail_stations"]
-    ] = Field(
-        default_factory=lambda: list[
-            Literal["bicycle_parking", "transit_stops", "rail_stations"]
-        ]()
-    )
+    poi_categories: list[str] = Field(default_factory=lambda: list[str]())
+    radius_m: float | None = Field(default=None, gt=0.0)
+    result_limit: int | None = Field(default=None, ge=1, le=500)
+    presentation_mode: Literal["text", "map", "both"] = "map"
     requested_basemap: str | None = None
     requested_attributes: list[str] = Field(default_factory=lambda: list[str]())
     required_data_sources: list[str] = Field(default_factory=lambda: list[str]())

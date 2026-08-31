@@ -42,6 +42,46 @@ class OverpassService:
             ("amenity", "bus_station"),
         ),
         "rail_stations": (("railway", "station"), ("railway", "halt")),
+        "food": (
+            ("amenity", "cafe"),
+            ("amenity", "restaurant"),
+            ("amenity", "fast_food"),
+        ),
+        "restaurants": (("amenity", "restaurant"),),
+        "restaurant": (("amenity", "restaurant"),),
+        "healthcare": (
+            ("amenity", "hospital"),
+            ("amenity", "clinic"),
+            ("amenity", "doctors"),
+            ("amenity", "pharmacy"),
+        ),
+        "hospitals": (("amenity", "hospital"),),
+        "hospital": (("amenity", "hospital"),),
+        "pharmacies": (("amenity", "pharmacy"),),
+        "pharmacy": (("amenity", "pharmacy"),),
+        "education": (
+            ("amenity", "school"),
+            ("amenity", "college"),
+            ("amenity", "university"),
+        ),
+        "schools": (("amenity", "school"),),
+        "school": (("amenity", "school"),),
+        "supermarkets": (("shop", "supermarket"),),
+        "supermarket": (("shop", "supermarket"),),
+        "parks": (("leisure", "park"),),
+        "park": (("leisure", "park"),),
+        "charging_stations": (("amenity", "charging_station"),),
+        "charging_station": (("amenity", "charging_station"),),
+        "bus_stops": (
+            ("highway", "bus_stop"),
+            ("public_transport", "platform"),
+            ("public_transport", "stop_position"),
+        ),
+        "bus_stop": (
+            ("highway", "bus_stop"),
+            ("public_transport", "platform"),
+            ("public_transport", "stop_position"),
+        ),
     }
     DEFAULT_AMENITIES = (
         "cafe",
@@ -62,6 +102,8 @@ class OverpassService:
         "terrace",
         "semidetached_house",
     )
+    MAX_RADIUS_M = 250_000.0
+    MAX_LIMIT = 500
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -112,8 +154,10 @@ class OverpassService:
         categories: list[str] | None = None,
         limit: int | None = None,
     ) -> dict[str, Any]:
-        resolved_radius_m = max(radius_m or self.default_radius_m, 100.0)
-        resolved_limit = max(1, limit or self.default_limit)
+        resolved_radius_m = min(
+            max(radius_m or self.default_radius_m, 100.0), self.MAX_RADIUS_M
+        )
+        resolved_limit = min(self.MAX_LIMIT, max(1, limit or self.default_limit))
         tags = [
             tag.strip()
             for tag in (amenity_tags or list(self.DEFAULT_AMENITIES))
@@ -128,10 +172,16 @@ class OverpassService:
             *[
                 selector
                 for category in (categories or [])
-                for selector in self.CATEGORY_SELECTORS.get(str(category), ())
+                for selector in self.CATEGORY_SELECTORS.get(
+                    self._normalize_category(category), ()
+                )
             ],
         ]
         selectors = list(dict.fromkeys(selectors))
+        if categories and not selectors:
+            raise OverpassRequestError(
+                "No supported OpenStreetMap POI category was requested."
+            )
         payload = await asyncio.to_thread(
             self._query_overpass,
             latitude=latitude,
@@ -194,6 +244,32 @@ class OverpassService:
             "resolved_at": datetime.now(UTC).isoformat(),
             "attribution": "© OpenStreetMap contributors (ODbL)",
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_category(value: object) -> str:
+        normalized = str(value or "").strip().casefold().replace("-", "_")
+        normalized = normalized.replace(" ", "_")
+        aliases = {
+            "restaurant": "restaurant",
+            "restaurants": "restaurants",
+            "hospital": "hospital",
+            "hospitals": "hospitals",
+            "pharmacy": "pharmacy",
+            "pharmacies": "pharmacies",
+            "school": "school",
+            "schools": "schools",
+            "supermarket": "supermarket",
+            "supermarkets": "supermarkets",
+            "park": "park",
+            "parks": "parks",
+            "charging": "charging_station",
+            "ev_charging": "charging_station",
+            "charging_stations": "charging_stations",
+            "bus_stops": "bus_stops",
+            "rail_stations": "rail_stations",
+        }
+        return aliases.get(normalized, normalized)
 
     # -------------------------------------------------------------------------
     async def get_residential_buildings(

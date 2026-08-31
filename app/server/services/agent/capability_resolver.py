@@ -34,6 +34,20 @@ class CapabilityResolver:
         requested = [
             str(item).strip() for item in turn.requested_layers if str(item).strip()
         ]
+        requested.extend(
+            str(item).strip()
+            for item in turn.requested_concepts
+            if str(item).strip()
+        )
+        # Older model outputs placed semantic dataset concepts in action_tags.
+        # Keep that typed field useful while excluding presentation-only words;
+        # executable identity is still resolved exclusively against the catalog.
+        if not turn.requested_layers and not turn.requested_concepts:
+            requested.extend(
+                item
+                for item in turn.normalized_action.action_tags
+                if self._is_data_concept(item)
+            )
         for task in turn.atomic_tasks:
             required_layers = task.get("required_layers")
             if not isinstance(required_layers, list):
@@ -69,6 +83,9 @@ class CapabilityResolver:
             return turn.model_copy(
                 update={
                     "requested_layers": resolved,
+                    "requested_concepts": self._dedupe(
+                        turn.requested_concepts
+                    ),
                     "overlay_commands": overlay_commands,
                 }
             )
@@ -77,6 +94,7 @@ class CapabilityResolver:
         return turn.model_copy(
             update={
                 "requested_layers": resolved,
+                "requested_concepts": self._dedupe(turn.requested_concepts),
                 "overlay_commands": overlay_commands,
                 "capability_limitations": self._dedupe(
                     [
@@ -155,12 +173,28 @@ class CapabilityResolver:
             capability_id = str(exact.get("id") or "").strip()
             return capability_id if self._is_usable(exact, turn) else None
 
+        candidates = [
+            item
+            for item in capabilities
+            if self._is_usable(item, turn)
+            and ("_" not in query or self._query_token_coverage(query, item) == 1.0)
+        ]
+        role_candidates = [
+            item
+            for item in candidates
+            if self._matches_task_role(item, turn.task_class)
+        ]
+        # A semantic concept can be published both as a renderable dataset and
+        # as a direct text tool. Prefer the catalog role required by the task,
+        # while retaining a fallback when a catalog only exposes the other
+        # role. Exact capability IDs above remain authoritative.
+        if role_candidates:
+            candidates = role_candidates
+
         ranked = sorted(
             (
                 (self._score(query, item), str(item.get("id") or ""))
-                for item in capabilities
-                if self._is_usable(item, turn)
-                and ("_" not in query or self._query_token_coverage(query, item) == 1.0)
+                for item in candidates
             ),
             key=lambda value: (-value[0], value[1]),
         )
@@ -178,6 +212,16 @@ class CapabilityResolver:
         return top_ids[0]
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _matches_task_role(capability: dict[str, Any], task_class: str) -> bool:
+        capability_type = str(capability.get("type") or "").strip().casefold()
+        if task_class == "direct_query":
+            return capability_type == "direct-tool"
+        if task_class == "map_search":
+            return capability_type != "direct-tool"
+        return True
+
+    # -------------------------------------------------------------------------
     def _is_usable(
         self,
         capability: dict[str, Any],
@@ -187,10 +231,40 @@ class CapabilityResolver:
         if not capability_id or not self.runtime_registry.is_enabled(capability_id):
             return False
         supports_mode = getattr(self.runtime_registry, "supports_mode", None)
-        if callable(supports_mode) and turn.task_class == "map_search":
-            if not supports_mode(capability_id, "map"):
+        if callable(supports_mode):
+            required_mode = {
+                "map_search": "map",
+                "direct_query": "direct_text",
+            }.get(turn.task_class)
+            if required_mode is not None and not supports_mode(
+                capability_id, required_mode
+            ):
                 return False
         return self._supports_temporal_request(capability, turn)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_data_concept(value: object) -> bool:
+        normalized = str(value or "").strip().casefold().replace("-", "_")
+        return normalized not in {
+            "",
+            "map",
+            "location",
+            "coordinates",
+            "basemap",
+            "overlay",
+            "chat",
+            "direct_query",
+            "map_search",
+            "place",
+            "visualization",
+            "catalog",
+            "data",
+            "query",
+            "search",
+            "direct",
+            "tool",
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod

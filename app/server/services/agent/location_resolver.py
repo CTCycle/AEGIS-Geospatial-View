@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from server.common.typing import json_array, json_object
@@ -17,8 +18,17 @@ class LocationResolver:
     SPECIFICITY_BY_SIGNAL_TYPE = {
         "coordinates": 4,
         "address": 3,
+        "poi": 3,
+        "street": 3,
+        "neighborhood": 2,
+        "district": 2,
+        "municipality": 2,
         "city": 2,
         "deictic": 2,
+        "county": 1,
+        "province": 1,
+        "state": 1,
+        "region": 1,
         "country": 1,
     }
 
@@ -34,32 +44,19 @@ class LocationResolver:
     ) -> ResolvedLocation | ClarificationRequest:
         if not location_signals:
             active = json_object(memory_snapshot.get("active_location"))
+            remembered = self._location_from_memory(active)
+            if remembered is not None:
+                return remembered
             if active:
-                return ResolvedLocation(
-                    label=str(active.get("label") or ""),
-                    latitude=float(active.get("latitude") or 0.0),
-                    longitude=float(active.get("longitude") or 0.0),
-                    country=active.get("country")
-                    if isinstance(active.get("country"), str)
-                    else None,
-                    city=active.get("city")
-                    if isinstance(active.get("city"), str)
-                    else None,
-                    address=active.get("address")
-                    if isinstance(active.get("address"), str)
-                    else None,
-                    source=str(active.get("source") or "memory"),
-                    confidence=float(active.get("confidence") or 0.85),
-                    location_type=active.get("location_type")
-                    if isinstance(active.get("location_type"), str)
-                    else None,
-                    location_class=active.get("location_class")
-                    if isinstance(active.get("location_class"), str)
-                    else None,
-                    bbox=json_array(active.get("bbox")) or None,
-                    bbox_source=active.get("bbox_source")
-                    if isinstance(active.get("bbox_source"), str)
-                    else None,
+                LOGGER.warning(
+                    "Ignoring invalid active location memory label=%s",
+                    active.get("label"),
+                )
+            if active and not remembered:
+                return ClarificationRequest(
+                    question="I could not safely reuse the remembered location. Which location should I use?",
+                    reason="Remembered location is missing valid coordinates.",
+                    missing_fields=["location"],
                 )
             return ClarificationRequest(
                 question="Which location should I use?",
@@ -165,35 +162,144 @@ class LocationResolver:
 
     # -------------------------------------------------------------------------
     async def _resolve_signal(self, signal: LocationSignal) -> ResolvedLocation | None:
-        if signal.latitude is not None and signal.longitude is not None:
+        if self._valid_coordinates(signal.latitude, signal.longitude):
             return ResolvedLocation(
                 label=signal.normalized_value or signal.raw_value,
-                latitude=signal.latitude,
-                longitude=signal.longitude,
+                latitude=float(signal.latitude),
+                longitude=float(signal.longitude),
                 source=signal.source,
                 confidence=signal.confidence,
                 location_type=signal.signal_type,
             )
         geocoded = await self.nominatim_service.extract_coordinates(
             address=signal.normalized_value or signal.raw_value,
-            city=None,
-            country_name=None,
+            city=(signal.normalized_value or signal.raw_value)
+            if signal.signal_type in {"city", "municipality"}
+            else None,
+            country_name=(signal.normalized_value or signal.raw_value)
+            if signal.signal_type == "country"
+            else None,
             country_code=None,
+            expected_location_type=signal.signal_type,
         )
         geocoded = json_object(geocoded)
         if not geocoded:
             return None
-        return ResolvedLocation(
-            label=str(geocoded.get("display_name") or signal.raw_value),
-            latitude=float(geocoded["lat"]),
-            longitude=float(geocoded["lon"]),
-            source="geocoder",
-            confidence=float(geocoded.get("confidence") or signal.confidence),
-            location_type=str(geocoded.get("selected_result_type") or "") or None,
-            location_class=str(geocoded.get("selected_result_class") or "") or None,
-            bbox=json_array(geocoded.get("bbox")) or None,
-            bbox_source=str(geocoded.get("bbox_source") or "") or None,
+        latitude = self._number(geocoded.get("lat"))
+        longitude = self._number(geocoded.get("lon"))
+        if not self._valid_coordinates(latitude, longitude):
+            return None
+        bbox = self._valid_bbox(geocoded.get("bbox"))
+        try:
+            return ResolvedLocation(
+                label=str(geocoded.get("display_name") or signal.raw_value),
+                latitude=latitude,
+                longitude=longitude,
+                source="geocoder",
+                confidence=self._bounded_confidence(
+                    geocoded.get("confidence"), signal.confidence
+                ),
+                location_type=str(geocoded.get("selected_result_type") or "")
+                or None,
+                location_class=str(geocoded.get("selected_result_class") or "")
+                or None,
+                bbox=bbox,
+                bbox_source=str(geocoded.get("bbox_source") or "") or None,
+            )
+        except (TypeError, ValueError):
+            return None
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _location_from_memory(cls, active: dict[str, Any]) -> ResolvedLocation | None:
+        if not active:
+            return None
+        latitude = cls._number(active.get("latitude"))
+        longitude = cls._number(active.get("longitude"))
+        label = str(active.get("label") or "").strip()
+        if not label or not cls._valid_coordinates(latitude, longitude):
+            return None
+        try:
+            return ResolvedLocation(
+                label=label,
+                latitude=latitude,
+                longitude=longitude,
+                country=active.get("country")
+                if isinstance(active.get("country"), str)
+                else None,
+                city=active.get("city")
+                if isinstance(active.get("city"), str)
+                else None,
+                address=active.get("address")
+                if isinstance(active.get("address"), str)
+                else None,
+                source=str(active.get("source") or "memory"),
+                confidence=cls._bounded_confidence(active.get("confidence"), 0.85),
+                location_type=active.get("location_type")
+                if isinstance(active.get("location_type"), str)
+                else None,
+                location_class=active.get("location_class")
+                if isinstance(active.get("location_class"), str)
+                else None,
+                bbox=cls._valid_bbox(active.get("bbox")),
+                bbox_source=active.get("bbox_source")
+                if isinstance(active.get("bbox_source"), str)
+                else None,
+            )
+        except (TypeError, ValueError):
+            return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _number(value: object) -> float | None:
+        if isinstance(value, bool):
+            return None
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        return number if math.isfinite(number) else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _valid_coordinates(
+        latitude: float | None, longitude: float | None
+    ) -> bool:
+        return (
+            latitude is not None
+            and longitude is not None
+            and math.isfinite(latitude)
+            and math.isfinite(longitude)
+            and -90.0 <= latitude <= 90.0
+            and -180.0 <= longitude <= 180.0
         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _valid_bbox(cls, value: object) -> list[float] | None:
+        if not isinstance(value, (list, tuple)) or len(value) != 4:
+            return None
+        numbers = [cls._number(item) for item in value]
+        if any(item is None for item in numbers):
+            return None
+        west, south, east, north = numbers
+        assert west is not None and south is not None
+        assert east is not None and north is not None
+        if not (-180 <= west <= 180 and -180 <= east <= 180):
+            return None
+        if not (-90 <= south <= 90 and -90 <= north <= 90):
+            return None
+        if west > east or south > north:
+            return None
+        return [west, south, east, north]
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _bounded_confidence(cls, value: object, fallback: float) -> float:
+        number = cls._number(value)
+        if number is None:
+            number = fallback
+        return max(0.0, min(1.0, number))
 
     # -------------------------------------------------------------------------
     def build_ambiguity_question(

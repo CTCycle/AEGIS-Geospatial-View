@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
@@ -34,15 +35,19 @@ class LocationMemoryService:
         if not active:
             return []
         label = str(active.get("label") or "").strip()
-        if not label:
+        latitude = _finite_number(active.get("latitude"), minimum=-90.0, maximum=90.0)
+        longitude = _finite_number(
+            active.get("longitude"), minimum=-180.0, maximum=180.0
+        )
+        if not label or latitude is None or longitude is None:
             return []
         return [
             LocationSignal(
                 signal_type="deictic",
                 raw_value=label,
                 normalized_value=label,
-                latitude=float(active.get("latitude") or 0.0),
-                longitude=float(active.get("longitude") or 0.0),
+                latitude=latitude,
+                longitude=longitude,
                 confidence=0.85,
                 source="memory",
             )
@@ -84,3 +89,17 @@ class LocationMemoryService:
             "location_slots": slots[:8],
             "active_location": location_payload,
         }
+
+
+def _finite_number(
+    value: object, *, minimum: float, maximum: float
+) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number) or not minimum <= number <= maximum:
+        return None
+    return number

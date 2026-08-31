@@ -79,3 +79,28 @@ def test_explicit_correction_location_precedes_remembered_bbox() -> None:
     assert arguments["latitude"] == 47.3769
     assert arguments["longitude"] == 8.5417
     assert "bbox" not in arguments
+
+
+###############################################################################
+def test_poi_constraints_reach_the_direct_tool_arguments() -> None:
+    turn = _turn(TemporalSignal(mode="current")).model_copy(
+        update={
+            "normalized_action": NormalizedAction(
+                action_id="geospatial_data_retrieval",
+                action_label="Nearby hospitals",
+                requires_location=True,
+            ),
+            "poi_categories": ["hospitals"],
+            "radius_m": 1500.0,
+            "result_limit": 25,
+        }
+    )
+
+    arguments = ToolArgumentBuilder().build_capability_arguments(
+        "get_nearby_poi", turn, {}
+    )
+
+    assert arguments["poi_categories"] == ["hospitals"]
+    assert arguments["categories"] == ["hospitals"]
+    assert arguments["radius_m"] == 1500.0
+    assert arguments["limit"] == 25

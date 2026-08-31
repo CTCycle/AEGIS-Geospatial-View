@@ -106,3 +106,84 @@ def test_parser_uses_canonical_prompt_for_normal_and_schema_correction_calls() -
     corrected_prompt = provider.requests[1].messages[0]["content"]
     assert corrected_prompt == build_parser_prompt(schema_correction=True)
     assert corrected_prompt.count(PARSER_SCHEMA_CORRECTION) == 1
+
+
+###############################################################################
+def test_parser_normalizes_explicit_null_overlay_patch() -> None:
+    class _Provider:
+        def structured_output(self, request, schema):  # noqa: ANN001
+            _ = request, schema
+            return {
+                "task_class": "map_search",
+                "action_id": "overlay_control",
+                "requires_location": False,
+                "overlay_commands": [
+                    {
+                        "action": "hide",
+                        "selector": {"concepts": ["weather"]},
+                        "patch": None,
+                    }
+                ],
+                "parser_confidence": 0.9,
+            }
+
+    class _Factory:
+        def get_provider(self, provider: str):  # noqa: ANN001
+            _ = provider
+            return _Provider()
+
+    result = ParserService(
+        llm_factory=_Factory(),  # type: ignore[arg-type]
+        settings_repo=object(),
+        provider="test",
+        model="test-model",
+    ).parse_turn(
+        user_message="Hide the weather overlay",
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+
+    assert len(result.overlay_commands) == 1
+    assert result.overlay_commands[0].patch.model_dump(mode="json") == {
+        "opacity": None,
+        "time": None,
+        "style": None,
+        "format": None,
+    }
+
+
+###############################################################################
+def test_parser_maps_unknown_model_action_to_generic_data_action_with_semantics() -> None:
+    class _Provider:
+        def structured_output(self, request, schema):  # noqa: ANN001
+            _ = request, schema
+            return {
+                "task_class": "direct_query",
+                "action_id": "weather_query",
+                "action_tags": ["weather"],
+                "requested_concepts": ["weather"],
+                "requires_location": True,
+                "location_signals": [
+                    {"signal_type": "city", "raw_value": "Rome", "confidence": 0.9}
+                ],
+                "parser_confidence": 0.9,
+            }
+
+    class _Factory:
+        def get_provider(self, provider: str):  # noqa: ANN001
+            _ = provider
+            return _Provider()
+
+    result = ParserService(
+        llm_factory=_Factory(),  # type: ignore[arg-type]
+        settings_repo=object(),
+        provider="test",
+        model="test-model",
+    ).parse_turn(
+        user_message="Show the weather in Rome",
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+
+    assert result.normalized_action.action_id == "geospatial_data_retrieval"
+    assert result.requested_concepts == ["weather"]

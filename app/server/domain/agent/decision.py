@@ -59,6 +59,9 @@ class ExecutionPlan(BaseModel):
     temporal_mode: str | None = None
     temporal_text: str | None = None
     temporal_reference_time_iso: str | None = None
+    tool_arguments: dict[str, object] = Field(
+        default_factory=lambda: dict[str, object]()
+    )
     basemap_id: str | None = None
     overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
     tool_id: str | None = None

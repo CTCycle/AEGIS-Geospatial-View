@@ -154,6 +154,7 @@ class DeepSeekProvider(LLMProvider):
                 model=request.model,
                 messages=self.normalize_tool_messages(effective_request.messages),
                 temperature=request.temperature,
+                stream=False,
                 **kwargs,
             )
         except Exception as exc:
@@ -209,6 +210,7 @@ class DeepSeekProvider(LLMProvider):
                 ),
                 temperature=request.temperature,
                 response_format={"type": "json_object"},
+                stream=False,
             )
         except Exception as exc:
             raise LLMProviderRequestError.from_exception(
