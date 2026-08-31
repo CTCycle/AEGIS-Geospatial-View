@@ -9,7 +9,11 @@ from server.services.agent.native_tool_loop import (
     NativeToolLoop,
 )
 from server.services.agent.tool_registry import ToolRegistry
-from server.contracts.geospatial import MapSession, ViewportPolicy
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    ViewportPolicy,
+)
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.llm.types import LLMToolResult
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
@@ -308,6 +312,7 @@ def test_native_tool_loop_uses_the_latest_map_session_result() -> None:
         resolved_location=location,
         basemap_id="osm",
         viewport=viewport,
+        overlay_collection=OverlayCollectionState(),
     )
     second = first.model_copy(update={"session_id": "second"})
     result = NativeToolLoop._extract_map_session(

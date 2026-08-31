@@ -110,15 +110,20 @@ High-level fields:
 - `context_usage`
 - `visualization_update`
 
-`map_session.overlay_collection` is the revisioned authoritative overlay
+`map_session.overlay_collection` is the required, revisioned authoritative
+overlay collection. Its `instances` contain the render descriptor, stable
+capability/scope/variant identity, visibility, opacity, and bounded
+inspections. Render-entry arrays and separate overlay-ID projections are not
+part of the map-session wire contract; clients derive those views from the
 collection. `turn_contract.overlay_commands` describes deterministic
 add/remove/keep-only/show/hide/update operations; `visualization_update`
 returns the resulting revision and stable added, removed, updated, unmatched,
 and ambiguous instance IDs/selectors.
 
-Map sessions may include bounded `inspections` at feature, location, overlay,
-or non-spatial association levels. Clients should render only the normalized
-inspection contract and must not expose raw provider metadata or unsafe links.
+Map-session inspections are carried by their owning overlay instance and may
+represent feature, location, overlay, or non-spatial associations. Clients
+should render only the normalized inspection contract and must not expose raw
+provider metadata or unsafe links.
 
 `operation` is the stable frontend-facing summary of verified backend outcome.
 

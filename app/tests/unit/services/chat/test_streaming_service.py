@@ -19,7 +19,11 @@ from server.contracts.extraction import (
     NormalizedAction,
     TurnParseResult,
 )
-from server.contracts.geospatial import MapSession
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    OverlayInstance,
+)
 from server.services.chat.streaming import ChatStreamingService
 from server.services.llm.errors import LLMConfigurationError
 
@@ -125,7 +129,13 @@ class ToolStatusAgentOrchestrator:
                         "content": {
                             "ok": True,
                             "data": {
-                                "map_session": {"overlay_ids": ["weather_overlay"]}
+                                "map_session": {
+                                    "overlay_collection": {
+                                        "collection_id": "active-map",
+                                        "revision": 0,
+                                        "instances": [],
+                                    }
+                                }
                             },
                             "error": None,
                             "metadata": {},
@@ -145,14 +155,25 @@ class ToolStatusAgentOrchestrator:
                     "confidence": 0.9,
                 },
                 basemap_id="osm_default",
-                overlay_ids=["weather_overlay"],
                 viewport={
                     "center_latitude": 41.9028,
                     "center_longitude": 12.4964,
                     "radius_m": 2500.0,
                 },
                 basemap={"id": "osm_default", "label": "OpenStreetMap"},
-                overlays=[{"id": "weather_overlay", "label": "Weather Overlay"}],
+                overlay_collection=OverlayCollectionState(
+                    instances=[
+                        OverlayInstance(
+                            instance_id="weather-overlay",
+                            capability_id="weather_overlay",
+                            label="Weather Overlay",
+                            provider="test",
+                            overlay_type="overlay",
+                            rendering_mode="metadata-only",
+                            descriptor={"id": "weather-overlay"},
+                        )
+                    ]
+                ),
                 center={"latitude": 41.9028, "longitude": 12.4964},
                 bounds=[12.0, 41.0, 13.0, 42.0],
             ),

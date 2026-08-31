@@ -14,7 +14,9 @@ from server.contracts.geospatial import (
     OverlayCollectionState,
     OverlayInstance,
     OverlayMutationResult,
+    ViewportPolicy,
 )
+from server.domain.agent.decision import ResolvedLocation
 
 
 ###############################################################################
@@ -892,6 +894,120 @@ class OverlayCollectionService:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def from_rendered_descriptors(
+        cls,
+        descriptors: Iterable[dict[str, object]],
+        *,
+        resolved_location: ResolvedLocation,
+        viewport: ViewportPolicy,
+        revision: int = 0,
+    ) -> OverlayCollectionState:
+        """Create the authoritative collection for a newly rendered map."""
+        location_label = resolved_location.label.strip() or "map"
+        session_scope_key = (
+            f"location:{cls._norm(location_label)}:"
+            f"{resolved_location.latitude:.4f}:{resolved_location.longitude:.4f}"
+        )
+        instances: list[OverlayInstance] = []
+        for raw_descriptor in descriptors:
+            descriptor = dict(raw_descriptor)
+            overlay_id = str(descriptor.get("id") or descriptor.get("layer_id") or "")
+            if not overlay_id:
+                continue
+            capability_id = str(descriptor.get("capability_id") or overlay_id)
+            render = descriptor.get("render")
+            render_payload = render if isinstance(render, dict) else {}
+            variant = {
+                key: (
+                    str(descriptor[key])
+                    if descriptor.get(key) is not None
+                    else (
+                        str(render_payload[key])
+                        if render_payload.get(key) is not None
+                        else None
+                    )
+                )
+                for key in ("time", "style", "format")
+            }
+            instance_id = str(
+                descriptor.get("instance_id")
+                or cls._stable_id(capability_id, session_scope_key, variant)
+            )
+            descriptor["id"] = instance_id
+            descriptor["instance_id"] = instance_id
+            descriptor["capability_id"] = capability_id
+            label = str(descriptor.get("label") or overlay_id)
+            provider = str(descriptor.get("provider") or "unknown")
+            overlay_type = str(descriptor.get("type") or "overlay")
+            rendering_mode = str(
+                descriptor.get("rendering_mode")
+                or render_payload.get("rendering_mode")
+                or overlay_type
+                or "metadata-only"
+            )
+            raw_inspections = descriptor.get("inspections")
+            inspections: list[MapInspection] = []
+            if isinstance(raw_inspections, list):
+                for raw_inspection in cast(list[Any], raw_inspections):
+                    if not isinstance(raw_inspection, dict):
+                        continue
+                    try:
+                        inspections.append(MapInspection.model_validate(raw_inspection))
+                    except Exception:  # noqa: BLE001
+                        continue
+            raw_opacity = descriptor.get("default_opacity")
+            opacity = (
+                float(raw_opacity) if isinstance(raw_opacity, (int, float)) else 1.0
+            )
+            instances.append(
+                OverlayInstance(
+                    instance_id=instance_id,
+                    capability_id=capability_id,
+                    label=label,
+                    provider=provider,
+                    overlay_type=overlay_type,
+                    rendering_mode=rendering_mode,
+                    scope_key=session_scope_key,
+                    scope={"kind": "location", "label": location_label},
+                    resolved_location=resolved_location,
+                    viewport=viewport.model_dump(mode="json"),
+                    visible=descriptor.get("visible") is not False,
+                    opacity=opacity,
+                    render_variant=variant,
+                    descriptor=descriptor,
+                    inspections=inspections,
+                )
+            )
+        return OverlayCollectionState(revision=revision, instances=instances)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def catalog_from_collection(
+        collection: OverlayCollectionState,
+    ) -> list[dict[str, Any]]:
+        """Expose current descriptors as an add-command catalog."""
+        catalog: list[dict[str, Any]] = []
+        for instance in collection.instances:
+            descriptor = dict(instance.descriptor)
+            catalog.append(
+                {
+                    **descriptor,
+                    "id": instance.capability_id,
+                    "instance_id": instance.instance_id,
+                    "capability_id": instance.capability_id,
+                    "label": instance.label,
+                    "provider": instance.provider,
+                    "overlay_type": instance.overlay_type,
+                    "rendering_mode": instance.rendering_mode,
+                    "visible": instance.visible,
+                    "default_opacity": instance.opacity,
+                    "descriptor": descriptor,
+                }
+            )
+        return catalog
+
+    # -------------------------------------------------------------------------
+    @classmethod
     def from_map_session(
         cls, session: MapSession | dict[str, Any] | None
     ) -> OverlayCollectionState:
@@ -902,76 +1018,7 @@ class OverlayCollectionService:
             if isinstance(session, MapSession)
             else MapSession.model_validate(session)
         )
-        if model.overlay_collection is not None:
-            return model.overlay_collection.model_copy(deep=True)
-        instances: list[OverlayInstance] = []
-        location_label = model.resolved_location.label.strip() or "map"
-        point = (model.resolved_location.latitude, model.resolved_location.longitude)
-        session_scope_key = (
-            f"location:{cls._norm(location_label)}:{point[0]:.4f}:{point[1]:.4f}"
-        )
-        for descriptor in model.overlays:
-            overlay_id = str(descriptor.get("id") or descriptor.get("layer_id") or "")
-            if not overlay_id:
-                continue
-            capability_id = str(descriptor.get("capability_id") or overlay_id)
-            variant = {
-                "time": str(descriptor.get("time"))
-                if descriptor.get("time") is not None
-                else None,
-                "style": str(descriptor.get("style"))
-                if descriptor.get("style") is not None
-                else None,
-                "format": str(descriptor.get("format"))
-                if descriptor.get("format") is not None
-                else None,
-            }
-            instance_id = str(
-                descriptor.get("instance_id")
-                or cls._stable_id(capability_id, session_scope_key, variant)
-            )
-            raw_inspections = descriptor.get("inspections")
-            inspections: list[MapInspection] = []
-            if isinstance(raw_inspections, list):
-                for raw_inspection in cast(list[Any], raw_inspections):
-                    if not isinstance(raw_inspection, dict):
-                        continue
-                    try:
-                        inspections.append(MapInspection.model_validate(raw_inspection))
-                    except Exception:
-                        continue
-            instances.append(
-                OverlayInstance(
-                    instance_id=instance_id,
-                    capability_id=capability_id,
-                    label=str(descriptor.get("label") or overlay_id),
-                    provider=str(descriptor.get("provider") or "unknown"),
-                    overlay_type=str(descriptor.get("type") or "overlay"),
-                    rendering_mode=str(
-                        descriptor.get("rendering_mode") or "metadata-only"
-                    ),
-                    scope_key=session_scope_key,
-                    scope={"kind": "location", "label": location_label},
-                    resolved_location=model.resolved_location,
-                    viewport=model.viewport.model_dump(mode="json"),
-                    visible=descriptor.get("visible") is not False,
-                    opacity=(
-                        float(default_opacity)
-                        if isinstance(
-                            default_opacity := descriptor.get("default_opacity"),
-                            (int, float),
-                        )
-                        else 1.0
-                    ),
-                    render_variant=variant,
-                    descriptor=dict(descriptor),
-                    inspections=inspections,
-                )
-            )
-        return OverlayCollectionState(
-            revision=model.overlay_collection_revision,
-            instances=instances,
-        )
+        return model.overlay_collection.model_copy(deep=True)
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -980,65 +1027,8 @@ class OverlayCollectionService:
         session: MapSession,
         collection: OverlayCollectionState,
     ) -> MapSession:
-        """Project the authoritative collection into the existing map session.
-
-        Descriptors are retained verbatim for unchanged instances.  Only the
-        presentation fields controlled by a command are changed, so a hide,
-        show, or remove operation never causes unrelated providers to run.
-        """
-        overlays: list[dict[str, Any]] = []
-        inspections: list[Any] = []
-        for instance in collection.instances:
-            descriptor = dict(instance.descriptor)
-            descriptor["id"] = instance.instance_id
-            descriptor["instance_id"] = instance.instance_id
-            descriptor["capability_id"] = instance.capability_id
-            descriptor["visible"] = instance.visible
-            descriptor["default_opacity"] = instance.opacity
-            descriptor.setdefault("label", instance.label)
-            descriptor.setdefault("provider", instance.provider)
-            descriptor.setdefault("type", instance.overlay_type)
-            descriptor.setdefault("rendering_mode", instance.rendering_mode)
-            overlays.append(descriptor)
-            inspections.extend(instance.inspections)
-        active_overlay_keys = {
-            key
-            for instance in collection.instances
-            for key in (
-                instance.instance_id,
-                instance.capability_id,
-                str(instance.descriptor.get("id") or ""),
-            )
-            if key
-        }
-        # A fresh provider projection can contain a failed request for an
-        # identifier that the authoritative collection has since resolved
-        # (for example, an instance ID carried as a catalog capability ID).
-        # Do not surface that stale failure alongside the now-renderable
-        # instance; retain failures for genuinely absent provider layers.
-        failed_overlays = [
-            failure
-            for failure in session.failed_overlays
-            if str(failure.get("id") or "") not in active_overlay_keys
-        ]
+        """Replace only the authoritative collection in the map session."""
         return session.model_copy(
-            update={
-                "overlay_ids": [
-                    instance.instance_id for instance in collection.instances
-                ],
-                "requested_overlay_ids": [
-                    instance.instance_id for instance in collection.instances
-                ],
-                "rendered_overlay_ids": [
-                    instance.instance_id
-                    for instance in collection.instances
-                    if instance.visible
-                ],
-                "overlays": overlays,
-                "overlay_collection_revision": collection.revision,
-                "overlay_collection": collection,
-                "inspections": inspections,
-                "failed_overlays": failed_overlays,
-            },
+            update={"overlay_collection": collection},
             deep=True,
         )

@@ -4,7 +4,12 @@ from dataclasses import dataclass
 
 from server.contracts.chat import ChatOperationResult
 from server.domain.agent.decision import ResolvedLocation
-from server.contracts.geospatial import MapSession, ViewportPolicy
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    OverlayInstance,
+    ViewportPolicy,
+)
 from server.prompts.response import (
     VERIFIED_EVIDENCE_USER_TEMPLATE,
     build_grounded_response_system_prompt,
@@ -110,20 +115,27 @@ def test_synthesizer_evidence_marks_metadata_only_overlays() -> None:
             longitude=2.3522,
         ),
         basemap_id="osm_default",
-        overlay_ids=["openmeteo_air_quality_forecast"],
         viewport=ViewportPolicy(
             center_latitude=48.8566,
             center_longitude=2.3522,
             radius_m=18000.0,
         ),
-        overlays=[
-            {
-                "id": "openmeteo_air_quality_forecast",
-                "label": "Open-Meteo Air Quality Forecast",
-                "rendering_mode": "metadata-only",
-                "source_protocol": "JSON time series",
-            }
-        ],
+        overlay_collection=OverlayCollectionState(
+            instances=[
+                OverlayInstance(
+                    instance_id="air-quality-paris",
+                    capability_id="openmeteo_air_quality_forecast",
+                    label="Open-Meteo Air Quality Forecast",
+                    provider="openmeteo",
+                    overlay_type="time-series-insight",
+                    rendering_mode="metadata-only",
+                    descriptor={
+                        "id": "air-quality-paris",
+                        "source_protocol": "JSON time series",
+                    },
+                )
+            ]
+        ),
     )
     operation = ChatOperationResult(
         kind="map_session",
@@ -246,13 +258,22 @@ def test_synthesizer_falls_back_when_successful_overlay_is_called_failed() -> No
             label="Tokyo", latitude=35.6, longitude=139.7
         ),
         basemap_id="osm_default",
-        overlay_ids=["overpass_poi_amenities"],
         viewport=ViewportPolicy(
             center_latitude=35.6, center_longitude=139.7, radius_m=4000.0
         ),
-        overlays=[
-            {"id": "overpass_poi_amenities", "rendering_mode": "clustered-points"}
-        ],
+        overlay_collection=OverlayCollectionState(
+            instances=[
+                OverlayInstance(
+                    instance_id="poi-tokyo",
+                    capability_id="overpass_poi_amenities",
+                    label="OpenStreetMap points of interest",
+                    provider="overpass",
+                    overlay_type="overlay",
+                    rendering_mode="clustered-points",
+                    descriptor={"id": "poi-tokyo"},
+                )
+            ]
+        ),
     )
     operation = ChatOperationResult(
         kind="map_session",

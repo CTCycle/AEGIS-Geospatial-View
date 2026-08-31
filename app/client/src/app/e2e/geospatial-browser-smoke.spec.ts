@@ -10,7 +10,7 @@ import { AppStateStoreService } from '../core/app-state-store.service';
 import { DEFAULT_BASE_TILE_PROXY_URL } from '../core/constants';
 import { FakeRealtimeService } from '../core/realtime.test-support';
 import { RealtimeService } from '../core/realtime.service';
-import { CameraFeature, ChatTurnResponse } from '../core/types';
+import { CameraFeature, ChatTurnResponse, JsonValue, MapSession } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { GeospatialPageComponent } from '../pages/geospatial-page.component';
 
@@ -49,7 +49,7 @@ describe('e2e/geospatial browser smoke', () => {
     remove: jasmine.Spy;
   };
 
-  const mockedMapResponse: ChatTurnResponse = {
+  const mockedMapResponse: ChatTurnResponse = ({
     conversation_id: 'conv-browser-smoke',
     request_id: 'browser-smoke-1',
     assistant_message: 'Rendered a mocked geospatial session.',
@@ -247,6 +247,14 @@ describe('e2e/geospatial browser smoke', () => {
           default_opacity: 0.5,
         },
         {
+          id: 'windy_webcams_missing_key',
+          label: 'Windy Webcams credentials are missing',
+          provider: 'windy',
+          type: 'metadata-only',
+          rendering_mode: 'metadata-only',
+          attribution: 'Windy webcams',
+        },
+        {
           id: 'metadata_context',
           label: 'Metadata setup layer',
           provider: 'mock_metadata',
@@ -256,6 +264,58 @@ describe('e2e/geospatial browser smoke', () => {
         },
       ],
     },
+  } as unknown as ChatTurnResponse);
+
+  const canonicalizeMockedMapSession = (raw: Record<string, unknown>): MapSession => {
+    const descriptors = Array.isArray(raw.overlays)
+      ? raw.overlays.filter((item): item is Record<string, unknown> => (
+        item !== null && typeof item === 'object'
+      ))
+      : [];
+    const instances = descriptors.map((descriptor) => {
+      const id = String(descriptor.id ?? 'overlay');
+      return {
+        instance_id: id,
+        capability_id: id,
+        label: String(descriptor.label ?? id),
+        provider: String(descriptor.provider ?? 'fixture'),
+        overlay_type: String(descriptor.type ?? 'overlay'),
+        rendering_mode: String(descriptor.rendering_mode ?? descriptor.type ?? 'metadata-only'),
+        scope_key: 'global',
+        scope: { kind: 'global' },
+        visible: descriptor.visible !== false,
+        opacity: typeof descriptor.default_opacity === 'number' ? descriptor.default_opacity : 1,
+        render_variant: {},
+        descriptor: descriptor as unknown as Record<string, JsonValue>,
+        inspections: [],
+      };
+    });
+    return {
+      session_id: String(raw.session_id),
+      resolved_location: raw.resolved_location as MapSession['resolved_location'],
+      basemap_id: String(raw.basemap_id),
+      viewport: raw.viewport as MapSession['viewport'],
+      center: raw.center as MapSession['center'],
+      bounds: raw.bounds as MapSession['bounds'],
+      basemap: raw.basemap as MapSession['basemap'],
+      compliance_warnings: Array.isArray(raw.compliance_warnings)
+        ? raw.compliance_warnings.filter((item): item is string => typeof item === 'string')
+        : [],
+      overlay_collection: {
+        collection_id: 'active-map',
+        revision: 0,
+        instances,
+      },
+    };
+  };
+
+  const canonicalMockedMapResponse: ChatTurnResponse = {
+    ...mockedMapResponse,
+    map_session: mockedMapResponse.map_session
+      ? canonicalizeMockedMapSession(
+        mockedMapResponse.map_session as unknown as Record<string, unknown>,
+      )
+      : null,
   };
 
   beforeEach(async () => {
@@ -276,7 +336,7 @@ describe('e2e/geospatial browser smoke', () => {
 
     apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['createConversation', 'sendChatTurn', 'fetchCatalog']);
     apiClient.createConversation.and.resolveTo({ conversation_id: 'conv-browser-smoke', title: 'show mocked map' });
-    apiClient.sendChatTurn.and.resolveTo(mockedMapResponse);
+    apiClient.sendChatTurn.and.resolveTo(canonicalMockedMapResponse);
     apiClient.fetchCatalog.and.resolveTo({ capabilities: [], basemaps: [], overlays: [], tools: [] });
     realtime = new FakeRealtimeService((payload) => apiClient.sendChatTurn(payload));
 
@@ -405,7 +465,8 @@ describe('e2e/geospatial browser smoke', () => {
     await component.sendMessage();
     fixture.detectChanges();
 
-    expect(component.payload?.map_session?.overlay_ids).toContain('windy_webcams_missing_key');
+    expect(component.payload?.map_session?.overlay_collection.instances.map((instance) => instance.capability_id))
+      .toContain('windy_webcams_missing_key');
     expect(fixture.nativeElement.textContent).toContain('Windy Webcams credentials are missing');
   });
 

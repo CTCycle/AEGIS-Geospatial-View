@@ -171,13 +171,14 @@ class AgentResponseBuilder:
     def _map_session_status(
         map_session: MapSession,
     ) -> Literal["success", "partial", "failed"]:
-        requested = list(map_session.requested_overlay_ids or map_session.overlay_ids)
-        if map_session.failed_overlays and not map_session.overlay_ids:
+        has_render_failure = any(
+            " is not available" in warning or " failed (" in warning
+            for warning in map_session.compliance_warnings
+        )
+        if has_render_failure and not map_session.overlay_collection.instances:
             return "failed"
-        if map_session.failed_overlays:
+        if has_render_failure:
             return "partial"
-        if requested and not map_session.overlay_ids:
-            return "failed"
         return "success"
 
     # -------------------------------------------------------------------------

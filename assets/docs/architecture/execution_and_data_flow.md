@@ -172,11 +172,12 @@ Live provider-native layer discovery flows through:
 - XML capability parsing and normalized provider layer descriptors
 
 Renderable map overlays are produced by `RenderDescriptorService` and then
-placed in `MapSession.overlays` and its authoritative revisioned collection.
+placed as instances in the required, authoritative `MapSession.overlay_collection`.
+The frontend derives render entries from those instances rather than reading a
+second overlay array or constructing provider-specific WMS or WMTS defaults.
 `MapInspectionService` translates verified provider metadata into bounded
-feature/location/overlay/non-spatial inspection contracts. The frontend should
-consume those descriptors directly rather than constructing provider-specific
-WMS or WMTS defaults.
+feature/location/overlay/non-spatial inspection contracts attached to the
+owning collection instance.
 
 ## Async And Threaded Behavior
 

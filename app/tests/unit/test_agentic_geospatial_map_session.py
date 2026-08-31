@@ -5,8 +5,15 @@ import json
 import threading
 from typing import TypeVar
 
+import pytest
+
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
-from server.contracts.geospatial import ProviderLayerSelection
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    ProviderLayerSelection,
+    ViewportPolicy,
+)
 from server.services.geospatial.providers.base import ProviderRateLimitError
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
@@ -51,19 +58,38 @@ def test_agentic_geospatial_selected_capabilities_flow_into_map_session() -> Non
 
     session = _run_async(LocationSearchOrchestrator().execute(request))
 
-    assert session.overlay_ids == ["tomtom_traffic_flow", "windy_webcams"]
-    assert [overlay["id"] for overlay in session.overlays] == [
+    instances = session.overlay_collection.instances
+    assert [instance.capability_id for instance in instances] == [
         "tomtom_traffic_flow",
         "windy_webcams",
     ]
     assert session.center == {"latitude": 41.9, "longitude": 12.5}
-    assert session.requested_overlay_ids == ["tomtom_traffic_flow", "windy_webcams"]
-    assert session.rendered_overlay_ids == ["tomtom_traffic_flow", "windy_webcams"]
-    assert session.failed_overlays == []
+    assert session.overlay_collection.revision == 0
+    assert all(instance.visible for instance in instances)
 
 
 ###############################################################################
-def test_agentic_geospatial_map_session_separates_failed_overlay_ids() -> None:
+def test_map_session_rejects_legacy_overlay_projection_fields() -> None:
+    location = ResolvedLocation(
+        label="Rome",
+        latitude=41.9,
+        longitude=12.5,
+        confidence=1.0,
+    )
+
+    with pytest.raises(ValueError, match="overlays"):
+        MapSession(
+            session_id="map-test",
+            resolved_location=location,
+            basemap_id="osm_default",
+            viewport=ViewportPolicy(center_latitude=41.9, center_longitude=12.5),
+            overlay_collection=OverlayCollectionState(),
+            overlays=[],  # type: ignore[call-arg]
+        )
+
+
+###############################################################################
+def test_agentic_geospatial_map_session_surfaces_missing_overlay_warning() -> None:
     location = ResolvedLocation(
         label="Rome",
         latitude=41.9,
@@ -80,12 +106,14 @@ def test_agentic_geospatial_map_session_separates_failed_overlay_ids() -> None:
 
     session = _run_async(LocationSearchOrchestrator().execute(request))
 
-    assert session.requested_overlay_ids == ["tomtom_traffic_flow", "missing_overlay"]
-    assert session.overlay_ids == ["tomtom_traffic_flow"]
-    assert session.rendered_overlay_ids == ["tomtom_traffic_flow"]
-    assert session.failed_overlays == [
-        {"id": "missing_overlay", "reason": "not available in the capability catalog"}
-    ]
+    assert [
+        instance.capability_id for instance in session.overlay_collection.instances
+    ] == ["tomtom_traffic_flow"]
+    assert any(
+        "Overlay 'missing_overlay' is not available in the capability catalog."
+        == warning
+        for warning in session.compliance_warnings
+    )
 
 
 ###############################################################################
@@ -175,15 +203,13 @@ def test_agentic_geospatial_provider_layer_selection_flows_into_map_session() ->
         ).execute(request)
     )
 
-    assert session.requested_overlay_ids == [
-        "gibs:MODIS_Terra_CorrectedReflectance_TrueColor"
-    ]
-    assert session.overlay_ids == ["gibs:MODIS_Terra_CorrectedReflectance_TrueColor"]
+    instance = session.overlay_collection.instances[0]
+    assert instance.capability_id == "gibs:MODIS_Terra_CorrectedReflectance_TrueColor"
     assert (
-        session.overlays[0]["tile_url_template"]
+        instance.descriptor["tile_url_template"]
         == "https://gibs.example/{z}/{x}/{y}.png"
     )
-    assert session.failed_overlays == []
+    assert session.compliance_warnings == []
 
 
 ###############################################################################
@@ -214,13 +240,9 @@ def test_agentic_geospatial_provider_layer_failure_preserves_error_code() -> Non
         ).execute(request)
     )
 
-    assert session.overlay_ids == []
-    assert session.failed_overlays == [
-        {
-            "id": "gibs:broken-layer",
-            "reason": "provider rate limit reached",
-            "code": "rate_limited",
-        }
+    assert session.overlay_collection.instances == []
+    assert session.compliance_warnings == [
+        "Provider layer 'gibs:broken-layer' failed (rate_limited): provider rate limit reached."
     ]
 
 
@@ -294,7 +316,10 @@ def test_agentic_geospatial_wms_and_wmts_descriptors_include_backend_render_temp
     request = RequestBuilder().build_location_search_request(plan, location)
 
     session = _run_async(LocationSearchOrchestrator().execute(request))
-    overlays = {overlay["id"]: overlay for overlay in session.overlays}
+    overlays = {
+        instance.capability_id: instance.descriptor
+        for instance in session.overlay_collection.instances
+    }
 
     eea = overlays["eea_noise_2019"]
     esa = overlays["esa_worldcover"]
@@ -329,9 +354,11 @@ def test_agentic_geospatial_metadata_only_descriptors_stay_non_renderable() -> N
     request = RequestBuilder().build_location_search_request(plan, location)
 
     session = _run_async(LocationSearchOrchestrator().execute(request))
-    overlay = session.overlays[0]
+    instance = session.overlay_collection.instances[0]
+    overlay = instance.descriptor
 
-    assert overlay["id"] == "eurostat_regional_demographics"
+    assert instance.capability_id == "eurostat_regional_demographics"
+    assert overlay["id"] == instance.instance_id
     assert overlay["rendering_mode"] == "metadata-only"
     assert overlay["type"] == "time-series-insight"
     assert "tile_url_template" not in overlay

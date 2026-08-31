@@ -13,6 +13,7 @@ import {
   ModelSettingsResponse,
   MapInspection,
   OverlayCollectionState,
+  OverlayInstance,
 } from './types';
 import { isFiniteNumber, isRecord, isStringArray } from './type-guards';
 
@@ -283,36 +284,74 @@ const normalizeInspection = (value: unknown): MapInspection | null => {
 };
 
 const normalizeOverlayCollection = (value: unknown): OverlayCollectionState | null => {
-  if (!isRecord(value) || typeof value.collection_id !== 'string' || typeof value.revision !== 'number' || !Array.isArray(value.instances)) {
+  if (
+    !isRecord(value)
+    || typeof value.collection_id !== 'string'
+    || !isFiniteNumber(value.revision)
+    || value.revision < 0
+    || !Array.isArray(value.instances)
+  ) {
     return null;
   }
-  const instances = value.instances.flatMap((entry) => {
-    if (!isRecord(entry) || typeof entry.instance_id !== 'string' || typeof entry.capability_id !== 'string') {
-      return [];
+  const instances: OverlayInstance[] = [];
+  for (const entry of value.instances) {
+    if (
+      !isRecord(entry)
+      || typeof entry.instance_id !== 'string'
+      || typeof entry.capability_id !== 'string'
+      || typeof entry.label !== 'string'
+      || typeof entry.provider !== 'string'
+      || typeof entry.overlay_type !== 'string'
+      || typeof entry.rendering_mode !== 'string'
+      || typeof entry.scope_key !== 'string'
+      || !isRecord(entry.scope)
+      || typeof entry.visible !== 'boolean'
+      || !isFiniteNumber(entry.opacity)
+      || entry.opacity < 0
+      || entry.opacity > 1
+      || !isRecord(entry.render_variant)
+      || !isRecord(entry.descriptor)
+      || !Array.isArray(entry.inspections)
+    ) {
+      return null;
     }
-    return [{
+    const renderVariant: Record<string, string | null> = {};
+    for (const [key, item] of Object.entries(entry.render_variant)) {
+      if (item !== null && typeof item !== 'string') {
+        return null;
+      }
+      renderVariant[key] = item;
+    }
+    const inspections: MapInspection[] = [];
+    for (const inspection of entry.inspections) {
+      const normalized = normalizeInspection(inspection);
+      if (!normalized) {
+        return null;
+      }
+      inspections.push(normalized);
+    }
+    instances.push({
       instance_id: entry.instance_id,
       capability_id: entry.capability_id,
-      label: typeof entry.label === 'string' ? entry.label : entry.instance_id,
-      provider: typeof entry.provider === 'string' ? entry.provider : 'unknown',
-      overlay_type: typeof entry.overlay_type === 'string' ? entry.overlay_type : 'overlay',
-      rendering_mode: typeof entry.rendering_mode === 'string' ? entry.rendering_mode : 'metadata-only',
-      scope_key: typeof entry.scope_key === 'string' ? entry.scope_key : 'global',
-      scope: isRecord(entry.scope) ? entry.scope as Record<string, JsonValue> : {},
-      visible: entry.visible !== false,
-      opacity: typeof entry.opacity === 'number' ? Math.max(0, Math.min(1, entry.opacity)) : 1,
-      render_variant: isRecord(entry.render_variant)
-        ? Object.fromEntries(Object.entries(entry.render_variant).filter(([, item]) => item === null || typeof item === 'string')) as Record<string, string | null>
-        : {},
-      descriptor: isRecord(entry.descriptor) ? entry.descriptor as Record<string, JsonValue> : {},
-      inspections: Array.isArray(entry.inspections)
-        ? entry.inspections.flatMap((inspection) => {
-          const normalized = normalizeInspection(inspection);
-          return normalized ? [normalized] : [];
-        })
-        : [],
-    }];
-  });
+      label: entry.label,
+      provider: entry.provider,
+      overlay_type: entry.overlay_type,
+      rendering_mode: entry.rendering_mode,
+      scope_key: entry.scope_key,
+      scope: entry.scope as Record<string, JsonValue>,
+      resolved_location: isRecord(entry.resolved_location)
+        ? entry.resolved_location as unknown as OverlayInstance['resolved_location']
+        : undefined,
+      viewport: isRecord(entry.viewport)
+        ? entry.viewport as unknown as OverlayInstance['viewport']
+        : undefined,
+      visible: entry.visible,
+      opacity: entry.opacity,
+      render_variant: renderVariant,
+      descriptor: entry.descriptor as Record<string, JsonValue>,
+      inspections,
+    });
+  }
   return { collection_id: value.collection_id, revision: Math.max(0, value.revision), instances };
 };
 
@@ -400,56 +439,58 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
   };
 };
 
+export const mapOverlayEntryFromInstance = (instance: OverlayInstance): MapOverlayEntry | null => (
+  normalizeMapOverlayEntry({
+    ...instance.descriptor,
+    id: instance.instance_id,
+    instance_id: instance.instance_id,
+    capability_id: instance.capability_id,
+    label: instance.label,
+    provider: instance.provider,
+    type: instance.overlay_type,
+    rendering_mode: instance.rendering_mode,
+    visible: instance.visible,
+    default_opacity: instance.opacity,
+    inspections: instance.inspections,
+  })
+);
+
 export const normalizeMapSession = (value: unknown): MapSession | null => {
-  if (!isRecord(value) || typeof value.session_id !== 'string' || !isRecord(value.resolved_location)) {
+  const supersededFields = [
+    'overlay_ids',
+    'overlays',
+    'requested_overlay_ids',
+    'rendered_overlay_ids',
+    'failed_overlays',
+    'overlay_collection_revision',
+    'inspections',
+  ];
+  if (
+    !isRecord(value)
+    || typeof value.session_id !== 'string'
+    || !isRecord(value.resolved_location)
+    || typeof value.basemap_id !== 'string'
+    || !isRecord(value.viewport)
+    || supersededFields.some((field) => field in value)
+  ) {
     return null;
   }
-  const overlays = Array.isArray(value.overlays)
-    ? value.overlays.map(normalizeMapOverlayEntry).filter((item): item is MapOverlayEntry => item !== null)
-    : [];
+  const overlayCollection = normalizeOverlayCollection(value.overlay_collection);
+  if (!overlayCollection) {
+    return null;
+  }
   return {
-    ...value,
     session_id: String(value.session_id),
     resolved_location: value.resolved_location as unknown as MapSession['resolved_location'],
-    basemap_id: String(value.basemap_id ?? ''),
-    overlay_ids: isStringArray(value.overlay_ids) ? value.overlay_ids : overlays.map((overlay) => overlay.id),
-    viewport: isRecord(value.viewport) ? value.viewport as unknown as MapSession['viewport'] : {
-      center_latitude: 0,
-      center_longitude: 0,
-      radius_m: 2500,
-    },
+    basemap_id: value.basemap_id,
+    viewport: value.viewport as unknown as MapSession['viewport'],
+    generated_at: typeof value.generated_at === 'string' ? value.generated_at : undefined,
     payload: isRecord(value.payload) ? value.payload as Record<string, JsonValue> : {},
     center: isRecord(value.center) ? value.center as MapSession['center'] : undefined,
     bounds: Array.isArray(value.bounds) ? value.bounds as number[] : undefined,
     basemap: isRecord(value.basemap) ? value.basemap as MapSession['basemap'] : undefined,
-    overlays,
-    requested_overlay_ids: isStringArray(value.requested_overlay_ids) ? value.requested_overlay_ids : undefined,
-    rendered_overlay_ids: isStringArray(value.rendered_overlay_ids)
-      ? value.rendered_overlay_ids
-      : overlays.map((overlay) => overlay.id),
-    failed_overlays: Array.isArray(value.failed_overlays)
-      ? value.failed_overlays.flatMap((item): Array<{ id: string; reason: string; code?: string }> => {
-        if (!isRecord(item) || typeof item.id !== 'string' || typeof item.reason !== 'string') {
-          return [];
-        }
-        return [{
-          id: item.id,
-          reason: item.reason,
-          ...(typeof item.code === 'string' ? { code: item.code } : {}),
-        }];
-      })
-      : [],
     compliance_warnings: isStringArray(value.compliance_warnings) ? value.compliance_warnings : [],
-    overlay_collection_revision: isFiniteNumber(value.overlay_collection_revision)
-      ? value.overlay_collection_revision
-      : 0,
-    overlay_collection: normalizeOverlayCollection(value.overlay_collection),
-    inspections: Array.isArray(value.inspections)
-      ? value.inspections.flatMap((inspection) => {
-        const normalized = normalizeInspection(inspection);
-        return normalized ? [normalized] : [];
-      })
-      : [],
+    overlay_collection: overlayCollection,
   };
 };
 

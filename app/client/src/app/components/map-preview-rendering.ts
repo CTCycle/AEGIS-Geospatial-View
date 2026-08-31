@@ -13,6 +13,7 @@ import {
   DEFAULT_WMTS_FORMAT,
   DEFAULT_WMTS_MATRIX_SET,
 } from '../core/constants';
+import { mapOverlayEntryFromInstance } from '../core/api-parsers';
 import { MapOverlayEntry, MapSession, OverlayRenderStatus } from '../core/types';
 import { isFiniteNumber } from '../core/type-guards';
 
@@ -25,6 +26,13 @@ type ClusterGeoJsonSource = {
     callback: (error: Error | null, zoom: number) => void,
   ) => void;
 };
+
+export const mapSessionOverlayEntries = (mapSession?: MapSession): OverlayEntry[] => (
+  mapSession?.overlay_collection?.instances.flatMap((instance) => {
+    const entry = mapOverlayEntryFromInstance(instance);
+    return entry ? [entry] : [];
+  }) || []
+);
 
 const toMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim()) {
@@ -201,7 +209,7 @@ export const buildStyle = (mapSession?: MapSession): StyleSpecification => {
 };
 
 export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRenderStatus[] => {
-  const overlays = mapSession?.overlays || [];
+  const overlays = mapSessionOverlayEntries(mapSession);
   const statuses: OverlayRenderStatus[] = [];
 
   overlays.forEach((overlay, index) => {
@@ -303,7 +311,7 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
 };
 
 export const removeOverlayLayers = (map: Map, mapSession?: MapSession): void => {
-  const keep = new Set((mapSession?.overlays || []).flatMap(getOverlayLayerIds));
+  const keep = new Set(mapSessionOverlayEntries(mapSession).flatMap(getOverlayLayerIds));
   const sourcesToRemove = new Set<string>();
   const styleLayers = typeof map.getStyle === 'function' ? map.getStyle()?.layers || [] : [];
   for (const layer of styleLayers) {

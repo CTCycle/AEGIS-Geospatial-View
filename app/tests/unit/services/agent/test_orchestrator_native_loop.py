@@ -19,7 +19,7 @@ from server.contracts.extraction import (
     NormalizedAction,
     TurnParseResult,
 )
-from server.contracts.geospatial import MapSession
+from server.contracts.geospatial import MapSession, ViewportPolicy
 from server.domain.agent.pipeline import ToolPlan
 from server.prompts.agent import build_native_agent_system_prompt
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
@@ -29,6 +29,7 @@ from server.services.agent.direct_turn_response import DirectTurnResponseService
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.native_tool_loop import AgentToolLoopResult
 from server.services.agent.orchestrator import AgentOrchestrator
+from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.policy_engine import AgentPolicyConstraints
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
@@ -605,6 +606,18 @@ class _Catalog:
         latitude = float(capability_arguments.get("latitude") or 41.9028)
         longitude = float(capability_arguments.get("longitude") or 12.4964)
         label = str(capability_arguments.get("location") or "Rome")
+        resolved_location = ResolvedLocation(
+            label=label,
+            latitude=latitude,
+            longitude=longitude,
+            source="resolver",
+            confidence=0.9,
+        )
+        viewport = {
+            "center_latitude": latitude,
+            "center_longitude": longitude,
+            "radius_m": 2500.0,
+        }
         return {
             "ok": True,
             "operation": "map_session_created",
@@ -612,22 +625,15 @@ class _Catalog:
             "arguments": capability_arguments,
             "map_session": MapSession(
                 session_id="map-1",
-                resolved_location=ResolvedLocation(
-                    label=label,
-                    latitude=latitude,
-                    longitude=longitude,
-                    source="resolver",
-                    confidence=0.9,
-                ),
+                resolved_location=resolved_location,
                 basemap_id="osm_default",
-                overlay_ids=[capability_id],
-                viewport={
-                    "center_latitude": latitude,
-                    "center_longitude": longitude,
-                    "radius_m": 2500.0,
-                },
+                viewport=viewport,
                 basemap={"id": "osm_default", "label": "OpenStreetMap"},
-                overlays=[{"id": capability_id, "label": capability_id}],
+                overlay_collection=OverlayCollectionService.from_rendered_descriptors(
+                    [{"id": capability_id, "label": capability_id}],
+                    resolved_location=resolved_location,
+                    viewport=ViewportPolicy.model_validate(viewport),
+                ),
                 center={"latitude": latitude, "longitude": longitude},
                 bounds=[
                     longitude - 0.01,
@@ -774,6 +780,18 @@ AgentOrchestrator = _build_test_orchestrator
 
 
 ###############################################################################
+def map_overlay_capability_ids(map_session: MapSession | None) -> list[str]:
+    return (
+        [
+            instance.capability_id
+            for instance in map_session.overlay_collection.instances
+        ]
+        if map_session is not None
+        else []
+    )
+
+
+###############################################################################
 class _SearchOrchestrator:
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
@@ -786,13 +804,16 @@ class _SearchOrchestrator:
             session_id="fallback-map",
             resolved_location=payload.resolved_location,
             basemap_id=payload.basemap_id,
-            overlay_ids=payload.overlay_ids,
             viewport=payload.viewport,
             basemap={"id": payload.basemap_id, "label": payload.basemap_id},
-            overlays=[
-                {"id": overlay_id, "label": overlay_id}
-                for overlay_id in payload.overlay_ids
-            ],
+            overlay_collection=OverlayCollectionService.from_rendered_descriptors(
+                [
+                    {"id": overlay_id, "label": overlay_id}
+                    for overlay_id in payload.overlay_ids
+                ],
+                resolved_location=payload.resolved_location,
+                viewport=payload.viewport,
+            ),
             payload={"action_id": payload.action_id},
             center={
                 "latitude": payload.viewport.center_latitude,
@@ -1168,7 +1189,7 @@ def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap(
             "longitude": 12.4964,
         }
         assert response.map_session.resolved_location.label == "Rome"
-        assert response.map_session.overlay_ids == []
+        assert map_overlay_capability_ids(response.map_session) == []
 
     run_async_in_thread(_run())
 
@@ -1219,7 +1240,9 @@ def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session(
         assert response.map_session is not None
         assert response.operation is not None
         assert response.operation.kind == "map_session"
-        assert response.map_session.overlay_ids == ["tomtom_traffic_flow"]
+        assert map_overlay_capability_ids(response.map_session) == [
+            "tomtom_traffic_flow"
+        ]
         assert response.map_session.compliance_warnings
         assert "Missing credential" in response.map_session.compliance_warnings[0]
         assert len(search_orchestrator.requests) == 1
@@ -1273,7 +1296,9 @@ def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainvi
 
         assert response.map_session is not None
         assert response.map_session.resolved_location.label == "Zurich"
-        assert response.map_session.overlay_ids == ["rainviewer_precipitation_radar"]
+        assert map_overlay_capability_ids(response.map_session) == [
+            "rainviewer_precipitation_radar"
+        ]
 
     run_async_in_thread(_run())
 
@@ -1322,7 +1347,9 @@ def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -
 
         assert response.map_session is not None
         assert response.map_session.resolved_location.label == "Paris"
-        assert response.map_session.overlay_ids == ["openaq_air_quality"]
+        assert map_overlay_capability_ids(response.map_session) == [
+            "openaq_air_quality"
+        ]
 
     run_async_in_thread(_run())
 
@@ -1373,7 +1400,7 @@ def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning(
 
         assert response.map_session is not None
         assert response.map_session.resolved_location.label == "Times Square"
-        assert response.map_session.overlay_ids == ["windy_webcams"]
+        assert map_overlay_capability_ids(response.map_session) == ["windy_webcams"]
         assert response.map_session.compliance_warnings
         assert "Missing credential" in response.map_session.compliance_warnings[0]
 
@@ -1415,22 +1442,31 @@ def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
                 "arguments": dict(arguments.get("arguments") or {}),
                 "map_session": MapSession(
                     session_id=f"map-{capability_id}",
-                    resolved_location=ResolvedLocation(
-                        label="Rome",
-                        latitude=41.9028,
-                        longitude=12.4964,
-                        source="resolver",
-                        confidence=0.9,
+                    resolved_location=(
+                        resolved_location := ResolvedLocation(
+                            label="Rome",
+                            latitude=41.9028,
+                            longitude=12.4964,
+                            source="resolver",
+                            confidence=0.9,
+                        )
                     ),
                     basemap_id="osm_default",
-                    overlay_ids=[capability_id],
                     viewport={
                         "center_latitude": 41.9028,
                         "center_longitude": 12.4964,
                         "radius_m": 2500.0,
                     },
                     basemap={"id": "osm_default", "label": "OpenStreetMap"},
-                    overlays=[{"id": capability_id, "label": capability_id}],
+                    overlay_collection=OverlayCollectionService.from_rendered_descriptors(
+                        [{"id": capability_id, "label": capability_id}],
+                        resolved_location=resolved_location,
+                        viewport=ViewportPolicy(
+                            center_latitude=41.9028,
+                            center_longitude=12.4964,
+                            radius_m=2500.0,
+                        ),
+                    ),
                     center={"latitude": 41.9028, "longitude": 12.4964},
                     bounds=[12.0, 41.0, 13.0, 42.0],
                 ).model_dump(mode="json"),
@@ -1512,7 +1548,10 @@ def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
         )
 
         assert response.map_session is not None
-        assert response.map_session.overlay_ids == ["traffic_overlay", "rain_overlay"]
+        assert map_overlay_capability_ids(response.map_session) == [
+            "traffic_overlay",
+            "rain_overlay",
+        ]
 
     run_async_in_thread(_run())
 
@@ -1647,7 +1686,7 @@ def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_orde
         assert response.operation.kind == "map_session"
         assert response.decision.plan.state == "map_search"
         assert response.decision.plan.mode == "map"
-        assert response.map_session.overlay_ids == [
+        assert map_overlay_capability_ids(response.map_session) == [
             "traffic_overlay",
             "shared_overlay",
             "rain_overlay",
@@ -1802,7 +1841,9 @@ def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() 
         assert response.map_session is not None
         assert response.decision.plan.state == "map_search"
         assert response.map_session.resolved_location.label == "Rome"
-        assert response.map_session.overlay_ids == ["tomtom_traffic_flow"]
+        assert map_overlay_capability_ids(response.map_session) == [
+            "tomtom_traffic_flow"
+        ]
 
     run_async_in_thread(_run())
 
@@ -1936,7 +1977,7 @@ def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_withou
         assert response.map_session is not None
         assert response.map_session.resolved_location.latitude == 47.3769
         assert response.map_session.resolved_location.longitude == 8.5417
-        assert response.map_session.overlay_ids == [
+        assert map_overlay_capability_ids(response.map_session) == [
             "tomtom_traffic_flow",
             "rainviewer_precipitation_radar",
         ]

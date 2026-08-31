@@ -432,7 +432,7 @@ class PlannedTurnExecutionService:
             ),
             remove_layer_ids=removed_instance_ids,
             collection_revision=(
-                map_session.overlay_collection_revision
+                map_session.overlay_collection.revision
                 if map_session is not None
                 else None
             ),

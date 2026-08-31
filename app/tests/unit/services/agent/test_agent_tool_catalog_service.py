@@ -15,6 +15,8 @@ from server.contracts.geospatial import (
     GeospatialProviderLayerDescriptor,
     GeospatialProviderLayersResponse,
     MapSession,
+    OverlayCollectionState,
+    OverlayInstance,
 )
 from server.services.agent.agent_tool_catalog_service import (
     AgentToolCatalogService,
@@ -173,13 +175,22 @@ class _SearchOrchestrator:
             session_id="map-1",
             resolved_location=payload.resolved_location,
             basemap_id=payload.basemap_id,
-            overlay_ids=payload.overlay_ids,
             viewport=payload.viewport,
             basemap={"id": payload.basemap_id, "label": payload.basemap_id},
-            overlays=[
-                {"id": overlay_id, "label": overlay_id}
-                for overlay_id in payload.overlay_ids
-            ],
+            overlay_collection=OverlayCollectionState(
+                instances=[
+                    OverlayInstance(
+                        instance_id=f"instance-{overlay_id}",
+                        capability_id=overlay_id,
+                        label=overlay_id,
+                        provider="test",
+                        overlay_type="overlay",
+                        rendering_mode="metadata-only",
+                        descriptor={"id": f"instance-{overlay_id}"},
+                    )
+                    for overlay_id in payload.overlay_ids
+                ]
+            ),
             payload={"action_id": payload.action_id},
             center={
                 "latitude": payload.viewport.center_latitude,
@@ -506,15 +517,10 @@ def test_provider_layer_rendering_surfaces_failed_provider_without_map_success()
                 session_id="map-failed",
                 resolved_location=payload.resolved_location,
                 basemap_id=payload.basemap_id,
-                overlay_ids=[],
                 viewport=payload.viewport,
-                requested_overlay_ids=["test:layer-1"],
-                failed_overlays=[
-                    {
-                        "id": "test:layer-1",
-                        "reason": "provider rate limit reached",
-                        "code": "rate_limited",
-                    }
+                overlay_collection=OverlayCollectionState(),
+                compliance_warnings=[
+                    "Provider layer 'test:layer-1' failed (rate_limited): provider rate limit reached."
                 ],
             )
 
@@ -529,6 +535,6 @@ def test_provider_layer_rendering_surfaces_failed_provider_without_map_success()
     assert result["operation"] == "provider_error"
     assert result["error"] == {
         "code": "rate_limited",
-        "message": "Provider layer 'test:layer-1' failed: provider rate limit reached.",
+        "message": "Provider layer 'test:layer-1' failed (rate_limited): provider rate limit reached",
     }
     assert result["map_session"] is None

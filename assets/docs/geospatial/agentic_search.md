@@ -181,13 +181,15 @@ good visible map state.
 
 ## Overlay Collection And Inspection
 
-`MapSession.overlay_collection` is the authoritative revisioned collection of
-stable overlay instances. An instance identity combines capability, resolved
-geographic scope, and render variant, so the same weather capability can exist
-independently for Zurich and Switzerland. Visibility and opacity changes update
-only the selected instances; unrelated descriptors and provider results are
-retained. The response `visualization_update` reports collection revision,
-added/removed/updated instance IDs, and unmatched or ambiguous selectors.
+`MapSession.overlay_collection` is the required authoritative revisioned
+collection of stable overlay instances. An instance identity combines
+capability, resolved geographic scope, and render variant, so the same weather
+capability can exist independently for Zurich and Switzerland. Visibility and
+opacity changes update only the selected instances; unrelated descriptors and
+provider results are retained. Render entries and ID lists are derived views,
+not parallel map-session state. The response `visualization_update` reports
+collection revision, added/removed/updated instance IDs, and unmatched or
+ambiguous selectors.
 
 Provider metadata is normalized into bounded `MapInspection` contracts. Feature
 and location associations can be inspected on the map; raster metadata remains

@@ -176,10 +176,30 @@ describe('pages/geospatial-page.component', () => {
         session_id: 'canonical-map',
         resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
         basemap_id: 'osm_default',
-        overlay_ids: ['safe_overlay'],
         viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
         center: { latitude: 41.9, longitude: 12.5 },
-        overlays: [{ id: 'safe_overlay', label: 'Safe overlay', provider: 'fixture', type: 'geojson', url: '/api/geospatial/layers/safe_overlay/features' }],
+        overlay_collection: {
+          collection_id: 'active-map',
+          revision: 0,
+          instances: [{
+            instance_id: 'safe_overlay',
+            capability_id: 'safe_overlay',
+            label: 'Safe overlay',
+            provider: 'fixture',
+            overlay_type: 'geojson',
+            rendering_mode: 'geojson',
+            scope_key: 'global',
+            scope: { kind: 'global' },
+            visible: true,
+            opacity: 1,
+            render_variant: {},
+            descriptor: {
+              id: 'safe_overlay',
+              url: '/api/geospatial/layers/safe_overlay/features',
+            },
+            inspections: [],
+          }],
+        },
       },
     });
     sendChatTurnMock.and.resolveTo(mapResponse);
@@ -197,7 +217,8 @@ describe('pages/geospatial-page.component', () => {
     expect(component['pendingMapSession']?.session_id).toBe('canonical-map');
     component.onMapRenderStateChange({ sessionId: 'canonical-map', state: 'ready' });
     expect(component.mapSession?.session_id).toBe('canonical-map');
-    expect(component.mapSession?.overlay_ids).toEqual(['safe_overlay']);
+    expect(component.mapSession?.overlay_collection.instances.map((instance) => instance.capability_id))
+      .toEqual(['safe_overlay']);
   });
 
   it('operation-driven failures preserve the response and flag the agent model', async () => {
@@ -306,9 +327,8 @@ describe('pages/geospatial-page.component', () => {
           session_id: 'street-map',
           resolved_location: { label: 'Colosseum, Rome', latitude: 41.8902, longitude: 12.4922 },
           basemap_id: 'osm_default',
-          overlay_ids: ['overpass_residential_buildings'],
           viewport: { center_latitude: 41.8902, center_longitude: 12.4922, radius_m: 2500 },
-          overlays: [],
+          overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
         },
       },
     });
@@ -422,9 +442,8 @@ describe('pages/geospatial-page.component', () => {
         session_id: 's1',
         resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
         basemap_id: 'osm_default',
-        overlay_ids: [],
         viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
-        overlays: [],
+        overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
       },
     };
     component.contextUsage = {

@@ -371,13 +371,13 @@ class AgentToolCatalogService:
         map_session = await self.search_orchestrator.execute(request)
         provider_failure = next(
             (
-                failure
-                for failure in map_session.failed_overlays
-                if failure.get("id") == capability_id
+                warning
+                for warning in map_session.compliance_warnings
+                if warning.startswith(f"Provider layer '{capability_id}' failed (")
             ),
             None,
         )
-        if provider_failure is not None:
+        if provider_failure:
             supported_codes = {
                 "auth_required",
                 "rate_limited",
@@ -386,18 +386,15 @@ class AgentToolCatalogService:
                 "malformed_response",
                 "unsupported",
             }
-            code = str(provider_failure.get("code") or "provider_unavailable")
+            code = provider_failure.split(" failed (", 1)[1].split("):", 1)[0]
             if code not in supported_codes:
                 code = "provider_unavailable"
-            reason = str(
-                provider_failure.get("reason") or "provider layer could not be rendered"
-            )
             return self._error_result(
                 capability_id=capability_id,
                 arguments=arguments,
                 operation="provider_error",
                 code=code,
-                message=f"Provider layer '{capability_id}' failed: {reason}.",
+                message=provider_failure.rstrip("."),
             )
         return self._map_result(
             capability_id=capability_id,
