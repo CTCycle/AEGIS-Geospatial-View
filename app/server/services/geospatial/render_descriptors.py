@@ -95,14 +95,11 @@ class RenderDescriptorService:
             provider_id = str(
                 auth.get("providerKey") or capability.get("provider") or ""
             )
-            credential_env = self.credential_resolver.environment_name(provider_id)
-            if (
-                bool(auth.get("required"))
-                and credential_env
-                and not self.credential_resolver.is_configured(provider_id)
-            ):
+            if bool(
+                auth.get("required")
+            ) and not self.credential_resolver.is_configured(provider_id):
                 warnings.append(
-                    f"{overlay_id}: {credential_env} is required for live camera metadata."
+                    f"{overlay_id}: a saved credential for '{provider_id}' is required for live camera metadata."
                 )
             camera_params = {
                 "provider": str(capability.get("provider") or "unknown"),
@@ -641,16 +638,10 @@ class RenderDescriptorService:
             return template, None
         provider = str((capability or {}).get("provider") or "").strip().lower()
         capability_id = str((capability or {}).get("id") or "").strip()
-        env_name = self.credential_resolver.environment_name(provider)
-        if env_name is None:
-            return (
-                template,
-                f"No credential mapping is configured for provider '{provider}'.",
-            )
         if not self.credential_resolver.is_configured(provider):
             return (
                 template,
-                f"{env_name} is required to render this provider tile layer.",
+                f"A saved credential for '{provider}' is required to render this provider tile layer.",
             )
         if capability_id:
             return f"/api/geospatial/tiles/{capability_id}/{{z}}/{{x}}/{{y}}.png", None

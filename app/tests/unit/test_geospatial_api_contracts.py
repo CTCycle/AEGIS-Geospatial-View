@@ -333,7 +333,7 @@ def test_geospatial_tile_proxy_rejects_missing_credentials_without_leaking_secre
 
 
 ###############################################################################
-def test_geospatial_tile_proxy_fetches_manifest_backed_credentialed_tile(
+def test_geospatial_tile_proxy_ignores_environment_credentials(
     monkeypatch,
 ) -> None:
     captured: dict[str, str] = {}
@@ -354,9 +354,8 @@ def test_geospatial_tile_proxy_fetches_manifest_backed_credentialed_tile(
 
     response = client.get("/api/geospatial/tiles/tomtom_traffic_flow/4/5/6.png")
 
-    assert response.status_code == 200
-    assert response.content == b"tile-binary"
-    assert "tomtom-secret-forbidden" in captured["url"]
+    assert response.status_code == 401
+    assert captured == {}
     assert "tomtom-secret-forbidden" not in response.text
 
 
@@ -434,7 +433,9 @@ def test_geospatial_camera_detail_returns_provider_payload_shape() -> None:
 
 
 ###############################################################################
-def test_geospatial_credential_status_uses_existing_env_pattern(monkeypatch) -> None:
+def test_geospatial_credential_status_ignores_environment_variables(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("WINDY_WEBCAMS_API_KEY", "test-key")
     client = create_started_client()
 
@@ -443,12 +444,14 @@ def test_geospatial_credential_status_uses_existing_env_pattern(monkeypatch) -> 
     assert response.status_code == 200
     payload = response.json()
     assert payload["required"] is True
-    assert payload["configured"] is True
-    assert payload["environmentVariable"] == "WINDY_WEBCAMS_API_KEY"
+    assert payload["configured"] is False
+    assert "environmentVariable" not in payload
 
 
 ###############################################################################
-def test_geospatial_provider_account_setup_detail_reports_env(monkeypatch) -> None:
+def test_geospatial_provider_account_setup_detail_reports_encrypted_storage(
+    monkeypatch,
+) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
     client = create_started_client()
 
@@ -458,34 +461,28 @@ def test_geospatial_provider_account_setup_detail_reports_env(monkeypatch) -> No
     payload = response.json()
     assert payload["provider_id"] == "tomtom"
     assert payload["requires_credentials"] is True
-    assert payload["environment_variable"] == "TOMTOM_API_KEY"
+    assert "environment_variable" not in payload
     assert payload["configured"] is False
     assert payload["instructions"]
+    assert any("encrypted Access settings" in item for item in payload["instructions"])
 
 
 ###############################################################################
-@pytest.mark.parametrize(
-    ("provider_id", "env_name"),
-    [
-        ("opentripmap", "OPENTRIPMAP_API_KEY"),
-        ("openchargemap", "OPENCHARGEMAP_API_KEY"),
-    ],
-)
-def test_optional_provider_credential_status_uses_provider_environment(
-    monkeypatch, provider_id: str, env_name: str
+@pytest.mark.parametrize("provider_id", ["opentripmap", "openchargemap"])
+def test_optional_provider_credential_status_uses_saved_storage_only(
+    monkeypatch, provider_id: str
 ) -> None:
-    monkeypatch.delenv(env_name, raising=False)
     client = create_started_client()
 
     missing = client.get(f"/api/geospatial/sources/{provider_id}/credential-status")
     assert missing.status_code == 200
-    assert missing.json()["environmentVariable"] == env_name
+    assert "environmentVariable" not in missing.json()
     assert missing.json()["configured"] is False
 
-    monkeypatch.setenv(env_name, "test-key")
+    monkeypatch.setenv("AEGIS_UNUSED_PROVIDER_KEY", "test-key")
     configured = client.get(f"/api/geospatial/sources/{provider_id}/credential-status")
     assert configured.status_code == 200
-    assert configured.json()["configured"] is True
+    assert configured.json()["configured"] is False
 
 
 ###############################################################################

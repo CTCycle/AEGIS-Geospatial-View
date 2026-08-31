@@ -264,7 +264,6 @@ export interface GeospatialProviderAccountSetup {
   requiresCredentials: boolean;
   authMode: string;
   docsUrl?: string | null;
-  environmentVariable?: string | null;
   configured: boolean;
   instructions: string[];
   automation: GeospatialProviderSignupAutomation;
@@ -282,7 +281,6 @@ export interface GeospatialCredentialStatus {
   provider: string;
   required: boolean;
   configured: boolean;
-  environmentVariable?: string | null;
 }
 
 export interface GeospatialProviderPayload {

@@ -103,5 +103,5 @@ class LiveValidationReport(BaseModel):
 class LiveCheck:
     provider_id: str
     request: ProviderRequest
-    credential_env: str | None = None
+    requires_credentials: bool = False
     required_feature_count: int | None = None

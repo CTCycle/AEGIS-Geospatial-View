@@ -103,7 +103,7 @@ def test_camera_detail_preserves_safe_fallback_without_provider_data() -> None:
         MissingCredentialService(**_service_dependencies())
     )
 
-    response = client.get("/api/geospatial/cameras/windy%2Fcamera-1")
+    response = client.get("/api/geospatial/cameras/windy_webcams%2Fcamera-1")
 
     assert response.status_code == 200
     assert response.json()["status"] == "missing-credential"

@@ -15,7 +15,6 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from server.common.paths import PROJECT_DIR
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.provider_registry import PROVIDER_FACTORIES
-from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.geospatial.endpoint_validation import EndpointValidationService
 
 NATIVE_TOOL_SOURCE = (
@@ -308,9 +307,6 @@ def build_inventory(
             ),
             None,
         )
-        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(
-            provider_key or provider_id
-        )
         profile_ids = sorted(
             str(item.get("id"))
             for item in provider_manifests
@@ -343,7 +339,7 @@ def build_inventory(
                 "requires_authentication": required_auth,
                 "configuration": {
                     "provider_key": provider_key,
-                    "credential_environment_variable": env_name,
+                    "credential_storage": "encrypted_sqlite",
                     "runtime_profile_ids": profile_ids,
                     "local_or_external": "local_snapshot"
                     if any(

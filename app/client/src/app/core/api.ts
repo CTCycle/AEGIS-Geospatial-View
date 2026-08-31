@@ -155,7 +155,6 @@ export const fetchGeospatialCredentialStatus = async (providerId: string): Promi
     provider: String(data.provider ?? providerId),
     required: Boolean(data.required),
     configured: Boolean(data.configured),
-    environmentVariable: typeof data.environmentVariable === 'string' ? data.environmentVariable : null,
   };
 };
 

@@ -157,7 +157,6 @@ interface GeospatialProviderAccountSetupDto {
   requires_credentials?: unknown;
   auth_mode?: unknown;
   docs_url?: unknown;
-  environment_variable?: unknown;
   configured?: unknown;
   instructions?: unknown;
   automation?: unknown;
@@ -209,7 +208,6 @@ export const mapGeospatialProviderAccountSetup = (
   requiresCredentials: Boolean(dto.requires_credentials),
   authMode: String(dto.auth_mode ?? 'api-key'),
   docsUrl: typeof dto.docs_url === 'string' ? dto.docs_url : null,
-  environmentVariable: typeof dto.environment_variable === 'string' ? dto.environment_variable : null,
   configured: Boolean(dto.configured),
   instructions: isStringArray(dto.instructions) ? dto.instructions : [],
   automation: mapGeospatialProviderSignupAutomation(isRecord(dto.automation) ? dto.automation : {}),

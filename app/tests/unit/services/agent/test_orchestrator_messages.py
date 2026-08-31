@@ -50,14 +50,14 @@ def test_map_session_message_includes_readable_warnings() -> None:
             "overlay_ids": ["tomtom_traffic_flow"],
             "overlays": [{"id": "tomtom_traffic_flow", "label": "TomTom Traffic Flow"}],
             "compliance_warnings": [
-                "tomtom_traffic_flow: TOMTOM_API_KEY is required to render this provider tile layer.",
+                "tomtom_traffic_flow: A saved credential for 'tomtom' is required to render this provider tile layer.",
             ],
         },
     )
 
     assert "Some requested map data needs attention:" in message
     assert (
-        "TomTom Traffic Flow: TomTom API key is required to render this provider tile layer."
+        "TomTom Traffic Flow: A saved credential for 'tomtom' is required to render this provider tile layer."
         in message
     )
     assert "TOMTOM_API_KEY" not in message

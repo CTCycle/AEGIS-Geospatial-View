@@ -23,7 +23,6 @@ const setup = (providerId: string, support: GeospatialProviderAccountSetup['auto
   requiresCredentials: true,
   authMode: 'api-key',
   docsUrl: 'https://example.test/docs',
-  environmentVariable: `${providerId.toUpperCase()}_API_KEY`,
   configured: false,
   instructions: ['Create an account.', 'Paste the key back into AEGIS.'],
   automation: {

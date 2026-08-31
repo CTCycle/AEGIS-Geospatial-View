@@ -24,13 +24,11 @@ agent visibility is catalog-based and does not require rebuilding embeddings.
 credential-resolution boundary used by provider adapters, the geospatial API,
 agent discovery/rendering, and runtime status reporting.
 
-Resolution order is strict:
+Resolution is strict:
 
 1. Look up the active encrypted database credential for the provider and label.
 2. Decrypt and validate the saved value; mark it used when the caller requests
    usage tracking.
-3. Consult the mapped environment variable only when no saved credential exists.
-
 A saved credential that is empty or cannot be decrypted is an error condition;
 the resolver does not silently fall back to a second secret source. Credential
 values never enter manifests, API responses, provider payloads, browser logs,
@@ -40,20 +38,8 @@ Credentialed provider requests remain server-mediated: credentials are sent in
 request headers or used to construct an internal proxy request, never exposed
 in a frontend URL, render descriptor, or public provider payload.
 
-Environment fallback variables include:
+Non-secret deployment configuration variables include:
 
-- `ARCGIS_API_KEY`
-- `CENSUS_API_KEY`
-- `GOOGLE_MAPS_API_KEY`
-- `NASA_API_KEY`
-- `OPENAQ_API_KEY`
-- `OPENAIP_API_KEY`
-- `OPENCHARGEMAP_API_KEY`
-- `OPENTRIPMAP_API_KEY`
-- `SENTINEL_HUB_CLIENT_ID`
-- `SENTINEL_HUB_CLIENT_SECRET`
-- `TOMTOM_API_KEY`
-- `WINDY_WEBCAMS_API_KEY`
 - `LOCAL_OPEN_DATA_SOURCES`
 - `AEGIS_MOBILITY_DATABASE_CATALOG_PATH` (optional local CSV snapshot override)
 
@@ -63,7 +49,7 @@ and rejects private or loopback network targets.
 
 ## Secret Safety Rules
 
-- Store secrets only through encrypted credential storage or local environment variables.
+- Store secrets only through encrypted credential storage in AEGIS Access settings.
 - Do not commit keys, tokens, `.env` files, shell history, screenshots, or provider dashboard exports.
 - Credential-gated manifests must reference only provider key names and access-page provider IDs.
 - Raw keys are prohibited in manifests, browser logs, provider responses, and snapshots.
