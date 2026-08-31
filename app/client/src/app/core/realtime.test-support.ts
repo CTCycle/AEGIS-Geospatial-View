@@ -33,7 +33,7 @@ export class FakeRealtimeService {
     return () => this.stateHandlers.delete(handler);
   }
 
-  connect(conversationId: string): void {
+  connect(conversationId: string, _options: { runId?: string; afterSequence?: number } = {}): void {
     this.conversationId = conversationId;
     this.setState('open');
   }

@@ -445,6 +445,23 @@ export interface ConversationCreateResponse {
   title?: string | null;
 }
 
+export interface ActiveConversationRunSnapshot {
+  run_id: string;
+  run_version: number;
+  state: AgentRunState;
+}
+
+export interface ConversationSnapshotResponse {
+  conversation_id: string;
+  title?: string | null;
+  context_revision: number;
+  messages: ChatMessage[];
+  task_snapshot?: ConversationTaskSnapshot | null;
+  memory_snapshot: Record<string, JsonValue>;
+  map_session?: MapSession | null;
+  active_run?: ActiveConversationRunSnapshot | null;
+}
+
 export interface ChatTurnRequest {
   conversation_id: string;
   title?: string;
@@ -694,14 +711,14 @@ export interface AgentTask {
 }
 
 export interface ConversationTaskSnapshot {
-  schema_version: 2;
+  schema_version: 3;
   conversation_key: string;
   current_task_id?: string | null;
   goal?: { id: string; text: string; status: string; revision: number } | null;
   tasks: AgentTask[];
   geospatial_state: Record<string, JsonValue>;
   evidence_refs: string[];
-  active_map_session?: Record<string, JsonValue> | null;
+  active_map_session?: MapSession | null;
   assumptions: string[];
   unresolved_questions: string[];
   conversation_summary?: Record<string, JsonValue> | null;

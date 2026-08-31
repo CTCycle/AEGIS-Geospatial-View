@@ -5,6 +5,7 @@ import {
   createConversation,
   fetchCatalog,
   fetchChatModels,
+  fetchConversationSnapshot,
   fetchChatSettings,
   fetchGeospatialCameras,
   fetchGeospatialCredentialStatus,
@@ -22,6 +23,7 @@ import {
   ChatTurnResponse,
   ConversationCreateRequest,
   ConversationCreateResponse,
+  ConversationSnapshotResponse,
   GenericObjectResponse,
   GeospatialCredentialStatus,
   GeospatialProviderAccountSetupListResponse,
@@ -69,6 +71,10 @@ export class ApiClientService {
 
   createConversation(payload: ConversationCreateRequest): Promise<ConversationCreateResponse> {
     return createConversation(payload);
+  }
+
+  fetchConversationSnapshot(conversationId: string): Promise<ConversationSnapshotResponse> {
+    return fetchConversationSnapshot(conversationId);
   }
 
   fetchChatModels(provider?: 'deepseek' | 'opencode' | 'opencode-go'): Promise<ModelLibraryResponse> {

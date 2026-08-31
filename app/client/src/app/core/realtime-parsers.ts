@@ -1,5 +1,5 @@
 import { REALTIME_PROTOCOL_VERSION } from './constants';
-import { normalizeMapSession, parseContextUsage } from './api-parsers';
+import { normalizeConversationTaskSnapshot, normalizeMapSession, parseContextUsage } from './api-parsers';
 import { isFiniteNumber, isJsonObject, isRecord, isStringArray } from './type-guards';
 import type {
   ChatOperationResult,
@@ -51,9 +51,6 @@ const POLICY_PLAN_STATES: readonly PolicyDecision['plan']['state'][] = [
   'map_search',
   'reject',
 ];
-const TASK_STATUSES: readonly ConversationTaskSnapshot['tasks'][number]['status'][] = [
-  'pending', 'in_progress', 'completed', 'failed', 'blocked', 'skipped', 'superseded',
-];
 
 export interface ParsedRunCompletionPayload {
   contextRevision?: number;
@@ -88,11 +85,6 @@ const isOperationStatus = (value: unknown): value is ChatOperationResult['status
 
 const isPolicyPlanState = (value: unknown): value is PolicyDecision['plan']['state'] =>
   typeof value === 'string' && POLICY_PLAN_STATES.includes(value as PolicyDecision['plan']['state']);
-
-const isTaskStatus = (
-  value: unknown,
-): value is ConversationTaskSnapshot['tasks'][number]['status'] =>
-  typeof value === 'string' && TASK_STATUSES.includes(value as ConversationTaskSnapshot['tasks'][number]['status']);
 
 const parseProviderError = (
   value: unknown,
@@ -233,93 +225,6 @@ const parsePolicyDecision = (value: unknown): PolicyDecision | undefined => {
   return decision;
 };
 
-const parseTaskSnapshot = (value: unknown): ConversationTaskSnapshot | undefined => {
-  if (
-    !isJsonObject(value) ||
-    value['schema_version'] !== 2 ||
-    !isNonEmptyString(value['conversation_key']) ||
-    !Array.isArray(value['tasks']) ||
-    !isJsonObject(value['geospatial_state']) ||
-    !isStringArray(value['evidence_refs']) ||
-    !isStringArray(value['assumptions']) ||
-    !isStringArray(value['unresolved_questions'])
-  ) {
-    return undefined;
-  }
-
-  const tasks: ConversationTaskSnapshot['tasks'] = [];
-  for (const item of value['tasks']) {
-    if (!isJsonObject(item)) {
-      return undefined;
-    }
-
-    if (
-      !isNonEmptyString(item['id']) ||
-      !isNonEmptyString(item['description']) ||
-      !isNonEmptyString(item['kind']) ||
-      !isTaskStatus(item['status']) ||
-      !isStringArray(item['depends_on']) ||
-      typeof item['required'] !== 'boolean' ||
-      !isStringArray(item['input_refs']) ||
-      !isStringArray(item['output_refs']) ||
-      !isFiniteInteger(item['attempt_count']) ||
-      !isFiniteInteger(item['scope_revision'])
-    ) {
-      return undefined;
-    }
-
-    const task: ConversationTaskSnapshot['tasks'][number] = {
-      id: item['id'],
-      description: item['description'],
-      kind: item['kind'],
-      status: item['status'],
-      depends_on: item['depends_on'],
-      required: item['required'],
-      input_refs: item['input_refs'],
-      output_refs: item['output_refs'],
-      attempt_count: item['attempt_count'],
-      scope_revision: item['scope_revision'],
-    };
-    if (item['last_failure'] === null) {
-      task.last_failure = null;
-    } else if (hasOwn(item, 'last_failure')) {
-      if (!isJsonObject(item['last_failure'])) {
-        return undefined;
-      }
-      task.last_failure = item['last_failure'];
-    }
-
-    tasks.push(task);
-  }
-
-  const snapshot: ConversationTaskSnapshot = {
-    schema_version: 2,
-    conversation_key: value['conversation_key'],
-    tasks,
-    geospatial_state: value['geospatial_state'],
-    evidence_refs: value['evidence_refs'],
-    assumptions: value['assumptions'],
-    unresolved_questions: value['unresolved_questions'],
-  };
-
-  if (value['current_task_id'] === null || isNonEmptyString(value['current_task_id'])) {
-    snapshot.current_task_id = value['current_task_id'];
-  }
-
-  if (value['active_map_session'] === null || isJsonObject(value['active_map_session'])) {
-    snapshot.active_map_session = value['active_map_session'];
-  }
-
-  if (value['goal'] === null || isJsonObject(value['goal'])) {
-    snapshot.goal = value['goal'] as ConversationTaskSnapshot['goal'];
-  }
-  if (value['conversation_summary'] === null || isJsonObject(value['conversation_summary'])) {
-    snapshot.conversation_summary = value['conversation_summary'];
-  }
-
-  return snapshot;
-};
-
 export const parseRealtimeServerMessage = (
   data: unknown,
   expectedConversationId?: string,
@@ -429,7 +334,7 @@ export const parseRunCompletionPayload = (value: unknown): ParsedRunCompletionPa
   }
 
   if (hasOwn(value, 'task_snapshot')) {
-    parsed.taskSnapshot = parseTaskSnapshot(value['task_snapshot']);
+    parsed.taskSnapshot = normalizeConversationTaskSnapshot(value['task_snapshot']);
   }
 
   return parsed;

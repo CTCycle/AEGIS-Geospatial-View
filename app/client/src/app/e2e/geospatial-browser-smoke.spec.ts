@@ -334,7 +334,12 @@ describe('e2e/geospatial browser smoke', () => {
     };
     spyOn(maplibregl, 'Map').and.returnValue(fakeMap as never);
 
-    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['createConversation', 'sendChatTurn', 'fetchCatalog']);
+    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', [
+      'createConversation',
+      'fetchConversationSnapshot',
+      'sendChatTurn',
+      'fetchCatalog',
+    ]);
     apiClient.createConversation.and.resolveTo({ conversation_id: 'conv-browser-smoke', title: 'show mocked map' });
     apiClient.sendChatTurn.and.resolveTo(canonicalMockedMapResponse);
     apiClient.fetchCatalog.and.resolveTo({ capabilities: [], basemaps: [], overlays: [], tools: [] });

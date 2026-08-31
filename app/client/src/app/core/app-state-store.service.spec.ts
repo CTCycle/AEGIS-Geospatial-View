@@ -9,8 +9,8 @@ describe('core/app-state-store.service', () => {
   it('getters return clones instead of mutable references', () => {
     const service = new AppStateStoreService();
     const chat = service.getChatPage();
-    chat.chatPanel.status = 'Changed';
-    expect(service.getChatPage().chatPanel.status).not.toBe('Changed');
+    chat.chatPanel.composerDraft = 'Changed';
+    expect(service.getChatPage().chatPanel.composerDraft).not.toBe('Changed');
     service.ngOnDestroy();
   });
 

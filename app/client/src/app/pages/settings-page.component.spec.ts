@@ -86,13 +86,13 @@ describe('pages/settings-page.component', () => {
     router = TestBed.inject(Router);
   });
 
-  it('parses initial query params', () => {
+  it('parses only the UI catalog query params', () => {
     window.history.replaceState({}, '', '/settings?q=gpt&mode=cloud');
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
     expect(component.searchText).toBe('gpt');
-    expect(component.providerMode).toBe('cloud');
+    expect(component.settings.active_provider_mode).toBe('cloud');
   });
 
   it('loadData success and failure paths', async () => {
@@ -600,7 +600,7 @@ describe('pages/settings-page.component', () => {
     component.setSearchText('gpt');
     await fixture.whenStable();
     expect(window.location.pathname).toBe('/settings');
-    expect(window.location.search).toBe('?q=gpt&mode=cloud');
+    expect(window.location.search).toBe('?q=gpt');
     expect(store.updateSettingsPage).toHaveBeenCalled();
   });
 

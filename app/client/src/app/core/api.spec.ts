@@ -1,10 +1,12 @@
 import {
   API_BASE_URL,
   API_CHAT_TURN_PATH,
+  API_CONVERSATION_PATH,
 } from './constants';
 import {
   ApiRequestError,
   buildApiError,
+  fetchConversationSnapshot,
   fetchGeospatialCameras,
   fetchGeospatialLayerFeatures,
   sendChatTurn,
@@ -13,6 +15,7 @@ import {
   buildModelDescription,
   parseCatalogResponse,
   parseChatTurnResponse,
+  parseConversationSnapshotResponse,
   parseModelSettingsResponse,
 } from './api-parsers';
 
@@ -127,6 +130,80 @@ describe('core/api', () => {
     expect(parsed.assistant_message).toBe('done');
     expect(parsed.operation?.kind).toBe('direct_answer');
     expect(parsed.context_usage?.selected_context_window).toBe(2048);
+  });
+
+  it('parseConversationSnapshotResponse accepts the current durable contract', () => {
+    const parsed = parseConversationSnapshotResponse({
+      conversation_id: 'conv-abc',
+      title: 'Rome map',
+      context_revision: 4,
+      messages: [
+        { role: 'user', content: 'Show Rome', created_at: '2026-08-31T10:00:00Z' },
+        { role: 'assistant', content: 'Done', created_at: '2026-08-31T10:00:01Z' },
+      ],
+      memory_snapshot: { location_slots: [] },
+      task_snapshot: null,
+      map_session: null,
+      active_run: {
+        run_id: 'run-1',
+        run_version: 2,
+        state: 'running',
+      },
+    });
+
+    expect(parsed.conversation_id).toBe('conv-abc');
+    expect(parsed.messages.length).toBe(2);
+    expect(parsed.messages[1].kind).toBe('normal');
+    expect(parsed.active_run?.run_id).toBe('run-1');
+  });
+
+  it('parseConversationSnapshotResponse rejects legacy or malformed durable state', () => {
+    expect(() => parseConversationSnapshotResponse({
+      conversation_id: 'conv-abc',
+      context_revision: 1,
+      messages: [{ role: 'assistant', content: 'missing timestamp' }],
+      memory_snapshot: {},
+    })).toThrow();
+    expect(() => parseConversationSnapshotResponse({
+      conversation_id: 'conv-abc',
+      context_revision: 1,
+      messages: [],
+      memory_snapshot: {},
+      task_snapshot: {
+        schema_version: 2,
+        conversation_key: 'conv-abc',
+        tasks: [],
+        geospatial_state: {},
+        evidence_refs: [],
+        assumptions: [],
+        unresolved_questions: [],
+      },
+    })).toThrow();
+  });
+
+  it('fetchConversationSnapshot uses the encoded conversation route', async () => {
+    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
+      new Response(JSON.stringify({
+        conversation_id: 'conv/abc',
+        title: null,
+        context_revision: 0,
+        messages: [],
+        memory_snapshot: {},
+        task_snapshot: null,
+        map_session: null,
+        active_run: null,
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    (window.fetch as unknown) = fetchSpy;
+
+    await fetchConversationSnapshot('conv/abc');
+
+    expect(fetchSpy.calls.mostRecent().args[0]).toBe(
+      `${API_BASE_URL}${API_CONVERSATION_PATH('conv/abc')}`,
+    );
   });
 
   [

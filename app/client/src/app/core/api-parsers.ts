@@ -1,6 +1,12 @@
 import {
+  ActiveConversationRunSnapshot,
+  AgentRunState,
   CatalogResponse,
+  ChatMessage,
+  ChatRole,
   ChatTurnResponse,
+  ConversationSnapshotResponse,
+  ConversationTaskSnapshot,
   GeospatialLayerRenderDescriptor,
   GeospatialProviderAccountSetup,
   GeospatialProviderAccountSetupListResponse,
@@ -15,7 +21,7 @@ import {
   OverlayCollectionState,
   OverlayInstance,
 } from './types';
-import { isFiniteNumber, isRecord, isStringArray } from './type-guards';
+import { isFiniteNumber, isJsonObject, isRecord, isStringArray } from './type-guards';
 
 export const parseBooleanCredentialMap = (value: unknown): Record<string, Record<string, boolean>> => {
   if (!isRecord(value)) {
@@ -494,6 +500,154 @@ export const normalizeMapSession = (value: unknown): MapSession | null => {
   };
 };
 
+const TASK_STATUSES: readonly ConversationTaskSnapshot['tasks'][number]['status'][] = [
+  'pending', 'in_progress', 'completed', 'failed', 'blocked', 'skipped', 'superseded',
+];
+
+const RUN_STATES: readonly AgentRunState[] = [
+  'pending',
+  'running',
+  'updating',
+  'waiting_for_clarification',
+  'completed',
+  'failed',
+  'cancelled',
+];
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
+const isNonNegativeInteger = (value: unknown): value is number =>
+  isFiniteNumber(value) && Number.isInteger(value) && value >= 0;
+
+const isTaskStatus = (
+  value: unknown,
+): value is ConversationTaskSnapshot['tasks'][number]['status'] =>
+  typeof value === 'string' && TASK_STATUSES.includes(value as ConversationTaskSnapshot['tasks'][number]['status']);
+
+const normalizeTaskGoal = (
+  value: unknown,
+): NonNullable<ConversationTaskSnapshot['goal']> | null | undefined => {
+  if (value === null) {
+    return null;
+  }
+  if (!isRecord(value)
+    || !isNonEmptyString(value.id)
+    || !isNonEmptyString(value.text)
+    || !['active', 'completed', 'partial', 'superseded'].includes(String(value.status))
+    || !isNonNegativeInteger(value.revision)) {
+    return undefined;
+  }
+  return {
+    id: value.id,
+    text: value.text,
+    status: value.status as NonNullable<ConversationTaskSnapshot['goal']>['status'],
+    revision: value.revision,
+  };
+};
+
+export const normalizeConversationTaskSnapshot = (
+  value: unknown,
+): ConversationTaskSnapshot | undefined => {
+  if (
+    !isJsonObject(value)
+    || value.schema_version !== 3
+    || !isNonEmptyString(value.conversation_key)
+    || !Array.isArray(value.tasks)
+    || !isRecord(value.geospatial_state)
+    || !isStringArray(value.evidence_refs)
+    || !isStringArray(value.assumptions)
+    || !isStringArray(value.unresolved_questions)
+  ) {
+    return undefined;
+  }
+
+  const tasks: ConversationTaskSnapshot['tasks'] = [];
+  for (const item of value.tasks) {
+    if (!isJsonObject(item)
+      || !isNonEmptyString(item.id)
+      || !isNonEmptyString(item.description)
+      || !isNonEmptyString(item.kind)
+      || !isTaskStatus(item.status)
+      || !isStringArray(item.depends_on)
+      || typeof item.required !== 'boolean'
+      || !isStringArray(item.input_refs)
+      || !isStringArray(item.output_refs)
+      || !isNonNegativeInteger(item.attempt_count)
+      || !isNonNegativeInteger(item.scope_revision)) {
+      return undefined;
+    }
+
+    const task: ConversationTaskSnapshot['tasks'][number] = {
+      id: item.id,
+      description: item.description,
+      kind: item.kind,
+      status: item.status,
+      depends_on: item.depends_on,
+      required: item.required,
+      input_refs: item.input_refs,
+      output_refs: item.output_refs,
+      attempt_count: item.attempt_count,
+      scope_revision: item.scope_revision,
+    };
+    if (item.last_failure === null) {
+      task.last_failure = null;
+    } else if (Object.prototype.hasOwnProperty.call(item, 'last_failure')) {
+      if (!isJsonObject(item.last_failure)) {
+        return undefined;
+      }
+      task.last_failure = item.last_failure;
+    }
+    tasks.push(task);
+  }
+
+  const snapshot: ConversationTaskSnapshot = {
+    schema_version: 3,
+    conversation_key: value.conversation_key,
+    tasks,
+    geospatial_state: value.geospatial_state,
+    evidence_refs: value.evidence_refs,
+    assumptions: value.assumptions,
+    unresolved_questions: value.unresolved_questions,
+  };
+
+  if (Object.prototype.hasOwnProperty.call(value, 'current_task_id')) {
+    if (value.current_task_id !== null && !isNonEmptyString(value.current_task_id)) {
+      return undefined;
+    }
+    snapshot.current_task_id = value.current_task_id as string | null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, 'active_map_session')) {
+    if (value.active_map_session === null) {
+      snapshot.active_map_session = null;
+    } else {
+      const mapSession = normalizeMapSession(value.active_map_session);
+      if (!mapSession) {
+        return undefined;
+      }
+      snapshot.active_map_session = mapSession;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, 'goal')) {
+    const goal = normalizeTaskGoal(value.goal);
+    if (goal === undefined) {
+      return undefined;
+    }
+    snapshot.goal = goal;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, 'conversation_summary')) {
+    if (value.conversation_summary !== null && !isJsonObject(value.conversation_summary)) {
+      return undefined;
+    }
+    snapshot.conversation_summary = value.conversation_summary;
+  }
+
+  return snapshot;
+};
+
 const parseProviderLayerDescriptor = (value: unknown): GeospatialProviderLayerDescriptor | null => {
   if (!isRecord(value) || typeof value.layer_id !== 'string') {
     return null;
@@ -696,5 +850,102 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     context_revision: typeof value.context_revision === 'number'
       ? value.context_revision
       : undefined,
+  };
+};
+
+const normalizeConversationMessage = (value: unknown): ChatMessage | undefined => {
+  if (!isRecord(value)
+    || !isNonEmptyString(value.role)
+    || !['user', 'assistant', 'system', 'tool'].includes(value.role)
+    || typeof value.content !== 'string'
+    || !isNonEmptyString(value.created_at)) {
+    return undefined;
+  }
+  return {
+    role: value.role as ChatRole,
+    content: value.content,
+    created_at: value.created_at,
+    kind: 'normal',
+  };
+};
+
+const normalizeActiveConversationRun = (
+  value: unknown,
+): ActiveConversationRunSnapshot | null | undefined => {
+  if (value === null) {
+    return null;
+  }
+  if (!isRecord(value)
+    || !isNonEmptyString(value.run_id)
+    || !isNonNegativeInteger(value.run_version)
+    || value.run_version < 1
+    || typeof value.state !== 'string'
+    || !RUN_STATES.includes(value.state as AgentRunState)) {
+    return undefined;
+  }
+  return {
+    run_id: value.run_id,
+    run_version: value.run_version,
+    state: value.state as AgentRunState,
+  };
+};
+
+export const parseConversationSnapshotResponse = (
+  value: unknown,
+): ConversationSnapshotResponse => {
+  if (!isJsonObject(value)
+    || !isNonEmptyString(value.conversation_id)
+    || !isNonNegativeInteger(value.context_revision)
+    || !Array.isArray(value.messages)
+    || !isJsonObject(value.memory_snapshot)) {
+    throw new Error('Unexpected conversation snapshot response format');
+  }
+
+  const parsedMessages = value.messages.map(normalizeConversationMessage);
+  if (parsedMessages.some((message) => message === undefined)) {
+    throw new Error('Unexpected conversation snapshot message format');
+  }
+  const messages = parsedMessages.filter((message): message is ChatMessage => message !== undefined);
+
+  const taskSnapshot = value.task_snapshot === undefined || value.task_snapshot === null
+    ? value.task_snapshot ?? undefined
+    : normalizeConversationTaskSnapshot(value.task_snapshot);
+  if (value.task_snapshot !== undefined
+    && value.task_snapshot !== null
+    && !taskSnapshot) {
+    throw new Error('Unexpected conversation snapshot task format');
+  }
+
+  const mapSession = value.map_session === undefined || value.map_session === null
+    ? value.map_session ?? undefined
+    : normalizeMapSession(value.map_session);
+  if (value.map_session !== undefined
+    && value.map_session !== null
+    && !mapSession) {
+    throw new Error('Unexpected conversation snapshot map format');
+  }
+
+  const activeRun = value.active_run === undefined || value.active_run === null
+    ? value.active_run ?? undefined
+    : normalizeActiveConversationRun(value.active_run);
+  if (value.active_run !== undefined
+    && value.active_run !== null
+    && !activeRun) {
+    throw new Error('Unexpected conversation snapshot run format');
+  }
+
+  if (value.title !== undefined && value.title !== null && typeof value.title !== 'string') {
+    throw new Error('Unexpected conversation snapshot title format');
+  }
+
+  return {
+    conversation_id: value.conversation_id,
+    title: value.title as string | null | undefined,
+    context_revision: value.context_revision,
+    messages,
+    task_snapshot: taskSnapshot,
+    memory_snapshot: value.memory_snapshot,
+    map_session: mapSession,
+    active_run: activeRun,
   };
 };
