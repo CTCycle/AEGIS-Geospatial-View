@@ -313,4 +313,31 @@ describe('map-preview-rendering', () => {
     expect(layers[0]['filter']).toEqual(['has', 'point_count']);
     expect(layers[2]['filter']).toEqual(['!', ['has', 'point_count']]);
   });
+
+  it('keeps clustered points renderable when the style has no glyphs', () => {
+    const layers: Array<Record<string, unknown>> = [];
+    const map = {
+      addSource: () => undefined,
+      addLayer: (layer: Record<string, unknown>) => layers.push(layer),
+      getStyle: () => ({}),
+    };
+    const overlay = {
+      id: 'clustered-no-glyphs',
+      label: 'POIs',
+      provider: 'fixture',
+      type: 'clustered-points',
+      rendering_mode: 'clustered-points',
+      data: {
+        type: 'FeatureCollection',
+        features: [],
+      },
+    } as unknown as MapOverlayEntry;
+
+    expect(addOverlayLayers(map as never, makeMapSession([overlay]))[0].status)
+      .toBe('loaded');
+    expect(layers.map((layer) => layer.id)).toEqual([
+      'overlay-layer-clustered-no-glyphs-clusters',
+      'overlay-layer-clustered-no-glyphs-points',
+    ]);
+  });
 });
