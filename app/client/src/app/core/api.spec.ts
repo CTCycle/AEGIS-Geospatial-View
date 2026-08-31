@@ -19,6 +19,44 @@ import {
   parseModelSettingsResponse,
 } from './api-parsers';
 
+const catalogEntry = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  id: 'entry',
+  name: 'Entry',
+  kind: 'overlay',
+  type: 'overlay',
+  description: 'A catalog entry.',
+  provider: 'provider',
+  requires_credentials: false,
+  is_available: true,
+  supports_map: true,
+  supports_direct_text: false,
+  coverage: 'global',
+  action_tags: [],
+  task_tags: [],
+  source_protocol: 'provider-api',
+  data_format: 'geojson',
+  geometry_type: 'mixed',
+  queryable: true,
+  endpoint_health: 'functional',
+  auth_mode: 'none',
+  official_docs_url: 'https://example.test/docs',
+  capability_kind: 'vector-overlay',
+  rendering_mode: 'geojson',
+  reliability: {
+    status: 'functional',
+    last_audited: '2026-08-31',
+    known_limitations: [],
+  },
+  auth: {
+    type: 'none',
+    required: false,
+    provider_key: null,
+    access_page_provider_id: null,
+  },
+  metadata: {},
+  ...overrides,
+});
+
 describe('core/api', () => {
   afterEach(() => {
     (window.fetch as unknown) = undefined;
@@ -27,29 +65,30 @@ describe('core/api', () => {
   it('parseCatalogResponse normalizes entries', () => {
     const parsed = parseCatalogResponse({
       capabilities: [
-        { id: 'b1', kind: 'basemap' },
+        catalogEntry({ id: 'b1', name: 'b1', kind: 'basemap', type: 'basemap', capability_kind: 'basemap' }),
       ],
       basemaps: [
-        { id: 'b1', kind: 'basemap' },
+        catalogEntry({ id: 'b1', name: 'b1', kind: 'basemap', type: 'basemap', capability_kind: 'basemap' }),
       ],
       overlays: [
-        {
+        catalogEntry({
           id: 'o1',
+          name: 'o1',
           kind: 'overlay',
-          capabilityKind: 'raster-overlay',
-          renderingMode: 'wmts',
+          capability_kind: 'raster-overlay',
+          rendering_mode: 'wmts',
           reliability: {
             status: 'partial',
-            lastAudited: '2026-05-11',
-            knownLimitations: ['time dimension'],
+            last_audited: '2026-05-11',
+            known_limitations: ['time dimension'],
           },
           auth: {
             type: 'api-key',
             required: true,
-            providerKey: 'tomtom',
-            accessPageProviderId: 'tomtom',
+            provider_key: 'tomtom',
+            access_page_provider_id: 'tomtom',
           },
-        },
+        }),
       ],
       providers: [],
       cameras: [],
@@ -68,16 +107,31 @@ describe('core/api', () => {
 
   it('parseCatalogResponse does not reconstruct grouped arrays from capabilities', () => {
     const parsed = parseCatalogResponse({
-      capabilities: [{ id: 'b1', kind: 'basemap' }],
+      capabilities: [catalogEntry({ id: 'b1', kind: 'basemap', type: 'basemap', capability_kind: 'basemap' })],
+      providers: [],
+      basemaps: [],
+      overlays: [],
+      cameras: [],
+      transit: [],
+      tools: [],
     });
     expect(parsed.capabilities.length).toBe(1);
     expect(parsed.basemaps?.length ?? 0).toBe(0);
     expect(parsed.overlays?.length ?? 0).toBe(0);
   });
 
-  it('parseModelSettingsResponse defaults correctly', () => {
+  it('parseModelSettingsResponse accepts the current contract', () => {
     const parsed = parseModelSettingsResponse({
+      active_provider_mode: 'cloud',
+      agent_model_provider: '',
+      agent_model_name: '',
+      ollama_url: 'http://127.0.0.1:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      deepseek_base_url: null,
+      credentials: {},
       credential_health: { openai: { api_key: 'unreadable' } },
+      selected_model_context: {},
     });
     expect(parsed.active_provider_mode).toBe('cloud');
     expect(parsed.agent_model_provider).toBe('');
@@ -85,6 +139,10 @@ describe('core/api', () => {
     expect(parsed.credentials).toEqual({});
     expect(parsed.credential_health?.openai.api_key).toBe('unreadable');
     expect(parsed.deepseek_base_url).toBeNull();
+  });
+
+  it('parseModelSettingsResponse rejects missing current fields', () => {
+    expect(() => parseModelSettingsResponse({ credential_health: {} })).toThrowError(/Invalid model settings API response/);
   });
 
   it('parseChatTurnResponse accepts valid backend response', () => {
@@ -110,6 +168,7 @@ describe('core/api', () => {
       decision: {
         plan: { state: 'direct_tool', mode: 'direct_text', action_id: 'weather', overlay_ids: [] },
       },
+      memory_snapshot: {},
       operation: {
         kind: 'direct_answer',
         status: 'success',

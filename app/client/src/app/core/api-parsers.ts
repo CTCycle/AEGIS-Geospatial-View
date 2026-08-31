@@ -5,9 +5,13 @@ import {
   ChatMessage,
   ChatRole,
   ChatTurnResponse,
+  ConversationCreateResponse,
   ConversationSnapshotResponse,
   ConversationTaskSnapshot,
+  GenericObjectResponse,
+  GeospatialCredentialStatus,
   GeospatialLayerRenderDescriptor,
+  GeospatialProviderPayload,
   GeospatialProviderAccountSetup,
   GeospatialProviderAccountSetupListResponse,
   GeospatialProviderLayerDescriptor,
@@ -17,24 +21,157 @@ import {
   ModelCardDescriptor,
   ModelLibraryResponse,
   ModelSettingsResponse,
+  OllamaHealthResponse,
   MapInspection,
   OverlayCollectionState,
   OverlayInstance,
 } from './types';
 import { isFiniteNumber, isJsonObject, isRecord, isStringArray } from './type-guards';
+import { ApiContractError } from './api-errors';
 
-export const parseBooleanCredentialMap = (value: unknown): Record<string, Record<string, boolean>> => {
-  if (!isRecord(value)) {
-    return {};
+const apiContract = (endpoint: string, detail: string, raw?: unknown): never => {
+  throw new ApiContractError(endpoint, detail, raw);
+};
+
+const requireApiRecord = (value: unknown, endpoint: string, field = 'response'): Record<string, unknown> => {
+  if (!isRecord(value) || Array.isArray(value)) {
+    return apiContract(endpoint, `${field} must be an object`, value);
   }
+  return value;
+};
+
+const requireApiJsonObject = (
+  value: unknown,
+  endpoint: string,
+  field: string,
+): Record<string, JsonValue> => {
+  if (!isJsonObject(value)) {
+    return apiContract(endpoint, `${field} must be a JSON object`, value);
+  }
+  return value;
+};
+
+const requireApiArray = (value: unknown, endpoint: string, field: string): unknown[] => {
+  if (!Array.isArray(value)) {
+    return apiContract(endpoint, `${field} must be an array`, value);
+  }
+  return value;
+};
+
+const requireApiString = (
+  record: Record<string, unknown>,
+  field: string,
+  endpoint: string,
+): string => {
+  if (typeof record[field] !== 'string') {
+    return apiContract(endpoint, `${field} must be a string`, record[field]);
+  }
+  return record[field] as string;
+};
+
+const requireApiStringOrNull = (
+  record: Record<string, unknown>,
+  field: string,
+  endpoint: string,
+): string | null => {
+  if (!(field in record) || (record[field] !== null && typeof record[field] !== 'string')) {
+    return apiContract(endpoint, `${field} must be a string or null`, record[field]);
+  }
+  return record[field] as string | null;
+};
+
+const requireApiBoolean = (
+  record: Record<string, unknown>,
+  field: string,
+  endpoint: string,
+): boolean => {
+  if (typeof record[field] !== 'boolean') {
+    return apiContract(endpoint, `${field} must be a boolean`, record[field]);
+  }
+  return record[field] as boolean;
+};
+
+const requireApiStringArray = (
+  record: Record<string, unknown>,
+  field: string,
+  endpoint: string,
+): string[] => {
+  if (!isStringArray(record[field])) {
+    return apiContract(endpoint, `${field} must be an array of strings`, record[field]);
+  }
+  return record[field] as string[];
+};
+
+const optionalApiString = (
+  record: Record<string, unknown>,
+  field: string,
+  endpoint: string,
+): string | null | undefined => {
+  if (!(field in record)) {
+    return undefined;
+  }
+  if (record[field] !== null && typeof record[field] !== 'string') {
+    return apiContract(endpoint, `${field} must be a string or null`, record[field]);
+  }
+  return record[field] as string | null;
+};
+
+const optionalApiNullableBoolean = (
+  record: Record<string, unknown>,
+  field: string,
+  endpoint: string,
+): boolean | null | undefined => {
+  if (!(field in record)) {
+    return undefined;
+  }
+  if (record[field] !== null && typeof record[field] !== 'boolean') {
+    return apiContract(endpoint, `${field} must be a boolean or null`, record[field]);
+  }
+  return record[field] as boolean | null;
+};
+
+const optionalApiNumber = (
+  record: Record<string, unknown>,
+  field: string,
+  endpoint: string,
+): number | null | undefined => {
+  if (!(field in record)) {
+    return undefined;
+  }
+  if (record[field] !== null && !isFiniteNumber(record[field])) {
+    return apiContract(endpoint, `${field} must be a finite number or null`, record[field]);
+  }
+  return record[field] as number | null;
+};
+
+const optionalApiRecord = (
+  record: Record<string, unknown>,
+  field: string,
+  endpoint: string,
+): Record<string, unknown> | null | undefined => {
+  if (!(field in record)) {
+    return undefined;
+  }
+  if (record[field] === null) {
+    return null;
+  }
+  return requireApiRecord(record[field], endpoint, field);
+};
+
+export const parseBooleanCredentialMap = (
+  value: unknown,
+  endpoint = 'model settings',
+): Record<string, Record<string, boolean>> => {
+  const record = requireApiRecord(value, endpoint, 'credentials');
   const parsed: Record<string, Record<string, boolean>> = {};
-  Object.entries(value).forEach(([provider, providerValue]) => {
-    if (!isRecord(providerValue)) {
-      return;
-    }
+  Object.entries(record).forEach(([provider, providerValue]) => {
+    const providerRecord = requireApiRecord(providerValue, endpoint, `credentials.${provider}`);
     const nextProvider: Record<string, boolean> = {};
-    Object.entries(providerValue).forEach(([key, flag]) => {
-      nextProvider[key] = Boolean(flag);
+    Object.entries(providerRecord).forEach(([key, flag]) => {
+      if (typeof flag !== 'boolean') {
+        return apiContract(endpoint, `credentials.${provider}.${key} must be a boolean`, flag);
+      }
+      nextProvider[key] = flag as boolean;
     });
     parsed[provider] = nextProvider;
   });
@@ -62,171 +199,219 @@ export const requireNumber = (value: unknown, fieldName: string): number => {
   return value;
 };
 
-export const normalizeCapabilities = (input: unknown): CatalogResponse['capabilities'] => (
-  Array.isArray(input) ? input : []
-)
-  .filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.id === 'string')
-  .map((item) => ({
-    id: String(item.id),
-    name: String(item.name ?? item.id),
-    kind: String(item.kind ?? 'overlay'),
-    type: typeof item.type === 'string' ? item.type : undefined,
-    description: typeof item.description === 'string' ? item.description : undefined,
-    provider: String(item.provider ?? 'unknown'),
-    requires_credentials: Boolean(item.requires_credentials),
-    is_available: Boolean(item.is_available),
-    supports_map: Boolean(item.supports_map),
-    supports_direct_text: Boolean(item.supports_direct_text),
-    coverage: String(item.coverage ?? 'global'),
-    source_protocol: typeof item.source_protocol === 'string' ? item.source_protocol : undefined,
-    data_format: typeof item.data_format === 'string' ? item.data_format : undefined,
-    geometry_type: typeof item.geometry_type === 'string' ? item.geometry_type : undefined,
-    queryable: typeof item.queryable === 'boolean' ? item.queryable : undefined,
-    endpoint_health: typeof item.endpoint_health === 'string' ? item.endpoint_health : undefined,
-    auth_mode: typeof item.auth_mode === 'string' ? item.auth_mode : undefined,
-    official_docs_url: typeof item.official_docs_url === 'string' ? item.official_docs_url : undefined,
-    capability_kind: typeof item.capability_kind === 'string'
-      ? item.capability_kind
-      : (typeof item.capabilityKind === 'string' ? item.capabilityKind : undefined),
-    rendering_mode: typeof item.rendering_mode === 'string'
-      ? item.rendering_mode
-      : (typeof item.renderingMode === 'string' ? item.renderingMode : undefined),
-    reliability: isRecord(item.reliability)
+export const normalizeCapabilities = (
+  input: unknown,
+  endpoint = 'geospatial catalog',
+  field = 'capabilities',
+): CatalogResponse['capabilities'] => requireApiArray(input, endpoint, field).map((raw, index) => {
+  const item = requireApiRecord(raw, endpoint, `capabilities[${index}]`);
+  const reliability = requireApiRecord(item.reliability, endpoint, `capabilities[${index}].reliability`);
+  const auth = requireApiRecord(item.auth, endpoint, `capabilities[${index}].auth`);
+  const render = item.render === undefined ? undefined : requireApiRecord(
+    item.render,
+    endpoint,
+    `capabilities[${index}].render`,
+  );
+  return {
+    id: requireApiString(item, 'id', endpoint),
+    name: requireApiString(item, 'name', endpoint),
+    kind: requireApiString(item, 'kind', endpoint),
+    type: requireApiString(item, 'type', endpoint),
+    description: requireApiString(item, 'description', endpoint),
+    provider: requireApiString(item, 'provider', endpoint),
+    requires_credentials: requireApiBoolean(item, 'requires_credentials', endpoint),
+    is_available: requireApiBoolean(item, 'is_available', endpoint),
+    supports_map: requireApiBoolean(item, 'supports_map', endpoint),
+    supports_direct_text: requireApiBoolean(item, 'supports_direct_text', endpoint),
+    coverage: requireApiString(item, 'coverage', endpoint),
+    source_protocol: requireApiString(item, 'source_protocol', endpoint),
+    data_format: requireApiString(item, 'data_format', endpoint),
+    geometry_type: requireApiString(item, 'geometry_type', endpoint),
+    queryable: requireApiBoolean(item, 'queryable', endpoint),
+    endpoint_health: requireApiString(item, 'endpoint_health', endpoint),
+    auth_mode: requireApiString(item, 'auth_mode', endpoint),
+    official_docs_url: requireApiString(item, 'official_docs_url', endpoint),
+    capability_kind: requireApiString(item, 'capability_kind', endpoint),
+    rendering_mode: requireApiString(item, 'rendering_mode', endpoint),
+    reliability: {
+      status: requireApiString(reliability, 'status', endpoint),
+      lastAudited: optionalApiString(reliability, 'last_audited', endpoint) ?? undefined,
+      knownLimitations: requireApiStringArray(reliability, 'known_limitations', endpoint),
+    },
+    auth: {
+      type: requireApiString(auth, 'type', endpoint),
+      required: requireApiBoolean(auth, 'required', endpoint),
+      providerKey: optionalApiString(auth, 'provider_key', endpoint) ?? null,
+      accessPageProviderId: optionalApiString(auth, 'access_page_provider_id', endpoint) ?? null,
+    },
+    action_tags: requireApiStringArray(item, 'action_tags', endpoint),
+    task_tags: requireApiStringArray(item, 'task_tags', endpoint),
+    metadata: requireApiRecord(item.metadata, endpoint, `capabilities[${index}].metadata`) as Record<string, JsonValue>,
+    render: render
       ? {
-        status: String(item.reliability.status ?? 'unknown'),
-        lastAudited: typeof item.reliability.lastAudited === 'string'
-          ? item.reliability.lastAudited
-          : undefined,
-        knownLimitations: isStringArray(item.reliability.knownLimitations)
-          ? item.reliability.knownLimitations
-          : undefined,
+        status: optionalApiString(render, 'status', endpoint) ?? undefined,
+        tile_url: optionalApiString(render, 'tile_url', endpoint) ?? null,
+        style_url: optionalApiString(render, 'style_url', endpoint) ?? null,
+        attribution: optionalApiString(render, 'attribution', endpoint) ?? undefined,
+        reason: optionalApiString(render, 'reason', endpoint) ?? undefined,
       }
       : undefined,
-    auth: isRecord(item.auth)
-      ? {
-        type: String(item.auth.type ?? 'none'),
-        required: Boolean(item.auth.required),
-        providerKey: typeof item.auth.providerKey === 'string' ? item.auth.providerKey : null,
-        accessPageProviderId: typeof item.auth.accessPageProviderId === 'string'
-          ? item.auth.accessPageProviderId
-          : null,
-      }
-      : undefined,
-    action_tags: Array.isArray(item.action_tags)
-      ? item.action_tags.filter((v): v is string => typeof v === 'string')
-      : [],
-    task_tags: Array.isArray(item.task_tags)
-      ? item.task_tags.filter((v): v is string => typeof v === 'string')
-      : [],
-    metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
-    render: isRecord(item.render)
-      ? {
-        status: typeof item.render.status === 'string' ? item.render.status : undefined,
-        tile_url: stringOrNull(item.render.tile_url),
-        style_url: stringOrNull(item.render.style_url),
-        attribution: typeof item.render.attribution === 'string' ? item.render.attribution : undefined,
-        reason: typeof item.render.reason === 'string' ? item.render.reason : undefined,
-      }
-      : undefined,
-  }));
-
-interface GeospatialProviderSignupFieldDto {
-  key?: unknown;
-  label?: unknown;
-  field_type?: unknown;
-  required?: unknown;
-  sensitive?: unknown;
-  help_text?: unknown;
-}
-
-interface GeospatialProviderSignupAutomationDto {
-  support?: unknown;
-  signup_url?: unknown;
-  developer_portal_url?: unknown;
-  docs_url?: unknown;
-  required_fields?: unknown;
-  user_action_notes?: unknown;
-  safety_notes?: unknown;
-  experimental?: unknown;
-  experimental_label?: unknown;
-}
-
-interface GeospatialProviderAccountSetupDto {
-  provider_id?: unknown;
-  name?: unknown;
-  requires_credentials?: unknown;
-  auth_mode?: unknown;
-  docs_url?: unknown;
-  configured?: unknown;
-  instructions?: unknown;
-  automation?: unknown;
-  credential_storage_key?: unknown;
-  credential_label?: unknown;
-  key_format_hint?: unknown;
-  validation_supported?: unknown;
-}
+  };
+});
 
 export const mapGeospatialProviderSignupField = (
-  dto: GeospatialProviderSignupFieldDto,
-): GeospatialProviderAccountSetup['automation']['requiredFields'][number] => ({
-  key: String(dto.key ?? ''),
-  label: String(dto.label ?? dto.key ?? ''),
-  fieldType: dto.field_type === 'email' || dto.field_type === 'textarea' || dto.field_type === 'select'
-    ? dto.field_type
-    : 'text',
-  required: dto.required !== false,
-  sensitive: Boolean(dto.sensitive),
-  helpText: typeof dto.help_text === 'string' ? dto.help_text : null,
-});
+  dto: Record<string, unknown>,
+  endpoint = 'geospatial provider account setup',
+  field = 'field',
+): GeospatialProviderAccountSetup['automation']['requiredFields'][number] => {
+  const fieldType = requireApiString(dto, 'field_type', endpoint);
+  if (!['text', 'email', 'textarea', 'select'].includes(fieldType)) {
+    return apiContract(endpoint, `${field}.field_type is unsupported`, fieldType);
+  }
+  return {
+    key: requireApiString(dto, 'key', endpoint),
+    label: requireApiString(dto, 'label', endpoint),
+    fieldType: fieldType as GeospatialProviderAccountSetup['automation']['requiredFields'][number]['fieldType'],
+    required: requireApiBoolean(dto, 'required', endpoint),
+    sensitive: requireApiBoolean(dto, 'sensitive', endpoint),
+    helpText: requireApiStringOrNull(dto, 'help_text', endpoint),
+  };
+};
 
 export const mapGeospatialProviderSignupAutomation = (
-  dto: GeospatialProviderSignupAutomationDto,
-): GeospatialProviderAccountSetup['automation'] => ({
-  support: dto.support === 'guided_playwright' || dto.support === 'agent_assisted' || dto.support === 'unsupported'
-    ? dto.support
-    : 'manual_only',
-  signupUrl: typeof dto.signup_url === 'string' ? dto.signup_url : null,
-  developerPortalUrl: typeof dto.developer_portal_url === 'string' ? dto.developer_portal_url : null,
-  docsUrl: typeof dto.docs_url === 'string' ? dto.docs_url : null,
-  requiredFields: Array.isArray(dto.required_fields)
-    ? dto.required_fields
-      .filter((item): item is GeospatialProviderSignupFieldDto => isRecord(item))
-      .map(mapGeospatialProviderSignupField)
-      .filter((field) => !field.sensitive)
-    : [],
-  userActionNotes: isStringArray(dto.user_action_notes) ? dto.user_action_notes : [],
-  safetyNotes: isStringArray(dto.safety_notes) ? dto.safety_notes : [],
-  experimental: dto.experimental !== false,
-  experimentalLabel: typeof dto.experimental_label === 'string' ? dto.experimental_label : 'Experimental guided setup',
-});
+  dto: Record<string, unknown>,
+  endpoint = 'geospatial provider account setup',
+): GeospatialProviderAccountSetup['automation'] => {
+  const support = requireApiString(dto, 'support', endpoint);
+  if (!['manual_only', 'guided_playwright', 'agent_assisted', 'unsupported'].includes(support)) {
+    return apiContract(endpoint, 'automation.support is unsupported', support);
+  }
+  const requiredFields = requireApiArray(dto.required_fields, endpoint, 'automation.required_fields')
+    .map((item, index) => mapGeospatialProviderSignupField(
+      requireApiRecord(item, endpoint, `automation.required_fields[${index}]`),
+      endpoint,
+      `automation.required_fields[${index}]`,
+    ))
+    .filter((field) => !field.sensitive);
+  return {
+    support: support as GeospatialProviderAccountSetup['automation']['support'],
+    signupUrl: requireApiStringOrNull(dto, 'signup_url', endpoint),
+    developerPortalUrl: requireApiStringOrNull(dto, 'developer_portal_url', endpoint),
+    docsUrl: requireApiStringOrNull(dto, 'docs_url', endpoint),
+    requiredFields,
+    userActionNotes: requireApiStringArray(dto, 'user_action_notes', endpoint),
+    safetyNotes: requireApiStringArray(dto, 'safety_notes', endpoint),
+    experimental: requireApiBoolean(dto, 'experimental', endpoint),
+    experimentalLabel: requireApiString(dto, 'experimental_label', endpoint),
+  };
+};
 
 export const mapGeospatialProviderAccountSetup = (
-  dto: GeospatialProviderAccountSetupDto,
+  dto: Record<string, unknown>,
+  endpoint = 'geospatial provider account setup',
 ): GeospatialProviderAccountSetup => ({
-  providerId: String(dto.provider_id ?? ''),
-  name: String(dto.name ?? dto.provider_id ?? ''),
-  requiresCredentials: Boolean(dto.requires_credentials),
-  authMode: String(dto.auth_mode ?? 'api-key'),
-  docsUrl: typeof dto.docs_url === 'string' ? dto.docs_url : null,
-  configured: Boolean(dto.configured),
-  instructions: isStringArray(dto.instructions) ? dto.instructions : [],
-  automation: mapGeospatialProviderSignupAutomation(isRecord(dto.automation) ? dto.automation : {}),
-  credentialStorageKey: String(dto.credential_storage_key ?? dto.provider_id ?? ''),
-  credentialLabel: String(dto.credential_label ?? 'api_key'),
-  keyFormatHint: typeof dto.key_format_hint === 'string' ? dto.key_format_hint : null,
-  validationSupported: Boolean(dto.validation_supported),
+  providerId: requireApiString(dto, 'provider_id', endpoint),
+  name: requireApiString(dto, 'name', endpoint),
+  requiresCredentials: requireApiBoolean(dto, 'requires_credentials', endpoint),
+  authMode: requireApiString(dto, 'auth_mode', endpoint),
+  docsUrl: requireApiStringOrNull(dto, 'docs_url', endpoint),
+  configured: requireApiBoolean(dto, 'configured', endpoint),
+  instructions: requireApiStringArray(dto, 'instructions', endpoint),
+  automation: mapGeospatialProviderSignupAutomation(
+    requireApiRecord(dto.automation, endpoint, 'automation'),
+    endpoint,
+  ),
+  credentialStorageKey: requireApiString(dto, 'credential_storage_key', endpoint),
+  credentialLabel: requireApiString(dto, 'credential_label', endpoint),
+  keyFormatHint: requireApiStringOrNull(dto, 'key_format_hint', endpoint),
+  validationSupported: requireApiBoolean(dto, 'validation_supported', endpoint),
 });
 
 export const parseGeospatialProviderAccountSetups = (
   value: unknown,
+  endpoint = 'geospatial provider account setup',
 ): GeospatialProviderAccountSetupListResponse => {
-  const providers = isRecord(value) && Array.isArray(value.providers)
-    ? value.providers
-      .filter((item): item is GeospatialProviderAccountSetupDto => isRecord(item))
-      .map(mapGeospatialProviderAccountSetup)
-    : [];
+  const record = requireApiRecord(value, endpoint);
+  const providers = requireApiArray(record.providers, endpoint, 'providers')
+    .map((item, index) => mapGeospatialProviderAccountSetup(
+      requireApiRecord(item, endpoint, `providers[${index}]`),
+      endpoint,
+    ));
   return { providers };
 };
+
+export const parseGeospatialProviderPayload = (
+  value: unknown,
+  endpoint = 'geospatial provider',
+): GeospatialProviderPayload => {
+  const record = requireApiRecord(value, endpoint);
+  const parsed: GeospatialProviderPayload = {
+    status: requireApiString(record, 'status', endpoint),
+    provider: requireApiString(record, 'provider', endpoint),
+  };
+  if ('payload' in record) {
+    if (record.payload !== null) {
+      parsed.payload = requireApiJsonObject(record.payload, endpoint, 'payload');
+    }
+  }
+  if ('attribution' in record) {
+    parsed.attribution = requireApiStringArray(record, 'attribution', endpoint);
+  }
+  if ('warnings' in record) {
+    parsed.warnings = requireApiStringArray(record, 'warnings', endpoint);
+  }
+  if ('stale' in record) {
+    parsed.stale = requireApiBoolean(record, 'stale', endpoint);
+  }
+  if ('message' in record) {
+    const message = requireApiStringOrNull(record, 'message', endpoint);
+    if (message !== null) {
+      parsed.message = message;
+    }
+  }
+  return parsed;
+};
+
+export const parseGeospatialLayersResponse = (
+  value: unknown,
+): Pick<CatalogResponse, 'basemaps' | 'overlays' | 'cameras' | 'transit'> => {
+  const endpoint = 'geospatial layers';
+  const record = requireApiRecord(value, endpoint);
+  return {
+    basemaps: normalizeCapabilities(record.basemaps, endpoint, 'basemaps'),
+    overlays: normalizeCapabilities(record.overlays, endpoint, 'overlays'),
+    cameras: normalizeCapabilities(record.cameras, endpoint, 'cameras'),
+    transit: normalizeCapabilities(record.transit, endpoint, 'transit'),
+  };
+};
+
+export const parseGeospatialCredentialStatus = (
+  value: unknown,
+): GeospatialCredentialStatus => {
+  const endpoint = 'geospatial credential status';
+  const record = requireApiRecord(value, endpoint);
+  return {
+    provider: requireApiString(record, 'provider', endpoint),
+    required: requireApiBoolean(record, 'required', endpoint),
+    configured: requireApiBoolean(record, 'configured', endpoint),
+  };
+};
+
+export const parseConversationCreateResponse = (
+  value: unknown,
+): ConversationCreateResponse => {
+  const endpoint = 'conversation create';
+  const record = requireApiRecord(value, endpoint);
+  return {
+    conversation_id: requireApiString(record, 'conversation_id', endpoint),
+    title: requireApiStringOrNull(record, 'title', endpoint),
+  };
+};
+
+export const parseGenericObjectResponse = (
+  value: unknown,
+  endpoint: string,
+): GenericObjectResponse => requireApiRecord(value, endpoint);
 
 const stringOrNull = (value: unknown): string | null => (
   typeof value === 'string' && value.trim() ? value : null
@@ -720,69 +905,71 @@ export const buildModelDescription = (item: Record<string, unknown>): string => 
   return details ? `Optimized for ${details}.` : 'General purpose local model.';
 };
 
-export const normalizeModelCards = (input: unknown): ModelCardDescriptor[] => {
-  if (!Array.isArray(input)) {
-    return [];
-  }
-  return input
-    .filter((item): item is Record<string, unknown> => isRecord(item))
-    .map((item) => {
-      const capabilities = isStringArray(item.capabilities) ? item.capabilities : [];
-      return {
-        id: String(item.id ?? item.name ?? ''),
-        name: String(item.name ?? item.id ?? ''),
-        description: buildModelDescription(item),
-        provider: String(item.provider ?? ''),
-        capabilities,
-        supports_tools: typeof item.supports_tools === 'boolean' ? item.supports_tools : (capabilities.includes('tools') ? true : null),
-        supports_structured_output: typeof item.supports_structured_output === 'boolean'
-          ? item.supports_structured_output
-          : (capabilities.includes('structured') || capabilities.includes('structured_output') ? true : null),
-        supports_vision: typeof item.supports_vision === 'boolean' ? item.supports_vision : (capabilities.includes('vision') ? true : null),
-        supports_embeddings: typeof item.supports_embeddings === 'boolean'
-          ? item.supports_embeddings
-          : (capabilities.includes('embeddings') ? true : null),
-        tool_support_source: typeof item.tool_support_source === 'string' ? item.tool_support_source : 'unknown',
-        context_window_tokens: isFiniteNumber(item.context_window_tokens) ? item.context_window_tokens : null,
-        maximum_output_tokens: isFiniteNumber(item.maximum_output_tokens) ? item.maximum_output_tokens : null,
-        context_profile_source: typeof item.context_profile_source === 'string' ? item.context_profile_source : 'unknown',
-        metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
-      };
-    });
-};
+export const normalizeModelCards = (
+  input: unknown,
+  endpoint = 'chat model library',
+  field = 'models',
+): ModelCardDescriptor[] => requireApiArray(input, endpoint, field).map((raw, index) => {
+  const item = requireApiRecord(raw, endpoint, `${field}[${index}]`);
+  return {
+    id: requireApiString(item, 'id', endpoint),
+    name: requireApiString(item, 'name', endpoint),
+    description: buildModelDescription({
+      ...item,
+      description: requireApiString(item, 'description', endpoint),
+    }),
+    provider: requireApiString(item, 'provider', endpoint),
+    capabilities: requireApiStringArray(item, 'capabilities', endpoint),
+    supports_tools: optionalApiNullableBoolean(item, 'supports_tools', endpoint),
+    supports_structured_output: optionalApiNullableBoolean(item, 'supports_structured_output', endpoint),
+    supports_vision: optionalApiNullableBoolean(item, 'supports_vision', endpoint),
+    supports_embeddings: optionalApiNullableBoolean(item, 'supports_embeddings', endpoint),
+    tool_support_source: requireApiString(item, 'tool_support_source', endpoint),
+    context_window_tokens: optionalApiNumber(item, 'context_window_tokens', endpoint) ?? null,
+    maximum_output_tokens: optionalApiNumber(item, 'maximum_output_tokens', endpoint) ?? null,
+    context_profile_source: requireApiString(item, 'context_profile_source', endpoint),
+    metadata: requireApiJsonObject(item.metadata, endpoint, `${field}[${index}].metadata`),
+  };
+});
 
 export const parseModelLibrarySources = (
   input: unknown,
+  endpoint = 'chat model library',
 ): ModelLibraryResponse['sources'] => {
-  if (!isRecord(input)) {
-    return {};
-  }
+  const record = requireApiRecord(input, endpoint, 'sources');
   const sources: ModelLibraryResponse['sources'] = {};
-  Object.entries(input).forEach(([key, value]) => {
-    if (!isRecord(value)) {
-      return;
-    }
+  Object.entries(record).forEach(([key, value]) => {
+    const source = requireApiRecord(value, endpoint, `sources.${key}`);
     sources[key] = {
-      ok: Boolean(value.ok),
-      reachable: typeof value.reachable === 'boolean' ? value.reachable : null,
-      message: typeof value.message === 'string' ? value.message : null,
-      model_count: typeof value.model_count === 'number' ? value.model_count : null,
+      ok: requireApiBoolean(source, 'ok', endpoint),
+      reachable: optionalApiNullableBoolean(source, 'reachable', endpoint) ?? null,
+      message: optionalApiString(source, 'message', endpoint) ?? null,
+      model_count: optionalApiNumber(source, 'model_count', endpoint) ?? null,
     };
   });
   return sources;
 };
 
+export const parseModelLibraryResponse = (value: unknown): ModelLibraryResponse => {
+  const endpoint = 'chat model library';
+  const record = requireApiRecord(value, endpoint);
+  return {
+    cloud: normalizeModelCards(record.cloud, endpoint, 'cloud'),
+    local: normalizeModelCards(record.local, endpoint, 'local'),
+    sources: parseModelLibrarySources(record.sources, endpoint),
+  };
+};
+
 export const parseCatalogResponse = (value: unknown): CatalogResponse => {
-  if (!isRecord(value)) {
-    throw new Error('Unexpected catalog response format');
-  }
-  const normalized = normalizeCapabilities(value.capabilities);
-  const providers = normalizeCapabilities(value.providers);
-  const basemaps = normalizeCapabilities(value.basemaps);
-  const overlays = normalizeCapabilities(value.overlays);
-  const tools = normalizeCapabilities(value.tools);
-  const cameras = normalizeCapabilities(value.cameras);
-  const transit = normalizeCapabilities(value.transit);
+  const endpoint = 'geospatial catalog';
+  const record = requireApiRecord(value, endpoint);
+  const normalized = normalizeCapabilities(record.capabilities, endpoint, 'capabilities');
+  const providers = normalizeCapabilities(record.providers, endpoint, 'providers');
+  const basemaps = normalizeCapabilities(record.basemaps, endpoint, 'basemaps');
+  const overlays = normalizeCapabilities(record.overlays, endpoint, 'overlays');
+  const tools = normalizeCapabilities(record.tools, endpoint, 'tools');
+  const cameras = normalizeCapabilities(record.cameras, endpoint, 'cameras');
+  const transit = normalizeCapabilities(record.transit, endpoint, 'transit');
   return {
     capabilities: normalized,
     providers,
@@ -795,59 +982,136 @@ export const parseCatalogResponse = (value: unknown): CatalogResponse => {
 };
 
 export const parseModelSettingsResponse = (value: unknown): ModelSettingsResponse => {
-  if (!isRecord(value)) {
-    throw new Error('Unexpected settings response format');
+  const endpoint = 'model settings';
+  const record = requireApiRecord(value, endpoint);
+  const activeProviderMode = requireApiString(record, 'active_provider_mode', endpoint);
+  if (activeProviderMode !== 'local' && activeProviderMode !== 'cloud') {
+    return apiContract(endpoint, 'active_provider_mode is unsupported', activeProviderMode);
+  }
+  const credentialHealthRecord = requireApiRecord(record.credential_health, endpoint, 'credential_health');
+  const credentialHealth: ModelSettingsResponse['credential_health'] = {};
+  Object.entries(credentialHealthRecord).forEach(([provider, providerValue]) => {
+    const providerRecord = requireApiRecord(providerValue, endpoint, `credential_health.${provider}`);
+    const statuses: Record<string, string> = {};
+    Object.entries(providerRecord).forEach(([key, status]) => {
+      statuses[key] = requireApiString(providerRecord, key, endpoint);
+    });
+    credentialHealth[provider] = statuses;
+  });
+  return {
+    active_provider_mode: activeProviderMode,
+    agent_model_provider: requireApiString(record, 'agent_model_provider', endpoint),
+    agent_model_name: requireApiString(record, 'agent_model_name', endpoint),
+    ollama_url: requireApiString(record, 'ollama_url', endpoint),
+    openai_base_url: requireApiStringOrNull(record, 'openai_base_url', endpoint),
+    google_base_url: requireApiStringOrNull(record, 'google_base_url', endpoint),
+    deepseek_base_url: requireApiStringOrNull(record, 'deepseek_base_url', endpoint),
+    credentials: parseBooleanCredentialMap(record.credentials, endpoint),
+    credential_health: credentialHealth,
+    selected_model_context: requireApiJsonObject(
+      record.selected_model_context,
+      endpoint,
+      'selected_model_context',
+    ),
+  };
+};
+
+export const parseOllamaRefreshResponse = (value: unknown): GenericObjectResponse => {
+  const endpoint = 'Ollama model refresh';
+  const record = requireApiRecord(value, endpoint);
+  return {
+    status: requireApiString(record, 'status', endpoint),
+    library_models: requireApiStringArray(record, 'library_models', endpoint),
+    local_models: requireApiStringArray(record, 'local_models', endpoint),
+    local_model_capabilities: normalizeModelCards(
+      record.local_model_capabilities,
+      endpoint,
+      'local_model_capabilities',
+    ),
+  };
+};
+
+export const parseOllamaHealthResponse = (value: unknown): OllamaHealthResponse => {
+  const endpoint = 'Ollama health';
+  const record = requireApiRecord(value, endpoint);
+  if (!('ok' in record) || (record.ok !== null && typeof record.ok !== 'boolean')) {
+    return apiContract(endpoint, 'ok must be a boolean or null', record.ok);
   }
   return {
-    active_provider_mode: (value.active_provider_mode === 'local' ? 'local' : 'cloud'),
-    agent_model_provider: String(value.agent_model_provider ?? ''),
-    agent_model_name: String(value.agent_model_name ?? ''),
-    ollama_url: String(value.ollama_url ?? 'http://127.0.0.1:11434'),
-    openai_base_url: typeof value.openai_base_url === 'string' ? value.openai_base_url : null,
-    google_base_url: typeof value.google_base_url === 'string' ? value.google_base_url : null,
-    deepseek_base_url: typeof value.deepseek_base_url === 'string' ? value.deepseek_base_url : null,
-    credentials: parseBooleanCredentialMap(value.credentials),
-    credential_health: isRecord(value.credential_health)
-      ? value.credential_health as ModelSettingsResponse['credential_health']
-      : {},
-    selected_model_context: isRecord(value.selected_model_context)
-      ? value.selected_model_context as Record<string, JsonValue>
-      : {},
+    ...record,
+    ok: record.ok as boolean | null,
+    detail: requireApiStringOrNull(record, 'detail', endpoint),
   };
 };
 
 export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
-  if (!isRecord(value)) {
-    throw new Error('Unexpected chat response format');
-  }
-  const operation = isRecord(value.operation) ? { ...value.operation } as Record<string, unknown> : undefined;
-  const toolPayload = isRecord(value.tool_payload) ? { ...value.tool_payload } as Record<string, unknown> : undefined;
-  if (toolPayload && isRecord(toolPayload.map_session)) {
-    toolPayload.map_session = normalizeMapSession(toolPayload.map_session);
+  const endpoint = 'chat turn';
+  const record = requireApiRecord(value, endpoint);
+  const operation = optionalApiRecord(record, 'operation', endpoint);
+  const toolPayload = optionalApiRecord(record, 'tool_payload', endpoint);
+  if (toolPayload && 'map_session' in toolPayload) {
+    if (toolPayload.map_session === null) {
+      toolPayload.map_session = null;
+    } else {
+      const normalizedToolMap = normalizeMapSession(toolPayload.map_session);
+      if (!normalizedToolMap) {
+        return apiContract(endpoint, 'tool_payload.map_session is malformed', toolPayload.map_session);
+      }
+      toolPayload.map_session = normalizedToolMap;
+    }
   }
 
+  let mapSession: MapSession | null | undefined;
+  if (!('map_session' in record) || record.map_session === undefined) {
+    mapSession = undefined;
+  } else if (record.map_session === null) {
+    mapSession = null;
+  } else {
+    mapSession = normalizeMapSession(record.map_session);
+    if (!mapSession) {
+      return apiContract(endpoint, 'map_session is malformed', record.map_session);
+    }
+  }
+
+  const contextUsage = record.context_usage === undefined
+    ? undefined
+    : record.context_usage === null
+      ? null
+      : parseContextUsage(record.context_usage);
+  if (record.context_usage !== undefined && record.context_usage !== null && !contextUsage) {
+    return apiContract(endpoint, 'context_usage is malformed', record.context_usage);
+  }
+
+  const taskSnapshot = record.task_snapshot === undefined
+    ? undefined
+    : record.task_snapshot === null
+      ? null
+      : normalizeConversationTaskSnapshot(record.task_snapshot);
+  if (record.task_snapshot !== undefined && record.task_snapshot !== null && !taskSnapshot) {
+    return apiContract(endpoint, 'task_snapshot is malformed', record.task_snapshot);
+  }
+
+  const toolPlan = optionalApiRecord(record, 'tool_plan', endpoint);
+  const failureDiagnostic = optionalApiRecord(record, 'failure_diagnostic', endpoint);
+  const visualizationUpdate = optionalApiRecord(record, 'visualization_update', endpoint);
+  const contextRevision = optionalApiNumber(record, 'context_revision', endpoint);
+
   return {
-    conversation_id: requireString(value.conversation_id, 'conversation_id'),
-    request_id: requireString(value.request_id, 'request_id'),
-    assistant_message: requireString(value.assistant_message, 'assistant_message'),
-    turn_contract: requireRecord(value.turn_contract, 'turn_contract') as unknown as ChatTurnResponse['turn_contract'],
-    decision: requireRecord(value.decision, 'decision') as unknown as ChatTurnResponse['decision'],
+    conversation_id: requireString(record.conversation_id, 'conversation_id'),
+    request_id: requireString(record.request_id, 'request_id'),
+    assistant_message: requireString(record.assistant_message, 'assistant_message'),
+    turn_contract: requireRecord(record.turn_contract, 'turn_contract') as unknown as ChatTurnResponse['turn_contract'],
+    decision: requireRecord(record.decision, 'decision') as unknown as ChatTurnResponse['decision'],
     operation: operation as unknown as ChatTurnResponse['operation'],
     tool_payload: toolPayload as ChatTurnResponse['tool_payload'],
-    map_session: normalizeMapSession(value.map_session),
-    memory_snapshot: isRecord(value.memory_snapshot) ? value.memory_snapshot as Record<string, JsonValue> : {},
-    context_usage: parseContextUsage(value.context_usage),
-    task_snapshot: isRecord(value.task_snapshot) ? value.task_snapshot as unknown as ChatTurnResponse['task_snapshot'] : undefined,
-    tool_plan: isRecord(value.tool_plan) ? value.tool_plan as unknown as ChatTurnResponse['tool_plan'] : undefined,
-    failure_diagnostic: isRecord(value.failure_diagnostic)
-      ? value.failure_diagnostic as unknown as ChatTurnResponse['failure_diagnostic']
-      : undefined,
-    visualization_update: isRecord(value.visualization_update)
-      ? value.visualization_update as unknown as ChatTurnResponse['visualization_update']
-      : undefined,
-    context_revision: typeof value.context_revision === 'number'
-      ? value.context_revision
-      : undefined,
+    map_session: mapSession,
+    memory_snapshot: requireApiJsonObject(record.memory_snapshot, endpoint, 'memory_snapshot'),
+    context_usage: contextUsage,
+    task_snapshot: taskSnapshot as unknown as ChatTurnResponse['task_snapshot'],
+    tool_plan: toolPlan as unknown as ChatTurnResponse['tool_plan'],
+    failure_diagnostic: failureDiagnostic as unknown as ChatTurnResponse['failure_diagnostic'],
+    visualization_update: visualizationUpdate as unknown as ChatTurnResponse['visualization_update'],
+    context_revision: contextRevision,
   };
 };
 

@@ -21,6 +21,42 @@ class GeospatialCatalogService:
         self.runtime_registry = runtime_registry
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _api_reliability(value: object) -> dict[str, Any]:
+        reliability = json_object(value)
+        last_audited = reliability.get("lastAudited")
+        return {
+            "status": str(reliability.get("status") or "unknown"),
+            "last_audited": (
+                last_audited if isinstance(last_audited, str) else None
+            ),
+            "known_limitations": [
+                item
+                for item in json_array(reliability.get("knownLimitations"))
+                if isinstance(item, str)
+            ],
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _api_auth(value: object) -> dict[str, Any]:
+        auth = json_object(value)
+        provider_key = auth.get("providerKey")
+        access_page_provider_id = auth.get("accessPageProviderId")
+        return {
+            "type": str(auth.get("type") or "none"),
+            "required": bool(auth.get("required", False)),
+            "provider_key": (
+                provider_key if isinstance(provider_key, str) else None
+            ),
+            "access_page_provider_id": (
+                access_page_provider_id
+                if isinstance(access_page_provider_id, str)
+                else None
+            ),
+        }
+
+    # -------------------------------------------------------------------------
     def _descriptor(self, item: dict[str, Any], kind: str) -> dict[str, Any]:
         metadata = json_object(item.get("metadata"))
         capability_id = str(item.get("id") or "")
@@ -45,8 +81,16 @@ class GeospatialCatalogService:
                 capability_id, "direct_text"
             ),
             "coverage": str(item.get("coverage") or "global"),
-            "action_tags": list(metadata.get("action_tags") or []),
-            "task_tags": list(metadata.get("task_tags") or []),
+            "action_tags": [
+                value
+                for value in json_array(metadata.get("action_tags"))
+                if isinstance(value, str)
+            ],
+            "task_tags": [
+                value
+                for value in json_array(metadata.get("task_tags"))
+                if isinstance(value, str)
+            ],
             "source_protocol": str(metadata.get("source_protocol") or ""),
             "data_format": str(metadata.get("data_format") or ""),
             "geometry_type": str(metadata.get("geometry_type") or ""),
@@ -58,8 +102,8 @@ class GeospatialCatalogService:
             ),
             "capability_kind": capability_kind,
             "rendering_mode": str(item.get("renderingMode") or ""),
-            "reliability": reliability,
-            "auth": auth,
+            "reliability": self._api_reliability(reliability),
+            "auth": self._api_auth(auth),
             "metadata": metadata,
         }
         if kind == "basemap":
@@ -136,8 +180,16 @@ class GeospatialCatalogService:
             or "point-insight" in json_array(item.get("capabilities"))
             or "poi" in json_array(item.get("capabilities")),
             "coverage": str(item.get("coverage") or "global"),
-            "action_tags": list(metadata.get("action_tags") or []),
-            "task_tags": list(metadata.get("task_tags") or []),
+            "action_tags": [
+                value
+                for value in json_array(metadata.get("action_tags"))
+                if isinstance(value, str)
+            ],
+            "task_tags": [
+                value
+                for value in json_array(metadata.get("task_tags"))
+                if isinstance(value, str)
+            ],
             "source_protocol": str(metadata.get("source_protocol") or ""),
             "data_format": str(metadata.get("data_format") or ""),
             "geometry_type": str(metadata.get("geometry_type") or ""),
@@ -149,8 +201,8 @@ class GeospatialCatalogService:
             ),
             "capability_kind": str(item.get("capabilityKind") or "metadata-only"),
             "rendering_mode": str(item.get("renderingMode") or ""),
-            "reliability": reliability,
-            "auth": auth,
+            "reliability": self._api_reliability(reliability),
+            "auth": self._api_auth(auth),
             "metadata": metadata,
         }
 

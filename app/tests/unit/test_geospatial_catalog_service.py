@@ -84,3 +84,25 @@ def test_catalog_marks_key_required_capabilities_available_with_saved_credential
 
     assert lookup["tomtom_traffic_flow"]["is_available"] is True
     assert providers["tomtom"]["is_available"] is True
+
+
+###############################################################################
+def test_catalog_exposes_snake_case_nested_api_metadata() -> None:
+    catalog = _service_with_credentials(False).list_catalog()
+    overlay = next(
+        item for item in catalog["overlays"] if item["id"] == "openaq_air_quality"
+    )
+
+    assert set(overlay["reliability"]) == {
+        "status",
+        "last_audited",
+        "known_limitations",
+    }
+    assert set(overlay["auth"]) == {
+        "type",
+        "required",
+        "provider_key",
+        "access_page_provider_id",
+    }
+    assert "lastAudited" not in overlay["reliability"]
+    assert "providerKey" not in overlay["auth"]
