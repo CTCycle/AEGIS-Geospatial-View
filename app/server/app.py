@@ -129,6 +129,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     run_event_publisher = RunEventPublisher(AgentRunEventRepository(database))
     run_repository = AgentRunRepository(database)
     conversation_repository = chat_runtime.conversation_repository
+    steering_repository = AgentSteeringRepository(database)
     conversation_snapshot_service = ConversationSnapshotService(
         conversation_repository=conversation_repository,
         history_service=chat_runtime.history_service,
@@ -140,7 +141,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         run_repository=run_repository,
         event_publisher=run_event_publisher,
         conversation_repository=conversation_repository,
-        steering_repository=AgentSteeringRepository(database),
+        steering_repository=steering_repository,
     )
     run_lifecycle_service = RunLifecycleService(
         conversation_repository=conversation_repository,
@@ -151,15 +152,11 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     )
     run_steering_service = RunSteeringService(
         run_repository=run_repository,
-        steering_repository=AgentSteeringRepository(database),
+        steering_repository=steering_repository,
         aggregation_service=aggregation_service,
         event_publisher=run_event_publisher,
         conversation_repository=conversation_repository,
-        task_state_service=getattr(
-            chat_runtime.agent_orchestrator,
-            "task_state_service",
-            None,
-        ),
+        task_state_service=chat_runtime.task_state_service,
     )
     realtime_connections = RealtimeConnectionRegistry()
     realtime_metrics = RealtimeMetrics()

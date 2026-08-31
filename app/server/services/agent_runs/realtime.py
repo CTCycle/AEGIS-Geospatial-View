@@ -108,7 +108,7 @@ class RealtimeConnection:
         steering_service: RunSteeringService,
         event_publisher: RunEventPublisher,
         registry: RealtimeConnectionRegistry,
-        metrics: RealtimeMetrics | None = None,
+        metrics: RealtimeMetrics,
     ) -> None:
         self.websocket = websocket
         self.conversation_id = conversation_id
@@ -118,7 +118,7 @@ class RealtimeConnection:
         self.steering_service = steering_service
         self.event_publisher = event_publisher
         self.registry = registry
-        self.metrics = metrics or RealtimeMetrics()
+        self.metrics = metrics
         self._outbound: asyncio.Queue[RealtimeServerMessage] = asyncio.Queue(
             maxsize=OUTBOUND_QUEUE_SIZE
         )
