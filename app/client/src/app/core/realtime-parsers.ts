@@ -131,17 +131,12 @@ const parseOperation = (value: unknown): ChatOperationResult | undefined => {
     kind,
     status,
     message,
-    map_session: null,
     direct_result: null,
     provider_error: null,
   };
 
   if (warnings !== undefined) {
     result.warnings = warnings;
-  }
-
-  if (hasOwn(value, 'map_session')) {
-    result.map_session = value['map_session'] === null ? null : normalizeMapSession(value['map_session']);
   }
 
   if (hasOwn(value, 'direct_result')) {

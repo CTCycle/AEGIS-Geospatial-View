@@ -106,7 +106,7 @@ export class FakeRealtimeService {
 
   private completionPayload(response: ChatTurnResponse): JsonObject {
     return {
-      map_session: response.operation?.map_session ?? response.map_session ?? null,
+      map_session: response.map_session ?? null,
       operation: response.operation ?? null,
       memory_snapshot: response.memory_snapshot ?? {},
       context_usage: response.context_usage ?? null,

@@ -767,7 +767,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.messages = [...this.messages, { role: 'assistant', content: result.assistant_message }];
 
     const operation = result.operation;
-    const mapSession = normalizeMapSession(operation?.map_session ?? result.map_session);
+    const mapSession = normalizeMapSession(result.map_session);
     if (mapSession) {
       this.handleMapSession(mapSession);
     }

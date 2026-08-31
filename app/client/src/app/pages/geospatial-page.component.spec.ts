@@ -163,7 +163,7 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.at(-1)?.content).toContain('Coordinates: 41.8902, 12.4922');
   });
 
-  it('prefers operation.map_session over the top-level response map_session', async () => {
+  it('uses the top-level response map_session as the single map result', async () => {
     const mapResponse = makeTurnResponse({
       assistant_message: 'Map ready.',
       operation: {
@@ -171,24 +171,15 @@ describe('pages/geospatial-page.component', () => {
         status: 'success',
         message: 'Map ready.',
         warnings: [],
-        map_session: {
-          session_id: 'operation-map',
-          resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
-          basemap_id: 'osm_default',
-          overlay_ids: ['safe_overlay'],
-          viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
-          center: { latitude: 41.9, longitude: 12.5 },
-          overlays: [{ id: 'safe_overlay', label: 'Safe overlay', provider: 'fixture', type: 'geojson', url: '/api/geospatial/layers/safe_overlay/features' }],
-        },
       },
       map_session: {
-        session_id: 'fallback-map',
-        resolved_location: { label: 'Leaky Rome', latitude: 41.9, longitude: 12.5 },
+        session_id: 'canonical-map',
+        resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
         basemap_id: 'osm_default',
-        overlay_ids: ['leaky_overlay'],
+        overlay_ids: ['safe_overlay'],
         viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
         center: { latitude: 41.9, longitude: 12.5 },
-        overlays: [{ id: 'leaky_overlay', label: 'Leaky overlay', provider: 'fixture', type: 'tile', url: 'https://tiles.example/{z}/{x}/{y}.png?api_key=forbidden-secret' }],
+        overlays: [{ id: 'safe_overlay', label: 'Safe overlay', provider: 'fixture', type: 'geojson', url: '/api/geospatial/layers/safe_overlay/features' }],
       },
     });
     sendChatTurnMock.and.resolveTo(mapResponse);
@@ -200,15 +191,13 @@ describe('pages/geospatial-page.component', () => {
     await component.sendMessage();
     await Promise.resolve();
     // The component's eager change detection starts MapLibre in a real
-    // browser; this unit spec focuses on payload precedence and sanitization.
+    // browser; this unit spec focuses on the single map result path.
     component['applyTurnResponse'](mapResponse, component.conversationNonce);
 
-    expect(component['pendingMapSession']?.session_id).toBe('operation-map');
-    component.onMapRenderStateChange({ sessionId: 'operation-map', state: 'ready' });
-    expect(component.mapSession?.session_id).toBe('operation-map');
+    expect(component['pendingMapSession']?.session_id).toBe('canonical-map');
+    component.onMapRenderStateChange({ sessionId: 'canonical-map', state: 'ready' });
+    expect(component.mapSession?.session_id).toBe('canonical-map');
     expect(component.mapSession?.overlay_ids).toEqual(['safe_overlay']);
-    expect(JSON.stringify(component.payload)).not.toContain('forbidden-secret');
-    expect(JSON.stringify(component.payload)).not.toContain('api_key=');
   });
 
   it('operation-driven failures preserve the response and flag the agent model', async () => {

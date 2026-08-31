@@ -126,7 +126,6 @@ class AgentResponseBuilder:
                 status=map_status,
                 message=assistant_message,
                 warnings=warnings,
-                map_session=map_session,
             )
         if direct_result is not None:
             return ChatOperationResult(

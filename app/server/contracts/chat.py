@@ -85,7 +85,6 @@ class ChatOperationResult(BaseModel):
     status: Literal["success", "partial", "failed"]
     message: str
     warnings: list[str] = Field(default_factory=lambda: list[str]())
-    map_session: MapSession | None = None
     direct_result: dict[str, Any] | None = None
     provider_error: dict[str, Any] | None = None
     failure_category: (
