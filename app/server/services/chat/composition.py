@@ -42,6 +42,7 @@ class ChatRuntime:
     agent_orchestrator: AgentOrchestrator
     conversation_repository: ConversationRepository
     history_service: ChatHistoryService
+    task_state_service: ConversationTaskStateService
 
 
 ###############################################################################
@@ -132,6 +133,7 @@ def build_chat_runtime(
             ollama_tool_capability_cache=ollama_tool_capability_cache,
         ),
         history_service=history_service,
+        task_state_service=task_state_service,
         agent_orchestrator=AgentOrchestrator(
             search_orchestrator=search_orchestrator,
             parser_service=parser_service,
