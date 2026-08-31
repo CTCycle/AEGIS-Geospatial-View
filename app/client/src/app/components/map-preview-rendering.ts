@@ -79,6 +79,16 @@ const isFiniteBoundsTuple = (value: unknown): value is [number, number, number, 
   Array.isArray(value)
   && value.length === 4
   && value.every(isFiniteNumber)
+  && value[0] >= -180
+  && value[0] <= 180
+  && value[1] >= -90
+  && value[1] <= 90
+  && value[2] >= -180
+  && value[2] <= 180
+  && value[3] >= -90
+  && value[3] <= 90
+  && value[0] <= value[2]
+  && value[1] <= value[3]
 );
 
 const normalizeOverlayBounds = (
@@ -155,6 +165,9 @@ const buildWmtsTileUrl = (
 
 const buildBasemapTileUrl = (mapSession?: MapSession): string | null => {
   const basemap = mapSession?.basemap;
+  if (mapSession && (!basemap || basemap.render_status === 'unavailable')) {
+    return null;
+  }
   const basemapId = mapSession?.basemap_id || basemap?.id || 'osm_default';
   const tileUrl = basemap?.tile_url || (basemapId === 'osm_default' ? DEFAULT_BASE_TILE_URL : null);
   if (!tileUrl) {

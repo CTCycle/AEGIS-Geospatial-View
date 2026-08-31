@@ -15,6 +15,8 @@ import {
   GeospatialProviderAccountSetup,
   GeospatialProviderAccountSetupListResponse,
   GeospatialProviderLayerDescriptor,
+  GeoJsonFeatureCollection,
+  JsonObject,
   JsonValue,
   MapOverlayEntry,
   MapSession,
@@ -363,6 +365,41 @@ export const parseGeospatialProviderPayload = (
   if ('stale' in record) {
     parsed.stale = requireApiBoolean(record, 'stale', endpoint);
   }
+  if ('result_status' in record) {
+    parsed.result_status = requireApiStringOrNull(record, 'result_status', endpoint);
+  }
+  if ('result_type' in record) {
+    parsed.result_type = requireApiStringOrNull(record, 'result_type', endpoint);
+  }
+  if ('fetched_at' in record) {
+    parsed.fetched_at = requireApiStringOrNull(record, 'fetched_at', endpoint);
+  }
+  if ('observation_time' in record) {
+    parsed.observation_time = requireApiStringOrNull(record, 'observation_time', endpoint);
+  }
+  if ('coverage' in record) {
+    parsed.coverage = record.coverage === null
+      ? null
+      : requireApiJsonObject(record.coverage, endpoint, 'coverage');
+  }
+  if ('spatial_resolution' in record) {
+    parsed.spatial_resolution = requireApiStringOrNull(record, 'spatial_resolution', endpoint);
+  }
+  if ('units' in record) {
+    const units = requireApiJsonObject(record.units, endpoint, 'units');
+    if (!Object.values(units).every((unit) => typeof unit === 'string')) {
+      return apiContract(endpoint, 'units values must be strings', record.units);
+    }
+    parsed.units = Object.fromEntries(
+      Object.entries(units).map(([key, unit]) => [key, String(unit)]),
+    );
+  }
+  if ('source_url' in record) {
+    parsed.source_url = safeHttpUrl(record.source_url);
+  }
+  if ('partial' in record) {
+    parsed.partial = requireApiBoolean(record, 'partial', endpoint);
+  }
   if ('message' in record) {
     const message = requireApiStringOrNull(record, 'message', endpoint);
     if (message !== null) {
@@ -421,6 +458,85 @@ const numberOrNull = (value: unknown): number | null => (
   typeof value === 'number' && Number.isFinite(value) ? value : null
 );
 
+const isValidLatitude = (value: unknown): value is number => (
+  isFiniteNumber(value) && value >= -90 && value <= 90
+);
+
+const isValidLongitude = (value: unknown): value is number => (
+  isFiniteNumber(value) && value >= -180 && value <= 180
+);
+
+const normalizeBoundsTuple = (
+  value: unknown,
+): [number, number, number, number] | null => {
+  if (
+    !Array.isArray(value)
+    || value.length !== 4
+    || !value.every(isFiniteNumber)
+  ) {
+    return null;
+  }
+  const [west, south, east, north] = value;
+  if (
+    !isValidLongitude(west)
+    || !isValidLatitude(south)
+    || !isValidLongitude(east)
+    || !isValidLatitude(north)
+    || west > east
+    || south > north
+  ) {
+    return null;
+  }
+  return [west, south, east, north];
+};
+
+const isValidGeoJsonCoordinateArray = (value: unknown): boolean => {
+  if (!Array.isArray(value) || value.length === 0) {
+    return false;
+  }
+  if (value.every(isFiniteNumber)) {
+    return value.length >= 2 && isValidLongitude(value[0]) && isValidLatitude(value[1]);
+  }
+  return value.every(isValidGeoJsonCoordinateArray);
+};
+
+const isValidGeoJsonGeometry = (value: unknown): value is Record<string, JsonValue> => {
+  if (!isRecord(value) || typeof value.type !== 'string') {
+    return false;
+  }
+  if (value.type === 'GeometryCollection') {
+    return Array.isArray(value.geometries)
+      && value.geometries.every((geometry) => isValidGeoJsonGeometry(geometry));
+  }
+  if (!['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'].includes(value.type)) {
+    return false;
+  }
+  return isValidGeoJsonCoordinateArray(value.coordinates);
+};
+
+const normalizeGeoJsonFeatureCollection = (value: unknown): MapOverlayEntry['data'] | null => {
+  if (!isRecord(value) || value.type !== 'FeatureCollection' || !Array.isArray(value.features)) {
+    return null;
+  }
+  const features = value.features.map((feature) => {
+    if (!isRecord(feature) || feature.type !== 'Feature' || !isValidGeoJsonGeometry(feature.geometry)) {
+      return null;
+    }
+    if (feature.properties !== undefined && feature.properties !== null && !isJsonObject(feature.properties)) {
+      return null;
+    }
+    return {
+      type: 'Feature' as const,
+      ...(typeof feature.id === 'string' || typeof feature.id === 'number' ? { id: feature.id } : {}),
+      geometry: feature.geometry as GeoJsonFeatureCollection['features'][number]['geometry'],
+      ...(feature.properties === undefined ? {} : { properties: feature.properties as JsonObject | null }),
+    };
+  });
+  return features.every((feature): feature is NonNullable<typeof feature> => feature !== null)
+    ? { type: 'FeatureCollection', features }
+    : null;
+};
+
 const safeHttpUrl = (value: unknown): string | null => {
   if (typeof value !== 'string') {
     return null;
@@ -468,7 +584,7 @@ const normalizeInspection = (value: unknown): MapInspection | null => {
     freshness: typeof value.freshness === 'string' ? value.freshness : null,
     stale: Boolean(value.stale),
     warnings: isStringArray(value.warnings) ? value.warnings.slice(0, 5) : [],
-    geometry: isRecord(value.geometry) ? value.geometry as Record<string, JsonValue> : null,
+    geometry: isValidGeoJsonGeometry(value.geometry) ? value.geometry : null,
   };
 };
 
@@ -583,6 +699,16 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
     return null;
   }
   const render = normalizeLayerRenderDescriptor(value.render);
+  const bounds = value.bounds === undefined ? undefined : normalizeBoundsTuple(value.bounds);
+  if (value.bounds !== undefined && !bounds) {
+    return null;
+  }
+  const normalizedBounds = bounds ?? undefined;
+  const data = value.data === undefined ? undefined : normalizeGeoJsonFeatureCollection(value.data);
+  if (value.data !== undefined && !data) {
+    return null;
+  }
+  const normalizedData = data ?? undefined;
   return {
     id: String(value.id),
     instance_id: typeof value.instance_id === 'string' ? value.instance_id : undefined,
@@ -602,9 +728,7 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
     tile_size: numberOrNull(value.tile_size ?? render?.tile_size) ?? undefined,
     min_zoom: numberOrNull(value.min_zoom ?? render?.min_zoom) ?? undefined,
     max_zoom: numberOrNull(value.max_zoom ?? render?.max_zoom) ?? undefined,
-    bounds: Array.isArray(value.bounds) && value.bounds.length === 4
-      ? value.bounds as [number, number, number, number]
-      : undefined,
+    bounds: normalizedBounds,
     attribution: stringOrNull(value.attribution) ?? render?.attribution?.join('; '),
     source_protocol: stringOrNull(value.source_protocol ?? render?.source_protocol) ?? undefined,
     data_format: stringOrNull(value.data_format) ?? undefined,
@@ -615,9 +739,7 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
     time: stringOrNull(value.time ?? render?.time),
     default_time: stringOrNull(value.default_time ?? render?.default_time),
     warnings: isStringArray(value.warnings) ? value.warnings : render?.warnings,
-    data: isRecord(value.data) && value.data.type === 'FeatureCollection' && Array.isArray(value.data.features)
-      ? value.data as unknown as MapOverlayEntry['data']
-      : undefined,
+    data: normalizedData,
     inspections: Array.isArray(value.inspections)
       ? value.inspections.flatMap((inspection) => {
         const normalized = normalizeInspection(inspection);
@@ -654,30 +776,53 @@ export const normalizeMapSession = (value: unknown): MapSession | null => {
     'overlay_collection_revision',
     'inspections',
   ];
+  if (!isRecord(value) || Array.isArray(value)) {
+    return null;
+  }
+  const basemap = isRecord(value.basemap) ? value.basemap : null;
+  const resolvedLocation = isRecord(value.resolved_location) ? value.resolved_location : null;
+  const viewport = isRecord(value.viewport) ? value.viewport : null;
+  const center = value.center === undefined || value.center === null
+    ? null
+    : isRecord(value.center) ? value.center : undefined;
+  const bounds = value.bounds === undefined ? undefined : normalizeBoundsTuple(value.bounds);
   if (
     !isRecord(value)
     || typeof value.session_id !== 'string'
-    || !isRecord(value.resolved_location)
+    || !resolvedLocation
+    || !isValidLatitude(resolvedLocation.latitude)
+    || !isValidLongitude(resolvedLocation.longitude)
     || typeof value.basemap_id !== 'string'
-    || !isRecord(value.viewport)
+    || !viewport
+    || !isValidLatitude(viewport.center_latitude)
+    || !isValidLongitude(viewport.center_longitude)
+    || !isFiniteNumber(viewport.radius_m)
+    || viewport.radius_m <= 0
+    || !basemap
+    || typeof basemap.id !== 'string'
+    || basemap.id !== value.basemap_id
+    || center === undefined
+    || (center !== null && (!isValidLatitude(center.latitude) || !isValidLongitude(center.longitude)))
+    || (value.bounds !== undefined && !bounds)
     || supersededFields.some((field) => field in value)
   ) {
     return null;
   }
+  const normalizedBounds = bounds ?? undefined;
   const overlayCollection = normalizeOverlayCollection(value.overlay_collection);
   if (!overlayCollection) {
     return null;
   }
   return {
     session_id: String(value.session_id),
-    resolved_location: value.resolved_location as unknown as MapSession['resolved_location'],
+    resolved_location: resolvedLocation as unknown as MapSession['resolved_location'],
     basemap_id: value.basemap_id,
-    viewport: value.viewport as unknown as MapSession['viewport'],
+    viewport: viewport as unknown as MapSession['viewport'],
     generated_at: typeof value.generated_at === 'string' ? value.generated_at : undefined,
     payload: isRecord(value.payload) ? value.payload as Record<string, JsonValue> : {},
-    center: isRecord(value.center) ? value.center as MapSession['center'] : undefined,
-    bounds: Array.isArray(value.bounds) ? value.bounds as number[] : undefined,
-    basemap: isRecord(value.basemap) ? value.basemap as MapSession['basemap'] : undefined,
+    center: center as MapSession['center'],
+    bounds: normalizedBounds,
+    basemap: basemap as MapSession['basemap'],
     compliance_warnings: isStringArray(value.compliance_warnings) ? value.compliance_warnings : [],
     overlay_collection: overlayCollection,
   };
