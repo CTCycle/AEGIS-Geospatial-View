@@ -87,26 +87,6 @@ class ChatSettingsService:
                     "context_profile_source": profile.metadata_source,
                 }
             )
-        try:
-            selected = self.model_library_service.find_model(
-                provider=record.agent_model_provider,
-                model_name=record.agent_model_name,
-                ollama_url=self.model_library_service.normalize_ollama_url(
-                    record.ollama_url
-                ),
-            )
-            if selected is not None:
-                for key in (
-                    "context_window_tokens",
-                    "maximum_output_tokens",
-                    "context_profile_source",
-                ):
-                    value = selected.get(key)
-                    if value is not None:
-                        selected_model_context[key] = value
-        except Exception:
-            # Settings must remain readable when a live model catalog is down.
-            pass
         return ModelSettingsResponse(
             active_provider_mode=active_provider_mode,
             agent_model_provider=record.agent_model_provider,

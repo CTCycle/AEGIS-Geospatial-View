@@ -164,6 +164,14 @@ class FakeModelLibraryService:
 
 
 ###############################################################################
+class NoLiveCatalogModelLibraryService(FakeModelLibraryService):
+    # -------------------------------------------------------------------------
+    def find_model(self, **kwargs: Any) -> dict[str, object] | None:
+        _ = kwargs
+        raise AssertionError("reading settings must not query a live model catalog")
+
+
+###############################################################################
 def build_service(
     *,
     settings_repo: FakeSettingsRepository | None = None,
@@ -218,6 +226,21 @@ def test_get_settings_preserves_blank_agent_when_no_models_are_available() -> No
     assert response.agent_model_provider == ""
     assert response.agent_model_name == ""
     assert settings_repo.last_update is None
+
+
+###############################################################################
+def test_get_settings_uses_canonical_static_context_without_live_catalog() -> None:
+    service = build_service(model_library_service=NoLiveCatalogModelLibraryService())
+
+    response = service.get_settings()
+
+    assert response.selected_model_context == {
+        "provider": "openai",
+        "model": "gpt-4.1",
+        "context_window_tokens": 1_047_576,
+        "maximum_output_tokens": 32_768,
+        "context_profile_source": "openai_model_catalog",
+    }
 
 
 ###############################################################################
