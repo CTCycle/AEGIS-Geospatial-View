@@ -372,6 +372,20 @@ export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
   );
 };
 
+const mapHasGlyphs = (map: Map): boolean => {
+  if (typeof map.getStyle !== 'function') {
+    // Keep lightweight map doubles useful in unit tests. Real MapLibre maps
+    // always expose getStyle(), so an absent glyphs URL is handled below.
+    return true;
+  }
+  try {
+    const glyphs = map.getStyle()?.glyphs;
+    return typeof glyphs === 'string' && glyphs.trim().length > 0;
+  } catch {
+    return false;
+  }
+};
+
 const addGeoJsonOverlayLayer = (
   map: Map,
   overlay: OverlayEntry,
@@ -437,22 +451,24 @@ const addGeoJsonOverlayLayer = (
         'circle-stroke-color': '#164e63',
       },
     });
-    map.addLayer({
-      id: `${baseLayerId}-cluster-count`,
-      source: sourceId,
-      type: 'symbol',
-      filter: ['has', 'point_count'],
-      layout: {
-        'text-field': ['get', 'point_count_abbreviated'],
-        'text-size': 12,
-      },
-      paint: {
-        'text-color': '#ffffff',
-        'text-halo-color': '#164e63',
-        'text-halo-width': 1,
-        'text-opacity': opacity,
-      },
-    });
+    if (mapHasGlyphs(map)) {
+      map.addLayer({
+        id: `${baseLayerId}-cluster-count`,
+        source: sourceId,
+        type: 'symbol',
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': ['get', 'point_count_abbreviated'],
+          'text-size': 12,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#164e63',
+          'text-halo-width': 1,
+          'text-opacity': opacity,
+        },
+      });
+    }
     map.addLayer({
       id: `${baseLayerId}-points`,
       source: sourceId,
