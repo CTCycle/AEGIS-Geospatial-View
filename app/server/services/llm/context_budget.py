@@ -77,7 +77,7 @@ def resolve_model_context_limit(model: str) -> int | None:
 
 ###############################################################################
 def _request_metadata(request: LLMRequest) -> dict[str, Any]:
-    return request.metadata if isinstance(request.metadata, dict) else {}
+    return request.metadata
 
 
 ###############################################################################
@@ -292,6 +292,7 @@ def _compact_messages(
 
     selected_indices: set[int] = set(pinned_indices)
     dropped: list[dict[str, Any]] = []
+    selected = list(messages)
     for indices, block in reversed(blocks):
         if set(indices) & selected_indices:
             continue
@@ -309,7 +310,7 @@ def _compact_messages(
         # remove the oldest non-pinned blocks until the summary fits.
         summary_char_limit = 1800
         while True:
-            snippets = []
+            snippets: list[str] = []
             for message in reversed(dropped):
                 content = str(message.get("content") or "").strip()
                 if content:

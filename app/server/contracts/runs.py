@@ -68,7 +68,9 @@ class ConversationSnapshotResponse(BaseModel):
     conversation_id: str
     title: str | None = None
     context_revision: int = Field(..., ge=0)
-    messages: list[ConversationMessageSnapshot] = Field(default_factory=list)
+    messages: list[ConversationMessageSnapshot] = Field(
+        default_factory=lambda: list[ConversationMessageSnapshot]()
+    )
     task_snapshot: ConversationTaskSnapshot | None = None
     memory_snapshot: dict[str, Any] = Field(default_factory=dict)
     map_session: MapSession | None = None

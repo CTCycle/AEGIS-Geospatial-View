@@ -4,7 +4,7 @@ from server.common.typing import is_json_object, json_array, json_object
 
 from collections.abc import Callable
 import asyncio
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from server.common.logger import logger as LOGGER
@@ -44,6 +44,7 @@ from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.tool_planner import DeterministicToolPlanner
 from server.prompts.agent import build_native_agent_messages
+from server.services.llm.types import LLMToolDefinition
 from server.services.chat.history_service import ChatHistoryService
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
@@ -501,11 +502,14 @@ class AgentOrchestrator:
         build_native_tools = getattr(
             self.agent_tool_catalog_service, "build_native_tools", None
         )
-        native_tools = (
-            build_native_tools(native_context)
-            if callable(build_native_tools)
-            else self.tool_registry.list_native_tools()
-        )
+        native_tools: list[LLMToolDefinition]
+        if callable(build_native_tools):
+            native_tools = cast(
+                Callable[[AgentExecutionContext], list[LLMToolDefinition]],
+                build_native_tools,
+            )(native_context)
+        else:
+            native_tools = self.tool_registry.list_native_tools()
         tool_loop_result = await self.native_tool_loop.run(
             AgentToolLoopRequest(
                 provider=settings.agent_model_provider,

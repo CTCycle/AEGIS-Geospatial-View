@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from hashlib import sha256
 from math import asin, cos, radians, sin, sqrt
+from collections.abc import Callable
 from typing import Any, Iterable, cast
 import unicodedata
 
+from server.common.typing import json_array, json_object
 from server.contracts.extraction import OverlayCommand, OverlaySelector
 from server.contracts.geospatial import (
     MapSession,
@@ -430,7 +432,9 @@ class OverlayCollectionService:
         # when it produces an active match. Model outputs can carry a
         # capability ID in the instance slot; an unmatched stale instance ID
         # must not prevent the valid capability/label tier from resolving.
-        for values, matcher in (
+        identity_matchers: tuple[
+            tuple[list[str], Callable[[OverlayInstance], bool]], ...
+        ] = (
             (
                 selector.instance_ids,
                 lambda instance: instance.instance_id in selector.instance_ids,
@@ -446,7 +450,8 @@ class OverlayCollectionService:
                     in {cls._norm(value) for value in selector.labels}
                 ),
             ),
-        ):
+        )
+        for values, matcher in identity_matchers:
             if not values:
                 continue
             matches = [
@@ -525,56 +530,44 @@ class OverlayCollectionService:
                 or item.get("renderingMode")
                 or "metadata-only"
             )
-            concepts_raw = item.get("concepts")
-            concepts = (
-                [
-                    value
-                    for value in cast(list[Any], concepts_raw)
-                    if isinstance(value, str)
-                ]
-                if isinstance(concepts_raw, list)
-                else []
-            )
+            concepts = [
+                value
+                for value in json_array(item.get("concepts"))
+                if isinstance(value, str)
+            ]
             descriptor = item.get("descriptor")
-            descriptor_values = descriptor if isinstance(descriptor, dict) else {}
+            descriptor_values = json_object(descriptor)
             tag_values: list[str] = []
             for key in ("tags", "action_tags", "map_type_tags"):
                 raw_values = item.get(key)
-                if isinstance(raw_values, list):
-                    tag_values.extend(
-                        value
-                        for value in cast(list[Any], raw_values)
-                        if isinstance(value, str)
-                    )
-                raw_descriptor_values = descriptor_values.get(key)
-                if isinstance(raw_descriptor_values, list):
-                    tag_values.extend(
-                        value
-                        for value in cast(list[Any], raw_descriptor_values)
-                        if isinstance(value, str)
-                    )
-            raw_metadata = item.get("metadata")
-            if isinstance(raw_metadata, dict):
-                for metadata_key in (
-                    "keywords",
-                    "action_tags",
-                    "task_tags",
-                    "capabilities",
-                ):
-                    raw_values = raw_metadata.get(metadata_key)
-                    if isinstance(raw_values, list):
-                        tag_values.extend(
-                            value
-                            for value in cast(list[Any], raw_values)
-                            if isinstance(value, str)
-                        )
-            descriptor_concepts = descriptor_values.get("concepts")
-            if isinstance(descriptor_concepts, list):
-                concepts.extend(
+                tag_values.extend(
                     value
-                    for value in cast(list[Any], descriptor_concepts)
+                    for value in json_array(raw_values)
                     if isinstance(value, str)
                 )
+                tag_values.extend(
+                    value
+                    for value in json_array(descriptor_values.get(key))
+                    if isinstance(value, str)
+                )
+            raw_metadata = item.get("metadata")
+            metadata_values = json_object(raw_metadata)
+            for metadata_key in (
+                "keywords",
+                "action_tags",
+                "task_tags",
+                "capabilities",
+            ):
+                tag_values.extend(
+                    value
+                    for value in json_array(metadata_values.get(metadata_key))
+                    if isinstance(value, str)
+                )
+            concepts.extend(
+                value
+                for value in json_array(descriptor_values.get("concepts"))
+                if isinstance(value, str)
+            )
             concepts.extend(tag_values)
             concepts = list(dict.fromkeys(concepts))
             haystack = {
@@ -915,8 +908,7 @@ class OverlayCollectionService:
             if not overlay_id:
                 continue
             capability_id = str(descriptor.get("capability_id") or overlay_id)
-            render = descriptor.get("render")
-            render_payload = render if isinstance(render, dict) else {}
+            render_payload = json_object(descriptor.get("render"))
             variant = {
                 key: (
                     str(descriptor[key])

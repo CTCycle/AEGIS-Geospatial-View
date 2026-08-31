@@ -144,8 +144,10 @@ class ChatModelLibraryService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _positive_int(value: object) -> int | None:
+        if value is None or not isinstance(value, (str, int, float)):
+            return None
         try:
-            parsed = int(value) if value is not None else 0
+            parsed = int(value)
         except TypeError, ValueError:
             return None
         return parsed if parsed > 0 else None
