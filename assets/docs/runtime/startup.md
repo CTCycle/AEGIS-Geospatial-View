@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-08-21
+Last updated: 2026-08-31
 
 ## Local Development Via Launcher
 
@@ -18,9 +18,11 @@ creates the local file without overwriting an existing file.
 The menu is grouped into clear sections. Application options launch the
 application, install or update dependencies, rebuild the frontend independently,
 and initialize the database explicitly. Maintenance options run the test suite,
-remove logs, clear caches, and uninstall local dependencies. Update options pull
-the latest `main` branch with `git pull` or check `origin/main` status without
-downloading or applying changes. Data management can remove the SQLite database,
+remove logs, clear caches, and uninstall local dependencies. The update action
+requires a non-detached, clean checkout of `main` and pulls it with
+`git pull --ff-only origin main`; it never switches branches or modifies local
+changes. The check action reports `origin/main` status without downloading or
+applying changes. Data management can remove the SQLite database,
 runtime/provider data, ingested files, generated vectors, and logs while
 preserving application source files. The final option exits the launcher.
 

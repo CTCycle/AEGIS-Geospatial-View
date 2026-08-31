@@ -57,6 +57,8 @@ $UvArm64Uri = 'https://github.com/astral-sh/uv/releases/latest/download/uv-aarch
 $NodeVersion = '22.23.1'
 $NodeArchiveName = "node-v$NodeVersion-win-x64.zip"
 $NodeArchiveUri = "https://nodejs.org/dist/v$NodeVersion/$NodeArchiveName"
+$script:NextProgressId = 1
+$script:ActiveProgressIds = [Collections.Generic.HashSet[int]]::new()
 
 # -----------------------------------------------------------------------------
 # RUNTIME AND DOWNLOAD HELPERS
@@ -72,15 +74,22 @@ function Invoke-DownloadAndExtract {
         [string]$DestinationPath
     )
     $ErrorActionPreference = 'Stop'
-    $ProgressPreference = 'SilentlyContinue'
-    New-Item -ItemType Directory -Path (Split-Path -Parent $ArchivePath) -Force | Out-Null
-    New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
-    Invoke-WebRequest -Uri $Uri -OutFile $ArchivePath
+    $previousProgressPreference = $ProgressPreference
+    $activity = "AEGIS: download and extract $([IO.Path]::GetFileName($ArchivePath))"
+    $progressId = Start-LauncherProgress -Activity $activity -Status "Downloading $Uri"
     try {
+        $ProgressPreference = 'SilentlyContinue'
+        New-Item -ItemType Directory -Path (Split-Path -Parent $ArchivePath) -Force | Out-Null
+        New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
+        Invoke-WebRequest -Uri $Uri -OutFile $ArchivePath
+        $ProgressPreference = $previousProgressPreference
+        Update-LauncherProgress -Id $progressId -Activity $activity -Status 'Extracting archive'
         Expand-Archive -LiteralPath $ArchivePath -DestinationPath $DestinationPath -Force
     }
     finally {
+        $ProgressPreference = $previousProgressPreference
         Remove-Item -LiteralPath $ArchivePath -Force -ErrorAction SilentlyContinue
+        Complete-LauncherProgress $progressId
     }
 }
 
@@ -133,18 +142,27 @@ function Wait-HttpHealth {
         [int]$IntervalSeconds = 1
     )
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-    do {
-        try {
-            $response = Invoke-WebRequest -UseBasicParsing -Uri $Uri -TimeoutSec 2
-            if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) {
-                return $true
+    $activity = "AEGIS: wait for health $Uri"
+    $progressId = Start-LauncherProgress -Activity $activity -Status "Waiting up to $TimeoutSeconds seconds"
+    try {
+        do {
+            $elapsed = [int](([DateTime]::UtcNow - $deadline.AddSeconds(-$TimeoutSeconds)).TotalSeconds)
+            Update-LauncherProgress -Id $progressId -Activity $activity -Status "Waiting for healthy response; ${elapsed}s elapsed"
+            try {
+                $response = Invoke-WebRequest -UseBasicParsing -Uri $Uri -TimeoutSec 2
+                if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) {
+                    return $true
+                }
             }
-        }
-        catch {
-        }
-        Start-Sleep -Seconds $IntervalSeconds
-    } while ([DateTime]::UtcNow -lt $deadline)
-    return $false
+            catch {
+            }
+            Start-Sleep -Seconds $IntervalSeconds
+        } while ([DateTime]::UtcNow -lt $deadline)
+        return $false
+    }
+    finally {
+        Complete-LauncherProgress $progressId
+    }
 }
 
 function Write-Status {
@@ -168,6 +186,63 @@ function Write-Status {
         'WAIT' { 'Yellow' }
     }
     Write-Host "[$Level] $Message" -ForegroundColor $color
+}
+
+function Start-LauncherProgress {
+    param([Parameter(Mandatory)][string]$Activity, [string]$Status = 'Starting')
+    $id = $script:NextProgressId++
+    [void]$script:ActiveProgressIds.Add($id)
+    Write-Progress -Id $id -Activity $Activity -Status $Status
+    return $id
+}
+
+function Update-LauncherProgress {
+    param(
+        [Parameter(Mandatory)][int]$Id,
+        [Parameter(Mandatory)][string]$Activity,
+        [Parameter(Mandatory)][string]$Status,
+        [Nullable[int]]$PercentComplete
+    )
+    if (-not $script:ActiveProgressIds.Contains($Id)) { return }
+    $progress = @{ Id = $Id; Activity = $Activity; Status = $Status }
+    if ($null -ne $PercentComplete) { $progress.PercentComplete = $PercentComplete }
+    Write-Progress @progress
+}
+
+function Complete-LauncherProgress([int]$Id) {
+    if ($script:ActiveProgressIds.Contains($Id)) {
+        Write-Progress -Id $Id -Activity 'AEGIS launcher' -Completed
+        [void]$script:ActiveProgressIds.Remove($Id)
+    }
+}
+
+function Clear-LauncherProgress {
+    foreach ($id in @($script:ActiveProgressIds)) {
+        Write-Progress -Id $id -Activity 'AEGIS launcher' -Completed
+        [void]$script:ActiveProgressIds.Remove($id)
+    }
+}
+
+function Invoke-TrackedLauncherAction {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][scriptblock]$Action
+    )
+    $activity = "AEGIS: $Name"
+    $progressId = Start-LauncherProgress -Activity $activity -Status 'Starting'
+    Write-Status RUN "Starting $Name"
+    try {
+        Update-LauncherProgress -Id $progressId -Activity $activity -Status 'Running'
+        & $Action
+        Write-Status SUCCESS "$Name completed"
+    }
+    catch {
+        Write-Status FATAL "$Name failed: $($_.Exception.Message)"
+        throw
+    }
+    finally {
+        Complete-LauncherProgress $progressId
+    }
 }
 
 # -----------------------------------------------------------------------------
@@ -579,10 +654,21 @@ function Invoke-GitCommand {
     )
 
     $gitExecutable = Get-GitExecutable
-    $output = @(& $gitExecutable -C $RootDir @Arguments)
-    if ($LASTEXITCODE -ne 0) {
-        throw "Git command failed: git $($Arguments -join ' ') (exit code $LASTEXITCODE)."
+    $display = "git $($Arguments -join ' ')"
+    $activity = "AEGIS: $display"
+    $progressId = Start-LauncherProgress -Activity $activity -Status 'Running Git command'
+    Write-Status RUN $display
+    try {
+        $output = @(& $gitExecutable -C $RootDir @Arguments)
+        $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
     }
+    finally {
+        Complete-LauncherProgress $progressId
+    }
+    if ($exitCode -ne 0) {
+        throw "Git command failed: $display (exit code $exitCode)."
+    }
+    Write-Status OK "Completed $display"
     return $output
 }
 
@@ -592,20 +678,19 @@ function Invoke-ApplicationUpdate {
         throw 'The working tree contains local changes. Commit or stash them before updating from main.'
     }
 
-    $currentBranch = ((Invoke-GitCommand -Arguments @('branch', '--show-current')) | Select-Object -First 1).Trim()
+    $currentBranch = (@(Invoke-GitCommand -Arguments @('branch', '--show-current')) -join [Environment]::NewLine).Trim()
     if (-not $currentBranch) {
         throw 'The repository is in a detached HEAD state. Switch to a local branch before updating.'
     }
 
     if ($currentBranch -ne 'main') {
-        Write-Status INFO "Switching from '$currentBranch' to the main branch."
-        Invoke-GitCommand -Arguments @('switch', 'main') | ForEach-Object { Write-Host "  $_" }
+        throw "Update requires the main branch to be checked out; current branch is '$currentBranch'. No files were changed."
     }
 
     Write-Status RUN 'Updating the application from origin/main with git pull.'
     Invoke-GitCommand -Arguments @('pull', '--ff-only', 'origin', 'main') |
         ForEach-Object { Write-Host "  $_" }
-    Write-Status SUCCESS 'Application update completed. The launcher is now on the main branch.'
+    Write-Status SUCCESS 'Application update from origin/main completed.'
 }
 
 function Invoke-CheckForUpdates {
@@ -714,16 +799,24 @@ function Remove-DirectoryContents {
         return [pscustomobject]$result
     }
 
-    foreach ($child in $children) {
-        if ($child.Name -in $PreserveNames) {
-            continue
+    $progressId = Start-LauncherProgress -Activity "AEGIS: remove data from $Path" -Status "0 of $($children.Count) items"
+    try {
+        for ($index = 0; $index -lt $children.Count; $index++) {
+            $child = $children[$index]
+            if ($child.Name -in $PreserveNames) {
+                continue
+            }
+            Update-LauncherProgress -Id $progressId -Activity "AEGIS: remove data from $Path" -Status "$($index + 1) of $($children.Count): $($child.Name)" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $children.Count)))
+            if (Remove-PathBestEffort -Path $child.FullName -Recurse) {
+                $result.Removed++
+            }
+            else {
+                $result.Skipped++
+            }
         }
-        if (Remove-PathBestEffort -Path $child.FullName -Recurse) {
-            $result.Removed++
-        }
-        else {
-            $result.Skipped++
-        }
+    }
+    finally {
+        Complete-LauncherProgress $progressId
     }
     return [pscustomobject]$result
 }
@@ -792,13 +885,22 @@ function Remove-ApplicationLogs {
     }
     $removed = 0
     $skipped = 0
-    foreach ($log in $logs) {
-        if (Remove-PathBestEffort -Path $log.FullName) {
-            $removed++
+    $progressId = Start-LauncherProgress -Activity 'AEGIS: remove application logs' -Status "0 of $($logs.Count) files"
+    try {
+        for ($index = 0; $index -lt $logs.Count; $index++) {
+            $log = $logs[$index]
+            $percent = [int](($index + 1) * 100 / $logs.Count)
+            Update-LauncherProgress -Id $progressId -Activity 'AEGIS: remove application logs' -Status "$($index + 1) of $($logs.Count): $($log.Name)" -PercentComplete $percent
+            if (Remove-PathBestEffort -Path $log.FullName) {
+                $removed++
+            }
+            else {
+                $skipped++
+            }
         }
-        else {
-            $skipped++
-        }
+    }
+    finally {
+        Complete-LauncherProgress $progressId
     }
     Write-Status SUCCESS "Removed $removed log file(s); skipped $skipped locked or inaccessible file(s)."
 }
@@ -829,10 +931,19 @@ function Remove-PathBestEffort {
         }
 
         $childFailure = $false
-        foreach ($child in $children) {
-            if (-not (Remove-PathBestEffort -Path $child.FullName -Recurse)) {
-                $childFailure = $true
+        $progressId = Start-LauncherProgress -Activity "AEGIS: remove $($item.Name)" -Status "0 of $($children.Count) items"
+        try {
+            for ($index = 0; $index -lt $children.Count; $index++) {
+                $child = $children[$index]
+                $percent = if ($children.Count -eq 0) { 100 } else { [int](($index + 1) * 100 / $children.Count) }
+                Update-LauncherProgress -Id $progressId -Activity "AEGIS: remove $($item.Name)" -Status "$($index + 1) of $($children.Count): $($child.Name)" -PercentComplete $percent
+                if (-not (Remove-PathBestEffort -Path $child.FullName -Recurse)) {
+                    $childFailure = $true
+                }
             }
+        }
+        finally {
+            Complete-LauncherProgress $progressId
         }
         if ($childFailure) {
             return $false
@@ -883,7 +994,12 @@ function Clear-ApplicationCache {
     Remove-PythonCaches
     $cacheRoots = @($RuntimeCacheDir, $ToolCacheDir) + $LegacyCachePaths
     $skipped = 0
-    foreach ($cacheRoot in ($cacheRoots | Select-Object -Unique)) {
+    $uniqueCacheRoots = @($cacheRoots | Select-Object -Unique)
+    $progressId = Start-LauncherProgress -Activity 'AEGIS: clear caches' -Status "0 of $($uniqueCacheRoots.Count) roots"
+    try {
+        for ($rootIndex = 0; $rootIndex -lt $uniqueCacheRoots.Count; $rootIndex++) {
+            $cacheRoot = $uniqueCacheRoots[$rootIndex]
+            Update-LauncherProgress -Id $progressId -Activity 'AEGIS: clear caches' -Status "Root $($rootIndex + 1) of $($uniqueCacheRoots.Count): $cacheRoot" -PercentComplete ([int](($rootIndex + 1) * 100 / [Math]::Max(1, $uniqueCacheRoots.Count)))
         try {
             $cacheRootExists = Test-Path -LiteralPath $cacheRoot -ErrorAction Stop
         }
@@ -911,6 +1027,10 @@ function Clear-ApplicationCache {
                 $skipped++
             }
         }
+        }
+    }
+    finally {
+        Complete-LauncherProgress $progressId
     }
     New-Item -ItemType Directory -Path $RuntimeCacheDir, $ToolCacheDir -Force | Out-Null
     Write-Status SUCCESS "Development caches cleared where permitted; skipped $skipped locked or inaccessible item(s)."
@@ -927,7 +1047,11 @@ function Uninstall-Application {
         (Join-Path $ClientDir 'dist')
     )
     $skipped = 0
-    foreach ($target in $targets) {
+    $progressId = Start-LauncherProgress -Activity 'AEGIS: uninstall application' -Status "0 of $($targets.Count) paths"
+    try {
+        for ($index = 0; $index -lt $targets.Count; $index++) {
+            $target = $targets[$index]
+            Update-LauncherProgress -Id $progressId -Activity 'AEGIS: uninstall application' -Status "$($index + 1) of $($targets.Count): $target" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $targets.Count)))
         try {
             $targetExists = Test-Path -LiteralPath $target -ErrorAction Stop
         }
@@ -939,6 +1063,10 @@ function Uninstall-Application {
         if ($targetExists -and -not (Remove-PathBestEffort -Path $target -Recurse)) {
             $skipped++
         }
+    }
+    }
+    finally {
+        Complete-LauncherProgress $progressId
     }
 
     # Keep dependency lockfiles: install/update uses them for reproducible restores.
@@ -1040,21 +1168,23 @@ while ($true) {
     }
 
     try {
-        switch ($selection) {
-            '1' {
-                Invoke-LaunchApplication
-                exit 0
+        Invoke-TrackedLauncherAction -Name "menu option $selection" -Action {
+            switch ($selection) {
+                '1' {
+                    Invoke-LaunchApplication
+                    exit 0
+                }
+                '2' { Invoke-InstallOrUpdate }
+                '3' { Invoke-RebuildFrontend }
+                '4' { Invoke-InitializeDatabase }
+                '5' { Invoke-TestSuite }
+                '6' { Remove-ApplicationLogs }
+                '7' { Clear-ApplicationCache }
+                '8' { Uninstall-Application }
+                '9' { Invoke-ApplicationUpdate }
+                '10' { Invoke-CheckForUpdates }
+                '11' { Invoke-RemoveAllData }
             }
-            '2' { Invoke-InstallOrUpdate }
-            '3' { Invoke-RebuildFrontend }
-            '4' { Invoke-InitializeDatabase }
-            '5' { Invoke-TestSuite }
-            '6' { Remove-ApplicationLogs }
-            '7' { Clear-ApplicationCache }
-            '8' { Uninstall-Application }
-            '9' { Invoke-ApplicationUpdate }
-            '10' { Invoke-CheckForUpdates }
-            '11' { Invoke-RemoveAllData }
         }
     }
     catch {
@@ -1066,3 +1196,4 @@ while ($true) {
 
     Wait-ForMenuReturn
 }
+Clear-LauncherProgress
