@@ -624,22 +624,28 @@ class GeospatialApiService:
                 "message": str(exc),
                 "error_code": "provider_unavailable",
             }
+        fetched_at = getattr(response, "fetched_at", None)
+        if not isinstance(fetched_at, datetime):
+            fetched_at = datetime.now().astimezone()
+        units = getattr(response, "units", {})
+        if not isinstance(units, dict):
+            units = {}
         return {
             "status": "ok",
             "provider": provider_id,
-            "payload": response.payload,
-            "attribution": response.attribution,
-            "warnings": response.warnings,
-            "stale": response.stale,
+            "payload": getattr(response, "payload", None),
+            "attribution": list(getattr(response, "attribution", [])),
+            "warnings": list(getattr(response, "warnings", [])),
+            "stale": bool(getattr(response, "stale", False)),
             "result_status": getattr(response, "result_status", "ok"),
             "result_type": getattr(response, "result_type", "unknown"),
-            "fetched_at": response.fetched_at.isoformat(),
-            "observation_time": response.observation_time,
-            "coverage": response.coverage,
-            "spatial_resolution": response.spatial_resolution,
-            "units": dict(response.units),
-            "source_url": response.source_url,
-            "partial": response.partial,
+            "fetched_at": fetched_at.isoformat(),
+            "observation_time": getattr(response, "observation_time", None),
+            "coverage": getattr(response, "coverage", None),
+            "spatial_resolution": getattr(response, "spatial_resolution", None),
+            "units": dict(units),
+            "source_url": getattr(response, "source_url", None),
+            "partial": bool(getattr(response, "partial", False)),
         }
 
     # -------------------------------------------------------------------------
