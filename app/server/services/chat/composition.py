@@ -76,7 +76,6 @@ def build_chat_runtime(
 
     capability_registry = geospatial_runtime.capability_registry
     runtime_registry = geospatial_runtime.runtime_registry
-    manifest_loader = geospatial_runtime.manifest_loader
     geospatial_api_service = geospatial_runtime.api_service
     parser_service = ParserService(
         llm_factory=llm_factory,
@@ -96,7 +95,6 @@ def build_chat_runtime(
     agent_tool_catalog_service = AgentToolCatalogService(
         capability_registry=capability_registry,
         runtime_registry=runtime_registry,
-        manifest_loader=manifest_loader,
         search_orchestrator=search_orchestrator,
         request_builder=request_builder,
         location_resolver=location_resolver,

@@ -731,7 +731,6 @@ def _test_agent_tool_catalog(
 ) -> AgentToolCatalogService:
     return AgentToolCatalogService(
         capability_registry=CapabilityRegistry(),
-        manifest_loader=GeospatialManifestLoader(),
         runtime_registry=tool_registry.runtime_registry,
         search_orchestrator=search_orchestrator,
         request_builder=RequestBuilder(),

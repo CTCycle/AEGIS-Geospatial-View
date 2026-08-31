@@ -23,7 +23,6 @@ from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.api_service import GeospatialApiService
-from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMToolDefinition
 from server.services.search.orchestrator import LocationSearchOrchestrator
@@ -36,8 +35,7 @@ class AgentToolCatalogService:
     def __init__(
         self,
         *,
-        capability_registry: CapabilityRegistry | None = None,
-        manifest_loader: GeospatialManifestLoader | None = None,
+        capability_registry: CapabilityRegistry,
         runtime_registry: RuntimeRegistry,
         search_orchestrator: LocationSearchOrchestrator | None = None,
         request_builder: RequestBuilder | None = None,
@@ -46,8 +44,7 @@ class AgentToolCatalogService:
         policy_engine: PolicyEngine | None = None,
         geospatial_api_service: GeospatialApiService,
     ) -> None:
-        self.capability_registry = capability_registry or CapabilityRegistry()
-        self.manifest_loader = manifest_loader or GeospatialManifestLoader()
+        self.capability_registry = capability_registry
         self.runtime_registry = runtime_registry
         self.search_orchestrator = search_orchestrator
         self.request_builder = request_builder or RequestBuilder()

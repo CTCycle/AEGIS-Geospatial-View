@@ -21,7 +21,6 @@ from server.services.cryptography import CredentialEncryptionService
 ###############################################################################
 @dataclass(frozen=True)
 class GeospatialRuntime:
-    manifest_loader: GeospatialManifestLoader
     catalog_snapshot: GeospatialManifestSnapshot
     capability_registry: CapabilityRegistry
     runtime_registry: RuntimeRegistry
@@ -69,7 +68,6 @@ def build_geospatial_runtime(database: SQLiteRepository) -> GeospatialRuntime:
         credential_resolver=credential_resolver,
     )
     return GeospatialRuntime(
-        manifest_loader=manifest_loader,
         catalog_snapshot=catalog_snapshot,
         capability_registry=capability_registry,
         runtime_registry=runtime_registry,
