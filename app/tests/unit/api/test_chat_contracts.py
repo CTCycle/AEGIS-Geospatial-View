@@ -41,6 +41,14 @@ def test_chat_turn_contract_openapi_marks_conversation_id_required() -> None:
 
 
 ###############################################################################
+def test_chat_settings_update_uses_patch_semantics() -> None:
+    settings_path = _app().openapi()["paths"]["/api/chat/settings"]
+
+    assert "patch" in settings_path
+    assert "put" not in settings_path
+
+
+###############################################################################
 def test_chat_turn_request_rejects_missing_conversation_id() -> None:
     try:
         ChatTurnRequest(message="Show Rome")

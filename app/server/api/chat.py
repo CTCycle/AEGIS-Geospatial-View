@@ -174,7 +174,7 @@ def get_settings(
 
 
 ###############################################################################
-@router.put(
+@router.patch(
     CHAT_SETTINGS_ROUTE,
     response_model=ModelSettingsResponse,
     status_code=status.HTTP_200_OK,

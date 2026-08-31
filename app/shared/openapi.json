@@ -195,12 +195,12 @@
           }
         }
       },
-      "put": {
+      "patch": {
         "tags": [
           "chat"
         ],
         "summary": "Update Settings",
-        "operationId": "update_settings_api_chat_settings_put",
+        "operationId": "update_settings_api_chat_settings_patch",
         "requestBody": {
           "content": {
             "application/json": {
@@ -348,6 +348,48 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConversationCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get Conversation Snapshot",
+        "operationId": "get_conversation_snapshot_api_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSnapshotResponse"
                 }
               }
             }
@@ -1407,6 +1449,30 @@
   },
   "components": {
     "schemas": {
+      "ActiveConversationRunSnapshot": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "run_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Run Version"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentRunState"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "run_version",
+          "state"
+        ],
+        "title": "ActiveConversationRunSnapshot"
+      },
       "AgentGoal": {
         "properties": {
           "id": {
@@ -1442,6 +1508,19 @@
           "text"
         ],
         "title": "AgentGoal"
+      },
+      "AgentRunState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "updating",
+          "waiting_for_clarification",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "title": "AgentRunState"
       },
       "AgentTask": {
         "properties": {
@@ -1960,16 +2039,6 @@
             "type": "array",
             "title": "Warnings"
           },
-          "map_session": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/MapSession"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "direct_result": {
             "anyOf": [
               {
@@ -2230,6 +2299,27 @@
         ],
         "title": "ClarificationRequest"
       },
+      "ContextQuery": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "none",
+              "active_location",
+              "active_overlays",
+              "active_map_summary",
+              "previous_user_request",
+              "capabilities",
+              "failure"
+            ],
+            "title": "Kind",
+            "default": "none"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ContextQuery"
+      },
       "ContextUsageResponse": {
         "properties": {
           "estimated_input_tokens": {
@@ -2462,6 +2552,110 @@
         ],
         "title": "ConversationCreateResponse"
       },
+      "ConversationMessageSnapshot": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant",
+              "system",
+              "tool"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "ConversationMessageSnapshot"
+      },
+      "ConversationSnapshotResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "context_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Context Revision"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessageSnapshot"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "task_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationTaskSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memory_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Memory Snapshot"
+          },
+          "map_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MapSession"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "active_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActiveConversationRunSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "context_revision"
+        ],
+        "title": "ConversationSnapshotResponse"
+      },
       "ConversationTaskSnapshot": {
         "properties": {
           "schema_version": {
@@ -2649,6 +2843,17 @@
               }
             ],
             "title": "Temporal Text"
+          },
+          "temporal_reference_time_iso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temporal Reference Time Iso"
           },
           "basemap_id": {
             "anyOf": [
@@ -2887,17 +3092,6 @@
           "configured": {
             "type": "boolean",
             "title": "Configured"
-          },
-          "environmentVariable": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Environmentvariable"
           }
         },
         "additionalProperties": false,
@@ -3187,17 +3381,6 @@
               }
             ],
             "title": "Docs Url"
-          },
-          "environment_variable": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Environment Variable"
           },
           "configured": {
             "type": "boolean",
@@ -4142,13 +4325,6 @@
             "type": "string",
             "title": "Basemap Id"
           },
-          "overlay_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Overlay Ids"
-          },
           "viewport": {
             "$ref": "#/components/schemas/ViewportPolicy"
           },
@@ -4209,38 +4385,6 @@
             ],
             "title": "Basemap"
           },
-          "overlays": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Overlays"
-          },
-          "requested_overlay_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Requested Overlay Ids"
-          },
-          "rendered_overlay_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Rendered Overlay Ids"
-          },
-          "failed_overlays": {
-            "items": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Failed Overlays"
-          },
           "compliance_warnings": {
             "items": {
               "type": "string"
@@ -4248,28 +4392,8 @@
             "type": "array",
             "title": "Compliance Warnings"
           },
-          "overlay_collection_revision": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Overlay Collection Revision",
-            "default": 0
-          },
           "overlay_collection": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OverlayCollectionState"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "inspections": {
-            "items": {
-              "$ref": "#/components/schemas/MapInspection"
-            },
-            "type": "array",
-            "title": "Inspections"
+            "$ref": "#/components/schemas/OverlayCollectionState"
           }
         },
         "additionalProperties": false,
@@ -4278,7 +4402,8 @@
           "session_id",
           "resolved_location",
           "basemap_id",
-          "viewport"
+          "viewport",
+          "overlay_collection"
         ],
         "title": "MapSession"
       },
@@ -5454,6 +5579,56 @@
               }
             ],
             "title": "Reference Time Iso"
+          },
+          "start_time_iso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time Iso"
+          },
+          "end_time_iso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time Iso"
+          },
+          "granularity": {
+            "type": "string",
+            "enum": [
+              "instant",
+              "hour",
+              "day",
+              "month",
+              "year",
+              "custom",
+              "none"
+            ],
+            "title": "Granularity",
+            "default": "none"
+          },
+          "aggregation": {
+            "type": "string",
+            "enum": [
+              "none",
+              "instant",
+              "sum",
+              "mean",
+              "min",
+              "max",
+              "count"
+            ],
+            "title": "Aggregation",
+            "default": "none"
           }
         },
         "additionalProperties": false,
@@ -5664,6 +5839,9 @@
           },
           "temporal_signal": {
             "$ref": "#/components/schemas/TemporalSignal"
+          },
+          "context_query": {
+            "$ref": "#/components/schemas/ContextQuery"
           },
           "ambiguities": {
             "items": {

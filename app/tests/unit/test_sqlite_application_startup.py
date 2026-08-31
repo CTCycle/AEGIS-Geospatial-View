@@ -48,7 +48,7 @@ def test_application_starts_against_isolated_sqlite_database(
                 "SELECT COUNT(*) FROM reference_countries"
             ).fetchone()
 
-        assert version == ("202608200001",)
+        assert version == ("202608310001",)
         assert credential_count == (1,)
         assert reference_count is not None and reference_count[0] > 0
     finally:

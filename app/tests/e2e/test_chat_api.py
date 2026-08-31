@@ -17,8 +17,8 @@ def _get(api_context: APIRequestContext, path: str):
 
 
 ###############################################################################
-def _put(api_context: APIRequestContext, path: str, payload: dict):
-    return api_context.put(path, data=payload)
+def _patch(api_context: APIRequestContext, path: str, payload: dict):
+    return api_context.patch(path, data=payload)
 
 
 ###############################################################################
@@ -68,24 +68,24 @@ def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) ->
         "ollama_url": base_body.get("ollama_url", "http://localhost:11434"),
         "credentials": {"openai": {"api_key": "sk-test-value"}},
     }
-    updated = _put(api_context, "/api/chat/settings", update_payload)
+    updated = _patch(api_context, "/api/chat/settings", update_payload)
     if updated.status == 422:
         pytest.skip("Requested local agent model is unavailable for this check.")
     assert updated.ok
     updated_body = updated.json()
     assert updated_body["credentials"]["openai"]["api_key"] is True
 
-    parity_update = _put(api_context, "/api/chat/settings", update_payload)
+    parity_update = _patch(api_context, "/api/chat/settings", update_payload)
     assert parity_update.ok
     assert set(updated_body.keys()) == set(parity_update.json().keys())
 
-    restored = _put(api_context, "/api/chat/settings", base_body)
+    restored = _patch(api_context, "/api/chat/settings", base_body)
     assert restored.ok
 
 
 ###############################################################################
 def test_chat_settings_invalid_payload_handling(api_context: APIRequestContext) -> None:
-    response = _put(
+    response = _patch(
         api_context,
         "/api/chat/settings",
         {"active_provider_mode": 1, "credentials": "bad"},
