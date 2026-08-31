@@ -10,6 +10,7 @@ from playwright.sync_api import ConsoleMessage, Page, Route, expect
 
 from tests.e2e.helpers.chat_stub_payloads import (
     chat_completion_map_payload,
+    geospatial_catalog_payload,
     model_settings_payload,
 )
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
@@ -34,10 +35,13 @@ def _models_payload() -> dict[str, Any]:
                 "description": "Cloud model",
                 "provider": "openai",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {},
             }
         ],
         "local": [],
+        "sources": {},
     }
 
 
@@ -64,9 +68,7 @@ def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
     )
     page.route(
         re.compile(r".*/api/geospatial/capabilities$"),
-        lambda route: _json_ok(
-            route, {"providers": [], "basemaps": [], "overlays": []}
-        ),
+        lambda route: _json_ok(route, geospatial_catalog_payload()),
     )
 
     def handle_osm_proxy(route: Route) -> None:

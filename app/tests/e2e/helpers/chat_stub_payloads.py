@@ -136,7 +136,16 @@ def model_settings_payload() -> dict[str, Any]:
         "ollama_url": "http://localhost:11434",
         "openai_base_url": None,
         "google_base_url": None,
+        "deepseek_base_url": None,
         "credentials": {"openai": {"api_key": False}, "google": {"api_key": False}},
+        "credential_health": {},
+        "selected_model_context": {
+            "provider": "ollama",
+            "model": "llama3.2",
+            "context_window_tokens": None,
+            "maximum_output_tokens": None,
+            "context_profile_source": "fixture",
+        },
     }
 
 
@@ -152,6 +161,8 @@ def model_catalog_payload() -> dict[str, Any]:
                 "capabilities": ["chat", "tools", "structured_output"],
                 "supports_tools": True,
                 "supports_structured_output": True,
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {"tier": "mini"},
             },
             {
@@ -160,6 +171,8 @@ def model_catalog_payload() -> dict[str, Any]:
                 "description": "General purpose OpenAI cloud model.",
                 "provider": "openai",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {"tier": "mini"},
             },
             {
@@ -168,6 +181,8 @@ def model_catalog_payload() -> dict[str, Any]:
                 "description": "Fast Google cloud model.",
                 "provider": "google",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {"tier": "flash"},
             },
             {
@@ -176,6 +191,8 @@ def model_catalog_payload() -> dict[str, Any]:
                 "description": "Local Ollama model available in cloud catalog.",
                 "provider": "ollama",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {"family": "llama"},
             },
         ],
@@ -186,9 +203,12 @@ def model_catalog_payload() -> dict[str, Any]:
                 "description": "Installed local Ollama model.",
                 "provider": "ollama",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {"family": "llama"},
             }
         ],
+        "sources": {},
     }
 
 
@@ -201,7 +221,29 @@ def selected_agent_settings_payload() -> dict[str, Any]:
         "ollama_url": "http://localhost:11434",
         "openai_base_url": "https://api.openai.com/v1",
         "google_base_url": "https://generativelanguage.googleapis.com/v1beta",
+        "deepseek_base_url": None,
         "credentials": {"openai": {"api_key": False}, "google": {"api_key": True}},
+        "credential_health": {},
+        "selected_model_context": {
+            "provider": "openai",
+            "model": "gpt-4.1-mini",
+            "context_window_tokens": None,
+            "maximum_output_tokens": None,
+            "context_profile_source": "fixture",
+        },
+    }
+
+
+###############################################################################
+def geospatial_catalog_payload() -> dict[str, Any]:
+    return {
+        "capabilities": [],
+        "providers": [],
+        "basemaps": [],
+        "overlays": [],
+        "cameras": [],
+        "transit": [],
+        "tools": [],
     }
 
 
