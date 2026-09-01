@@ -11,7 +11,11 @@ from openai import OpenAI
 
 from server.services.llm.base import LLMProvider
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
-from server.services.llm.context_budget import compute_context_usage, prepare_request
+from server.services.llm.context_budget import (
+    apply_reported_usage,
+    compute_context_usage,
+    prepare_request,
+)
 from server.services.llm.errors import (
     LLMProviderRequestError,
     LLMResponseParsingError,
@@ -208,10 +212,6 @@ class OpenAIProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
-        request = prepare_request(request, provider=self.provider_name)
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
         native_tools = list(tools or request.tools or [])
         schema = response_json_schema or request.response_json_schema
         effective_request = replace(
@@ -219,6 +219,12 @@ class OpenAIProvider(LLMProvider):
             tools=native_tools or None,
             response_json_schema=schema,
         )
+        effective_request = prepare_request(
+            effective_request, provider=self.provider_name
+        )
+        self.last_context_usage = compute_context_usage(
+            effective_request, provider=self.provider_name
+        ).to_dict()
         self._validate_request_capabilities(effective_request)
         kwargs: dict[str, Any] = {}
         if native_tools:
@@ -249,6 +255,10 @@ class OpenAIProvider(LLMProvider):
                 exc, provider=self.provider_name, model=request.model, stage="chat"
             ) from exc
         raw = dump_response_payload(response)
+        self.last_context_usage = apply_reported_usage(
+            compute_context_usage(effective_request, provider=self.provider_name),
+            raw,
+        ).to_dict()
         return LLMResult(
             content=str(getattr(response, "output_text", "") or ""),
             raw=raw,
@@ -279,12 +289,15 @@ class OpenAIProvider(LLMProvider):
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
-        request = prepare_request(request, provider=self.provider_name)
+        schema_dump = getattr(schema, "model_json_schema", None)
+        request_schema = json_object(schema_dump()) if callable(schema_dump) else {}
+        request = prepare_request(
+            replace(request, response_json_schema=request_schema),
+            provider=self.provider_name,
+        )
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
-        schema_dump = getattr(schema, "model_json_schema", None)
-        request_schema = json_object(schema_dump()) if callable(schema_dump) else {}
         self._validate_request_capabilities(
             replace(request, response_json_schema=request_schema)
         )
@@ -304,6 +317,11 @@ class OpenAIProvider(LLMProvider):
                 model=request.model,
                 stage="structured_output",
             ) from exc
+        raw = dump_response_payload(response)
+        self.last_context_usage = apply_reported_usage(
+            compute_context_usage(request, provider=self.provider_name),
+            raw,
+        ).to_dict()
         parsed = getattr(response, "output_parsed", None)
         if is_json_object(parsed):
             return parsed

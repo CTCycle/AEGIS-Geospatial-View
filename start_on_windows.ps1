@@ -58,7 +58,8 @@ $NodeVersion = '22.23.1'
 $NodeArchiveName = "node-v$NodeVersion-win-x64.zip"
 $NodeArchiveUri = "https://nodejs.org/dist/v$NodeVersion/$NodeArchiveName"
 $script:NextProgressId = 1
-$script:ActiveProgressIds = [Collections.Generic.HashSet[int]]::new()
+$script:ActiveProgressActivities = [Collections.Generic.Dictionary[int, string]]::new()
+$script:LauncherInteractive = -not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected
 
 # -----------------------------------------------------------------------------
 # RUNTIME AND DOWNLOAD HELPERS
@@ -192,8 +193,8 @@ function Write-Status {
 function Start-LauncherProgress {
     param([Parameter(Mandatory)][string]$Activity, [Parameter(Mandatory)][string]$Status)
     $id = $script:NextProgressId++
-    [void]$script:ActiveProgressIds.Add($id)
-    Write-Progress -Id $id -Activity $Activity -Status $Status
+    $script:ActiveProgressActivities[$id] = $Activity
+    if ($script:LauncherInteractive) { Write-Progress -Id $id -Activity $Activity -Status $Status }
     return $id
 }
 
@@ -204,23 +205,27 @@ function Update-LauncherProgress {
         [Parameter(Mandatory)][string]$Status,
         [Nullable[int]]$PercentComplete
     )
-    if (-not $script:ActiveProgressIds.Contains($Id)) { return }
+    if (-not $script:ActiveProgressActivities.ContainsKey($Id)) { return }
     $progress = @{ Id = $Id; Activity = $Activity; Status = $Status }
     if ($null -ne $PercentComplete) { $progress.PercentComplete = $PercentComplete }
-    Write-Progress @progress
+    if ($script:LauncherInteractive) { Write-Progress @progress }
 }
 
 function Complete-LauncherProgress([int]$Id) {
-    if ($script:ActiveProgressIds.Contains($Id)) {
-        Write-Progress -Id $Id -Activity 'AEGIS launcher' -Completed
-        [void]$script:ActiveProgressIds.Remove($Id)
+    if ($script:ActiveProgressActivities.ContainsKey($Id)) {
+        $activity = $script:ActiveProgressActivities[$Id]
+        try {
+            if ($script:LauncherInteractive) { Write-Progress -Id $Id -Activity $activity -Completed }
+        }
+        finally {
+            [void]$script:ActiveProgressActivities.Remove($Id)
+        }
     }
 }
 
 function Clear-LauncherProgress {
-    foreach ($id in @($script:ActiveProgressIds)) {
-        Write-Progress -Id $id -Activity 'AEGIS launcher' -Completed
-        [void]$script:ActiveProgressIds.Remove($id)
+    foreach ($id in @($script:ActiveProgressActivities.Keys)) {
+        Complete-LauncherProgress -Id $id
     }
 }
 
@@ -237,6 +242,9 @@ function Invoke-TrackedLauncherAction {
     catch {
         Write-Status FATAL "$Name failed: $($_.Exception.Message)"
         throw
+    }
+    finally {
+        Clear-LauncherProgress
     }
 }
 

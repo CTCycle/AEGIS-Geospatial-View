@@ -12,7 +12,11 @@ from google.genai import types as genai_types
 
 from server.services.llm.base import LLMProvider
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
-from server.services.llm.context_budget import compute_context_usage, prepare_request
+from server.services.llm.context_budget import (
+    apply_reported_usage,
+    compute_context_usage,
+    prepare_request,
+)
 from server.services.llm.errors import (
     LLMProviderRequestError,
     LLMResponseParsingError,
@@ -130,11 +134,6 @@ class GoogleProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
-        request = prepare_request(request, provider=self.provider_name)
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
-        config = self._config_from_request(request)
         native_tools = list(tools or request.tools or [])
         schema = response_json_schema or request.response_json_schema
         effective_request = replace(
@@ -142,6 +141,13 @@ class GoogleProvider(LLMProvider):
             tools=native_tools or None,
             response_json_schema=schema,
         )
+        effective_request = prepare_request(
+            effective_request, provider=self.provider_name
+        )
+        self.last_context_usage = compute_context_usage(
+            effective_request, provider=self.provider_name
+        ).to_dict()
+        config = self._config_from_request(effective_request)
         self._validate_request_capabilities(effective_request)
         if native_tools:
             config["tools"] = [
@@ -165,8 +171,8 @@ class GoogleProvider(LLMProvider):
             config["response_json_schema"] = schema
         try:
             response = self._client().models.generate_content(
-                model=request.model,
-                contents=self._contents_from_messages(request.messages),
+                model=effective_request.model,
+                contents=self._contents_from_messages(effective_request.messages),
                 config=config,
             )
         except LLMStructuredOutputError:
@@ -176,6 +182,10 @@ class GoogleProvider(LLMProvider):
                 exc, provider=self.provider_name, model=request.model, stage="chat"
             ) from exc
         raw = dump_response_payload(response)
+        self.last_context_usage = apply_reported_usage(
+            compute_context_usage(effective_request, provider=self.provider_name),
+            raw,
+        ).to_dict()
         return LLMResult(
             content=str(getattr(response, "text", "") or ""),
             raw=raw,
@@ -203,14 +213,17 @@ class GoogleProvider(LLMProvider):
     def structured_output(
         self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
-        request = prepare_request(request, provider=self.provider_name)
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
         model_json_schema = getattr(schema, "model_json_schema", None)
         json_schema = (
             json_object(model_json_schema()) if callable(model_json_schema) else {}
         )
+        request = prepare_request(
+            replace(request, response_json_schema=json_schema),
+            provider=self.provider_name,
+        )
+        self.last_context_usage = compute_context_usage(
+            request, provider=self.provider_name
+        ).to_dict()
         self._validate_request_capabilities(
             replace(request, response_json_schema=json_schema)
         )
@@ -233,6 +246,11 @@ class GoogleProvider(LLMProvider):
                 model=request.model,
                 stage="structured_output",
             ) from exc
+        raw = dump_response_payload(response)
+        self.last_context_usage = apply_reported_usage(
+            compute_context_usage(request, provider=self.provider_name),
+            raw,
+        ).to_dict()
         try:
             loaded = json.loads(str(getattr(response, "text", "") or "{}"))
         except (TypeError, json.JSONDecodeError) as exc:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import math
-import re
 from dataclasses import replace
 from typing import Any
 
@@ -51,27 +50,15 @@ def estimate_json_tokens(value: object) -> int:
 
 ###############################################################################
 def resolve_model_context_limit(model: str) -> int | None:
-    """Resolve only known/trusted limits; never invent an 8K fallback."""
+    """Return no limit without an exact catalog or provider metadata record.
 
-    normalized = model.strip().lower()
-    explicit = re.search(r"(?P<size>\d+)\s*k(?:$|[-_:])", normalized)
-    if explicit:
-        return max(1024, int(explicit.group("size")) * 1024)
+    Model names are not a reliable context contract.  Callers that have
+    provider metadata should pass it to :func:`resolve_model_context_profile`.
+    This compatibility-shaped helper intentionally refuses family and suffix
+    heuristics so an unknown model cannot receive a fabricated percentage.
+    """
 
-    known_limits = {
-        "llama3.2": 131072,
-        "llama3.1": 131072,
-        "qwen2.5": 32768,
-        "qwen3": 40960,
-        "mistral": 32768,
-        "mixtral": 32768,
-        "deepseek-r1": 131072,
-        "gemma3": 131072,
-        "nomic-embed-text": 8192,
-    }
-    for marker, limit in known_limits.items():
-        if marker in normalized:
-            return limit
+    _ = model
     return None
 
 
@@ -112,15 +99,25 @@ def _profile_for_request(
             ),
         )
     if context_limit is None:
-        context_limit = resolve_model_context_limit(request.model)
-    if context_limit is None and maximum_output is None:
+        context_limit = None
+    default_output_reserve = _positive_int(metadata.get("default_output_reserve"))
+    if context_limit is None and maximum_output is None and default_output_reserve is None:
         return None
     return ModelContextProfile(
         provider=normalized_provider,
         model=request.model,
         context_window_tokens=context_limit,
         maximum_output_tokens=maximum_output,
-        default_output_reserve=maximum_output or UNKNOWN_OUTPUT_ALLOWANCE_TOKENS,
+        default_output_reserve=(
+            default_output_reserve
+            or maximum_output
+            or UNKNOWN_OUTPUT_ALLOWANCE_TOKENS
+        ),
+        tokenizer_strategy=str(
+            metadata.get("tokenizer_strategy") or "chars_per_token_4"
+        ),
+        supports_context_caching=bool(metadata.get("supports_context_caching")),
+        supports_server_compaction=bool(metadata.get("supports_server_compaction")),
         metadata_source=str(
             metadata.get("context_profile_source") or "provider_metadata"
         ),
@@ -180,8 +177,6 @@ def _context_components(
             0,
             limit
             - expected_output
-            - tool_tokens
-            - schema_tokens
             - CONTEXT_HEADROOM_TOKENS,
         )
         if limit is not None
@@ -194,10 +189,11 @@ def _context_components(
 def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage:
     normalized = provider.strip().lower()
     profile = _profile_for_request(normalized, request)
-    estimated = estimate_message_tokens(request.messages)
+    message_tokens = estimate_message_tokens(request.messages)
     expected_output, tool_tokens, schema_tokens, safety_margin, usable = (
         _context_components(request, profile)
     )
+    estimated = message_tokens + tool_tokens + schema_tokens
     limit = profile.context_window_tokens if profile is not None else None
     percent = (
         round((estimated / max(usable, 1)) * 100, 1) if usable is not None else None
@@ -222,6 +218,69 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
         compaction_applied=bool(
             _request_metadata(request).get("_context_compaction_applied")
         ),
+    )
+
+
+###############################################################################
+def apply_reported_usage(
+    usage: ContextUsage,
+    raw_response: dict[str, Any] | None,
+) -> ContextUsage:
+    """Overlay provider-reported token counts without losing the estimate."""
+
+    payload = raw_response if isinstance(raw_response, dict) else {}
+    usage_payload = payload.get("usage")
+    usage_payload = usage_payload if isinstance(usage_payload, dict) else {}
+    usage_metadata = payload.get("usage_metadata")
+    usage_metadata = (
+        usage_metadata if isinstance(usage_metadata, dict) else {}
+    )
+
+    def first_non_negative(*values: object) -> int | None:
+        for value in values:
+            try:
+                parsed = int(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                continue
+            if parsed >= 0:
+                return parsed
+        return None
+
+    input_tokens = first_non_negative(
+        usage_payload.get("prompt_tokens"),
+        usage_payload.get("input_tokens"),
+        usage_metadata.get("prompt_token_count"),
+        payload.get("prompt_eval_count"),
+        payload.get("input_tokens"),
+    )
+    output_tokens = first_non_negative(
+        usage_payload.get("completion_tokens"),
+        usage_payload.get("output_tokens"),
+        usage_metadata.get("candidates_token_count"),
+        payload.get("eval_count"),
+        payload.get("output_tokens"),
+    )
+    if input_tokens is None and output_tokens is None:
+        return usage
+
+    source = "provider_reported" if input_tokens is not None else "hybrid"
+    effective_input = (
+        input_tokens if input_tokens is not None else usage.estimated_input_tokens
+    )
+    percent = (
+        round(
+            (effective_input / max(usage.usable_prompt_budget_tokens, 1)) * 100,
+            1,
+        )
+        if usage.usable_prompt_budget_tokens is not None
+        else None
+    )
+    return replace(
+        usage,
+        reported_input_tokens=input_tokens,
+        reported_output_tokens=output_tokens,
+        usage_percent=percent,
+        usage_source=source,
     )
 
 
@@ -378,7 +437,11 @@ def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:
     usable = usage.usable_prompt_budget_tokens
     if usable is None or usage.estimated_input_tokens <= usable:
         return request
-    messages, compacted = _compact_messages(request.messages, usable)
+    message_budget = max(
+        0,
+        usable - usage.tool_schema_tokens - usage.response_schema_tokens,
+    )
+    messages, compacted = _compact_messages(request.messages, message_budget)
     if not messages:
         raise LLMContextLimitError(
             provider=provider,
