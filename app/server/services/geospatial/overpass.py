@@ -243,15 +243,34 @@ class OverpassService:
             )
         points.sort(key=lambda item: float(item.get("distance_m") or 0.0))
         trimmed = points[:resolved_limit]
+        fetched_at = datetime.now(UTC).isoformat()
+        truncated = len(points) > len(trimmed)
         return {
             "provider": "overpass",
             "kind": "poi_amenities",
+            "source_url": self.base_url,
+            "fetched_at": fetched_at,
+            "result_status": (
+                "partial" if truncated else "valid_empty" if not trimmed else "ok"
+            ),
+            "result_type": "features",
+            "partial": truncated,
             "latitude": latitude,
             "longitude": longitude,
             "radius_m": resolved_radius_m,
-            "total_results": len(trimmed),
+            "total_results": len(points),
+            "returned_results": len(trimmed),
+            "limit": resolved_limit,
+            "truncated": truncated,
             "items": trimmed,
-            "resolved_at": datetime.now(UTC).isoformat(),
+            "resolved_at": fetched_at,
+            "coverage": {
+                "type": "circle",
+                "center": {"latitude": latitude, "longitude": longitude},
+                "radius_m": resolved_radius_m,
+            },
+            "spatial_resolution": "point features",
+            "units": {"distance_m": "m", "radius_m": "m"},
             "attribution": "© OpenStreetMap contributors (ODbL)",
         }
 
