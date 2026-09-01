@@ -99,9 +99,7 @@ class CapabilityResolver:
             str(item).strip() for item in turn.requested_layers if str(item).strip()
         ]
         requested.extend(
-            str(item).strip()
-            for item in turn.requested_concepts
-            if str(item).strip()
+            str(item).strip() for item in turn.requested_concepts if str(item).strip()
         )
         # Older model outputs placed semantic dataset concepts in action_tags.
         # Keep that typed field useful while excluding presentation-only words;
@@ -136,20 +134,29 @@ class CapabilityResolver:
 
         resolved: list[str] = []
         unresolved: list[str] = []
+        poi_capability = self._resolve_one("poi", turn) if turn.poi_categories else None
         for layer in requested:
             capability_id = self._resolve_one(layer, turn)
             if capability_id is None:
+                if poi_capability and self._is_poi_refinement(layer, turn):
+                    if poi_capability not in resolved:
+                        resolved.append(poi_capability)
+                    continue
                 unresolved.append(layer)
             elif capability_id not in resolved:
                 resolved.append(capability_id)
+
+        # POI categories are query refinements, not separate catalog entries.
+        # Resolve the generic executable capability once and pass the category
+        # through the typed argument contract for provider-side validation.
+        if poi_capability and not resolved and not unresolved:
+            resolved.append(poi_capability)
 
         if not unresolved:
             return turn.model_copy(
                 update={
                     "requested_layers": resolved,
-                    "requested_concepts": self._dedupe(
-                        turn.requested_concepts
-                    ),
+                    "requested_concepts": self._dedupe(turn.requested_concepts),
                     "overlay_commands": overlay_commands,
                 }
             )
@@ -311,6 +318,17 @@ class CapabilityResolver:
     def _is_data_concept(value: object) -> bool:
         normalized = str(value or "").strip().casefold().replace("-", "_")
         return normalized not in _NON_DATA_CONCEPT_TAGS
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _is_poi_refinement(cls, value: object, turn: TurnParseResult) -> bool:
+        normalized = cls._normalize_text(str(value or ""))
+        if not normalized:
+            return False
+        return any(
+            normalized == cls._normalize_text(str(category))
+            for category in turn.poi_categories
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

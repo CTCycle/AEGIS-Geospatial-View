@@ -206,6 +206,25 @@ def test_resolves_generic_poi_transit_and_radar_atomic_layers() -> None:
 
 
 ###############################################################################
+def test_resolves_poi_category_as_refinement_of_generic_poi_capability() -> None:
+    turn = _turn("Find hospitals around Rome", "hospitals")
+    turn = turn.model_copy(
+        update={
+            "requested_layers": [],
+            "requested_concepts": ["hospitals"],
+            "poi_categories": ["hospitals"],
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.requested_layers == ["overpass_poi_amenities"]
+    assert resolved.poi_categories == ["hospitals"]
+    assert resolved.capability_limitations == []
+    assert resolved.clarification_plan is None
+
+
+###############################################################################
 def test_resolves_traffic_semantics_to_enabled_capability() -> None:
     resolved = _resolver().resolve(
         _turn("Show traffic flow around the Colosseum in Rome", "tomtom_traffic_flow")
