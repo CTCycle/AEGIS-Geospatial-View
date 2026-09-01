@@ -522,6 +522,36 @@ describe('components/map-preview.component', () => {
     expect(component.mapSession).toBeUndefined();
   });
 
+  it('clears an inspection that no longer belongs to the active map session', () => {
+    const inspection = {
+      inspection_id: 'hospital-1',
+      title: 'Hospital',
+      association: 'feature',
+      fields: [{ key: 'category', label: 'Category', value: 'hospital' }],
+    };
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{
+          id: 'hospitals',
+          label: 'Hospitals',
+          type: 'geojson',
+          provider: 'overpass',
+          inspections: [inspection],
+        }],
+      }) as never,
+    };
+    fixture.detectChanges();
+    component.openInspection(inspection);
+    expect(component.selectedInspection?.inspection_id).toBe('hospital-1');
+
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({ overlays: [] }) as never,
+    });
+    fixture.detectChanges();
+
+    expect(component.selectedInspection).toBeUndefined();
+  });
+
   it('does not materialize credential-bearing URLs into chosen map session state or source definitions', () => {
     component.payload = {
       map_session: makeMapSession({

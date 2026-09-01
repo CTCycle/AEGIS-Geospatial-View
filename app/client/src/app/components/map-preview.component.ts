@@ -272,6 +272,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (!next) {
       this.mapSession = undefined;
       this.overlayRenderStatuses = [];
+      this.selectedInspection = undefined;
       return;
     }
     this.mapSession = {
@@ -286,6 +287,16 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       overlayId: overlay.id,
       status: 'pending',
     }));
+    this.reconcileSelectedInspection();
+  }
+
+  private reconcileSelectedInspection(): void {
+    if (!this.selectedInspection) {
+      return;
+    }
+    this.selectedInspection = this.inspectionEntries.find((inspection) => (
+      inspection.inspection_id === this.selectedInspection?.inspection_id
+    ));
   }
 
   private rebuildOverlayStateFromSession(): void {
