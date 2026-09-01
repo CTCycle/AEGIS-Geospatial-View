@@ -812,3 +812,62 @@ def test_tool_plan_executor_binds_verified_predecessor_output() -> None:
         assert results[0].provenance.units == {"value": "unit"}
 
     run_async_in_thread(_run())
+
+
+###############################################################################
+def test_tool_plan_executor_extracts_nested_provider_provenance() -> None:
+    async def _run() -> None:
+        registry = ToolRegistry(runtime_registry=_runtime())
+
+        async def handler(arguments, context):  # noqa: ANN001
+            _ = arguments, context
+            return {
+                "ok": True,
+                "operation": "direct_result_created",
+                "direct_result": {
+                    "result": {
+                        "result": {
+                            "provider": "openmeteo",
+                            "observation_time": "2026-09-01T08:45",
+                            "coverage": {"type": "point", "latitude": 41.9},
+                            "spatial_resolution": "point forecast",
+                            "units": {"temperature": "C"},
+                        }
+                    }
+                },
+            }
+
+        registry.register_native_tool(
+            LLMToolDefinition(
+                name="nested",
+                description="nested",
+                parameters_json_schema={"type": "object"},
+            ),
+            handler,
+        )
+        result = (
+            await ToolPlanExecutor(tool_registry=registry).execute(
+                ToolPlan(
+                    tool_group="direct_chat",
+                    candidate_tools=["nested"],
+                    selected_tools=["nested"],
+                    steps=[
+                        ToolPlanStep(
+                            step_id="nested",
+                            tool_name="nested",
+                            reason="nested provenance",
+                        )
+                    ],
+                ),
+                AgentExecutionContext(),
+            )
+        )[0]
+
+        assert result.ok is True
+        assert result.provenance.provider == "openmeteo"
+        assert result.provenance.observation_time == "2026-09-01T08:45"
+        assert result.provenance.coverage == {"type": "point", "latitude": 41.9}
+        assert result.provenance.spatial_resolution == "point forecast"
+        assert result.provenance.units == {"temperature": "C"}
+
+    run_async_in_thread(_run())

@@ -291,9 +291,7 @@ class ToolPlanExecutor:
     @staticmethod
     def _path_parts(path: str) -> list[str]:
         return [
-            part
-            for part in re.findall(r"[^.\[\]]+", path.strip().lstrip("$."))
-            if part
+            part for part in re.findall(r"[^.\[\]]+", path.strip().lstrip("$.")) if part
         ]
 
     # -------------------------------------------------------------------------
@@ -335,22 +333,7 @@ class ToolPlanExecutor:
     # -------------------------------------------------------------------------
     @classmethod
     def _provenance_fields(cls, data: Any) -> dict[str, Any]:
-        candidates: list[dict[str, Any]] = []
-        if is_json_object(data):
-            candidates.append(data)
-            for key in (
-                "result",
-                "direct_result",
-                "map_session",
-                "metadata",
-                "provenance",
-            ):
-                nested = data.get(key)
-                if is_json_object(nested):
-                    candidates.append(nested)
-                    nested_result = nested.get("result")
-                    if is_json_object(nested_result):
-                        candidates.append(nested_result)
+        candidates = cls._provenance_candidates(data)
         provider = cls._first_string(
             candidates, "provider", "provider_id", "providerId"
         )
@@ -378,12 +361,10 @@ class ToolPlanExecutor:
             if isinstance(key, str) and isinstance(value, str)
         }
         result_status = (
-            cls._first_string(candidates, "result_status", "resultStatus")
-            or "unknown"
+            cls._first_string(candidates, "result_status", "resultStatus") or "unknown"
         )
         result_type = (
-            cls._first_string(candidates, "result_type", "resultType")
-            or "unknown"
+            cls._first_string(candidates, "result_type", "resultType") or "unknown"
         )
         warnings = cls._first_string_list(candidates, "warnings")
         partial = any(bool(candidate.get("partial")) for candidate in candidates)
@@ -402,6 +383,48 @@ class ToolPlanExecutor:
         }
 
     # -------------------------------------------------------------------------
+    @classmethod
+    def _provenance_candidates(cls, value: Any) -> list[dict[str, Any]]:
+        """Collect nested provider envelopes without assuming one tool shape."""
+        candidates: list[dict[str, Any]] = []
+        seen: set[int] = set()
+        preferred_keys = (
+            "provenance",
+            "metadata",
+            "direct_result",
+            "map_session",
+            "payload",
+            "result",
+            "data",
+        )
+
+        def visit(current: Any, depth: int) -> None:
+            if depth > 8:
+                return
+            if is_json_object(current):
+                identity = id(current)
+                if identity in seen:
+                    return
+                seen.add(identity)
+                candidates.append(current)
+                for key in preferred_keys:
+                    if key in current:
+                        visit(current[key], depth + 1)
+                for key, nested in current.items():
+                    if key in preferred_keys:
+                        continue
+                    if is_json_object(nested) or is_json_array(nested):
+                        visit(nested, depth + 1)
+                return
+            if is_json_array(current):
+                for nested in current[:50]:
+                    if is_json_object(nested) or is_json_array(nested):
+                        visit(nested, depth + 1)
+
+        visit(value, 0)
+        return candidates
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _result_field(value: Any, key: str) -> str | None:
         if not is_json_object(value):
@@ -411,9 +434,7 @@ class ToolPlanExecutor:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _first_string(
-        candidates: list[dict[str, Any]], *keys: str
-    ) -> str | None:
+    def _first_string(candidates: list[dict[str, Any]], *keys: str) -> str | None:
         for candidate in candidates:
             for key in keys:
                 value = candidate.get(key)
@@ -448,9 +469,7 @@ class ToolPlanExecutor:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _first_string_list(
-        candidates: list[dict[str, Any]], key: str
-    ) -> list[str]:
+    def _first_string_list(candidates: list[dict[str, Any]], key: str) -> list[str]:
         for candidate in candidates:
             value = candidate.get(key)
             if is_json_array(value):
