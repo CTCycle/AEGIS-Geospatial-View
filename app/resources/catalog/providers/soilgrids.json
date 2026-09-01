@@ -4,43 +4,15 @@
   "provider": "soilgrids",
   "type": "provider",
   "description": "Global 250 m modeled soil-property data from ISRIC SoilGrids through public OGC WMS and WCS services.",
-  "capabilities": [
-    "soil",
-    "wms",
-    "wcs",
-    "soil-properties"
-  ],
+  "capabilities": ["soil", "wms", "wcs", "soil-properties"],
   "coverage": "global",
   "metadata": {
     "docs_url": "https://docs.isric.org/globaldata/soilgrids/",
     "official_docs_url": "https://docs.isric.org/globaldata/soilgrids/",
-    "keywords": [
-      "soil",
-      "soilgrids",
-      "isric",
-      "ph",
-      "organic carbon",
-      "nitrogen",
-      "clay",
-      "sand",
-      "silt",
-      "bulk density",
-      "water content"
-    ],
-    "action_tags": [
-      "soil",
-      "soil-properties",
-      "wms",
-      "wcs"
-    ],
-    "task_tags": [
-      "soil analysis",
-      "site assessment",
-      "environmental analysis"
-    ],
-    "map_type_tags": [
-      "thematic"
-    ],
+    "keywords": ["soil", "soilgrids", "isric", "ph", "organic carbon", "nitrogen", "clay", "sand", "silt", "bulk density", "water content"],
+    "action_tags": ["soil", "soil-properties", "wms", "wcs"],
+    "task_tags": ["soil analysis", "site assessment", "environmental analysis"],
+    "map_type_tags": ["thematic"],
     "coverage_scope": "global",
     "temporal_behavior": "rolling-release",
     "constraints": "Model predictions at 250 m resolution are not parcel-scale measurements.",
@@ -55,67 +27,34 @@
     "rate_limit_notes": "Public ISRIC service; keep requests spatially bounded and cache repeated access.",
     "retrieval_mode": "direct",
     "last_validated": "2026-09-02",
-    "search_examples": [
-      "show soil pH around this location",
-      "map clay content in this area",
-      "show soil organic carbon near the selected site"
-    ],
+    "search_examples": ["show soil pH around this location", "map clay content in this area", "show soil organic carbon near the selected site"],
     "location_dependency": "Requires a map location or bounded area for useful retrieval."
   },
   "version": 1,
   "last_modified": "2026-09-02T00:00:00+00:00",
   "capabilityKind": "metadata-only",
   "renderingMode": "metadata-only",
-  "sourceOfficialDocs": [
-    "https://docs.isric.org/globaldata/soilgrids/",
-    "https://docs.isric.org/globaldata/soilgrids/wcs.html"
-  ],
+  "sourceOfficialDocs": ["https://docs.isric.org/globaldata/soilgrids/", "https://docs.isric.org/globaldata/soilgrids/wcs.html"],
   "license": {
     "name": "CC BY 4.0",
     "url": "https://creativecommons.org/licenses/by/4.0/",
     "attributionRequired": true,
-    "commercialUse": "allowed-with-attribution",
-    "embeddingAllowed": "allowed-with-attribution"
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
   },
-  "auth": {
-    "type": "none",
-    "required": false,
-    "providerKey": null,
-    "accessPageProviderId": null
-  },
+  "auth": {"type": "none", "required": false, "providerKey": null, "accessPageProviderId": null},
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": false,
-    "plannerHints": [
-      "soil",
-      "soil properties",
-      "soilgrids",
-      "isric"
-    ],
+    "plannerHints": ["soil", "soil properties", "soilgrids", "isric"],
     "requiredUserAction": [],
-    "avoidWhen": [
-      "general chat",
-      "no geographic context"
-    ]
+    "avoidWhen": ["general chat", "no geographic context"]
   },
   "reliability": {
     "status": "functional",
     "lastAudited": "2026-09-02",
-    "knownLimitations": [
-      "The separate SoilGrids REST API is not used because ISRIC currently recommends WMS/WCS for production access.",
-      "Predictions are modeled at 250 m resolution and should not be interpreted as field or parcel measurements."
-    ]
+    "knownLimitations": ["The separate SoilGrids REST API is not used because ISRIC currently recommends WMS/WCS for production access.", "Predictions are modeled at 250 m resolution and should not be interpreted as field or parcel measurements."]
   },
-  "cachePolicy": {
-    "mode": "memory",
-    "ttlSeconds": 86400,
-    "staleWhileRevalidateSeconds": 86400
-  },
-  "normalization": {
-    "geometryPath": null,
-    "idPath": null,
-    "timestampPath": null,
-    "fieldMap": {},
-    "expectedGeometry": "not-applicable"
-  }
+  "cachePolicy": {"mode": "memory", "ttlSeconds": 86400, "staleWhileRevalidateSeconds": 86400},
+  "normalization": {"geometryPath": null, "idPath": null, "timestampPath": null, "fieldMap": {}, "expectedGeometry": "not-applicable"}
 }
