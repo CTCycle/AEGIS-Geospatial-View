@@ -250,6 +250,7 @@ class PlannedTurnExecutionService:
                     turn_contract,
                     state_session=active_state_session,
                 )
+        self.turn_state_assembler.append_provider_events(tool_payload, map_session)
         mutation_clarification = next(
             (
                 result.clarification
@@ -330,7 +331,7 @@ class PlannedTurnExecutionService:
                 tool_result_refs=[result.step_id for result in planned_results],
             )
             self.task_state_service.set_active_visualization(
-                conversation_key, map_session
+                conversation_key, map_session, tool_payload=tool_payload
             )
             assistant_message = self.response_synthesizer.synthesize(
                 user_text=turn_contract.user_text,
@@ -401,7 +402,9 @@ class PlannedTurnExecutionService:
             tool_plan=tool_plan.model_dump(mode="json"),
             tool_result_refs=[result.step_id for result in planned_results],
         )
-        self.task_state_service.set_active_visualization(conversation_key, map_session)
+        self.task_state_service.set_active_visualization(
+            conversation_key, map_session, tool_payload=tool_payload
+        )
         added_instance_ids = [
             instance_id
             for result in overlay_mutation_results

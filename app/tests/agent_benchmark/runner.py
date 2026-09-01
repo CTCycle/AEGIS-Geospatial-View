@@ -90,6 +90,17 @@ def _tool_results(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 ###############################################################################
+def _provider_events(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return non-tool provider work captured by the application trace."""
+    return [
+        item
+        for trace in traces
+        for item in trace.get("provider_events", [])
+        if isinstance(item, dict)
+    ]
+
+
+###############################################################################
 def _capability_ids(tool_calls: list[dict[str, Any]]) -> set[str]:
     capability_ids: set[str] = set()
     for call in tool_calls:
@@ -267,6 +278,8 @@ def _has_structured_clarification(trace: dict[str, Any]) -> bool:
 def _has_provider_provenance(result: dict[str, Any]) -> bool:
     provenance = result.get("provenance")
     if not isinstance(provenance, dict):
+        provenance = result
+    if not isinstance(provenance, dict):
         return False
     provider = provenance.get("provider")
     fetched_at = provenance.get("fetched_at")
@@ -332,7 +345,13 @@ def _evaluate_expected_properties(
         )
     ]
 
-    capabilities = _capability_ids(tool_calls) | _overlay_ids(traces)
+    provider_events = _provider_events(traces)
+    capabilities = _capability_ids(tool_calls) | _overlay_ids(traces) | {
+        str(item.get("capability_id")).strip()
+        for item in provider_events
+        if isinstance(item.get("capability_id"), str)
+        and item.get("capability_id").strip()
+    }
     missing_families = []
     for family in expected.get("capability_families", []):
         family_key = str(family).strip().casefold()
@@ -353,14 +372,18 @@ def _evaluate_expected_properties(
     )
 
     minimum_tool_count = expected.get("minimum_tool_count")
+    execution_evidence_count = len(tool_calls) + len(provider_events)
     count_passed = (
-        isinstance(minimum_tool_count, int) and len(tool_calls) >= minimum_tool_count
+        isinstance(minimum_tool_count, int)
+        and execution_evidence_count >= minimum_tool_count
     )
     results.append(
         _assertion_result(
             "expected_minimum_tool_count",
             count_passed,
-            f"Observed {len(tool_calls)} tool calls; required at least {minimum_tool_count}.",
+            f"Observed {execution_evidence_count} execution events "
+            f"({len(tool_calls)} tool calls, {len(provider_events)} provider events); "
+            f"required at least {minimum_tool_count}.",
         )
     )
 
@@ -400,10 +423,15 @@ def _evaluate_expected_properties(
     successful_results = [
         result for result in _tool_results(traces) if not result.get("is_error")
     ]
-    provenance_passed = (
-        not provenance_required
-        or bool(successful_results)
-        and all(_has_provider_provenance(result) for result in successful_results)
+    provider_event_provenance = (
+        bool(provider_events)
+        and all(_has_provider_provenance(event) for event in provider_events)
+    )
+    tool_result_provenance = bool(successful_results) and all(
+        _has_provider_provenance(result) for result in successful_results
+    )
+    provenance_passed = not provenance_required or (
+        tool_result_provenance if successful_results else provider_event_provenance
     )
     results.append(
         _assertion_result(
@@ -416,8 +444,8 @@ def _evaluate_expected_properties(
     )
 
     if expected.get("fabrication_forbidden") is True:
-        grounded = bool(successful_results) and all(
-            _has_provider_provenance(result) for result in successful_results
+        grounded = (
+            tool_result_provenance if successful_results else provider_event_provenance
         )
         grounded_or_limited = grounded or _has_explicit_limitation(traces)
         results.append(
@@ -797,6 +825,7 @@ def evaluate_model_scenario(
     scenario: dict[str, Any], traces: list[dict[str, Any]]
 ) -> dict[str, Any]:
     tool_calls = _tool_calls(traces)
+    provider_events = _provider_events(traces)
     assertion_results = [
         _evaluate_model_assertion(str(name), traces, tool_calls)
         for name in scenario.get("assertions", [])
@@ -824,6 +853,8 @@ def evaluate_model_scenario(
         "passed": all(item["passed"] for item in assertion_results),
         "assertions": assertion_results,
         "tool_calls": len(tool_calls),
+        "provider_events": len(provider_events),
+        "execution_evidence": len(tool_calls) + len(provider_events),
         "duplicate_tool_calls": len(fingerprints) - len(set(fingerprints)),
         "unnecessary_tool_calls": unnecessary_tool_calls,
         "failed_tool_calls": sum(
@@ -1216,6 +1247,9 @@ def run_manifest(
                     "status_code": response.status_code,
                     "tool_calls": tool_calls,
                     "tool_results": tool_payload.get("tool_results", [])
+                    if isinstance(tool_payload, dict)
+                    else [],
+                    "provider_events": tool_payload.get("provider_events", [])
                     if isinstance(tool_payload, dict)
                     else [],
                     "response": payload,

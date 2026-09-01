@@ -24,6 +24,11 @@ from server.domain.agent.runtime import (
     validate_task_graph,
     ToolCapabilityProfile,
 )
+from server.domain.agent.decision import (
+    LocationResolutionProvenance,
+    ResolvedLocation,
+)
+from server.contracts.geospatial import MapSession
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.conversation_state import ConversationTaskStateService
 
@@ -232,3 +237,94 @@ def test_terminal_task_update_finalizes_its_atomic_execution_graph() -> None:
     assert {item.status for item in snapshot.tasks} == {"completed"}
     assert snapshot.goal is not None
     assert snapshot.goal.status == "completed"
+
+
+###############################################################################
+def test_verified_map_projects_location_sources_and_evidence_into_task_state() -> None:
+    service = ConversationTaskStateService()
+    turn = TurnParseResult(
+        user_text="Find hospitals in Rome",
+        conversation_context=ConversationContextSnapshot(),
+        task_class="map_search",
+        normalized_action=NormalizedAction(
+            action_id="geospatial_data_retrieval",
+            action_label="Find hospitals in Rome",
+            requires_location=True,
+        ),
+    )
+    task = service.start_task("conversation", turn, "geospatial_features")
+    location = ResolvedLocation(
+        label="Rome",
+        latitude=41.9,
+        longitude=12.5,
+        provenance=LocationResolutionProvenance(
+            provider="nominatim",
+            source_url="https://nominatim.openstreetmap.org/search",
+        ),
+    )
+    map_session = MapSession(
+        session_id="map-rome",
+        resolved_location=location,
+        basemap_id="osm_default",
+        viewport={
+            "center_latitude": 41.9,
+            "center_longitude": 12.5,
+            "radius_m": 5000.0,
+            "bbox": [12.4, 41.8, 12.6, 42.0],
+        },
+        bounds=[12.4, 41.8, 12.6, 42.0],
+        basemap={"id": "osm_default", "provider": "osm"},
+        overlay_collection={
+            "instances": [
+                {
+                    "instance_id": "hospital-layer",
+                    "capability_id": "overpass_poi_amenities",
+                    "label": "Hospitals",
+                    "provider": "overpass",
+                    "overlay_type": "point",
+                    "rendering_mode": "clustered-points",
+                }
+            ]
+        },
+    )
+
+    service.update_task("conversation", task.task_id, status="completed")
+    service.set_active_visualization(
+        "conversation",
+        map_session,
+        tool_payload={
+            "provider_events": [
+                {
+                    "capability_id": "location",
+                    "provider": "nominatim",
+                }
+            ],
+            "tool_results": [
+                {
+                    "is_error": False,
+                    "provenance": {
+                        "capability_id": "overpass_poi_amenities",
+                        "provider": "overpass",
+                    },
+                }
+            ],
+        },
+    )
+
+    snapshot = service.snapshot("conversation")
+    assert snapshot.geospatial_state.resolved_locations[0]["label"] == "Rome"
+    assert snapshot.geospatial_state.geographic_scope.radius_m == 5000.0
+    assert snapshot.geospatial_state.geographic_scope.bbox == [12.4, 41.8, 12.6, 42.0]
+    assert snapshot.geospatial_state.layer_refs == ["hospital-layer"]
+    assert snapshot.geospatial_state.data_source_refs == [
+        "osm_default",
+        "osm",
+        "overpass_poi_amenities",
+        "overpass",
+        "location",
+        "nominatim",
+    ]
+    assert snapshot.evidence_refs == [
+        "location:nominatim",
+        "overpass_poi_amenities:overpass",
+    ]

@@ -10,6 +10,7 @@ import threading
 import time
 import unicodedata
 from collections import OrderedDict
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -75,6 +76,7 @@ class NominatimService:
             country_code=country_code,
             query=params["q"],
             expected_location_type=expected_location_type,
+            fetched_at=datetime.now(UTC),
         )
         if not ranked:
             return None
@@ -220,6 +222,7 @@ class NominatimService:
         country_name: str | None,
         country_code: str | None,
         query: str,
+        fetched_at: datetime | None = None,
     ) -> dict[str, Any] | None:
         try:
             latitude = float(data["lat"])
@@ -234,6 +237,14 @@ class NominatimService:
             "selected_result_class": str(data.get("class") or ""),
             "display_name": data.get("display_name"),
         }
+        if fetched_at is not None:
+            result.update(
+                {
+                    "provider": "nominatim",
+                    "source_url": self.base_url,
+                    "fetched_at": fetched_at.isoformat(),
+                }
+            )
         bounding_box = data.get("boundingbox")
         if is_json_array(bounding_box) and len(bounding_box) == 4:
             try:
@@ -300,6 +311,7 @@ class NominatimService:
         country_code: str | None,
         query: str,
         expected_location_type: str | None,
+        fetched_at: datetime | None = None,
     ) -> list[dict[str, Any]]:
         scored: list[tuple[float, dict[str, Any]]] = []
         normalized_query = self.normalize_component(query)
@@ -311,6 +323,7 @@ class NominatimService:
                 country_name=country_name,
                 country_code=country_code,
                 query=query,
+                fetched_at=fetched_at,
             )
             if not is_json_object(formatted):
                 continue

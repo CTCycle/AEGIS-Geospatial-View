@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from server.common.time import utc_now
 from server.domain.agent.actions import AgentAction
 
 PlanState = Literal["clarify", "direct_response", "direct_tool", "map_search", "reject"]
@@ -17,6 +19,19 @@ class ClarificationRequest(BaseModel):
     question: str
     reason: str
     missing_fields: list[str] = Field(default_factory=lambda: list[str]())
+
+
+###############################################################################
+class LocationResolutionProvenance(BaseModel):
+    """Provider evidence for a location resolved outside the tool registry."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    source_url: str | None = None
+    fetched_at: datetime = Field(default_factory=utc_now)
+    result_status: str = "ok"
+    result_type: str = "location"
 
 
 ###############################################################################
@@ -47,6 +62,7 @@ class ResolvedLocation(BaseModel):
     location_class: str | None = None
     bbox: list[float] | None = None
     bbox_source: str | None = None
+    provenance: LocationResolutionProvenance | None = None
 
 
 ###############################################################################
