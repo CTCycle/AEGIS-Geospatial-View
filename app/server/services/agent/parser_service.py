@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from server.common.typing import is_json_object
+from server.common.typing import is_json_array, is_json_object
 
 import json
 import re
@@ -151,6 +151,11 @@ class ParserService:
                         "rendering_mode": capability.get("renderingMode"),
                         "capabilities": list(capability.get("capabilities") or []),
                         "keywords": list(metadata.get("keywords") or []),
+                        "supported_categories": [
+                            str(item).strip()
+                            for item in metadata.get("supported_categories", [])
+                            if isinstance(item, str) and item.strip()
+                        ],
                     }
                 )
         return evidence
@@ -533,7 +538,16 @@ class ParserService:
 
         # A model/provider failure must remain a failure.  Prose inspection
         # here would turn an unverified request into an executable map plan.
-        extracted = self._apply_domain_rules(user_message, extracted, memory_snapshot)
+        extracted = self._apply_domain_rules(
+            user_message,
+            extracted,
+            memory_snapshot,
+            capability_catalog=(
+                self._catalog_evidence()
+                if parser_failure_ambiguity is None
+                else None
+            ),
+        )
 
         if parser_failure_ambiguity is None and not extracted.location_signals:
             coordinate_signal = self._extract_coordinate_signal(user_message)
@@ -725,9 +739,15 @@ class ParserService:
         user_message: str,
         extracted: LLMParserExtraction,
         memory_snapshot: dict[str, Any],
+        capability_catalog: list[dict[str, Any]] | None = None,
     ) -> LLMParserExtraction:
         """Normalize validated model output without interpreting user prose."""
         _ = user_message, memory_snapshot
+        poi_categories = cls._recover_catalog_poi_categories(
+            user_message,
+            extracted,
+            capability_catalog,
+        )
         return extracted.model_copy(
             update={
                 "task_tags": cls._dedupe(extracted.task_tags),
@@ -738,11 +758,72 @@ class ParserService:
                 "requested_concepts": cls._dedupe(extracted.requested_concepts),
                 "requested_layers": cls._dedupe(extracted.requested_layers),
                 "requested_attributes": cls._dedupe(extracted.requested_attributes),
-                "poi_categories": cls._dedupe(extracted.poi_categories),
+                "poi_categories": cls._dedupe(
+                    [*extracted.poi_categories, *poi_categories]
+                ),
                 "required_data_sources": cls._dedupe(extracted.required_data_sources),
                 "capability_limitations": cls._dedupe(extracted.capability_limitations),
             }
         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _recover_catalog_poi_categories(
+        cls,
+        user_message: str,
+        extracted: LLMParserExtraction,
+        capability_catalog: list[dict[str, Any]] | None,
+    ) -> list[str]:
+        """Recover explicit POI categories omitted by a valid model response.
+
+        This is deliberately catalog-backed and intent-gated.  It does not
+        infer a layer or a provider from arbitrary prose; it only restores a
+        category value when the parser already identified a POI retrieval
+        request and an enabled capability declares that category.
+        """
+        if not capability_catalog or extracted.poi_categories:
+            return []
+        if extracted.task_class != "map_search":
+            return []
+        intent_text = " ".join(
+            [
+                extracted.action_id,
+                *extracted.task_tags,
+                *extracted.action_tags,
+                *extracted.requested_visualizations,
+                *extracted.requested_concepts,
+            ]
+        )
+        if not re.search(
+            r"\b(?:poi|amenit(?:y|ies)|nearby\s+places?|place\s+discovery|service\s+discovery)\b",
+            cls._normalize_category_text(intent_text),
+        ):
+            return []
+        normalized_message = cls._normalize_category_text(user_message)
+        recovered: list[str] = []
+        for capability in capability_catalog:
+            categories = capability.get("supported_categories")
+            if not is_json_array(categories):
+                continue
+            for category in categories:
+                if not isinstance(category, str) or not category.strip():
+                    continue
+                normalized_category = cls._normalize_category_text(category)
+                if re.search(
+                    rf"(?<!\w){re.escape(normalized_category)}(?!\w)",
+                    normalized_message,
+                ):
+                    recovered.append(category.strip())
+        return cls._dedupe(recovered)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_category_text(value: object) -> str:
+        return re.sub(
+            r"\s+",
+            " ",
+            re.sub(r"[^\w]+", " ", str(value or "").casefold()),
+        ).strip()
 
     # -------------------------------------------------------------------------
     @staticmethod
