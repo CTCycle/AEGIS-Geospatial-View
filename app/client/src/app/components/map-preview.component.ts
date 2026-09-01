@@ -94,6 +94,8 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   private activeBasemapId: string | null = null;
   private activeCenterKey: string | null = null;
   private mapContainerRef?: ElementRef<HTMLDivElement>;
+  private resizeObserver?: ResizeObserver;
+  private resizeFrame: number | null = null;
   private viewInitialized = false;
   private mapPreparing = false;
   private destroyed = false;
@@ -110,7 +112,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     handler: (event: unknown) => void;
   }> = [];
 
-  constructor(private readonly changeDetector: ChangeDetectorRef) {}
+  constructor(
+    private readonly changeDetector: ChangeDetectorRef,
+    private readonly hostElement: ElementRef<HTMLElement>,
+  ) {}
 
   get hasCenter(): boolean {
     return Number.isFinite(this.mapSession?.center?.latitude)
@@ -158,6 +163,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       return;
     }
     this.viewInitialized = true;
+    this.observeHostSize();
     if (!this.mapSession && this.payload) {
       this.syncSessionFromPayload();
       this.rebuildOverlayStateFromSession();
@@ -183,6 +189,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   ngOnDestroy(): void {
     this.destroyed = true;
+    this.stopObservingHostSize();
     this.destroyMap();
   }
 
@@ -470,6 +477,45 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       }
       this.emitRenderState('ready');
       this.changeDetector.detectChanges();
+      this.scheduleMapResize();
+    });
+  }
+
+  private observeHostSize(): void {
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = new ResizeObserver(() => this.scheduleMapResize());
+    this.resizeObserver.observe(this.hostElement.nativeElement);
+  }
+
+  private stopObservingHostSize(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = undefined;
+    if (this.resizeFrame !== null) {
+      cancelAnimationFrame(this.resizeFrame);
+      this.resizeFrame = null;
+    }
+  }
+
+  private scheduleMapResize(): void {
+    if (this.destroyed || this.resizeFrame !== null) {
+      return;
+    }
+    this.resizeFrame = requestAnimationFrame(() => {
+      this.resizeFrame = null;
+      if (this.destroyed) {
+        return;
+      }
+      const maps = new Set<Map>();
+      if (this.mapRef) {
+        maps.add(this.mapRef);
+      }
+      if (this.pendingCandidate?.map) {
+        maps.add(this.pendingCandidate.map);
+      }
+      maps.forEach((map) => map.resize());
     });
   }
 

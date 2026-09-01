@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-08-27
+Last updated: 2026-09-01
 
 ## Route-Level Pages
 
@@ -65,6 +65,8 @@ remain escaped plain text.
 ## Map Rendering
 
 `MapPreviewComponent` renders only normalized `MapSession` payloads through MapLibre. It does not render embedded HTML map payloads. Raster overlays should prefer `overlay.render` descriptors from the backend, including WMS/WMTS time, format, CRS, style, and tile matrix metadata.
+
+The map preview host and its internal frame are explicit full-size layout surfaces. A `ResizeObserver` resizes MapLibre after grid, sidebar, or viewport changes so the rendered canvas remains aligned with the available canvas.
 
 The backend `overlay_collection.instances` is authoritative for overlay
 identity, descriptors, inspections, and revisions. The component derives its
