@@ -355,6 +355,42 @@ class ParserService:
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _extract_deictic_reference(user_message: str) -> str | None:
+        """Extract a location-reference phrase the model may omit.
+
+        Deictic references are a language boundary concern, not a place-name
+        or provider heuristic.  The structured parser is still authoritative
+        for intent; this small deterministic supplement makes the memory
+        resolver reliable when a valid model response leaves out ``there`` or
+        an equivalent reference.
+        """
+        message = str(user_message or "")
+        for pattern in (
+            r"\baround\s+(?:here|there)\b",
+            r"\bnear\s+me\b",
+            r"\bmy\s+location\b",
+            r"\bwhere\s+(?:i|we)\s+am\b",
+            r"\b(?:this|that|the\s+same)\s+(?:area|place|location)\b",
+            r"\bnearby\b",
+            r"\bhere\b",
+        ):
+            match = re.search(pattern, message, flags=re.IGNORECASE)
+            if match is not None:
+                return match.group(0)
+
+        # Avoid treating existential constructions such as "there are
+        # hospitals" as a reference to the active conversation location.
+        if re.search(
+            r"\bthere\s+(?:is|are|was|were|has|have|will|would|can|could)\b",
+            message,
+            flags=re.IGNORECASE,
+        ):
+            return None
+        match = re.search(r"\bthere\b", message, flags=re.IGNORECASE)
+        return match.group(0) if match is not None else None
+
+    # -------------------------------------------------------------------------
     @classmethod
     def build_parser_failure_turn_result(
         cls,
@@ -596,6 +632,18 @@ class ParserService:
             for item in extracted_location_signals
             if item.raw_value.strip()
         ]
+        if parser_failure_ambiguity is None and not location_signals:
+            deictic_reference = self._extract_deictic_reference(user_message)
+            if deictic_reference is not None:
+                location_signals.append(
+                    LocationSignal(
+                        signal_type="deictic",
+                        raw_value=deictic_reference,
+                        normalized_value=deictic_reference,
+                        confidence=0.95,
+                        source="text",
+                    )
+                )
         normalized_action = NormalizedAction(
             action_id=self._normalize_action_id(
                 extracted.action_id,
