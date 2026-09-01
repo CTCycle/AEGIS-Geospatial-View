@@ -1,8 +1,8 @@
 # AEGIS Geographic-Agent Validation Report
 
-Date: 2026-09-01  
-Branch: `develop`  
-Final validation commits: `319da265`, `62a345b3`  
+Date: 2026-09-01
+Branch: `develop`
+Final validation commits: `319da265`, `62a345b3`
 Scope: agent interpretation, provider execution, typed state, provenance, frontend map rendering, conversation continuity, and degraded behavior.
 
 ## Final assessment
