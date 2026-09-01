@@ -178,7 +178,9 @@ def get_model_context_profile(provider: str, model: str) -> ModelContextProfile 
                     metadata.get("maximum_output_tokens")
                 ),
                 default_output_reserve=(
-                    _positive_int(metadata.get("default_output_reserve")) or 8_192
+                    _positive_int(metadata.get("default_output_reserve"))
+                    or _positive_int(metadata.get("maximum_output_tokens"))
+                    or 0
                 ),
                 tokenizer_strategy=str(
                     metadata.get("tokenizer_strategy") or "chars_per_token_4"

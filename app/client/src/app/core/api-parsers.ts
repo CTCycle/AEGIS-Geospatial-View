@@ -23,6 +23,7 @@ import {
   ModelCardDescriptor,
   ModelLibraryResponse,
   ModelSettingsResponse,
+  SelectedModelContext,
   OllamaHealthResponse,
   MapInspection,
   OverlayCollectionState,
@@ -1013,11 +1014,14 @@ export const parseContextUsage = (input: unknown): ChatTurnResponse['context_usa
   }
   return {
     estimated_input_tokens: estimatedInputTokens,
+    reported_input_tokens: isFiniteNumber(input.reported_input_tokens) ? input.reported_input_tokens : null,
+    reported_output_tokens: isFiniteNumber(input.reported_output_tokens) ? input.reported_output_tokens : null,
     selected_context_window: isFiniteNumber(input.selected_context_window) ? input.selected_context_window : null,
     model_context_limit: isFiniteNumber(input.model_context_limit) ? input.model_context_limit : null,
     usage_percent: usagePercent,
     provider: typeof input.provider === 'string' ? input.provider : '',
     model: typeof input.model === 'string' ? input.model : '',
+    usage_source: typeof input.usage_source === 'string' ? input.usage_source : 'estimated',
     reserved_output_tokens: isFiniteNumber(input.reserved_output_tokens) ? input.reserved_output_tokens : undefined,
     tool_schema_tokens: isFiniteNumber(input.tool_schema_tokens) ? input.tool_schema_tokens : undefined,
     response_schema_tokens: isFiniteNumber(input.response_schema_tokens) ? input.response_schema_tokens : undefined,
@@ -1027,6 +1031,10 @@ export const parseContextUsage = (input: unknown): ChatTurnResponse['context_usa
     expected_output_tokens: isFiniteNumber(input.expected_output_tokens) ? input.expected_output_tokens : null,
     context_profile_source: typeof input.context_profile_source === 'string' ? input.context_profile_source : 'unknown',
     compaction_applied: Boolean(input.compaction_applied),
+    phases: isRecord(input.phases) ? input.phases : undefined,
+    peak_request_tokens: isFiniteNumber(input.peak_request_tokens) ? input.peak_request_tokens : null,
+    total_input_tokens: isFiniteNumber(input.total_input_tokens) ? input.total_input_tokens : null,
+    total_output_tokens: isFiniteNumber(input.total_output_tokens) ? input.total_output_tokens : null,
   };
 };
 
@@ -1143,6 +1151,30 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
     });
     credentialHealth[provider] = statuses;
   });
+  const selectedModelContextRecord = requireApiRecord(
+    record.selected_model_context,
+    endpoint,
+    'selected_model_context',
+  );
+  const selectedModelContext: SelectedModelContext = {
+    provider: requireApiString(selectedModelContextRecord, 'provider', endpoint),
+    model: requireApiString(selectedModelContextRecord, 'model', endpoint),
+    context_window_tokens: optionalApiNumber(
+      selectedModelContextRecord,
+      'context_window_tokens',
+      endpoint,
+    ) ?? null,
+    maximum_output_tokens: optionalApiNumber(
+      selectedModelContextRecord,
+      'maximum_output_tokens',
+      endpoint,
+    ) ?? null,
+    context_profile_source: requireApiString(
+      selectedModelContextRecord,
+      'context_profile_source',
+      endpoint,
+    ),
+  };
   return {
     active_provider_mode: activeProviderMode,
     agent_model_provider: requireApiString(record, 'agent_model_provider', endpoint),
@@ -1153,11 +1185,7 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
     deepseek_base_url: requireApiStringOrNull(record, 'deepseek_base_url', endpoint),
     credentials: parseBooleanCredentialMap(record.credentials, endpoint),
     credential_health: credentialHealth,
-    selected_model_context: requireApiJsonObject(
-      record.selected_model_context,
-      endpoint,
-      'selected_model_context',
-    ),
+    selected_model_context: selectedModelContext,
   };
 };
 

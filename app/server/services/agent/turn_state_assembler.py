@@ -203,6 +203,8 @@ class AgentTurnStateAssembler:
             kind="clarification",
             status="partial",
             message=assistant_message,
+            provider_error=turn_contract.provider_error,
+            failure_category=turn_contract.failure_category,
         )
         assistant_message = self.response_synthesizer.synthesize(
             user_text=turn_contract.user_text,
@@ -279,6 +281,107 @@ class AgentTurnStateAssembler:
             context_usage=context_usage,
             task_snapshot=self.task_state_service.snapshot(conversation_key),
             visualization_update=visualization_update,
+        )
+
+    # -------------------------------------------------------------------------
+    async def build_location_clarification_response(
+        self,
+        *,
+        request_id: str,
+        conversation_id: str,
+        conversation_key: str,
+        task: ConversationTaskRecord,
+        turn_contract: Any,
+        latest_memory: dict[str, Any],
+        context_usage: Any,
+        clarification: ClarificationRequest,
+        tool_payload: dict[str, Any] | None = None,
+    ) -> ChatTurnResponse:
+        """Stop safely when the resolver finds a location ambiguity.
+
+        Location resolution happens during map assembly, after preflight.  The
+        clarification therefore needs its own response path; converting it to
+        a generic planning error would lose the user's valid active map and
+        hide the actual disambiguation question.
+        """
+
+        clarification_plan = {
+            "question": clarification.question,
+            "reason": clarification.reason,
+            "blocking_fields": list(clarification.missing_fields or ["location"]),
+            "options": [],
+            "preserve_valid_results": True,
+            "apply_visualization_changes": False,
+        }
+        operation = ChatOperationResult(
+            kind="clarification",
+            status="partial",
+            message=clarification.question,
+            provider_error=getattr(turn_contract, "provider_error", None),
+            failure_category=(
+                getattr(turn_contract, "failure_category", None)
+                if getattr(turn_contract, "provider_error", None)
+                else None
+            ),
+        )
+        assistant_message = self.response_synthesizer.synthesize(
+            user_text=turn_contract.user_text,
+            fallback_text=clarification.question,
+            operation=operation,
+            clarification_plan=clarification_plan,
+            task_status="needs_clarification",
+        )
+        operation = operation.model_copy(update={"message": assistant_message})
+        decision = PolicyDecision(
+            plan=ExecutionPlan(
+                state="clarify",
+                mode="map",
+                action_id=turn_contract.normalized_action.action_id,
+            ),
+            clarification=clarification,
+            trace=DecisionTrace(
+                steps=[
+                    "location_resolution.validate_specific_target",
+                    "location_resolution.request_clarification",
+                ]
+            ),
+        )
+        self.task_state_service.update_task(
+            conversation_key,
+            task.task_id,
+            status="needs_clarification",
+            blocking_ambiguity=clarification.reason,
+            progress_summary=assistant_message,
+        )
+        memory_snapshot = json_object(latest_memory)
+        self.history_service.append_message(
+            conversation_id=conversation_id,
+            role="assistant",
+            content=assistant_message,
+            request_id=request_id,
+            structured_payload={
+                "turn_contract": turn_contract.model_dump(mode="json"),
+                "decision": decision.model_dump(mode="json"),
+                "operation": operation.model_dump(mode="json"),
+                "memory_snapshot": memory_snapshot,
+                "request_id": request_id,
+            },
+            tool_payload=tool_payload,
+            map_session=None,
+        )
+        return ChatTurnResponse(
+            request_id=request_id,
+            conversation_id=conversation_id,
+            assistant_message=assistant_message,
+            turn_contract=turn_contract,
+            decision=decision,
+            operation=operation,
+            tool_payload=tool_payload,
+            map_session=None,
+            memory_snapshot=memory_snapshot,
+            context_usage=context_usage,
+            task_snapshot=self.task_state_service.snapshot(conversation_key),
+            visualization_update=VisualizationUpdate(),
         )
 
     # -------------------------------------------------------------------------
@@ -423,13 +526,15 @@ class AgentTurnStateAssembler:
         capability_selection: dict[str, Any],
         turn_contract: Any,
         latest_memory: dict[str, Any] | None,
-    ) -> MapSession | None:
+    ) -> MapSession | ClarificationRequest | None:
         resolved_location = (
             await self.policy_engine.location_resolver.resolve_location_signals(
                 turn_contract.location_signals,
                 latest_memory or {},
             )
         )
+        if isinstance(resolved_location, ClarificationRequest):
+            return resolved_location
         if not isinstance(resolved_location, ResolvedLocation):
             return None
         active_visualization = (
@@ -484,13 +589,15 @@ class AgentTurnStateAssembler:
         self,
         turn_contract: Any,
         latest_memory: dict[str, Any] | None,
-    ) -> MapSession | None:
+    ) -> MapSession | ClarificationRequest | None:
         resolved_location = (
             await self.policy_engine.location_resolver.resolve_location_signals(
                 turn_contract.location_signals,
                 latest_memory or {},
             )
         )
+        if isinstance(resolved_location, ClarificationRequest):
+            return resolved_location
         if not isinstance(resolved_location, ResolvedLocation):
             return None
         active_visualization = (
@@ -577,7 +684,7 @@ class AgentTurnStateAssembler:
         tool_payload: dict[str, Any] | None,
         turn_contract: Any,
         latest_memory: dict[str, Any] | None,
-    ) -> MapSession | None:
+    ) -> MapSession | ClarificationRequest | None:
         if not is_json_object(tool_payload):
             return None
         active_visualization = (
@@ -676,7 +783,7 @@ class AgentTurnStateAssembler:
             )
         )
         if isinstance(resolved_location, ClarificationRequest):
-            return None
+            return resolved_location
 
         plan = ExecutionPlan(
             state="map_search",

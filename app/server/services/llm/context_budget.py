@@ -11,17 +11,13 @@ from server.services.llm.types import ContextUsage, LLMRequest, ModelContextProf
 from server.prompts.context import build_compacted_history_summary
 
 CONTEXT_HEADROOM_TOKENS = 512
-UNKNOWN_OUTPUT_ALLOWANCE_TOKENS = 2048
-# Kept as an import-compatible marker for older callers; known models now
-# initialize to their full supported cap instead of this minimum.
-MIN_OLLAMA_CONTEXT_WINDOW = 2048
 
 
 ###############################################################################
 def _positive_int(value: object) -> int | None:
     try:
         number = int(value)  # type: ignore[arg-type]
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     return number if number > 0 else None
 
@@ -111,7 +107,7 @@ def _profile_for_request(
         default_output_reserve=(
             default_output_reserve
             or maximum_output
-            or UNKNOWN_OUTPUT_ALLOWANCE_TOKENS
+            or 0
         ),
         tokenizer_strategy=str(
             metadata.get("tokenizer_strategy") or "chars_per_token_4"
@@ -160,7 +156,11 @@ def _expected_output_tokens(
         return configured
     if profile is not None:
         return profile.maximum_output_tokens or profile.default_output_reserve
-    return UNKNOWN_OUTPUT_ALLOWANCE_TOKENS
+    # An unknown model has no trustworthy default output reservation.  A
+    # caller that needs one must provide the actual request reservation in
+    # metadata; inventing a cap here would make both compaction and the UI
+    # falsely determinate.
+    return 0
 
 
 ###############################################################################
@@ -169,7 +169,11 @@ def _context_components(
     profile: ModelContextProfile | None,
 ) -> tuple[int, int, int, int, int | None]:
     expected_output = _expected_output_tokens(request, profile)
-    tool_tokens = estimate_json_tokens([tool.__dict__ for tool in request.tools or []])
+    tool_tokens = (
+        estimate_json_tokens([tool.__dict__ for tool in request.tools])
+        if request.tools
+        else 0
+    )
     schema_tokens = estimate_json_tokens(request.response_json_schema)
     limit = profile.context_window_tokens if profile is not None else None
     usable = (
@@ -211,7 +215,7 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
         response_schema_tokens=schema_tokens,
         safety_margin_tokens=safety_margin,
         usable_prompt_budget_tokens=usable,
-        current_conversation_tokens=estimated,
+        current_conversation_tokens=message_tokens,
         context_profile_source=profile.metadata_source
         if profile is not None
         else "unknown",
@@ -231,10 +235,21 @@ def apply_reported_usage(
     payload = raw_response if isinstance(raw_response, dict) else {}
     usage_payload = payload.get("usage")
     usage_payload = usage_payload if isinstance(usage_payload, dict) else {}
+    nested_response = payload.get("response")
+    nested_response = nested_response if isinstance(nested_response, dict) else {}
+    if not usage_payload:
+        nested_usage = nested_response.get("usage")
+        usage_payload = (
+            nested_usage if isinstance(nested_usage, dict) else {}
+        )
     usage_metadata = payload.get("usage_metadata")
-    usage_metadata = (
-        usage_metadata if isinstance(usage_metadata, dict) else {}
-    )
+    if not isinstance(usage_metadata, dict):
+        nested_usage_metadata = nested_response.get("usage_metadata")
+        usage_metadata = (
+            nested_usage_metadata
+            if isinstance(nested_usage_metadata, dict)
+            else {}
+        )
 
     def first_non_negative(*values: object) -> int | None:
         for value in values:
@@ -252,6 +267,8 @@ def apply_reported_usage(
         usage_metadata.get("prompt_token_count"),
         payload.get("prompt_eval_count"),
         payload.get("input_tokens"),
+        nested_response.get("prompt_eval_count"),
+        nested_response.get("input_tokens"),
     )
     output_tokens = first_non_negative(
         usage_payload.get("completion_tokens"),
@@ -259,6 +276,8 @@ def apply_reported_usage(
         usage_metadata.get("candidates_token_count"),
         payload.get("eval_count"),
         payload.get("output_tokens"),
+        nested_response.get("eval_count"),
+        nested_response.get("output_tokens"),
     )
     if input_tokens is None and output_tokens is None:
         return usage

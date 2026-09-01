@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import pytest
+
 from server.contracts.extraction import (
     ConversationContextSnapshot,
+    LocationSignal,
     NormalizedAction,
     OverlayCommand,
     OverlaySelector,
@@ -330,6 +333,62 @@ def test_ignores_presentation_action_tags_as_dataset_concepts() -> None:
 
     assert resolved.requested_layers == []
     assert resolved.capability_limitations == []
+    assert resolved.clarification_plan is None
+
+
+@pytest.mark.parametrize("action_tag", ["show_map", "map_center", "navigate"])
+def test_ignores_structured_map_interaction_tags_as_dataset_concepts(
+    action_tag: str,
+) -> None:
+    turn = _turn("Show a location", "")
+    turn = turn.model_copy(
+        update={
+            "location_signals": [
+                LocationSignal(signal_type="city", raw_value="Rome")
+            ],
+            "normalized_action": NormalizedAction(
+                action_id="map_search",
+                action_label="Location map",
+                action_tags=[action_tag],
+                requires_location=True,
+            ),
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.requested_layers == []
+    assert resolved.capability_limitations == []
+    assert resolved.clarification_plan is None
+
+
+###############################################################################
+def test_location_focus_drops_catalog_keyword_layers_without_typed_data_request() -> None:
+    turn = _turn("Map the agency site", "esa_worldcover").model_copy(
+        update={
+            "location_signals": [
+                LocationSignal(signal_type="poi", raw_value="agency site"),
+                LocationSignal(signal_type="city", raw_value="Noordwijk"),
+            ],
+            "entity_target": "agency site",
+            "map_target": "agency site in Noordwijk",
+            "normalized_action": NormalizedAction(
+                action_id="geospatial_data_retrieval",
+                action_label="Map the agency site",
+                task_tags=["map", "poi"],
+                action_tags=["map", "location"],
+                requires_location=True,
+            ),
+            "atomic_tasks": [
+                {"task_type": "geocode", "required_layers": []},
+                {"task_type": "map_render", "required_layers": []},
+            ],
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.requested_layers == []
     assert resolved.clarification_plan is None
 
 

@@ -99,6 +99,10 @@ class _FakeOpenAIResponses:
                 SimpleNamespace(type="response.output_text.delta", delta="chunk-1"),
                 SimpleNamespace(type="response.created", delta="ignored"),
                 SimpleNamespace(type="response.output_text.delta", delta="chunk-2"),
+                SimpleNamespace(
+                    type="response.completed",
+                    usage=SimpleNamespace(input_tokens=8, output_tokens=2),
+                ),
             ]
         return _FakeOpenAIResponse()
 
@@ -154,7 +158,17 @@ class _FakeGoogleModels:
     # -------------------------------------------------------------------------
     def generate_content_stream(self, **kwargs):  # noqa: ANN001, ANN202
         self.generate_content_stream_calls.append(kwargs)
-        return [SimpleNamespace(text="chunk-1"), SimpleNamespace(text="chunk-2")]
+        return [
+            SimpleNamespace(text="chunk-1"),
+            SimpleNamespace(text="chunk-2"),
+            SimpleNamespace(
+                text="",
+                usage_metadata=SimpleNamespace(
+                    prompt_token_count=8,
+                    candidates_token_count=2,
+                ),
+            ),
+        ]
 
     # -------------------------------------------------------------------------
     def embed_content(self, **kwargs):  # noqa: ANN001, ANN202
@@ -200,7 +214,10 @@ def test_openai_provider_uses_responses_api(monkeypatch) -> None:
     response = provider.chat(_request())
     assert isinstance(response, LLMResult)
     assert response.content == "chat-ok"
-    assert list(provider.stream_chat(_request())) == ["chunk-1", "chunk-2"]
+    stream = provider.stream_chat(_request())
+    assert list(stream) == ["chunk-1", "chunk-2"]
+    assert stream.context_usage is not None
+    assert stream.context_usage["reported_input_tokens"] == 8
     assert provider.structured_output(_request(), schema=_StructuredPayload) == {
         "answer": "structured"
     }
@@ -268,7 +285,10 @@ def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
     response = provider.chat(_request())
     assert isinstance(response, LLMResult)
     assert response.content == "chat-ok"
-    assert list(provider.stream_chat(_request())) == ["chunk-1", "chunk-2"]
+    stream = provider.stream_chat(_request())
+    assert list(stream) == ["chunk-1", "chunk-2"]
+    assert stream.context_usage is not None
+    assert stream.context_usage["reported_input_tokens"] == 8
     assert provider.structured_output(_request(), schema=_StructuredPayload) == {
         "answer": "structured"
     }
@@ -320,7 +340,12 @@ def test_ollama_provider_http_paths(monkeypatch) -> None:
         return iter(
             [
                 {"message": {"content": "chunk-1"}},
-                {"message": {"content": "chunk-2"}, "done": True},
+                {
+                    "message": {"content": "chunk-2"},
+                    "done": True,
+                    "prompt_eval_count": 8,
+                    "eval_count": 2,
+                },
             ]
         )
 
@@ -331,7 +356,10 @@ def test_ollama_provider_http_paths(monkeypatch) -> None:
     response = provider.chat(_request())
     assert isinstance(response, LLMResult)
     assert response.content == "chat-ok"
-    assert list(provider.stream_chat(_request())) == ["chunk-1", "chunk-2"]
+    stream = provider.stream_chat(_request())
+    assert list(stream) == ["chunk-1", "chunk-2"]
+    assert stream.context_usage is not None
+    assert stream.context_usage["reported_input_tokens"] == 8
     assert provider.structured_output(_request(), schema=_StructuredPayload) == {
         "answer": "structured"
     }
@@ -348,5 +376,5 @@ def test_ollama_provider_http_paths(monkeypatch) -> None:
         payload for _, payload in post_calls if payload.get("format")
     )
     assert structured_payload["think"] is False
-    assert provider.last_context_usage is not None
-    assert provider.last_context_usage["provider"] == "ollama"
+    assert response.context_usage is not None
+    assert response.context_usage["provider"] == "ollama"

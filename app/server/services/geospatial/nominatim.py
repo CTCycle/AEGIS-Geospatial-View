@@ -27,6 +27,23 @@ from server.configurations import get_server_settings
 
 ###############################################################################
 class NominatimService:
+    GENERIC_QUERY_DESCRIPTORS = frozenset(
+        {
+            "site",
+            "location",
+            "place",
+            "facility",
+            "premises",
+            "campus",
+            "office",
+            "headquarters",
+            "hq",
+        }
+    )
+    ACRONYM_STOP_WORDS = frozenset(
+        {"a", "an", "and", "at", "de", "del", "di", "la", "of", "the"}
+    )
+
     # -------------------------------------------------------------------------
     def __init__(
         self, user_agent: str | None = None, timeout: float | None = None
@@ -53,34 +70,254 @@ class NominatimService:
         limit: int = 5,
         expected_location_type: str | None = None,
     ) -> dict[str, Any] | None:
-        query = self.compose_query(address, city, country_name)
-        if not query:
+        queries = self.compose_query_variants(address, city, country_name)
+        if not queries:
             return None
         effective_limit = max(1, min(10, int(limit or 1)))
-        params: dict[str, str] = {
-            "q": query,
-            "format": "jsonv2",
-            "addressdetails": "1",
-            "limit": str(effective_limit),
-        }
-        if country_code:
-            params["countrycodes"] = country_code.lower()
-        response = await asyncio.to_thread(self.perform_request, params)
-        if not response:
-            return None
-        ranked = self.rank_candidates(
-            response,
-            address=address or "",
-            city=city,
-            country_name=country_name,
-            country_code=country_code,
-            query=params["q"],
-            expected_location_type=expected_location_type,
-            fetched_at=datetime.now(UTC),
-        )
+        ranked: list[dict[str, Any]] = []
+        selected_query = queries[0]
+        fetched_at = datetime.now(UTC)
+        for candidate_query in queries:
+            params: dict[str, str] = {
+                "q": candidate_query,
+                "format": "jsonv2",
+                "addressdetails": "1",
+                "namedetails": "1",
+                # Prefer a stable validation language while retaining the
+                # provider's alternate names in ``namedetails``.  This lets
+                # the resolver accept user-language names without depending
+                # on the server's locale or on one display-name spelling.
+                "accept-language": "en",
+                "limit": str(effective_limit),
+            }
+            if country_code:
+                params["countrycodes"] = country_code.lower()
+            response = await asyncio.to_thread(self.perform_request, params)
+            if not response:
+                continue
+            ranked = self.rank_candidates(
+                response,
+                address=address or "",
+                city=city,
+                country_name=country_name,
+                country_code=country_code,
+                query=candidate_query,
+                expected_location_type=expected_location_type,
+                fetched_at=fetched_at,
+            )
+            if ranked:
+                selected_query = candidate_query
+                break
         if not ranked:
             return None
-        return ranked[0]
+        selected = dict(ranked[0])
+        ambiguous_candidates = self._find_ambiguous_candidates(
+            ranked,
+            expected_location_type=expected_location_type,
+            query=selected_query,
+            has_parent_context=bool(
+                city or country_name or country_code or "," in params["q"]
+            ),
+        )
+        if ambiguous_candidates:
+            selected["ambiguous_candidates"] = ambiguous_candidates
+        return selected
+
+    # -------------------------------------------------------------------------
+    def compose_query_variants(
+        self,
+        address: str | None,
+        city: str | None,
+        country_name: str | None,
+    ) -> list[str]:
+        """Build bounded provider queries for names and common descriptions.
+
+        Facility descriptions and acronyms are often indexed differently from
+        the phrase emitted by an extraction model.  The original complete
+        query always runs first; reduced and acronym forms are only attempted
+        when that query returns no usable candidates.
+        """
+
+        primary = self.compose_query(address, city, country_name)
+        if not primary:
+            return []
+        variants = [primary]
+        address_tokens = self.tokenize(address)
+        core_tokens = [
+            token
+            for token in address_tokens
+            if token not in self.GENERIC_QUERY_DESCRIPTORS
+        ]
+        core_address = " ".join(core_tokens)
+        if core_address and self.normalize_component(core_address) != self.normalize_component(
+            address or ""
+        ):
+            reduced = self.compose_query(core_address, city, country_name)
+            if reduced and self.normalize_component(reduced) not in {
+                self.normalize_component(item) for item in variants
+            }:
+                variants.append(reduced)
+        acronym_tokens = [
+            token for token in core_tokens if token not in self.ACRONYM_STOP_WORDS
+        ]
+        acronym = "".join(token[0] for token in acronym_tokens if token)
+        if len(acronym) >= 3:
+            acronym_query = self.compose_query(acronym, city, country_name)
+            if acronym_query and self.normalize_component(acronym_query) not in {
+                self.normalize_component(item) for item in variants
+            }:
+                variants.append(acronym_query)
+        return variants
+
+    # -------------------------------------------------------------------------
+    def _find_ambiguous_candidates(
+        self,
+        ranked: list[dict[str, Any]],
+        *,
+        expected_location_type: str | None,
+        query: str,
+        has_parent_context: bool,
+    ) -> list[dict[str, Any]]:
+        """Return close, distinct candidates at the requested granularity."""
+
+        if len(ranked) < 2:
+            return []
+        expected = str(expected_location_type or "").strip().lower()
+        city_types = {"city", "town", "village", "municipality", "hamlet"}
+        administrative_types = {
+            "country",
+            "state",
+            "region",
+            "county",
+            "province",
+            "administrative",
+        }
+
+        def city_level(candidate: dict[str, Any]) -> bool:
+            candidate_type = str(
+                candidate.get("selected_result_type") or ""
+            ).lower()
+            if candidate_type in city_types:
+                candidate_text = self._candidate_text(candidate)
+                return self.compute_token_overlap(
+                    self.tokenize(query), self.tokenize(candidate_text)
+                ) >= 0.6
+            if candidate_type not in {"administrative", "boundary"}:
+                return False
+            address = (
+                dict(candidate.get("address"))
+                if is_json_object(candidate.get("address"))
+                else {}
+            )
+            locality = next(
+                (
+                    str(address.get(key) or "")
+                    for key in ("city", "town", "village", "municipality")
+                    if address.get(key)
+                ),
+                "",
+            )
+            return bool(locality) and self.compute_token_overlap(
+                self.tokenize(locality), self.tokenize(query)
+            ) >= 0.8
+
+        if expected in {"city", "municipality"}:
+            same_level_candidates = [
+                candidate for candidate in ranked if city_level(candidate)
+            ]
+        elif expected in {"region", "state", "province", "county"}:
+            same_level_candidates = [
+                candidate
+                for candidate in ranked
+                if str(candidate.get("selected_result_type") or "").lower()
+                in administrative_types
+                and str(candidate.get("selected_result_type") or "").lower()
+                != "country"
+            ]
+        elif expected in {"address", "poi", "street"}:
+            same_level_candidates = [
+                candidate
+                for candidate in ranked
+                if str(candidate.get("selected_result_class") or "").lower()
+                not in {"administrative", "boundary"}
+            ]
+        elif expected == "country":
+            same_level_candidates = [
+                candidate
+                for candidate in ranked
+                if str(candidate.get("selected_result_type") or "").lower()
+                == "country"
+            ]
+        else:
+            first_type = str(ranked[0].get("selected_result_type") or "").lower()
+            same_level_candidates = [
+                candidate
+                for candidate in ranked
+                if first_type
+                and str(candidate.get("selected_result_type") or "").lower()
+                == first_type
+            ]
+        if len(same_level_candidates) < 2:
+            return []
+
+        first = same_level_candidates[0]
+        second = next(
+            (
+                candidate
+                for candidate in same_level_candidates[1:]
+                if not self._same_point(first, candidate)
+            ),
+            None,
+        )
+        if second is None:
+            return []
+        first_confidence = float(first.get("confidence") or 0.0)
+        second_confidence = float(second.get("confidence") or 0.0)
+        confidence_gap = abs(first_confidence - second_confidence)
+        # An unqualified city name is ambiguous whenever two distinct,
+        # same-level candidates survive target matching.  Ranking is useful
+        # for ordering, but it is not evidence that the user intended the
+        # highest-ranked city.  With explicit parent context, require closer
+        # scores so duplicate/low-quality representations do not create
+        # needless stops.
+        if not has_parent_context:
+            confidence_gap = 0.0
+        if has_parent_context and confidence_gap >= 0.08:
+            return []
+        first_label = str(first.get("display_name") or "").strip()
+        second_label = str(second.get("display_name") or "").strip()
+        if not first_label or not second_label or first_label == second_label:
+            return []
+        return [
+            {"display_name": first_label, "lat": first.get("lat"), "lon": first.get("lon")},
+            {"display_name": second_label, "lat": second.get("lat"), "lon": second.get("lon")},
+        ]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _candidate_text(candidate: dict[str, Any]) -> str:
+        parts = [str(candidate.get("display_name") or "")]
+        for field in ("address", "namedetails"):
+            values = candidate.get(field)
+            if is_json_object(values):
+                parts.extend(str(value) for value in values.values())
+        return " ".join(part for part in parts if part).strip()
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _same_point(left: dict[str, Any], right: dict[str, Any]) -> bool:
+        try:
+            return (
+                abs(float(left.get("lat") or 0.0) - float(right.get("lat") or 0.0))
+                < 0.01
+                and abs(
+                    float(left.get("lon") or 0.0)
+                    - float(right.get("lon") or 0.0)
+                )
+                < 0.01
+            )
+        except (TypeError, ValueError):
+            return False
 
     # -------------------------------------------------------------------------
     async def extract_bbox_from_coordinates(
@@ -117,11 +354,15 @@ class NominatimService:
     ) -> str:
         normalized_address = (address or "").strip()
         components = [normalized_address] if normalized_address else []
-        if city and city.lower() not in normalized_address.lower():
+        normalized_city = self.normalize_component(city or "")
+        if normalized_city and normalized_city not in self.normalize_component(
+            normalized_address
+        ):
             components.append(city)
         if country_name:
-            lowered = " ".join(components).lower()
-            if country_name.lower() not in lowered:
+            normalized_components = self.normalize_component(" ".join(components))
+            normalized_country = self.normalize_component(country_name)
+            if normalized_country and normalized_country not in normalized_components:
                 components.append(country_name)
         return ", ".join(component for component in components if component)
 
@@ -235,8 +476,15 @@ class NominatimService:
             "source": "nominatim",
             "selected_result_type": str(data.get("type") or ""),
             "selected_result_class": str(data.get("class") or ""),
+            "selected_address_type": str(data.get("addresstype") or ""),
             "display_name": data.get("display_name"),
         }
+        address_data = data.get("address")
+        if is_json_object(address_data):
+            result["address"] = dict(address_data)
+        namedetails = data.get("namedetails")
+        if is_json_object(namedetails):
+            result["namedetails"] = dict(namedetails)
         if fetched_at is not None:
             result.update(
                 {
@@ -270,35 +518,114 @@ class NominatimService:
 
     # -------------------------------------------------------------------------
     def _location_type_matches(
-        self, *, expected_location_type: str | None, data: dict[str, Any]
+        self,
+        *,
+        expected_location_type: str | None,
+        data: dict[str, Any],
+        address: str | None,
+        query: str,
     ) -> float:
         expected = str(expected_location_type or "").strip().lower()
         if not expected:
-            return 0.0
+            return 1.0
         class_name = str(data.get("class") or "").lower()
         type_name = str(data.get("type") or "").lower()
+        address_data = data.get("address")
+        if not is_json_object(address_data):
+            address_data = {}
         if expected == "coordinates":
-            return 0.25
+            return 3.0
+        address_type = str(data.get("addresstype") or "").strip().lower()
+        if expected in {"city", "municipality"} and address_type in {
+            "country",
+            "state",
+            "region",
+            "county",
+            "province",
+        }:
+            # Nominatim can return an administrative boundary whose generic
+            # ``type`` is ``administrative`` even though it is a parent
+            # region.  The explicit address type is the safer granularity
+            # signal for rejecting that downgrade.
+            return 0.0
         if expected in {"poi", "address"}:
             if class_name in {"amenity", "tourism", "building", "shop", "highway"}:
-                return 0.22
+                return 3.0
             if class_name in {"boundary", "administrative"} or type_name in {
                 "city",
                 "state",
                 "region",
                 "county",
             }:
-                return -0.2
+                return 0.0
+            return 2.0
         if expected == "city" and type_name in {
             "city",
             "town",
             "village",
             "municipality",
         }:
-            return 0.2
+            return 3.0
+        if expected in {"city", "municipality"} and type_name in {
+            "administrative",
+            "boundary",
+        }:
+            locality = next(
+                (
+                    str(address_data.get(key) or "")
+                    for key in (
+                        "city",
+                        "town",
+                        "village",
+                        "municipality",
+                    )
+                    if address_data.get(key)
+                ),
+                "",
+            )
+            candidate_text = self._candidate_text(data)
+            target_tokens = self.tokenize(address) or self.tokenize(query)
+            if locality and (
+                self.compute_token_overlap(
+                    self.tokenize(locality), self.tokenize(query)
+                )
+                >= 0.8
+                or self.compute_token_overlap(
+                    target_tokens, self.tokenize(candidate_text)
+                )
+                >= 0.8
+            ):
+                # Some geocoders represent a city boundary as an administrative
+                # result while still returning the city in address details. It
+                # remains the specific city target and must outrank its parent.
+                return 3.0
+            if target_tokens and (
+                self.compute_token_overlap(
+                    target_tokens, self.tokenize(candidate_text)
+                )
+                >= 0.8
+            ):
+                # Some localized geocoder responses omit a city address field
+                # but put the requested locality in the display name.
+                return 3.0
+            return 0.0
+        if expected in {"city", "municipality"} and type_name in {
+            "country",
+            "state",
+            "region",
+            "county",
+            "province",
+        }:
+            # A parent result must never outrank a more specific city result.
+            return 0.0
         if expected == "region" and type_name in {"state", "region", "county"}:
-            return 0.2
-        return 0.0
+            return 3.0
+        if expected in {"region", "state", "province", "county"} and type_name in {
+            "administrative",
+            "boundary",
+        }:
+            return 2.0
+        return 1.0
 
     # -------------------------------------------------------------------------
     def rank_candidates(
@@ -313,9 +640,19 @@ class NominatimService:
         expected_location_type: str | None,
         fetched_at: datetime | None = None,
     ) -> list[dict[str, Any]]:
-        scored: list[tuple[float, dict[str, Any]]] = []
+        scored: list[tuple[float, float, dict[str, Any]]] = []
         normalized_query = self.normalize_component(query)
         for candidate in candidates:
+            if not self._candidate_matches_requested_target(
+                candidate,
+                address=address,
+                expected_location_type=expected_location_type,
+            ):
+                # Search providers frequently return a nearby child feature
+                # when a named parent facility is not indexed under the
+                # complete phrase.  A partial acronym hit is not sufficient
+                # evidence that the child is the requested target.
+                continue
             formatted = self.format_result(
                 candidate,
                 address=address,
@@ -335,12 +672,52 @@ class NominatimService:
             )
             confidence = float(formatted.get("confidence") or 0.0)
             location_type_bonus = self._location_type_matches(
-                expected_location_type=expected_location_type, data=candidate
+                expected_location_type=expected_location_type,
+                data=candidate,
+                address=address,
+                query=query,
             )
             score = confidence + text_bonus + location_type_bonus
-            scored.append((score, formatted))
-        scored.sort(key=lambda item: item[0], reverse=True)
-        return [item[1] for item in scored]
+            scored.append((location_type_bonus, score, formatted))
+        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        return [item[2] for item in scored]
+
+    # -------------------------------------------------------------------------
+    def _candidate_matches_requested_target(
+        self,
+        candidate: dict[str, Any],
+        *,
+        address: str | None,
+        expected_location_type: str | None,
+    ) -> bool:
+        """Require the requested named target to survive geocoder ranking.
+
+        ``address`` is also used for POI names by the location resolver.  The
+        provider query may return a child feature that shares only an acronym
+        with the requested parent (for example, a shop or parking area).  For
+        named POI/address targets, require all non-descriptor target tokens to
+        appear in the provider's display name or alternate names.  This keeps
+        query variants useful without allowing a nearby partial match to be
+        promoted to a verified target.
+        """
+
+        expected = str(expected_location_type or "").strip().lower()
+        if expected not in {"address", "poi", "street"}:
+            return True
+        target_tokens = self.tokenize(address)
+        if not target_tokens:
+            return False
+        target_tokens = [
+            token
+            for token in target_tokens
+            if token not in self.GENERIC_QUERY_DESCRIPTORS
+        ]
+        if not target_tokens:
+            return False
+        candidate_tokens = self.tokenize(self._candidate_text(candidate))
+        return (
+            self.compute_token_overlap(target_tokens, candidate_tokens) >= 0.8
+        )
 
     # -------------------------------------------------------------------------
     def compute_confidence(

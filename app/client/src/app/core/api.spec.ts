@@ -134,7 +134,13 @@ describe('core/api', () => {
       deepseek_base_url: null,
       credentials: {},
       credential_health: { openai: { api_key: 'unreadable' } },
-      selected_model_context: {},
+      selected_model_context: {
+        provider: '',
+        model: '',
+        context_window_tokens: null,
+        maximum_output_tokens: null,
+        context_profile_source: 'unknown',
+      },
     });
     expect(parsed.active_provider_mode).toBe('cloud');
     expect(parsed.agent_model_provider).toBe('');
@@ -185,6 +191,7 @@ describe('core/api', () => {
         usage_percent: 4.9,
         provider: 'ollama',
         model: 'llama3.2',
+        usage_source: 'provider_reported',
       },
     });
     expect(parsed.request_id).toBe('chat-abc');
@@ -192,6 +199,7 @@ describe('core/api', () => {
     expect(parsed.assistant_message).toBe('done');
     expect(parsed.operation?.kind).toBe('direct_answer');
     expect(parsed.context_usage?.selected_context_window).toBe(2048);
+    expect(parsed.context_usage?.usage_source).toBe('provider_reported');
   });
 
   it('preserves provider provenance metadata instead of dropping it at the API boundary', () => {

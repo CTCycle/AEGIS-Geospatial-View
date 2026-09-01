@@ -12,6 +12,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -130,6 +131,83 @@ def _map_has_location(map_session: dict[str, Any] | None) -> bool:
 
 
 ###############################################################################
+def _has_explicit_coordinate_evidence(trace: dict[str, Any]) -> bool:
+    """Verify that a coordinate-only map is grounded in the user's request.
+
+    Explicit coordinates are already the external grounding supplied by the
+    user, so they do not need a geocoder provider event. The benchmark must
+    still verify the coordinates against the request and the typed extraction;
+    a model-invented coordinate must not count as execution evidence.
+    """
+
+    map_session = _map_session(trace)
+    if not _map_has_location(map_session):
+        return False
+    location = map_session.get("resolved_location") if map_session else None
+    if not isinstance(location, dict):
+        return False
+    location_type = str(
+        location.get("location_type") or location.get("location_class") or ""
+    ).casefold()
+    if location_type not in {"coordinate", "coordinates"}:
+        return False
+
+    contract = _contract(trace)
+    user_text = contract.get("user_text") or trace.get("prompt")
+    if not isinstance(user_text, str) or not user_text.strip():
+        return False
+    user_text_casefolded = user_text.casefold()
+    numeric_values = [
+        float(value)
+        for value in re.findall(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)", user_text)
+    ]
+    map_latitude = location.get("latitude")
+    map_longitude = location.get("longitude")
+    if not isinstance(map_latitude, int | float) or isinstance(map_latitude, bool):
+        return False
+    if not isinstance(map_longitude, int | float) or isinstance(map_longitude, bool):
+        return False
+
+    signals = contract.get("location_signals")
+    if not isinstance(signals, list):
+        return False
+    for signal in signals:
+        if not isinstance(signal, dict):
+            continue
+        signal_type = str(signal.get("signal_type") or "").casefold()
+        latitude = signal.get("latitude")
+        longitude = signal.get("longitude")
+        if signal_type not in {"coordinate", "coordinates"}:
+            continue
+        if not isinstance(latitude, int | float) or isinstance(latitude, bool):
+            continue
+        if not isinstance(longitude, int | float) or isinstance(longitude, bool):
+            continue
+        if abs(float(latitude) - float(map_latitude)) > 1e-6 or abs(
+            float(longitude) - float(map_longitude)
+        ) > 1e-6:
+            continue
+
+        raw_values = (
+            signal.get("raw_value"),
+            signal.get("normalized_value"),
+        )
+        if any(
+            isinstance(value, str)
+            and value.strip()
+            and value.casefold() in user_text_casefolded
+            for value in raw_values
+        ):
+            return True
+        for index in range(len(numeric_values) - 1):
+            if abs(numeric_values[index] - float(latitude)) <= 1e-6 and abs(
+                numeric_values[index + 1] - float(longitude)
+            ) <= 1e-6:
+                return True
+    return False
+
+
+###############################################################################
 def _overlay_ids(traces: list[dict[str, Any]]) -> set[str]:
     overlays: set[str] = set()
     for trace in traces:
@@ -162,15 +240,72 @@ def _has_error(trace: dict[str, Any]) -> bool:
 
 
 ###############################################################################
+def _live_provider_block_reason(trace: dict[str, Any]) -> str | None:
+    """Classify unavailable configured upstreams without turning them into passes."""
+
+    status_code = int(trace.get("status_code") or 0)
+    if status_code in {502, 503, 504}:
+        return f"http_{status_code}"
+    response = _response(trace)
+    operation = response.get("operation")
+    if not isinstance(operation, dict):
+        operation = {}
+    provider_error = operation.get("provider_error")
+    failure_category = operation.get("failure_category")
+    if isinstance(provider_error, dict):
+        failure_category = provider_error.get("category") or failure_category
+    if failure_category == "provider_api":
+        return "provider_unavailable"
+    diagnostic = response.get("failure_diagnostic")
+    if isinstance(diagnostic, dict) and diagnostic.get("category") == "provider_api":
+        return "provider_unavailable"
+    normalized = json.dumps(response, ensure_ascii=True, default=str).casefold()
+    if any(
+        marker in normalized
+        for marker in (
+            "could not perform structured extraction",
+            "failed while processing structured extraction",
+            "provider request failed",
+        )
+    ):
+        return "provider_unavailable"
+    return None
+
+
+###############################################################################
 def _answer(trace: dict[str, Any]) -> str:
     value = _response(trace).get("assistant_message")
     return value if isinstance(value, str) else ""
 
 
 ###############################################################################
-def _valid_tool_arguments(tool_calls: list[dict[str, Any]]) -> bool:
+def _valid_tool_arguments(
+    tool_calls: list[dict[str, Any]], traces: list[dict[str, Any]] | None = None
+) -> bool:
     if not tool_calls:
-        return False
+        # A location-only map is a valid execution even when the request did
+        # not need a native capability call. Its typed provider event and
+        # verified map session are the argument/evidence boundary. Explicit
+        # user coordinates are also a valid grounding boundary and do not
+        # require a redundant geocoder request.
+        return bool(
+            traces
+            and any(_has_explicit_coordinate_evidence(trace) for trace in traces)
+        ) or bool(
+            traces
+            and all(_map_has_location(_map_session(trace)) for trace in traces)
+            and all(
+                _has_provider_provenance(event)
+                for trace in traces
+                for event in trace.get("provider_events", [])
+                if isinstance(event, dict)
+            )
+            and any(
+                isinstance(event, dict)
+                for trace in traces
+                for event in trace.get("provider_events", [])
+            )
+        )
 
     def valid_value(key: str, value: Any) -> bool:
         normalized = key.casefold()
@@ -203,6 +338,423 @@ def _valid_tool_arguments(tool_calls: list[dict[str, Any]]) -> bool:
 ###############################################################################
 def _assertion_result(name: str, passed: bool, reason: str) -> dict[str, Any]:
     return {"name": name, "passed": passed, "reason": reason}
+
+
+_CONTEXT_USAGE_SOURCES = frozenset(
+    {"not_measured", "estimated", "provider_reported", "hybrid"}
+)
+_FAILURE_CATEGORIES = frozenset(
+    {
+        "model_capability",
+        "provider_api",
+        "schema_definition",
+        "response_parsing",
+        "context_limit",
+    }
+)
+_PARENT_LOCATION_TYPES = frozenset(
+    {
+        "country",
+        "region",
+        "state",
+        "province",
+        "county",
+        "administrative",
+        "administrative_area",
+    }
+)
+
+
+def _context_usage_records(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for trace in traces:
+        response_usage = _response(trace).get("context_usage")
+        if isinstance(response_usage, dict):
+            records.append(response_usage)
+        tool_payload = trace.get("tool_payload")
+        if isinstance(tool_payload, dict):
+            for usage in tool_payload.get("context_usages", []):
+                if isinstance(usage, dict):
+                    records.append(usage)
+    return records
+
+
+def _non_negative_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _usage_input_tokens(usage: dict[str, Any]) -> int | None:
+    reported = usage.get("reported_input_tokens")
+    if _non_negative_int(reported):
+        return reported
+    estimated = usage.get("estimated_input_tokens")
+    return estimated if _non_negative_int(estimated) else None
+
+
+def _evaluate_context_usage_invariants(
+    traces: list[dict[str, Any]],
+) -> dict[str, Any]:
+    records = _context_usage_records(traces)
+    if not records:
+        return _assertion_result(
+            "context_usage_invariants",
+            False,
+            "No context-usage sample was recorded.",
+        )
+    for usage in records:
+        source = usage.get("usage_source")
+        if source not in _CONTEXT_USAGE_SOURCES:
+            return _assertion_result(
+                "context_usage_invariants",
+                False,
+                f"Unsupported context usage source: {source!r}.",
+            )
+        estimated = usage.get("estimated_input_tokens")
+        if not _non_negative_int(estimated):
+            return _assertion_result(
+                "context_usage_invariants",
+                False,
+                "Every sample must preserve a non-negative integer estimate.",
+            )
+        for key in ("reported_input_tokens", "reported_output_tokens"):
+            value = usage.get(key)
+            if value is not None and not _non_negative_int(value):
+                return _assertion_result(
+                    "context_usage_invariants",
+                    False,
+                    f"{key} must be null or a non-negative integer.",
+                )
+        percent = usage.get("usage_percent")
+        cap = usage.get("selected_context_window")
+        usable = usage.get("usable_prompt_budget_tokens")
+        if percent is not None:
+            if not isinstance(percent, int | float) or isinstance(percent, bool):
+                return _assertion_result(
+                    "context_usage_invariants",
+                    False,
+                    "A determinate percentage must be numeric.",
+                )
+            if (
+                percent < 0
+                or not _non_negative_int(cap)
+                or not isinstance(usable, int)
+                or usable <= 0
+            ):
+                return _assertion_result(
+                    "context_usage_invariants",
+                    False,
+                    "A determinate percentage requires a positive usable budget and known cap.",
+                )
+        if cap is None and percent is not None:
+            return _assertion_result(
+                "context_usage_invariants",
+                False,
+                "Unknown-cap samples must remain indeterminate.",
+            )
+        peak = usage.get("peak_request_tokens")
+        total_input = usage.get("total_input_tokens")
+        total_output = usage.get("total_output_tokens")
+        if peak is not None and not _non_negative_int(peak):
+            return _assertion_result(
+                "context_usage_invariants",
+                False,
+                "Peak request tokens must be a non-negative integer when present.",
+            )
+        if total_input is not None and not _non_negative_int(total_input):
+            return _assertion_result(
+                "context_usage_invariants",
+                False,
+                "Total input tokens must be a non-negative integer when present.",
+            )
+        if total_output is not None and not _non_negative_int(total_output):
+            return _assertion_result(
+                "context_usage_invariants",
+                False,
+                "Total output tokens must be a non-negative integer when present.",
+            )
+        if (
+            isinstance(peak, int)
+            and isinstance(total_input, int)
+            and peak > total_input
+        ):
+            return _assertion_result(
+                "context_usage_invariants",
+                False,
+                "Peak input usage cannot exceed total input usage.",
+            )
+        phases = usage.get("phases")
+        if not isinstance(phases, dict):
+            continue
+        phase_inputs: list[int] = []
+        for phase_name, phase in phases.items():
+            if not isinstance(phase, dict):
+                return _assertion_result(
+                    "context_usage_invariants",
+                    False,
+                    f"Phase {phase_name!r} is not an object.",
+                )
+            phase_source = phase.get("usage_source")
+            if phase_source is not None and phase_source not in _CONTEXT_USAGE_SOURCES:
+                return _assertion_result(
+                    "context_usage_invariants",
+                    False,
+                    f"Phase {phase_name!r} has an unsupported usage source.",
+                )
+            input_tokens = _usage_input_tokens(phase)
+            if input_tokens is not None:
+                phase_inputs.append(input_tokens)
+        if phase_inputs and isinstance(peak, int) and peak != max(phase_inputs):
+            return _assertion_result(
+                "context_usage_invariants",
+                False,
+                "Peak request usage does not match the largest phase footprint.",
+            )
+        if phase_inputs and isinstance(total_input, int) and total_input != sum(phase_inputs):
+            return _assertion_result(
+                "context_usage_invariants",
+                False,
+                "Total input usage does not match the phase totals.",
+            )
+    return _assertion_result(
+        "context_usage_invariants",
+        True,
+        "Usage sources, caps, phase totals, and peak semantics are consistent.",
+    )
+
+
+def _evaluate_location_target_consistency(
+    scenario: dict[str, Any], traces: list[dict[str, Any]]
+) -> dict[str, Any]:
+    maps = [_map_session(trace) for trace in traces]
+    available_maps = [item for item in maps if isinstance(item, dict)]
+    if not available_maps:
+        if _has_allowed_clarification(scenario, traces):
+            return _assertion_result(
+                "location_target_consistency",
+                True,
+                "The request stopped with an explicit clarification instead of an unverified target.",
+            )
+        return _assertion_result(
+            "location_target_consistency",
+            False,
+            "No map target was returned for a location consistency check.",
+        )
+    geographic_scale = str(
+        scenario.get("dimensions", {}).get("geographic_scale", "")
+    ).casefold()
+    fine_scale = geographic_scale in {
+        "city",
+        "town",
+        "village",
+        "neighborhood",
+        "district",
+        "address",
+        "poi",
+    }
+    for map_session in available_maps:
+        location = map_session.get("resolved_location")
+        center = map_session.get("center")
+        if not isinstance(location, dict) or not isinstance(center, dict):
+            return _assertion_result(
+                "location_target_consistency",
+                False,
+                "A map session is missing its resolved location or center.",
+            )
+        if (
+            location.get("latitude") != center.get("latitude")
+            or location.get("longitude") != center.get("longitude")
+        ):
+            return _assertion_result(
+                "location_target_consistency",
+                False,
+                "The viewport center does not match the resolved target.",
+            )
+        location_type = str(
+            location.get("location_type") or location.get("location_class") or ""
+        ).casefold()
+        if fine_scale and location_type in _PARENT_LOCATION_TYPES:
+            return _assertion_result(
+                "location_target_consistency",
+                False,
+                "A specific location was silently downgraded to a parent area.",
+            )
+    return _assertion_result(
+        "location_target_consistency",
+        True,
+        "Resolved target, viewport center, and geographic specificity are consistent.",
+    )
+
+
+def _evaluate_failure_diagnostics(traces: list[dict[str, Any]]) -> dict[str, Any]:
+    for trace in traces:
+        response = _response(trace)
+        operation = response.get("operation")
+        contract = _contract(trace)
+        provider_error = (
+            operation.get("provider_error")
+            if isinstance(operation, dict)
+            else None
+        )
+        failure_category = (
+            operation.get("failure_category")
+            if isinstance(operation, dict)
+            else None
+        ) or contract.get("failure_category")
+        if (
+            isinstance(operation, dict)
+            and operation.get("kind") == "clarification"
+            and not isinstance(provider_error, dict)
+            and not isinstance(failure_category, str)
+            and not isinstance(response.get("failure_diagnostic"), dict)
+            and int(trace.get("status_code") or 0) < 400
+        ):
+            # A clarification is a deliberate safe stop, not an execution
+            # failure requiring a failure category.
+            continue
+        failure_present = (
+            int(trace.get("status_code") or 0) >= 400
+            or isinstance(provider_error, dict)
+            or isinstance(failure_category, str)
+            or isinstance(response.get("failure_diagnostic"), dict)
+            or (
+                isinstance(operation, dict)
+                and operation.get("status") in {"failed", "partial"}
+            )
+        )
+        if not failure_present:
+            continue
+        category = (
+            provider_error.get("category")
+            if isinstance(provider_error, dict)
+            else None
+        ) or failure_category
+        if category not in _FAILURE_CATEGORIES:
+            return _assertion_result(
+                "categorized_failures",
+                False,
+                "A failed or partial operation lacks a recognized failure category.",
+            )
+    return _assertion_result(
+        "categorized_failures",
+        True,
+        "Every observed failure or partial operation is categorized.",
+    )
+
+
+def _evaluate_no_false_success(traces: list[dict[str, Any]]) -> dict[str, Any]:
+    for trace in traces:
+        response = _response(trace)
+        operation = response.get("operation")
+        if not isinstance(operation, dict):
+            continue
+        if operation.get("status") != "success":
+            continue
+        if operation.get("kind") == "map_session" and not _map_has_location(
+            _map_session(trace)
+        ):
+            return _assertion_result(
+                "no_false_success",
+                False,
+                "A successful map operation lacks a verified target and viewport.",
+            )
+        if operation.get("failure_category") or isinstance(
+            operation.get("provider_error"), dict
+        ):
+            return _assertion_result(
+                "no_false_success",
+                False,
+                "A successful operation also contains failure diagnostics.",
+            )
+    return _assertion_result(
+        "no_false_success",
+        True,
+        "No operation was reported successful without corresponding verified evidence.",
+    )
+
+
+def _evaluate_clarification_correctness(
+    scenario: dict[str, Any], traces: list[dict[str, Any]]
+) -> dict[str, Any]:
+    expected = scenario.get("expected", {})
+    if expected.get("clarification") != "required":
+        return _assertion_result(
+            "clarification_correctness",
+            True,
+            "The scenario does not require clarification.",
+        )
+    if not traces:
+        return _assertion_result(
+            "clarification_correctness",
+            False,
+            "No turn was recorded for a required clarification.",
+        )
+    trace = traces[-1]
+    response = _response(trace)
+    decision = response.get("decision")
+    clarification = (
+        decision.get("clarification") if isinstance(decision, dict) else None
+    )
+    plan = decision.get("plan") if isinstance(decision, dict) else None
+    question = clarification.get("question") if isinstance(clarification, dict) else None
+    operation = response.get("operation")
+    operation_executed = (
+        isinstance(operation, dict)
+        and operation.get("status") == "success"
+        and operation.get("kind") == "map_session"
+    )
+    if (
+        not isinstance(plan, dict)
+        or plan.get("state") != "clarify"
+        or not isinstance(question, str)
+        or not question.strip()
+        or operation_executed
+    ):
+        return _assertion_result(
+            "clarification_correctness",
+            False,
+            "The ambiguous request did not yield a non-executing clarification.",
+        )
+    return _assertion_result(
+        "clarification_correctness",
+        True,
+        "The ambiguous request produced an explicit clarification without executing a new map operation.",
+    )
+
+
+def _evaluate_deadline_compliance(
+    scenario: dict[str, Any], traces: list[dict[str, Any]]
+) -> dict[str, Any]:
+    expected = scenario.get("expected", {})
+    deadline = scenario.get("max_turn_seconds") or expected.get("max_turn_seconds")
+    if (
+        not isinstance(deadline, (int, float))
+        or isinstance(deadline, bool)
+        or deadline <= 0
+    ):
+        return _assertion_result(
+            "deadline_compliance",
+            False,
+            "The scenario did not declare a positive benchmark deadline.",
+        )
+    for trace in traces:
+        duration = trace.get("duration_seconds")
+        if not isinstance(duration, (int, float)) or isinstance(duration, bool):
+            return _assertion_result(
+                "deadline_compliance",
+                False,
+                "The benchmark did not record a numeric turn duration.",
+            )
+        if duration > deadline:
+            return _assertion_result(
+                "deadline_compliance",
+                False,
+                f"A turn exceeded the declared {deadline:g}-second deadline.",
+            )
+    return _assertion_result(
+        "deadline_compliance",
+        True,
+        "Every recorded turn completed within its declared deadline.",
+    )
 
 
 _CAPABILITY_FAMILY_TOKENS: dict[str, tuple[str, ...]] = {
@@ -273,6 +825,18 @@ def _has_structured_clarification(trace: dict[str, Any]) -> bool:
     if contract.get("expected_frontend_update") == "clarification":
         return True
     return isinstance(contract.get("clarification_plan"), dict)
+
+
+def _has_allowed_clarification(
+    scenario: dict[str, Any], traces: list[dict[str, Any]]
+) -> bool:
+    expected = scenario.get("expected")
+    return (
+        isinstance(expected, dict)
+        and expected.get("clarification") == "allowed"
+        and bool(traces)
+        and _has_structured_clarification(traces[-1])
+    )
 
 
 def _has_provider_provenance(result: dict[str, Any]) -> bool:
@@ -346,12 +910,22 @@ def _evaluate_expected_properties(
     ]
 
     provider_events = _provider_events(traces)
+    last_trace = traces[-1] if traces else {}
+    has_clarification = _has_structured_clarification(last_trace)
+    allowed_clarification = _has_allowed_clarification(scenario, traces)
     capabilities = _capability_ids(tool_calls) | _overlay_ids(traces) | {
         str(item.get("capability_id")).strip()
         for item in provider_events
         if isinstance(item.get("capability_id"), str)
         and item.get("capability_id").strip()
     }
+    explicit_coordinate_evidence_count = sum(
+        _has_explicit_coordinate_evidence(trace) for trace in traces
+    )
+    if explicit_coordinate_evidence_count:
+        # Coordinates supplied by the user are first-class location evidence,
+        # even though no external location provider was needed.
+        capabilities.add("location")
     missing_families = []
     for family in expected.get("capability_families", []):
         family_key = str(family).strip().casefold()
@@ -364,16 +938,22 @@ def _evaluate_expected_properties(
     results.append(
         _assertion_result(
             "expected_capability_families",
-            not missing_families,
+            allowed_clarification or not missing_families,
             "All expected capability families were observed."
             if not missing_families
+            else "An explicit clarification was allowed before capability execution."
+            if allowed_clarification
             else f"Missing capability families: {', '.join(missing_families)}.",
         )
     )
 
     minimum_tool_count = expected.get("minimum_tool_count")
-    execution_evidence_count = len(tool_calls) + len(provider_events)
-    count_passed = (
+    execution_evidence_count = (
+        len(tool_calls)
+        + len(provider_events)
+        + explicit_coordinate_evidence_count
+    )
+    count_passed = allowed_clarification or (
         isinstance(minimum_tool_count, int)
         and execution_evidence_count >= minimum_tool_count
     )
@@ -382,14 +962,13 @@ def _evaluate_expected_properties(
             "expected_minimum_tool_count",
             count_passed,
             f"Observed {execution_evidence_count} execution events "
-            f"({len(tool_calls)} tool calls, {len(provider_events)} provider events); "
+            f"({len(tool_calls)} tool calls, {len(provider_events)} provider events, "
+            f"{explicit_coordinate_evidence_count} explicit coordinate evidence); "
             f"required at least {minimum_tool_count}.",
         )
     )
 
     clarification = expected.get("clarification")
-    last_trace = traces[-1] if traces else {}
-    has_clarification = _has_structured_clarification(last_trace)
     clarification_passed = (
         clarification == "allowed"
         or clarification == "required"
@@ -414,8 +993,10 @@ def _evaluate_expected_properties(
     results.append(
         _assertion_result(
             "expected_rendering_type",
-            bool(expected_rendering & observed_rendering),
-            f"Observed rendering types: {sorted(observed_rendering)}; accepted: {sorted(expected_rendering)}.",
+            allowed_clarification or bool(expected_rendering & observed_rendering),
+            "An explicit clarification was allowed without rendering a map."
+            if allowed_clarification
+            else f"Observed rendering types: {sorted(observed_rendering)}; accepted: {sorted(expected_rendering)}.",
         )
     )
 
@@ -430,14 +1011,23 @@ def _evaluate_expected_properties(
     tool_result_provenance = bool(successful_results) and all(
         _has_provider_provenance(result) for result in successful_results
     )
-    provenance_passed = not provenance_required or (
-        tool_result_provenance if successful_results else provider_event_provenance
+    # Control-plane capability selections do not themselves have provider
+    # provenance. The verified location/map provider event is the authoritative
+    # evidence for those executions; data-bearing tool results still need their
+    # own provenance when no provider event exists.
+    provenance_evidence = (
+        tool_result_provenance or provider_event_provenance
+        if successful_results
+        else provider_event_provenance or bool(explicit_coordinate_evidence_count)
+    )
+    provenance_passed = (
+        allowed_clarification or not provenance_required or provenance_evidence
     )
     results.append(
         _assertion_result(
             "expected_provenance",
             provenance_passed,
-            "Every successful tool result has provider and retrieval provenance."
+            "Every successful execution has provider and retrieval provenance."
             if provenance_passed
             else "A successful tool result is missing provider or retrieval provenance.",
         )
@@ -445,7 +1035,9 @@ def _evaluate_expected_properties(
 
     if expected.get("fabrication_forbidden") is True:
         grounded = (
-            tool_result_provenance if successful_results else provider_event_provenance
+            tool_result_provenance or provider_event_provenance
+            if successful_results
+            else provider_event_provenance or bool(explicit_coordinate_evidence_count)
         )
         grounded_or_limited = grounded or _has_explicit_limitation(traces)
         results.append(
@@ -465,6 +1057,7 @@ def _evaluate_model_assertion(
     name: str,
     traces: list[dict[str, Any]],
     tool_calls: list[dict[str, Any]],
+    scenario: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     contracts = [_contract(trace) for trace in traces]
     maps = [_map_session(trace) for trace in traces]
@@ -485,6 +1078,19 @@ def _evaluate_model_assertion(
     last_response = _response(last_trace)
     last_map = maps[-1] if maps else None
 
+    if name == "context_usage_invariants":
+        return _evaluate_context_usage_invariants(traces)
+    if name == "location_target_consistency":
+        return _evaluate_location_target_consistency(scenario or {}, traces)
+    if name == "categorized_failures":
+        return _evaluate_failure_diagnostics(traces)
+    if name == "no_false_success":
+        return _evaluate_no_false_success(traces)
+    if name == "clarification_correctness":
+        return _evaluate_clarification_correctness(scenario or {}, traces)
+    if name == "deadline_compliance":
+        return _evaluate_deadline_compliance(scenario or {}, traces)
+
     if name in {"one_location_tool", "rendered_map"}:
         return _assertion_result(
             name,
@@ -492,6 +1098,15 @@ def _evaluate_model_assertion(
             "A verified map session contains a resolved location, center, and basemap."
             if map_available
             else "No verified map session was returned.",
+        )
+    if name == "location_or_clarification":
+        passed = map_available or _has_structured_clarification(last_trace)
+        return _assertion_result(
+            name,
+            passed,
+            "The request produced a verified map or an explicit safe clarification."
+            if passed
+            else "The request produced neither a verified map nor an explicit clarification.",
         )
     if name in {"air_quality_tool", "environment_layer"}:
         passed = any(
@@ -690,13 +1305,17 @@ def _evaluate_model_assertion(
             else "POI and weather were not both executed.",
         )
     if name == "valid_arguments":
-        passed = _valid_tool_arguments(tool_calls)
+        passed = _valid_tool_arguments(tool_calls, traces) or (
+            _has_allowed_clarification(scenario or {}, traces)
+            and not tool_calls
+            and not map_available
+        )
         return _assertion_result(
             name,
             passed,
-            "All model tool arguments passed coordinate and bbox checks."
+            "All execution arguments passed coordinate and bbox checks."
             if passed
-            else "A tool argument was invalid or no tool call was made.",
+            else "An execution argument was invalid, or no verified execution or safe clarification was made.",
         )
     if name == "partial_failure_is_explicit":
         failure_markers = (
@@ -826,9 +1445,15 @@ def evaluate_model_scenario(
 ) -> dict[str, Any]:
     tool_calls = _tool_calls(traces)
     provider_events = _provider_events(traces)
+    explicit_coordinate_evidence_count = sum(
+        _has_explicit_coordinate_evidence(trace) for trace in traces
+    )
     assertion_results = [
-        _evaluate_model_assertion(str(name), traces, tool_calls)
-        for name in scenario.get("assertions", [])
+        _evaluate_model_assertion(str(name), traces, tool_calls, scenario)
+        for name in [
+            *scenario.get("assertions", []),
+            *scenario.get("invariants", []),
+        ]
     ]
     assertion_results.extend(
         _evaluate_expected_properties(scenario, traces, tool_calls)
@@ -854,7 +1479,11 @@ def evaluate_model_scenario(
         "assertions": assertion_results,
         "tool_calls": len(tool_calls),
         "provider_events": len(provider_events),
-        "execution_evidence": len(tool_calls) + len(provider_events),
+        "execution_evidence": (
+            len(tool_calls)
+            + len(provider_events)
+            + explicit_coordinate_evidence_count
+        ),
         "duplicate_tool_calls": len(fingerprints) - len(set(fingerprints)),
         "unnecessary_tool_calls": unnecessary_tool_calls,
         "failed_tool_calls": sum(
@@ -864,7 +1493,9 @@ def evaluate_model_scenario(
 
 
 ###############################################################################
-def _model_lane_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
+def _model_lane_metrics(
+    results: list[dict[str, Any]], *, lane: str = "model_in_loop"
+) -> dict[str, Any]:
     evaluations = [result.get("evaluation", {}) for result in results]
     assertion_results = [
         assertion
@@ -890,13 +1521,24 @@ def _model_lane_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
     ]
     scenario_count = len(results)
     passed = sum(1 for result in results if result.get("status") == "passed")
+    blocked = sum(1 for result in results if result.get("status") == "blocked")
+    available = scenario_count - blocked
+    if passed == scenario_count:
+        status = "passed"
+    elif passed + blocked == scenario_count and blocked:
+        status = "blocked"
+    else:
+        status = "failed"
     return {
-        "lane": "model_in_loop",
-        "status": "passed" if passed == scenario_count else "failed",
+        "lane": lane,
+        "status": status,
         "scenario_count": scenario_count,
         "passed_scenarios": passed,
-        "failed_scenarios": scenario_count - passed,
+        "failed_scenarios": scenario_count - passed - blocked,
+        "blocked_scenarios": blocked,
+        "available_scenarios": available,
         "task_success_rate": passed / scenario_count if scenario_count else 1.0,
+        "available_success_rate": passed / available if available else None,
         "assertion_pass_rate": (
             sum(1 for item in assertion_results if item.get("passed"))
             / len(assertion_results)
@@ -928,6 +1570,14 @@ def _model_lane_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
         "peak_context_usage_percent": max(
             (float(value) for value in usages if isinstance(value, int | float)),
             default=0.0,
+        ),
+        "context_usage_sample_count": len(
+            [
+                usage
+                for result in results
+                for trace in result.get("turns", [])
+                for usage in _context_usage_records([trace])
+            ]
         ),
     }
 
@@ -1177,6 +1827,7 @@ def run_scripted_fault_lane(*, manifest_path: Path, output_dir: Path) -> dict[st
         "manifest": str(manifest_path),
         "captured_at": datetime.now(timezone.utc).isoformat(),
         "lane": "scripted_fault",
+        "validation_type": "deterministic",
         "status": metrics["status"],
         "results": results,
     }
@@ -1201,6 +1852,7 @@ def run_manifest(
     output_dir: Path,
     base_url: str,
     lane: str | None = None,
+    repetitions: int = 1,
 ) -> dict[str, Any]:
     if lane == "scripted_fault":
         return run_scripted_fault_lane(
@@ -1217,74 +1869,84 @@ def run_manifest(
     started = time.perf_counter()
     health = client.get("/api/health")
     results: list[dict[str, Any]] = []
-    for scenario in scenarios:
-        conversation_response = client.post(
-            "/api/conversations",
-            json={"title": f"benchmark {scenario['id']}"},
-        )
-        conversation_payload = _json_response(conversation_response)
-        conversation_id = conversation_payload.get("conversation_id")
-        if not isinstance(conversation_id, str) or not conversation_id:
-            conversation_id = f"benchmark-{uuid4().hex}"
-        turns = scenario.get("turns") or [scenario.get("prompt", "")]
-        trace: list[dict[str, Any]] = []
-        scenario_started = time.perf_counter()
-        for turn in turns:
-            response = client.post(
-                "/api/chat/turn",
-                json={"conversation_id": conversation_id, "message": turn},
+    for repetition in range(1, repetitions + 1):
+        for scenario in scenarios:
+            conversation_response = client.post(
+                "/api/conversations",
+                json={"title": f"benchmark {scenario['id']} r{repetition}"},
             )
-            payload = _json_response(response)
-            tool_payload = payload.get("tool_payload")
-            tool_calls = (
-                tool_payload.get("tool_calls", [])
-                if isinstance(tool_payload, dict)
-                else []
-            )
-            trace.append(
+            conversation_payload = _json_response(conversation_response)
+            conversation_id = conversation_payload.get("conversation_id")
+            if not isinstance(conversation_id, str) or not conversation_id:
+                conversation_id = f"benchmark-{uuid4().hex}"
+            turns = scenario.get("turns") or [scenario.get("prompt", "")]
+            trace: list[dict[str, Any]] = []
+            scenario_started = time.perf_counter()
+            for turn in turns:
+                turn_started = time.perf_counter()
+                response = client.post(
+                    "/api/chat/turn",
+                    json={"conversation_id": conversation_id, "message": turn},
+                )
+                payload = _json_response(response)
+                tool_payload = payload.get("tool_payload")
+                tool_calls = (
+                    tool_payload.get("tool_calls", [])
+                    if isinstance(tool_payload, dict)
+                    else []
+                )
+                trace.append(
+                    {
+                        "prompt": turn,
+                        "duration_seconds": time.perf_counter() - turn_started,
+                        "status_code": response.status_code,
+                        "tool_calls": tool_calls,
+                        "tool_results": tool_payload.get("tool_results", [])
+                        if isinstance(tool_payload, dict)
+                        else [],
+                        "provider_events": tool_payload.get("provider_events", [])
+                        if isinstance(tool_payload, dict)
+                        else [],
+                        "response": payload,
+                        "map_session": payload.get("map_session"),
+                        "request_fingerprints": [
+                            _fingerprint(item)
+                            for item in tool_calls
+                            if isinstance(item, dict)
+                        ],
+                    }
+                )
+            evaluation = evaluate_model_scenario(scenario, trace)
+            blocked_reasons = [
+                reason
+                for item in trace
+                if (reason := _live_provider_block_reason(item)) is not None
+            ]
+            blocked = bool(blocked_reasons)
+            results.append(
                 {
-                    "prompt": turn,
-                    "status_code": response.status_code,
-                    "tool_calls": tool_calls,
-                    "tool_results": tool_payload.get("tool_results", [])
-                    if isinstance(tool_payload, dict)
-                    else [],
-                    "provider_events": tool_payload.get("provider_events", [])
-                    if isinstance(tool_payload, dict)
-                    else [],
-                    "response": payload,
-                    "map_session": payload.get("map_session"),
-                    "request_fingerprints": [
-                        _fingerprint(item)
-                        for item in tool_calls
-                        if isinstance(item, dict)
-                    ],
+                    "scenario_id": scenario["id"],
+                    "repetition": repetition,
+                    "conversation_id": conversation_id,
+                    "elapsed_seconds": time.perf_counter() - scenario_started,
+                    "turns": trace,
+                    "evaluation": evaluation,
+                    "blocked_reasons": sorted(set(blocked_reasons)),
+                    "status": "blocked"
+                    if blocked
+                    else ("passed" if evaluation["passed"] else "failed"),
                 }
             )
-        evaluation = evaluate_model_scenario(scenario, trace)
-        blocked = any(
-            item["status_code"] == 503
-            or "could not perform structured extraction" in str(item["response"])
-            or "credentials are not configured" in str(item["response"])
-            for item in trace
-        )
-        results.append(
-            {
-                "scenario_id": scenario["id"],
-                "conversation_id": conversation_id,
-                "elapsed_seconds": time.perf_counter() - scenario_started,
-                "turns": trace,
-                "evaluation": evaluation,
-                "status": "blocked"
-                if blocked
-                else ("passed" if evaluation["passed"] else "failed"),
-            }
-        )
-    metrics = _model_lane_metrics(results)
+    metrics = _model_lane_metrics(
+        results,
+        lane=lane or str(manifest.get("default_lane") or "model_in_loop"),
+    )
     bundle = {
         "manifest": str(manifest_path),
         "captured_at": datetime.now(timezone.utc).isoformat(),
         "base_url": base_url,
+        "repetitions": repetitions,
+        "validation_type": "live_provider",
         "health": {
             "status_code": health.status_code,
             "payload": _json_response(health),
@@ -1319,12 +1981,16 @@ def main() -> int:
     parser.add_argument(
         "--lane", choices=["model_in_loop", "scripted_fault", "live_smoke"]
     )
+    parser.add_argument("--repetitions", type=int, default=1)
     args = parser.parse_args()
+    if args.repetitions < 1:
+        parser.error("--repetitions must be at least 1")
     bundle = run_manifest(
         manifest_path=args.manifest,
         output_dir=args.output,
         base_url=args.base_url,
         lane=args.lane,
+        repetitions=args.repetitions,
     )
     return 0 if bundle.get("status") in {None, "passed", "recorded"} else 1
 

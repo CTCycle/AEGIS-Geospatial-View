@@ -15,6 +15,13 @@ const settings = {
   deepseek_base_url: null,
   credentials: {},
   credential_health: {},
+  selected_model_context: {
+    provider: '',
+    model: '',
+    context_window_tokens: null,
+    maximum_output_tokens: null,
+    context_profile_source: 'unknown',
+  },
 };
 
 const setup = (providerId: string, support: GeospatialProviderAccountSetup['automation']['support'] = 'agent_assisted'): GeospatialProviderAccountSetup => ({

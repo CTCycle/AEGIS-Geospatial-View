@@ -61,6 +61,7 @@ def test_structured_output_uses_deepseek_json_object_mode(monkeypatch) -> None:
     assert call["response_format"] == {"type": "json_object"}
     assert "JSON schema" in call["messages"][-1]["content"]
     assert '"answer"' in call["messages"][-1]["content"]
+    assert sum("JSON schema" in str(message.get("content")) for message in call["messages"]) == 1
     assert call["messages"][-1]["content"] == build_deepseek_json_schema_instruction(
         _StructuredPayload.model_json_schema()
     )

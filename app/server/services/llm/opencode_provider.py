@@ -130,11 +130,27 @@ class OpenCodeProvider(DeepSeekProvider):
         for key in (
             "context_window_tokens",
             "context_length",
+            "context_window",
+            "max_context_tokens",
             "maximum_output_tokens",
             "max_output_tokens",
+            "max_completion_tokens",
         ):
             if item.get(key) is not None:
                 metadata[key] = item[key]
+        if any(
+            key in metadata
+            for key in (
+                "context_window_tokens",
+                "context_length",
+                "context_window",
+                "max_context_tokens",
+                "maximum_output_tokens",
+                "max_output_tokens",
+                "max_completion_tokens",
+            )
+        ):
+            metadata["context_profile_source"] = "provider_models_api"
         raw_capabilities = item.get("capabilities")
         if is_json_array(raw_capabilities):
             normalized = {

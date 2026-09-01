@@ -62,6 +62,8 @@ describe('pages/geospatial-page.component', () => {
       ollama_url: 'http://127.0.0.1:11434',
       credentials: {},
       selected_model_context: {
+        provider: 'openai',
+        model: 'gpt-4.1',
         context_window_tokens: 1_047_576,
         maximum_output_tokens: 32_768,
         context_profile_source: 'openai_model_catalog',
@@ -640,6 +642,8 @@ describe('pages/geospatial-page.component', () => {
       ollama_url: 'http://127.0.0.1:11434',
       credentials: {},
       selected_model_context: {
+        provider: 'ollama',
+        model: 'qwen3.5:2b',
         context_window_tokens: 40_960,
         maximum_output_tokens: null,
         context_profile_source: 'provider_metadata',
@@ -653,6 +657,108 @@ describe('pages/geospatial-page.component', () => {
     expect(fixture.componentInstance.contextUsage?.selected_context_window).toBe(40_960);
     expect(fixture.componentInstance.contextUsage?.provider).toBe('ollama');
     expect(fixture.componentInstance.contextUsage?.model).toBe('qwen3.5:2b');
+  });
+
+  it('distinguishes estimated, provider-reported, unknown-cap, and unmeasured states', async () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+
+    component.contextUsage = {
+      estimated_input_tokens: 300,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: 10.4,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'estimated',
+    };
+    expect(component.contextUsageLabel).toBe('~10%');
+
+    component.contextUsage = {
+      estimated_input_tokens: 300,
+      reported_input_tokens: 280,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: 9.1,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'provider_reported',
+    };
+    expect(component.contextUsageLabel).toBe('9%');
+
+    component.contextUsage = {
+      estimated_input_tokens: 321,
+      selected_context_window: null,
+      model_context_limit: null,
+      usage_percent: null,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'estimated',
+    };
+    fixture.detectChanges();
+    expect(component.contextUsageLabel).toBe('~321 tokens');
+    expect(component.contextUsageDetail).toContain('limit unavailable');
+    expect((fixture.nativeElement.querySelector('.context-window-row progress') as HTMLProgressElement).getAttribute('value')).toBeNull();
+
+    component.contextUsage = {
+      estimated_input_tokens: 0,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: null,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'not_measured',
+    };
+    expect(component.contextUsageLabel).toBe('No request measured');
+    fixture.detectChanges();
+    expect((fixture.nativeElement.querySelector('.context-window-row progress') as HTMLProgressElement).getAttribute('value')).toBeNull();
+  });
+
+  it('retains the last measured context sample after failed or partial turns', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const previous = {
+      estimated_input_tokens: 240,
+      reported_input_tokens: 220,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: 7.8,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'provider_reported' as const,
+    };
+    component.contextUsage = previous;
+
+    component['applyTurnResponse'](makeTurnResponse({
+      operation: { kind: 'error', status: 'failed', message: 'Provider failed.', warnings: [] },
+      context_usage: {
+        estimated_input_tokens: 900,
+        selected_context_window: null,
+        model_context_limit: null,
+        usage_percent: null,
+        provider: 'test',
+        model: 'runtime-model',
+        usage_source: 'not_measured',
+      },
+    }), component.conversationNonce);
+    expect(component.contextUsage).toEqual(previous);
+
+    component['applyTurnResponse'](makeTurnResponse({
+      operation: { kind: 'clarification', status: 'partial', message: 'Need clarification.', warnings: [] },
+      context_usage: {
+        estimated_input_tokens: 901,
+        selected_context_window: null,
+        model_context_limit: null,
+        usage_percent: null,
+        provider: 'test',
+        model: 'runtime-model',
+        usage_source: 'not_measured',
+      },
+    }), component.conversationNonce);
+    expect(component.contextUsage).toEqual(previous);
   });
 
   it('switches the active session to a catalog-provided satellite descriptor', async () => {

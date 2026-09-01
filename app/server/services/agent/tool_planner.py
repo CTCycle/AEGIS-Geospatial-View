@@ -210,13 +210,21 @@ class DeterministicToolPlanner:
                 if isinstance(references, list)
                 else []
             )
-            matched = [
-                step.step_id
-                for step in steps
-                if not layer_refs
-                and index < len(steps)
-                or any(cls._step_matches_reference(step, ref) for ref in layer_refs)
-            ]
+            if layer_refs:
+                matched = [
+                    step.step_id
+                    for step in steps
+                    if any(
+                        cls._step_matches_reference(step, ref) for ref in layer_refs
+                    )
+                ]
+            else:
+                # Without an explicit capability reference there is no safe
+                # ownership mapping.  Positional matching would project a
+                # geocode/map task graph onto unrelated capabilities and can
+                # create artificial dependency cycles or suppress parallel
+                # provider fetches after one optional provider fails.
+                matched = []
             task_steps[task_id] = list(dict.fromkeys(matched))
 
         updated: list[ToolPlanStep] = []

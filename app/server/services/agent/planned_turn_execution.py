@@ -5,6 +5,7 @@ from typing import Any
 
 from server.common.logger import logger as LOGGER
 from server.domain.agent.context import ConversationDirective
+from server.domain.agent.decision import ClarificationRequest
 from server.domain.agent.execution import AgentExecutionContext
 from server.domain.agent.pipeline import (
     ConversationTaskRecord,
@@ -15,6 +16,7 @@ from server.contracts.chat import ChatOperationResult, ChatTurnResponse
 from server.contracts.extraction import TurnParseResult
 from server.contracts.geospatial import MapSession, OverlayMutationResult
 from server.services.agent.conversation_state import ConversationTaskStateService
+from server.services.agent.capability_resolver import CapabilityResolver
 from server.services.agent.instruction_state import ConversationInstructionService
 from server.services.agent.response_builder import AgentResponseBuilder
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
@@ -234,15 +236,45 @@ class PlannedTurnExecutionService:
             )
         ]
         if not local_overlay_mutation:
-            map_session = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
+            map_result = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
                 tool_payload=tool_payload,
                 turn_contract=turn_contract,
                 latest_memory=latest_memory,
             )
-            if map_session is None and tool_plan.visualization_update:
-                map_session = await self.turn_state_assembler.build_map_session_from_turn_contract(
+            if isinstance(map_result, ClarificationRequest):
+                return await self.turn_state_assembler.build_location_clarification_response(
+                    request_id=request_id,
+                    conversation_id=conversation_id,
+                    conversation_key=conversation_key,
+                    task=task,
+                    turn_contract=turn_contract,
+                    latest_memory=latest_memory,
+                    context_usage=context_usage,
+                    clarification=map_result,
+                    tool_payload=tool_payload,
+                )
+            map_session = map_result
+            if (
+                map_session is None
+                and CapabilityResolver.is_location_focus_only(turn_contract)
+                and turn_contract.clarification_plan is None
+            ):
+                map_result = await self.turn_state_assembler.build_map_session_from_turn_contract(
                     turn_contract, latest_memory
                 )
+                if isinstance(map_result, ClarificationRequest):
+                    return await self.turn_state_assembler.build_location_clarification_response(
+                        request_id=request_id,
+                        conversation_id=conversation_id,
+                        conversation_key=conversation_key,
+                        task=task,
+                        turn_contract=turn_contract,
+                        latest_memory=latest_memory,
+                        context_usage=context_usage,
+                        clarification=map_result,
+                        tool_payload=tool_payload,
+                    )
+                map_session = map_result
             if map_session is not None and turn_contract.overlay_commands:
                 active_state_session = self._active_map_session(latest_memory)
                 map_session, overlay_mutation_results = self._apply_overlay_commands(
@@ -301,6 +333,21 @@ class PlannedTurnExecutionService:
                 is_capability_question=False,
                 require_verified_result=turn_contract.task_class == "map_search",
             )
+            if operation.status in {"failed", "partial"}:
+                operation = operation.model_copy(
+                    update={
+                        "failure_category": (
+                            AgentResponseBuilder.infer_failure_category(tool_payload)
+                            or turn_contract.failure_category
+                            or operation.failure_category
+                            or (
+                                "model_capability"
+                                if operation.status == "failed"
+                                else None
+                            )
+                        )
+                    }
+                )
             if (
                 any(not result.ok for result in planned_results)
                 and operation.status == "success"
@@ -313,6 +360,19 @@ class PlannedTurnExecutionService:
                     update={
                         "status": "partial",
                         "warnings": [*operation.warnings, mutation_clarification],
+                    }
+                )
+            if (
+                operation.status in {"failed", "partial"}
+                and operation.failure_category is None
+            ):
+                operation = operation.model_copy(
+                    update={
+                        "failure_category": (
+                            AgentResponseBuilder.infer_failure_category(tool_payload)
+                            or turn_contract.failure_category
+                            or operation.failure_category
+                        )
                     }
                 )
             # Persist the verified execution state before asking the language
@@ -366,8 +426,31 @@ class PlannedTurnExecutionService:
                             else []
                         ),
                     ],
-                    "failure_category": synthesis_category
-                    or operation.failure_category,
+                    # A synthesis failure does not invalidate a verified map or
+                    # tool operation; the warning above retains its category.
+                    "failure_category": (
+                        None
+                        if operation.status == "success"
+                        else synthesis_category or operation.failure_category
+                    ),
+                }
+            )
+        if (
+            operation.status in {"failed", "partial"}
+            and operation.failure_category is None
+        ):
+            operation = operation.model_copy(
+                update={
+                    "failure_category": (
+                        AgentResponseBuilder.infer_failure_category(tool_payload)
+                        or turn_contract.failure_category
+                        or operation.failure_category
+                        or (
+                            "model_capability"
+                            if operation.status == "failed"
+                            else None
+                        )
+                    )
                 }
             )
         decision = AgentResponseBuilder.build_final_decision(

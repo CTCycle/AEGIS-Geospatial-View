@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -71,6 +72,43 @@ class LLMResult:
         default_factory=lambda: list["LLMToolCall"]()
     )
     finish_reason: str | None = None
+    context_usage: dict[str, Any] | None = None
+
+
+###############################################################################
+class LLMStructuredOutput(dict[str, Any]):
+    """Validated structured data with invocation-local provider telemetry."""
+
+    def __init__(
+        self,
+        payload: dict[str, Any],
+        *,
+        context_usage: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(payload)
+        self.context_usage = dict(context_usage) if context_usage is not None else None
+
+
+###############################################################################
+class LLMTextStream(Iterator[str]):
+    """Text iterator carrying usage for the request that produced the stream."""
+
+    def __init__(
+        self,
+        chunks: Iterable[str],
+        *,
+        context_usage: dict[str, Any] | None = None,
+    ) -> None:
+        self._iterator = iter(chunks)
+        self.context_usage = (
+            dict(context_usage) if context_usage is not None else None
+        )
+
+    def __iter__(self) -> "LLMTextStream":
+        return self
+
+    def __next__(self) -> str:
+        return next(self._iterator)
 
 
 ###############################################################################

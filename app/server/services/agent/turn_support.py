@@ -174,9 +174,15 @@ class AgentTurnSupport:
     @staticmethod
     def has_parser_runtime_failure(turn_contract: Any) -> bool:
         ambiguities = set(turn_contract.ambiguities or [])
+        # Capability resolution also uses ``failure_category`` for a typed
+        # model-capability limitation.  That is an execution-time
+        # clarification, not evidence that structured extraction failed. A
+        # parser failure always carries either a parser marker or the
+        # provider error produced by the extraction adapter.
+        if is_json_object(getattr(turn_contract, "provider_error", None)):
+            return True
         return (
-            getattr(turn_contract, "failure_category", None) is not None
-            or "parser_unavailable" in ambiguities
+            "parser_unavailable" in ambiguities
             or "parser_timeout" in ambiguities
             or "parser_authentication_failed" in ambiguities
             or any(

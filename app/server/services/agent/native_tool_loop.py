@@ -20,6 +20,8 @@ from server.domain.agent.runtime import canonical_call_fingerprint
 from server.prompts.agent import build_working_state_message
 from server.services.llm.factory import LLMFactory
 from server.services.llm.context_budget import prepare_request
+from server.services.llm.context_profile_resolver import ModelContextProfileResolver
+from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
 from server.services.llm.types import (
     LLMRequest,
     LLMToolCall,
@@ -37,6 +39,7 @@ class NativeToolLoop:
         *,
         provider_factory: LLMFactory,
         tool_registry: ToolRegistry,
+        context_profile_resolver: ModelContextProfileResolver | None = None,
         max_iterations: int = 8,
         max_parallel_tool_calls: int = 8,
         max_tool_result_chars: int = 12000,
@@ -49,6 +52,7 @@ class NativeToolLoop:
     ) -> None:
         self.provider_factory = provider_factory
         self.tool_registry = tool_registry
+        self.context_profile_resolver = context_profile_resolver
         self.max_iterations = max_iterations
         self.max_parallel_tool_calls = max_parallel_tool_calls
         self.max_tool_result_chars = max_tool_result_chars
@@ -58,7 +62,6 @@ class NativeToolLoop:
         self.max_state_transitions = max_state_transitions
         self.max_run_seconds = max_run_seconds
         self.max_no_progress_steps = max_no_progress_steps
-        self.last_context_usages: list[dict[str, Any]] = []
 
     # -------------------------------------------------------------------------
     async def run(self, request: AgentToolLoopRequest) -> AgentToolLoopResult:
@@ -83,7 +86,8 @@ class NativeToolLoop:
         model_budget = 2 if simple_run else self.max_model_calls
         tool_budget = 2 if simple_run else self.max_tool_calls
         transition_budget = 6 if simple_run else self.max_state_transitions
-        self.last_context_usages = []
+        context_usages: list[dict[str, Any]] = []
+        run_deadline = time.monotonic() + (45.0 if simple_run else self.max_run_seconds)
 
         for iteration in range(1, self.max_iterations + 1):
             if (
@@ -103,6 +107,7 @@ class NativeToolLoop:
                     model_calls=iteration - 1,
                     duplicate_tool_calls=duplicate_tool_calls,
                     no_progress_steps=no_progress_steps,
+                    context_usages=list(context_usages),
                 )
             working_state = build_working_state_message(
                 parsed_request=request.context.parsed_request,
@@ -133,18 +138,31 @@ class NativeToolLoop:
                         tools=request.tools,
                         tool_choice="auto",
                         temperature=request.temperature,
-                        metadata={"max_tokens": request.max_tokens}
-                        if request.max_tokens is not None
-                        else {},
+                        metadata={
+                            **(
+                                self.context_profile_resolver.request_metadata(
+                                    request.provider,
+                                    request.model,
+                                )
+                                if self.context_profile_resolver is not None
+                                else {}
+                            ),
+                            **(
+                                {"max_tokens": request.max_tokens}
+                                if request.max_tokens is not None
+                                else {}
+                            ),
+                            REQUEST_DEADLINE_METADATA_KEY: run_deadline,
+                        },
                     ),
                     provider=request.provider,
                 )
                 messages = list(llm_request.messages)
                 working_state = messages[1]
                 response = provider.chat(llm_request)
-                usage = getattr(provider, "last_context_usage", None)
+                usage = getattr(response, "context_usage", None)
                 if is_json_object(usage):
-                    self.last_context_usages.append(dict(usage))
+                    context_usages.append(dict(usage))
             except Exception as exc:
                 LOGGER.exception(
                     "tool_loop_failed provider=%s model=%s",
@@ -175,6 +193,9 @@ class NativeToolLoop:
                     )
                 else:
                     final_text = "The agent tool loop failed before it could complete the request."
+                usage = getattr(exc, "context_usage", None)
+                if is_json_object(usage):
+                    context_usages.append(dict(usage))
                 return AgentToolLoopResult(
                     final_text=final_text,
                     tool_calls=all_calls,
@@ -187,6 +208,7 @@ class NativeToolLoop:
                     no_progress_steps=no_progress_steps,
                     failure_category=category,
                     failure_detail=detail,
+                    context_usages=list(context_usages),
                 )
 
             if not response.tool_calls:
@@ -200,6 +222,7 @@ class NativeToolLoop:
                     model_calls=iteration,
                     duplicate_tool_calls=duplicate_tool_calls,
                     no_progress_steps=no_progress_steps,
+                    context_usages=list(context_usages),
                 )
 
             tool_calls = response.tool_calls[
@@ -274,6 +297,7 @@ class NativeToolLoop:
                     model_calls=iteration,
                     duplicate_tool_calls=duplicate_tool_calls,
                     no_progress_steps=no_progress_steps,
+                    context_usages=list(context_usages),
                 )
             for result in results:
                 messages.append(
@@ -295,6 +319,7 @@ class NativeToolLoop:
             model_calls=self.max_iterations,
             duplicate_tool_calls=duplicate_tool_calls,
             no_progress_steps=no_progress_steps,
+            context_usages=list(context_usages),
         )
 
     # -------------------------------------------------------------------------

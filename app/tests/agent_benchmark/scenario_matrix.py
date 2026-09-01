@@ -28,6 +28,16 @@ ALLOWED_TASK_CLASSES = frozenset(
 ALLOWED_RENDERING_TYPES = frozenset(
     {"map", "point", "line", "polygon", "raster", "chart", "text", "none"}
 )
+ALLOWED_INVARIANTS = frozenset(
+    {
+        "context_usage_invariants",
+        "location_target_consistency",
+        "categorized_failures",
+        "no_false_success",
+        "clarification_correctness",
+        "deadline_compliance",
+    }
+)
 
 
 def _string_set(value: object) -> set[str] | None:
@@ -66,6 +76,22 @@ def validate_scenario_matrix(document: object) -> list[str]:
         lane = scenario.get("lane")
         if lane not in ALLOWED_LANES:
             errors.append(f"{prefix}.lane is not supported: {lane!r}")
+        invariants = scenario.get("invariants", [])
+        if not isinstance(invariants, list) or not all(
+            isinstance(item, str) and item.strip() for item in invariants
+        ):
+            errors.append(f"{prefix}.invariants must be a string list")
+        elif not set(invariants) <= ALLOWED_INVARIANTS:
+            errors.append(f"{prefix}.invariants contains an unknown invariant")
+        max_turn_seconds = scenario.get("max_turn_seconds")
+        if max_turn_seconds is not None and (
+            not isinstance(max_turn_seconds, (int, float))
+            or isinstance(max_turn_seconds, bool)
+            or max_turn_seconds <= 0
+        ):
+            errors.append(
+                f"{prefix}.max_turn_seconds must be a positive number when present"
+            )
         has_prompt = isinstance(scenario.get("prompt"), str) and bool(
             scenario["prompt"].strip()
         )

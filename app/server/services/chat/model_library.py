@@ -229,8 +229,55 @@ class ChatModelLibraryService:
                     item_object.get("provider") == provider
                     and item_object.get("name") == model_name
                 ):
+                    if provider == "ollama":
+                        self._enrich_ollama_context_metadata(
+                            item_object,
+                            model_name=model_name,
+                            ollama_url=ollama_url,
+                        )
                     return item_object
         return None
+
+    # -------------------------------------------------------------------------
+    def _enrich_ollama_context_metadata(
+        self,
+        item: dict[str, object],
+        *,
+        model_name: str,
+        ollama_url: str,
+    ) -> None:
+        """Attach provider-declared local context metadata to one model.
+
+        The normal local model listing remains lightweight.  A selected model
+        gets one additional ``/api/show`` lookup so settings and request
+        budgeting can share the same exact provider metadata without deriving
+        a limit from a model name or family.
+        """
+
+        ollama = OllamaProvider(
+            base_url=self.normalize_ollama_url(ollama_url),
+            tool_capability_cache=self.ollama_tool_capability_cache,
+        )
+        get_metadata = getattr(ollama, "get_model_context_metadata", None)
+        if not callable(get_metadata):
+            return
+        try:
+            metadata = get_metadata(model_name)
+        except Exception:
+            return
+        if not is_json_object(metadata):
+            return
+        item_metadata = item.get("metadata")
+        merged = dict(item_metadata) if is_json_object(item_metadata) else {}
+        merged.update(metadata)
+        item["metadata"] = merged
+        for key in (
+            "context_window_tokens",
+            "maximum_output_tokens",
+            "context_profile_source",
+        ):
+            if metadata.get(key) is not None:
+                item[key] = metadata[key]
 
     # -------------------------------------------------------------------------
     @staticmethod
