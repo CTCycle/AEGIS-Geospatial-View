@@ -37,7 +37,7 @@ SOILGRIDS_STANDARD_DEPTHS = {
     "60-100cm",
     "100-200cm",
 }
-SOILGRIDS_QUANTILES = {"mean", "Q0.05", "Q0.5", "Q0.50", "Q0.95"}
+SOILGRIDS_QUANTILES = {"mean", "Q0.05", "Q0.5", "Q0.95"}
 
 
 ###############################################################################
@@ -49,6 +49,8 @@ class SoilGridsProvider(GeospatialProvider):
         property_id = str(request.params.get("property") or "phh2o").strip().lower()
         depth = str(request.params.get("depth") or "0-5cm").strip()
         quantile = str(request.params.get("quantile") or "mean").strip()
+        if quantile == "Q0.50":
+            quantile = "Q0.5"
 
         if property_id not in SOILGRIDS_PROPERTIES:
             raise ProviderUnavailableError(
