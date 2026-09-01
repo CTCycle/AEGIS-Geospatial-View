@@ -100,6 +100,42 @@ def test_synthesizer_returns_grounded_markdown_and_bounded_evidence() -> None:
 
 
 ###############################################################################
+def test_synthesizer_evidence_retains_nested_provider_measurements() -> None:
+    provider = _Provider("The current temperature is verified.")
+    synthesizer = GroundedResponseSynthesizer(
+        settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+        llm_factory=_Factory(provider),  # type: ignore[arg-type]
+        enabled=True,
+    )
+    operation = ChatOperationResult(
+        kind="direct_answer",
+        status="success",
+        message="Verified weather result.",
+    )
+
+    synthesizer.synthesize(
+        user_text="What is the current temperature?",
+        fallback_text="Verified weather result.",
+        operation=operation,
+        direct_result={
+            "tool_id": "get_weather_forecast",
+            "result": {
+                "result": {
+                    "provider": "openmeteo",
+                    "current": {
+                        "time": "2026-09-01T09:00",
+                        "temperature_2m": 27.3,
+                    },
+                }
+            },
+        },
+    )
+
+    request_text = provider.requests[0].messages[1]["content"]
+    assert '"temperature_2m":27.3' in request_text
+
+
+###############################################################################
 def test_synthesizer_evidence_marks_metadata_only_overlays() -> None:
     provider = _Provider("Map context ready.")
     synthesizer = GroundedResponseSynthesizer(

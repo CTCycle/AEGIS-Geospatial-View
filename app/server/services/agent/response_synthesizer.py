@@ -290,7 +290,11 @@ class GroundedResponseSynthesizer:
             return value
         if isinstance(value, str):
             return value[:1000]
-        if depth >= 3:
+        # Provider results commonly have an execution envelope, a tool
+        # wrapper, and a provider result wrapper before reaching measurements.
+        # Keep enough depth for those values to reach the grounded model while
+        # retaining strict size bounds for arbitrary provider payloads.
+        if depth >= 5:
             return None
         if is_json_array(value):
             return [cls._bounded_value(item, depth=depth + 1) for item in value[:20]]
