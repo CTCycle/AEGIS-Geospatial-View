@@ -1,0 +1,28 @@
+{
+  "capability_id": "soilgrids_soil_properties",
+  "enabled_by_default": true,
+  "credential_provider": null,
+  "supports_map": true,
+  "supports_direct_text": true,
+  "coverage_policy": "global",
+  "health_policy": "best_effort",
+  "handler_name": "soilgrids_soil_properties",
+  "capability_kind": "raster-overlay",
+  "rendering_mode": "wms",
+  "health_status": "functional",
+  "planner_hints": [
+    "soil",
+    "soil properties",
+    "soilgrids",
+    "soil ph",
+    "clay",
+    "sand",
+    "silt",
+    "organic carbon",
+    "nitrogen",
+    "bulk density",
+    "soil water content"
+  ],
+  "manual_toggle": true,
+  "auth_required": false
+}
