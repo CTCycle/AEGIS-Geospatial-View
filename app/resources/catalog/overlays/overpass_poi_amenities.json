@@ -15,12 +15,36 @@
     "default_opacity": 1,
     "requires_key": false,
     "attribution": "© OpenStreetMap contributors (ODbL)",
-    "keywords": [
+      "keywords": [
       "overpass",
       "osm",
       "poi",
       "amenities",
       "places"
+    ],
+    "supported_categories": [
+      "bicycle_parking",
+      "transit_stops",
+      "rail_stations",
+      "food",
+      "restaurants",
+      "restaurant",
+      "healthcare",
+      "hospitals",
+      "hospital",
+      "pharmacies",
+      "pharmacy",
+      "education",
+      "schools",
+      "school",
+      "supermarkets",
+      "supermarket",
+      "parks",
+      "park",
+      "charging_stations",
+      "charging_station",
+      "bus_stops",
+      "bus_stop"
     ],
     "action_tags": [
       "poi search",

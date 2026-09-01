@@ -405,3 +405,39 @@ def test_parser_domain_boundary_does_not_invent_intent_from_prose() -> None:
     assert extracted.requested_layers == []
     assert extracted.requested_basemap is None
     assert extracted.overlay_commands == []
+
+
+###############################################################################
+def test_parser_recovers_explicit_catalog_poi_category_for_poi_intent() -> None:
+    extracted = ParserService._apply_domain_rules(
+        "Find hospitals within 5 km of Rome, Italy.",
+        LLMParserExtraction(
+            task_class="map_search",
+            action_id="poi_search",
+            task_tags=["poi"],
+            requested_visualizations=["poi"],
+        ),
+        {},
+        capability_catalog=[
+            {
+                "id": "overpass_poi_amenities",
+                "supported_categories": ["hospitals", "restaurants"],
+            }
+        ],
+    )
+
+    assert extracted.poi_categories == ["hospitals"]
+
+
+###############################################################################
+def test_parser_does_not_recover_catalog_category_without_poi_intent() -> None:
+    extracted = ParserService._apply_domain_rules(
+        "The hospital is near Rome.",
+        LLMParserExtraction(task_class="map_search"),
+        {},
+        capability_catalog=[
+            {"id": "overpass_poi_amenities", "supported_categories": ["hospital"]}
+        ],
+    )
+
+    assert extracted.poi_categories == []
