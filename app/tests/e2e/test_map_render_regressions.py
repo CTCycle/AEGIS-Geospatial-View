@@ -123,6 +123,34 @@ def _assert_no_render_blockers(errors: list[str]) -> None:
 
 
 ###############################################################################
+def _assert_map_uses_full_canvas(page: Page) -> None:
+    """Verify the rendered map and MapLibre canvas share the full map frame."""
+    boxes = {
+        "canvas panel": page.locator(".canvas-panel__body").bounding_box(),
+        "map preview host": page.locator("app-map-preview").bounding_box(),
+        "map frame": page.locator(".maplibre-wrap:visible").bounding_box(),
+        "map container": page.locator(".maplibre-container:visible").last.bounding_box(),
+        "map canvas": page.locator(".maplibregl-canvas:visible").last.bounding_box(),
+    }
+    missing = [name for name, box in boxes.items() if box is None]
+    assert not missing, f"Missing map geometry for: {missing}"
+
+    panel = boxes["canvas panel"]
+    assert panel is not None
+    for name in ("map preview host", "map frame", "map container", "map canvas"):
+        box = boxes[name]
+        assert box is not None
+        assert abs(box["x"] - panel["x"]) <= 2, f"{name} is not aligned to the canvas"
+        assert abs(box["y"] - panel["y"]) <= 2, f"{name} is not aligned to the canvas"
+        assert abs(
+            (box["x"] + box["width"]) - (panel["x"] + panel["width"])
+        ) <= 2, f"{name} does not use the full canvas width"
+        assert abs(
+            (box["y"] + box["height"]) - (panel["y"] + panel["height"])
+        ) <= 2, f"{name} does not use the full canvas height"
+
+
+###############################################################################
 def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
     page: Page, base_url: str
 ) -> None:
@@ -137,6 +165,7 @@ def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     expect(page.locator(".maplibregl-canvas")).to_be_visible(timeout=15000)
     page.wait_for_timeout(500)
+    _assert_map_uses_full_canvas(page)
     assert requested_zooms, "Expected raster tile requests for map rendering"
     assert max(requested_zooms) <= 19
     _assert_no_render_blockers(errors)
