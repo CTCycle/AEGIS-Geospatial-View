@@ -233,3 +233,45 @@ def test_parser_prioritizes_actionable_data_over_context_query_label() -> None:
     assert result.context_query.kind == "none"
     assert result.relationship == "follow_up"
     assert result.requested_concepts == ["temperature"]
+
+
+def test_parser_recovers_omitted_deictic_reference_for_memory_resolution() -> None:
+    class _Provider:
+        def structured_output(self, request, schema):  # noqa: ANN001
+            _ = request, schema
+            return {
+                "task_class": "direct_query",
+                "action_id": "get_weather_forecast",
+                "requested_concepts": ["temperature"],
+                "relationship": "follow_up",
+                "tools_needed": True,
+                "requires_location": True,
+                "location_signals": [],
+                "parser_confidence": 0.9,
+            }
+
+    class _Factory:
+        def get_provider(self, provider: str):  # noqa: ANN001
+            _ = provider
+            return _Provider()
+
+    result = ParserService(
+        llm_factory=_Factory(),  # type: ignore[arg-type]
+        settings_repo=object(),
+        provider="test",
+        model="test-model",
+    ).parse_turn(
+        user_message="What is the current temperature there?",
+        memory_snapshot={
+            "active_location": {
+                "label": "Rome",
+                "latitude": 41.9,
+                "longitude": 12.5,
+            }
+        },
+        conversation_messages=[],
+    )
+
+    assert result.location_signals[0].signal_type == "deictic"
+    assert result.location_signals[0].source == "text"
+    assert result.ambiguities == []
