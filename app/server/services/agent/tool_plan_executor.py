@@ -188,7 +188,9 @@ class ToolPlanExecutor:
                         attempt=attempt,
                         elapsed_ms=elapsed_ms,
                         call_fingerprint=fingerprint,
-                        **self._provenance_fields(data),
+                        **self._provenance_fields(
+                            data, capability_id=step.capability_id
+                        ),
                     ),
                 )
                 if on_tool_completed is not None:
@@ -207,7 +209,9 @@ class ToolPlanExecutor:
                         attempt=attempt,
                         elapsed_ms=elapsed_ms,
                         call_fingerprint=fingerprint,
-                        **self._provenance_fields(data),
+                        **self._provenance_fields(
+                            data, capability_id=step.capability_id
+                        ),
                     ),
                 )
                 if on_tool_completed is not None:
@@ -225,7 +229,9 @@ class ToolPlanExecutor:
                         attempt=attempt,
                         elapsed_ms=elapsed_ms,
                         call_fingerprint=fingerprint,
-                        **self._provenance_fields(data),
+                        **self._provenance_fields(
+                            data, capability_id=step.capability_id
+                        ),
                     ),
                 )
                 if on_tool_completed is not None:
@@ -332,8 +338,22 @@ class ToolPlanExecutor:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _provenance_fields(cls, data: Any) -> dict[str, Any]:
+    def _provenance_fields(
+        cls, data: Any, *, capability_id: str | None = None
+    ) -> dict[str, Any]:
         candidates = cls._provenance_candidates(data)
+        scoped_candidates = cls._capability_scoped_candidates(
+            candidates, capability_id
+        )
+        if scoped_candidates:
+            candidates = [
+                *scoped_candidates,
+                *[
+                    candidate
+                    for candidate in candidates
+                    if candidate not in scoped_candidates
+                ],
+            ]
         provider = cls._first_string(
             candidates, "provider", "provider_id", "providerId"
         )
@@ -381,6 +401,50 @@ class ToolPlanExecutor:
             "partial": partial,
             "warnings": warnings,
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _capability_scoped_candidates(
+        candidates: list[dict[str, Any]], capability_id: str | None
+    ) -> list[dict[str, Any]]:
+        """Prefer provenance belonging to the executed capability.
+
+        A map result can contain both basemap and overlay metadata.  The
+        generic recursive collector intentionally supports either shape, but
+        its traversal order must not let a basemap provider masquerade as the
+        provider for the requested overlay.
+        """
+        if not capability_id:
+            return []
+        matches: list[dict[str, Any]] = []
+        identifiers = (
+            "capability_id",
+            "capabilityId",
+            "layer_id",
+            "layerId",
+        )
+        provenance_fields = (
+            "provider",
+            "provider_id",
+            "providerId",
+            "source_url",
+            "sourceUrl",
+            "result_status",
+            "resultStatus",
+            "result_type",
+            "resultType",
+        )
+        for candidate in candidates:
+            candidate_ids = {
+                str(candidate.get(key)).strip()
+                for key in identifiers
+                if candidate.get(key) is not None
+            }
+            if capability_id not in candidate_ids:
+                continue
+            if any(candidate.get(key) is not None for key in provenance_fields):
+                matches.append(candidate)
+        return matches
 
     # -------------------------------------------------------------------------
     @classmethod

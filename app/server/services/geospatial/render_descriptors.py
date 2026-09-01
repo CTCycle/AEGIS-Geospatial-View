@@ -166,11 +166,55 @@ class RenderDescriptorService:
                                 "type": "Point",
                                 "coordinates": [item["longitude"], item["latitude"]],
                             },
-                            "properties": item,
+                            "properties": {
+                                **(
+                                    {
+                                        "source_url": payload.get("source_url"),
+                                        "freshness": payload.get("fetched_at"),
+                                        "status": payload.get("result_status"),
+                                    }
+                                    if payload.get("source_url")
+                                    or payload.get("fetched_at")
+                                    or payload.get("result_status")
+                                    else {}
+                                ),
+                                **item,
+                            },
                         }
                         for item in features
                     ],
                 }
+                descriptor.update(
+                    {
+                        key: payload[key]
+                        for key in (
+                            "source_url",
+                            "fetched_at",
+                            "result_status",
+                            "result_type",
+                            "partial",
+                            "coverage",
+                            "spatial_resolution",
+                            "units",
+                            "total_results",
+                            "returned_results",
+                            "limit",
+                            "truncated",
+                        )
+                        if payload.get(key) is not None
+                    }
+                )
+                inspection_metadata = json_object(
+                    descriptor.get("inspection_metadata")
+                )
+                inspection_metadata.update(
+                    {
+                        key: payload[key]
+                        for key in ("source_url", "fetched_at", "result_status")
+                        if payload.get(key) is not None
+                    }
+                )
+                descriptor["inspection_metadata"] = inspection_metadata
                 descriptor.pop("url", None)
                 return descriptor, warnings
             except Exception as exc:  # noqa: BLE001

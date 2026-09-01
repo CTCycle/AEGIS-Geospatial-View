@@ -36,6 +36,7 @@ from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.tool_planner import DeterministicToolPlanner
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.agent.turn_state_assembler import AgentTurnStateAssembler
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
@@ -869,5 +870,125 @@ def test_tool_plan_executor_extracts_nested_provider_provenance() -> None:
         assert result.provenance.coverage == {"type": "point", "latitude": 41.9}
         assert result.provenance.spatial_resolution == "point forecast"
         assert result.provenance.units == {"temperature": "C"}
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_tool_plan_executor_scopes_provenance_to_requested_capability() -> None:
+    async def _run() -> None:
+        registry = ToolRegistry(runtime_registry=_runtime())
+
+        async def handler(arguments, context):  # noqa: ANN001
+            _ = arguments, context
+            return {
+                "ok": True,
+                "capability_id": "overpass_poi_amenities",
+                "map_session": {
+                    "basemap": {"provider": "arcgis", "source_url": "basemap"},
+                    "overlay_collection": {
+                        "instances": [
+                            {
+                                "capability_id": "overpass_poi_amenities",
+                                "provider": "overpass",
+                                "source_url": "overlay",
+                                "result_status": "ok",
+                                "result_type": "feature_collection",
+                            }
+                        ]
+                    },
+                },
+            }
+
+        registry.register_native_tool(
+            LLMToolDefinition(
+                name="execute_geospatial_capability",
+                description="execute",
+                parameters_json_schema={"type": "object"},
+            ),
+            handler,
+        )
+        result = (
+            await ToolPlanExecutor(tool_registry=registry).execute(
+                ToolPlan(
+                    tool_group="geospatial_features",
+                    candidate_tools=["execute_geospatial_capability"],
+                    selected_tools=["execute_geospatial_capability"],
+                    steps=[
+                        ToolPlanStep(
+                            step_id="poi",
+                            tool_name="execute_geospatial_capability",
+                            capability_id="overpass_poi_amenities",
+                            reason="retrieve points of interest",
+                        )
+                    ],
+                ),
+                AgentExecutionContext(),
+            )
+        )[0]
+
+        assert result.ok is True
+        assert result.provenance.provider == "overpass"
+        assert result.provenance.source_url == "overlay"
+        assert result.provenance.result_status == "ok"
+        assert result.provenance.result_type == "feature_collection"
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_map_state_assembler_reuses_single_verified_tool_map_session() -> None:
+    async def _run() -> None:
+        map_session = MapSession(
+            session_id="map-tool-result",
+            resolved_location=ResolvedLocation(
+                label="Rome", latitude=41.9, longitude=12.5
+            ),
+            basemap_id="osm_default",
+            viewport={
+                "center_latitude": 41.9,
+                "center_longitude": 12.5,
+                "radius_m": 5000.0,
+            },
+            basemap={"id": "osm_default", "provider": "osm"},
+            overlay_collection={
+                "instances": [
+                    {
+                        "instance_id": "poi-rome",
+                        "capability_id": "overpass_poi_amenities",
+                        "label": "Points of interest",
+                        "provider": "overpass",
+                        "overlay_type": "overlay",
+                        "rendering_mode": "clustered-points",
+                        "descriptor": {
+                            "id": "poi-rome",
+                            "data": {
+                                "type": "FeatureCollection",
+                                "features": [],
+                            },
+                        },
+                    }
+                ]
+            },
+        )
+        assembler = AgentTurnStateAssembler.__new__(AgentTurnStateAssembler)
+
+        result = await assembler.build_combined_map_session_from_tool_results(
+            tool_payload={
+                "tool_results": [
+                    {
+                        "content": {
+                            "ok": True,
+                            "data": {"map_session": map_session.model_dump(mode="json")},
+                        }
+                    }
+                ]
+            },
+            turn_contract=SimpleNamespace(),
+            latest_memory={},
+        )
+
+        assert result is not None
+        assert result.session_id == "map-tool-result"
 
     run_async_in_thread(_run())

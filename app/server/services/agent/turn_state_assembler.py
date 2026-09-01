@@ -535,6 +535,7 @@ class AgentTurnStateAssembler:
             if isinstance(active_visualization_object.get("basemap_id"), str)
             else None
         )
+        candidate_map_sessions: list[MapSession] = []
 
         for result in json_array(tool_payload.get("tool_results")):
             if not is_json_object(result):
@@ -549,6 +550,7 @@ class AgentTurnStateAssembler:
             if is_json_object(map_payload):
                 map_session = self._map_session_from_memory(map_payload)
                 if map_session is not None:
+                    candidate_map_sessions.append(map_session)
                     if basemap_id is None:
                         basemap_id = map_session.basemap_id
                     for overlay_id in self._overlay_capability_ids(map_session):
@@ -566,6 +568,25 @@ class AgentTurnStateAssembler:
                 for overlay_id in json_array(selection.get("overlay_ids")):
                     if isinstance(overlay_id, str) and overlay_id not in overlay_ids:
                         overlay_ids.append(overlay_id)
+
+        # A successful geospatial tool already returns a validated map session.
+        # Re-querying the search orchestrator here duplicates provider work and
+        # can make the final response depend on a second, different snapshot.
+        # Reuse the single complete result when there is no prior map to merge.
+        if not active_map_session and len(candidate_map_sessions) == 1:
+            candidate = candidate_map_sessions[0]
+            candidate_overlay_ids = set(self._overlay_capability_ids(candidate))
+            requested_basemap = getattr(turn_contract, "requested_basemap", None)
+            if (
+                set(overlay_ids).issubset(candidate_overlay_ids)
+                and (basemap_id is None or basemap_id == candidate.basemap_id)
+                and (
+                    not isinstance(requested_basemap, str)
+                    or not requested_basemap.strip()
+                    or requested_basemap == candidate.basemap_id
+                )
+            ):
+                return candidate
 
         if not overlay_ids and basemap_id is None:
             return None
