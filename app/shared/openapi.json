@@ -4197,6 +4197,47 @@
         "type": "object",
         "title": "LayerAuditReport"
       },
+      "LocationResolutionProvenance": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          },
+          "result_status": {
+            "type": "string",
+            "title": "Result Status",
+            "default": "ok"
+          },
+          "result_type": {
+            "type": "string",
+            "title": "Result Type",
+            "default": "location"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "title": "LocationResolutionProvenance",
+        "description": "Provider evidence for a location resolved outside the tool registry."
+      },
       "LocationSignal": {
         "properties": {
           "signal_type": {
@@ -5503,6 +5544,16 @@
               }
             ],
             "title": "Bbox Source"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocationResolutionProvenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
