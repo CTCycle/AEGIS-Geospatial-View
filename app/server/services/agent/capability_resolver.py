@@ -10,6 +10,70 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
+_NON_DATA_CONCEPT_TAGS = frozenset(
+    {
+        # Presentation and interaction actions are not dataset identities.
+        "show",
+        "display",
+        "view",
+        "visualize",
+        "visualise",
+        "render",
+        "plot",
+        "find",
+        "get",
+        "list",
+        "retrieve",
+        "lookup",
+        "look_up",
+        "tell",
+        "explain",
+        "describe",
+        "compare",
+        "contrast",
+        "add",
+        "remove",
+        "hide",
+        "clear",
+        "update",
+        "switch",
+        "change",
+        "replace",
+        "keep",
+        "preserve",
+        # Map/session and relative-location references are resolved elsewhere.
+        "map",
+        "location",
+        "coordinates",
+        "basemap",
+        "overlay",
+        "chat",
+        "direct_query",
+        "map_search",
+        "place",
+        "visualization",
+        "visualisation",
+        "catalog",
+        "data",
+        "query",
+        "search",
+        "direct",
+        "tool",
+        "near",
+        "nearby",
+        "around",
+        "within",
+        "here",
+        "there",
+        "this",
+        "that",
+        "current",
+        "recent",
+        "historical",
+    }
+)
+
+
 ###############################################################################
 class CapabilityResolver:
     """Resolve parser concepts against the executable catalog.
@@ -246,25 +310,7 @@ class CapabilityResolver:
     @staticmethod
     def _is_data_concept(value: object) -> bool:
         normalized = str(value or "").strip().casefold().replace("-", "_")
-        return normalized not in {
-            "",
-            "map",
-            "location",
-            "coordinates",
-            "basemap",
-            "overlay",
-            "chat",
-            "direct_query",
-            "map_search",
-            "place",
-            "visualization",
-            "catalog",
-            "data",
-            "query",
-            "search",
-            "direct",
-            "tool",
-        }
+        return normalized not in _NON_DATA_CONCEPT_TAGS
 
     # -------------------------------------------------------------------------
     @staticmethod
