@@ -134,7 +134,10 @@ class OverpassProvider(GeospatialProvider):
             payload={
                 "renderingMode": "clustered-points",
                 "features": features,
-                "totalResults": len(features),
+                "totalResults": payload.get("total_results", len(features)),
+                "returnedResults": payload.get("returned_results", len(features)),
+                "limit": payload.get("limit"),
+                "truncated": bool(payload.get("truncated")),
                 "center": {"latitude": latitude, "longitude": longitude},
                 "radiusM": radius_m,
                 "resolvedAt": payload.get("resolved_at"),
@@ -151,7 +154,14 @@ class OverpassProvider(GeospatialProvider):
             units={"distance_m": "m", "radius_m": "m"},
             source_url=getattr(self.service, "base_url", None),
             result_type="features",
-            result_status="valid_empty" if not features else "ok",
+            result_status=(
+                "partial"
+                if bool(payload.get("truncated"))
+                else "valid_empty"
+                if not features
+                else "ok"
+            ),
+            partial=bool(payload.get("truncated")),
         )
 
 

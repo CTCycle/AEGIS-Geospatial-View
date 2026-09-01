@@ -76,6 +76,7 @@ class OpenMeteoService:
             params=params,
             provider_key="openmeteo_weather",
         )
+        fetched_at = datetime.now(UTC).isoformat()
         hourly = json_object(payload.get("hourly"))
         timeline = list(hourly.get("time") or [])
         temperature = list(hourly.get("temperature_2m") or [])
@@ -103,6 +104,14 @@ class OpenMeteoService:
         return {
             "provider": "openmeteo",
             "kind": "weather_forecast",
+            "source_url": self.weather_base_url,
+            "fetched_at": fetched_at,
+            "result_status": "ok" if timeline else "valid_empty",
+            "result_type": "metadata",
+            "partial": any(
+                len(values) < len(timeline)
+                for values in (temperature, precipitation, weather_code)
+            ),
             "latitude": latitude,
             "longitude": longitude,
             "timezone": payload.get("timezone"),
@@ -111,7 +120,7 @@ class OpenMeteoService:
             else {},
             "hourly_preview": preview,
             "hourly_forecast": hourly_forecast,
-            "resolved_at": datetime.now(UTC).isoformat(),
+            "resolved_at": fetched_at,
             "observation_time": json_object(payload.get("current")).get("time"),
             "units": self._units(payload),
             "spatial_resolution": "point forecast",
@@ -140,6 +149,7 @@ class OpenMeteoService:
             params=params,
             provider_key="openmeteo_air_quality",
         )
+        fetched_at = datetime.now(UTC).isoformat()
         hourly = json_object(payload.get("hourly"))
         timeline = list(hourly.get("time") or [])
         pollutants = {
@@ -159,11 +169,18 @@ class OpenMeteoService:
         return {
             "provider": "openmeteo",
             "kind": "air_quality_forecast",
+            "source_url": self.air_quality_base_url,
+            "fetched_at": fetched_at,
+            "result_status": "ok" if timeline else "valid_empty",
+            "result_type": "metadata",
+            "partial": any(
+                len(values) < len(timeline) for values in pollutants.values()
+            ),
             "latitude": latitude,
             "longitude": longitude,
             "timezone": payload.get("timezone"),
             "hourly_preview": preview,
-            "resolved_at": datetime.now(UTC).isoformat(),
+            "resolved_at": fetched_at,
             "observation_time": preview[0].get("time") if preview else None,
             "units": self._units(payload),
             "spatial_resolution": "point forecast",
