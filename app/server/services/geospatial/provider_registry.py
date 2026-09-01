@@ -48,6 +48,7 @@ from server.services.geospatial.providers.overpass import OverpassProvider
 from server.services.geospatial.providers.overture import OvertureProvider
 from server.services.geospatial.providers.pvgis import PVGISProvider
 from server.services.geospatial.providers.rainviewer import RainViewerProvider
+from server.services.geospatial.providers.soilgrids import SoilGridsProvider
 from server.services.geospatial.providers.tomtom import TomTomProvider
 from server.services.geospatial.providers.mobility_database import (
     MobilityDatabaseProvider,
@@ -76,6 +77,7 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "noaa": lambda _credential: NOAAProvider(),
     "fema": lambda _credential: FEMAProvider(),
     "nasa_firms": lambda credential: NASAFIRMSProvider(api_key=credential),
+    "soilgrids": lambda _credential: SoilGridsProvider(),
     "opentripmap": lambda credential: OpenTripMapProvider(api_key=credential),
     "openchargemap": lambda credential: OpenChargeMapProvider(api_key=credential),
     "ourairports": lambda _credential: OurAirportsProvider(),
