@@ -979,7 +979,12 @@ def test_map_state_assembler_reuses_single_verified_tool_map_session() -> None:
                     {
                         "content": {
                             "ok": True,
-                            "data": {"map_session": map_session.model_dump(mode="json")},
+                            "data": {
+                                "map_session": map_session.model_dump(mode="json"),
+                                "warnings": [
+                                    "Provider credentials are not configured."
+                                ],
+                            },
                         }
                     }
                 ]
@@ -990,5 +995,8 @@ def test_map_state_assembler_reuses_single_verified_tool_map_session() -> None:
 
         assert result is not None
         assert result.session_id == "map-tool-result"
+        assert result.compliance_warnings == [
+            "Provider credentials are not configured."
+        ]
 
     run_async_in_thread(_run())

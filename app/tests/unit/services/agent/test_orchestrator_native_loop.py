@@ -831,25 +831,6 @@ class _NoResultSearchOrchestrator(_SearchOrchestrator):
 
 
 ###############################################################################
-class _WarningSearchOrchestrator(_SearchOrchestrator):
-    # -------------------------------------------------------------------------
-    async def execute(self, payload):  # noqa: ANN001
-        session = await super().execute(payload)
-        warnings: list[str] = []
-        if "windy_webcams" in payload.overlay_ids:
-            warnings.append(
-                "windy_webcams: Missing credential. Configure provider access before live camera previews."
-            )
-        if "tomtom_traffic_flow" in payload.overlay_ids:
-            warnings.append(
-                "tomtom_traffic_flow: Missing credential. Showing basemap without live traffic tiles."
-            )
-        if warnings:
-            session.compliance_warnings = warnings
-        return session
-
-
-###############################################################################
 class _FailingCatalog:
     # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
@@ -1194,13 +1175,13 @@ def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap(
 
 
 ###############################################################################
-def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session() -> (
+def test_orchestrator_stage10_show_rome_with_traffic_reuses_tool_map_session() -> (
     None
 ):
     async def _run() -> None:
         policy = _Policy()
         history = _HistoryRepo()
-        search_orchestrator = _WarningSearchOrchestrator()
+        search_orchestrator = _SearchOrchestrator()
         native_loop = _NativeLoop(
             AgentToolLoopResult(
                 final_text="I found Rome with traffic.",
@@ -1242,9 +1223,8 @@ def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session(
         assert map_overlay_capability_ids(response.map_session) == [
             "tomtom_traffic_flow"
         ]
-        assert response.map_session.compliance_warnings
-        assert "Missing credential" in response.map_session.compliance_warnings[0]
-        assert len(search_orchestrator.requests) == 1
+        assert response.map_session.compliance_warnings == []
+        assert len(search_orchestrator.requests) == 0
 
     run_async_in_thread(_run())
 
@@ -1354,13 +1334,13 @@ def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -
 
 
 ###############################################################################
-def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning() -> (
+def test_orchestrator_stage10_show_webcams_around_times_square_reuses_tool_map_session() -> (
     None
 ):
     async def _run() -> None:
         policy = _Policy()
         history = _HistoryRepo()
-        search_orchestrator = _WarningSearchOrchestrator()
+        search_orchestrator = _SearchOrchestrator()
         native_loop = _NativeLoop(
             AgentToolLoopResult(
                 final_text="I found webcams around Times Square.",
@@ -1400,8 +1380,7 @@ def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning(
         assert response.map_session is not None
         assert response.map_session.resolved_location.label == "Times Square"
         assert map_overlay_capability_ids(response.map_session) == ["windy_webcams"]
-        assert response.map_session.compliance_warnings
-        assert "Missing credential" in response.map_session.compliance_warnings[0]
+        assert response.map_session.compliance_warnings == []
 
     run_async_in_thread(_run())
 
