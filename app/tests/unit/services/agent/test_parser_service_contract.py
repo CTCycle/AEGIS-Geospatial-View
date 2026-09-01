@@ -187,3 +187,49 @@ def test_parser_maps_unknown_model_action_to_generic_data_action_with_semantics(
 
     assert result.normalized_action.action_id == "geospatial_data_retrieval"
     assert result.requested_concepts == ["weather"]
+
+
+###############################################################################
+def test_parser_prioritizes_actionable_data_over_context_query_label() -> None:
+    class _Provider:
+        def structured_output(self, request, schema):  # noqa: ANN001
+            _ = request, schema
+            return {
+                "task_class": "direct_query",
+                "action_id": "weather_query",
+                "action_tags": ["weather"],
+                "requested_concepts": ["temperature"],
+                "context_query": {"kind": "active_location"},
+                "relationship": "follow_up",
+                "tools_needed": True,
+                "requires_location": True,
+                "location_signals": [
+                    {
+                        "signal_type": "deictic",
+                        "raw_value": "there",
+                        "normalized_value": "there",
+                        "confidence": 0.9,
+                    }
+                ],
+                "parser_confidence": 0.9,
+            }
+
+    class _Factory:
+        def get_provider(self, provider: str):  # noqa: ANN001
+            _ = provider
+            return _Provider()
+
+    result = ParserService(
+        llm_factory=_Factory(),  # type: ignore[arg-type]
+        settings_repo=object(),
+        provider="test",
+        model="test-model",
+    ).parse_turn(
+        user_message="What is the current temperature there?",
+        memory_snapshot={"active_location": {"label": "Rome"}},
+        conversation_messages=[],
+    )
+
+    assert result.context_query.kind == "none"
+    assert result.relationship == "follow_up"
+    assert result.requested_concepts == ["temperature"]

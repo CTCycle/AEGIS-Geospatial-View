@@ -13,6 +13,7 @@ from server.domain.agent.pipeline import ConversationTaskRecord, TaskFailureDeta
 from server.contracts.extraction import (
     ContextQuery,
     ConversationContextSnapshot,
+    LocationSignal,
     NormalizedAction,
     TurnParseResult,
 )
@@ -259,6 +260,51 @@ def test_typed_context_query_uses_active_map_location_without_tool_call() -> Non
         assert response is not None
         assert response.tool_payload is None
         assert "Lugano" in response.assistant_message
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_actionable_context_reference_reaches_tool_pipeline() -> None:
+    async def _run() -> None:
+        service, state, _ = _service()
+        turn = _turn(
+            user_text="What is the current temperature there?",
+            task_class="direct_query",
+            relationship="follow_up",
+            context_query_kind="active_location",
+        ).model_copy(
+            update={
+                "location_signals": [
+                    LocationSignal(
+                        signal_type="deictic",
+                        raw_value="there",
+                        normalized_value="there",
+                        source="model",
+                    )
+                ],
+                "normalized_action": NormalizedAction(
+                    action_id="geospatial_data_retrieval",
+                    action_label="Geospatial data retrieval",
+                    requires_location=True,
+                ),
+                "requested_concepts": ["temperature"],
+                "tools_needed": True,
+            }
+        )
+        response = await service.handle(
+            request_id="request-actionable-context",
+            conversation_id="conversation",
+            conversation_key="conversation",
+            task=_task(state, turn),
+            turn_contract=turn,
+            latest_memory={"active_location": {"label": "Rome"}},
+            latest_contract=None,
+            recent_messages=[],
+            context_usage=None,
+        )
+
+        assert response is None
 
     run_async_in_thread(_run())
 
