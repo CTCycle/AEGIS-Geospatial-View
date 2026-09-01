@@ -194,6 +194,244 @@ def _assertion_result(name: str, passed: bool, reason: str) -> dict[str, Any]:
     return {"name": name, "passed": passed, "reason": reason}
 
 
+_CAPABILITY_FAMILY_TOKENS: dict[str, tuple[str, ...]] = {
+    "location": ("location", "geocode", "coordinate", "place"),
+    "weather": ("weather", "forecast", "rain", "precipitation"),
+    "air_quality": ("air_quality", "airquality", "pollution", "openaq"),
+    "poi": ("poi", "amenit", "hospital", "pharmacy", "restaurant", "park"),
+    "transit": ("transit", "gtfs", "station", "railway", "bus"),
+    "elevation": ("elevation", "terrain", "topograph"),
+    "boundaries": ("boundar", "admin", "protected"),
+    "land_cover": ("land_cover", "landcover", "land_use"),
+    "population": ("population", "census", "demograph"),
+    "roads": ("road", "traffic"),
+}
+
+
+def _observed_rendering_types(traces: list[dict[str, Any]]) -> set[str]:
+    observed: set[str] = set()
+    for trace in traces:
+        map_session = _map_session(trace)
+        if _map_has_location(map_session):
+            observed.add("map")
+        if _answer(trace).strip():
+            observed.add("text")
+        if not isinstance(map_session, dict):
+            continue
+        collection = map_session.get("overlay_collection")
+        instances = collection.get("instances") if isinstance(collection, dict) else []
+        if not isinstance(instances, list):
+            continue
+        for instance in instances:
+            if not isinstance(instance, dict):
+                continue
+            descriptor = instance.get("descriptor")
+            descriptor = descriptor if isinstance(descriptor, dict) else {}
+            geometry = str(
+                descriptor.get("geometry_type") or instance.get("overlay_type") or ""
+            ).casefold()
+            rendering = str(
+                descriptor.get("rendering_mode") or instance.get("rendering_mode") or ""
+            ).casefold()
+            value = f"{geometry} {rendering}"
+            if "polygon" in value or "area" in value:
+                observed.add("polygon")
+            if "line" in value or "road" in value:
+                observed.add("line")
+            if any(marker in value for marker in ("point", "marker", "station")):
+                observed.add("point")
+            if any(
+                marker in value for marker in ("raster", "tile", "xyz", "wms", "wmts")
+            ):
+                observed.add("raster")
+    if not observed:
+        observed.add("none")
+    return observed
+
+
+def _has_structured_clarification(trace: dict[str, Any]) -> bool:
+    response = _response(trace)
+    decision = response.get("decision")
+    if isinstance(decision, dict):
+        plan = decision.get("plan")
+        if isinstance(plan, dict) and plan.get("state") == "clarify":
+            return True
+        if isinstance(decision.get("clarification"), dict):
+            return True
+    contract = _contract(trace)
+    if contract.get("expected_frontend_update") == "clarification":
+        return True
+    return isinstance(contract.get("clarification_plan"), dict)
+
+
+def _has_provider_provenance(result: dict[str, Any]) -> bool:
+    provenance = result.get("provenance")
+    if not isinstance(provenance, dict):
+        return False
+    provider = provenance.get("provider")
+    fetched_at = provenance.get("fetched_at")
+    return (
+        isinstance(provider, str)
+        and bool(provider.strip())
+        and isinstance(fetched_at, str)
+        and bool(fetched_at.strip())
+    )
+
+
+def _has_explicit_limitation(traces: list[dict[str, Any]]) -> bool:
+    for trace in traces:
+        response = _response(trace)
+        contract = _contract(trace)
+        limitations = contract.get("capability_limitations")
+        if isinstance(limitations, list) and any(
+            isinstance(item, str) and item.strip() for item in limitations
+        ):
+            return True
+        if _has_structured_clarification(trace):
+            return True
+        operation = response.get("operation")
+        if isinstance(operation, dict) and operation.get("status") in {
+            "failed",
+            "partial",
+        }:
+            return True
+        answer = _answer(trace).casefold()
+        if any(
+            marker in answer
+            for marker in ("not available", "unavailable", "could not", "cannot verify")
+        ):
+            return True
+    return False
+
+
+def _evaluate_expected_properties(
+    scenario: dict[str, Any],
+    traces: list[dict[str, Any]],
+    tool_calls: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    expected = scenario.get("expected")
+    if not isinstance(expected, dict):
+        return []
+
+    contracts = [_contract(trace) for trace in traces]
+    observed_classes = {
+        str(contract.get("task_class"))
+        for contract in contracts
+        if str(contract.get("task_class") or "").strip()
+    }
+    allowed_classes = {
+        str(value).strip()
+        for value in expected.get("task_classes", [])
+        if isinstance(value, str) and value.strip()
+    }
+    results = [
+        _assertion_result(
+            "expected_task_class",
+            bool(observed_classes) and observed_classes <= allowed_classes,
+            f"Observed task classes: {sorted(observed_classes)}; allowed: {sorted(allowed_classes)}.",
+        )
+    ]
+
+    capabilities = _capability_ids(tool_calls) | _overlay_ids(traces)
+    missing_families = []
+    for family in expected.get("capability_families", []):
+        family_key = str(family).strip().casefold()
+        tokens = _CAPABILITY_FAMILY_TOKENS.get(family_key, (family_key,))
+        if not any(
+            any(token in capability.casefold() for token in tokens)
+            for capability in capabilities
+        ):
+            missing_families.append(family_key)
+    results.append(
+        _assertion_result(
+            "expected_capability_families",
+            not missing_families,
+            "All expected capability families were observed."
+            if not missing_families
+            else f"Missing capability families: {', '.join(missing_families)}.",
+        )
+    )
+
+    minimum_tool_count = expected.get("minimum_tool_count")
+    count_passed = (
+        isinstance(minimum_tool_count, int) and len(tool_calls) >= minimum_tool_count
+    )
+    results.append(
+        _assertion_result(
+            "expected_minimum_tool_count",
+            count_passed,
+            f"Observed {len(tool_calls)} tool calls; required at least {minimum_tool_count}.",
+        )
+    )
+
+    clarification = expected.get("clarification")
+    last_trace = traces[-1] if traces else {}
+    has_clarification = _has_structured_clarification(last_trace)
+    clarification_passed = (
+        clarification == "allowed"
+        or clarification == "required"
+        and has_clarification
+        or clarification == "not_required"
+        and not has_clarification
+    )
+    results.append(
+        _assertion_result(
+            "expected_clarification",
+            clarification_passed,
+            f"Clarification expectation={clarification!r}; observed={has_clarification}.",
+        )
+    )
+
+    expected_rendering = {
+        str(value).strip().casefold()
+        for value in expected.get("rendering_types", [])
+        if isinstance(value, str) and value.strip()
+    }
+    observed_rendering = _observed_rendering_types(traces)
+    results.append(
+        _assertion_result(
+            "expected_rendering_type",
+            bool(expected_rendering & observed_rendering),
+            f"Observed rendering types: {sorted(observed_rendering)}; accepted: {sorted(expected_rendering)}.",
+        )
+    )
+
+    provenance_required = expected.get("provenance_required") is True
+    successful_results = [
+        result for result in _tool_results(traces) if not result.get("is_error")
+    ]
+    provenance_passed = (
+        not provenance_required
+        or bool(successful_results)
+        and all(_has_provider_provenance(result) for result in successful_results)
+    )
+    results.append(
+        _assertion_result(
+            "expected_provenance",
+            provenance_passed,
+            "Every successful tool result has provider and retrieval provenance."
+            if provenance_passed
+            else "A successful tool result is missing provider or retrieval provenance.",
+        )
+    )
+
+    if expected.get("fabrication_forbidden") is True:
+        grounded = bool(successful_results) and all(
+            _has_provider_provenance(result) for result in successful_results
+        )
+        grounded_or_limited = grounded or _has_explicit_limitation(traces)
+        results.append(
+            _assertion_result(
+                "expected_grounding",
+                grounded_or_limited,
+                "The response has provider evidence or an explicit limitation/clarification."
+                if grounded_or_limited
+                else "The response contains no provider evidence or explicit limitation.",
+            )
+        )
+    return results
+
+
 ###############################################################################
 def _evaluate_model_assertion(
     name: str,
@@ -563,6 +801,9 @@ def evaluate_model_scenario(
         _evaluate_model_assertion(str(name), traces, tool_calls)
         for name in scenario.get("assertions", [])
     ]
+    assertion_results.extend(
+        _evaluate_expected_properties(scenario, traces, tool_calls)
+    )
     fingerprints = [
         fingerprint
         for trace in traces
@@ -874,6 +1115,14 @@ def _run_scripted_fault_scenario(scenario: dict[str, Any]) -> dict[str, Any]:
 ###############################################################################
 def run_scripted_fault_lane(*, manifest_path: Path, output_dir: Path) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("matrix_version") == "1.0":
+        from tests.agent_benchmark.scenario_matrix import validate_scenario_matrix
+
+        errors = validate_scenario_matrix(manifest)
+        if errors:
+            raise ValueError(
+                "Invalid geographic-agent scenario matrix:\n- " + "\n- ".join(errors)
+            )
     scenarios = [
         item for item in manifest["scenarios"] if item.get("lane") == "scripted_fault"
     ]

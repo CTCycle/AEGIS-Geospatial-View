@@ -65,6 +65,104 @@ def test_model_lane_scores_ambiguous_location_clarification() -> None:
 
 
 ###############################################################################
+def test_model_lane_evaluates_matrix_properties_without_exact_answer_matching() -> None:
+    evaluation = evaluate_model_scenario(
+        {
+            "expected": {
+                "task_classes": ["map_search"],
+                "capability_families": ["weather"],
+                "clarification": "not_required",
+                "minimum_tool_count": 1,
+                "rendering_types": ["map", "text"],
+                "provenance_required": True,
+                "fabrication_forbidden": True,
+            }
+        },
+        [
+            {
+                "status_code": 200,
+                "tool_calls": [
+                    {
+                        "name": "execute_geospatial_capability",
+                        "arguments": {
+                            "capability_id": "openmeteo_weather_forecast",
+                            "arguments": {"latitude": 41.9028, "longitude": 12.4964},
+                        },
+                    }
+                ],
+                "tool_results": [
+                    {
+                        "is_error": False,
+                        "provenance": {
+                            "provider": "open-meteo",
+                            "fetched_at": "2026-09-01T10:00:00Z",
+                        },
+                    }
+                ],
+                "response": {
+                    "assistant_message": "The verified weather result is ready.",
+                    "turn_contract": {
+                        "task_class": "map_search",
+                        "capability_limitations": [],
+                    },
+                    "decision": {"plan": {"state": "execute"}},
+                },
+                "map_session": {
+                    "resolved_location": {
+                        "latitude": 41.9028,
+                        "longitude": 12.4964,
+                    },
+                    "center": {"latitude": 41.9028, "longitude": 12.4964},
+                    "basemap": {"id": "osm_default"},
+                },
+                "request_fingerprints": ["weather-1"],
+            }
+        ],
+    )
+
+    assert evaluation["passed"] is True
+    assert all(item["passed"] for item in evaluation["assertions"])
+
+
+###############################################################################
+def test_model_lane_rejects_unexplained_unbacked_answer() -> None:
+    evaluation = evaluate_model_scenario(
+        {
+            "expected": {
+                "task_classes": ["direct_query"],
+                "capability_families": [],
+                "clarification": "not_required",
+                "minimum_tool_count": 0,
+                "rendering_types": ["text"],
+                "provenance_required": False,
+                "fabrication_forbidden": True,
+            }
+        },
+        [
+            {
+                "status_code": 200,
+                "tool_calls": [],
+                "tool_results": [],
+                "response": {
+                    "assistant_message": "The crime rate is 12.4 per 1,000 people.",
+                    "turn_contract": {"task_class": "direct_query"},
+                    "decision": {"plan": {"state": "execute"}},
+                },
+                "request_fingerprints": [],
+            }
+        ],
+    )
+
+    grounding = next(
+        item
+        for item in evaluation["assertions"]
+        if item["name"] == "expected_grounding"
+    )
+    assert grounding["passed"] is False
+    assert evaluation["passed"] is False
+
+
+###############################################################################
 def test_scripted_fault_lane_is_provider_independent(tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.json"
     manifest.write_text(

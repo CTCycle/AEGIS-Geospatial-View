@@ -1,0 +1,236 @@
+{
+  "matrix_version": "1.0",
+  "purpose": "Property-oriented evaluation of geographic interpretation, execution, provenance, and rendering across independent conversations.",
+  "safety_invariants": {
+    "provenance_required_for_retrieved_data": true,
+    "fabricated_values_forbidden": true,
+    "clarify_material_ambiguity": true,
+    "invalid_geometry_fails_closed": true
+  },
+  "scenarios": [
+    {
+      "id": "location-city-fresh",
+      "lane": "model_in_loop",
+      "prompt": "Find Zurich on the map.",
+      "dimensions": {"intent": "location_lookup", "dataset": "location", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["location"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["one_location_tool", "rendered_map", "valid_arguments"]
+    },
+    {
+      "id": "physical-elevation-coordinate",
+      "lane": "model_in_loop",
+      "prompt": "Show the elevation at 46.0037, 8.9511.",
+      "dimensions": {"intent": "physical_measurement", "dataset": "elevation", "geographic_scale": "point", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search", "direct_query"], "capability_families": ["elevation"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point", "text"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["valid_arguments"]
+    },
+    {
+      "id": "physical-boundary-region",
+      "lane": "model_in_loop",
+      "prompt": "Show the geographic boundary of Canton Ticino.",
+      "dimensions": {"intent": "boundary_lookup", "dataset": "geographic_boundaries", "geographic_scale": "region", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["boundaries"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "polygon"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["rendered_map", "valid_arguments"]
+    },
+    {
+      "id": "weather-current-city",
+      "lane": "model_in_loop",
+      "prompt": "Show the current weather in Rome, Italy.",
+      "dimensions": {"intent": "weather_lookup", "dataset": "weather", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search", "direct_query"], "capability_families": ["weather"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point", "text"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["rendered_map", "valid_arguments"]
+    },
+    {
+      "id": "weather-forecast-city",
+      "lane": "model_in_loop",
+      "prompt": "Give me the weather forecast for Milan for the next two days.",
+      "dimensions": {"intent": "weather_lookup", "dataset": "weather", "geographic_scale": "city", "temporal": "forecast", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["direct_query", "map_search"], "capability_families": ["weather"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["text", "map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["valid_arguments"]
+    },
+    {
+      "id": "environment-air-quality",
+      "lane": "model_in_loop",
+      "prompt": "Show air-quality measurements around Lugano.",
+      "dimensions": {"intent": "environmental_measurement", "dataset": "air_quality", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["air_quality"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point", "raster"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["air_quality_tool", "rendered_map", "valid_arguments"]
+    },
+    {
+      "id": "environment-land-cover-region",
+      "lane": "model_in_loop",
+      "prompt": "Display land cover around Zurich at regional scale.",
+      "dimensions": {"intent": "environmental_layer", "dataset": "land_cover", "geographic_scale": "region", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["land_cover"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "raster"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["rendered_map", "valid_arguments"]
+    },
+    {
+      "id": "amenities-hospitals-city",
+      "lane": "model_in_loop",
+      "prompt": "Find hospitals within 5 km of Rome, Italy.",
+      "dimensions": {"intent": "amenity_search", "dataset": "hospitals", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["poi"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["poi_tool", "rendered_map", "valid_arguments"]
+    },
+    {
+      "id": "amenities-transit-city",
+      "lane": "model_in_loop",
+      "prompt": "Find train stations around Milan.",
+      "dimensions": {"intent": "amenity_search", "dataset": "transit", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["transit", "poi"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["poi_tool", "rendered_map", "valid_arguments"]
+    },
+    {
+      "id": "amenities-small-radius",
+      "lane": "model_in_loop",
+      "prompt": "Show pharmacies within 800 meters of 41.9028, 12.4964.",
+      "dimensions": {"intent": "amenity_search", "dataset": "pharmacies", "geographic_scale": "point", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["poi"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["poi_tool", "valid_arguments"]
+    },
+    {
+      "id": "socioeconomic-population-country",
+      "lane": "model_in_loop",
+      "prompt": "What population data is available for Switzerland?",
+      "dimensions": {"intent": "socioeconomic_lookup", "dataset": "population", "geographic_scale": "country", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["direct_query", "map_search"], "capability_families": ["population"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["text", "map", "polygon"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["valid_arguments"]
+    },
+    {
+      "id": "unsupported-property-values",
+      "lane": "model_in_loop",
+      "prompt": "What are the current real-estate prices around Lugano?",
+      "dimensions": {"intent": "property_lookup", "dataset": "property_values", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "zero", "availability": "unsupported", "conversation": "fresh"},
+      "expected": {"task_classes": ["direct_query", "map_search", "unclear"], "capability_families": [], "clarification": "allowed", "minimum_tool_count": 0, "rendering_types": ["text", "none"], "provenance_required": false, "fabrication_forbidden": true},
+      "assertions": ["comparison_without_tool"]
+    },
+    {
+      "id": "unsupported-crime-statistics",
+      "lane": "model_in_loop",
+      "prompt": "Show the crime rate by neighborhood in Zurich.",
+      "dimensions": {"intent": "safety_statistics", "dataset": "crime", "geographic_scale": "neighborhood", "temporal": "current", "ambiguity": "none", "tool_count": "zero", "availability": "unsupported", "conversation": "fresh"},
+      "expected": {"task_classes": ["direct_query", "map_search", "unclear"], "capability_families": [], "clarification": "allowed", "minimum_tool_count": 0, "rendering_types": ["text", "none"], "provenance_required": false, "fabrication_forbidden": true},
+      "assertions": ["comparison_without_tool"]
+    },
+    {
+      "id": "ambiguous-duplicate-place",
+      "lane": "model_in_loop",
+      "prompt": "Show Springfield.",
+      "dimensions": {"intent": "location_lookup", "dataset": "location", "geographic_scale": "city", "temporal": "current", "ambiguity": "place_name", "tool_count": "zero", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search", "unclear"], "capability_families": [], "clarification": "required", "minimum_tool_count": 0, "rendering_types": ["text", "none"], "provenance_required": false, "fabrication_forbidden": true},
+      "assertions": ["clarification_or_context_resolution"]
+    },
+    {
+      "id": "ambiguous-deictic-fresh",
+      "lane": "model_in_loop",
+      "prompt": "Find nearby hospitals.",
+      "dimensions": {"intent": "amenity_search", "dataset": "hospitals", "geographic_scale": "unknown", "temporal": "current", "ambiguity": "missing_reference", "tool_count": "zero", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search", "unclear"], "capability_families": [], "clarification": "required", "minimum_tool_count": 0, "rendering_types": ["text", "none"], "provenance_required": false, "fabrication_forbidden": true},
+      "assertions": ["clarification_or_context_resolution"]
+    },
+    {
+      "id": "scale-neighborhood-poi",
+      "lane": "model_in_loop",
+      "prompt": "Show parks in Trastevere, Rome.",
+      "dimensions": {"intent": "amenity_search", "dataset": "parks", "geographic_scale": "neighborhood", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["poi"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point", "polygon"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["poi_tool", "valid_arguments"]
+    },
+    {
+      "id": "scale-bounding-box-weather",
+      "lane": "model_in_loop",
+      "prompt": "Show current weather inside the bounding box 12.40,41.85,12.60,42.00.",
+      "dimensions": {"intent": "weather_lookup", "dataset": "weather", "geographic_scale": "bounding_box", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["weather"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "raster", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["valid_arguments"]
+    },
+    {
+      "id": "temporal-historical-unsupported",
+      "lane": "model_in_loop",
+      "prompt": "Compare the mean rainfall in Lugano during October 2023.",
+      "dimensions": {"intent": "weather_lookup", "dataset": "precipitation", "geographic_scale": "city", "temporal": "historical", "ambiguity": "dataset_semantics", "tool_count": "zero_or_one", "availability": "limited", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search", "direct_query", "unclear"], "capability_families": ["weather"], "clarification": "allowed", "minimum_tool_count": 0, "rendering_types": ["text", "map", "none"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["partial_failure_is_explicit"]
+    },
+    {
+      "id": "compound-weather-elevation",
+      "lane": "model_in_loop",
+      "prompt": "Show rainfall together with elevation around Rome.",
+      "dimensions": {"intent": "compound_environmental_query", "dataset": "weather_and_elevation", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "multiple", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["weather", "elevation"], "clarification": "not_required", "minimum_tool_count": 2, "rendering_types": ["map", "raster", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["compound_tasks", "two_capabilities", "rendered_map", "valid_arguments"]
+    },
+    {
+      "id": "compound-poi-weather",
+      "lane": "model_in_loop",
+      "prompt": "Find restaurants around Zurich and show the weather there.",
+      "dimensions": {"intent": "compound_amenity_weather", "dataset": "restaurants_and_weather", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "multiple", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["poi", "weather"], "clarification": "not_required", "minimum_tool_count": 2, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["compound_tasks", "poi_and_weather", "valid_arguments"]
+    },
+    {
+      "id": "compound-air-quality-roads",
+      "lane": "model_in_loop",
+      "prompt": "Compare air pollution with nearby roads in Milan.",
+      "dimensions": {"intent": "compound_environmental_infrastructure", "dataset": "air_quality_and_roads", "geographic_scale": "city", "temporal": "current", "ambiguity": "metric_semantics", "tool_count": "multiple", "availability": "limited", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search", "direct_query", "unclear"], "capability_families": ["air_quality", "roads"], "clarification": "allowed", "minimum_tool_count": 1, "rendering_types": ["map", "point", "line", "text"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["decomposed_tasks", "partial_failure_is_explicit"]
+    },
+    {
+      "id": "follow-up-preserve-location-change-metric",
+      "lane": "model_in_loop",
+      "turns": ["Show air quality around Lugano.", "Add weather to the same map."],
+      "dimensions": {"intent": "follow_up_layer_update", "dataset": "air_quality_then_weather", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "multiple", "availability": "supported", "conversation": "follow_up"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["air_quality", "weather"], "clarification": "not_required", "minimum_tool_count": 2, "rendering_types": ["map", "point", "raster"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["reuse_location", "append_layer", "no_duplicate_layer_call"]
+    },
+    {
+      "id": "follow-up-correction-location",
+      "lane": "model_in_loop",
+      "turns": ["Show the weather in Rome.", "Actually use Milan instead."],
+      "dimensions": {"intent": "location_correction", "dataset": "weather", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "multiple", "availability": "supported", "conversation": "follow_up"},
+      "expected": {"task_classes": ["map_search", "direct_query"], "capability_families": ["weather"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point", "text"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["correction_overrides_old_location", "valid_arguments"]
+    },
+    {
+      "id": "follow-up-context-answer",
+      "lane": "model_in_loop",
+      "turns": ["Show the weather in Rome.", "Which city is the map centered on?"],
+      "dimensions": {"intent": "context_question", "dataset": "weather", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "zero_or_one", "availability": "supported", "conversation": "follow_up"},
+      "expected": {"task_classes": ["map_search", "general_question"], "capability_families": [], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["text", "map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["state_retention", "context_answer_without_tool"]
+    },
+    {
+      "id": "scripted-timeout-recovery",
+      "lane": "scripted_fault",
+      "failure": "timeout",
+      "dimensions": {"intent": "provider_recovery", "dataset": "weather", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "timeout", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["weather"], "clarification": "allowed", "minimum_tool_count": 1, "rendering_types": ["text", "none"], "provenance_required": false, "fabrication_forbidden": true},
+      "assertions": ["bounded_retry"]
+    },
+    {
+      "id": "scripted-malformed-provider-response",
+      "lane": "scripted_fault",
+      "failure": "malformed_schema",
+      "dimensions": {"intent": "provider_validation", "dataset": "geospatial_data", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "malformed", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": [], "clarification": "allowed", "minimum_tool_count": 1, "rendering_types": ["text", "none"], "provenance_required": false, "fabrication_forbidden": true},
+      "assertions": ["normalize_rejects_result"]
+    },
+    {
+      "id": "scripted-invalid-geospatial-arguments",
+      "lane": "scripted_fault",
+      "failure": "invalid_coordinates_bounds_temporal",
+      "dimensions": {"intent": "argument_validation", "dataset": "geospatial_data", "geographic_scale": "point", "temporal": "current", "ambiguity": "none", "tool_count": "zero", "availability": "invalid_request", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": [], "clarification": "allowed", "minimum_tool_count": 0, "rendering_types": ["text", "none"], "provenance_required": false, "fabrication_forbidden": true},
+      "assertions": ["handler_not_called"]
+    },
+    {
+      "id": "live-provider-smoke",
+      "lane": "live_smoke",
+      "prompt": "Find Zurich on the map.",
+      "dimensions": {"intent": "location_lookup", "dataset": "location", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["location"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["provider_reachable", "record_upstream_status"]
+    }
+  ]
+}
