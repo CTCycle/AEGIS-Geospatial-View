@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import pytest
 
+from server.contracts.extraction import (
+    ConversationContextSnapshot,
+    NormalizedAction,
+    TurnParseResult,
+)
 from server.domain.agent.runtime import (
     AgentGoal,
     AgentTask,
@@ -190,3 +195,40 @@ def test_hydration_accepts_v3_only_and_restores_active_task() -> None:
         {"schema_version": 2, "conversation_key": "conversation", "tasks": []},
     )
     assert service.snapshot("conversation").current_task_id is None
+
+
+###############################################################################
+def test_terminal_task_update_finalizes_its_atomic_execution_graph() -> None:
+    service = ConversationTaskStateService()
+    turn = TurnParseResult(
+        user_text="Find hospitals in Rome",
+        conversation_context=ConversationContextSnapshot(),
+        task_class="map_search",
+        normalized_action=NormalizedAction(
+            action_id="geospatial_data_retrieval",
+            action_label="Find hospitals in Rome",
+            requires_location=True,
+        ),
+        atomic_tasks=[
+            {
+                "id": "resolve-location",
+                "summary": "Resolve Rome",
+                "depends_on": [],
+                "required": True,
+            },
+            {
+                "id": "search-hospitals",
+                "summary": "Search hospitals",
+                "depends_on": ["resolve-location"],
+                "required": True,
+            },
+        ],
+    )
+
+    task = service.start_task("conversation", turn, "geospatial_features")
+    service.update_task("conversation", task.task_id, status="completed")
+
+    snapshot = service.snapshot("conversation")
+    assert {item.status for item in snapshot.tasks} == {"completed"}
+    assert snapshot.goal is not None
+    assert snapshot.goal.status == "completed"

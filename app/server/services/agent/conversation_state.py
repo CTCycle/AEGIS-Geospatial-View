@@ -266,7 +266,30 @@ class ConversationTaskStateService:
                 )
                 if failure is not None:
                     runtime_task.last_failure = failure.model_dump(mode="json")
+            if status in {"completed", "failed"}:
+                task_prefix = f"{task_id}-"
+                for related_task in runtime.tasks:
+                    if not (
+                        related_task.id == task_id
+                        or related_task.id.startswith(task_prefix)
+                    ):
+                        continue
+                    if status == "completed":
+                        related_task.status = "completed"
+                        related_task.last_failure = None
+                    elif related_task.id != task_id:
+                        related_task.status = "blocked"
+                        related_task.last_failure = {
+                            "code": "dependency_failed",
+                            "message": "A required task in this execution graph failed.",
+                        }
+                if runtime.goal is not None:
+                    runtime.goal.status = (
+                        "completed" if status == "completed" else "partial"
+                    )
             runtime.revision += 1
+            if runtime.goal is not None:
+                runtime.goal.revision = runtime.revision
             state.updated_at = utc_now()
             return task
 
