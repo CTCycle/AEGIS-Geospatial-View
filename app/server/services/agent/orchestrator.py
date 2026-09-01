@@ -658,6 +658,26 @@ class AgentOrchestrator:
                     },
                 }
             )
+        # Persist the verified execution state before asking the language
+        # model to phrase it.  Otherwise the synthesis evidence can contain
+        # the pre-execution task graph and contradict a completed map.
+        synthesis_failure = self.turn_state_assembler.failure_from_operation(
+            operation, tool_payload
+        )
+        self.task_state_service.update_task(
+            conversation_key,
+            task.task_id,
+            status="failed" if synthesis_failure is not None else "completed",
+            progress_summary=operation.message,
+            failure=synthesis_failure,
+            tool_plan=tool_plan.model_dump(mode="json"),
+            tool_result_refs=[
+                str(item.get("tool_call_id"))
+                for item in json_array(tool_payload.get("tool_results"))
+                if is_json_object(item) and item.get("tool_call_id")
+            ],
+        )
+        self.task_state_service.set_active_visualization(conversation_key, map_session)
         assistant_message = self.response_synthesizer.synthesize(
             user_text=turn_contract.user_text,
             fallback_text=assistant_message,
