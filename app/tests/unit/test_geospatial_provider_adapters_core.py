@@ -7,11 +7,13 @@ import pytest
 from server.services.geospatial.cache import GeospatialCache
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.overpass import (
+    OverpassInvalidQueryError,
     OverpassRateLimitError,
     OverpassRequestError,
 )
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
+    ProviderInvalidQueryError,
     ProviderRateLimitError,
     ProviderRequest,
     ProviderUnavailableError,
@@ -317,6 +319,26 @@ def test_overpass_provider_propagates_rate_limits_and_timeouts() -> None:
 
 
 ###############################################################################
+def test_overpass_provider_distinguishes_invalid_query_from_transport_failure() -> None:
+
+    ###############################################################################
+    class _InvalidQueryService(_OverpassService):
+        # -------------------------------------------------------------------------
+        async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
+            raise OverpassInvalidQueryError("unsupported category")
+
+    with pytest.raises(ProviderInvalidQueryError):
+        run_async_in_thread(
+            OverpassProvider(service=_InvalidQueryService()).fetch(  # type: ignore[arg-type]
+                ProviderRequest(
+                    capability_id="overpass_poi_amenities",
+                    bbox=(12.0, 41.0, 13.0, 42.0),
+                )
+            )
+        )
+
+
+###############################################################################
 def test_overpass_provider_returns_empty_result() -> None:
 
     ###############################################################################
@@ -542,7 +564,9 @@ def test_provider_registry_ignores_environment_keys_for_gated_adapters(
     assert getattr(registry.get("tomtom"), "api_key") == ""
     with pytest.raises(ProviderAuthError, match="API key is required"):
         run_async_in_thread(
-            registry.fetch("tomtom", ProviderRequest(capability_id="tomtom_traffic_flow"))
+            registry.fetch(
+                "tomtom", ProviderRequest(capability_id="tomtom_traffic_flow")
+            )
         )
 
 

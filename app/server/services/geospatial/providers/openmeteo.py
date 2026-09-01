@@ -67,9 +67,9 @@ class OpenMeteoProvider(GeospatialProvider):
                 if isinstance(key, str) and isinstance(value, str)
             },
             source_url=(
-                self.service.air_quality_base_url
+                getattr(self.service, "air_quality_base_url", None)
                 if "air_quality" in request.capability_id
-                else self.service.weather_base_url
+                else getattr(self.service, "weather_base_url", None)
             ),
             result_type="features" if rendering_mode != "metadata-only" else "metadata",
         )

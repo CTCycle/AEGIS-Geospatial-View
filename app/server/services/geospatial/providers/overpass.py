@@ -9,6 +9,7 @@ from server.services.geospatial.normalizers import (
     normalize_poi_feature,
 )
 from server.services.geospatial.overpass import (
+    OverpassInvalidQueryError,
     OverpassRateLimitError,
     OverpassRequestError,
     OverpassService,
@@ -59,8 +60,10 @@ class OverpassProvider(GeospatialProvider):
                 )
             except OverpassRateLimitError as exc:
                 raise ProviderRateLimitError(str(exc)) from exc
-            except OverpassRequestError as exc:
+            except OverpassInvalidQueryError as exc:
                 raise ProviderInvalidQueryError(str(exc)) from exc
+            except OverpassRequestError as exc:
+                raise ProviderUnavailableError(str(exc)) from exc
             except (OverpassServiceError, ValueError) as exc:
                 raise ProviderUnavailableError(str(exc)) from exc
             return ProviderResponse(
@@ -77,9 +80,7 @@ class OverpassProvider(GeospatialProvider):
                 source_url=getattr(self.service, "base_url", None),
                 result_type="features",
                 result_status=(
-                    "valid_empty"
-                    if not json_array(payload.get("features"))
-                    else "ok"
+                    "valid_empty" if not json_array(payload.get("features")) else "ok"
                 ),
             )
         tags = request.params.get("amenity_tags")
@@ -104,8 +105,10 @@ class OverpassProvider(GeospatialProvider):
             )
         except OverpassRateLimitError as exc:
             raise ProviderRateLimitError(str(exc)) from exc
-        except OverpassRequestError as exc:
+        except OverpassInvalidQueryError as exc:
             raise ProviderInvalidQueryError(str(exc)) from exc
+        except OverpassRequestError as exc:
+            raise ProviderUnavailableError(str(exc)) from exc
         except (OverpassServiceError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
         features: list[dict[str, Any]] = []
