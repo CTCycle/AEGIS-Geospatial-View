@@ -621,6 +621,7 @@ class AgentOrchestrator:
                     list(turn_contract.overlay_commands),
                 )
             )
+        self.turn_state_assembler.append_provider_events(tool_payload, map_session)
         memory_snapshot = await self.turn_state_assembler.build_updated_memory_snapshot(
             turn_contract=turn_contract,
             latest_memory=latest_memory,
@@ -682,7 +683,9 @@ class AgentOrchestrator:
                 if is_json_object(item) and item.get("tool_call_id")
             ],
         )
-        self.task_state_service.set_active_visualization(conversation_key, map_session)
+        self.task_state_service.set_active_visualization(
+            conversation_key, map_session, tool_payload=tool_payload
+        )
         assistant_message = self.response_synthesizer.synthesize(
             user_text=turn_contract.user_text,
             fallback_text=assistant_message,
@@ -739,7 +742,9 @@ class AgentOrchestrator:
                 if is_json_object(item) and item.get("tool_call_id")
             ],
         )
-        self.task_state_service.set_active_visualization(conversation_key, map_session)
+        self.task_state_service.set_active_visualization(
+            conversation_key, map_session, tool_payload=tool_payload
+        )
 
         mutation_added = [
             instance_id

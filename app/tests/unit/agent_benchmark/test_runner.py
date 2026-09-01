@@ -125,6 +125,61 @@ def test_model_lane_evaluates_matrix_properties_without_exact_answer_matching() 
 
 
 ###############################################################################
+def test_model_lane_accepts_first_class_location_provider_evidence() -> None:
+    evaluation = evaluate_model_scenario(
+        {
+            "expected": {
+                "task_classes": ["map_search"],
+                "capability_families": ["location"],
+                "clarification": "not_required",
+                "minimum_tool_count": 1,
+                "rendering_types": ["map"],
+                "provenance_required": True,
+                "fabrication_forbidden": True,
+            }
+        },
+        [
+            {
+                "status_code": 200,
+                "tool_calls": [],
+                "tool_results": [],
+                "provider_events": [
+                    {
+                        "kind": "location_resolution",
+                        "capability_id": "location",
+                        "provider": "nominatim",
+                        "source_url": "https://nominatim.openstreetmap.org/search",
+                        "fetched_at": "2026-09-01T10:00:00Z",
+                    }
+                ],
+                "response": {
+                    "assistant_message": "Zurich is centered on the map.",
+                    "turn_contract": {
+                        "task_class": "map_search",
+                        "capability_limitations": [],
+                    },
+                    "decision": {"plan": {"state": "map_search"}},
+                },
+                "map_session": {
+                    "resolved_location": {
+                        "latitude": 47.3744,
+                        "longitude": 8.5410,
+                    },
+                    "center": {"latitude": 47.3744, "longitude": 8.5410},
+                    "basemap": {"id": "esri_world_imagery"},
+                },
+                "request_fingerprints": [],
+            }
+        ],
+    )
+
+    assert evaluation["passed"] is True
+    assert evaluation["tool_calls"] == 0
+    assert evaluation["provider_events"] == 1
+    assert evaluation["execution_evidence"] == 1
+
+
+###############################################################################
 def test_model_lane_rejects_unexplained_unbacked_answer() -> None:
     evaluation = evaluate_model_scenario(
         {

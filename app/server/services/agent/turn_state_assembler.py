@@ -316,6 +316,66 @@ class AgentTurnStateAssembler:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def append_provider_events(
+        tool_payload: dict[str, Any] | None,
+        map_session: MapSession | None,
+    ) -> None:
+        """Expose provider work that is not represented by a native tool call.
+
+        Location resolution is a required execution boundary, but it happens
+        in the policy layer before a catalog capability can run.  Keep that
+        provider evidence alongside native tool results so traces and
+        evaluation can account for the complete request lifecycle without
+        inventing a synthetic tool call.
+        """
+        if not is_json_object(tool_payload) or map_session is None:
+            return
+        provenance = map_session.resolved_location.provenance
+        if provenance is None:
+            return
+        existing_events = [
+            item
+            for item in json_array(tool_payload.get("provider_events"))
+            if is_json_object(item)
+        ]
+        event = {
+            "kind": "location_resolution",
+            "capability_id": "location",
+            "provider": provenance.provider,
+            "source_url": provenance.source_url,
+            "fetched_at": provenance.fetched_at.isoformat(),
+            "result_status": provenance.result_status,
+            "result_type": provenance.result_type,
+            "location": {
+                "label": map_session.resolved_location.label,
+                "latitude": map_session.resolved_location.latitude,
+                "longitude": map_session.resolved_location.longitude,
+                "bbox": map_session.resolved_location.bbox,
+            },
+        }
+        event_key = (
+            event["kind"],
+            event["provider"],
+            event["fetched_at"],
+            event["location"]["latitude"],
+            event["location"]["longitude"],
+        )
+        if not any(
+            (
+                item.get("kind"),
+                item.get("provider"),
+                item.get("fetched_at"),
+                json_object(item.get("location")).get("latitude"),
+                json_object(item.get("location")).get("longitude"),
+            )
+            == event_key
+            for item in existing_events
+        ):
+            existing_events.append(event)
+        tool_payload["provider_events"] = existing_events
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def extract_direct_result_from_tool_results(
         tool_payload: dict[str, Any] | None,
     ) -> dict[str, Any] | None:

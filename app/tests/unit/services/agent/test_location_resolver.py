@@ -51,12 +51,18 @@ def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
                     "lat": 41.9028,
                     "lon": 12.4964,
                     "confidence": 0.62,
+                    "provider": "nominatim",
+                    "source_url": "https://nominatim.openstreetmap.org/search",
+                    "fetched_at": "2026-09-01T10:00:00+00:00",
                 },
                 "Italy": {
                     "display_name": "Italy",
                     "lat": 41.8719,
                     "lon": 12.5674,
                     "confidence": 0.61,
+                    "provider": "nominatim",
+                    "source_url": "https://nominatim.openstreetmap.org/search",
+                    "fetched_at": "2026-09-01T10:00:00+00:00",
                 },
             }
             return lookup.get(address)
@@ -84,5 +90,8 @@ def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
         assert result.label == "Rome, Lazio, Italy"
         assert result.latitude == 41.9028
         assert result.longitude == 12.4964
+        assert result.provenance is not None
+        assert result.provenance.provider == "nominatim"
+        assert result.provenance.source_url.endswith("/search")
 
     run_async_in_thread(_run())

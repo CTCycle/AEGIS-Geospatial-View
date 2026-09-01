@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from server.services.geospatial.nominatim import NominatimService
 
 
@@ -40,7 +42,11 @@ def test_nominatim_rank_candidates_prefers_poi_when_expected() -> None:
         country_code="IT",
         query="Colosseum, Rome, Italy",
         expected_location_type="poi",
+        fetched_at=datetime(2026, 9, 1, 10, 0, tzinfo=UTC),
     )
     assert ranked
     assert ranked[0]["selected_result_type"] == "attraction"
     assert ranked[0]["lat"] == 41.8902
+    assert ranked[0]["provider"] == "nominatim"
+    assert ranked[0]["source_url"].endswith("/search")
+    assert ranked[0]["fetched_at"] == "2026-09-01T10:00:00+00:00"

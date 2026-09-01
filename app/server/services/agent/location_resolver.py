@@ -3,12 +3,16 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from server.common.typing import json_array, json_object
+from server.common.typing import json_object
 
 from typing import Sequence
 
 from server.common.logger import logger as LOGGER
-from server.domain.agent.decision import ClarificationRequest, ResolvedLocation
+from server.domain.agent.decision import (
+    ClarificationRequest,
+    LocationResolutionProvenance,
+    ResolvedLocation,
+)
 from server.contracts.extraction import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
 
@@ -205,6 +209,7 @@ class LocationResolver:
                 or None,
                 bbox=bbox,
                 bbox_source=str(geocoded.get("bbox_source") or "") or None,
+                provenance=self._provenance_from_geocoded(geocoded),
             )
         except (TypeError, ValueError):
             return None
@@ -245,6 +250,7 @@ class LocationResolver:
                 bbox_source=active.get("bbox_source")
                 if isinstance(active.get("bbox_source"), str)
                 else None,
+                provenance=cls._provenance_from_memory(active),
             )
         except (TypeError, ValueError):
             return None
@@ -300,6 +306,41 @@ class LocationResolver:
         if number is None:
             number = fallback
         return max(0.0, min(1.0, number))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _provenance_from_geocoded(
+        value: dict[str, Any],
+    ) -> LocationResolutionProvenance | None:
+        provider = str(value.get("provider") or "").strip()
+        fetched_at = value.get("fetched_at")
+        if not provider or fetched_at is None:
+            return None
+        try:
+            return LocationResolutionProvenance.model_validate(
+                {
+                    "provider": provider,
+                    "source_url": value.get("source_url"),
+                    "fetched_at": fetched_at,
+                    "result_status": value.get("result_status") or "ok",
+                    "result_type": value.get("result_type") or "location",
+                }
+            )
+        except (TypeError, ValueError):
+            return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _provenance_from_memory(
+        value: dict[str, Any],
+    ) -> LocationResolutionProvenance | None:
+        raw = value.get("provenance")
+        if not isinstance(raw, dict):
+            return None
+        try:
+            return LocationResolutionProvenance.model_validate(raw)
+        except (TypeError, ValueError):
+            return None
 
     # -------------------------------------------------------------------------
     def build_ambiguity_question(

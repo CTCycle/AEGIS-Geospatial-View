@@ -298,6 +298,8 @@ class ConversationTaskStateService:
         self,
         conversation_key: str,
         map_session: MapSession | None,
+        *,
+        tool_payload: dict[str, Any] | None = None,
     ) -> None:
         if map_session is None:
             return
@@ -305,13 +307,84 @@ class ConversationTaskStateService:
             state = self._get_state(conversation_key)
             runtime = self._runtime_state(state, conversation_key)
             runtime.active_map_session = map_session.model_dump(mode="json")
-            runtime.geospatial_state.renderable_refs = (
-                [str(map_session.session_id)]
-                if getattr(map_session, "session_id", None)
-                else runtime.geospatial_state.renderable_refs
-            )
+            self._update_geospatial_state(runtime, map_session, tool_payload)
             runtime.revision += 1
             state.updated_at = utc_now()
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _update_geospatial_state(
+        runtime: AgentThreadState,
+        map_session: MapSession,
+        tool_payload: dict[str, Any] | None,
+    ) -> None:
+        """Project the verified map result into the durable working state."""
+        geospatial = runtime.geospatial_state
+        location = map_session.resolved_location.model_dump(mode="json")
+        geospatial.resolved_locations = [location]
+        geospatial.geographic_scope.bbox = list(
+            map_session.viewport.bbox or map_session.bounds or []
+        ) or None
+        geospatial.geographic_scope.radius_m = map_session.viewport.radius_m
+        geospatial.geographic_scope.crs = "EPSG:4326"
+        geospatial.layer_refs = [
+            instance.instance_id
+            for instance in map_session.overlay_collection.instances
+        ]
+        geospatial.feature_refs = [
+            inspection.feature_id
+            for instance in map_session.overlay_collection.instances
+            for inspection in instance.inspections
+            if inspection.feature_id
+        ]
+
+        data_sources: list[str] = []
+        if map_session.basemap_id:
+            data_sources.append(map_session.basemap_id)
+        if isinstance(map_session.basemap, dict):
+            provider = str(map_session.basemap.get("provider") or "").strip()
+            if provider:
+                data_sources.append(provider)
+        for instance in map_session.overlay_collection.instances:
+            for value in (instance.capability_id, instance.provider):
+                normalized = str(value or "").strip()
+                if normalized:
+                    data_sources.append(normalized)
+        evidence_refs: list[str] = []
+        payload = tool_payload if isinstance(tool_payload, dict) else {}
+        for event in payload.get("provider_events", []):
+            if not isinstance(event, dict):
+                continue
+            capability_id = str(event.get("capability_id") or "").strip()
+            provider = str(event.get("provider") or "").strip()
+            if capability_id:
+                data_sources.append(capability_id)
+            if provider:
+                data_sources.append(provider)
+            if capability_id and provider:
+                evidence_refs.append(f"{capability_id}:{provider}")
+        for result in payload.get("tool_results", []):
+            if not isinstance(result, dict) or result.get("is_error"):
+                continue
+            provenance = result.get("provenance")
+            if not isinstance(provenance, dict):
+                continue
+            capability_id = str(provenance.get("capability_id") or "").strip()
+            provider = str(provenance.get("provider") or "").strip()
+            if capability_id:
+                data_sources.append(capability_id)
+            if provider:
+                data_sources.append(provider)
+            evidence_key = capability_id or str(provenance.get("tool_name") or "")
+            if evidence_key and provider:
+                evidence_refs.append(f"{evidence_key}:{provider}")
+        geospatial.data_source_refs = list(dict.fromkeys(data_sources))
+        runtime.evidence_refs = list(dict.fromkeys(evidence_refs))
+        geospatial.renderable_refs = (
+            [str(map_session.session_id)]
+            if getattr(map_session, "session_id", None)
+            else []
+        )
 
     # -------------------------------------------------------------------------
     def latest_failure(self, conversation_key: str) -> TaskFailureDetail | None:
