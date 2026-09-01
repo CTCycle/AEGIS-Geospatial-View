@@ -2367,6 +2367,28 @@
             "type": "string",
             "title": "Model"
           },
+          "reported_input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Input Tokens"
+          },
+          "reported_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Output Tokens"
+          },
           "reserved_output_tokens": {
             "type": "integer",
             "title": "Reserved Output Tokens",
@@ -2389,6 +2411,12 @@
           },
           "usage_source": {
             "type": "string",
+            "enum": [
+              "not_measured",
+              "estimated",
+              "provider_reported",
+              "hybrid"
+            ],
             "title": "Usage Source",
             "default": "estimated"
           },
@@ -4795,9 +4823,7 @@
             "title": "Credential Health"
           },
           "selected_model_context": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Selected Model Context"
+            "$ref": "#/components/schemas/SelectedModelContextResponse"
           }
         },
         "additionalProperties": false,
@@ -4807,7 +4833,8 @@
           "agent_model_provider",
           "agent_model_name",
           "ollama_url",
-          "credentials"
+          "credentials",
+          "selected_model_context"
         ],
         "title": "ModelSettingsResponse"
       },
@@ -5564,6 +5591,52 @@
           "longitude"
         ],
         "title": "ResolvedLocation"
+      },
+      "SelectedModelContextResponse": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "context_window_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window Tokens"
+          },
+          "maximum_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Output Tokens"
+          },
+          "context_profile_source": {
+            "type": "string",
+            "title": "Context Profile Source",
+            "default": "unknown"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "model"
+        ],
+        "title": "SelectedModelContextResponse"
       },
       "TaskFailureDetail": {
         "properties": {

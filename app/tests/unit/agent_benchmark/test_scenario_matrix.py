@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from tests.agent_benchmark.scenario_matrix import (
     load_scenario_matrix,
     validate_scenario_matrix,
@@ -44,3 +46,17 @@ def test_matrix_covers_required_geographic_agent_dimensions() -> None:
         "bounding_box",
     }
     assert all(item["expected"]["fabrication_forbidden"] for item in dimensions)
+
+
+###############################################################################
+def test_held_out_matrix_validates_and_uses_generalized_invariants() -> None:
+    path = Path(__file__).parents[2] / "agent_benchmark" / "scenario_matrix.holdout.v1.json"
+    matrix = load_scenario_matrix(path)
+
+    assert len(matrix["scenarios"]) >= 10
+    assert all(item.get("invariants") for item in matrix["scenarios"])
+    assert "location_target_consistency" in {
+        invariant
+        for item in matrix["scenarios"]
+        for invariant in item["invariants"]
+    }

@@ -6,6 +6,9 @@ from server.common.typing import is_json_array, is_json_object
 
 import json
 import re
+from dataclasses import dataclass
+from contextvars import ContextVar
+from time import monotonic
 from typing import Literal, cast
 
 from server.common.logger import logger as LOGGER
@@ -35,13 +38,24 @@ from server.services.llm.errors import (
 from server.services.llm.factory import LLMFactory
 from server.prompts.parser import build_parser_prompt
 from server.services.llm.types import LLMRequest
+from server.services.llm.context_profile_resolver import ModelContextProfileResolver
+from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.agent.turn_support import AgentTurnSupport
 
 
 ###############################################################################
+@dataclass(frozen=True)
+class ParserRunResult:
+    turn_contract: TurnParseResult
+    context_usage: dict[str, object] | None
+
+
+###############################################################################
 class ParserService:
+    PARSER_TIMEOUT_SECONDS = 35.0
+    RETRY_MIN_REMAINING_SECONDS = 1.0
     _FAILURE_CATEGORIES = frozenset(
         {
             "model_capability",
@@ -62,6 +76,7 @@ class ParserService:
         model: str | None = None,
         capability_registry: CapabilityRegistry | None = None,
         runtime_registry: RuntimeRegistry | None = None,
+        context_profile_resolver: ModelContextProfileResolver | None = None,
     ) -> None:
         self.llm_factory = llm_factory
         self.settings_repo = settings_repo
@@ -69,7 +84,20 @@ class ParserService:
         self.model = model
         self.capability_registry = capability_registry
         self.runtime_registry = runtime_registry
-        self.last_context_usage: dict[str, object] | None = None
+        self.context_profile_resolver = context_profile_resolver
+        self._last_context_usage: ContextVar[dict[str, object] | None] = ContextVar(
+            "aegis_parser_context_usage", default=None
+        )
+
+    # -------------------------------------------------------------------------
+    @property
+    def last_context_usage(self) -> dict[str, object] | None:
+        return self._last_context_usage.get()
+
+    # -------------------------------------------------------------------------
+    @last_context_usage.setter
+    def last_context_usage(self, value: dict[str, object] | None) -> None:
+        self._last_context_usage.set(value)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -255,6 +283,7 @@ class ParserService:
         active_instructions: list[dict[str, Any]] | None = None,
         task_snapshot: dict[str, Any] | None = None,
         schema_correction: bool = False,
+        deadline_monotonic: float | None = None,
     ) -> LLMParserExtraction:
         settings = None
         if self.provider is None or self.model is None:
@@ -268,6 +297,14 @@ class ParserService:
         if provider_name is None or model_name is None:
             raise LLMConfigurationError(
                 "Agent provider and model must be configured for structured extraction."
+            )
+        if deadline_monotonic is not None and monotonic() >= deadline_monotonic:
+            raise LLMProviderRequestError(
+                provider=provider_name,
+                model=model_name,
+                stage="structured_intent_extraction",
+                code="parser_timeout",
+                retryable=False,
             )
         parser_provider = self.llm_factory.get_provider(provider_name)
         self.last_context_usage = None
@@ -286,6 +323,23 @@ class ParserService:
             provider=provider_name,
             tools=[],
             tool_choice="none",
+            metadata={
+                **(
+                    self.context_profile_resolver.request_metadata(
+                        provider_name,
+                        model_name,
+                    )
+                    if self.context_profile_resolver is not None
+                    else {}
+                ),
+                "max_tokens": 4096,
+                "purpose": "structured_intent_extraction",
+                **(
+                    {REQUEST_DEADLINE_METADATA_KEY: deadline_monotonic}
+                    if deadline_monotonic is not None
+                    else {}
+                ),
+            },
             messages=[
                 {
                     "role": "system",
@@ -300,7 +354,7 @@ class ParserService:
         payload = parser_provider.structured_output(
             request=request, schema=LLMParserExtraction
         )
-        usage = getattr(parser_provider, "last_context_usage", None)
+        usage = getattr(payload, "context_usage", None)
         self.last_context_usage = dict(usage) if is_json_object(usage) else None
         try:
             extracted = LLMParserExtraction.model_validate(payload)
@@ -498,10 +552,13 @@ class ParserService:
                 else None
             ),
             provider_error=provider_error,
-            failure_category=cls._normalize_failure_category(
-                provider_error.get("category")
-                if is_json_object(provider_error)
-                else None
+            failure_category=(
+                cls._normalize_failure_category(
+                    provider_error.get("category")
+                    if is_json_object(provider_error)
+                    else None
+                )
+                or "provider_api"
             ),
         )
 
@@ -513,7 +570,28 @@ class ParserService:
         conversation_messages: list[dict[str, Any]],
         active_instructions: list[dict[str, Any]] | None = None,
         task_snapshot: dict[str, Any] | None = None,
+        deadline_monotonic: float | None = None,
     ) -> TurnParseResult:
+        return self.parse_turn_with_usage(
+            user_message=user_message,
+            memory_snapshot=memory_snapshot,
+            conversation_messages=conversation_messages,
+            active_instructions=active_instructions,
+            task_snapshot=task_snapshot,
+            deadline_monotonic=deadline_monotonic,
+        ).turn_contract
+
+    # -------------------------------------------------------------------------
+    def parse_turn_with_usage(
+        self,
+        user_message: str,
+        memory_snapshot: dict[str, Any],
+        conversation_messages: list[dict[str, Any]],
+        active_instructions: list[dict[str, Any]] | None = None,
+        task_snapshot: dict[str, Any] | None = None,
+        deadline_monotonic: float | None = None,
+    ) -> ParserRunResult:
+        self.last_context_usage = None
         normalized_recent = self._normalize_recent_messages(conversation_messages)
         parser_failure_ambiguity: str | None = None
         parser_provider_error: dict[str, object] | None = None
@@ -525,6 +603,7 @@ class ParserService:
                 recent_messages=normalized_recent,
                 active_instructions=active_instructions,
                 task_snapshot=task_snapshot,
+                deadline_monotonic=deadline_monotonic,
             )
         except LLMConfigurationError:
             raise
@@ -561,6 +640,16 @@ class ParserService:
                     if "invalid_api_key" in str(exc).lower() or "401" in str(exc)
                     else "parser_unavailable"
                 )
+                parser_failure_category = "provider_api"
+                parser_provider_error = {
+                    "code": failure_ambiguity,
+                    "category": "provider_api",
+                    "provider": self.provider or "",
+                    "model": self.model or "",
+                    "stage": "structured_intent_extraction",
+                    "retryable": False,
+                    "detail": str(exc),
+                }
             parser_failure_ambiguity = failure_ambiguity
             extracted = LLMParserExtraction(
                 task_class="unclear",
@@ -777,13 +866,29 @@ class ParserService:
             ),
             ",".join(result.ambiguities) if result.ambiguities else "-",
         )
-        return result
+        return ParserRunResult(
+            turn_contract=result,
+            context_usage=(
+                dict(self.last_context_usage)
+                if is_json_object(self.last_context_usage)
+                else None
+            ),
+        )
 
     # -------------------------------------------------------------------------
     def _extract_turn_with_retry(self, **kwargs: Any) -> LLMParserExtraction:
+        deadline = kwargs.get("deadline_monotonic")
+
+        def retry_allowed() -> bool:
+            if not isinstance(deadline, (int, float)):
+                return True
+            return monotonic() + self.RETRY_MIN_REMAINING_SECONDS < float(deadline)
+
         try:
             return self._extract_turn(**kwargs)
         except LLMResponseParsingError as exc:
+            if not retry_allowed():
+                raise
             LOGGER.warning(
                 "Retrying parser schema correction provider=%s model=%s code=%s",
                 exc.provider,
@@ -792,7 +897,7 @@ class ParserService:
             )
             return self._extract_turn(**kwargs, schema_correction=True)
         except LLMProviderRequestError as exc:
-            if not exc.retryable:
+            if not exc.retryable or not retry_allowed():
                 raise
             LOGGER.warning(
                 "Retrying transient parser provider failure provider=%s model=%s code=%s",
@@ -818,8 +923,31 @@ class ParserService:
             extracted,
             capability_catalog,
         )
+        execution_required = cls._has_typed_execution_evidence(extracted)
+        normalized_action_id = extracted.action_id
+        if (
+            execution_required
+            and extracted.task_class == "map_search"
+            and extracted.location_signals
+            and normalized_action_id == AgentAction.UNKNOWN.value
+        ):
+            normalized_action_id = AgentAction.LOCATION_RENDER.value
+        requires_location = extracted.requires_location or (
+            extracted.task_class == "map_search"
+            or (
+                extracted.task_class == "direct_query"
+                and bool(extracted.location_signals)
+            )
+        )
         return extracted.model_copy(
             update={
+                "action_id": normalized_action_id,
+                "tools_needed": extracted.tools_needed or execution_required,
+                "direct_response_sufficient": (
+                    extracted.direct_response_sufficient
+                    and not execution_required
+                ),
+                "requires_location": requires_location,
                 "task_tags": cls._dedupe(extracted.task_tags),
                 "action_tags": cls._dedupe(extracted.action_tags),
                 "requested_visualizations": cls._dedupe(
@@ -835,6 +963,36 @@ class ParserService:
                 "capability_limitations": cls._dedupe(extracted.capability_limitations),
             }
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _has_typed_execution_evidence(extracted: LLMParserExtraction) -> bool:
+        """Derive execution from typed intent instead of a model boolean."""
+
+        if extracted.task_class not in {"map_search", "direct_query"}:
+            return False
+        if extracted.task_class == "map_search":
+            return True
+        if extracted.action_id in {
+            AgentAction.CHAT_RESPONSE.value,
+            AgentAction.UNKNOWN.value,
+        }:
+            return any(
+                (
+                    extracted.location_signals,
+                    extracted.requested_concepts,
+                    extracted.requested_layers,
+                    extracted.requested_visualizations,
+                    extracted.requested_basemap,
+                    extracted.required_data_sources,
+                    extracted.required_tool_category,
+                    extracted.poi_categories,
+                    extracted.atomic_tasks,
+                    extracted.overlay_commands,
+                    extracted.viewport_intent,
+                )
+            )
+        return True
 
     # -------------------------------------------------------------------------
     @classmethod

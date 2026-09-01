@@ -23,9 +23,12 @@ from server.services.llm.errors import (
     LLMStructuredOutputError,
 )
 from server.services.llm.response_serialization import dump_response_payload
+from server.services.llm.request_deadline import remaining_request_seconds
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
+    LLMStructuredOutput,
+    LLMTextStream,
     LLMToolCall,
     LLMToolDefinition,
     ModelDescriptor,
@@ -42,7 +45,6 @@ class GoogleProvider(LLMProvider):
     def __init__(self, *, api_key: str, base_url: str | None = None) -> None:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/") if base_url else None
-        self.last_context_usage: dict[str, Any] | None = None
 
     # -------------------------------------------------------------------------
     def _client(self) -> Any:
@@ -56,6 +58,27 @@ class GoogleProvider(LLMProvider):
                 ),
             )
         return genai.Client(api_key=self.api_key)
+
+    # -------------------------------------------------------------------------
+    def _client_for_request(self, request: LLMRequest) -> Any:
+        remaining = remaining_request_seconds(request)
+        if remaining is None:
+            return self._client()
+        if remaining <= 0:
+            raise TimeoutError("The bounded LLM request deadline has expired.")
+        timeout_ms = max(1, int(remaining * 1000))
+        http_options_constructor: Any = genai_types.HttpOptions
+        kwargs: dict[str, Any] = {
+            "api_key": self.api_key,
+            "http_options": http_options_constructor(timeout=timeout_ms),
+        }
+        if self.base_url and self.base_url != DEFAULT_GOOGLE_BASE_URL:
+            kwargs["http_options"] = http_options_constructor(
+                baseUrl=self.base_url,
+                apiVersion="v1beta",
+                timeout=timeout_ms,
+            )
+        return genai.Client(**kwargs)
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
@@ -144,9 +167,7 @@ class GoogleProvider(LLMProvider):
         effective_request = prepare_request(
             effective_request, provider=self.provider_name
         )
-        self.last_context_usage = compute_context_usage(
-            effective_request, provider=self.provider_name
-        ).to_dict()
+        usage = compute_context_usage(effective_request, provider=self.provider_name)
         config = self._config_from_request(effective_request)
         self._validate_request_capabilities(effective_request)
         if native_tools:
@@ -170,7 +191,7 @@ class GoogleProvider(LLMProvider):
             config["response_mime_type"] = "application/json"
             config["response_json_schema"] = schema
         try:
-            response = self._client().models.generate_content(
+            response = self._client_for_request(effective_request).models.generate_content(
                 model=effective_request.model,
                 contents=self._contents_from_messages(effective_request.messages),
                 config=config,
@@ -182,32 +203,57 @@ class GoogleProvider(LLMProvider):
                 exc, provider=self.provider_name, model=request.model, stage="chat"
             ) from exc
         raw = dump_response_payload(response)
-        self.last_context_usage = apply_reported_usage(
-            compute_context_usage(effective_request, provider=self.provider_name),
-            raw,
-        ).to_dict()
+        usage = apply_reported_usage(usage, raw)
         return LLMResult(
             content=str(getattr(response, "text", "") or ""),
             raw=raw,
             tool_calls=self._parse_tool_calls(raw),
             finish_reason=self._extract_finish_reason(raw),
+            context_usage=usage.to_dict(),
         )
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
         request = prepare_request(request, provider=self.provider_name)
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
-        stream = self._client().models.generate_content_stream(
-            model=request.model,
-            contents=self._contents_from_messages(request.messages),
-            config=self._config_from_request(request),
-        )
-        for chunk in stream:
-            text = getattr(chunk, "text", "")
-            if text:
-                yield str(text)
+        usage = compute_context_usage(request, provider=self.provider_name)
+        stream: LLMTextStream
+
+        def iterate() -> Iterable[str]:
+            nonlocal usage
+            try:
+                response_stream = self._client_for_request(
+                    request
+                ).models.generate_content_stream(
+                    model=request.model,
+                    contents=self._contents_from_messages(request.messages),
+                    config=self._config_from_request(request),
+                )
+                for chunk in response_stream:
+                    remaining = remaining_request_seconds(request)
+                    if remaining is not None and remaining <= 0:
+                        raise TimeoutError(
+                            "The bounded LLM request deadline has expired."
+                        )
+                    usage = apply_reported_usage(
+                        usage,
+                        dump_response_payload(chunk),
+                    )
+                    stream.context_usage = usage.to_dict()
+                    text = getattr(chunk, "text", "")
+                    if text:
+                        yield str(text)
+            except LLMProviderRequestError:
+                raise
+            except Exception as exc:
+                raise LLMProviderRequestError.from_exception(
+                    exc,
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="stream",
+                ) from exc
+
+        stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
+        return stream
 
     # -------------------------------------------------------------------------
     def structured_output(
@@ -221,14 +267,12 @@ class GoogleProvider(LLMProvider):
             replace(request, response_json_schema=json_schema),
             provider=self.provider_name,
         )
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
+        usage = compute_context_usage(request, provider=self.provider_name)
         self._validate_request_capabilities(
             replace(request, response_json_schema=json_schema)
         )
         try:
-            response = self._client().models.generate_content(
+            response = self._client_for_request(request).models.generate_content(
                 model=request.model,
                 contents=self._contents_from_messages(request.messages),
                 config={
@@ -247,10 +291,7 @@ class GoogleProvider(LLMProvider):
                 stage="structured_output",
             ) from exc
         raw = dump_response_payload(response)
-        self.last_context_usage = apply_reported_usage(
-            compute_context_usage(request, provider=self.provider_name),
-            raw,
-        ).to_dict()
+        usage = apply_reported_usage(usage, raw)
         try:
             loaded = json.loads(str(getattr(response, "text", "") or "{}"))
         except (TypeError, json.JSONDecodeError) as exc:
@@ -267,7 +308,7 @@ class GoogleProvider(LLMProvider):
                 stage="structured_output",
                 detail="The provider returned a JSON value instead of an object.",
             )
-        return json_object(loaded)
+        return LLMStructuredOutput(loaded, context_usage=usage.to_dict())
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:

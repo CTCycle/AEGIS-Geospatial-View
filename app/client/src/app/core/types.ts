@@ -479,6 +479,8 @@ export interface ChatTurnRequest {
 
 export interface ContextUsage {
   estimated_input_tokens: number;
+  reported_input_tokens?: number | null;
+  reported_output_tokens?: number | null;
   selected_context_window?: number | null;
   model_context_limit?: number | null;
   usage_percent: number | null;
@@ -488,7 +490,7 @@ export interface ContextUsage {
   tool_schema_tokens?: number;
   response_schema_tokens?: number;
   safety_margin_tokens?: number;
-  usage_source?: string;
+  usage_source?: 'not_measured' | 'estimated' | 'provider_reported' | 'hybrid' | string;
   phases?: Record<string, unknown>;
   peak_request_tokens?: number | null;
   total_input_tokens?: number | null;
@@ -821,7 +823,15 @@ export interface ModelSettingsResponse {
   deepseek_base_url?: string | null;
   credentials: Record<string, Record<string, boolean>>;
   credential_health?: Record<string, Record<string, 'healthy' | 'unreadable' | string>>;
-  selected_model_context?: Record<string, JsonValue>;
+  selected_model_context: SelectedModelContext;
+}
+
+export interface SelectedModelContext {
+  provider: string;
+  model: string;
+  context_window_tokens: number | null;
+  maximum_output_tokens: number | null;
+  context_profile_source: string;
 }
 
 export interface ModelSettingsUpdateRequest {

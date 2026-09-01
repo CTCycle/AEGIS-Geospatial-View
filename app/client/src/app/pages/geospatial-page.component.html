@@ -73,8 +73,8 @@
             <progress
               class="context-window-row__progress"
               max="100"
-              [attr.value]="contextUsage ? contextUsagePercent : null"
-              [attr.aria-valuenow]="contextUsage ? contextUsagePercent : null"
+              [attr.value]="contextUsage?.usage_percent !== null && contextUsage?.usage_percent !== undefined ? contextUsagePercent : null"
+              [attr.aria-valuenow]="contextUsage?.usage_percent !== null && contextUsage?.usage_percent !== undefined ? contextUsagePercent : null"
               aria-valuemin="0"
               aria-valuemax="100"
               [attr.aria-valuetext]="contextUsageDetail"

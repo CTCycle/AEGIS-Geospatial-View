@@ -116,3 +116,71 @@ def test_map_response_preserves_and_renders_companion_direct_result() -> None:
     assert "temperature 23.4 C" in message
     assert operation.kind == "map_session"
     assert operation.direct_result == direct_result
+
+
+###############################################################################
+def test_infer_failure_category_classifies_provider_warnings_in_success_envelope() -> None:
+    category = AgentResponseBuilder.infer_failure_category(
+        {
+            "tool_results": [
+                {
+                    "is_error": False,
+                    "content": {
+                        "ok": True,
+                        "data": {
+                            "warnings": [
+                                "public feature retrieval failed; no layer was added (ProviderInvalidQueryError)."
+                            ]
+                        },
+                    },
+                    "provenance": {
+                        "provider": "example-provider",
+                        "warnings": ["public feature retrieval failed"],
+                    },
+                }
+            ]
+        }
+    )
+
+    assert category == "provider_api"
+
+
+###############################################################################
+def test_infer_failure_category_ignores_non_failure_overlay_warnings() -> None:
+    category = AgentResponseBuilder.infer_failure_category(
+        {
+            "tool_results": [
+                {
+                    "is_error": False,
+                    "content": {
+                        "ok": True,
+                        "data": {
+                            "warnings": [
+                                "No existing overlay matches the requested selector; the map was left unchanged."
+                            ]
+                        },
+                    },
+                }
+            ]
+        }
+    )
+
+    assert category is None
+
+
+###############################################################################
+def test_provider_warning_is_available_to_override_broader_capability_failure() -> None:
+    inferred = AgentResponseBuilder.infer_failure_category(
+        {
+            "tool_results": [
+                {
+                    "is_error": False,
+                    "provenance": {
+                        "warnings": ["public feature retrieval failed"],
+                    },
+                }
+            ]
+        }
+    )
+
+    assert inferred == "provider_api"

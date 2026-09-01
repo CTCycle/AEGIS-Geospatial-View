@@ -15,6 +15,13 @@ const settings = (overrides: Partial<ModelSettingsResponse> = {}): ModelSettings
   deepseek_base_url: null,
   credentials: { openai: { api_key: true } },
   credential_health: { openai: { api_key: 'healthy' } },
+  selected_model_context: {
+    provider: 'openai',
+    model: 'gpt-4.1-mini',
+    context_window_tokens: 1047576,
+    maximum_output_tokens: 32768,
+    context_profile_source: 'openai_model_catalog',
+  },
   ...overrides,
 });
 

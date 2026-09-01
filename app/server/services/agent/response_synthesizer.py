@@ -4,6 +4,8 @@ from server.common.typing import is_json_array, is_json_object
 
 import logging
 import re
+from contextvars import ContextVar
+from time import monotonic
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -14,6 +16,8 @@ from server.repositories.model_settings import ModelSettingsRepository
 from server.services.llm.factory import LLMFactory
 from server.prompts.response import build_response_prompt
 from server.services.llm.errors import LLMProviderRequestError, LLMStructuredOutputError
+from server.services.llm.context_profile_resolver import ModelContextProfileResolver
+from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
 from server.services.llm.types import LLMRequest
 
 LOGGER = logging.getLogger(__name__)
@@ -41,20 +45,59 @@ class GroundedSynthesisResult(BaseModel):
 
 ###############################################################################
 class GroundedResponseSynthesizer:
+    SYNTHESIS_TIMEOUT_SECONDS = 35.0
     # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
         settings_repo: ModelSettingsRepository,
         llm_factory: LLMFactory,
+        context_profile_resolver: ModelContextProfileResolver | None = None,
         enabled: bool | None = None,
     ) -> None:
         self.settings_repo = settings_repo
         self.llm_factory = llm_factory
+        self.context_profile_resolver = context_profile_resolver
         self.enabled = True if enabled is None else enabled
-        self.last_context_usage: dict[str, Any] | None = None
-        self.last_failure_category: str | None = None
-        self.last_failure_detail: str | None = None
+        self._last_context_usage: ContextVar[dict[str, Any] | None] = ContextVar(
+            "aegis_synthesis_context_usage", default=None
+        )
+        self._last_failure_category: ContextVar[str | None] = ContextVar(
+            "aegis_synthesis_failure_category", default=None
+        )
+        self._last_failure_detail: ContextVar[str | None] = ContextVar(
+            "aegis_synthesis_failure_detail", default=None
+        )
+
+    # -------------------------------------------------------------------------
+    @property
+    def last_context_usage(self) -> dict[str, Any] | None:
+        return self._last_context_usage.get()
+
+    # -------------------------------------------------------------------------
+    @last_context_usage.setter
+    def last_context_usage(self, value: dict[str, Any] | None) -> None:
+        self._last_context_usage.set(value)
+
+    # -------------------------------------------------------------------------
+    @property
+    def last_failure_category(self) -> str | None:
+        return self._last_failure_category.get()
+
+    # -------------------------------------------------------------------------
+    @last_failure_category.setter
+    def last_failure_category(self, value: str | None) -> None:
+        self._last_failure_category.set(value)
+
+    # -------------------------------------------------------------------------
+    @property
+    def last_failure_detail(self) -> str | None:
+        return self._last_failure_detail.get()
+
+    # -------------------------------------------------------------------------
+    @last_failure_detail.setter
+    def last_failure_detail(self, value: str | None) -> None:
+        self._last_failure_detail.set(value)
 
     # -------------------------------------------------------------------------
     def synthesize(
@@ -97,18 +140,33 @@ class GroundedResponseSynthesizer:
         self.last_failure_detail = None
         try:
             provider = self.llm_factory.get_provider(settings.agent_model_provider)
+            request = LLMRequest(
+                model=settings.agent_model_name,
+                temperature=0.35,
+                messages=build_response_prompt(evidence),
+                metadata={
+                    **(
+                        self.context_profile_resolver.request_metadata(
+                            settings.agent_model_provider,
+                            settings.agent_model_name,
+                        )
+                        if self.context_profile_resolver is not None
+                        else {}
+                    ),
+                    "max_tokens": 4096,
+                    "purpose": "grounded_agent_response",
+                    REQUEST_DEADLINE_METADATA_KEY: (
+                        monotonic() + self.SYNTHESIS_TIMEOUT_SECONDS
+                    ),
+                },
+            )
             payload = provider.structured_output(
-                LLMRequest(
-                    model=settings.agent_model_name,
-                    temperature=0.35,
-                    messages=build_response_prompt(evidence),
-                    metadata={"purpose": "grounded_agent_response"},
-                ),
+                request,
                 GroundedSynthesisResult,
             )
-            result = GroundedSynthesisResult.model_validate(payload)
-            usage = getattr(provider, "last_context_usage", None)
+            usage = getattr(payload, "context_usage", None)
             self.last_context_usage = dict(usage) if is_json_object(usage) else None
+            result = GroundedSynthesisResult.model_validate(payload)
             if any(key not in evidence for key in result.used_evidence_keys):
                 raise ValueError(
                     "Synthesis referenced evidence keys outside the verified payload."

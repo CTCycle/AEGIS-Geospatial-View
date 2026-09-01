@@ -261,10 +261,15 @@
 }
 
 .context-window-row__value {
-    flex: 0 0 2.3rem;
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
     text-align: right;
     color: #b8cbd2;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .context-window-row--warning .context-window-row__progress {

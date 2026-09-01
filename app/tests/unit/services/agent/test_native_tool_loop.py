@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from tests.conftest import run_async_in_thread
 from typing import Any
 
@@ -74,6 +76,61 @@ class _Factory:
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> _Provider:
         return self.provider
+
+
+###############################################################################
+def test_native_tool_loop_keeps_usage_with_concurrent_invocations() -> None:
+    class _InvocationProvider(_Provider):
+        def chat(self, request):  # noqa: ANN001
+            return LLMResult(
+                content=request.model,
+                context_usage={
+                    "provider": "test",
+                    "model": request.model,
+                    "estimated_input_tokens": 10,
+                },
+            )
+
+    async def _run() -> None:
+        provider = _InvocationProvider([])
+        loop = NativeToolLoop(
+            provider_factory=_Factory(provider), tool_registry=_registry()
+        )
+
+        async def run_model(model: str) -> object:
+            request = AgentToolLoopRequest(
+                provider="test",
+                model=model,
+                messages=[{"role": "user", "content": model}],
+                tools=[],
+                temperature=0,
+                context=AgentExecutionContext(),
+            )
+            return await asyncio.to_thread(
+                lambda: asyncio.run(loop.run(request))
+            )
+
+        first, second = await asyncio.gather(
+            run_model("model-a"),
+            run_model("model-b"),
+        )
+
+        assert first.context_usages == [
+            {
+                "provider": "test",
+                "model": "model-a",
+                "estimated_input_tokens": 10,
+            }
+        ]
+        assert second.context_usages == [
+            {
+                "provider": "test",
+                "model": "model-b",
+                "estimated_input_tokens": 10,
+            }
+        ]
+
+    run_async_in_thread(_run())
 
 
 ###############################################################################

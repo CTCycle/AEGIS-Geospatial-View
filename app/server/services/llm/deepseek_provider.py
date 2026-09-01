@@ -21,9 +21,13 @@ from server.services.llm.errors import (
     LLMProviderRequestError,
     LLMResponseParsingError,
 )
+from server.services.llm.response_serialization import dump_response_payload
+from server.services.llm.request_deadline import remaining_request_seconds
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
+    LLMStructuredOutput,
+    LLMTextStream,
     LLMToolCall,
     LLMToolDefinition,
     ModelDescriptor,
@@ -40,7 +44,6 @@ class DeepSeekProvider(LLMProvider):
     def __init__(self, *, api_key: str, base_url: str | None = None) -> None:
         self.api_key = api_key
         self.base_url = (base_url or DEFAULT_DEEPSEEK_BASE_URL).rstrip("/")
-        self.last_context_usage: dict[str, Any] | None = None
         self._declared_model_capabilities: dict[str, dict[str, bool]] = {}
 
     # -------------------------------------------------------------------------
@@ -51,6 +54,19 @@ class DeepSeekProvider(LLMProvider):
             timeout=30.0,
             max_retries=0,
         )
+
+    # -------------------------------------------------------------------------
+    def _client_for_request(self, request: LLMRequest) -> Any:
+        client = self._client()
+        remaining = remaining_request_seconds(request)
+        if remaining is None:
+            return client
+        if remaining <= 0:
+            raise TimeoutError("The bounded LLM request deadline has expired.")
+        with_options = getattr(client, "with_options", None)
+        if callable(with_options):
+            return with_options(timeout=min(30.0, remaining))
+        return client
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
@@ -134,12 +150,17 @@ class DeepSeekProvider(LLMProvider):
             tools=native_tools or None,
             response_json_schema=schema,
         )
+        if schema and not native_tools:
+            effective_request = replace(
+                effective_request,
+                messages=self._messages_with_json_schema(
+                    effective_request.messages, schema
+                ),
+            )
         effective_request = prepare_request(
             effective_request, provider=self.provider_name
         )
-        self.last_context_usage = compute_context_usage(
-            effective_request, provider=self.provider_name
-        ).to_dict()
+        usage = compute_context_usage(effective_request, provider=self.provider_name)
         self._validate_request_capabilities(effective_request)
         kwargs: dict[str, Any] = {}
         if native_tools:
@@ -149,17 +170,11 @@ class DeepSeekProvider(LLMProvider):
             kwargs["tool_choice"] = tool_choice or request.tool_choice or "auto"
         if schema and not native_tools:
             kwargs["response_format"] = {"type": "json_object"}
-            effective_request = replace(
-                effective_request,
-                messages=self._messages_with_json_schema(
-                    effective_request.messages, schema
-                ),
-            )
         try:
-            response = self._client().chat.completions.create(
-                model=request.model,
+            response = self._client_for_request(effective_request).chat.completions.create(
+                model=effective_request.model,
                 messages=self.normalize_tool_messages(effective_request.messages),
-                temperature=request.temperature,
+                temperature=effective_request.temperature,
                 stream=False,
                 **kwargs,
             )
@@ -167,36 +182,66 @@ class DeepSeekProvider(LLMProvider):
             raise LLMProviderRequestError.from_exception(
                 exc, provider=self.provider_name, model=request.model, stage="chat"
             ) from exc
-        raw = response.model_dump(mode="json")
-        self.last_context_usage = apply_reported_usage(
-            compute_context_usage(effective_request, provider=self.provider_name),
-            raw,
-        ).to_dict()
+        raw = dump_response_payload(response)
+        usage = apply_reported_usage(usage, raw)
         content, tool_calls = self._parse_choice(response)
         return LLMResult(
             content=content,
             raw=raw,
             tool_calls=tool_calls,
             finish_reason=self._finish_reason(response),
+            context_usage=usage.to_dict(),
         )
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
         request = prepare_request(request, provider=self.provider_name)
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
-        stream = self._client().chat.completions.create(
-            model=request.model,
-            messages=self.normalize_tool_messages(request.messages),
-            temperature=request.temperature,
-            stream=True,
-        )
-        for chunk in stream:
-            delta = chunk.choices[0].delta if getattr(chunk, "choices", None) else None
-            text = getattr(delta, "content", None)
-            if isinstance(text, str) and text:
-                yield text
+        usage = compute_context_usage(request, provider=self.provider_name)
+        stream: LLMTextStream
+
+        def iterate() -> Iterable[str]:
+            nonlocal usage
+            try:
+                response_stream = self._client_for_request(
+                    request
+                ).chat.completions.create(
+                    model=request.model,
+                    messages=self.normalize_tool_messages(request.messages),
+                    temperature=request.temperature,
+                    stream=True,
+                    stream_options={"include_usage": True},
+                )
+                for chunk in response_stream:
+                    remaining = remaining_request_seconds(request)
+                    if remaining is not None and remaining <= 0:
+                        raise TimeoutError(
+                            "The bounded LLM request deadline has expired."
+                        )
+                    usage = apply_reported_usage(
+                        usage,
+                        dump_response_payload(chunk),
+                    )
+                    stream.context_usage = usage.to_dict()
+                    delta = (
+                        chunk.choices[0].delta
+                        if getattr(chunk, "choices", None)
+                        else None
+                    )
+                    text = getattr(delta, "content", None)
+                    if isinstance(text, str) and text:
+                        yield text
+            except LLMProviderRequestError:
+                raise
+            except Exception as exc:
+                raise LLMProviderRequestError.from_exception(
+                    exc,
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="stream",
+                ) from exc
+
+        stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
+        return stream
 
     # -------------------------------------------------------------------------
     def structured_output(
@@ -207,21 +252,21 @@ class DeepSeekProvider(LLMProvider):
             json_object(model_json_schema()) if callable(model_json_schema) else {}
         )
         request = prepare_request(
-            replace(request, response_json_schema=json_schema),
+            replace(
+                request,
+                response_json_schema=json_schema,
+                messages=self._messages_with_json_schema(request.messages, json_schema),
+            ),
             provider=self.provider_name,
         )
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
+        usage = compute_context_usage(request, provider=self.provider_name)
         self._validate_request_capabilities(
             replace(request, response_json_schema=json_schema)
         )
         try:
-            response = self._client().chat.completions.create(
+            response = self._client_for_request(request).chat.completions.create(
                 model=request.model,
-                messages=self.normalize_tool_messages(
-                    self._messages_with_json_schema(request.messages, json_schema)
-                ),
+                messages=self.normalize_tool_messages(request.messages),
                 temperature=request.temperature,
                 response_format={"type": "json_object"},
                 stream=False,
@@ -233,11 +278,8 @@ class DeepSeekProvider(LLMProvider):
                 model=request.model,
                 stage="structured_output",
             ) from exc
-        raw = response.model_dump(mode="json")
-        self.last_context_usage = apply_reported_usage(
-            compute_context_usage(request, provider=self.provider_name),
-            raw,
-        ).to_dict()
+        raw = dump_response_payload(response)
+        usage = apply_reported_usage(usage, raw)
         content, _ = self._parse_choice(response)
         try:
             loaded = json.loads(content or "{}")
@@ -257,7 +299,7 @@ class DeepSeekProvider(LLMProvider):
             )
         validator = getattr(schema, "model_validate", None)
         if not callable(validator):
-            return loaded
+            return LLMStructuredOutput(loaded, context_usage=usage.to_dict())
         try:
             validated = validator(loaded)
         except Exception as exc:  # noqa: BLE001
@@ -268,7 +310,8 @@ class DeepSeekProvider(LLMProvider):
                 detail="The provider response did not match the requested extraction schema.",
             ) from exc
         dumper = getattr(validated, "model_dump", None)
-        return json_object(dumper(mode="json")) if callable(dumper) else loaded
+        payload = json_object(dumper(mode="json")) if callable(dumper) else loaded
+        return LLMStructuredOutput(payload, context_usage=usage.to_dict())
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -343,11 +386,27 @@ class DeepSeekProvider(LLMProvider):
         for key in (
             "context_window_tokens",
             "context_length",
+            "context_window",
+            "max_context_tokens",
             "maximum_output_tokens",
             "max_output_tokens",
+            "max_completion_tokens",
         ):
             if item.get(key) is not None:
                 metadata[key] = item[key]
+        if any(
+            key in metadata
+            for key in (
+                "context_window_tokens",
+                "context_length",
+                "context_window",
+                "max_context_tokens",
+                "maximum_output_tokens",
+                "max_output_tokens",
+                "max_completion_tokens",
+            )
+        ):
+            metadata["context_profile_source"] = "provider_models_api"
         raw_capabilities = item.get("capabilities")
         if is_json_array(raw_capabilities):
             normalized = {

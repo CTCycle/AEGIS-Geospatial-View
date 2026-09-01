@@ -61,6 +61,115 @@ class AgentResponseBuilder:
         return False
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def infer_failure_category(
+        tool_payload: dict[str, Any] | None,
+    ) -> Literal[
+        "model_capability",
+        "provider_api",
+        "schema_definition",
+        "response_parsing",
+        "context_limit",
+    ] | None:
+        """Classify an execution failure from its typed tool error code."""
+
+        if not is_json_object(tool_payload):
+            return None
+        provider_codes = {
+            "auth_required",
+            "provider_timeout",
+            "provider_unavailable",
+            "rate_limited",
+            "invalid_query",
+            "malformed_response",
+        }
+        parsing_codes = {
+            "dependency_cycle",
+            "dependency_failed",
+            "duplicate_tool_call",
+            "invalid_input_binding",
+            "invalid_tool_output",
+        }
+        for result in json_array(tool_payload.get("tool_results")):
+            if not is_json_object(result):
+                continue
+            content = json_object(result.get("content"))
+            error = json_object(content.get("error"))
+            error_message = str(
+                error.get("message") or result.get("error") or ""
+            ).casefold()
+            code = str(
+                error.get("code") or result.get("error_code") or ""
+            ).strip().casefold()
+            warning_texts: list[str] = []
+
+            def collect_warnings(value: Any, *, depth: int = 0) -> None:
+                if depth > 3:
+                    return
+                if isinstance(value, dict):
+                    for key, nested in value.items():
+                        normalized_key = str(key).casefold()
+                        if normalized_key in {"warning", "warnings"}:
+                            if isinstance(nested, str):
+                                warning_texts.append(nested)
+                            elif isinstance(nested, list):
+                                warning_texts.extend(
+                                    str(item)
+                                    for item in nested
+                                    if isinstance(item, (str, int, float))
+                                )
+                        elif normalized_key in {
+                            "content",
+                            "data",
+                            "metadata",
+                            "provenance",
+                        }:
+                            collect_warnings(nested, depth=depth + 1)
+                elif isinstance(value, list):
+                    for nested in value:
+                        collect_warnings(nested, depth=depth + 1)
+
+            collect_warnings(result)
+            warning_text = " ".join(warning_texts).casefold()
+            if any(
+                marker in error_message
+                for marker in (
+                    "requires provider credentials",
+                    "provider credentials",
+                    "provider unavailable",
+                    "upstream unavailable",
+                )
+            ):
+                return "provider_api"
+            if any(
+                marker in warning_text
+                for marker in (
+                    "retrieval failed",
+                    "provider request failed",
+                    "provider unavailable",
+                    "requires provider credentials",
+                    "upstream unavailable",
+                    "timed out",
+                    "timeout",
+                    "rate limit",
+                    "rate_limited",
+                    "invalid query",
+                    "invalidqueryerror",
+                    "malformed response",
+                    "connection error",
+                    "service unavailable",
+                )
+            ):
+                return "provider_api"
+            if code == "context_limit":
+                return "context_limit"
+            if code in provider_codes or code.startswith("provider_"):
+                return "provider_api"
+            if code in parsing_codes:
+                return "response_parsing"
+        return None
+
+    # -------------------------------------------------------------------------
     @classmethod
     def build_verified_assistant_message(
         cls,

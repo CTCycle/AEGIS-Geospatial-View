@@ -4,6 +4,7 @@ from server.common.typing import is_json_object, json_array, json_object
 
 from collections.abc import Callable
 import asyncio
+from time import monotonic
 from typing import Any, cast
 from uuid import uuid4
 
@@ -17,6 +18,7 @@ from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.capability_resolver import CapabilityResolver
+from server.domain.agent.decision import ClarificationRequest
 from server.services.agent.direct_turn_response import DirectTurnResponseService
 from server.services.agent.conversation_state import (
     ConversationTaskStateService,
@@ -45,6 +47,7 @@ from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.tool_planner import DeterministicToolPlanner
 from server.prompts.agent import build_native_agent_messages
 from server.services.llm.types import LLMToolDefinition
+from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 from server.services.chat.history_service import ChatHistoryService
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
@@ -85,6 +88,7 @@ class AgentOrchestrator:
         capability_resolver: CapabilityResolver,
         response_synthesizer: GroundedResponseSynthesizer,
         direct_turn_response_service: DirectTurnResponseService,
+        context_profile_resolver: ModelContextProfileResolver | None = None,
     ) -> None:
         self.search_orchestrator = search_orchestrator
         self.parser_service = parser_service
@@ -101,7 +105,7 @@ class AgentOrchestrator:
         self.task_state_service = task_state_service
         self.instruction_state_service = ConversationInstructionService()
         self._active_directives: dict[str, list[ConversationDirective]] = {}
-        self.context_assembler = AgentContextAssembler()
+        self.context_assembler = AgentContextAssembler(context_profile_resolver)
         self._context_packages: dict[str, Any] = {}
         self._persisted_context_state: dict[str, dict[str, Any]] = {}
         self.pipeline_router = pipeline_router
@@ -183,35 +187,155 @@ class AgentOrchestrator:
 
     # -------------------------------------------------------------------------
     def _with_phase_usage(self, response: ChatTurnResponse) -> ChatTurnResponse:
+        def numeric_value(item: dict[str, Any], key: str) -> int | None:
+            value = item.get(key)
+            if isinstance(value, bool):
+                return None
+            try:
+                parsed = int(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return None
+            return parsed if parsed >= 0 else None
+
+        def aggregate_optional(
+            items: list[dict[str, Any]], key: str
+        ) -> int | None:
+            values = [numeric_value(item, key) for item in items]
+            return sum(value for value in values if value is not None) if all(
+                value is not None for value in values
+            ) else None
+
+        def phase_source(items: list[dict[str, Any]]) -> str:
+            if not items:
+                return "estimated"
+            has_input = all(
+                numeric_value(item, "reported_input_tokens") is not None
+                for item in items
+            )
+            has_output = all(
+                numeric_value(item, "reported_output_tokens") is not None
+                for item in items
+            )
+            if has_input and has_output:
+                return "provider_reported"
+            if has_input or has_output:
+                return "hybrid"
+            return "estimated"
+
+        def effective_input_value(item: dict[str, Any]) -> int:
+            reported = numeric_value(item, "reported_input_tokens")
+            if reported is not None:
+                return reported
+            return numeric_value(item, "estimated_input_tokens") or 0
+
         phases: dict[str, dict[str, Any]] = {}
         if response.context_usage is not None:
             phases["parser"] = response.context_usage.model_dump(
                 mode="json", exclude={"phases"}
             )
-        loop_usages = getattr(self.native_tool_loop, "last_context_usages", [])
+        loop_usages = []
+        if is_json_object(response.tool_payload):
+            raw_loop_usages = response.tool_payload.get("context_usages")
+            if isinstance(raw_loop_usages, list):
+                loop_usages = [
+                    item for item in raw_loop_usages if is_json_object(item)
+                ]
         if loop_usages:
-            phases["native_loop"] = {
+            native_phase: dict[str, Any] = {
                 "iterations": loop_usages,
                 "estimated_input_tokens": sum(
                     int(item.get("estimated_input_tokens") or 0) for item in loop_usages
                 ),
+                "reported_input_tokens": aggregate_optional(
+                    loop_usages, "reported_input_tokens"
+                ),
+                "reported_output_tokens": aggregate_optional(
+                    loop_usages, "reported_output_tokens"
+                ),
+                "usage_source": phase_source(loop_usages),
+                "peak_request_tokens": max(
+                    (effective_input_value(item) for item in loop_usages),
+                ),
+                "total_input_tokens": sum(
+                    effective_input_value(item)
+                    for item in loop_usages
+                ),
+                "total_output_tokens": aggregate_optional(
+                    loop_usages, "reported_output_tokens"
+                ),
             }
+            first_loop_usage = loop_usages[0]
+            for key in (
+                "provider",
+                "model",
+                "selected_context_window",
+                "model_context_limit",
+                "usable_prompt_budget_tokens",
+                "context_profile_source",
+            ):
+                if first_loop_usage.get(key) is not None:
+                    native_phase[key] = first_loop_usage[key]
+            for key in (
+                "reserved_output_tokens",
+                "tool_schema_tokens",
+                "response_schema_tokens",
+                "safety_margin_tokens",
+            ):
+                value = aggregate_optional(loop_usages, key)
+                if value is not None:
+                    native_phase[key] = value
+            native_phase["compaction_applied"] = any(
+                item.get("compaction_applied") is True for item in loop_usages
+            )
+            phases["native_loop"] = native_phase
         synthesis = getattr(self.response_synthesizer, "last_context_usage", None)
         if is_json_object(synthesis):
             phases["synthesis"] = synthesis
-        if response.context_usage is None or not phases:
+        base_usage = response.context_usage
+        if base_usage is None:
+            for candidate in phases.values():
+                try:
+                    base_usage = ContextUsageResponse.model_validate(candidate)
+                except Exception:
+                    continue
+                break
+        if base_usage is None and loop_usages:
+            try:
+                base_usage = ContextUsageResponse.model_validate(loop_usages[0])
+            except Exception:
+                base_usage = None
+        if base_usage is None or not phases:
             return response
+
         inputs = [
-            int(item.get("estimated_input_tokens") or 0)
+            effective_input_value(item)
             for item in phases.values()
             if is_json_object(item)
         ]
-        usage = response.context_usage.model_copy(
+        output_values = [
+            numeric_value(item, "reported_output_tokens")
+            for item in phases.values()
+            if is_json_object(item)
+            and numeric_value(item, "reported_output_tokens") is not None
+        ]
+        usage = base_usage.model_copy(
             update={
                 "phases": phases,
                 "peak_request_tokens": max(inputs, default=0),
                 "total_input_tokens": sum(inputs),
-                "total_output_tokens": 0,
+                "usage_percent": (
+                    round(
+                        (max(inputs, default=0)
+                         / max(base_usage.usable_prompt_budget_tokens, 1))
+                        * 100,
+                        1,
+                    )
+                    if base_usage.usable_prompt_budget_tokens is not None
+                    else None
+                ),
+                "total_output_tokens": (
+                    sum(output_values) if len(output_values) == len(phases) else None
+                ),
             }
         )
         return response.model_copy(update={"context_usage": usage})
@@ -302,11 +426,35 @@ class AgentOrchestrator:
             )
         ]
         parser_kwargs["task_snapshot"] = state_before.model_dump(mode="json")
+        parser_run = None
+        parser_usage: dict[str, object] | None = None
+        parser_timeout_seconds = float(
+            getattr(self.parser_service, "PARSER_TIMEOUT_SECONDS", 35.0)
+        )
+        parser_deadline = monotonic() + parser_timeout_seconds
         try:
-            turn_contract = await asyncio.wait_for(
-                asyncio.to_thread(self.parser_service.parse_turn, **parser_kwargs),
-                timeout=35.0,
+            parse_with_usage = getattr(
+                self.parser_service, "parse_turn_with_usage", None
             )
+            if callable(parse_with_usage):
+                parser_run = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        parse_with_usage,
+                        **parser_kwargs,
+                        deadline_monotonic=parser_deadline,
+                    ),
+                    timeout=parser_timeout_seconds + 1.0,
+                )
+                turn_contract = parser_run.turn_contract
+                parser_usage = parser_run.context_usage
+            else:
+                turn_contract = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.parser_service.parse_turn,
+                        **parser_kwargs,
+                    ),
+                    timeout=parser_timeout_seconds + 1.0,
+                )
         except asyncio.TimeoutError:
             LOGGER.warning(
                 "parser_budget_exhausted request_id=%s provider=%s model=%s",
@@ -320,6 +468,7 @@ class AgentOrchestrator:
                 conversation_messages=recent_messages,
                 provider_error={
                     "code": "parser_timeout",
+                    "category": "provider_api",
                     "provider": settings.agent_model_provider,
                     "model": settings.agent_model_name,
                     "stage": "structured_intent_extraction",
@@ -381,8 +530,8 @@ class AgentOrchestrator:
             else False,
         )
         context_usage = (
-            ContextUsageResponse.model_validate(self.parser_service.last_context_usage)
-            if is_json_object(self.parser_service.last_context_usage)
+            ContextUsageResponse.model_validate(parser_usage)
+            if is_json_object(parser_usage)
             else None
         )
         preflight_decision = self.policy_engine.evaluate_preflight(turn_contract)
@@ -567,12 +716,28 @@ class AgentOrchestrator:
             "stopped_reason": tool_loop_result.stopped_reason,
             "failure_category": tool_loop_result.failure_category,
             "failure_detail": tool_loop_result.failure_detail,
+            "context_usages": tool_loop_result.context_usages,
         }
-        map_session = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
+        map_result = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
             tool_payload=tool_payload,
             turn_contract=turn_contract,
             latest_memory=latest_memory,
         )
+        if isinstance(map_result, ClarificationRequest) and (
+            tool_loop_result.failure_category is None
+        ):
+            return await self.turn_state_assembler.build_location_clarification_response(
+                request_id=request_id,
+                conversation_id=conversation_id,
+                conversation_key=conversation_key,
+                task=task,
+                turn_contract=turn_contract,
+                latest_memory=latest_memory,
+                context_usage=None,
+                clarification=map_result,
+                tool_payload=tool_payload,
+            )
+        map_session = map_result if isinstance(map_result, MapSession) else None
         if map_session is None:
             map_session = tool_loop_result.map_session
         overlay_mutation_results = []
@@ -605,11 +770,26 @@ class AgentOrchestrator:
             )
         )
         if map_session is None and capability_selection is not None:
-            map_session = await self.turn_state_assembler.build_map_session_from_capability_selection(
+            map_result = await self.turn_state_assembler.build_map_session_from_capability_selection(
                 capability_selection=capability_selection,
                 turn_contract=turn_contract,
                 latest_memory=latest_memory,
             )
+            if isinstance(map_result, ClarificationRequest) and (
+                tool_loop_result.failure_category is None
+            ):
+                return await self.turn_state_assembler.build_location_clarification_response(
+                    request_id=request_id,
+                    conversation_id=conversation_id,
+                    conversation_key=conversation_key,
+                    task=task,
+                    turn_contract=turn_contract,
+                    latest_memory=latest_memory,
+                    context_usage=None,
+                    clarification=map_result,
+                    tool_payload=tool_payload,
+                )
+            map_session = map_result if isinstance(map_result, MapSession) else None
         if (
             map_session is not None
             and turn_contract.overlay_commands
@@ -718,7 +898,14 @@ class AgentOrchestrator:
                         else []
                     ),
                 ],
-                "failure_category": synthesis_category or operation.failure_category,
+                # A synthesis failure does not invalidate a verified map/tool
+                # operation. Keep the operation successful and surface the
+                # categorized synthesis warning separately.
+                "failure_category": (
+                    None
+                    if operation.status == "success"
+                    else synthesis_category or operation.failure_category
+                ),
             }
         )
         decision = AgentResponseBuilder.build_final_decision(

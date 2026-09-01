@@ -1,0 +1,106 @@
+{
+  "matrix_version": "1.0",
+  "purpose": "Held-out adversarial location and entity variants for production-like model evaluation.",
+  "scenarios": [
+    {
+      "id": "holdout-city-country-1",
+      "lane": "model_in_loop",
+      "prompt": "Put the map on Valparaiso, Chile.",
+      "max_turn_seconds": 180,
+      "dimensions": {"intent": "location_lookup", "dataset": "location", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["location"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["one_location_tool", "rendered_map", "valid_arguments"],
+      "invariants": ["context_usage_invariants", "location_target_consistency", "categorized_failures", "no_false_success", "deadline_compliance"]
+    },
+    {
+      "id": "holdout-city-diacritic-2",
+      "lane": "model_in_loop",
+      "prompt": "Show the map for Saint-Etienne, France.",
+      "max_turn_seconds": 180,
+      "dimensions": {"intent": "location_lookup", "dataset": "location", "geographic_scale": "city", "temporal": "current", "ambiguity": "diacritic_variant", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["location"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["one_location_tool", "rendered_map", "valid_arguments"],
+      "invariants": ["context_usage_invariants", "location_target_consistency", "categorized_failures", "no_false_success", "deadline_compliance"]
+    },
+    {
+      "id": "holdout-poi-parent-chain-3",
+      "lane": "model_in_loop",
+      "prompt": "Locate the Acropolis Museum in Athens, Greece.",
+      "max_turn_seconds": 180,
+      "dimensions": {"intent": "point_of_interest_lookup", "dataset": "points_of_interest", "geographic_scale": "poi", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["poi", "location"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["poi_tool", "rendered_map", "valid_arguments"],
+      "invariants": ["context_usage_invariants", "location_target_consistency", "categorized_failures", "no_false_success", "deadline_compliance"]
+    },
+    {
+      "id": "holdout-address-parent-chain-4",
+      "lane": "model_in_loop",
+      "prompt": "Map the European Space Agency site in Noordwijk, Netherlands.",
+      "max_turn_seconds": 180,
+      "dimensions": {"intent": "address_or_entity_lookup", "dataset": "location", "geographic_scale": "address", "temporal": "current", "ambiguity": "entity_parent_context", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["location"], "clarification": "allowed", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["location_or_clarification", "valid_arguments"],
+      "invariants": ["context_usage_invariants", "location_target_consistency", "categorized_failures", "no_false_success", "deadline_compliance"]
+    },
+    {
+      "id": "holdout-coordinate-5",
+      "lane": "model_in_loop",
+      "prompt": "Center the map at 35.6895, 139.6917.",
+      "max_turn_seconds": 180,
+      "dimensions": {"intent": "coordinate_lookup", "dataset": "location", "geographic_scale": "point", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["location"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["one_location_tool", "rendered_map", "valid_arguments"],
+      "invariants": ["context_usage_invariants", "location_target_consistency", "categorized_failures", "no_false_success", "deadline_compliance"]
+    },
+    {
+      "id": "holdout-multilingual-6",
+      "lane": "model_in_loop",
+      "prompt": "Mostra la mappa di Ciudad de México, México.",
+      "max_turn_seconds": 180,
+      "dimensions": {"intent": "location_lookup", "dataset": "location", "geographic_scale": "city", "temporal": "current", "ambiguity": "multilingual_name", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["location"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["one_location_tool", "rendered_map", "valid_arguments"],
+      "invariants": ["context_usage_invariants", "location_target_consistency", "categorized_failures", "no_false_success", "deadline_compliance"]
+    },
+    {
+      "id": "holdout-ambiguous-riverside-7",
+      "lane": "model_in_loop",
+      "prompt": "Show Riverside on the map.",
+      "max_turn_seconds": 180,
+      "dimensions": {"intent": "location_lookup", "dataset": "location", "geographic_scale": "city", "temporal": "current", "ambiguity": "same_level_place_name", "tool_count": "zero", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search", "unclear"], "capability_families": [], "clarification": "required", "minimum_tool_count": 0, "rendering_types": ["text", "none"], "provenance_required": false, "fabrication_forbidden": true},
+      "assertions": ["clarification_or_context_resolution"],
+      "invariants": ["context_usage_invariants", "clarification_correctness", "categorized_failures", "no_false_success", "deadline_compliance"]
+    },
+    {
+      "id": "holdout-ambiguous-sanjose-8",
+      "lane": "model_in_loop",
+      "prompt": "Can you map San Jose?",
+      "max_turn_seconds": 180,
+      "dimensions": {"intent": "location_lookup", "dataset": "location", "geographic_scale": "city", "temporal": "current", "ambiguity": "diacritic_and_same_level", "tool_count": "zero", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search", "unclear"], "capability_families": [], "clarification": "required", "minimum_tool_count": 0, "rendering_types": ["text", "none"], "provenance_required": false, "fabrication_forbidden": true},
+      "assertions": ["clarification_or_context_resolution"],
+      "invariants": ["context_usage_invariants", "clarification_correctness", "categorized_failures", "no_false_success", "deadline_compliance"]
+    },
+    {
+      "id": "holdout-followup-entity-9",
+      "lane": "model_in_loop",
+      "turns": ["Put the map on Aarhus, Denmark.", "Actually, show the university campus there."],
+      "max_turn_seconds": 180,
+      "dimensions": {"intent": "follow_up_entity_lookup", "dataset": "point_of_interest", "geographic_scale": "poi", "temporal": "current", "ambiguity": "deictic_parented_entity", "tool_count": "multiple", "availability": "supported", "conversation": "follow_up"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["location", "poi"], "clarification": "allowed", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["reuse_location", "rendered_map", "valid_arguments"],
+      "invariants": ["context_usage_invariants", "location_target_consistency", "categorized_failures", "no_false_success", "deadline_compliance"]
+    },
+    {
+      "id": "holdout-country-city-conflict-10",
+      "lane": "model_in_loop",
+      "prompt": "Map the city of Torshavn in the Faroe Islands.",
+      "max_turn_seconds": 180,
+      "dimensions": {"intent": "location_lookup", "dataset": "location", "geographic_scale": "city", "temporal": "current", "ambiguity": "diacritic_parent_context", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["location"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["one_location_tool", "rendered_map", "valid_arguments"],
+      "invariants": ["context_usage_invariants", "location_target_consistency", "categorized_failures", "no_false_success", "deadline_compliance"]
+    }
+  ]
+}

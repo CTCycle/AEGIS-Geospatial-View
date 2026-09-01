@@ -160,3 +160,22 @@ def test_atomic_task_dependencies_and_bindings_reach_executable_plan() -> None:
     assert second.input_bindings[0].target == "arguments.reference"
     assert second.input_bindings[0].source_step_id == first.step_id
     assert first.output_refs == ["air-quality-result"]
+
+
+###############################################################################
+def test_atomic_tasks_without_layer_refs_do_not_create_inferred_dependencies() -> None:
+    turn = _turn(
+        "Resolve the place and render it",
+        layers=["openmeteo_air_quality_forecast", "openmeteo_weather_forecast"],
+    ).model_copy(
+        update={
+            "atomic_tasks": [
+                {"id": "first", "depends_on": [], "required_layers": []},
+                {"id": "second", "depends_on": ["first"], "required_layers": []},
+            ]
+        }
+    )
+
+    plan = DeterministicToolPlanner().build_plan(turn, "environmental_data")
+
+    assert [step.depends_on for step in plan.steps] == [[], []]

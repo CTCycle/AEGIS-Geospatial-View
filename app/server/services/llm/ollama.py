@@ -11,7 +11,11 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from server.services.llm.base import LLMProvider
-from server.services.llm.context_budget import compute_context_usage, prepare_request
+from server.services.llm.context_budget import (
+    apply_reported_usage,
+    compute_context_usage,
+    prepare_request,
+)
 from server.prompts.providers import OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT
 from server.services.llm.errors import (
     LLMProviderRequestError,
@@ -19,9 +23,12 @@ from server.services.llm.errors import (
     LLMStructuredOutputError,
 )
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
+from server.services.llm.request_deadline import remaining_request_seconds
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
+    LLMStructuredOutput,
+    LLMTextStream,
     LLMToolCall,
     LLMToolDefinition,
     ModelDescriptor,
@@ -94,28 +101,41 @@ class OllamaProvider(LLMProvider):
         self.tool_capability_cache = (
             tool_capability_cache or OllamaToolCapabilityCache()
         )
-        self.last_context_usage: dict[str, Any] | None = None
         self.last_list_models_error: str | None = None
+        self._show_payload_cache: dict[str, dict[str, Any] | None] = {}
 
     # -------------------------------------------------------------------------
-    def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _post_json(
+        self,
+        path: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         request = Request(
             f"{self.base_url}{path}",
             data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        timeout = (
+        default_timeout = (
             self._STRUCTURED_REQUEST_TIMEOUT_SECONDS
             if path == "/api/chat" and payload.get("format")
             else self._DEFAULT_REQUEST_TIMEOUT_SECONDS
         )
-        with urlopen(request, timeout=timeout) as response:
+        effective_timeout = default_timeout if timeout is None else min(
+            default_timeout, max(0.1, timeout)
+        )
+        with urlopen(request, timeout=effective_timeout) as response:
             return json.loads(response.read().decode("utf-8"))
 
     # -------------------------------------------------------------------------
     def _stream_post(
-        self, path: str, payload: dict[str, Any]
+        self,
+        path: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
     ) -> Iterator[dict[str, Any]]:
         request = Request(
             f"{self.base_url}{path}",
@@ -123,7 +143,8 @@ class OllamaProvider(LLMProvider):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urlopen(request, timeout=60) as response:
+        effective_timeout = 60.0 if timeout is None else min(60.0, max(0.1, timeout))
+        with urlopen(request, timeout=effective_timeout) as response:
             reader: TextIO = response  # type: ignore[assignment]
             for line in reader:
                 line = line.strip()
@@ -145,6 +166,29 @@ class OllamaProvider(LLMProvider):
         request = Request(url, headers={"User-Agent": "AEGIS/1.0"}, method="GET")
         with urlopen(request, timeout=20) as response:
             return response.read().decode("utf-8", errors="ignore")
+
+    # -------------------------------------------------------------------------
+    def _post_json_for_request(
+        self, path: str, payload: dict[str, Any], request: LLMRequest
+    ) -> dict[str, Any]:
+        remaining = remaining_request_seconds(request)
+        if remaining is None:
+            return self._post_json(path, payload)
+        if remaining <= 0:
+            raise TimeoutError("The bounded LLM request deadline has expired.")
+        return self._post_json(path, payload, timeout=remaining)
+
+    # -------------------------------------------------------------------------
+    def _stream_post_for_request(
+        self, path: str, payload: dict[str, Any], request: LLMRequest
+    ) -> Iterator[dict[str, Any]]:
+        remaining = remaining_request_seconds(request)
+        if remaining is None:
+            yield from self._stream_post(path, payload)
+            return
+        if remaining <= 0:
+            raise TimeoutError("The bounded LLM request deadline has expired.")
+        yield from self._stream_post(path, payload, timeout=remaining)
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
@@ -282,10 +326,56 @@ class OllamaProvider(LLMProvider):
         return True
 
     # -------------------------------------------------------------------------
-    def _show_capabilities(self, model: str) -> set[str] | None:
+    def get_model_context_metadata(self, model: str) -> dict[str, Any]:
+        """Read an exact context declaration from Ollama's model metadata.
+
+        Ollama's tags endpoint does not expose the model context window.  The
+        show endpoint may expose it in ``model_info`` (for example as
+        ``general.context_length``).  Only that provider-declared value is
+        accepted; model names, families, and Modelfile text are intentionally
+        not interpreted as limits.
+        """
+
+        payload = self._show_payload(model)
+        if payload is None:
+            return {}
+        model_info = json_object(payload.get("model_info"))
+        candidates: list[object] = []
+        for key, value in model_info.items():
+            normalized_key = str(key).strip().lower()
+            if normalized_key.endswith((".context_length", ".context_window_tokens")):
+                candidates.append(value)
+        for key in ("context_window_tokens", "context_length"):
+            if payload.get(key) is not None:
+                candidates.append(payload[key])
+        for value in candidates:
+            try:
+                context_window = int(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                continue
+            if context_window > 0:
+                return {
+                    "context_window_tokens": context_window,
+                    "context_profile_source": "ollama_show_model_info",
+                }
+        return {}
+
+    # -------------------------------------------------------------------------
+    def _show_payload(self, model: str) -> dict[str, Any] | None:
+        normalized_model = model.strip()
+        if normalized_model in self._show_payload_cache:
+            return self._show_payload_cache[normalized_model]
         try:
-            payload = self._post_json("/api/show", {"name": model})
+            payload = self._post_json("/api/show", {"name": normalized_model})
         except Exception:
+            payload = None
+        self._show_payload_cache[normalized_model] = payload
+        return payload
+
+    # -------------------------------------------------------------------------
+    def _show_capabilities(self, model: str) -> set[str] | None:
+        payload = self._show_payload(model)
+        if payload is None:
             return None
         raw = payload.get("capabilities")
         if not is_json_array(raw):
@@ -426,9 +516,6 @@ class OllamaProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
-        request = prepare_request(request, provider=self.provider_name)
-        usage = compute_context_usage(request, provider=self.provider_name)
-        self.last_context_usage = usage.to_dict()
         native_tools = list(tools or request.tools or [])
         schema = response_json_schema or request.response_json_schema
         effective_request = replace(
@@ -436,12 +523,18 @@ class OllamaProvider(LLMProvider):
             tools=native_tools or None,
             response_json_schema=schema,
         )
+        effective_request = prepare_request(
+            effective_request, provider=self.provider_name
+        )
+        usage = compute_context_usage(
+            effective_request, provider=self.provider_name
+        )
         self._validate_request_capabilities(effective_request)
         payload: dict[str, Any] = {
-            "model": request.model,
-            "messages": request.messages,
+            "model": effective_request.model,
+            "messages": effective_request.messages,
             "stream": False,
-            "options": {"temperature": request.temperature},
+            "options": {"temperature": effective_request.temperature},
         }
         if usage.selected_context_window is not None:
             payload["options"]["num_ctx"] = usage.selected_context_window
@@ -452,26 +545,34 @@ class OllamaProvider(LLMProvider):
         if schema:
             payload["format"] = schema
         try:
-            response = self._post_json("/api/chat", payload)
+            response = self._post_json_for_request(
+                "/api/chat",
+                payload,
+                effective_request,
+            )
         except LLMStructuredOutputError:
             raise
         except Exception as exc:
             raise LLMProviderRequestError.from_exception(
-                exc, provider=self.provider_name, model=request.model, stage="chat"
+                exc,
+                provider=self.provider_name,
+                model=effective_request.model,
+                stage="chat",
             ) from exc
+        usage = apply_reported_usage(usage, response)
         message = json_object(response.get("message"))
         return LLMResult(
             content=str(message.get("content") or ""),
             raw=response,
             tool_calls=self._parse_tool_calls(message),
             finish_reason=str(response.get("done_reason") or "") or None,
+            context_usage=usage.to_dict(),
         )
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
         request = prepare_request(request, provider=self.provider_name)
         usage = compute_context_usage(request, provider=self.provider_name)
-        self.last_context_usage = usage.to_dict()
         payload: dict[str, Any] = {
             "model": request.model,
             "messages": request.messages,
@@ -480,16 +581,37 @@ class OllamaProvider(LLMProvider):
         }
         if usage.selected_context_window is not None:
             payload["options"]["num_ctx"] = usage.selected_context_window
-        for event in self._stream_post("/api/chat", payload):
-            message = (
-                event.get("message") if is_json_object(event.get("message")) else None
-            )
-            if message is not None:
-                content = message.get("content")
-                if isinstance(content, str) and content:
-                    yield content
-            if event.get("done"):
-                break
+        stream: LLMTextStream
+
+        def iterate() -> Iterable[str]:
+            nonlocal usage
+            try:
+                for event in self._stream_post_for_request("/api/chat", payload, request):
+                    message = (
+                        event.get("message")
+                        if is_json_object(event.get("message"))
+                        else None
+                    )
+                    if message is not None:
+                        content = message.get("content")
+                        if isinstance(content, str) and content:
+                            yield content
+                    if event.get("done"):
+                        usage = apply_reported_usage(usage, event)
+                        stream.context_usage = usage.to_dict()
+                        break
+            except LLMProviderRequestError:
+                raise
+            except Exception as exc:
+                raise LLMProviderRequestError.from_exception(
+                    exc,
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="stream",
+                ) from exc
+
+        stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
+        return stream
 
     # -------------------------------------------------------------------------
     def structured_output(
@@ -505,7 +627,6 @@ class OllamaProvider(LLMProvider):
         )
         self._validate_request_capabilities(effective_request)
         usage = compute_context_usage(effective_request, provider=self.provider_name)
-        self.last_context_usage = usage.to_dict()
         payload: dict[str, Any] = {
             "model": effective_request.model,
             "messages": effective_request.messages,
@@ -517,7 +638,11 @@ class OllamaProvider(LLMProvider):
         if usage.selected_context_window is not None:
             payload["options"]["num_ctx"] = usage.selected_context_window
         try:
-            response = self._post_json("/api/chat", payload)
+            response = self._post_json_for_request(
+                "/api/chat",
+                payload,
+                effective_request,
+            )
         except LLMStructuredOutputError:
             raise
         except Exception as exc:
@@ -527,6 +652,7 @@ class OllamaProvider(LLMProvider):
                 model=effective_request.model,
                 stage="structured_output",
             ) from exc
+        usage = apply_reported_usage(usage, response)
         message = json_object(response.get("message"))
         content = str(message.get("content") or "{}")
         try:
@@ -558,8 +684,11 @@ class OllamaProvider(LLMProvider):
                 ) from exc
             dumper = getattr(validated, "model_dump", None)
             if callable(dumper):
-                return json_object(dumper(mode="json"))
-        return json_object(loaded)
+                return LLMStructuredOutput(
+                    json_object(dumper(mode="json")),
+                    context_usage=usage.to_dict(),
+                )
+        return LLMStructuredOutput(loaded, context_usage=usage.to_dict())
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:

@@ -1,5 +1,28 @@
 from server.services.agent.context_assembler import AgentContextAssembler
 from server.services.agent.instruction_state import ConversationInstructionService
+from server.services.llm.types import ModelContextProfile
+
+
+###############################################################################
+class _ExplicitProfileResolver:
+    def resolve(self, provider: str, model: str) -> ModelContextProfile:  # noqa: ARG002
+        if model == "4k-local":
+            return ModelContextProfile(
+                provider=provider,
+                model=model,
+                context_window_tokens=4096,
+                maximum_output_tokens=512,
+                default_output_reserve=512,
+                metadata_source="provider_metadata",
+            )
+        return ModelContextProfile(
+            provider=provider,
+            model=model,
+            context_window_tokens=1_048_576,
+            maximum_output_tokens=8192,
+            default_output_reserve=8192,
+            metadata_source="provider_metadata",
+        )
 
 
 ###############################################################################
@@ -17,7 +40,7 @@ def _messages(count: int) -> list[dict]:
 
 ###############################################################################
 def test_known_model_profiles_drive_compaction_without_unknown_fallback() -> None:
-    assembler = AgentContextAssembler()
+    assembler = AgentContextAssembler(_ExplicitProfileResolver())
     messages = _messages(80)
     kwargs = {
         "current_user_message": "Current request",

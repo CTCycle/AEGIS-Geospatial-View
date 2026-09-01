@@ -246,19 +246,53 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   get contextUsageLabel(): string {
     if (!this.contextUsage) {
-      return '—';
+      return 'No request measured';
     }
-    return this.contextUsage.usage_percent === null ? 'Unknown' : `${this.contextUsagePercent}%`;
+    const source = this.contextUsage.usage_source || 'estimated';
+    const isUnmeasured = source === 'not_measured'
+      || ((this.contextUsage.reported_input_tokens ?? this.contextUsage.estimated_input_tokens) <= 0
+        && this.contextUsage.usage_percent === null);
+    if (isUnmeasured) {
+      return 'No request measured';
+    }
+    const approximate = source !== 'provider_reported';
+    if (this.contextUsage.usage_percent === null) {
+      const tokens = this.contextUsage.reported_input_tokens ?? this.contextUsage.estimated_input_tokens;
+      return `${approximate ? '~' : ''}${tokens.toLocaleString()} tokens`;
+    }
+    return `${approximate ? '~' : ''}${this.contextUsagePercent}%`;
   }
 
   get contextUsageDetail(): string {
     if (!this.contextUsage) {
-      return 'Context window awaiting first request';
+      return 'No request measured';
     }
     const selected = this.contextUsage.selected_context_window ?? this.contextUsage.model_context_limit;
     const model = [this.contextUsage.provider, this.contextUsage.model].filter(Boolean).join(' / ');
-    const limitText = selected ? `${selected.toLocaleString()} token cap` : 'provider limit not reported';
-    return `${this.contextUsage.estimated_input_tokens.toLocaleString()} tokens / ${limitText}${model ? ` - ${model}` : ''}`;
+    const source = this.contextUsage.usage_source || 'estimated';
+    const inputTokens = this.contextUsage.reported_input_tokens ?? this.contextUsage.estimated_input_tokens;
+    const estimateText = this.contextUsage.reported_input_tokens === null || this.contextUsage.reported_input_tokens === undefined
+      ? 'estimated'
+      : 'provider-reported';
+    const limitText = selected
+      ? `${selected.toLocaleString()} token cap${this.contextUsage.usable_prompt_budget_tokens !== null && this.contextUsage.usable_prompt_budget_tokens !== undefined
+        ? `, ${this.contextUsage.usable_prompt_budget_tokens.toLocaleString()} usable prompt tokens`
+        : ''}`
+      : 'limit unavailable';
+    const phases = this.contextUsage.phases && Object.keys(this.contextUsage.phases).length > 0
+      ? `; phases: ${Object.entries(this.contextUsage.phases).map(([name, value]) => {
+        const phase = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+        const phaseTokens = typeof phase['reported_input_tokens'] === 'number'
+          ? phase['reported_input_tokens']
+          : typeof phase['estimated_input_tokens'] === 'number'
+            ? phase['estimated_input_tokens']
+            : undefined;
+        const phaseSource = typeof phase['usage_source'] === 'string' ? phase['usage_source'] : undefined;
+        return `${name}${phaseTokens === undefined ? '' : ` ${phaseTokens.toLocaleString()} tokens`}${phaseSource ? ` (${phaseSource})` : ''}`;
+      }).join(', ')}`
+      : '';
+    const compaction = this.contextUsage.compaction_applied ? '; compaction applied' : '';
+    return `${inputTokens.toLocaleString()} tokens (${estimateText}) / ${limitText}${model ? ` - ${model}` : ''}; source: ${source}${phases}${compaction}`;
   }
 
   get contextUsageTone(): 'neutral' | 'warning' | 'critical' {
@@ -272,6 +306,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return 'warning';
     }
     return 'neutral';
+  }
+
+  private hasMeasuredContextUsage(): boolean {
+    if (!this.contextUsage) {
+      return false;
+    }
+    const tokens = this.contextUsage.reported_input_tokens ?? this.contextUsage.estimated_input_tokens;
+    return this.contextUsage.usage_source !== 'not_measured' && tokens > 0;
   }
 
   startNewChat(): void {
@@ -820,7 +862,11 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.memorySnapshot = parsed.memorySnapshot;
     }
     if (parsed.contextUsage !== undefined) {
-      this.contextUsage = parsed.contextUsage ?? undefined;
+      const failedTurn = parsed.operation?.status === 'failed'
+        || parsed.operation?.status === 'partial';
+      if (parsed.contextUsage !== null && (!failedTurn || !this.hasMeasuredContextUsage())) {
+        this.contextUsage = parsed.contextUsage;
+      }
     }
   }
 
@@ -855,7 +901,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.lastDecision = result.decision;
     this.lastOperation = operation;
     this.memorySnapshot = result.memory_snapshot ?? {};
-    this.contextUsage = result.context_usage ?? undefined;
+    const failedTurn = operation?.status === 'failed' || operation?.status === 'partial';
+    if (result.context_usage !== null
+      && result.context_usage !== undefined
+      && (!failedTurn || !this.hasMeasuredContextUsage())) {
+      this.contextUsage = result.context_usage;
+    }
     this.assistantDraft = '';
     this.status = 'Agent ready';
     this.progressPercent = 100;
@@ -1037,13 +1088,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         estimated_input_tokens: 0,
         selected_context_window: contextLimit,
         model_context_limit: contextLimit,
-        usage_percent: contextLimit ? 0 : null,
+        usage_percent: null,
         provider: settings.agent_model_provider,
         model: settings.agent_model_name,
         expected_output_tokens: maximumOutput,
         context_profile_source: typeof profile.context_profile_source === 'string'
           ? profile.context_profile_source
           : 'unknown',
+        usage_source: 'not_measured',
       };
       this.changeDetectorRef.detectChanges();
     } catch {

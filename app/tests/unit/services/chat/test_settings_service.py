@@ -234,7 +234,7 @@ def test_get_settings_uses_canonical_static_context_without_live_catalog() -> No
 
     response = service.get_settings()
 
-    assert response.selected_model_context == {
+    assert response.selected_model_context.model_dump(mode="json") == {
         "provider": "openai",
         "model": "gpt-4.1",
         "context_window_tokens": 1_047_576,

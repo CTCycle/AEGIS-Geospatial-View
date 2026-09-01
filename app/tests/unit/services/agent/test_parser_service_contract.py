@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+from time import monotonic
+
 from server.domain.agent.extraction_schemas import LLMParserExtraction
 from server.prompts.parser import PARSER_SCHEMA_CORRECTION, build_parser_prompt
 from server.services.agent.parser_service import ParserService
@@ -275,3 +278,117 @@ def test_parser_recovers_omitted_deictic_reference_for_memory_resolution() -> No
     assert result.location_signals[0].signal_type == "deictic"
     assert result.location_signals[0].source == "text"
     assert result.ambiguities == []
+
+
+@pytest.mark.parametrize(
+    ("task_class", "action_id", "typed_fields", "requires_location"),
+    [
+        (
+            "map_search",
+            "chat_response",
+            {"location_signals": [{"signal_type": "city", "raw_value": "Quito"}]},
+            True,
+        ),
+        (
+            "direct_query",
+            "chat_response",
+            {"requested_concepts": ["weather"]},
+            False,
+        ),
+        (
+            "map_search",
+            "unknown",
+            {},
+            True,
+        ),
+    ],
+)
+def test_typed_execution_invariants_override_inconsistent_model_flags(
+    task_class: str,
+    action_id: str,
+    typed_fields: dict[str, object],
+    requires_location: bool,
+) -> None:
+    extracted = LLMParserExtraction(
+        task_class=task_class,  # type: ignore[arg-type]
+        action_id=action_id,
+        requires_location=False,
+        tools_needed=False,
+        direct_response_sufficient=True,
+        parser_confidence=0.9,
+        **typed_fields,
+    )
+
+    normalized = ParserService._apply_domain_rules(
+        "generic request",
+        extracted,
+        {},
+    )
+
+    assert normalized.tools_needed is True
+    assert normalized.direct_response_sufficient is False
+    assert normalized.requires_location is requires_location
+
+
+###############################################################################
+def test_parser_retry_does_not_start_after_deadline(monkeypatch) -> None:
+    parser = ParserService(
+        llm_factory=object(),  # type: ignore[arg-type]
+        settings_repo=object(),
+        provider="test",
+        model="test-model",
+    )
+    calls = 0
+
+    def expired_extract(**kwargs):  # noqa: ANN003, ANN202
+        nonlocal calls
+        calls += 1
+        raise LLMResponseParsingError(
+            provider="test",
+            model="test-model",
+            stage="structured_intent_extraction",
+            detail="invalid structured payload",
+        )
+
+    monkeypatch.setattr(parser, "_extract_turn", expired_extract)
+
+    with pytest.raises(LLMResponseParsingError):
+        parser._extract_turn_with_retry(
+            user_message="show a map",
+            memory_snapshot={},
+            recent_messages=[],
+            deadline_monotonic=monotonic() - 1.0,
+        )
+
+    assert calls == 1
+
+
+###############################################################################
+def test_unexpected_parser_exception_has_categorized_provider_diagnostic() -> None:
+    class _BrokenProvider:
+        # -------------------------------------------------------------------------
+        def structured_output(self, request, schema):  # noqa: ANN001
+            _ = request, schema
+            raise RuntimeError("provider returned an unusable response")
+
+    class _Factory:
+        # -------------------------------------------------------------------------
+        def get_provider(self, provider: str):  # noqa: ANN001
+            _ = provider
+            return _BrokenProvider()
+
+    result = ParserService(
+        llm_factory=_Factory(),  # type: ignore[arg-type]
+        settings_repo=object(),
+        provider="test",
+        model="test-model",
+    ).parse_turn(
+        user_message="show a map of an unknown place",
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+
+    assert result.failure_category == "provider_api"
+    assert result.provider_error is not None
+    assert result.provider_error["code"] == "parser_unavailable"
+    assert result.provider_error["category"] == "provider_api"

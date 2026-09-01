@@ -18,6 +18,7 @@ from server.services.chat.model_library import (
 )
 from server.services.cryptography import CredentialEncryptionService
 from server.services.llm.context_budget import resolve_model_context_profile
+from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 
 
 ###############################################################################
@@ -35,11 +36,13 @@ class ChatSettingsService:
         credentials_repo: CredentialRepository,
         crypto_service: CredentialEncryptionService,
         model_library_service: ChatModelLibraryService,
+        context_profile_resolver: ModelContextProfileResolver | None = None,
     ) -> None:
         self.settings_repo = settings_repo
         self.credentials_repo = credentials_repo
         self.crypto_service = crypto_service
         self.model_library_service = model_library_service
+        self.context_profile_resolver = context_profile_resolver
 
     # -------------------------------------------------------------------------
     def get_settings(self) -> ModelSettingsResponse:
@@ -68,17 +71,24 @@ class ChatSettingsService:
                     if item.provider in {"openai", "google", *DYNAMIC_CLOUD_PROVIDERS}
                     else "stored"
                 )
-        selected_model_context: dict[str, object] = {
+        profile = (
+            self.context_profile_resolver.resolve(
+                record.agent_model_provider,
+                record.agent_model_name,
+            )
+            if self.context_profile_resolver is not None
+            else resolve_model_context_profile(
+                record.agent_model_provider,
+                record.agent_model_name,
+            )
+        )
+        selected_model_context = {
             "provider": record.agent_model_provider,
             "model": record.agent_model_name,
             "context_window_tokens": None,
             "maximum_output_tokens": None,
             "context_profile_source": "unknown",
         }
-        profile = resolve_model_context_profile(
-            record.agent_model_provider,
-            record.agent_model_name,
-        )
         if profile is not None:
             selected_model_context.update(
                 {

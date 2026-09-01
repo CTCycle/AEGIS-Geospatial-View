@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tests.agent_benchmark.runner import evaluate_model_scenario, run_manifest
+from tests.agent_benchmark.runner import (
+    _live_provider_block_reason,
+    evaluate_model_scenario,
+    run_manifest,
+)
 
 
 ###############################################################################
@@ -180,6 +184,177 @@ def test_model_lane_accepts_first_class_location_provider_evidence() -> None:
 
 
 ###############################################################################
+def test_model_lane_accepts_explicit_coordinate_grounding_without_provider_call() -> None:
+    evaluation = evaluate_model_scenario(
+        {
+            "expected": {
+                "task_classes": ["map_search"],
+                "capability_families": ["location"],
+                "clarification": "not_required",
+                "minimum_tool_count": 1,
+                "rendering_types": ["map"],
+                "provenance_required": True,
+                "fabrication_forbidden": True,
+            }
+        },
+        [
+            {
+                "status_code": 200,
+                "prompt": "Center the map at 35.6895, 139.6917.",
+                "tool_calls": [],
+                "tool_results": [],
+                "provider_events": [],
+                "response": {
+                    "assistant_message": "The map is centered on the requested coordinates.",
+                    "turn_contract": {
+                        "user_text": "Center the map at 35.6895, 139.6917.",
+                        "task_class": "map_search",
+                        "location_signals": [
+                            {
+                                "signal_type": "coordinates",
+                                "raw_value": "35.6895, 139.6917",
+                                "normalized_value": "35.6895, 139.6917",
+                                "latitude": 35.6895,
+                                "longitude": 139.6917,
+                            }
+                        ],
+                        "capability_limitations": [],
+                    },
+                    "decision": {"plan": {"state": "map_search"}},
+                },
+                "map_session": {
+                    "resolved_location": {
+                        "label": "35.6895, 139.6917",
+                        "latitude": 35.6895,
+                        "longitude": 139.6917,
+                        "location_type": "coordinates",
+                        "source": "model",
+                    },
+                    "center": {"latitude": 35.6895, "longitude": 139.6917},
+                    "basemap": {"id": "esri_world_imagery"},
+                },
+                "request_fingerprints": [],
+            }
+        ],
+    )
+
+    assert evaluation["passed"] is True
+    assert evaluation["provider_events"] == 0
+    assert evaluation["execution_evidence"] == 1
+
+
+###############################################################################
+def test_model_lane_does_not_count_model_invented_coordinates_as_grounding() -> None:
+    evaluation = evaluate_model_scenario(
+        {
+            "assertions": ["valid_arguments"],
+            "expected": {
+                "task_classes": ["map_search"],
+                "capability_families": ["location"],
+                "clarification": "not_required",
+                "minimum_tool_count": 1,
+                "rendering_types": ["map"],
+                "provenance_required": True,
+                "fabrication_forbidden": True,
+            },
+        },
+        [
+            {
+                "status_code": 200,
+                "prompt": "Center the map on an unspecified place.",
+                "tool_calls": [],
+                "tool_results": [],
+                "provider_events": [],
+                "response": {
+                    "assistant_message": "The map is centered.",
+                    "turn_contract": {
+                        "user_text": "Center the map on an unspecified place.",
+                        "task_class": "map_search",
+                        "location_signals": [
+                            {
+                                "signal_type": "coordinates",
+                                "raw_value": "35.6895, 139.6917",
+                                "normalized_value": "35.6895, 139.6917",
+                                "latitude": 35.6895,
+                                "longitude": 139.6917,
+                            }
+                        ],
+                        "capability_limitations": [],
+                    },
+                    "decision": {"plan": {"state": "map_search"}},
+                },
+                "map_session": {
+                    "resolved_location": {
+                        "label": "35.6895, 139.6917",
+                        "latitude": 35.6895,
+                        "longitude": 139.6917,
+                        "location_type": "coordinates",
+                    },
+                    "center": {"latitude": 35.6895, "longitude": 139.6917},
+                    "basemap": {"id": "esri_world_imagery"},
+                },
+                "request_fingerprints": [],
+            }
+        ],
+    )
+
+    assert evaluation["passed"] is False
+    assert any(
+        item["name"] == "valid_arguments" and not item["passed"]
+        for item in evaluation["assertions"]
+    )
+
+
+###############################################################################
+def test_model_lane_accepts_safe_clarification_for_allowed_location_outcome() -> None:
+    evaluation = evaluate_model_scenario(
+        {
+            "expected": {
+                "task_classes": ["map_search"],
+                "capability_families": ["location"],
+                "clarification": "allowed",
+                "minimum_tool_count": 1,
+                "rendering_types": ["map", "point"],
+                "provenance_required": True,
+                "fabrication_forbidden": True,
+            },
+            "assertions": ["valid_arguments", "location_or_clarification"],
+            "invariants": ["location_target_consistency"],
+        },
+        [
+            {
+                "status_code": 200,
+                "response": {
+                    "assistant_message": "Please provide a more specific location.",
+                    "turn_contract": {
+                        "task_class": "map_search",
+                        "clarification_plan": {
+                            "state": "clarify",
+                            "question": "Which site do you mean?",
+                        },
+                    },
+                    "decision": {
+                        "plan": {"state": "clarify"},
+                        "clarification": {"question": "Which site do you mean?"},
+                    },
+                    "operation": {
+                        "kind": "clarification",
+                        "status": "partial",
+                    },
+                },
+                "map_session": None,
+                "tool_calls": [],
+                "tool_results": [],
+                "provider_events": [],
+                "request_fingerprints": [],
+            }
+        ],
+    )
+
+    assert evaluation["passed"] is True
+
+
+###############################################################################
 def test_model_lane_rejects_unexplained_unbacked_answer() -> None:
     evaluation = evaluate_model_scenario(
         {
@@ -215,6 +390,186 @@ def test_model_lane_rejects_unexplained_unbacked_answer() -> None:
     )
     assert grounding["passed"] is False
     assert evaluation["passed"] is False
+
+
+###############################################################################
+def test_model_lane_checks_context_peak_and_phase_invariants() -> None:
+    usage = {
+        "estimated_input_tokens": 180,
+        "reported_input_tokens": 200,
+        "reported_output_tokens": 5,
+        "selected_context_window": 4096,
+        "usage_percent": 6.5,
+        "usable_prompt_budget_tokens": 3072,
+        "usage_source": "provider_reported",
+        "peak_request_tokens": 700,
+        "total_input_tokens": 1000,
+        "total_output_tokens": 23,
+        "phases": {
+            "parser": {
+                "estimated_input_tokens": 90,
+                "reported_input_tokens": 100,
+                "reported_output_tokens": 7,
+                "usage_source": "provider_reported",
+            },
+            "native_loop": {
+                "estimated_input_tokens": 500,
+                "reported_input_tokens": 700,
+                "reported_output_tokens": 11,
+                "usage_source": "provider_reported",
+            },
+            "synthesis": {
+                "estimated_input_tokens": 180,
+                "reported_input_tokens": 200,
+                "reported_output_tokens": 5,
+                "usage_source": "provider_reported",
+            },
+        },
+    }
+    evaluation = evaluate_model_scenario(
+        {"invariants": ["context_usage_invariants"]},
+        [{"status_code": 200, "response": {"context_usage": usage}}],
+    )
+
+    assert evaluation["passed"] is True
+
+
+###############################################################################
+def test_model_lane_rejects_unknown_cap_determinate_percentage() -> None:
+    evaluation = evaluate_model_scenario(
+        {"invariants": ["context_usage_invariants"]},
+        [
+            {
+                "status_code": 200,
+                "response": {
+                    "context_usage": {
+                        "estimated_input_tokens": 30,
+                        "selected_context_window": None,
+                        "usage_percent": 4.0,
+                        "usage_source": "estimated",
+                    }
+                },
+            }
+        ],
+    )
+
+    assert evaluation["passed"] is False
+
+
+###############################################################################
+def test_model_lane_rejects_parent_downgrade_and_center_mismatch() -> None:
+    evaluation = evaluate_model_scenario(
+        {
+            "dimensions": {"geographic_scale": "city"},
+            "invariants": ["location_target_consistency"],
+        },
+        [
+            {
+                "status_code": 200,
+                "map_session": {
+                    "resolved_location": {
+                        "label": "Example Country",
+                        "latitude": 40.0,
+                        "longitude": 10.0,
+                        "location_type": "country",
+                    },
+                    "center": {"latitude": 40.1, "longitude": 10.0},
+                    "basemap": {"id": "osm"},
+                },
+                "response": {},
+            }
+        ],
+    )
+
+    assert evaluation["passed"] is False
+
+
+###############################################################################
+def test_model_lane_requires_categorized_failures_and_no_false_success() -> None:
+    evaluation = evaluate_model_scenario(
+        {
+            "invariants": ["categorized_failures", "no_false_success"],
+        },
+        [
+            {
+                "status_code": 200,
+                "response": {
+                    "operation": {
+                        "kind": "map_session",
+                        "status": "failed",
+                        "failure_category": "provider_api",
+                    }
+                },
+            }
+        ],
+    )
+
+    assert evaluation["passed"] is True
+
+
+###############################################################################
+def test_model_lane_checks_ambiguous_clarification_and_deadline() -> None:
+    evaluation = evaluate_model_scenario(
+        {
+            "max_turn_seconds": 5,
+            "expected": {
+                "task_classes": ["map_search", "unclear"],
+                "capability_families": [],
+                "clarification": "required",
+                "minimum_tool_count": 0,
+                "rendering_types": ["text", "none"],
+                "provenance_required": False,
+                "fabrication_forbidden": True,
+            },
+            "invariants": ["clarification_correctness", "deadline_compliance"],
+        },
+        [
+            {
+                "status_code": 200,
+                "duration_seconds": 1.25,
+                "map_session": None,
+                "response": {
+                    "turn_contract": {"task_class": "unclear"},
+                    "decision": {
+                        "plan": {"state": "clarify"},
+                        "clarification": {
+                            "question": "Which location do you mean?"
+                        },
+                    }
+                },
+            }
+        ],
+    )
+
+    assert evaluation["passed"] is True
+
+
+###############################################################################
+def test_live_lane_blocks_provider_failure_without_blocking_verified_map_success() -> None:
+    assert _live_provider_block_reason(
+        {
+            "status_code": 200,
+            "response": {
+                "operation": {
+                    "kind": "error",
+                    "status": "failed",
+                    "failure_category": "provider_api",
+                }
+            },
+        }
+    ) == "provider_unavailable"
+    assert _live_provider_block_reason(
+        {
+            "status_code": 200,
+            "response": {
+                "operation": {
+                    "kind": "map_session",
+                    "status": "success",
+                },
+                "map_session": {"resolved_location": {"latitude": 1, "longitude": 2}},
+            },
+        }
+    ) is None
 
 
 ###############################################################################

@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 
 ## Local Development Via Launcher
 
@@ -19,8 +19,9 @@ The menu is grouped into clear sections. Application options launch the
 application, install or update dependencies, rebuild the frontend independently,
 and initialize the database explicitly. Maintenance options run the test suite,
 remove logs, clear caches, and uninstall local dependencies. Cache and data
-removal attempts one bulk operation per target and uses deterministic,
-deepest-first item recovery only when the bulk operation fails. The update action
+removal enumerates each target and removes individual files and directories in a
+deterministic, deepest-first order. Locked or protected items are reported and
+skipped so cleanup can continue. The update action
 requires a non-detached, clean checkout of `main` and pulls it with
 `git pull --ff-only origin main`; it never switches branches or modifies local
 changes. The check action reports `origin/main` status without downloading or
@@ -63,7 +64,7 @@ does not delete the environment.
 The launcher stores uv, npm, pip, Python bytecode, and Playwright state under
 `runtimes/cache`. Ruff, pytest, Angular, coverage, and other test-tool state is
 stored under `app/tests/cache`. Launching preserves the uv cache. Use menu option
-2 to install or update dependencies and prune it, or menu option 7 to clear all
+2 to install or update dependencies and prune it, or menu option 9 to clear all
 disposable development caches without reinstalling. Locked or administrator-only
 files are reported and skipped so cleanup can continue.
 

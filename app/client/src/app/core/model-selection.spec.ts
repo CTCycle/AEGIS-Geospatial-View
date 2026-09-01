@@ -19,6 +19,13 @@ const baseSettings = (): ModelSettingsResponse => ({
   google_base_url: null,
   deepseek_base_url: null,
   credentials: {},
+  selected_model_context: {
+    provider: 'google',
+    model: 'gemini-2.5-flash',
+    context_window_tokens: 1048576,
+    maximum_output_tokens: 65536,
+    context_profile_source: 'google_models_api',
+  },
 });
 
 const model = (overrides: Partial<ModelCardDescriptor> = {}): ModelCardDescriptor => ({

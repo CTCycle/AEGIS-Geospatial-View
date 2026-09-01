@@ -29,6 +29,7 @@ from server.services.chat.history_service import ChatHistoryService
 from server.services.geospatial.composition import GeospatialRuntime
 from server.services.llm.factory import LLMFactory
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
+from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
@@ -68,11 +69,16 @@ def build_chat_runtime(
         ollama_tool_capability_cache=ollama_tool_capability_cache,
         provider_factory=llm_factory,
     )
+    context_profile_resolver = ModelContextProfileResolver(
+        model_library_service=model_library_service,
+        settings_repo=settings_repo,
+    )
     settings_service = ChatSettingsService(
         settings_repo=settings_repo,
         credentials_repo=credentials_repo,
         crypto_service=crypto_service,
         model_library_service=model_library_service,
+        context_profile_resolver=context_profile_resolver,
     )
 
     capability_registry = geospatial_runtime.capability_registry
@@ -81,6 +87,7 @@ def build_chat_runtime(
     parser_service = ParserService(
         llm_factory=llm_factory,
         settings_repo=settings_repo,
+        context_profile_resolver=context_profile_resolver,
         capability_registry=capability_registry,
         runtime_registry=runtime_registry,
     )
@@ -106,11 +113,13 @@ def build_chat_runtime(
     native_tool_loop = NativeToolLoop(
         provider_factory=llm_factory,
         tool_registry=tool_registry,
+        context_profile_resolver=context_profile_resolver,
     )
     history_service = ChatHistoryService(history_repository)
     response_synthesizer = GroundedResponseSynthesizer(
         settings_repo=settings_repo,
         llm_factory=llm_factory,
+        context_profile_resolver=context_profile_resolver,
     )
     task_state_service = ConversationTaskStateService()
     pipeline_router = DeterministicAgentRouter()
@@ -152,6 +161,7 @@ def build_chat_runtime(
             tool_planner=tool_planner,
             tool_plan_executor=tool_plan_executor,
             direct_turn_response_service=direct_turn_response_service,
+            context_profile_resolver=context_profile_resolver,
             capability_resolver=CapabilityResolver(
                 capability_registry=capability_registry,
                 runtime_registry=runtime_registry,

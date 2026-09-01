@@ -70,6 +70,23 @@ _NON_DATA_CONCEPT_TAGS = frozenset(
         "current",
         "recent",
         "historical",
+        # Structured map-interaction labels are not dataset identities.  The
+        # model may emit these as action tags for a location-only request; the
+        # map pipeline resolves the location and chooses the catalog-backed
+        # basemap independently.
+        "show_map",
+        "map_center",
+        "map_focus",
+        "map_render",
+        "map_display",
+        "map_navigation",
+        "navigate",
+        "focus",
+        "center",
+        "zoom",
+        "locate",
+        "city",
+        "country",
     }
 )
 
@@ -95,16 +112,53 @@ class CapabilityResolver:
 
     # -------------------------------------------------------------------------
     def resolve(self, turn: TurnParseResult) -> TurnParseResult:
-        requested = [
-            str(item).strip() for item in turn.requested_layers if str(item).strip()
+        capabilities = self._all_capabilities()
+        atomic_layer_refs = {
+            self._normalize_text(str(item))
+            for task in turn.atomic_tasks
+            if isinstance(task, dict)
+            for item in json_array(task.get("required_layers"))
+            if str(item).strip()
+        }
+        grounded_layers = [
+            str(item).strip()
+            for item in turn.requested_layers
+            if str(item).strip()
+            and self._retain_requested_layer(
+                str(item),
+                turn=turn,
+                capabilities=capabilities,
+                atomic_layer_refs=atomic_layer_refs,
+            )
         ]
-        requested.extend(
-            str(item).strip() for item in turn.requested_concepts if str(item).strip()
-        )
+        # A model can hallucinate an enabled catalog ID while extracting a
+        # location-only request.  Determine focus from the internally
+        # consistent, text-grounded layer set rather than allowing that ID to
+        # turn a map navigation request into data retrieval.
+        focus_turn = turn.model_copy(update={"requested_layers": grounded_layers})
+        location_focus_only = self.is_location_focus_only(focus_turn, capabilities)
+        requested = grounded_layers
+        if location_focus_only:
+            requested = [
+                item
+                for item in requested
+                if self._is_location_focus_capability(item, capabilities, turn)
+            ]
+        requested_concepts = [
+            str(item).strip()
+            for item in turn.requested_concepts
+            if str(item).strip()
+        ]
+        if not location_focus_only:
+            requested.extend(requested_concepts)
         # Older model outputs placed semantic dataset concepts in action_tags.
         # Keep that typed field useful while excluding presentation-only words;
         # executable identity is still resolved exclusively against the catalog.
-        if not turn.requested_layers and not turn.requested_concepts:
+        if (
+            not location_focus_only
+            and not turn.requested_layers
+            and not turn.requested_concepts
+        ):
             requested.extend(
                 item
                 for item in turn.normalized_action.action_tags
@@ -118,6 +172,12 @@ class CapabilityResolver:
                 str(item).strip()
                 for item in cast(list[Any], required_layers)
                 if str(item).strip()
+                and self._retain_requested_layer(
+                    str(item),
+                    turn=turn,
+                    capabilities=capabilities,
+                    atomic_layer_refs=atomic_layer_refs,
+                )
             )
 
         overlay_commands = self._resolve_overlay_commands(
@@ -191,8 +251,215 @@ class CapabilityResolver:
                     [*turn.ambiguities, "unresolved_geospatial_capability"]
                 ),
                 "expected_frontend_update": "clarification",
+                "failure_category": "model_capability",
             }
         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def is_location_focus_only(
+        cls,
+        turn: TurnParseResult,
+        capabilities: list[dict[str, Any]] | None = None,
+    ) -> bool:
+        """Detect a typed geocode/map-render graph with no data retrieval.
+
+        A model can emit catalog-looking layer names while describing only a
+        place lookup (for example, an entity name that happens to match a
+        catalog keyword).  Atomic task types and explicit capability fields
+        are the authoritative distinction.  The caller may provide a
+        text-grounded layer view so an unanchored model hallucination cannot
+        change the execution mode.
+        """
+
+        if turn.task_class != "map_search":
+            return False
+        if turn.poi_categories or turn.required_data_sources:
+            return False
+        if turn.required_tool_category:
+            return False
+        if any(
+            command.action in {"add", "show", "update"}
+            for command in turn.overlay_commands
+        ):
+            return False
+        if turn.normalized_action.action_id in {
+            "data_layer_query",
+            "dataset_display",
+            "overlay_control",
+            "visible_layer_interrogation",
+            "map_external_source_combination",
+        }:
+            return False
+        if turn.requested_layers:
+            if capabilities is None:
+                # After capability resolution, any remaining layer is an
+                # enabled catalog identity and therefore an actual data
+                # request.  Before resolution, unknown model labels are
+                # allowed to be discarded by the catalog-aware caller below.
+                return False
+            for requested_layer in turn.requested_layers:
+                normalized = cls._normalize_text(str(requested_layer))
+                capability = next(
+                    (
+                        item
+                        for item in capabilities
+                        if cls._normalize_text(str(item.get("id") or ""))
+                        == normalized
+                    ),
+                    None,
+                )
+                if capability is None:
+                    # An unknown layer is not evidence of a location-only
+                    # request.  Leave it in the normal resolution path so a
+                    # genuinely requested unavailable layer receives an
+                    # explicit capability clarification.
+                    return False
+                kind = str(
+                    capability.get("capabilityKind")
+                    or capability.get("capability_kind")
+                    or ""
+                ).strip().casefold()
+                if kind != "basemap":
+                    return False
+        if not turn.atomic_tasks:
+            return bool(turn.location_signals or turn.map_target or turn.entity_target)
+        for task in turn.atomic_tasks:
+            if not isinstance(task, dict):
+                continue
+            required_layers = task.get("required_layers")
+            if isinstance(required_layers, list) and any(
+                str(item).strip() for item in required_layers
+            ):
+                return False
+            task_type = str(task.get("task_type") or "").strip().casefold()
+            if task_type and not any(
+                marker in task_type
+                for marker in ("geocode", "location", "map", "viewport", "focus")
+            ):
+                return False
+        return bool(turn.location_signals or turn.map_target or turn.entity_target)
+
+    # -------------------------------------------------------------------------
+    def _is_location_focus_capability(
+        self,
+        value: str,
+        capabilities: list[dict[str, Any]],
+        turn: TurnParseResult,
+    ) -> bool:
+        normalized = self._normalize_text(value)
+        if not normalized:
+            return False
+        for capability in capabilities:
+            capability_id = str(capability.get("id") or "").strip()
+            if self._normalize_text(capability_id) != normalized:
+                continue
+            kind = str(
+                capability.get("capabilityKind")
+                or capability.get("capability_kind")
+                or ""
+            ).strip().casefold()
+            if kind == "basemap":
+                return self._is_usable(capability, turn)
+        return False
+
+    # -------------------------------------------------------------------------
+    def _retain_requested_layer(
+        self,
+        value: str,
+        *,
+        turn: TurnParseResult,
+        capabilities: list[dict[str, Any]],
+        atomic_layer_refs: set[str],
+    ) -> bool:
+        """Keep a model layer only when it has typed or textual support."""
+
+        normalized = self._normalize_text(value)
+        if not normalized:
+            return False
+        if normalized in atomic_layer_refs:
+            return True
+        user_text = self._normalize_text(turn.user_text)
+        if normalized in user_text:
+            return True
+        if any(
+            str(task.get("task_type") or "").strip().casefold()
+            and not any(
+                marker in str(task.get("task_type") or "").strip().casefold()
+                for marker in ("geocode", "location", "map", "viewport", "focus")
+            )
+            for task in turn.atomic_tasks
+            if isinstance(task, dict)
+        ):
+            return True
+        if (
+            turn.normalized_action.action_id
+            in {
+                "data_layer_query",
+                "dataset_display",
+                "overlay_control",
+                "visible_layer_interrogation",
+                "map_external_source_combination",
+            }
+            or turn.temporal_signal.mode != "none"
+            or turn.temporal_signal.aggregation != "none"
+        ):
+            # A typed data/temporal request should be allowed to reach the
+            # normal capability validator.  If the requested layer is
+            # unavailable or incompatible, it will produce a categorized
+            # clarification rather than being silently discarded.
+            return True
+
+        capability = next(
+            (
+                item
+                for item in capabilities
+                if self._normalize_text(str(item.get("id") or "")) == normalized
+            ),
+            None,
+        )
+        if capability is None:
+            # Keep unknown values so the normal resolver can report a typed
+            # model-capability clarification instead of silently dropping a
+            # user-requested but unavailable layer.
+            return True
+
+        metadata = json_object(capability.get("metadata"))
+        evidence_values = [
+            str(capability.get("name") or ""),
+            *[str(item) for item in json_array(capability.get("capabilities"))],
+            *[str(item) for item in json_array(metadata.get("keywords"))],
+            *[str(item) for item in json_array(metadata.get("action_tags"))],
+            *[str(item) for item in json_array(metadata.get("task_tags"))],
+            *[
+                str(item)
+                for item in json_array(
+                    json_object(capability.get("agenticUse")).get("plannerHints")
+                )
+            ],
+        ]
+        user_tokens = set(self._tokens(turn.user_text))
+        generic_tokens = {
+            "add",
+            "data",
+            "display",
+            "layer",
+            "map",
+            "overlay",
+            "show",
+            "site",
+            "the",
+            "view",
+        }
+        for evidence in evidence_values:
+            evidence_tokens = {
+                token
+                for token in self._tokens(evidence)
+                if token not in generic_tokens
+            }
+            if evidence_tokens & user_tokens:
+                return True
+        return False
 
     # -------------------------------------------------------------------------
     def _resolve_overlay_commands(

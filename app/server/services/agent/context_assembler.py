@@ -7,12 +7,20 @@ from server.services.llm.context_budget import (
     estimate_json_tokens,
     resolve_model_context_profile,
 )
+from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 from server.services.llm.errors import LLMContextLimitError
 from server.domain.agent.runtime import compact_task_context
 
 
 ###############################################################################
 class AgentContextAssembler:
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        context_profile_resolver: ModelContextProfileResolver | None = None,
+    ) -> None:
+        self.context_profile_resolver = context_profile_resolver
+
     # -------------------------------------------------------------------------
     def assemble(
         self,
@@ -26,7 +34,11 @@ class AgentContextAssembler:
         map_memory: dict[str, Any],
         prior_summary: dict[str, Any] | None = None,
     ) -> AgentContextPackage:
-        profile = resolve_model_context_profile(provider, model)
+        profile = (
+            self.context_profile_resolver.resolve(provider, model)
+            if self.context_profile_resolver is not None
+            else resolve_model_context_profile(provider, model)
+        )
         context_window = profile.context_window_tokens if profile else None
         output_reserve = (
             (profile.maximum_output_tokens or profile.default_output_reserve)
