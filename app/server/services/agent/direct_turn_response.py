@@ -211,7 +211,10 @@ class DirectTurnResponseService:
 
         if (
             turn_contract.task_class == "general_question"
-            or context_query_kind != "none"
+            or (
+                context_query_kind != "none"
+                and not AgentTurnSupport.has_executable_intent(turn_contract)
+            )
         ):
             fallback_message = AgentTurnSupport.compose_context_query_message(
                 context_query_kind,

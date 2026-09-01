@@ -332,12 +332,14 @@ class AgentOrchestrator:
         )
         turn_contract = self.capability_resolver.resolve(turn_contract)
         LOGGER.info(
-            "chat_turn_parsed request_id=%s conversation_key=%s task=%s action=%s relationship=%s specialist_candidate=%s viewport_scope=%s basemap=%s layers=%s",
+            "chat_turn_parsed request_id=%s conversation_key=%s task=%s action=%s relationship=%s context_query=%s tools_needed=%s specialist_candidate=%s viewport_scope=%s basemap=%s layers=%s concepts=%s",
             request_id,
             conversation_key,
             turn_contract.task_class,
             turn_contract.normalized_action.action_id,
             turn_contract.relationship,
+            turn_contract.context_query.kind,
+            turn_contract.tools_needed,
             self.pipeline_router.select_specialist(turn_contract),
             turn_contract.viewport_intent.scope
             if turn_contract.viewport_intent is not None
@@ -345,6 +347,9 @@ class AgentOrchestrator:
             turn_contract.requested_basemap,
             ",".join(turn_contract.requested_layers)
             if turn_contract.requested_layers
+            else "-",
+            ",".join(turn_contract.requested_concepts)
+            if turn_contract.requested_concepts
             else "-",
         )
         if progress_callback is not None:

@@ -37,6 +37,7 @@ from server.prompts.parser import build_parser_prompt
 from server.services.llm.types import LLMRequest
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
+from server.services.agent.turn_support import AgentTurnSupport
 
 
 ###############################################################################
@@ -548,6 +549,23 @@ class ParserService:
                 else None
             ),
         )
+        if (
+            extracted.context_query.kind != "none"
+            and AgentTurnSupport.has_executable_intent(extracted)
+        ):
+            LOGGER.info(
+                "parser_context_query_suppressed action=%s task=%s context_query=%s",
+                extracted.action_id,
+                extracted.task_class,
+                extracted.context_query.kind,
+            )
+            extracted = extracted.model_copy(
+                update={
+                    "context_query": extracted.context_query.model_copy(
+                        update={"kind": "none"}
+                    )
+                }
+            )
 
         if parser_failure_ambiguity is None and not extracted.location_signals:
             coordinate_signal = self._extract_coordinate_signal(user_message)
@@ -690,13 +708,17 @@ class ParserService:
             failure_category=self._normalize_failure_category(parser_failure_category),
         )
         LOGGER.info(
-            "parser_normalized task=%s action=%s relationship=%s locations=%d basemap=%s layers=%d viewport_scope=%s tighten=%s ambiguities=%s",
+            "parser_normalized task=%s action=%s relationship=%s context_query=%s tools_needed=%s direct_response_sufficient=%s locations=%d basemap=%s layers=%d concepts=%s viewport_scope=%s tighten=%s ambiguities=%s",
             result.task_class,
             result.normalized_action.action_id,
             result.relationship,
+            result.context_query.kind,
+            result.tools_needed,
+            result.direct_response_sufficient,
             len(result.location_signals),
             result.requested_basemap,
             len(result.requested_layers),
+            ",".join(result.requested_concepts) if result.requested_concepts else "-",
             result.viewport_intent.scope
             if result.viewport_intent is not None
             else None,

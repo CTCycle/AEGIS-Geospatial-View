@@ -8,6 +8,18 @@ from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDec
 
 ###############################################################################
 class AgentTurnSupport:
+    _EXECUTABLE_ACTION_IDS = frozenset(
+        {
+            "map_search",
+            "location_render",
+            "geospatial_data_retrieval",
+            "data_layer_query",
+            "overlay_control",
+            "dataset_display",
+            "map_external_source_combination",
+        }
+    )
+
     # -------------------------------------------------------------------------
     @staticmethod
     def build_direct_reject_decision(action_id: str) -> PolicyDecision:
@@ -109,6 +121,54 @@ class AgentTurnSupport:
             if content:
                 return content
         return None
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def has_executable_intent(cls, turn_contract: Any) -> bool:
+        """Return whether a context label must not short-circuit execution.
+
+        The parser may identify a deictic reference (for example, "there")
+        while also identifying a real data request.  Context-query handling is
+        only valid for state questions that do not require a provider or map
+        mutation; typed data/layer fields therefore take precedence here.
+        """
+        task_class = str(getattr(turn_contract, "task_class", "") or "")
+        if task_class not in {"map_search", "direct_query"}:
+            return False
+
+        normalized_action = getattr(turn_contract, "normalized_action", None)
+        action_id = str(
+            getattr(normalized_action, "action_id", None)
+            or getattr(turn_contract, "action_id", None)
+            or ""
+        ).strip()
+        if action_id in cls._EXECUTABLE_ACTION_IDS:
+            return True
+
+        for field_name in (
+            "tools_needed",
+            "requested_layers",
+            "requested_concepts",
+            "requested_visualizations",
+            "requested_basemap",
+            "required_data_sources",
+            "required_tool_category",
+            "poi_categories",
+            "atomic_tasks",
+            "overlay_commands",
+        ):
+            value = getattr(turn_contract, field_name, None)
+            if value:
+                return True
+
+        temporal = getattr(turn_contract, "temporal_signal", None)
+        return bool(
+            temporal is not None
+            and (
+                getattr(temporal, "mode", "none") != "none"
+                or getattr(temporal, "aggregation", "none") != "none"
+            )
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
