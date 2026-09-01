@@ -51,11 +51,15 @@ class ContextUsageResponse(BaseModel):
     usage_percent: float | None
     provider: str
     model: str
+    reported_input_tokens: int | None = None
+    reported_output_tokens: int | None = None
     reserved_output_tokens: int = 0
     tool_schema_tokens: int = 0
     response_schema_tokens: int = 0
     safety_margin_tokens: int = 512
-    usage_source: str = "estimated"
+    usage_source: Literal[
+        "not_measured", "estimated", "provider_reported", "hybrid"
+    ] = "estimated"
     usable_prompt_budget_tokens: int | None = None
     current_conversation_tokens: int | None = None
     expected_output_tokens: int | None = None
@@ -168,6 +172,17 @@ class ModelLibrarySourceStatus(BaseModel):
 
 
 ###############################################################################
+class SelectedModelContextResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    model: str
+    context_window_tokens: int | None = None
+    maximum_output_tokens: int | None = None
+    context_profile_source: str = "unknown"
+
+
+###############################################################################
 class ModelSettingsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -182,9 +197,7 @@ class ModelSettingsResponse(BaseModel):
     credential_health: dict[str, dict[str, str]] = Field(
         default_factory=lambda: dict[str, dict[str, str]]()
     )
-    selected_model_context: dict[str, Any] = Field(
-        default_factory=lambda: dict[str, Any]()
-    )
+    selected_model_context: SelectedModelContextResponse
 
 
 ###############################################################################

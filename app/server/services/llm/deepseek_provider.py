@@ -11,7 +11,11 @@ import httpx
 from openai import OpenAI
 
 from server.services.llm.base import LLMProvider
-from server.services.llm.context_budget import compute_context_usage, prepare_request
+from server.services.llm.context_budget import (
+    apply_reported_usage,
+    compute_context_usage,
+    prepare_request,
+)
 from server.prompts.providers import build_deepseek_json_schema_instruction
 from server.services.llm.errors import (
     LLMProviderRequestError,
@@ -123,10 +127,6 @@ class DeepSeekProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
-        request = prepare_request(request, provider=self.provider_name)
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
         native_tools = list(tools or request.tools or [])
         schema = response_json_schema or request.response_json_schema
         effective_request = replace(
@@ -134,6 +134,12 @@ class DeepSeekProvider(LLMProvider):
             tools=native_tools or None,
             response_json_schema=schema,
         )
+        effective_request = prepare_request(
+            effective_request, provider=self.provider_name
+        )
+        self.last_context_usage = compute_context_usage(
+            effective_request, provider=self.provider_name
+        ).to_dict()
         self._validate_request_capabilities(effective_request)
         kwargs: dict[str, Any] = {}
         if native_tools:
@@ -161,10 +167,15 @@ class DeepSeekProvider(LLMProvider):
             raise LLMProviderRequestError.from_exception(
                 exc, provider=self.provider_name, model=request.model, stage="chat"
             ) from exc
+        raw = response.model_dump(mode="json")
+        self.last_context_usage = apply_reported_usage(
+            compute_context_usage(effective_request, provider=self.provider_name),
+            raw,
+        ).to_dict()
         content, tool_calls = self._parse_choice(response)
         return LLMResult(
             content=content,
-            raw=response.model_dump(mode="json"),
+            raw=raw,
             tool_calls=tool_calls,
             finish_reason=self._finish_reason(response),
         )
@@ -191,14 +202,17 @@ class DeepSeekProvider(LLMProvider):
     def structured_output(
         self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
-        request = prepare_request(request, provider=self.provider_name)
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
         model_json_schema = getattr(schema, "model_json_schema", None)
         json_schema = (
             json_object(model_json_schema()) if callable(model_json_schema) else {}
         )
+        request = prepare_request(
+            replace(request, response_json_schema=json_schema),
+            provider=self.provider_name,
+        )
+        self.last_context_usage = compute_context_usage(
+            request, provider=self.provider_name
+        ).to_dict()
         self._validate_request_capabilities(
             replace(request, response_json_schema=json_schema)
         )
@@ -219,6 +233,11 @@ class DeepSeekProvider(LLMProvider):
                 model=request.model,
                 stage="structured_output",
             ) from exc
+        raw = response.model_dump(mode="json")
+        self.last_context_usage = apply_reported_usage(
+            compute_context_usage(request, provider=self.provider_name),
+            raw,
+        ).to_dict()
         content, _ = self._parse_choice(response)
         try:
             loaded = json.loads(content or "{}")

@@ -4,6 +4,12 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 CapabilityState = Literal["supported", "unsupported", "unknown"]
+ContextUsageSource = Literal[
+    "not_measured",
+    "estimated",
+    "provider_reported",
+    "hybrid",
+]
 FailureCategory = Literal[
     "model_capability",
     "provider_api",
@@ -121,11 +127,13 @@ class ContextUsage:
     usage_percent: float | None
     provider: str
     model: str
+    reported_input_tokens: int | None = None
+    reported_output_tokens: int | None = None
     reserved_output_tokens: int = 0
     tool_schema_tokens: int = 0
     response_schema_tokens: int = 0
     safety_margin_tokens: int = 512
-    usage_source: str = "estimated"
+    usage_source: ContextUsageSource = "estimated"
     usable_prompt_budget_tokens: int | None = None
     current_conversation_tokens: int | None = None
     expected_output_tokens: int | None = None
@@ -133,9 +141,22 @@ class ContextUsage:
     compaction_applied: bool = False
 
     # -------------------------------------------------------------------------
+    @property
+    def effective_input_tokens(self) -> int:
+        """Return the best available input count for the usage indicator."""
+
+        return (
+            self.reported_input_tokens
+            if self.reported_input_tokens is not None
+            else self.estimated_input_tokens
+        )
+
+    # -------------------------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:
         return {
             "estimated_input_tokens": self.estimated_input_tokens,
+            "reported_input_tokens": self.reported_input_tokens,
+            "reported_output_tokens": self.reported_output_tokens,
             "selected_context_window": self.selected_context_window,
             "model_context_limit": self.model_context_limit,
             "usage_percent": self.usage_percent,
