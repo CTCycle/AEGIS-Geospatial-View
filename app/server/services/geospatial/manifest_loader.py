@@ -91,6 +91,7 @@ class GeospatialManifestLoader:
         "cachePolicy",
         "normalization",
     }
+    RUNTIME_PROFILE_FRAGMENTS_DIR = "runtime_profiles.d"
 
     # -------------------------------------------------------------------------
     def __init__(self, root_path: str | Path | None = None) -> None:
@@ -169,6 +170,33 @@ class GeospatialManifestLoader:
         return entries
 
     # -------------------------------------------------------------------------
+    def _load_runtime_profile_fragments(self) -> list[JsonDict]:
+        folder = Path(self.root_path) / self.RUNTIME_PROFILE_FRAGMENTS_DIR
+        if not folder.exists():
+            return []
+        if not folder.is_dir():
+            raise ManifestValidationError(
+                f"Runtime profile fragments path '{folder}' must be a directory."
+            )
+        profiles: list[JsonDict] = []
+        for path in sorted(folder.iterdir()):
+            if path.suffix.lower() != ".json":
+                continue
+            payload = self._load_json(path)
+            if not is_json_object(payload):
+                raise ManifestValidationError(
+                    f"Runtime profile fragment '{path}' must be an object."
+                )
+            try:
+                profile = RuntimeProfile.model_validate(payload)
+            except ValidationError as exc:
+                raise ManifestValidationError(
+                    f"Runtime profile fragment '{path.name}' failed validation: {exc}"
+                ) from exc
+            profiles.append(profile.model_dump())
+        return profiles
+
+    # -------------------------------------------------------------------------
     def _load_runtime_profiles(self, filename: str) -> list[JsonDict]:
         path = Path(self.root_path) / filename
         payload = self._load_json(path)
@@ -180,7 +208,22 @@ class GeospatialManifestLoader:
             raise ManifestValidationError(
                 f"Runtime profiles failed validation: {exc}"
             ) from exc
-        return [profile.model_dump() for profile in document.profiles]
+
+        profiles = [profile.model_dump() for profile in document.profiles]
+        profiles.extend(self._load_runtime_profile_fragments())
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for profile in profiles:
+            capability_id = str(profile.get("capability_id") or "").strip()
+            if capability_id in seen:
+                duplicates.add(capability_id)
+            seen.add(capability_id)
+        if duplicates:
+            raise ManifestValidationError(
+                "Duplicate runtime profile capability ids: "
+                + ", ".join(sorted(duplicates))
+            )
+        return profiles
 
     # -------------------------------------------------------------------------
     def load_all(self) -> JsonDict:
