@@ -72,7 +72,15 @@ class AgentResponseBuilder:
         require_verified_result: bool = False,
     ) -> str:
         if map_session is not None:
-            return cls.compose_map_session_message(map_session)
+            map_message = cls.compose_map_session_message(map_session)
+            if direct_result is not None:
+                tool_id = direct_result.get("tool_id") or direct_result.get("tool")
+                direct_message = cls.compose_direct_tool_message(
+                    tool_id, {"result": direct_result}
+                )
+                if not direct_message.startswith("Completed "):
+                    return f"{map_message} {direct_message}"
+            return map_message
         if direct_result is not None:
             tool_id = direct_result.get("tool_id") or direct_result.get("tool")
             return cls.compose_direct_tool_message(tool_id, {"result": direct_result})
@@ -126,6 +134,7 @@ class AgentResponseBuilder:
                 status=map_status,
                 message=assistant_message,
                 warnings=warnings,
+                direct_result=direct_result,
             )
         if direct_result is not None:
             return ChatOperationResult(
