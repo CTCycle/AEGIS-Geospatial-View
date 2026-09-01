@@ -27,8 +27,13 @@ class OverpassServiceError(ProviderError):
 
 
 ###############################################################################
-class OverpassRequestError(OverpassServiceError, ProviderInvalidQueryError):
-    """Raised when Overpass cannot fulfill a request."""
+class OverpassRequestError(OverpassServiceError):
+    """Raised when an Overpass request or response cannot be completed."""
+
+
+###############################################################################
+class OverpassInvalidQueryError(OverpassServiceError, ProviderInvalidQueryError):
+    """Raised when a request is structurally valid but not executable."""
 
 
 ###############################################################################
@@ -184,7 +189,7 @@ class OverpassService:
         ]
         selectors = list(dict.fromkeys(selectors))
         if categories and not selectors:
-            raise OverpassRequestError(
+            raise OverpassInvalidQueryError(
                 "No supported OpenStreetMap POI category was requested."
             )
         payload = await asyncio.to_thread(

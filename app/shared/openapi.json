@@ -2855,6 +2855,11 @@
             ],
             "title": "Temporal Reference Time Iso"
           },
+          "tool_arguments": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Tool Arguments"
+          },
           "basemap_id": {
             "anyOf": [
               {
@@ -3688,6 +3693,74 @@
             ],
             "title": "Result Type"
           },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "observation_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observation Time"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "spatial_resolution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spatial Resolution"
+          },
+          "units": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Units"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "partial": {
+            "type": "boolean",
+            "title": "Partial",
+            "default": false
+          },
           "error_code": {
             "anyOf": [
               {
@@ -4136,7 +4209,13 @@
               "deictic",
               "poi",
               "region",
-              "street"
+              "street",
+              "neighborhood",
+              "district",
+              "municipality",
+              "county",
+              "province",
+              "state"
             ],
             "title": "Signal Type"
           },
@@ -5635,6 +5714,38 @@
         "type": "object",
         "title": "TemporalSignal"
       },
+      "ToolInputBinding": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Target"
+          },
+          "source_step_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Step Id"
+          },
+          "source_path": {
+            "type": "string",
+            "title": "Source Path",
+            "default": "data"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target",
+          "source_step_id"
+        ],
+        "title": "ToolInputBinding",
+        "description": "Bind a value produced by a predecessor into a later tool call."
+      },
       "ToolPlan": {
         "properties": {
           "tool_group": {
@@ -5730,6 +5841,20 @@
             },
             "type": "array",
             "title": "Depends On"
+          },
+          "input_bindings": {
+            "items": {
+              "$ref": "#/components/schemas/ToolInputBinding"
+            },
+            "type": "array",
+            "title": "Input Bindings"
+          },
+          "output_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Refs"
           },
           "parallel_group": {
             "anyOf": [
@@ -5900,6 +6025,13 @@
             ],
             "title": "Entity Target"
           },
+          "requested_concepts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Requested Concepts"
+          },
           "requested_layers": {
             "items": {
               "type": "string"
@@ -5916,15 +6048,45 @@
           },
           "poi_categories": {
             "items": {
-              "type": "string",
-              "enum": [
-                "bicycle_parking",
-                "transit_stops",
-                "rail_stations"
-              ]
+              "type": "string"
             },
             "type": "array",
             "title": "Poi Categories"
+          },
+          "radius_m": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radius M"
+          },
+          "result_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Limit"
+          },
+          "presentation_mode": {
+            "type": "string",
+            "enum": [
+              "text",
+              "map",
+              "both"
+            ],
+            "title": "Presentation Mode",
+            "default": "map"
           },
           "requested_basemap": {
             "anyOf": [
