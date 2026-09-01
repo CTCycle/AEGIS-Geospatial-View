@@ -167,11 +167,21 @@ class GroundedResponseSynthesizer:
         if map_session.compliance_warnings:
             return True
         normalized = re.sub(r"\s+", " ", content.casefold())
-        return not bool(
-            re.search(
-                r"\b(?:failed|failure|error|not available|could not|unable to)\b",
-                normalized,
-            )
+        if re.search(
+            r"\b(?:failed|failure|error|not available|could not|unable to)\b",
+            normalized,
+        ):
+            return False
+        if GroundedResponseSynthesizer._feature_count(map_session) <= 0:
+            return True
+        contradiction_patterns = (
+            r"\b(?:no|without)\s+(?:direct\s+)?(?:result|results|feature|features|data|points|records|locations|sites)\b",
+            r"\b(?:does not|doesn't|did not|didn't)\s+(?:include|contain|show|provide|return)\b.{0,80}\b(?:result|results|feature|features|data|points|records|locations|sites)\b",
+            r"(?<!no )(?<!not )\b(?:further|additional|another)\s+(?:search|query|lookup|request)\b\s+(?:is\s+)?(?:needed|required|necessary)\b",
+            r"\b(?:pending|still pending|not completed|in progress)\b",
+        )
+        return not any(
+            re.search(pattern, normalized) for pattern in contradiction_patterns
         )
 
     # -------------------------------------------------------------------------
@@ -211,7 +221,7 @@ class GroundedResponseSynthesizer:
     def _overlay_summary(overlay: dict[str, Any]) -> dict[str, Any]:
         rendering_mode = overlay.get("rendering_mode")
         metadata_only = rendering_mode == "metadata-only"
-        return {
+        summary = {
             "id": overlay.get("id"),
             "label": overlay.get("label") or overlay.get("name"),
             "rendering_mode": rendering_mode,
@@ -219,6 +229,59 @@ class GroundedResponseSynthesizer:
             "rendered": not metadata_only,
             "status": "metadata_only" if metadata_only else "rendered",
         }
+        data = overlay.get("data")
+        if is_json_object(data) and data.get("type") == "FeatureCollection":
+            features = data.get("features")
+            if is_json_array(features):
+                summary["feature_count"] = len(features)
+                categories = sorted(
+                    {
+                        str(properties[key]).strip()
+                        for feature in features[:100]
+                        if is_json_object(feature)
+                        and is_json_object(properties := feature.get("properties"))
+                        for key in ("category", "amenity", "kind")
+                        if isinstance(properties.get(key), str)
+                        and properties[key].strip()
+                    }
+                )
+                if categories:
+                    summary["categories"] = categories[:20]
+        for key in (
+            "provider",
+            "source_url",
+            "fetched_at",
+            "observation_time",
+            "result_status",
+            "result_type",
+            "coverage",
+            "spatial_resolution",
+            "units",
+            "partial",
+            "total_results",
+            "returned_results",
+            "limit",
+            "truncated",
+            "radius_m",
+        ):
+            if overlay.get(key) is not None:
+                summary[key] = GroundedResponseSynthesizer._bounded_value(
+                    overlay[key]
+                )
+        return summary
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _feature_count(map_session: MapSession) -> int:
+        count = 0
+        for instance in map_session.overlay_collection.instances:
+            data = instance.descriptor.get("data")
+            if not is_json_object(data) or data.get("type") != "FeatureCollection":
+                continue
+            features = data.get("features")
+            if is_json_array(features):
+                count += len(features)
+        return count
 
     # -------------------------------------------------------------------------
     @classmethod

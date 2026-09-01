@@ -290,3 +290,73 @@ def test_synthesizer_falls_back_when_successful_overlay_is_called_failed() -> No
         )
         == "Map ready with the verified POI overlay."
     )
+
+
+###############################################################################
+def test_synthesizer_rejects_absence_claim_when_overlay_has_features() -> None:
+    provider = _Provider(
+        "The map is ready, but no direct results are included. "
+        "A further search is needed."
+    )
+    synthesizer = GroundedResponseSynthesizer(
+        settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+        llm_factory=_Factory(provider),  # type: ignore[arg-type]
+        enabled=True,
+    )
+    map_session = MapSession(
+        session_id="map-1",
+        resolved_location=ResolvedLocation(
+            label="Rome", latitude=41.9, longitude=12.5
+        ),
+        basemap_id="osm_default",
+        viewport=ViewportPolicy(
+            center_latitude=41.9, center_longitude=12.5, radius_m=5000.0
+        ),
+        overlay_collection=OverlayCollectionState(
+            instances=[
+                OverlayInstance(
+                    instance_id="poi-rome",
+                    capability_id="overpass_poi_amenities",
+                    label="OpenStreetMap points of interest",
+                    provider="overpass",
+                    overlay_type="overlay",
+                    rendering_mode="clustered-points",
+                    descriptor={
+                        "id": "poi-rome",
+                        "source_url": "https://overpass.example/api/interpreter",
+                        "result_status": "ok",
+                        "data": {
+                            "type": "FeatureCollection",
+                            "features": [
+                                {
+                                    "type": "Feature",
+                                    "properties": {"category": "hospital"},
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [12.5, 41.9],
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                )
+            ]
+        ),
+    )
+    operation = ChatOperationResult(
+        kind="map_session",
+        status="success",
+        message="Verified map with one feature.",
+    )
+
+    result = synthesizer.synthesize(
+        user_text="Show hospitals near Rome.",
+        fallback_text="Map ready with one verified hospital feature.",
+        operation=operation,
+        map_session=map_session,
+    )
+
+    assert result == "Map ready with one verified hospital feature."
+    request_text = provider.requests[0].messages[1]["content"]
+    assert '"feature_count":1' in request_text
+    assert '"provider":"overpass"' in request_text
