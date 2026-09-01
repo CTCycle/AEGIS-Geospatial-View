@@ -546,10 +546,28 @@ class AgentTurnStateAssembler:
             data = content.get("data")
             if not is_json_object(data):
                 continue
+            result_warnings = [
+                str(item).strip()
+                for item in json_array(data.get("warnings"))
+                if str(item).strip()
+            ]
             map_payload = data.get("map_session")
             if is_json_object(map_payload):
                 map_session = self._map_session_from_memory(map_payload)
                 if map_session is not None:
+                    if result_warnings:
+                        map_session = map_session.model_copy(
+                            update={
+                                "compliance_warnings": list(
+                                    dict.fromkeys(
+                                        [
+                                            *map_session.compliance_warnings,
+                                            *result_warnings,
+                                        ]
+                                    )
+                                )
+                            }
+                        )
                     candidate_map_sessions.append(map_session)
                     if basemap_id is None:
                         basemap_id = map_session.basemap_id
