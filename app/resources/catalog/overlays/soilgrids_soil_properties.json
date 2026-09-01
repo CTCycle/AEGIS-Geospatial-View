@@ -1,0 +1,185 @@
+{
+  "id": "soilgrids_soil_properties",
+  "name": "ISRIC SoilGrids Soil Properties",
+  "provider": "soilgrids",
+  "type": "wms",
+  "description": "Global SoilGrids 250 m soil-property raster overlay with selectable property, depth interval, and prediction statistic.",
+  "capabilities": [
+    "soil",
+    "soil-properties",
+    "wms",
+    "wcs"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "ISRIC SoilGrids Soil Properties",
+    "default_opacity": 0.55,
+    "requires_key": false,
+    "url": "https://maps.isric.org/mapserv?map=/map/phh2o.map",
+    "layer_id": "phh2o_0-5cm_mean",
+    "wms_version": "1.1.1",
+    "wms_format": "image/png",
+    "wms_style": "",
+    "wms_crs": "EPSG:3857",
+    "attribution": "ISRIC - World Soil Information, SoilGrids",
+    "default_property": "phh2o",
+    "default_depth": "0-5cm",
+    "default_quantile": "mean",
+    "available_properties": [
+      "bdod",
+      "cec",
+      "cfvo",
+      "clay",
+      "nitrogen",
+      "ocd",
+      "ocs",
+      "soc",
+      "phh2o",
+      "sand",
+      "silt",
+      "wv0010",
+      "wv1500",
+      "wv003"
+    ],
+    "available_depths": [
+      "0-5cm",
+      "5-15cm",
+      "15-30cm",
+      "30-60cm",
+      "60-100cm",
+      "100-200cm"
+    ],
+    "available_quantiles": [
+      "mean",
+      "Q0.05",
+      "Q0.5",
+      "Q0.95"
+    ],
+    "keywords": [
+      "soil",
+      "soilgrids",
+      "isric",
+      "ph",
+      "organic carbon",
+      "nitrogen",
+      "clay",
+      "sand",
+      "silt",
+      "bulk density",
+      "water content"
+    ],
+    "action_tags": [
+      "soil",
+      "soil-properties"
+    ],
+    "task_tags": [
+      "soil analysis",
+      "site assessment",
+      "environmental analysis"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "rolling-release",
+    "constraints": "Model predictions at 250 m resolution are not parcel-scale measurements.",
+    "human_summary": "Global modeled soil properties for environmental, agricultural, erosion, and site-context analysis.",
+    "primary_use_cases": [
+      "soil texture context",
+      "soil pH mapping",
+      "organic carbon assessment",
+      "soil nitrogen context",
+      "soil water-content context",
+      "multi-layer environmental analysis"
+    ],
+    "search_examples": [
+      "show soil pH around Zurich",
+      "map clay content in this bounding box",
+      "show soil organic carbon around the selected site"
+    ],
+    "disambiguation_notes": [
+      "Use SoilGrids for modeled regional soil context, not parcel-level laboratory measurements."
+    ],
+    "location_dependency": "Location-dependent global raster data.",
+    "integration_requirements": [
+      "No API key required",
+      "Use WMS for visualization and WCS for bounded coverage extraction"
+    ],
+    "official_docs_url": "https://docs.isric.org/globaldata/soilgrids/",
+    "source_protocol": "OGC WMS/WCS",
+    "data_format": "image/png and GeoTIFF coverage",
+    "geometry_type": "raster-grid",
+    "queryable": true,
+    "vectorizable": false,
+    "endpoint_health": "public-best-effort",
+    "auth_mode": "none",
+    "rate_limit_notes": "Keep requests spatially bounded and cache repeated access.",
+    "retrieval_mode": "direct",
+    "last_validated": "2026-09-02"
+  },
+  "version": 1,
+  "last_modified": "2026-09-02T00:00:00+00:00",
+  "capabilityKind": "raster-overlay",
+  "renderingMode": "wms",
+  "sourceOfficialDocs": [
+    "https://docs.isric.org/globaldata/soilgrids/",
+    "https://docs.isric.org/globaldata/soilgrids/wcs.html",
+    "https://docs.isric.org/globaldata/soilgrids/wms_from_qgis_arcmap.html"
+  ],
+  "license": {
+    "name": "CC BY 4.0",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "attributionRequired": true,
+    "commercialUse": "allowed-with-attribution",
+    "embeddingAllowed": "allowed-with-attribution"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": true,
+    "manualToggle": true,
+    "plannerHints": [
+      "soil",
+      "soil properties",
+      "soilgrids",
+      "soil ph",
+      "clay",
+      "sand",
+      "silt",
+      "organic carbon",
+      "nitrogen",
+      "bulk density",
+      "soil water content"
+    ],
+    "requiredUserAction": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context",
+      "parcel-scale measurement requested"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-09-02",
+    "knownLimitations": [
+      "SoilGrids is a modeled 250 m product and is not a substitute for local soil sampling.",
+      "The public OGC service is external and best-effort."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "raster-grid"
+  }
+}
