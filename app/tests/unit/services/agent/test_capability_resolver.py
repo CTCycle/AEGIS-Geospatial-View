@@ -288,3 +288,50 @@ def test_resolves_semantic_direct_request_to_direct_tool_capability() -> None:
 
     assert resolved.requested_layers == ["get_weather_forecast"]
     assert resolved.clarification_plan is None
+
+
+###############################################################################
+def test_ignores_presentation_action_tags_as_dataset_concepts() -> None:
+    turn = _turn("Show Springfield", "")
+    turn = turn.model_copy(
+        update={
+            "requested_layers": [],
+            "requested_concepts": [],
+            "normalized_action": NormalizedAction(
+                action_id="data_layer_query",
+                action_label="Layer query",
+                action_tags=["show"],
+                requested_visualizations=[],
+                requires_location=True,
+            ),
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.requested_layers == []
+    assert resolved.capability_limitations == []
+    assert resolved.clarification_plan is None
+
+
+###############################################################################
+def test_retains_semantic_action_tags_for_catalog_resolution() -> None:
+    turn = _turn("Show weather in Rome", "")
+    turn = turn.model_copy(
+        update={
+            "requested_layers": [],
+            "requested_concepts": [],
+            "normalized_action": NormalizedAction(
+                action_id="data_layer_query",
+                action_label="Layer query",
+                action_tags=["weather"],
+                requested_visualizations=[],
+                requires_location=True,
+            ),
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.requested_layers == ["openmeteo_weather_forecast"]
+    assert resolved.clarification_plan is None
