@@ -213,6 +213,9 @@ class AgentRunOrchestrator:
                     )
                     if response.visualization_update is not None
                     else None,
+                    "context_usage": response.context_usage.model_dump(mode="json")
+                    if response.context_usage is not None
+                    else None,
                 },
             )
             return
@@ -244,6 +247,9 @@ class AgentRunOrchestrator:
                     else "Failed",
                     "operation": response.operation.model_dump(mode="json")
                     if response.operation is not None
+                    else None,
+                    "context_usage": response.context_usage.model_dump(mode="json")
+                    if response.context_usage is not None
                     else None,
                 },
             )

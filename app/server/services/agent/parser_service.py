@@ -303,7 +303,7 @@ class ParserService:
                 provider=provider_name,
                 model=model_name,
                 stage="structured_intent_extraction",
-                code="parser_timeout",
+                code="provider_timeout",
                 retryable=False,
             )
         parser_provider = self.llm_factory.get_provider(provider_name)
@@ -364,6 +364,11 @@ class ParserService:
                 model=model_name,
                 stage="structured_intent_extraction",
                 detail="The provider response did not match the AEGIS extraction schema.",
+                context_usage=(
+                    dict(self.last_context_usage)
+                    if is_json_object(self.last_context_usage)
+                    else None
+                ),
             ) from exc
         LOGGER.debug(
             "Parser LLM extraction: provider=%s model=%s task=%s action=%s",
@@ -468,7 +473,9 @@ class ParserService:
             task_tags=[],
             action_tags=[],
             requires_location=False,
-            ambiguities=["parser_timeout"],
+            ambiguities=[
+                str(provider_error.get("code") or "provider_timeout")
+            ],
             parser_confidence=0.0,
             expected_frontend_update="failure_diagnostic",
         )
@@ -486,7 +493,12 @@ class ParserService:
             for item in extracted.location_signals
             if item.raw_value.strip()
         ]
-        ambiguities = cls._dedupe([*extracted.ambiguities, "parser_timeout"])
+        ambiguities = cls._dedupe(
+            [
+                *extracted.ambiguities,
+                str(provider_error.get("code") or "provider_timeout"),
+            ]
+        )
         return TurnParseResult(
             user_text=user_message,
             conversation_context=ConversationContextSnapshot(
@@ -609,6 +621,9 @@ class ParserService:
             raise
         except Exception as exc:
             LOGGER.exception("Parser LLM extraction failed: %s", exc)
+            failure_context_usage = getattr(exc, "context_usage", None)
+            if is_json_object(failure_context_usage):
+                self.last_context_usage = dict(failure_context_usage)
             if isinstance(exc, LLMStructuredOutputError):
                 failure_ambiguity = exc.code
                 parser_failure_category = exc.category
@@ -633,6 +648,7 @@ class ParserService:
                     "stage": exc.stage,
                     "http_status": exc.http_status,
                     "retryable": exc.retryable,
+                    "detail": str(exc),
                 }
             else:
                 failure_ambiguity = (

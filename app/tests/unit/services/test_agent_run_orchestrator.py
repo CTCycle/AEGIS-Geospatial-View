@@ -5,7 +5,11 @@ from datetime import UTC, datetime
 
 from server.domain.agent.decision import PolicyDecision
 from server.contracts.runs import AgentRunSnapshot, AgentRunState
-from server.contracts.chat import ChatOperationResult, ChatTurnResponse
+from server.contracts.chat import (
+    ChatOperationResult,
+    ChatTurnResponse,
+    ContextUsageResponse,
+)
 from server.contracts.events import RunEventType
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 
@@ -163,6 +167,14 @@ def _failed_response() -> ChatTurnResponse:
             status="failed",
             message="Configured parser model is unavailable.",
         ),
+        context_usage=ContextUsageResponse(
+            estimated_input_tokens=321,
+            selected_context_window=None,
+            model_context_limit=None,
+            usage_percent=None,
+            provider="opencode-go",
+            model="deepseek-v4-flash",
+        ),
     )
 
 
@@ -187,3 +199,40 @@ def test_execute_run_marks_failed_operation_as_failed_run() -> None:
     event_types = [event["type"] for event in publisher.events]
     assert RunEventType.ERROR in event_types
     assert RunEventType.COMPLETED not in event_types
+    error_event = next(
+        event for event in publisher.events if event["type"] == RunEventType.ERROR
+    )
+    assert error_event["payload"]["context_usage"]["estimated_input_tokens"] == 321
+
+
+###############################################################################
+def test_execute_run_includes_context_usage_in_clarification_event() -> None:
+    response = _failed_response().model_copy(
+        update={
+            "assistant_message": "Which location should I use?",
+            "operation": ChatOperationResult(
+                kind="clarification",
+                status="partial",
+                message="Which location should I use?",
+            ),
+        }
+    )
+    repository = _FakeRunRepository(_snapshot())
+    publisher = _FakeEventPublisher()
+    orchestrator = AgentRunOrchestrator(
+        agent_orchestrator=_FakeAgentOrchestrator(response),  # type: ignore[arg-type]
+        run_repository=repository,  # type: ignore[arg-type]
+        event_publisher=publisher,  # type: ignore[arg-type]
+        conversation_repository=object(),  # type: ignore[arg-type]
+    )
+
+    run_async_in_thread(orchestrator.execute_run("run_1"))
+
+    clarification_event = next(
+        event
+        for event in publisher.events
+        if event["type"] == RunEventType.CLARIFICATION_NEEDED
+    )
+    assert clarification_event["payload"]["context_usage"][
+        "estimated_input_tokens"
+    ] == 321

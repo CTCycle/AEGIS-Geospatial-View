@@ -11,6 +11,7 @@ from server.services.llm.types import ContextUsage, LLMRequest, ModelContextProf
 from server.prompts.context import build_compacted_history_summary
 
 CONTEXT_HEADROOM_TOKENS = 512
+RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY = "_response_schema_embedded_in_messages"
 
 
 ###############################################################################
@@ -174,7 +175,11 @@ def _context_components(
         if request.tools
         else 0
     )
-    schema_tokens = estimate_json_tokens(request.response_json_schema)
+    schema_tokens = (
+        0
+        if request.metadata.get(RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY) is True
+        else estimate_json_tokens(request.response_json_schema)
+    )
     limit = profile.context_window_tokens if profile is not None else None
     usable = (
         max(
@@ -470,6 +475,7 @@ def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:
                 "The system instructions, current turn, and required tool results exceed "
                 f"the usable prompt budget of {usable:,} tokens for {request.model}."
             ),
+            context_usage=usage.to_dict(),
         )
     metadata = dict(_request_metadata(request))
     metadata["_context_compaction_applied"] = compacted
@@ -487,5 +493,6 @@ def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:
                 "The required conversation context still exceeds the usable prompt budget "
                 f"of {prepared_usage.usable_prompt_budget_tokens:,} tokens for {request.model}."
             ),
+            context_usage=prepared_usage.to_dict(),
         )
     return prepared

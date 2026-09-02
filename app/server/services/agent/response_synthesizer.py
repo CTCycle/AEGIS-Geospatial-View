@@ -178,6 +178,9 @@ class GroundedResponseSynthesizer:
             ):
                 raise ValueError("Synthesis contradicted the verified operation state.")
         except LLMStructuredOutputError as exc:
+            usage = getattr(exc, "context_usage", None)
+            if is_json_object(usage):
+                self.last_context_usage = dict(usage)
             self.last_failure_category = exc.category
             self.last_failure_detail = exc.detail
             LOGGER.warning(
@@ -187,6 +190,9 @@ class GroundedResponseSynthesizer:
             )
             return fallback_text
         except LLMProviderRequestError as exc:
+            usage = getattr(exc, "context_usage", None)
+            if is_json_object(usage):
+                self.last_context_usage = dict(usage)
             self.last_failure_category = exc.category
             self.last_failure_detail = f"Provider request failed with code {exc.code}."
             LOGGER.warning(

@@ -6,7 +6,7 @@ from time import monotonic
 from server.domain.agent.extraction_schemas import LLMParserExtraction
 from server.prompts.parser import PARSER_SCHEMA_CORRECTION, build_parser_prompt
 from server.services.agent.parser_service import ParserService
-from server.services.llm.errors import LLMResponseParsingError
+from server.services.llm.errors import LLMProviderRequestError, LLMResponseParsingError
 
 
 ###############################################################################
@@ -392,3 +392,54 @@ def test_unexpected_parser_exception_has_categorized_provider_diagnostic() -> No
     assert result.provider_error is not None
     assert result.provider_error["code"] == "parser_unavailable"
     assert result.provider_error["category"] == "provider_api"
+
+
+###############################################################################
+def test_parser_failure_preserves_provider_context_usage() -> None:
+    context_usage = {
+        "estimated_input_tokens": 321,
+        "selected_context_window": None,
+        "model_context_limit": None,
+        "usage_percent": None,
+        "provider": "opencode-go",
+        "model": "deepseek-v4-flash",
+    }
+
+    class _TimeoutProvider:
+        calls = 0
+
+        def structured_output(self, request, schema):  # noqa: ANN001
+            _ = request, schema
+            self.calls += 1
+            raise LLMProviderRequestError(
+                provider="opencode-go",
+                model="deepseek-v4-flash",
+                stage="structured_output",
+                code="provider_timeout",
+                retryable=False,
+                context_usage=context_usage,
+            )
+
+    provider = _TimeoutProvider()
+
+    class _Factory:
+        def get_provider(self, provider_name: str) -> _TimeoutProvider:
+            _ = provider_name
+            return provider
+
+    result = ParserService(
+        llm_factory=_Factory(),  # type: ignore[arg-type]
+        settings_repo=object(),
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+    ).parse_turn_with_usage(
+        user_message="tell me what you can do",
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+
+    assert result.context_usage == context_usage
+    assert provider.calls == 1
+    assert result.turn_contract.provider_error is not None
+    assert result.turn_contract.provider_error["code"] == "provider_timeout"
+    assert result.turn_contract.provider_error["detail"]

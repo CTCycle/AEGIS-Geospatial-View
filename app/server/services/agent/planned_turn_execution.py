@@ -566,6 +566,9 @@ class PlannedTurnExecutionService:
                 "decision": decision.model_dump(mode="json"),
                 "operation": operation.model_dump(mode="json"),
                 "memory_snapshot": memory_snapshot,
+                "context_usage": context_usage.model_dump(mode="json")
+                if context_usage is not None
+                else None,
                 "previous_turn_contract": latest_contract,
                 "request_id": request_id,
             },

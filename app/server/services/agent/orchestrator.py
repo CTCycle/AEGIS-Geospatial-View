@@ -467,12 +467,12 @@ class AgentOrchestrator:
                 memory_snapshot=latest_memory,
                 conversation_messages=recent_messages,
                 provider_error={
-                    "code": "parser_timeout",
+                    "code": "provider_timeout",
                     "category": "provider_api",
                     "provider": settings.agent_model_provider,
                     "model": settings.agent_model_name,
                     "stage": "structured_intent_extraction",
-                    "retryable": True,
+                    "retryable": False,
                 },
             )
         turn_contract = self.turn_history_service.merge_memory_location_signals(
@@ -995,6 +995,9 @@ class AgentOrchestrator:
                 "decision": decision.model_dump(mode="json"),
                 "operation": operation.model_dump(mode="json"),
                 "memory_snapshot": memory_snapshot,
+                "context_usage": context_usage.model_dump(mode="json")
+                if context_usage is not None
+                else None,
                 "previous_turn_contract": latest_contract,
                 "request_id": request_id,
             },

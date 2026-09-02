@@ -27,6 +27,7 @@ class LLMStructuredOutputError(RuntimeError):
         retryable: bool = False,
         http_status: int | None = None,
         metadata: dict[str, Any] | None = None,
+        context_usage: dict[str, Any] | None = None,
     ) -> None:
         self.category = category
         self.provider = provider
@@ -37,6 +38,9 @@ class LLMStructuredOutputError(RuntimeError):
         self.retryable = retryable
         self.http_status = http_status
         self.metadata = dict(metadata or {})
+        self.context_usage = (
+            dict(context_usage) if context_usage is not None else None
+        )
         super().__init__(detail)
 
 
@@ -45,7 +49,15 @@ class LLMContextLimitError(LLMStructuredOutputError):
     """Raised when the selected model cannot accept the prepared context."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, provider: str, model: str, stage: str, detail: str) -> None:
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str,
+        stage: str,
+        detail: str,
+        context_usage: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(
             category="context_limit",
             provider=provider,
@@ -53,6 +65,7 @@ class LLMContextLimitError(LLMStructuredOutputError):
             stage=stage,
             code="context_limit_exceeded",
             detail=detail,
+            context_usage=context_usage,
         )
 
 
@@ -61,7 +74,15 @@ class LLMRequestSchemaError(LLMStructuredOutputError):
     """Raised for invalid local response schemas or native tool definitions."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, provider: str, model: str, stage: str, detail: str) -> None:
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str,
+        stage: str,
+        detail: str,
+        context_usage: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(
             category="schema_definition",
             provider=provider,
@@ -69,6 +90,7 @@ class LLMRequestSchemaError(LLMStructuredOutputError):
             stage=stage,
             code="invalid_schema_definition",
             detail=detail,
+            context_usage=context_usage,
         )
 
 
@@ -77,7 +99,15 @@ class LLMResponseParsingError(LLMStructuredOutputError):
     """Raised when a provider response cannot satisfy the requested schema."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, provider: str, model: str, stage: str, detail: str) -> None:
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str,
+        stage: str,
+        detail: str,
+        context_usage: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(
             category="response_parsing",
             provider=provider,
@@ -85,6 +115,7 @@ class LLMResponseParsingError(LLMStructuredOutputError):
             stage=stage,
             code="response_parsing_failed",
             detail=detail,
+            context_usage=context_usage,
         )
 
 
@@ -103,6 +134,7 @@ class LLMProviderRequestError(RuntimeError):
         http_status: int | None = None,
         retryable: bool = False,
         category: FailureCategory = "provider_api",
+        context_usage: dict[str, Any] | None = None,
     ) -> None:
         self.provider = provider
         self.model = model
@@ -111,6 +143,9 @@ class LLMProviderRequestError(RuntimeError):
         self.http_status = http_status
         self.retryable = retryable
         self.category = category
+        self.context_usage = (
+            dict(context_usage) if context_usage is not None else None
+        )
         detail = f"{provider} rejected {model} during {stage}"
         if http_status is not None:
             detail += f" (HTTP {http_status})"
@@ -119,7 +154,13 @@ class LLMProviderRequestError(RuntimeError):
     # -------------------------------------------------------------------------
     @classmethod
     def from_exception(
-        cls, exc: Exception, *, provider: str, model: str, stage: str
+        cls,
+        exc: Exception,
+        *,
+        provider: str,
+        model: str,
+        stage: str,
+        context_usage: dict[str, Any] | None = None,
     ) -> "LLMProviderRequestError":
         status = getattr(getattr(exc, "response", None), "status_code", None)
         if not isinstance(status, int):
@@ -171,6 +212,9 @@ class LLMProviderRequestError(RuntimeError):
         elif status == 429:
             code, retryable = "provider_rate_limited", True
             category = "provider_api"
+        elif cls._is_timeout_error(exc) or status in {408, 504, 524}:
+            code, retryable = "provider_timeout", False
+            category = "provider_api"
         elif isinstance(status, int) and status >= 500:
             code, retryable = "provider_unavailable", True
             category = "provider_api"
@@ -188,7 +232,26 @@ class LLMProviderRequestError(RuntimeError):
             http_status=status if isinstance(status, int) else None,
             retryable=retryable,
             category=category,
+            context_usage=context_usage,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_timeout_error(exc: Exception) -> bool:
+        current: BaseException | None = exc
+        for _ in range(4):
+            if current is None:
+                break
+            class_name = type(current).__name__.casefold()
+            detail = str(current).casefold()
+            if (
+                isinstance(current, TimeoutError)
+                or "timeout" in class_name
+                or "timed out" in detail
+            ):
+                return True
+            current = current.__cause__ or current.__context__
+        return False
 
     # -------------------------------------------------------------------------
     @staticmethod
