@@ -995,7 +995,7 @@
       "health_policy": "best_effort",
       "handler_name": null,
       "capability_kind": "analysis-tool",
-      "rendering_mode": "metadata-only",
+      "rendering_mode": "clustered-points",
       "health_status": "partial",
       "planner_hints": [
         "air-quality",
@@ -1022,7 +1022,7 @@
       "health_policy": "best_effort",
       "handler_name": null,
       "capability_kind": "analysis-tool",
-      "rendering_mode": "metadata-only",
+      "rendering_mode": "clustered-points",
       "health_status": "partial",
       "planner_hints": [
         "weather",
@@ -1047,7 +1047,7 @@
       "health_policy": "best_effort",
       "handler_name": null,
       "capability_kind": "analysis-tool",
-      "rendering_mode": "metadata-only",
+      "rendering_mode": "clustered-points",
       "health_status": "partial",
       "planner_hints": [
         "weather",

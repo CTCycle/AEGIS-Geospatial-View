@@ -50,7 +50,31 @@ class MapInspectionService:
         "period": "Period",
         "geography": "Geography",
         "source": "Source",
+        "temperature_2m": "Temperature",
+        "precipitation": "Precipitation",
+        "weather_code": "Weather code",
+        "relative_humidity_2m": "Relative humidity",
+        "surface_pressure": "Surface pressure",
+        "wind_speed_10m": "Wind speed",
+        "wind_direction_10m": "Wind direction",
+        "wind_gusts_10m": "Wind gusts",
+        "precipitation_probability": "Precipitation probability",
+        "pm2_5": "PM2.5",
+        "pm10": "PM10",
+        "carbon_monoxide": "Carbon monoxide",
+        "nitrogen_dioxide": "Nitrogen dioxide",
+        "ozone": "Ozone",
+        "sulphur_dioxide": "Sulphur dioxide",
+        "pressure": "Pressure",
+        "humidity": "Humidity",
         "license": "License",
+        "fetched_at": "Acquired",
+        "resolved_at": "Processed",
+        "result_status": "Result status",
+        "partial": "Partial data",
+        "timezone": "Time zone",
+        "latitude": "Latitude",
+        "longitude": "Longitude",
         "update_time": "Updated",
         "updated_at": "Updated",
         "updatedAt": "Updated",
@@ -67,6 +91,30 @@ class MapInspectionService:
         "forecastTime",
         "time",
         "freshness",
+        "temperature_2m",
+        "precipitation",
+        "weather_code",
+        "relative_humidity_2m",
+        "surface_pressure",
+        "wind_speed_10m",
+        "wind_direction_10m",
+        "wind_gusts_10m",
+        "precipitation_probability",
+        "pm2_5",
+        "pm10",
+        "carbon_monoxide",
+        "nitrogen_dioxide",
+        "ozone",
+        "sulphur_dioxide",
+        "pressure",
+        "humidity",
+        "fetched_at",
+        "resolved_at",
+        "result_status",
+        "partial",
+        "timezone",
+        "latitude",
+        "longitude",
     }
     _PLACE_KEYS = {"name", "label", "category", "address", "status", "provider"}
     _HAZARD_KEYS = {
@@ -158,9 +206,19 @@ class MapInspectionService:
         effective_keys = (
             allow_keys if allow_keys is not None else set(cls._FIELD_LABELS)
         )
-        for key, raw_value in payload.items():
+        flattened = dict(payload)
+        nested_metadata = payload.get("metadata")
+        if isinstance(nested_metadata, dict):
+            for key, raw_value in nested_metadata.items():
+                if key in effective_keys and key not in flattened:
+                    flattened[key] = raw_value
+        for key, raw_value in flattened.items():
             if key in cls._URL_KEYS:
                 source_url = source_url or cls._safe_url(raw_value)
+        units = flattened.get("units")
+        declared_units = units if isinstance(units, dict) else {}
+        for key, raw_value in flattened.items():
+            if key in cls._URL_KEYS:
                 continue
             if key not in effective_keys:
                 continue
@@ -172,13 +230,18 @@ class MapInspectionService:
                 "updated_at",
                 "updatedat",
                 "update_time",
+                "fetched_at",
+                "resolved_at",
             }:
                 freshness = str(value)
+            unit = declared_units.get(key)
+            unit_text = unit.strip() if isinstance(unit, str) and unit.strip() else None
             fields.append(
                 InspectionField(
                     key=key,
                     label=cls._FIELD_LABELS.get(key, key.replace("_", " ").title()),
                     value=value,
+                    unit=unit_text,
                     category=cls._field_category(key),
                     source_url=source_url,
                     order=len(fields),

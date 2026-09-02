@@ -21,6 +21,7 @@ from server.contracts.geospatial import (
     ProviderAuthType,
     RenderingMode,
 )
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
 type JsonDict = dict[str, Any]
 
@@ -456,9 +457,8 @@ def audit_all_manifests(
         manifest_items.append(
             (path, CapabilityManifestV2.model_validate(_read_json(path)))
         )
-    runtime_profiles = json_array(
-        _read_json(root / "runtime_profiles.json").get("profiles")
-    )
+    runtime_catalog = GeospatialManifestLoader(root).load_all()
+    runtime_profiles = json_array(runtime_catalog.get("runtime_profiles"))
     runtime_ids = {
         str(json_object(item).get("capability_id"))
         for item in runtime_profiles

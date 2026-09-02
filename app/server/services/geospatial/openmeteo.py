@@ -27,6 +27,36 @@ class OpenMeteoRequestError(OpenMeteoServiceError):
 
 ###############################################################################
 class OpenMeteoService:
+    WEATHER_VARIABLES = (
+        "temperature_2m",
+        "precipitation",
+        "weather_code",
+        "relative_humidity_2m",
+        "surface_pressure",
+        "wind_speed_10m",
+        "wind_direction_10m",
+        "wind_gusts_10m",
+        "precipitation_probability",
+    )
+    WEATHER_CURRENT_VARIABLES = (
+        "temperature_2m",
+        "precipitation",
+        "weather_code",
+        "relative_humidity_2m",
+        "surface_pressure",
+        "wind_speed_10m",
+        "wind_direction_10m",
+        "wind_gusts_10m",
+    )
+    AIR_QUALITY_VARIABLES = (
+        "pm10",
+        "pm2_5",
+        "carbon_monoxide",
+        "nitrogen_dioxide",
+        "ozone",
+        "sulphur_dioxide",
+    )
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -65,8 +95,8 @@ class OpenMeteoService:
         params = {
             "latitude": f"{latitude:.6f}",
             "longitude": f"{longitude:.6f}",
-            "hourly": "temperature_2m,precipitation,weather_code",
-            "current": "temperature_2m,precipitation,weather_code",
+            "hourly": ",".join(self.WEATHER_VARIABLES),
+            "current": ",".join(self.WEATHER_CURRENT_VARIABLES),
             "forecast_days": "3",
             "timezone": "auto",
         }
@@ -79,50 +109,55 @@ class OpenMeteoService:
         fetched_at = datetime.now(UTC).isoformat()
         hourly = json_object(payload.get("hourly"))
         timeline = list(hourly.get("time") or [])
-        temperature = list(hourly.get("temperature_2m") or [])
-        precipitation = list(hourly.get("precipitation") or [])
-        weather_code = list(hourly.get("weather_code") or [])
+        series = {
+            name: self._series(hourly.get(name)) for name in self.WEATHER_VARIABLES
+        }
         preview: list[dict[str, Any]] = []
         hourly_forecast: list[dict[str, Any]] = []
         for index in range(min(72, len(timeline))):
-            row = {
-                "time": timeline[index],
-                "temperature_2m": temperature[index]
-                if index < len(temperature)
-                else None,
-                "precipitation": precipitation[index]
-                if index < len(precipitation)
-                else None,
-                "weather_code": weather_code[index]
-                if index < len(weather_code)
-                else None,
-            }
+            row = {"time": timeline[index]}
+            row.update(
+                {
+                    name: values[index] if index < len(values) else None
+                    for name, values in series.items()
+                }
+            )
             hourly_forecast.append(row)
             if len(preview) >= 6:
                 continue
             preview.append(row)
+        current = json_object(payload.get("current"))
+        partial = self._is_partial(
+            timeline=timeline,
+            series=series,
+            current=current,
+            current_variables=self.WEATHER_CURRENT_VARIABLES,
+        )
+        result_status = self._result_status(
+            timeline=timeline,
+            current=current,
+            variables=self.WEATHER_CURRENT_VARIABLES,
+            partial=partial,
+        )
         return {
             "provider": "openmeteo",
             "kind": "weather_forecast",
             "source_url": self.weather_base_url,
             "fetched_at": fetched_at,
-            "result_status": "ok" if timeline else "valid_empty",
+            "result_status": result_status,
             "result_type": "metadata",
-            "partial": any(
-                len(values) < len(timeline)
-                for values in (temperature, precipitation, weather_code)
-            ),
+            "partial": partial,
             "latitude": latitude,
             "longitude": longitude,
             "timezone": payload.get("timezone"),
-            "current": payload.get("current")
-            if is_json_object(payload.get("current"))
-            else {},
+            "current": current,
             "hourly_preview": preview,
             "hourly_forecast": hourly_forecast,
             "resolved_at": fetched_at,
-            "observation_time": json_object(payload.get("current")).get("time"),
+            "observation_time": current.get("time"),
             "units": self._units(payload),
+            "requested_variables": list(self.WEATHER_VARIABLES),
+            "request_parameters": dict(params),
             "spatial_resolution": "point forecast",
             "coverage": {
                 "type": "point",
@@ -153,12 +188,7 @@ class OpenMeteoService:
         hourly = json_object(payload.get("hourly"))
         timeline = list(hourly.get("time") or [])
         pollutants = {
-            "pm2_5": list(hourly.get("pm2_5") or []),
-            "pm10": list(hourly.get("pm10") or []),
-            "nitrogen_dioxide": list(hourly.get("nitrogen_dioxide") or []),
-            "ozone": list(hourly.get("ozone") or []),
-            "sulphur_dioxide": list(hourly.get("sulphur_dioxide") or []),
-            "carbon_monoxide": list(hourly.get("carbon_monoxide") or []),
+            name: self._series(hourly.get(name)) for name in self.AIR_QUALITY_VARIABLES
         }
         preview: list[dict[str, Any]] = []
         for index in range(min(6, len(timeline))):
@@ -166,16 +196,18 @@ class OpenMeteoService:
             for key, values in pollutants.items():
                 row[key] = values[index] if index < len(values) else None
             preview.append(row)
+        partial = any(len(values) < len(timeline) for values in pollutants.values())
+        result_status = "ok" if timeline else "valid_empty"
+        if partial and timeline:
+            result_status = "partial"
         return {
             "provider": "openmeteo",
             "kind": "air_quality_forecast",
             "source_url": self.air_quality_base_url,
             "fetched_at": fetched_at,
-            "result_status": "ok" if timeline else "valid_empty",
+            "result_status": result_status,
             "result_type": "metadata",
-            "partial": any(
-                len(values) < len(timeline) for values in pollutants.values()
-            ),
+            "partial": partial,
             "latitude": latitude,
             "longitude": longitude,
             "timezone": payload.get("timezone"),
@@ -183,6 +215,8 @@ class OpenMeteoService:
             "resolved_at": fetched_at,
             "observation_time": preview[0].get("time") if preview else None,
             "units": self._units(payload),
+            "requested_variables": list(self.AIR_QUALITY_VARIABLES),
+            "request_parameters": dict(params),
             "spatial_resolution": "point forecast",
             "coverage": {
                 "type": "point",
@@ -202,6 +236,47 @@ class OpenMeteoService:
                 if isinstance(name, str) and isinstance(unit, str) and unit.strip():
                     units.setdefault(name, unit.strip())
         return units
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _series(value: object) -> list[Any]:
+        return list(value) if isinstance(value, list) else []
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_partial(
+        *,
+        timeline: list[Any],
+        series: dict[str, list[Any]],
+        current: dict[str, Any],
+        current_variables: tuple[str, ...],
+    ) -> bool:
+        has_current_data = any(
+            current.get(name) is not None for name in current_variables
+        )
+        if not timeline and not has_current_data:
+            return False
+        if timeline and any(len(values) < len(timeline) for values in series.values()):
+            return True
+        return any(
+            name not in current or current.get(name) is None
+            for name in current_variables
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _result_status(
+        *,
+        timeline: list[Any],
+        current: dict[str, Any],
+        variables: tuple[str, ...],
+        partial: bool,
+    ) -> str:
+        if timeline:
+            return "partial" if partial else "ok"
+        if any(current.get(name) is not None for name in variables):
+            return "partial"
+        return "valid_empty"
 
     # -------------------------------------------------------------------------
     def _get_json(
