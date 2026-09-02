@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import pytest
+
 from server.prompts.context import build_compacted_history_summary
+from server.services.llm.errors import LLMContextLimitError
 from server.services.llm.context_budget import (
+    RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY,
     apply_reported_usage,
     compute_context_usage,
     compute_ollama_context_usage,
+    estimate_message_tokens,
     prepare_request,
     resolve_model_context_limit,
     resolve_model_context_profile,
@@ -121,6 +126,32 @@ def test_complete_request_counts_messages_tools_and_response_schema_before_compa
 
 
 ###############################################################################
+def test_embedded_response_schema_is_counted_once_as_a_message() -> None:
+    messages = [
+        {"role": "system", "content": "Extract the requested object."},
+        {
+            "role": "system",
+            "content": '{"type":"object","properties":{"answer":{"type":"string"}}}',
+        },
+        {"role": "user", "content": "Hello"},
+    ]
+    request = LLMRequest(
+        model="deepseek-v4-flash",
+        messages=messages,
+        response_json_schema={
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+        },
+        metadata={RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY: True},
+    )
+
+    usage = compute_context_usage(request, provider="opencode-go")
+
+    assert usage.response_schema_tokens == 0
+    assert usage.estimated_input_tokens == estimate_message_tokens(messages)
+
+
+###############################################################################
 def test_provider_reported_input_and_output_replace_estimate_without_losing_it() -> None:
     usage = compute_context_usage(
         _request(
@@ -225,3 +256,23 @@ def test_prepare_request_does_not_invent_limit_for_unknown_model() -> None:
     prepared = prepare_request(request, provider="test")
 
     assert prepared.messages == request.messages
+
+
+###############################################################################
+def test_context_limit_failure_preserves_preflight_usage() -> None:
+    request = _request(
+        "x" * 100_000,
+        model="bounded-model",
+        metadata={
+            "context_window_tokens": 1024,
+            "maximum_output_tokens": 256,
+            "context_profile_source": "provider_metadata",
+        },
+    )
+
+    with pytest.raises(LLMContextLimitError) as error:
+        prepare_request(request, provider="test")
+
+    assert error.value.context_usage is not None
+    assert error.value.context_usage["estimated_input_tokens"] > 0
+    assert error.value.context_usage["usable_prompt_budget_tokens"] == 256

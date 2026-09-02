@@ -529,7 +529,11 @@ class OllamaProvider(LLMProvider):
         usage = compute_context_usage(
             effective_request, provider=self.provider_name
         )
-        self._validate_request_capabilities(effective_request)
+        try:
+            self._validate_request_capabilities(effective_request)
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
         payload: dict[str, Any] = {
             "model": effective_request.model,
             "messages": effective_request.messages,
@@ -558,6 +562,7 @@ class OllamaProvider(LLMProvider):
                 provider=self.provider_name,
                 model=effective_request.model,
                 stage="chat",
+                context_usage=usage.to_dict(),
             ) from exc
         usage = apply_reported_usage(usage, response)
         message = json_object(response.get("message"))
@@ -608,6 +613,7 @@ class OllamaProvider(LLMProvider):
                     provider=self.provider_name,
                     model=request.model,
                     stage="stream",
+                    context_usage=usage.to_dict(),
                 ) from exc
 
         stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
@@ -625,8 +631,12 @@ class OllamaProvider(LLMProvider):
             replace(request, response_json_schema=schema_json),
             provider=self.provider_name,
         )
-        self._validate_request_capabilities(effective_request)
         usage = compute_context_usage(effective_request, provider=self.provider_name)
+        try:
+            self._validate_request_capabilities(effective_request)
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
         payload: dict[str, Any] = {
             "model": effective_request.model,
             "messages": effective_request.messages,
@@ -651,6 +661,7 @@ class OllamaProvider(LLMProvider):
                 provider=self.provider_name,
                 model=effective_request.model,
                 stage="structured_output",
+                context_usage=usage.to_dict(),
             ) from exc
         usage = apply_reported_usage(usage, response)
         message = json_object(response.get("message"))
@@ -663,6 +674,7 @@ class OllamaProvider(LLMProvider):
                 model=effective_request.model,
                 stage="structured_output",
                 detail="The provider returned invalid JSON for structured extraction.",
+                context_usage=usage.to_dict(),
             ) from exc
         if not is_json_object(loaded):
             raise LLMResponseParsingError(
@@ -670,6 +682,7 @@ class OllamaProvider(LLMProvider):
                 model=effective_request.model,
                 stage="structured_output",
                 detail="The provider returned a JSON value instead of an object.",
+                context_usage=usage.to_dict(),
             )
         validator = getattr(schema, "model_validate", None)
         if callable(validator):
@@ -681,6 +694,7 @@ class OllamaProvider(LLMProvider):
                     model=effective_request.model,
                     stage="structured_output",
                     detail="The provider response did not match the requested extraction schema.",
+                    context_usage=usage.to_dict(),
                 ) from exc
             dumper = getattr(validated, "model_dump", None)
             if callable(dumper):

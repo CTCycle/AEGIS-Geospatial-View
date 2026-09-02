@@ -265,6 +265,9 @@ class AgentTurnStateAssembler:
                 "decision": decision.model_dump(mode="json"),
                 "operation": operation.model_dump(mode="json"),
                 "memory_snapshot": updated_memory,
+                "context_usage": context_usage.model_dump(mode="json")
+                if context_usage is not None
+                else None,
                 "request_id": request_id,
             },
             map_session=map_session.model_dump(mode="json") if map_session else None,
@@ -364,6 +367,9 @@ class AgentTurnStateAssembler:
                 "decision": decision.model_dump(mode="json"),
                 "operation": operation.model_dump(mode="json"),
                 "memory_snapshot": memory_snapshot,
+                "context_usage": context_usage.model_dump(mode="json")
+                if context_usage is not None
+                else None,
                 "request_id": request_id,
             },
             tool_payload=tool_payload,

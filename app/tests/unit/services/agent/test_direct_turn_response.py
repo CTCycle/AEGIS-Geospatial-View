@@ -10,6 +10,7 @@ from server.domain.agent.decision import (
     PolicyDecision,
 )
 from server.domain.agent.pipeline import ConversationTaskRecord, TaskFailureDetail
+from server.contracts.chat import ContextUsageResponse
 from server.contracts.extraction import (
     ContextQuery,
     ConversationContextSnapshot,
@@ -373,5 +374,56 @@ def test_parser_failure_is_terminal_for_context_looking_summary_request() -> Non
         assert response.operation.kind == "error"
         assert response.operation.status == "failed"
         assert response.failure_diagnostic is not None
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_provider_timeout_failure_persists_context_usage() -> None:
+    async def _run() -> None:
+        service, state, history = _service()
+        context_usage = ContextUsageResponse(
+            estimated_input_tokens=321,
+            selected_context_window=None,
+            model_context_limit=None,
+            usage_percent=None,
+            provider="opencode-go",
+            model="deepseek-v4-flash",
+        )
+        turn = _turn(
+            user_text="tell me what you can do",
+            ambiguities=["provider_timeout"],
+        ).model_copy(
+            update={
+                "provider_error": {
+                    "code": "provider_timeout",
+                    "category": "provider_api",
+                    "provider": "opencode-go",
+                    "model": "deepseek-v4-flash",
+                    "stage": "structured_output",
+                    "retryable": False,
+                    "detail": "opencode-go rejected deepseek-v4-flash during structured_output.",
+                },
+                "failure_category": "provider_api",
+            }
+        )
+        response = await service.handle(
+            request_id="request-provider-timeout",
+            conversation_id="conversation",
+            conversation_key="conversation",
+            task=_task(state, turn),
+            turn_contract=turn,
+            latest_memory={},
+            latest_contract=None,
+            recent_messages=[],
+            context_usage=context_usage,
+        )
+
+        assert response is not None
+        assert response.context_usage == context_usage
+        assert "timed out" in response.assistant_message
+        assert history.messages[-1]["structured_payload"]["context_usage"] == (
+            context_usage.model_dump(mode="json")
+        )
 
     run_async_in_thread(_run())

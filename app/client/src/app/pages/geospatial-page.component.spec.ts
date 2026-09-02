@@ -432,10 +432,24 @@ describe('pages/geospatial-page.component', () => {
       type: 'error',
       timestamp: new Date().toISOString(),
       visibility: 'user',
-      payload: { message: 'Provider timed out.' },
+      payload: {
+        message: 'Provider timed out.',
+        context_usage: {
+          estimated_input_tokens: 321,
+          selected_context_window: null,
+          model_context_limit: null,
+          usage_percent: null,
+          provider: 'opencode-go',
+          model: 'deepseek-v4-flash',
+          usage_source: 'estimated',
+        },
+      },
     });
     expect(component.messages.length).toBe(1);
     expect(component.status).toBe('Agent needs attention');
+    expect(component.contextUsage?.estimated_input_tokens).toBe(321);
+    expect(component.contextUsageLabel).toBe('~321 tokens');
+    expect(component.contextUsageDetail).toContain('limit unavailable');
     expect(component.agentReadiness).toEqual({
       status: 'needs_attention',
       label: 'Needs attention',

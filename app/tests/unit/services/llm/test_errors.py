@@ -21,6 +21,46 @@ def test_provider_connection_errors_are_retryable() -> None:
 
 
 ###############################################################################
+def test_provider_timeouts_are_terminal_and_preserve_context_usage() -> None:
+    context_usage = {
+        "estimated_input_tokens": 321,
+        "selected_context_window": None,
+        "model_context_limit": None,
+        "usage_percent": None,
+        "provider": "opencode-go",
+        "model": "deepseek-v4-flash",
+    }
+
+    error = LLMProviderRequestError.from_exception(
+        TimeoutError("request timed out"),
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+        stage="structured_output",
+        context_usage=context_usage,
+    )
+
+    assert error.code == "provider_timeout"
+    assert error.retryable is False
+    assert error.context_usage == context_usage
+
+
+###############################################################################
+def test_gateway_timeout_is_terminal_and_not_retryable() -> None:
+    class _GatewayTimeout(Exception):
+        response = SimpleNamespace(status_code=504)
+
+    error = LLMProviderRequestError.from_exception(
+        _GatewayTimeout("upstream gateway timeout"),
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+        stage="structured_output",
+    )
+
+    assert error.code == "provider_timeout"
+    assert error.retryable is False
+
+
+###############################################################################
 def test_non_transient_provider_errors_are_not_retryable() -> None:
     error = LLMProviderRequestError.from_exception(
         ValueError("invalid request"),

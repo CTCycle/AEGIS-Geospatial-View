@@ -27,6 +27,13 @@ class DirectTurnResponseService:
             or (provider_error or {}).get("category")
             or "provider_api"
         )
+        code = str((provider_error or {}).get("code") or "")
+        if category == "provider_api" and code == "provider_timeout":
+            return (
+                "The agent provider timed out before returning a structured response. "
+                "Check the provider service and retry the same model.",
+                category,
+            )
         details = str((provider_error or {}).get("detail") or "").strip()
         suffix = f" Detail: {details}" if details else ""
         messages = {
@@ -193,6 +200,9 @@ class DirectTurnResponseService:
                     "decision": decision.model_dump(mode="json"),
                     "operation": operation.model_dump(mode="json"),
                     "memory_snapshot": latest_memory,
+                    "context_usage": context_usage.model_dump(mode="json")
+                    if context_usage is not None
+                    else None,
                     "request_id": request_id,
                 },
             )
@@ -247,6 +257,9 @@ class DirectTurnResponseService:
                     "decision": None,
                     "operation": operation.model_dump(mode="json"),
                     "memory_snapshot": latest_memory,
+                    "context_usage": context_usage.model_dump(mode="json")
+                    if context_usage is not None
+                    else None,
                     "previous_turn_contract": latest_contract,
                     "request_id": request_id,
                 },
@@ -333,6 +346,9 @@ class DirectTurnResponseService:
                 "decision": preflight_decision.model_dump(mode="json"),
                 "operation": operation.model_dump(mode="json"),
                 "memory_snapshot": latest_memory,
+                "context_usage": context_usage.model_dump(mode="json")
+                if context_usage is not None
+                else None,
                 "previous_turn_contract": latest_contract,
                 "request_id": request_id,
             },
@@ -396,6 +412,9 @@ class DirectTurnResponseService:
                 "decision": decision.model_dump(mode="json"),
                 "operation": operation.model_dump(mode="json"),
                 "memory_snapshot": latest_memory,
+                "context_usage": context_usage.model_dump(mode="json")
+                if context_usage is not None
+                else None,
                 "previous_turn_contract": latest_contract,
                 "request_id": request_id,
             },

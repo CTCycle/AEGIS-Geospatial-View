@@ -776,6 +776,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.status = 'Agent needs attention';
         this.progressLabel = undefined;
         {
+          const parsed = parseRunCompletionPayload(event.payload);
+          this.applyContextUsage(parsed.contextUsage, true);
           const message = String(event.payload['message'] ?? 'Failed');
           this.agentReadiness = {
             status: 'needs_attention',
@@ -861,13 +863,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (parsed.memorySnapshot !== undefined) {
       this.memorySnapshot = parsed.memorySnapshot;
     }
-    if (parsed.contextUsage !== undefined) {
-      const failedTurn = parsed.operation?.status === 'failed'
-        || parsed.operation?.status === 'partial';
-      if (parsed.contextUsage !== null && (!failedTurn || !this.hasMeasuredContextUsage())) {
-        this.contextUsage = parsed.contextUsage;
-      }
-    }
+    const failedTurn = parsed.operation?.status === 'failed'
+      || parsed.operation?.status === 'partial';
+    this.applyContextUsage(parsed.contextUsage, failedTurn);
   }
 
   private readString(value: unknown): string | undefined {
@@ -876,6 +874,16 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   private readNumber(value: unknown): number | undefined {
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  }
+
+  private applyContextUsage(
+    usage: ContextUsage | null | undefined,
+    failedTurn: boolean,
+  ): void {
+    if (usage !== null && usage !== undefined
+      && (!failedTurn || !this.hasMeasuredContextUsage())) {
+      this.contextUsage = usage;
+    }
   }
 
   private newClientRequestId(): string {
@@ -902,11 +910,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.lastOperation = operation;
     this.memorySnapshot = result.memory_snapshot ?? {};
     const failedTurn = operation?.status === 'failed' || operation?.status === 'partial';
-    if (result.context_usage !== null
-      && result.context_usage !== undefined
-      && (!failedTurn || !this.hasMeasuredContextUsage())) {
-      this.contextUsage = result.context_usage;
-    }
+    this.applyContextUsage(result.context_usage, failedTurn);
     this.assistantDraft = '';
     this.status = 'Agent ready';
     this.progressPercent = 100;

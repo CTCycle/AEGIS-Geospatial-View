@@ -15,11 +15,13 @@ from server.services.llm.context_budget import (
     apply_reported_usage,
     compute_context_usage,
     prepare_request,
+    RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY,
 )
 from server.prompts.providers import build_deepseek_json_schema_instruction
 from server.services.llm.errors import (
     LLMProviderRequestError,
     LLMResponseParsingError,
+    LLMStructuredOutputError,
 )
 from server.services.llm.response_serialization import dump_response_payload
 from server.services.llm.request_deadline import remaining_request_seconds
@@ -65,8 +67,31 @@ class DeepSeekProvider(LLMProvider):
             raise TimeoutError("The bounded LLM request deadline has expired.")
         with_options = getattr(client, "with_options", None)
         if callable(with_options):
-            return with_options(timeout=min(30.0, remaining))
+            return with_options(timeout=remaining)
         return client
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _request_max_tokens(request: LLMRequest) -> int | None:
+        def positive_int(value: object) -> int | None:
+            if isinstance(value, bool):
+                return None
+            try:
+                parsed = int(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return None
+            return parsed if parsed > 0 else None
+
+        metadata = request.metadata
+        configured = positive_int(
+            metadata.get("max_tokens")
+            or metadata.get("max_output_tokens")
+            or metadata.get("max_completion_tokens")
+        )
+        maximum = positive_int(metadata.get("maximum_output_tokens"))
+        if configured is None:
+            return None
+        return min(configured, maximum) if maximum is not None else configured
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
@@ -145,10 +170,14 @@ class DeepSeekProvider(LLMProvider):
     ) -> LLMResult:
         native_tools = list(tools or request.tools or [])
         schema = response_json_schema or request.response_json_schema
+        metadata = dict(request.metadata)
+        if schema and not native_tools:
+            metadata[RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY] = True
         effective_request = replace(
             request,
             tools=native_tools or None,
             response_json_schema=schema,
+            metadata=metadata,
         )
         if schema and not native_tools:
             effective_request = replace(
@@ -161,8 +190,15 @@ class DeepSeekProvider(LLMProvider):
             effective_request, provider=self.provider_name
         )
         usage = compute_context_usage(effective_request, provider=self.provider_name)
-        self._validate_request_capabilities(effective_request)
+        try:
+            self._validate_request_capabilities(effective_request)
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
         kwargs: dict[str, Any] = {}
+        max_tokens = self._request_max_tokens(effective_request)
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
         if native_tools:
             kwargs["tools"] = [
                 self.tool_to_openai_schema(tool) for tool in native_tools
@@ -180,7 +216,11 @@ class DeepSeekProvider(LLMProvider):
             )
         except Exception as exc:
             raise LLMProviderRequestError.from_exception(
-                exc, provider=self.provider_name, model=request.model, stage="chat"
+                exc,
+                provider=self.provider_name,
+                model=request.model,
+                stage="chat",
+                context_usage=usage.to_dict(),
             ) from exc
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
@@ -202,6 +242,7 @@ class DeepSeekProvider(LLMProvider):
         def iterate() -> Iterable[str]:
             nonlocal usage
             try:
+                max_tokens = self._request_max_tokens(request)
                 response_stream = self._client_for_request(
                     request
                 ).chat.completions.create(
@@ -210,6 +251,7 @@ class DeepSeekProvider(LLMProvider):
                     temperature=request.temperature,
                     stream=True,
                     stream_options={"include_usage": True},
+                    **({"max_tokens": max_tokens} if max_tokens is not None else {}),
                 )
                 for chunk in response_stream:
                     remaining = remaining_request_seconds(request)
@@ -238,6 +280,7 @@ class DeepSeekProvider(LLMProvider):
                     provider=self.provider_name,
                     model=request.model,
                     stage="stream",
+                    context_usage=usage.to_dict(),
                 ) from exc
 
         stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
@@ -251,25 +294,34 @@ class DeepSeekProvider(LLMProvider):
         json_schema = (
             json_object(model_json_schema()) if callable(model_json_schema) else {}
         )
+        metadata = dict(request.metadata)
+        metadata[RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY] = True
         request = prepare_request(
             replace(
                 request,
                 response_json_schema=json_schema,
                 messages=self._messages_with_json_schema(request.messages, json_schema),
+                metadata=metadata,
             ),
             provider=self.provider_name,
         )
         usage = compute_context_usage(request, provider=self.provider_name)
-        self._validate_request_capabilities(
-            replace(request, response_json_schema=json_schema)
-        )
         try:
+            self._validate_request_capabilities(
+                replace(request, response_json_schema=json_schema)
+            )
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
+        try:
+            max_tokens = self._request_max_tokens(request)
             response = self._client_for_request(request).chat.completions.create(
                 model=request.model,
                 messages=self.normalize_tool_messages(request.messages),
                 temperature=request.temperature,
                 response_format={"type": "json_object"},
                 stream=False,
+                **({"max_tokens": max_tokens} if max_tokens is not None else {}),
             )
         except Exception as exc:
             raise LLMProviderRequestError.from_exception(
@@ -277,6 +329,7 @@ class DeepSeekProvider(LLMProvider):
                 provider=self.provider_name,
                 model=request.model,
                 stage="structured_output",
+                context_usage=usage.to_dict(),
             ) from exc
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
@@ -289,6 +342,7 @@ class DeepSeekProvider(LLMProvider):
                 model=request.model,
                 stage="structured_output",
                 detail="The provider returned invalid JSON for structured extraction.",
+                context_usage=usage.to_dict(),
             ) from exc
         if not is_json_object(loaded):
             raise LLMResponseParsingError(
@@ -296,6 +350,7 @@ class DeepSeekProvider(LLMProvider):
                 model=request.model,
                 stage="structured_output",
                 detail="The provider returned a JSON value instead of an object.",
+                context_usage=usage.to_dict(),
             )
         validator = getattr(schema, "model_validate", None)
         if not callable(validator):
@@ -308,6 +363,7 @@ class DeepSeekProvider(LLMProvider):
                 model=request.model,
                 stage="structured_output",
                 detail="The provider response did not match the requested extraction schema.",
+                context_usage=usage.to_dict(),
             ) from exc
         dumper = getattr(validated, "model_dump", None)
         payload = json_object(dumper(mode="json")) if callable(dumper) else loaded

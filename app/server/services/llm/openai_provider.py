@@ -62,7 +62,7 @@ class OpenAIProvider(LLMProvider):
             raise TimeoutError("The bounded LLM request deadline has expired.")
         with_options = getattr(client, "with_options", None)
         if callable(with_options):
-            return with_options(timeout=min(30.0, remaining))
+            return with_options(timeout=remaining)
         return client
 
     # -------------------------------------------------------------------------
@@ -238,7 +238,11 @@ class OpenAIProvider(LLMProvider):
             effective_request, provider=self.provider_name
         )
         usage = compute_context_usage(effective_request, provider=self.provider_name)
-        self._validate_request_capabilities(effective_request)
+        try:
+            self._validate_request_capabilities(effective_request)
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
         kwargs: dict[str, Any] = {}
         if native_tools:
             kwargs["tools"] = [
@@ -265,7 +269,11 @@ class OpenAIProvider(LLMProvider):
             raise
         except Exception as exc:
             raise LLMProviderRequestError.from_exception(
-                exc, provider=self.provider_name, model=request.model, stage="chat"
+                exc,
+                provider=self.provider_name,
+                model=request.model,
+                stage="chat",
+                context_usage=usage.to_dict(),
             ) from exc
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
@@ -316,6 +324,7 @@ class OpenAIProvider(LLMProvider):
                     provider=self.provider_name,
                     model=request.model,
                     stage="stream",
+                    context_usage=usage.to_dict(),
                 ) from exc
 
         stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
@@ -332,9 +341,13 @@ class OpenAIProvider(LLMProvider):
             provider=self.provider_name,
         )
         usage = compute_context_usage(request, provider=self.provider_name)
-        self._validate_request_capabilities(
-            replace(request, response_json_schema=request_schema)
-        )
+        try:
+            self._validate_request_capabilities(
+                replace(request, response_json_schema=request_schema)
+            )
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
         try:
             response = self._client_for_request(request).responses.parse(
                 model=request.model,
@@ -350,6 +363,7 @@ class OpenAIProvider(LLMProvider):
                 provider=self.provider_name,
                 model=request.model,
                 stage="structured_output",
+                context_usage=usage.to_dict(),
             ) from exc
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
@@ -372,6 +386,7 @@ class OpenAIProvider(LLMProvider):
                     model=request.model,
                     stage="structured_output",
                     detail="The provider returned invalid JSON for structured extraction.",
+                    context_usage=usage.to_dict(),
                 ) from exc
             if not is_json_object(loaded):
                 raise LLMResponseParsingError(
@@ -379,6 +394,7 @@ class OpenAIProvider(LLMProvider):
                     model=request.model,
                     stage="structured_output",
                     detail="The provider returned a JSON value instead of an object.",
+                    context_usage=usage.to_dict(),
                 )
             return LLMStructuredOutput(loaded, context_usage=usage.to_dict())
         return LLMStructuredOutput({}, context_usage=usage.to_dict())

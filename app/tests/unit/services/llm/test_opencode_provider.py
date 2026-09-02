@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import pytest
 from pydantic import BaseModel
 
 from server.services.llm.opencode_provider import (
@@ -10,6 +11,7 @@ from server.services.llm.opencode_provider import (
     OPENCODE_PROVIDER,
     OpenCodeProvider,
 )
+from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.types import LLMRequest
 
 
@@ -36,12 +38,25 @@ class _Response:
 ###############################################################################
 class _Completions:
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
+    def __init__(self, error: Exception | None = None) -> None:
         self.calls: list[dict[str, object]] = []
+        self.error = error
 
     # -------------------------------------------------------------------------
     def create(self, **kwargs):  # noqa: ANN003, ANN201
         self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        if kwargs.get("stream") is True:
+            return [
+                SimpleNamespace(
+                    choices=[
+                        SimpleNamespace(
+                            delta=SimpleNamespace(content="streamed")
+                        )
+                    ]
+                )
+            ]
         message = SimpleNamespace(
             content=json.dumps({"answer": "structured"}),
             tool_calls=[],
@@ -54,9 +69,15 @@ class _Completions:
 ###############################################################################
 class _Client:
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        self.completions = _Completions()
+    def __init__(self, error: Exception | None = None) -> None:
+        self.completions = _Completions(error)
         self.chat = SimpleNamespace(completions=self.completions)
+        self.timeout_options: list[dict[str, object]] = []
+
+    # -------------------------------------------------------------------------
+    def with_options(self, **kwargs):  # noqa: ANN003, ANN201
+        self.timeout_options.append(kwargs)
+        return self
 
 
 ###############################################################################
@@ -103,7 +124,7 @@ def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
 ###############################################################################
 def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -> None:
     client = _Client()
-    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_PROVIDER)
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
     monkeypatch.setattr(provider, "_client", lambda: client)
     request = LLMRequest(
         model="deepseek-v4-flash",
@@ -111,6 +132,7 @@ def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -
             {"role": "system", "content": "Extract the answer."},
             {"role": "user", "content": "Hello"},
         ],
+        metadata={"max_tokens": 123},
     )
 
     result = provider.structured_output(request, schema=_StructuredPayload)
@@ -118,4 +140,80 @@ def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -
     assert result == {"answer": "structured"}
     call = client.completions.calls[0]
     assert call["response_format"] == {"type": "json_object"}
+    assert call["max_tokens"] == 123
     assert "JSON schema" in call["messages"][-1]["content"]
+    assert result.context_usage["response_schema_tokens"] == 0
+
+
+###############################################################################
+def test_chat_forwards_bounded_output_tokens(monkeypatch) -> None:
+    client = _Client()
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+    monkeypatch.setattr(provider, "_client", lambda: client)
+    request = LLMRequest(
+        model="deepseek-v4-flash",
+        messages=[{"role": "user", "content": "Hello"}],
+        metadata={"max_tokens": 77},
+    )
+
+    provider.chat(request)
+
+    assert client.completions.calls[0]["max_tokens"] == 77
+
+
+###############################################################################
+def test_stream_forwards_bounded_output_tokens(monkeypatch) -> None:
+    client = _Client()
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+    monkeypatch.setattr(provider, "_client", lambda: client)
+    request = LLMRequest(
+        model="deepseek-v4-flash",
+        messages=[{"role": "user", "content": "Hello"}],
+        metadata={"max_tokens": 88},
+    )
+
+    assert list(provider.stream_chat(request)) == ["streamed"]
+    assert client.completions.calls[0]["max_tokens"] == 88
+
+
+###############################################################################
+def test_bounded_deadline_is_forwarded_without_the_old_thirty_second_cap(
+    monkeypatch,
+) -> None:
+    client = _Client()
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+    monkeypatch.setattr(provider, "_client", lambda: client)
+    monkeypatch.setattr(
+        "server.services.llm.deepseek_provider.remaining_request_seconds",
+        lambda request: 47.5,
+    )
+
+    provider._client_for_request(
+        LLMRequest(
+            model="deepseek-v4-flash",
+            messages=[{"role": "user", "content": "Hello"}],
+        )
+    )
+
+    assert client.timeout_options == [{"timeout": 47.5}]
+
+
+###############################################################################
+def test_timeout_failure_keeps_preflight_context_usage(monkeypatch) -> None:
+    client = _Client(TimeoutError("completion timed out"))
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+    monkeypatch.setattr(provider, "_client", lambda: client)
+    request = LLMRequest(
+        model="deepseek-v4-flash",
+        messages=[{"role": "user", "content": "Hello"}],
+        metadata={"max_tokens": 123},
+    )
+
+    with pytest.raises(LLMProviderRequestError) as error:
+        provider.structured_output(request, schema=_StructuredPayload)
+
+    assert error.value.code == "provider_timeout"
+    assert error.value.retryable is False
+    assert error.value.context_usage is not None
+    assert error.value.context_usage["estimated_input_tokens"] > 0
+    assert error.value.context_usage["response_schema_tokens"] == 0
