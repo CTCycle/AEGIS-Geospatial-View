@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from tests.conftest import run_async_in_thread
 
 import pytest
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
+from server.domain.geospatial.providers import ProviderResponse
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.search.request_builder import RequestBuilder
 
@@ -37,6 +41,107 @@ def _request():
             confidence=1.0,
         ),
     )
+
+
+def _sanremo_request():
+    return RequestBuilder().build_location_search_request(
+        ExecutionPlan(
+            state="map_search",
+            action_id="map_search",
+            basemap_id="osm_default",
+            overlay_ids=["openmeteo_pressure_humidity_wind"],
+        ),
+        ResolvedLocation(
+            label="Sanremo",
+            latitude=43.817,
+            longitude=7.777,
+            confidence=1.0,
+        ),
+    )
+
+
+class _SanremoWeatherProvider:
+    provider_id = "openmeteo"
+
+    async def fetch(self, request):  # noqa: ANN001
+        return ProviderResponse(
+            capability_id=request.capability_id,
+            provider_id=self.provider_id,
+            payload={
+                "features": [
+                    {
+                        "id": "sanremo-weather",
+                        "name": "Sanremo",
+                        "latitude": 43.817,
+                        "longitude": 7.777,
+                        "relative_humidity_2m": 68,
+                        "surface_pressure": 1011,
+                        "wind_speed_10m": 5.2,
+                        "metadata": {
+                            "forecastTime": "2026-09-02T10:00",
+                        },
+                    }
+                ],
+                "requested_variables": ["relative_humidity_2m"],
+                "request_parameters": {"latitude": 43.817, "longitude": 7.777},
+            },
+            fetched_at=datetime(2026, 9, 2, 9, tzinfo=UTC),
+            result_status="ok",
+            result_type="features",
+            observation_time="2026-09-02T09:00",
+            units={
+                "relative_humidity_2m": "%",
+                "surface_pressure": "hPa",
+                "wind_speed_10m": "km/h",
+            },
+            source_url="https://api.open-meteo.com/v1/forecast",
+        )
+
+
+###############################################################################
+def test_provider_backed_sanremo_weather_descriptor_contains_renderable_data() -> None:
+    capability = {
+        "id": "openmeteo_pressure_humidity_wind",
+        "name": "Open-Meteo Pressure Humidity Wind Forecast",
+        "provider": "openmeteo",
+        "type": "time-series-insight",
+        "capabilityKind": "analysis-tool",
+        "renderingMode": "clustered-points",
+        "metadata": {
+            "label": "Open-Meteo Pressure Humidity Wind",
+            "render_backend": "provider",
+            "url": "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}",
+            "source_protocol": "JSON time series",
+            "data_format": "JSON",
+            "geometry_type": "point",
+        },
+    }
+    service = RenderDescriptorService(
+        capability_registry=_CapabilityRegistry(capability),  # type: ignore[arg-type]
+        provider_registry=ProviderRegistry(
+            providers=[_SanremoWeatherProvider()]  # type: ignore[list-item]
+        ),
+    )
+
+    result = run_async_in_thread(
+        service.build_overlay_descriptor(
+            "openmeteo_pressure_humidity_wind", request=_sanremo_request()
+        )
+    )
+
+    assert result is not None
+    descriptor, warnings = result
+    assert warnings == []
+    assert descriptor["rendering_mode"] == "clustered-points"
+    assert str(descriptor["url"]).startswith(
+        "/api/geospatial/layers/openmeteo_pressure_humidity_wind/geojson?"
+    )
+    assert "api.open-meteo.com" not in str(descriptor["url"])
+    assert descriptor["source_url"] == "https://api.open-meteo.com/v1/forecast"
+    assert descriptor["result_status"] == "ok"
+    feature = descriptor["data"]["features"][0]
+    assert feature["geometry"]["coordinates"] == [7.777, 43.817]
+    assert feature["properties"]["relative_humidity_2m"] == 68
 
 
 ###############################################################################

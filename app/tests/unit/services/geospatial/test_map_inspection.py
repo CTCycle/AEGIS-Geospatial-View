@@ -126,3 +126,53 @@ def test_non_spatial_dataset_metadata_remains_inspectable() -> None:
         "license",
         "update_time",
     }
+
+
+###############################################################################
+def test_weather_feature_inspection_exposes_bounded_measurements_and_provenance() -> (
+    None
+):
+    inspections = MapInspectionService.build_for_descriptor(
+        {
+            "id": "openmeteo_pressure_humidity_wind",
+            "label": "Open-Meteo Pressure Humidity Wind",
+            "provider": "openmeteo",
+            "rendering_mode": "clustered-points",
+            "data": {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "id": "sanremo",
+                        "type": "Feature",
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [7.777, 43.817],
+                        },
+                        "properties": {
+                            "name": "Sanremo",
+                            "relative_humidity_2m": 62,
+                            "surface_pressure": 1012,
+                            "wind_speed_10m": 4.5,
+                            "forecast_time": "2026-09-02T10:00",
+                            "fetched_at": "2026-09-02T09:00:00+00:00",
+                            "result_status": "ok",
+                            "source_url": "https://api.open-meteo.com/v1/forecast",
+                            "units": {
+                                "relative_humidity_2m": "%",
+                                "surface_pressure": "hPa",
+                                "wind_speed_10m": "km/h",
+                            },
+                        },
+                    }
+                ],
+            },
+        }
+    )
+
+    assert len(inspections) == 1
+    fields = {field.key: field for field in inspections[0].fields}
+    assert fields["relative_humidity_2m"].value == 62
+    assert fields["relative_humidity_2m"].unit == "%"
+    assert fields["surface_pressure"].unit == "hPa"
+    assert fields["wind_speed_10m"].unit == "km/h"
+    assert inspections[0].source_url == "https://api.open-meteo.com/v1/forecast"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from server.common.typing import is_json_object, json_array, json_object
 
+from datetime import UTC, datetime
 from typing import Any
 
 from server.services.geospatial.openmeteo import OpenMeteoService, OpenMeteoServiceError
@@ -11,6 +12,7 @@ from server.services.geospatial.providers.base import (
     ProviderRequest,
     ProviderResponse,
     ProviderUnavailableError,
+    safe_request_params,
 )
 
 
@@ -31,28 +33,32 @@ class OpenMeteoProvider(GeospatialProvider):
                     latitude=latitude,
                     longitude=longitude,
                 )
-                rendering_mode = "clustered-points"
             else:
                 payload = await self.service.get_weather_forecast(
                     latitude=latitude,
                     longitude=longitude,
                 )
-                rendering_mode = (
-                    "clustered-points"
-                    if "pressure_humidity_wind" in request.capability_id
-                    else "metadata-only"
-                )
         except (OpenMeteoServiceError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
+        payload = dict(payload)
+        if not json_object(payload.get("request_parameters")):
+            payload["request_parameters"] = safe_request_params(request.params)
+        rendering_mode = "clustered-points"
         normalized = self._payload(payload, rendering_mode=rendering_mode)
+        partial = bool(payload.get("partial"))
+        result_status = str(payload.get("result_status") or "").strip()
+        if result_status not in {"ok", "valid_empty", "partial", "stale"}:
+            result_status = "partial" if partial else "ok"
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload=normalized,
             attribution=[str(payload.get("attribution") or "Data from Open-Meteo")],
+            fetched_at=self._fetched_at(payload.get("fetched_at")),
+            result_status=result_status,
             observation_time=(
                 str(payload.get("observation_time"))
-                if payload.get("observation_time")
+                if payload.get("observation_time") is not None
                 else None
             ),
             coverage=json_object(payload.get("coverage")) or None,
@@ -67,11 +73,16 @@ class OpenMeteoProvider(GeospatialProvider):
                 if isinstance(key, str) and isinstance(value, str)
             },
             source_url=(
-                getattr(self.service, "air_quality_base_url", None)
-                if "air_quality" in request.capability_id
-                else getattr(self.service, "weather_base_url", None)
+                str(payload.get("source_url"))
+                if payload.get("source_url") is not None
+                else (
+                    getattr(self.service, "air_quality_base_url", None)
+                    if "air_quality" in request.capability_id
+                    else getattr(self.service, "weather_base_url", None)
+                )
             ),
-            result_type="features" if rendering_mode != "metadata-only" else "metadata",
+            result_type="features",
+            partial=partial,
         )
 
     # -------------------------------------------------------------------------
@@ -85,14 +96,20 @@ class OpenMeteoProvider(GeospatialProvider):
             "latitude": payload.get("latitude"),
             "longitude": payload.get("longitude"),
             "timezone": payload.get("timezone"),
-            "current": payload.get("current") or {},
-            "hourlyPreview": payload.get("hourly_preview") or [],
+            "current": json_object(payload.get("current")),
+            "hourlyPreview": json_array(payload.get("hourly_preview")),
             "features": self._features(payload, rendering_mode=rendering_mode),
             "resolvedAt": payload.get("resolved_at"),
             "observation_time": payload.get("observation_time"),
             "units": payload.get("units") or {},
             "spatial_resolution": payload.get("spatial_resolution"),
             "coverage": payload.get("coverage"),
+            "source_url": payload.get("source_url"),
+            "fetched_at": payload.get("fetched_at"),
+            "result_status": payload.get("result_status"),
+            "partial": bool(payload.get("partial")),
+            "requested_variables": payload.get("requested_variables") or [],
+            "request_parameters": payload.get("request_parameters") or {},
         }
 
     # -------------------------------------------------------------------------
@@ -100,6 +117,8 @@ class OpenMeteoProvider(GeospatialProvider):
         self, payload: dict[str, Any], *, rendering_mode: str
     ) -> list[dict[str, Any]]:
         if rendering_mode != "clustered-points":
+            return []
+        if str(payload.get("result_status") or "ok") == "valid_empty":
             return []
         latitude = payload.get("latitude")
         longitude = payload.get("longitude")
@@ -111,7 +130,35 @@ class OpenMeteoProvider(GeospatialProvider):
         current = json_object(payload.get("current"))
         preview = json_array(payload.get("hourly_preview"))
         first_hour = preview[0] if preview and is_json_object(preview[0]) else {}
+        source_url = payload.get("source_url")
+        fetched_at = payload.get("fetched_at")
+        result_status = payload.get("result_status")
+        partial = bool(payload.get("partial"))
+        common = {
+            "latitude": float(latitude),
+            "longitude": float(longitude),
+            "source_url": source_url,
+            "fetched_at": fetched_at,
+            "observation_time": payload.get("observation_time"),
+            "forecast_time": first_hour.get("time"),
+            "timezone": payload.get("timezone"),
+            "result_status": result_status,
+            "partial": partial,
+            "units": json_object(payload.get("units")),
+            "request_parameters": json_object(payload.get("request_parameters")),
+        }
         if "air_quality" in kind:
+            pollutant_values = {
+                key: self._prefer(current.get(key), first_hour.get(key))
+                for key in (
+                    "pm2_5",
+                    "pm10",
+                    "nitrogen_dioxide",
+                    "ozone",
+                    "sulphur_dioxide",
+                    "carbon_monoxide",
+                )
+            }
             return [
                 {
                     "id": f"openmeteo:air-quality:{latitude:.4f}:{longitude:.4f}",
@@ -120,19 +167,34 @@ class OpenMeteoProvider(GeospatialProvider):
                     "source": self.provider_id,
                     "latitude": float(latitude),
                     "longitude": float(longitude),
+                    **pollutant_values,
                     "metadata": {
                         "pollutantSymbols": {
-                            "pm25": first_hour.get("pm2_5"),
-                            "pm10": first_hour.get("pm10"),
-                            "no2": first_hour.get("nitrogen_dioxide"),
-                            "o3": first_hour.get("ozone"),
-                            "so2": first_hour.get("sulphur_dioxide"),
-                            "co": first_hour.get("carbon_monoxide"),
+                            "pm25": pollutant_values["pm2_5"],
+                            "pm10": pollutant_values["pm10"],
+                            "no2": pollutant_values["nitrogen_dioxide"],
+                            "o3": pollutant_values["ozone"],
+                            "so2": pollutant_values["sulphur_dioxide"],
+                            "co": pollutant_values["carbon_monoxide"],
                         },
-                        "forecastTime": first_hour.get("time"),
+                        **common,
                     },
                 }
             ]
+        weather_values = {
+            key: self._prefer(current.get(key), first_hour.get(key))
+            for key in (
+                "temperature_2m",
+                "precipitation",
+                "weather_code",
+                "relative_humidity_2m",
+                "surface_pressure",
+                "wind_speed_10m",
+                "wind_direction_10m",
+                "wind_gusts_10m",
+                "precipitation_probability",
+            )
+        }
         return [
             {
                 "id": f"openmeteo:wind:{latitude:.4f}:{longitude:.4f}",
@@ -141,18 +203,36 @@ class OpenMeteoProvider(GeospatialProvider):
                 "source": self.provider_id,
                 "latitude": float(latitude),
                 "longitude": float(longitude),
+                **weather_values,
                 "metadata": {
                     "windArrow": {
-                        "speed": current.get("wind_speed_10m")
-                        or first_hour.get("wind_speed_10m"),
-                        "direction": current.get("wind_direction_10m")
-                        or first_hour.get("wind_direction_10m"),
+                        "speed": weather_values["wind_speed_10m"],
+                        "direction": weather_values["wind_direction_10m"],
                     },
-                    "pressure": current.get("surface_pressure")
-                    or first_hour.get("surface_pressure"),
-                    "humidity": current.get("relative_humidity_2m")
-                    or first_hour.get("relative_humidity_2m"),
-                    "forecastTime": first_hour.get("time"),
+                    "pressure": weather_values["surface_pressure"],
+                    "humidity": weather_values["relative_humidity_2m"],
+                    **common,
                 },
             }
         ]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _prefer(primary: object, fallback: object) -> object:
+        return primary if primary is not None else fallback
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _fetched_at(value: object) -> datetime:
+        if isinstance(value, datetime):
+            return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+        if isinstance(value, str) and value.strip():
+            try:
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except ValueError:
+                parsed = None
+            if parsed is not None:
+                return (
+                    parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+                )
+        return datetime.now(UTC)

@@ -9,9 +9,16 @@ from typing import Any
 from urllib.parse import urlencode
 
 from server.contracts.geospatial import LocationSearchRequest
+from server.services.geospatial.api_service import (
+    GeospatialProviderResponseError,
+    normalize_geojson_feature_collection,
+)
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
-from server.services.geospatial.provider_registry import ProviderRegistry
+from server.services.geospatial.provider_registry import (
+    ProviderRegistry,
+    ProviderRegistryError,
+)
 from server.services.geospatial.rainviewer import (
     RainViewerRequestError,
     RainViewerService,
@@ -21,6 +28,7 @@ from server.services.geospatial.normalizers import (
     NormalizationError,
     normalize_poi_feature,
 )
+from server.services.geospatial.providers.base import ProviderError, ProviderRequest
 
 
 ###############################################################################
@@ -90,6 +98,16 @@ class RenderDescriptorService:
         capability_type = str(capability.get("type") or "")
         rendering_mode = str(capability.get("renderingMode") or "")
         capability_kind = str(capability.get("capabilityKind") or "")
+        if str(
+            metadata.get("render_backend") or ""
+        ).strip().lower() == "provider" and rendering_mode in {
+            "clustered-points",
+            "geojson",
+            "choropleth",
+        }:
+            return await self._provider_overlay_descriptor(
+                capability, metadata, overlay_id, request, warnings
+            )
         if capability_kind == "camera-network":
             auth = json_object(capability.get("auth"))
             provider_id = str(
@@ -204,9 +222,7 @@ class RenderDescriptorService:
                         if payload.get(key) is not None
                     }
                 )
-                inspection_metadata = json_object(
-                    descriptor.get("inspection_metadata")
-                )
+                inspection_metadata = json_object(descriptor.get("inspection_metadata"))
                 inspection_metadata.update(
                     {
                         key: payload[key]
@@ -521,6 +537,116 @@ class RenderDescriptorService:
         )
         descriptor["url"] = self._feature_endpoint_url(overlay_id, request=request)
         return descriptor
+
+    # -------------------------------------------------------------------------
+    async def _provider_overlay_descriptor(
+        self,
+        capability: dict[str, Any],
+        metadata: dict[str, Any],
+        overlay_id: str,
+        request: LocationSearchRequest,
+        warnings: list[str],
+    ) -> tuple[dict[str, object], list[str]]:
+        provider_id = str(capability.get("provider") or "").strip().lower()
+        provider_request = ProviderRequest(
+            capability_id=overlay_id,
+            bbox=self._provider_bbox(request),
+            params={
+                "latitude": request.viewport.center_latitude,
+                "longitude": request.viewport.center_longitude,
+                "live": True,
+            },
+        )
+        try:
+            response = await self.provider_registry.fetch(provider_id, provider_request)
+            data = normalize_geojson_feature_collection(response.payload)
+        except (
+            GeospatialProviderResponseError,
+            ProviderError,
+            ProviderRegistryError,
+            ValueError,
+        ) as exc:
+            descriptor = self._feature_overlay_descriptor(
+                capability, metadata, overlay_id, request
+            )
+            descriptor.update(
+                {
+                    "rendering_mode": "metadata-only",
+                    "type": "metadata-only",
+                    "result_status": "unavailable",
+                    "result_type": "features",
+                    "partial": False,
+                    "warnings": [
+                        f"{overlay_id}: provider data is unavailable; retry to refresh."
+                    ],
+                }
+            )
+            warnings.append(
+                f"{overlay_id}: provider data is unavailable ({type(exc).__name__})."
+            )
+            return descriptor, warnings
+
+        descriptor = self._feature_overlay_descriptor(
+            capability, metadata, overlay_id, request
+        )
+        descriptor["data"] = data
+        descriptor.update(
+            {
+                "result_status": response.result_status,
+                "result_type": response.result_type,
+                "fetched_at": response.fetched_at.isoformat(),
+                "observation_time": response.observation_time,
+                "coverage": response.coverage,
+                "spatial_resolution": response.spatial_resolution,
+                "units": dict(response.units),
+                "source_url": response.source_url,
+                "partial": response.partial,
+                "warnings": list(response.warnings),
+                "requested_variables": list(
+                    json_array(response.payload.get("requested_variables"))
+                ),
+                "request_parameters": json_object(
+                    response.payload.get("request_parameters")
+                ),
+            }
+        )
+        if response.attribution:
+            descriptor["attribution"] = response.attribution[0]
+        inspection_metadata = json_object(descriptor.get("inspection_metadata"))
+        inspection_metadata.update(
+            {
+                key: value
+                for key, value in {
+                    "source_url": response.source_url,
+                    "fetched_at": response.fetched_at.isoformat(),
+                    "result_status": response.result_status,
+                    "partial": response.partial,
+                    "observation_time": response.observation_time,
+                }.items()
+                if value is not None
+            }
+        )
+        descriptor["inspection_metadata"] = inspection_metadata
+        return descriptor, warnings
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _provider_bbox(
+        request: LocationSearchRequest,
+    ) -> tuple[float, float, float, float] | None:
+        bounds = request.viewport.bbox or RenderDescriptorService._bounds_from_viewport(
+            request.viewport
+        )
+        if (
+            not bounds
+            or len(bounds) != 4
+            or not all(
+                isinstance(item, int | float) and not isinstance(item, bool)
+                for item in bounds
+            )
+        ):
+            return None
+        return (float(bounds[0]), float(bounds[1]), float(bounds[2]), float(bounds[3]))
 
     # -------------------------------------------------------------------------
     @staticmethod

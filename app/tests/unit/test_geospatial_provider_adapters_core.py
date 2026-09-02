@@ -215,7 +215,7 @@ def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
     )
 
     assert weather.payload["kind"] == "weather_forecast"
-    assert weather.payload["renderingMode"] == "metadata-only"
+    assert weather.payload["renderingMode"] == "clustered-points"
     assert air.payload["kind"] == "air_quality_forecast"
     assert air.payload["renderingMode"] == "clustered-points"
     assert air.payload["features"][0]["metadata"]["pollutantSymbols"]["pm25"] == 8
@@ -239,6 +239,44 @@ def test_openmeteo_provider_returns_wind_arrow_features() -> None:
     assert feature["category"] == "wind"
     assert feature["metadata"]["windArrow"] == {"speed": 7, "direction": 270}
     assert feature["metadata"]["pressure"] == 1008
+
+
+###############################################################################
+def test_openmeteo_provider_preserves_zero_measurements() -> None:
+    class _ZeroWeatherService(_OpenMeteoService):
+        async def get_weather_forecast(self, *, latitude: float, longitude: float):
+            return {
+                "kind": "weather_forecast",
+                "latitude": latitude,
+                "longitude": longitude,
+                "current": {
+                    "relative_humidity_2m": 0,
+                    "surface_pressure": 0,
+                    "wind_speed_10m": 0,
+                    "wind_direction_10m": 0,
+                    "wind_gusts_10m": 0,
+                },
+                "hourly_preview": [{"time": "2026-05-11T00:00"}],
+                "result_status": "partial",
+                "partial": True,
+                "source_url": "https://weather.example/forecast",
+            }
+
+    response = run_async_in_thread(
+        OpenMeteoProvider(service=_ZeroWeatherService()).fetch(  # type: ignore[arg-type]
+            ProviderRequest(
+                capability_id="openmeteo_pressure_humidity_wind",
+                params={"latitude": 43.817, "longitude": 7.777},
+            )
+        )
+    )
+
+    feature = response.payload["features"][0]
+    assert feature["relative_humidity_2m"] == 0
+    assert feature["metadata"]["humidity"] == 0
+    assert feature["surface_pressure"] == 0
+    assert feature["metadata"]["windArrow"] == {"speed": 0, "direction": 0}
+    assert response.result_status == "partial"
 
 
 ###############################################################################
