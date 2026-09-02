@@ -65,9 +65,10 @@ describe('CapabilityStatusListComponent', () => {
     fixture.detectChanges();
 
     const tooltip = host.querySelector<HTMLElement>('[role="tooltip"]');
-    expect(tooltip?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'The configured agent model is ready for use. Open model settings',
+    expect(tooltip?.querySelector('span')?.textContent).toBe(
+      'The configured agent model is ready for use.',
     );
+    expect(tooltip?.querySelector('.status-tooltip__action')?.textContent).toBe('Open model settings');
 
     items[0].dispatchEvent(new MouseEvent('mouseleave'));
     fixture.detectChanges();
