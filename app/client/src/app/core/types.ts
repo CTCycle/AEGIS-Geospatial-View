@@ -331,6 +331,17 @@ export interface MapOverlayEntry {
   style?: string | null;
   time?: string | null;
   default_time?: string | null;
+  result_status?: string | null;
+  fetched_at?: string | null;
+  observation_time?: string | null;
+  coverage?: Record<string, JsonValue> | null;
+  spatial_resolution?: string | null;
+  units?: Record<string, string>;
+  source_url?: string | null;
+  partial?: boolean;
+  stale?: boolean;
+  requested_variables?: string[];
+  request_parameters?: Record<string, JsonValue>;
   warnings?: string[];
   render?: GeospatialLayerRenderDescriptor | null;
   data?: GeoJsonFeatureCollection;

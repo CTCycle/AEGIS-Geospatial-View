@@ -121,7 +121,7 @@
 .map-zoom-controls {
     position: absolute;
     right: 1rem;
-    bottom: 9rem;
+    bottom: 3.35rem;
     z-index: 6;
     display: grid;
     gap: 0;
@@ -153,13 +153,13 @@
 }
 
 .map-zoom-controls--preview {
-    bottom: 8rem;
+    bottom: 3.35rem;
 }
 
 .compliance-panel {
     position: absolute;
     left: 0.75rem;
-    right: 0.75rem;
+    right: 8rem;
     bottom: 0.75rem;
     display: flex;
     flex-direction: column;
@@ -190,7 +190,7 @@
 
 .metadata-panel {
     left: 0.75rem;
-    top: 0.75rem;
+    top: 3.55rem;
     max-width: min(28rem, calc(100% - 1.5rem));
     display: grid;
     gap: 0.3rem;
@@ -200,7 +200,8 @@
 
 .metadata-panel--errors {
     top: auto;
-    bottom: 7.25rem;
+    right: 4.5rem;
+    bottom: 4.7rem;
     background: rgb(58 18 26 / 90%);
     border-color: rgb(248 113 113 / 28%);
     color: #fee2e2;
@@ -229,11 +230,11 @@
 
 .map-inspection-panel {
     position: absolute;
-    top: 0.75rem;
+    top: 4.1rem;
     right: 0.75rem;
     z-index: 10;
     width: min(22rem, calc(100% - 1.5rem));
-    max-height: min(32rem, calc(100% - 1.5rem));
+    max-height: min(32rem, calc(100% - 4.85rem));
     overflow: auto;
     display: grid;
     gap: 0.65rem;
@@ -333,13 +334,6 @@
     line-height: 1.35;
 }
 
-.map-inspection-popup {
-    display: grid;
-    gap: 0.25rem;
-    color: #15252d;
-    font: 12px/1.35 system-ui, sans-serif;
-}
-
 .legend-panel {
     right: 0.75rem;
     top: 0.75rem;
@@ -371,8 +365,9 @@
 }
 
 .attribution-panel {
-    left: 0.75rem;
-    bottom: 3.5rem;
+    left: auto;
+    right: 0.75rem;
+    bottom: 0.55rem;
     pointer-events: none;
     max-width: min(34rem, calc(100% - 1.5rem));
     display: flex;

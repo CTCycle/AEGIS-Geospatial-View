@@ -385,6 +385,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.isAlertsOpen = !this.isAlertsOpen;
   }
 
+  toggleToolbar(): void {
+    this.isToolbarCollapsed = !this.isToolbarCollapsed;
+    this.syncState();
+    this.changeDetectorRef.detectChanges();
+  }
+
   navigateToSettings(): void {
     this.syncState();
     this.router.navigateByUrl('/settings');

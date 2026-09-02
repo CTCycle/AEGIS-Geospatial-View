@@ -49,6 +49,7 @@ describe('OverlayControlsComponent', () => {
         message: 'Metadata only.',
       },
     ];
+    component.isExpanded = true;
 
     fixture.detectChanges();
 
@@ -57,5 +58,19 @@ describe('OverlayControlsComponent', () => {
 
     expect(range?.disabled).toBeTrue();
     expect(note?.textContent).toContain('metadata-only');
+  });
+
+  it('starts collapsed and exposes an accessible disclosure control', () => {
+    fixture.detectChanges();
+
+    const toggle = fixture.nativeElement.querySelector('.overlay-controls__toggle') as HTMLButtonElement | null;
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+    expect(fixture.nativeElement.querySelector('input[type="range"]')).toBeNull();
+
+    toggle?.click();
+    fixture.detectChanges();
+
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+    expect((fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement).getAttribute('aria-label')).toBe('Opacity for Overlay 1');
   });
 });

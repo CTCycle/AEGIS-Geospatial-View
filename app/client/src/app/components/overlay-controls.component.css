@@ -1,16 +1,65 @@
 .overlay-controls {
     position: absolute;
     left: 1rem;
-    bottom: 1rem;
+    bottom: 3.35rem;
     background: rgb(12 22 28 / 90%);
     border: 1px solid rgb(173 196 207 / 28%);
     border-radius: 0.35rem;
     padding: 0.5rem;
     z-index: 5;
-    max-width: 20rem;
+    width: min(21rem, calc(100% - 2rem));
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+}
+
+.overlay-controls__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+}
+
+.overlay-controls__header h2,
+.overlay-controls__header p {
+    margin: 0;
+}
+
+.overlay-controls__header h2 {
+    color: #edf8fb;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.overlay-controls__header p {
+    margin-top: 0.1rem;
+    color: #9cc2d1;
+    font-size: 0.68rem;
+}
+
+.overlay-controls__toggle {
+    flex: 0 0 auto;
+    border: 1px solid #3d5965;
+    border-radius: 0.25rem;
+    padding: 0.22rem 0.42rem;
+    background: #162833;
+    color: #dcecf1;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.overlay-controls__toggle:hover,
+.overlay-controls__toggle:focus-visible {
+    border-color: #73c7ed;
+    background: #1b3340;
+}
+
+.overlay-controls__list {
+    display: grid;
+    gap: 0.35rem;
+    max-height: min(22rem, calc(100vh - 12rem));
+    overflow-y: auto;
 }
 
 .overlay-control-row {
@@ -28,6 +77,10 @@
     gap: 0.35rem;
 }
 
+.overlay-control-row__opacity {
+    min-width: 0;
+}
+
 .overlay-control-row input[type="range"] {
     width: 100%;
 }
@@ -38,4 +91,16 @@
     font-size: 0.66rem;
     line-height: 1.35;
     color: #9cc2d1;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }

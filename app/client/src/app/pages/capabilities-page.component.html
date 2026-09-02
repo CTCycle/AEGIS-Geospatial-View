@@ -1,28 +1,41 @@
 <div class="capabilities-page">
   <header class="capabilities-page__header">
-    <div>
-      <p>Manifest-backed map types, layers, direct actions, and data providers exposed by AEGIS.</p>
+    <div class="capabilities-page__heading">
+      <p class="page-kicker">Catalog</p>
+      <h1>Geospatial catalog</h1>
+      <p>Manifest-backed providers, map types, layers, cameras, transit feeds, and direct tools available to AEGIS.</p>
+    </div>
+    <div class="capabilities-page__summary" aria-label="Catalog status">
+      <span>{{ catalogEntryCount }} entries</span>
+      <span>{{ isLoading ? 'Loading' : catalogLoadFailed ? 'Unavailable' : 'Ready' }}</span>
     </div>
   </header>
 
   <div class="capabilities-page__content">
     @if (isLoading) {
       <section class="capabilities-empty" aria-live="polite">Loading catalog...</section>
+    } @else if (catalogLoadFailed) {
+      <section class="capabilities-empty capabilities-empty--error" role="alert">
+        <h2>Catalog unavailable</h2>
+        <p>AEGIS could not load the catalog API. Retry the workspace when the service is available.</p>
+      </section>
+    } @else if (catalogEntryCount === 0) {
+      <section class="capabilities-empty" aria-live="polite">
+        <h2>No catalog entries available</h2>
+        <p>The catalog API responded successfully but did not return any capabilities.</p>
+      </section>
     } @else {
       @for (group of groups; track group.id) {
-        <section class="capability-section" [attr.aria-label]="group.label">
-          <header class="capability-section__header">
-            <div>
-              <h2>{{ group.label }}</h2>
-              <p>{{ group.description }}</p>
-            </div>
-            <span class="capability-section__count">{{ itemsFor(group.id).length }} items</span>
-          </header>
-
-          @if (itemsFor(group.id).length === 0) {
-            <p class="capability-section__empty">No entries returned by the catalog API.</p>
-          } @else {
-          <div class="capability-table-wrap">
+        @if (itemsFor(group.id).length > 0) {
+          <section class="capability-section" [attr.aria-label]="group.label">
+            <header class="capability-section__header">
+              <div>
+                <h2>{{ group.label }}</h2>
+                <p>{{ group.description }}</p>
+              </div>
+              <span class="capability-section__count">{{ itemsFor(group.id).length }} items</span>
+            </header>
+            <div class="capability-table-wrap">
             <table class="capability-table">
               <thead>
                 <tr>
@@ -42,7 +55,13 @@
                       <span>{{ item.provider }} · {{ item.type || item.kind }} · {{ item.coverage }}</span>
                     </td>
                     <td>{{ capabilityPurpose(item) }}</td>
-                    <td class="capability-table__source">{{ dataSource(item) }}</td>
+                    <td class="capability-table__source">
+                      @if (dataSourceUrl(item); as sourceUrl) {
+                        <a [href]="sourceUrl" target="_blank" rel="noreferrer">{{ dataSource(item) }}</a>
+                      } @else {
+                        {{ dataSource(item) }}
+                      }
+                    </td>
                     <td>{{ updateFrequency(item) }}</td>
                     <td>
                       <span class="access-status" [class.access-status--locked]="item.requires_credentials && !item.is_available">
@@ -54,9 +73,12 @@
                 }
               </tbody>
             </table>
-          </div>
-          }
-        </section>
+            </div>
+          </section>
+        }
+      }
+      @if (emptyGroups.length > 0) {
+        <p class="capabilities-page__empty-groups">Not populated in this catalog response: {{ emptyGroups.join(', ') }}.</p>
       }
     }
   </div>

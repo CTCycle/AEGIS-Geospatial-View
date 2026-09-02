@@ -11,7 +11,7 @@ import { SelectedAgentModelSummary } from '../core/model-selection';
   styleUrl: './selected-model-summary.component.css',
   changeDetection: ChangeDetectionStrategy.Eager,
   host: {
-    style: 'display: flex; flex: 1 1 auto; min-height: 100%;',
+    style: 'display: block; flex: 0 0 auto;',
   },
 })
 export class SelectedModelSummaryComponent {

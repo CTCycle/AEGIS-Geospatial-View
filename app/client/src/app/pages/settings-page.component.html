@@ -1,7 +1,9 @@
 <div class="settings-page">
   <header class="settings-page__header">
     <div class="settings-page__heading">
-      <p>Select one AEGIS agent model across cloud providers and local Ollama. The selected model handles structured extraction, orchestration, tool calling, and chat.</p>
+      <p class="page-kicker">Configuration</p>
+      <h1>Model settings</h1>
+      <p>Select the agent model used for structured extraction, orchestration, tool calling, and chat.</p>
     </div>
     <div class="settings-page__header-actions">
       <app-settings-icon-action
@@ -53,13 +55,13 @@
         <section class="settings-page__controls settings-page__controls--navbar" aria-label="Settings controls">
           <div class="settings-page__controls-left">
             <div class="provider-filter-toggle provider-toggle" role="group" aria-label="Model provider filter">
-              <button type="button" [class.active]="providerFilter === 'all'" (click)="setProviderFilter('all')">All</button>
-              <button type="button" [class.active]="providerFilter === 'ollama'" (click)="setProviderFilter('ollama')">Ollama</button>
-              <button type="button" [class.active]="providerFilter === 'openai'" (click)="setProviderFilter('openai')">OpenAI</button>
-              <button type="button" [class.active]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
-              <button type="button" [class.active]="providerFilter === 'deepseek'" (click)="setProviderFilter('deepseek')">DeepSeek</button>
-              <button type="button" [class.active]="providerFilter === 'opencode'" (click)="setProviderFilter('opencode')">OpenCode Zen</button>
-              <button type="button" [class.active]="providerFilter === 'opencode-go'" (click)="setProviderFilter('opencode-go')">OpenCode Go</button>
+              <button type="button" [class.active]="providerFilter === 'all'" [attr.aria-pressed]="providerFilter === 'all'" (click)="setProviderFilter('all')">All</button>
+              <button type="button" [class.active]="providerFilter === 'ollama'" [attr.aria-pressed]="providerFilter === 'ollama'" (click)="setProviderFilter('ollama')">Ollama</button>
+              <button type="button" [class.active]="providerFilter === 'openai'" [attr.aria-pressed]="providerFilter === 'openai'" (click)="setProviderFilter('openai')">OpenAI</button>
+              <button type="button" [class.active]="providerFilter === 'google'" [attr.aria-pressed]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
+              <button type="button" [class.active]="providerFilter === 'deepseek'" [attr.aria-pressed]="providerFilter === 'deepseek'" (click)="setProviderFilter('deepseek')">DeepSeek</button>
+              <button type="button" [class.active]="providerFilter === 'opencode'" [attr.aria-pressed]="providerFilter === 'opencode'" (click)="setProviderFilter('opencode')">OpenCode Zen</button>
+              <button type="button" [class.active]="providerFilter === 'opencode-go'" [attr.aria-pressed]="providerFilter === 'opencode-go'" (click)="setProviderFilter('opencode-go')">OpenCode Go</button>
             </div>
 
           </div>
@@ -80,6 +82,7 @@
             </button>
             <input
               class="model-search-bar"
+              type="search"
               placeholder="Search models"
               aria-label="Search models"
               [ngModel]="searchText"

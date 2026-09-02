@@ -35,6 +35,7 @@ export class CapabilityStatusListComponent {
   activeTooltipIndex: number | null = null;
   tooltipLeft = 0;
   tooltipTop = 0;
+  tooltipPlacement: 'above' | 'below' = 'above';
 
   private readonly tooltipIdPrefix = `capability-status-${CapabilityStatusListComponent.nextInstanceId++}`;
 
@@ -72,7 +73,10 @@ export class CapabilityStatusListComponent {
       Math.max(center, tooltipHalfWidth),
       Math.max(tooltipHalfWidth, viewportWidth - tooltipHalfWidth),
     );
-    this.tooltipTop = Math.max(8, rect.top - 8);
+    this.tooltipPlacement = rect.top < 84 ? 'below' : 'above';
+    this.tooltipTop = this.tooltipPlacement === 'below'
+      ? rect.bottom + 8
+      : Math.max(8, rect.top - 8);
     this.activeTooltipIndex = index;
   }
 
