@@ -89,6 +89,14 @@ class NativeToolLoop:
         context_usages: list[dict[str, Any]] = []
         run_deadline = time.monotonic() + (45.0 if simple_run else self.max_run_seconds)
 
+        def record_context_usage(raw_usage: object) -> None:
+            if not is_json_object(raw_usage):
+                return
+            usage = dict(raw_usage)
+            context_usages.append(usage)
+            if request.context_usage_callback is not None:
+                request.context_usage_callback(usage)
+
         for iteration in range(1, self.max_iterations + 1):
             if (
                 iteration > model_budget
@@ -123,7 +131,7 @@ class NativeToolLoop:
                 ],
             )
             messages[1] = working_state
-            LOGGER.info(
+            LOGGER.debug(
                 "tool_loop_started provider=%s model=%s iteration=%s",
                 request.provider,
                 request.model,
@@ -160,16 +168,27 @@ class NativeToolLoop:
                 messages = list(llm_request.messages)
                 working_state = messages[1]
                 response = provider.chat(llm_request)
-                usage = getattr(response, "context_usage", None)
-                if is_json_object(usage):
-                    context_usages.append(dict(usage))
+                record_context_usage(getattr(response, "context_usage", None))
             except Exception as exc:
-                LOGGER.exception(
-                    "tool_loop_failed provider=%s model=%s",
-                    request.provider,
-                    request.model,
-                )
                 category = getattr(exc, "category", None)
+                if category in {
+                    "context_limit",
+                    "model_capability",
+                    "schema_definition",
+                    "provider_api",
+                }:
+                    LOGGER.warning(
+                        "tool_loop_failed category=%s provider=%s model=%s",
+                        category,
+                        request.provider,
+                        request.model,
+                    )
+                else:
+                    LOGGER.exception(
+                        "tool_loop_failed provider=%s model=%s",
+                        request.provider,
+                        request.model,
+                    )
                 detail = str(getattr(exc, "detail", None) or exc)
                 if category == "context_limit":
                     final_text = (
@@ -193,9 +212,7 @@ class NativeToolLoop:
                     )
                 else:
                     final_text = "The agent tool loop failed before it could complete the request."
-                usage = getattr(exc, "context_usage", None)
-                if is_json_object(usage):
-                    context_usages.append(dict(usage))
+                record_context_usage(getattr(exc, "context_usage", None))
                 return AgentToolLoopResult(
                     final_text=final_text,
                     tool_calls=all_calls,
@@ -357,7 +374,7 @@ class NativeToolLoop:
         started = time.perf_counter()
         rejection = self._policy_rejection(call, context)
         if rejection is not None:
-            LOGGER.info(
+            LOGGER.debug(
                 "tool_call_rejected tool=%s iteration=%s reason=%s",
                 call.name,
                 iteration,
@@ -396,7 +413,7 @@ class NativeToolLoop:
             envelope_payload = envelope.to_dict()
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         ok = bool(envelope_payload.get("ok"))
-        LOGGER.info(
+        LOGGER.debug(
             "tool_call_executed tool=%s iteration=%s success=%s latency_ms=%s",
             call.name,
             iteration,

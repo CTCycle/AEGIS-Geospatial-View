@@ -21,8 +21,20 @@ class _FakeAgentOrchestrator:
         self.response = response
 
     # -------------------------------------------------------------------------
-    async def run_turn(self, payload):  # noqa: ANN001
+    async def run_turn(self, payload, progress_callback=None):  # noqa: ANN001
         _ = payload
+        if progress_callback is not None and self.response.context_usage is not None:
+            progress_callback(
+                "context_usage",
+                {
+                    "request_id": self.response.request_id,
+                    "conversation_id": self.response.conversation_id,
+                    "phase": "parser",
+                    "context_usage": self.response.context_usage.model_dump(
+                        mode="json"
+                    ),
+                },
+            )
         return self.response
 
 
@@ -203,6 +215,12 @@ def test_execute_run_marks_failed_operation_as_failed_run() -> None:
         event for event in publisher.events if event["type"] == RunEventType.ERROR
     )
     assert error_event["payload"]["context_usage"]["estimated_input_tokens"] == 321
+    context_event = next(
+        event
+        for event in publisher.events
+        if event["type"] == RunEventType.CONTEXT_USAGE
+    )
+    assert context_event["payload"]["phase"] == "parser"
 
 
 ###############################################################################
@@ -236,3 +254,37 @@ def test_execute_run_includes_context_usage_in_clarification_event() -> None:
     assert clarification_event["payload"]["context_usage"][
         "estimated_input_tokens"
     ] == 321
+
+
+def test_execute_run_publishes_context_samples_before_terminal_event() -> None:
+    response = _failed_response().model_copy(
+        update={
+            "operation": ChatOperationResult(
+                kind="direct_answer",
+                status="success",
+                message="Completed",
+            )
+        }
+    )
+    repository = _FakeRunRepository(_snapshot())
+    publisher = _FakeEventPublisher()
+    orchestrator = AgentRunOrchestrator(
+        agent_orchestrator=_FakeAgentOrchestrator(response),  # type: ignore[arg-type]
+        run_repository=repository,  # type: ignore[arg-type]
+        event_publisher=publisher,  # type: ignore[arg-type]
+        conversation_repository=object(),  # type: ignore[arg-type]
+    )
+
+    run_async_in_thread(orchestrator.execute_run("run_1"))
+
+    context_index = next(
+        index
+        for index, event in enumerate(publisher.events)
+        if event["type"] == RunEventType.CONTEXT_USAGE
+    )
+    terminal_index = next(
+        index
+        for index, event in enumerate(publisher.events)
+        if event["type"] == RunEventType.COMPLETED
+    )
+    assert context_index < terminal_index

@@ -29,21 +29,22 @@ LOG_CONFIG: dict[str, Any] = {
     },
     "handlers": {
         "console": {
-            "class": "logging.StreamHandler",
+            "class": "server.common.logging_handlers.SafeStreamHandler",
             "level": "INFO",
             "formatter": "minimal",
         },
         "file": {
             "class": "logging.FileHandler",
-            "level": "DEBUG",
+            "level": "INFO",
             "formatter": "default",
             "filename": str(log_filename),
             "mode": "a",
+            "encoding": "utf-8",
         },
     },
     "loggers": {
         "uvicorn.access": {
-            "level": "INFO",
+            "level": "WARNING",
             "handlers": ["console", "file"],
             "propagate": False,
         },
@@ -52,9 +53,44 @@ LOG_CONFIG: dict[str, Any] = {
             "handlers": ["console", "file"],
             "propagate": False,
         },
+        "openai": {
+            "level": "WARNING",
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
+        "openai._base_client": {
+            "level": "WARNING",
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
+        "httpx": {
+            "level": "WARNING",
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
+        "httpcore": {
+            "level": "WARNING",
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
+        "asyncio": {
+            "level": "WARNING",
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
+        "alembic.autogenerate": {
+            "level": "WARNING",
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
+        "alembic.runtime.plugins": {
+            "level": "WARNING",
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
     },
     "root": {
-        "level": "DEBUG",
+        "level": "INFO",
         "handlers": ["console", "file"],
     },
 }

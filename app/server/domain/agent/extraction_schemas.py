@@ -232,7 +232,12 @@ class LLMParserExtraction(BaseModel):
     requested_concepts: list[str] = Field(default_factory=lambda: list[str]())
     requested_layers: list[str] = Field(default_factory=lambda: list[str]())
     overlay_commands: list[LLMOverlayCommand] = Field(
-        default_factory=lambda: list[LLMOverlayCommand]()
+        default_factory=lambda: list[LLMOverlayCommand](),
+        description=(
+            "One typed command for every independent map mutation in the current "
+            "request, including mutations that can be applied while another data "
+            "request is unsupported."
+        ),
     )
     poi_categories: list[str] = Field(default_factory=lambda: list[str]())
     radius_m: float | None = Field(default=None, gt=0.0)

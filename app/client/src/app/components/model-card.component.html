@@ -27,7 +27,7 @@
     }
     <span>Tool support: {{ model.supports_tools === true ? (model.tool_support_source === 'ollama_probe' ? 'probed' : 'detected') : (model.supports_tools === false ? 'unavailable' : 'not verified') }}</span>
     @if (model.context_window_tokens) {
-      <span>Context: {{ model.context_window_tokens | number }} tokens</span>
+      <span>Max context: {{ model.context_window_tokens | number }}</span>
     } @else {
       <span>Context: provider limit not reported</span>
     }

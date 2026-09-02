@@ -84,7 +84,7 @@ class RequestBuilder:
             if turn_contract is not None
             else [],
         )
-        LOGGER.info(
+        LOGGER.debug(
             "map_request_built action=%s basemap=%s overlays=%d viewport_scope=%s tighten=%s radius_m=%.1f bbox=%s location_type=%s",
             request.action_id,
             request.basemap_id,

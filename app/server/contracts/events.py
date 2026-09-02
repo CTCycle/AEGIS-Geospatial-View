@@ -12,6 +12,7 @@ from server.common.time import utc_now
 ###############################################################################
 class RunEventType(StrEnum):
     PROGRESS = "progress"
+    CONTEXT_USAGE = "context_usage"
     ASSISTANT_TEXT_DELTA = "assistant_text_delta"
     ASSISTANT_TEXT_COMPLETED = "assistant_text_completed"
     TOOL_STARTED = "tool_started"

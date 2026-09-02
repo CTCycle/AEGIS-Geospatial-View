@@ -28,6 +28,7 @@ class ChatStreamingService:
                 event=cast(
                     Literal[
                         "status",
+                        "context_usage",
                         "parsed",
                         "policy",
                         "tool_call_started",

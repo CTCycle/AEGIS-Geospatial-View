@@ -19,10 +19,13 @@ from server.contracts.extraction import (
     ConversationContextSnapshot,
     LocationSignal,
     NormalizedAction,
+    OverlayCommand,
+    OverlaySelector,
+    OverlayScope,
     TurnParseResult,
     ViewportIntent,
 )
-from server.contracts.geospatial import MapSession
+from server.contracts.geospatial import MapSession, OverlayCollectionState, OverlayInstance
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.capability_resolver import CapabilityResolver
@@ -56,7 +59,16 @@ def _turn(
     ambiguities: list[str] | None = None,
     clarification_plan: dict[str, Any] | None = None,
     viewport_intent: ViewportIntent | None = None,
+    requested_concepts: list[str] | None = None,
+    overlay_commands: list[OverlayCommand] | None = None,
 ) -> TurnParseResult:
+    action_id = (
+        "data_layer_query"
+        if requested_layers
+        else "overlay_control"
+        if overlay_commands
+        else "map_search"
+    )
     return TurnParseResult(
         user_text=text,
         conversation_context=ConversationContextSnapshot(
@@ -77,9 +89,11 @@ def _turn(
         if task_class != "general_question"
         else [],
         normalized_action=NormalizedAction(
-            action_id="data_layer_query" if requested_layers else "map_search",
+            action_id=action_id,
             action_label="Residential building visualization"
             if requested_layers
+            else "Overlay control"
+            if overlay_commands
             else "Map search",
             task_tags=["map"],
             action_tags=["housing"] if requested_layers else [],
@@ -90,8 +104,10 @@ def _turn(
         relationship=relationship,
         entity_target=entity_target,
         requested_layers=requested_layers or [],
+        requested_concepts=requested_concepts or [],
+        overlay_commands=overlay_commands or [],
         requested_basemap=requested_basemap,
-        tools_needed=bool(requested_layers),
+        tools_needed=bool(requested_layers or requested_concepts or overlay_commands),
         clarification_plan=clarification_plan,
         viewport_intent=viewport_intent,
     )
@@ -538,6 +554,116 @@ def test_partial_capability_plan_executes_resolved_layers_before_clarifying() ->
         assert response.map_session is not None
         assert response.operation is not None
         assert response.operation.status == "partial"
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_compound_partial_request_mutates_active_overlays_and_reports_unsupported_values() -> None:
+    async def _run() -> None:
+        conversation_id = "conv-compound-partial"
+        orchestrator = _orchestrator(
+            [
+                _turn(
+                    "Show the map around Rome.",
+                    requested_layers=["overpass_residential_buildings"],
+                ),
+                _turn(
+                    "Remove visible overlays and show average house prices.",
+                    relationship="follow_up",
+                    task_class="direct_query",
+                    requested_concepts=["house_prices"],
+                    overlay_commands=[
+                        OverlayCommand(
+                            action="remove",
+                            selector=OverlaySelector(visibility="visible"),
+                            scope=OverlayScope(kind="current_view"),
+                        )
+                    ],
+                ),
+            ]
+        )
+
+        first = await orchestrator.run_turn(
+            ChatTurnRequest(
+                message="Show the map around Rome.",
+                conversation_id=conversation_id,
+            )
+        )
+        assert first.map_session is not None
+        active_session = first.map_session.model_copy(
+            update={
+                "overlay_collection": OverlayCollectionState(
+                    instances=[
+                        OverlayInstance(
+                            instance_id="srtm-dem",
+                            capability_id="elevation_dem_srtm",
+                            label="Elevation DEM (SRTM)",
+                            provider="nasa_gibs",
+                            overlay_type="raster",
+                            rendering_mode="wms",
+                            resolved_location=first.map_session.resolved_location,
+                            viewport=first.map_session.viewport.model_dump(mode="json"),
+                            descriptor={
+                                "id": "srtm-dem",
+                                "capability_id": "elevation_dem_srtm",
+                                "label": "Elevation DEM (SRTM)",
+                            },
+                        ),
+                        OverlayInstance(
+                            instance_id="eea-noise",
+                            capability_id="eea_noise_exposure_2019",
+                            label="EEA Noise Exposure 2019",
+                            provider="eea",
+                            overlay_type="raster",
+                            rendering_mode="wms",
+                            resolved_location=first.map_session.resolved_location,
+                            viewport=first.map_session.viewport.model_dump(mode="json"),
+                            descriptor={
+                                "id": "eea-noise",
+                                "capability_id": "eea_noise_exposure_2019",
+                                "label": "EEA Noise Exposure 2019",
+                            },
+                        ),
+                    ]
+                )
+            }
+        )
+        orchestrator.task_state_service.set_active_visualization(
+            conversation_id,
+            active_session,
+        )
+        persisted_state = orchestrator.conversation_repository.read_state(
+            conversation_id
+        )
+        persisted_state["task_snapshot"] = (
+            orchestrator.task_state_service.serialize(conversation_id)
+        )
+
+        second = await orchestrator.run_turn(
+            ChatTurnRequest(
+                message="Remove visible overlays and show average house prices.",
+                conversation_id=conversation_id,
+            )
+        )
+
+        assert second.operation is not None
+        assert second.operation.status == "partial"
+        assert second.map_session is not None
+        assert second.map_session.basemap_id == first.map_session.basemap_id
+        assert second.map_session.resolved_location == first.map_session.resolved_location
+        assert second.map_session.overlay_collection.instances == []
+        assert second.map_session.overlay_collection.revision == 1
+        assert second.visualization_update is not None
+        assert second.visualization_update.removed_instance_ids == [
+            "eea-noise",
+            "srtm-dem",
+        ]
+        assert second.visualization_update.collection_revision == 1
+        assert "Removed 2 active overlays." in second.assistant_message
+        assert "unsupported" in second.assistant_message.lower()
+        assert "house_prices" in second.assistant_message
+        assert len(orchestrator.search_orchestrator.requests) == 1
 
     run_async_in_thread(_run())
 

@@ -47,6 +47,7 @@ from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.tool_planner import DeterministicToolPlanner
 from server.prompts.agent import build_native_agent_messages
 from server.services.llm.types import LLMToolDefinition
+from server.services.llm.context_budget import calculate_context_usage_percent
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 from server.services.chat.history_service import ChatHistoryService
 from server.services.search.orchestrator import LocationSearchOrchestrator
@@ -144,6 +145,11 @@ class AgentOrchestrator:
         progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> ChatTurnResponse:
         conversation_id = payload.conversation_id
+        if hasattr(self.response_synthesizer, "last_context_usage"):
+            try:
+                self.response_synthesizer.last_context_usage = None
+            except (AttributeError, TypeError):
+                pass
         repository = self.conversation_repository
         persisted: dict[str, Any] | None = None
         directives: list[ConversationDirective] = []
@@ -164,6 +170,14 @@ class AgentOrchestrator:
         )
         self._active_directives[conversation_id] = directives
         response = await self._run_turn(payload, progress_callback)
+        synthesis_usage = getattr(self.response_synthesizer, "last_context_usage", None)
+        self._emit_context_usage(
+            progress_callback,
+            request_id=response.request_id,
+            conversation_id=conversation_id,
+            phase="synthesis",
+            usage=synthesis_usage,
+        )
         response = self._with_phase_usage(response)
         revision = repository.write_state(
             conversation_id,
@@ -184,6 +198,28 @@ class AgentOrchestrator:
         )
         response = response.model_copy(update={"context_revision": revision})
         return response
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _emit_context_usage(
+        progress_callback: Callable[[str, dict[str, Any]], None] | None,
+        *,
+        request_id: str,
+        conversation_id: str,
+        phase: str,
+        usage: object,
+    ) -> None:
+        if progress_callback is None or not is_json_object(usage):
+            return
+        progress_callback(
+            "context_usage",
+            {
+                "request_id": request_id,
+                "conversation_id": conversation_id,
+                "phase": phase,
+                "context_usage": dict(usage),
+            },
+        )
 
     # -------------------------------------------------------------------------
     def _with_phase_usage(self, response: ChatTurnResponse) -> ChatTurnResponse:
@@ -227,6 +263,11 @@ class AgentOrchestrator:
             if reported is not None:
                 return reported
             return numeric_value(item, "estimated_input_tokens") or 0
+
+        def phase_peak_value(item: dict[str, Any]) -> int:
+            return numeric_value(item, "peak_request_tokens") or effective_input_value(
+                item
+            )
 
         phases: dict[str, dict[str, Any]] = {}
         if response.context_usage is not None:
@@ -318,20 +359,47 @@ class AgentOrchestrator:
             if is_json_object(item)
             and numeric_value(item, "reported_output_tokens") is not None
         ]
+        peak_inputs = [
+            phase_peak_value(item)
+            for item in phases.values()
+            if is_json_object(item)
+        ]
+        model_context_limit = base_usage.model_context_limit
+        if not isinstance(model_context_limit, int) or model_context_limit <= 0:
+            model_context_limit = next(
+                (
+                    value
+                    for item in phases.values()
+                    if is_json_object(item)
+                    for value in [numeric_value(item, "model_context_limit")]
+                    if value is not None and value > 0
+                ),
+                None,
+            )
+        selected_context_window = base_usage.selected_context_window
+        if selected_context_window is None:
+            selected_context_window = next(
+                (
+                    value
+                    for item in phases.values()
+                    if is_json_object(item)
+                    for value in [numeric_value(item, "selected_context_window")]
+                    if value is not None and value > 0
+                ),
+                None,
+            )
         usage = base_usage.model_copy(
             update={
                 "phases": phases,
-                "peak_request_tokens": max(inputs, default=0),
+                "model_context_limit": model_context_limit,
+                "selected_context_window": selected_context_window,
+                "peak_request_tokens": max(peak_inputs, default=0),
                 "total_input_tokens": sum(inputs),
                 "usage_percent": (
-                    round(
-                        (max(inputs, default=0)
-                         / max(base_usage.usable_prompt_budget_tokens, 1))
-                        * 100,
-                        1,
+                    calculate_context_usage_percent(
+                        max(peak_inputs, default=0),
+                        model_context_limit,
                     )
-                    if base_usage.usable_prompt_budget_tokens is not None
-                    else None
                 ),
                 "total_output_tokens": (
                     sum(output_values) if len(output_values) == len(phases) else None
@@ -480,7 +548,7 @@ class AgentOrchestrator:
             latest_memory=latest_memory,
         )
         turn_contract = self.capability_resolver.resolve(turn_contract)
-        LOGGER.info(
+        LOGGER.debug(
             "chat_turn_parsed request_id=%s conversation_key=%s task=%s action=%s relationship=%s context_query=%s tools_needed=%s specialist_candidate=%s viewport_scope=%s basemap=%s layers=%s concepts=%s",
             request_id,
             conversation_key,
@@ -520,7 +588,7 @@ class AgentOrchestrator:
             turn_contract,
             specialist,
         )
-        LOGGER.info(
+        LOGGER.debug(
             "chat_turn_routed request_id=%s conversation_key=%s specialist=%s active_visualization=%s",
             request_id,
             conversation_key,
@@ -534,6 +602,14 @@ class AgentOrchestrator:
             if is_json_object(parser_usage)
             else None
         )
+        if progress_callback is not None and context_usage is not None:
+            self._emit_context_usage(
+                progress_callback,
+                request_id=request_id,
+                conversation_id=conversation_id,
+                phase="parser",
+                usage=context_usage.model_dump(mode="json"),
+            )
         preflight_decision = self.policy_engine.evaluate_preflight(turn_contract)
         direct_response = await self.direct_turn_response_service.handle(
             request_id=request_id,
@@ -570,7 +646,7 @@ class AgentOrchestrator:
             specialist,
             latest_memory,
         )
-        LOGGER.info(
+        LOGGER.debug(
             "chat_turn_plan request_id=%s specialist=%s tools=%s steps=%d visualization_update=%s",
             request_id,
             specialist,
@@ -684,6 +760,15 @@ class AgentOrchestrator:
                 temperature=0.2,
                 max_tokens=None,
                 context=native_context,
+                context_usage_callback=(
+                    lambda usage: self._emit_context_usage(
+                        progress_callback,
+                        request_id=request_id,
+                        conversation_id=conversation_id,
+                        phase="native_loop",
+                        usage=usage,
+                    )
+                ),
             )
         )
         decision_trace_steps = [

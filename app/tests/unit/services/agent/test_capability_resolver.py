@@ -8,6 +8,7 @@ from server.contracts.extraction import (
     NormalizedAction,
     OverlayCommand,
     OverlaySelector,
+    OverlayScope,
     TemporalSignal,
     TurnParseResult,
 )
@@ -152,6 +153,41 @@ def test_preserves_unmatched_capability_ids_for_focused_clarification() -> None:
     resolved = _resolver().resolve(turn)
 
     assert resolved.overlay_commands[0].selector.capability_ids == ["fictional_overlay"]
+
+
+###############################################################################
+def test_unsupported_direct_values_preserve_valid_overlay_mutation() -> None:
+    turn = _turn(
+        "Remove visible overlays and show average house prices",
+        "house_prices",
+    )
+    turn = turn.model_copy(
+        update={
+            "task_class": "direct_query",
+            "requested_layers": [],
+            "requested_concepts": ["house_prices"],
+            "overlay_commands": [
+                OverlayCommand(
+                    action="remove",
+                    selector=OverlaySelector(visibility="visible"),
+                    scope=OverlayScope(kind="current_view"),
+                )
+            ],
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.requested_layers == []
+    assert resolved.overlay_commands[0].action == "remove"
+    assert resolved.overlay_commands[0].scope.kind == "current_view"
+    assert resolved.overlay_commands[0].selector.visibility == "visible"
+    assert resolved.clarification_plan is not None
+    assert resolved.clarification_plan["blocking_fields"] == ["direct_data_source"]
+    assert resolved.clarification_plan["apply_visualization_changes"] is True
+    assert "executable values" in resolved.clarification_plan["question"]
+    assert "unsupported" in resolved.clarification_plan["question"]
+    assert any("house_prices" in item for item in resolved.capability_limitations)
 
 
 ###############################################################################

@@ -222,6 +222,31 @@ class CapabilityResolver:
             )
 
         readable = ", ".join(self._dedupe(unresolved))
+        direct_query = turn.task_class == "direct_query"
+        limitation = (
+            f"No enabled executable data source matched: {readable}."
+            if direct_query
+            else f"No enabled executable layer matched: {readable}."
+        )
+        question = (
+            f"The enabled catalog does not provide executable values for {readable}. "
+            "Those values are unsupported by the current data sources."
+            if direct_query
+            else (
+                f"I could not match {readable} to an enabled map layer. "
+                "Can you describe the data you want to see in different terms?"
+            )
+        )
+        blocking_field = "direct_data_source" if direct_query else "geospatial_layer"
+        reason = (
+            "No compatible executable direct data capability was found for the "
+            "structured value request."
+            if direct_query
+            else (
+                "No compatible executable catalog capability was found for "
+                "the structured layer request."
+            )
+        )
         return turn.model_copy(
             update={
                 "requested_layers": resolved,
@@ -230,22 +255,18 @@ class CapabilityResolver:
                 "capability_limitations": self._dedupe(
                     [
                         *turn.capability_limitations,
-                        f"No enabled executable layer matched: {readable}.",
+                        limitation,
                     ]
                 ),
                 "clarification_plan": {
-                    "question": (
-                        f"I could not match {readable} to an enabled map layer. "
-                        "Can you describe the data you want to see in different terms?"
-                    ),
-                    "reason": (
-                        "No compatible executable catalog capability was found for "
-                        "the structured layer request."
-                    ),
-                    "blocking_fields": ["geospatial_layer"],
+                    "question": question,
+                    "reason": reason,
+                    "blocking_fields": [blocking_field],
                     "options": [],
                     "preserve_valid_results": True,
-                    "apply_visualization_changes": False,
+                    "apply_visualization_changes": bool(
+                        overlay_commands or turn.requested_basemap
+                    ),
                 },
                 "ambiguities": self._dedupe(
                     [*turn.ambiguities, "unresolved_geospatial_capability"]

@@ -74,28 +74,20 @@ class AgentTurnStateAssembler:
         """
         collection_session = state_session or session
         collection = OverlayCollectionService.from_map_session(collection_session)
-        bound_commands: list[OverlayCommand] = []
-        for command in commands:
-            if command.state_reference.revision == 0 and collection.revision > 0:
-                command = command.model_copy(
-                    update={
-                        "state_reference": command.state_reference.model_copy(
-                            update={"revision": collection.revision}
-                        )
-                    }
-                )
-            bound_commands.append(command)
-        collection, results = OverlayCollectionService.apply_commands(
+        current_view = session.viewport.model_dump(mode="json")
+        basemap = collection_session.basemap
+        candidate_catalog = OverlayCollectionService.catalog_from_collection(
+            OverlayCollectionService.from_map_session(session)
+        )
+        current_collection, results = OverlayCollectionService.apply_commands(
             collection,
-            bound_commands,
-            catalog=OverlayCollectionService.catalog_from_collection(
-                OverlayCollectionService.from_map_session(session)
-            ),
-            current_view=session.viewport.model_dump(mode="json"),
-            basemap=collection_session.basemap,
+            commands,
+            catalog=candidate_catalog,
+            current_view=current_view,
+            basemap=basemap,
         )
         return OverlayCollectionService.merge_into_map_session(
-            session, collection
+            session, current_collection
         ), results
 
     # -------------------------------------------------------------------------
@@ -119,50 +111,53 @@ class AgentTurnStateAssembler:
             conversation_key
         ).active_map_session
         map_session: MapSession | None = None
-        removed_layers: list[str] = []
+        overlay_mutation_results: list[OverlayMutationResult] = []
         visualization_changes = task.visualization_changes
         requested_basemap = visualization_changes.get("basemap")
-        if bool(clarification.get("apply_visualization_changes")) and is_json_object(
-            previous_raw
-        ):
+        active_map_session = self._map_session_from_memory(previous_raw)
+        if active_map_session is None:
+            active_map_session = self._map_session_from_memory(
+                latest_memory.get("active_visualization")
+            )
+        if active_map_session is not None:
             try:
-                previous = MapSession.model_validate(previous_raw)
-                previous_overlay_ids = self._overlay_capability_ids(previous)
-                removed_layers = [
-                    layer_id
-                    for layer_id in previous_overlay_ids
-                    if layer_id
-                    in {
-                        "VIIRS_SNPP_CorrectedReflectance_TrueColor",
-                        "MODIS_Terra_CorrectedReflectance_TrueColor",
-                    }
-                ]
-                retained = [
-                    layer_id
-                    for layer_id in previous_overlay_ids
-                    if layer_id not in removed_layers
-                ]
-                plan = ExecutionPlan(
-                    state="map_search",
-                    mode="map",
-                    action_id=turn_contract.normalized_action.action_id,
-                    basemap_id=(
-                        str(requested_basemap)
-                        if isinstance(requested_basemap, str) and requested_basemap
-                        else previous.basemap_id
-                    ),
-                    overlay_ids=retained,
+                current_view = active_map_session.viewport.model_dump(mode="json")
+                local_commands = OverlayCollectionService.locally_applicable_commands(
+                    OverlayCollectionService.from_map_session(active_map_session),
+                    turn_contract.overlay_commands,
+                    current_view=current_view,
                 )
-                request = self.request_builder.build_location_search_request(
-                    plan,
-                    previous.resolved_location,
-                    turn_contract=turn_contract,
-                    active_visualization=previous.model_dump(mode="json"),
-                )
-                map_session = await self.search_orchestrator.execute(request)
+                if local_commands:
+                    map_session, overlay_mutation_results = self.apply_overlay_commands(
+                        active_map_session,
+                        local_commands,
+                    )
+                if bool(clarification.get("apply_visualization_changes")) and (
+                    isinstance(requested_basemap, str) and requested_basemap
+                ):
+                    source_map = map_session or active_map_session
+                    plan = ExecutionPlan(
+                        state="map_search",
+                        mode="map",
+                        action_id=turn_contract.normalized_action.action_id,
+                        basemap_id=requested_basemap,
+                        overlay_ids=self._overlay_capability_ids(source_map),
+                    )
+                    request = self.request_builder.build_location_search_request(
+                        plan,
+                        source_map.resolved_location,
+                        turn_contract=turn_contract,
+                        active_visualization=source_map.model_dump(mode="json"),
+                    )
+                    fetched_map = await self.search_orchestrator.execute(request)
+                    map_session = OverlayCollectionService.merge_into_map_session(
+                        fetched_map,
+                        source_map.overlay_collection,
+                    )
             except Exception as exc:
                 LOGGER.warning(
-                    "Could not apply partial follow-up map update", exc_info=True
+                    "Could not apply partial follow-up map update category=%s",
+                    type(exc).__name__,
                 )
                 failure = TaskFailureDetail(
                     stage="visualization_update",
@@ -193,12 +188,63 @@ class AgentTurnStateAssembler:
                 resolved_for_memory,
                 turn_contract.normalized_action,
             )
-        applied_change = (
-            f"I applied the valid map change to {requested_basemap}. "
-            if map_session is not None and requested_basemap
-            else ""
+        removed_instance_ids = [
+            instance_id
+            for result in overlay_mutation_results
+            for instance_id in result.removed_instance_ids
+        ]
+        removed_instance_id_set = set(removed_instance_ids)
+        removed_layer_ids = (
+            [
+                instance.capability_id
+                for instance in active_map_session.overlay_collection.instances
+                if instance.instance_id in removed_instance_id_set
+            ]
+            if active_map_session is not None
+            else []
         )
+        added_instance_ids = [
+            instance_id
+            for result in overlay_mutation_results
+            for instance_id in result.added_instance_ids
+        ]
+        updated_instance_ids = [
+            instance_id
+            for result in overlay_mutation_results
+            for instance_id in result.updated_instance_ids
+        ]
+        unmatched_selectors = [
+            selector
+            for result in overlay_mutation_results
+            for selector in result.unmatched_selectors
+        ]
+        ambiguous_selectors = [
+            selector
+            for result in overlay_mutation_results
+            for selector in result.ambiguous_selectors
+        ]
+        mutation_clarification = next(
+            (
+                result.clarification
+                for result in overlay_mutation_results
+                if result.clarification
+            ),
+            None,
+        )
+        applied_parts: list[str] = []
+        if removed_instance_ids:
+            applied_parts.append(
+                f"Removed {len(removed_instance_ids)} active overlay"
+                f"{'s' if len(removed_instance_ids) != 1 else ''}."
+            )
+        if map_session is not None and requested_basemap:
+            applied_parts.append(f"Applied the requested basemap: {requested_basemap}.")
+        applied_change = " ".join(applied_parts)
+        if applied_change:
+            applied_change += " "
         assistant_message = f"{applied_change}{question}"
+        if mutation_clarification:
+            assistant_message = f"{assistant_message} {mutation_clarification}"
         operation = ChatOperationResult(
             kind="clarification",
             status="partial",
@@ -253,7 +299,19 @@ class AgentTurnStateAssembler:
                 if isinstance(requested_basemap, str) and requested_basemap
                 else None
             ),
-            remove_layer_ids=removed_layers,
+            add_layer_ids=added_instance_ids,
+            remove_layer_ids=removed_layer_ids,
+            collection_revision=(
+                map_session.overlay_collection.revision
+                if map_session is not None
+                else None
+            ),
+            added_instance_ids=added_instance_ids,
+            removed_instance_ids=removed_instance_ids,
+            updated_instance_ids=sorted(set(updated_instance_ids)),
+            unmatched_selectors=unmatched_selectors,
+            ambiguous_selectors=ambiguous_selectors,
+            clarification=mutation_clarification,
         )
         self.history_service.append_message(
             conversation_id=conversation_id,

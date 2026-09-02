@@ -17,7 +17,7 @@ import {
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { LocalCommandService } from '../core/local-command.service';
-import { normalizeMapSession } from '../core/api-parsers';
+import { normalizeMapSession, parseContextUsage } from '../core/api-parsers';
 import { PersistedChatPageState } from '../core/app-state';
 import { MAX_CHAT_MESSAGE_LENGTH } from '../core/constants';
 import { parseRunCompletionPayload, parseRunEvent } from '../core/realtime-parsers';
@@ -257,42 +257,46 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     const approximate = source !== 'provider_reported';
     if (this.contextUsage.usage_percent === null) {
-      const tokens = this.contextUsage.reported_input_tokens ?? this.contextUsage.estimated_input_tokens;
-      return `${approximate ? '~' : ''}${tokens.toLocaleString()} tokens`;
+      return 'Context limit unavailable';
     }
-    return `${approximate ? '~' : ''}${this.contextUsagePercent}%`;
+    return `${approximate ? '~' : ''}${Math.round(this.contextUsage.usage_percent)}%`;
   }
 
   get contextUsageDetail(): string {
     if (!this.contextUsage) {
       return 'No request measured';
     }
-    const selected = this.contextUsage.selected_context_window ?? this.contextUsage.model_context_limit;
+    const modelLimit = this.contextUsage.model_context_limit;
+    const selected = this.contextUsage.selected_context_window;
     const model = [this.contextUsage.provider, this.contextUsage.model].filter(Boolean).join(' / ');
     const source = this.contextUsage.usage_source || 'estimated';
-    const inputTokens = this.contextUsage.reported_input_tokens ?? this.contextUsage.estimated_input_tokens;
+    const inputValue = this.contextUsage.reported_input_tokens ?? this.contextUsage.estimated_input_tokens;
     const estimateText = this.contextUsage.reported_input_tokens === null || this.contextUsage.reported_input_tokens === undefined
       ? 'estimated'
       : 'provider-reported';
-    const limitText = selected
-      ? `${selected.toLocaleString()} token cap${this.contextUsage.usable_prompt_budget_tokens !== null && this.contextUsage.usable_prompt_budget_tokens !== undefined
-        ? `, ${this.contextUsage.usable_prompt_budget_tokens.toLocaleString()} usable prompt tokens`
-        : ''}`
-      : 'limit unavailable';
+    const limitText = modelLimit
+      ? `max context ${modelLimit.toLocaleString()}`
+      : 'max context unavailable';
+    const usageText = modelLimit && this.contextUsage.usage_percent !== null
+      ? `${inputValue.toLocaleString()} / ${modelLimit.toLocaleString()} (${this.contextUsage.usage_percent}%)`
+      : `${inputValue.toLocaleString()} used`;
     const phases = this.contextUsage.phases && Object.keys(this.contextUsage.phases).length > 0
       ? `; phases: ${Object.entries(this.contextUsage.phases).map(([name, value]) => {
         const phase = value && typeof value === 'object' ? value as Record<string, unknown> : {};
-        const phaseTokens = typeof phase['reported_input_tokens'] === 'number'
+        const phaseInput = typeof phase['reported_input_tokens'] === 'number'
           ? phase['reported_input_tokens']
           : typeof phase['estimated_input_tokens'] === 'number'
             ? phase['estimated_input_tokens']
             : undefined;
         const phaseSource = typeof phase['usage_source'] === 'string' ? phase['usage_source'] : undefined;
-        return `${name}${phaseTokens === undefined ? '' : ` ${phaseTokens.toLocaleString()} tokens`}${phaseSource ? ` (${phaseSource})` : ''}`;
+        return `${name}${phaseInput === undefined ? '' : ` ${phaseInput.toLocaleString()} used`}${phaseSource ? ` (${phaseSource})` : ''}`;
       }).join(', ')}`
       : '';
     const compaction = this.contextUsage.compaction_applied ? '; compaction applied' : '';
-    return `${inputTokens.toLocaleString()} tokens (${estimateText}) / ${limitText}${model ? ` - ${model}` : ''}; source: ${source}${phases}${compaction}`;
+    const selectedText = selected && selected !== modelLimit
+      ? `; selected context ${selected.toLocaleString()}`
+      : '';
+    return `Context used: ${usageText} (${estimateText}); ${limitText}${selectedText}${model ? ` - ${model}` : ''}; source: ${source}${phases}${compaction}`;
   }
 
   get contextUsageTone(): 'neutral' | 'warning' | 'critical' {
@@ -753,6 +757,13 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.realtimeService.setResumeCursor(event.run_id, event.sequence);
     this.activeRunVersion = event.run_version;
     switch (event.type) {
+      case 'context_usage': {
+        const usage = parseContextUsage(event.payload['context_usage']);
+        if (usage) {
+          this.applyContextUsage(usage, false);
+        }
+        break;
+      }
       case 'progress':
       case 'tool_started':
       case 'tool_completed':

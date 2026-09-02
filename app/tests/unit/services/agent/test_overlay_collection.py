@@ -144,6 +144,105 @@ def test_location_scoped_remove_does_not_remove_other_scope() -> None:
 
 
 ###############################################################################
+def test_current_view_remove_removes_only_visible_overlays_inside_view() -> None:
+    collection = OverlayCollectionState(
+        instances=[
+            _instance(
+                "inside-visible",
+                "weather-inside",
+                label="Inside visible",
+                scope_key="view",
+                latitude=47.05,
+                longitude=8.05,
+            ),
+            _instance(
+                "inside-hidden",
+                "weather-hidden",
+                label="Inside hidden",
+                scope_key="view",
+                latitude=47.06,
+                longitude=8.06,
+                visible=False,
+            ),
+            _instance(
+                "outside-visible",
+                "weather-outside",
+                label="Outside visible",
+                scope_key="other",
+                latitude=47.50,
+                longitude=8.50,
+            ),
+        ]
+    )
+    command = OverlayCommand(
+        action="remove",
+        selector=OverlaySelector(visibility="visible"),
+        scope=OverlayScope(kind="current_view"),
+        state_reference=OverlayStateReference(revision=0),
+    )
+
+    updated, result = OverlayCollectionService.apply(
+        collection,
+        command,
+        current_view={
+            "center_latitude": 47.05,
+            "center_longitude": 8.05,
+            "radius_m": 10_000,
+            "bbox": [8.0, 47.0, 8.1, 47.1],
+        },
+    )
+
+    assert updated.revision == 1
+    assert [item.instance_id for item in updated.instances] == [
+        "inside-hidden",
+        "outside-visible",
+    ]
+    assert result.removed_instance_ids == ["inside-visible"]
+
+
+###############################################################################
+def test_current_view_remove_uses_viewport_center_when_bbox_is_unavailable() -> None:
+    collection = OverlayCollectionState(
+        instances=[
+            _instance(
+                "same-location",
+                "weather-same",
+                label="Same location",
+                scope_key="view",
+                latitude=47.37,
+                longitude=8.54,
+            ),
+            _instance(
+                "other-location",
+                "weather-other",
+                label="Other location",
+                scope_key="other",
+                latitude=47.50,
+                longitude=8.50,
+            ),
+        ]
+    )
+    command = OverlayCommand(
+        action="remove",
+        selector=OverlaySelector(visibility="visible"),
+        scope=OverlayScope(kind="current_view"),
+    )
+
+    updated, result = OverlayCollectionService.apply(
+        collection,
+        command,
+        current_view={
+            "center_latitude": 47.37,
+            "center_longitude": 8.54,
+            "radius_m": 2_500,
+        },
+    )
+
+    assert [item.instance_id for item in updated.instances] == ["other-location"]
+    assert result.removed_instance_ids == ["same-location"]
+
+
+###############################################################################
 def test_keep_only_removes_nonmatching_instances() -> None:
     collection = OverlayCollectionState(
         instances=[
@@ -191,6 +290,88 @@ def test_revision_conflict_preserves_collection() -> None:
     assert updated == collection
     assert result.revision == 3
     assert result.clarification
+
+
+###############################################################################
+def test_apply_overlay_commands_binds_default_revision_between_mutations() -> None:
+    weather = _instance(
+        "weather-zurich",
+        "openmeteo_weather_forecast",
+        label="Weather",
+        scope_key="Zurich",
+        latitude=47.37,
+        longitude=8.54,
+    )
+    traffic = _instance(
+        "traffic-zurich",
+        "tomtom_traffic_flow",
+        label="Traffic",
+        scope_key="Zurich",
+        latitude=47.37,
+        longitude=8.54,
+    )
+    session = MapSession(
+        session_id="map-1",
+        resolved_location=ResolvedLocation(
+            label="Zurich", latitude=47.37, longitude=8.54
+        ),
+        basemap_id="osm_default",
+        viewport=ViewportPolicy(
+            center_latitude=47.37,
+            center_longitude=8.54,
+            radius_m=2_500,
+        ),
+        overlay_collection=OverlayCollectionState(instances=[weather, traffic]),
+    )
+
+    updated, results = AgentTurnStateAssembler.apply_overlay_commands(
+        session,
+        [
+            OverlayCommand(
+                action="remove",
+                selector=OverlaySelector(instance_ids=["weather-zurich"]),
+            ),
+            OverlayCommand(
+                action="hide",
+                selector=OverlaySelector(instance_ids=["traffic-zurich"]),
+            ),
+        ],
+    )
+
+    assert [result.revision for result in results] == [1, 2]
+    assert updated.overlay_collection.revision == 2
+    assert updated.overlay_collection.instances[0].visible is False
+
+
+###############################################################################
+def test_local_overlay_partition_keeps_provider_work_independent() -> None:
+    collection = OverlayCollectionState(
+        instances=[
+            _instance(
+                "weather-zurich",
+                "openmeteo_weather_forecast",
+                label="Weather",
+                scope_key="Zurich",
+                latitude=47.37,
+                longitude=8.54,
+            )
+        ]
+    )
+    remove = OverlayCommand(
+        action="remove",
+        selector=OverlaySelector(instance_ids=["weather-zurich"]),
+    )
+    add = OverlayCommand(
+        action="add",
+        selector=OverlaySelector(capability_ids=["missing-capability"]),
+    )
+
+    applicable = OverlayCollectionService.locally_applicable_commands(
+        collection, [remove, add]
+    )
+
+    assert applicable == [remove]
+    assert not OverlayCollectionService.can_apply_locally(collection, [remove, add])
 
 
 ###############################################################################

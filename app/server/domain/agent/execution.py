@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -28,6 +29,7 @@ class AgentToolLoopRequest:
     temperature: float
     max_tokens: int | None = None
     context: AgentExecutionContext = field(default_factory=AgentExecutionContext)
+    context_usage_callback: Callable[[dict[str, Any]], None] | None = None
 
 
 ###############################################################################

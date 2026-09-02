@@ -80,7 +80,7 @@ class ToolPlanExecutor:
                 group = step.parallel_group or f"serial:{step.step_id}"
                 grouped.setdefault(group, []).append(step)
             for group, steps in grouped.items():
-                LOGGER.info(
+                LOGGER.debug(
                     "tool_plan_group_started group=%s steps=%s",
                     group,
                     [step.step_id for step in steps],

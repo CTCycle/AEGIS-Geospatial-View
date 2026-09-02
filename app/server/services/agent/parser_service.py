@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from server.common.typing import is_json_array, is_json_object
+from server.common.typing import is_json_array, is_json_object, json_array
 
 import json
 import re
@@ -219,11 +219,22 @@ class ParserService:
         )
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _overlay_commands(values: list[Any]) -> list[OverlayCommand]:
-        """Convert model extraction into the typed mutation contract."""
+    @classmethod
+    def _overlay_commands(
+        cls, extracted: LLMParserExtraction
+    ) -> list[OverlayCommand]:
+        """Convert extraction into a complete typed mutation contract.
+
+        Some providers describe map mutations in their atomic task graph while
+        omitting the dedicated overlay command field.  The task graph is still
+        typed execution evidence, so recover that mutation here instead of
+        inspecting the user's prose or guessing a provider capability.  A
+        removal sourced from the active map is deliberately canonicalized to a
+        current-view visible-overlay selector so persisted instance ids cannot
+        make a bulk mutation stale.
+        """
         commands: list[OverlayCommand] = []
-        for value in values:
+        for value in extracted.overlay_commands:
             try:
                 payload = (
                     value.model_dump(mode="json")
@@ -241,7 +252,150 @@ class ParserService:
                 LOGGER.warning(
                     "Ignoring invalid overlay command from parser extraction"
                 )
+        for task in extracted.atomic_tasks:
+            command = cls._overlay_command_from_atomic_task(task)
+            if command is None:
+                continue
+            task_payload = (
+                task.model_dump(mode="json")
+                if hasattr(task, "model_dump")
+                else task
+            )
+            if cls._is_bulk_active_overlay_removal(command, task_payload):
+                replacement = next(
+                    (
+                        index
+                        for index, existing in enumerate(commands)
+                        if existing.action == "remove"
+                        and existing.scope.kind == "current_view"
+                    ),
+                    None,
+                )
+                if replacement is None:
+                    replacement = next(
+                        (
+                            index
+                            for index, existing in enumerate(commands)
+                            if existing.action == "remove"
+                        ),
+                        None,
+                    )
+                if replacement is not None:
+                    existing = commands[replacement]
+                    command = existing.model_copy(
+                        update={
+                            "selector": {
+                                "instance_ids": [],
+                                "capability_ids": [],
+                                "concepts": [],
+                                "labels": [],
+                                "providers": [],
+                                "overlay_types": [],
+                                "rendering_modes": [],
+                                "tags": [],
+                                "visibility": "visible",
+                            },
+                            "scope": {
+                                "kind": "current_view",
+                                "location": None,
+                                "label": None,
+                            },
+                        }
+                    )
+                    commands[replacement] = command
+                    continue
+            if command.model_dump(mode="json") not in [
+                item.model_dump(mode="json") for item in commands
+            ]:
+                commands.append(command)
         return commands
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _overlay_command_from_atomic_task(cls, task: Any) -> OverlayCommand | None:
+        payload = task.model_dump(mode="json") if hasattr(task, "model_dump") else task
+        if not is_json_object(payload):
+            return None
+        changes = payload.get("visualization_changes")
+        if not is_json_object(changes):
+            return None
+        action = changes.get("action")
+        if action not in {"add", "remove", "keep_only", "show", "hide", "update"}:
+            return None
+        selector = (
+            dict(changes.get("selector"))
+            if is_json_object(changes.get("selector"))
+            else {}
+        )
+        for field_name in (
+            "instance_ids",
+            "capability_ids",
+            "concepts",
+            "labels",
+            "providers",
+            "overlay_types",
+            "rendering_modes",
+            "tags",
+            "visibility",
+        ):
+            if field_name in changes and field_name not in selector:
+                selector[field_name] = changes[field_name]
+        scope = (
+            dict(changes.get("scope"))
+            if is_json_object(changes.get("scope"))
+            else {}
+        )
+        patch = (
+            dict(changes.get("patch"))
+            if is_json_object(changes.get("patch"))
+            else {}
+        )
+        state_reference = (
+            dict(changes.get("state_reference"))
+            if is_json_object(changes.get("state_reference"))
+            else {}
+        )
+        if action == "remove" and cls._has_active_overlay_output(payload):
+            selector = {"visibility": "visible"}
+            scope = {"kind": "current_view"}
+        try:
+            return OverlayCommand.model_validate(
+                {
+                    "action": action,
+                    "selector": selector,
+                    "scope": scope,
+                    "patch": patch,
+                    "state_reference": state_reference,
+                }
+            )
+        except Exception:
+            return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_bulk_active_overlay_removal(
+        command: OverlayCommand, task_payload: object
+    ) -> bool:
+        return command.action == "remove" and ParserService._has_active_overlay_output(
+            task_payload
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _has_active_overlay_output(task_payload: object) -> bool:
+        if not is_json_object(task_payload):
+            return False
+        input_refs = {
+            str(item).strip()
+            for item in json_array(task_payload.get("input_refs"))
+            if str(item).strip()
+        }
+        output_refs = {
+            str(item).strip()
+            for item in json_array(task_payload.get("output_refs"))
+            if str(item).strip()
+        }
+        return "active_map_session" in input_refs and "overlay_removed" in output_refs
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -377,7 +531,7 @@ class ParserService:
             extracted.task_class,
             extracted.action_id,
         )
-        LOGGER.info(
+        LOGGER.debug(
             "parser_extract provider=%s model=%s task=%s action=%s relationship=%s viewport_scope=%s",
             provider_name,
             model_name,
@@ -534,7 +688,7 @@ class ParserService:
                 entity_target=extracted.entity_target,
                 requested_concepts=cls._dedupe(extracted.requested_concepts),
                 requested_layers=cls._dedupe(extracted.requested_layers),
-            overlay_commands=cls._overlay_commands(extracted.overlay_commands),
+            overlay_commands=cls._overlay_commands(extracted),
                 poi_categories=list(dict.fromkeys(extracted.poi_categories)),
                 radius_m=extracted.radius_m,
                 result_limit=extracted.result_limit,
@@ -620,7 +774,13 @@ class ParserService:
         except LLMConfigurationError:
             raise
         except Exception as exc:
-            LOGGER.exception("Parser LLM extraction failed: %s", exc)
+            LOGGER.warning(
+                "Parser LLM extraction failed category=%s code=%s provider=%s model=%s",
+                getattr(exc, "category", None) or "provider_api",
+                getattr(exc, "code", None) or type(exc).__name__,
+                getattr(exc, "provider", None) or self.provider or "unknown",
+                getattr(exc, "model", None) or self.model or "unknown",
+            )
             failure_context_usage = getattr(exc, "context_usage", None)
             if is_json_object(failure_context_usage):
                 self.last_context_usage = dict(failure_context_usage)
@@ -694,7 +854,7 @@ class ParserService:
             extracted.context_query.kind != "none"
             and AgentTurnSupport.has_executable_intent(extracted)
         ):
-            LOGGER.info(
+            LOGGER.debug(
                 "parser_context_query_suppressed action=%s task=%s context_query=%s",
                 extracted.action_id,
                 extracted.task_class,
@@ -799,11 +959,10 @@ class ParserService:
             ambiguities = self._dedupe([*ambiguities, "deictic_without_memory"])
 
         if normalized_action.requires_location and not location_signals:
-            LOGGER.info(
-                "Parser missing location: action=%s ambiguities=%s user_text=%r",
+            LOGGER.debug(
+                "Parser missing location: action=%s ambiguities=%s",
                 normalized_action.action_id,
                 ambiguities,
-                user_message,
             )
         confidence = extracted.parser_confidence
         if ambiguities:
@@ -828,7 +987,7 @@ class ParserService:
             entity_target=extracted.entity_target,
             requested_concepts=self._dedupe(extracted.requested_concepts),
             requested_layers=self._dedupe(extracted.requested_layers),
-            overlay_commands=self._overlay_commands(extracted.overlay_commands),
+            overlay_commands=self._overlay_commands(extracted),
             poi_categories=list(dict.fromkeys(extracted.poi_categories)),
             radius_m=extracted.radius_m,
             result_limit=extracted.result_limit,
@@ -860,7 +1019,7 @@ class ParserService:
             provider_error=parser_provider_error,
             failure_category=self._normalize_failure_category(parser_failure_category),
         )
-        LOGGER.info(
+        LOGGER.debug(
             "parser_normalized task=%s action=%s relationship=%s context_query=%s tools_needed=%s direct_response_sufficient=%s locations=%d basemap=%s layers=%d concepts=%s viewport_scope=%s tighten=%s ambiguities=%s",
             result.task_class,
             result.normalized_action.action_id,

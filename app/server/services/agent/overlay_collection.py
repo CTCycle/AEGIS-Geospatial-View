@@ -278,10 +278,13 @@ class OverlayCollectionService:
         if not isinstance(value, dict):
             return None
         location = cast(dict[str, Any], value)
-        latitude = location.get("latitude")
-        longitude = location.get("longitude")
+        latitude = location.get("latitude", location.get("center_latitude"))
+        longitude = location.get("longitude", location.get("center_longitude"))
         if isinstance(latitude, (int, float)) and isinstance(longitude, (int, float)):
             return float(latitude), float(longitude)
+        nested_location = location.get("location")
+        if isinstance(nested_location, dict):
+            return cls._location_point(nested_location)
         return None
 
     # -------------------------------------------------------------------------
@@ -335,15 +338,33 @@ class OverlayCollectionService:
             if instance.resolved_location is not None
             else instance.scope
         )
+        instance_viewport = instance.viewport or {}
+        instance_point = instance_point or cls._location_point(instance_viewport)
         if scope.kind == "current_view":
             view = current_view or {}
             view_bbox = view.get("bbox")
             if cls._bbox_contains(view_bbox, instance_point):
                 return True
-            instance_bbox = instance.viewport.get("bbox") if instance.viewport else None
+            instance_bbox = instance_viewport.get("bbox")
             if view_bbox is not None and instance_bbox is not None:
                 return cls._bboxes_intersect(view_bbox, instance_bbox)
-            return False
+            if view_bbox is not None:
+                return False
+            view_point = cls._location_point(view)
+            if view_point is None or instance_point is None:
+                return False
+            view_radius = view.get("radius_m")
+            if isinstance(view_radius, (int, float)) and view_radius > 0:
+                instance_radius = instance_viewport.get("radius_m")
+                padding = (
+                    float(instance_radius)
+                    if isinstance(instance_radius, (int, float)) and instance_radius > 0
+                    else 0.0
+                )
+                return cls._distance_m(view_point, instance_point) <= float(
+                    view_radius
+                ) + padding
+            return view_point == instance_point
         target = scope.location or {}
         target_bbox = target.get("bbox")
         if cls._bbox_contains(target_bbox, instance_point):
@@ -861,6 +882,14 @@ class OverlayCollectionService:
         current = collection.model_copy(deep=True)
         results: list[OverlayMutationResult] = []
         for command in commands:
+            if command.state_reference.revision == 0 and current.revision > 0:
+                command = command.model_copy(
+                    update={
+                        "state_reference": command.state_reference.model_copy(
+                            update={"revision": current.revision}
+                        )
+                    }
+                )
             current, result = cls.apply(
                 current,
                 command,
@@ -884,6 +913,67 @@ class OverlayCollectionService:
         return bool(
             cls._matching_instances(collection, command, current_view=current_view)
         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def can_apply_locally(
+        cls,
+        collection: OverlayCollectionState,
+        commands: Iterable[OverlayCommand],
+        *,
+        current_view: dict[str, Any] | None = None,
+    ) -> bool:
+        """Return whether every command can be satisfied from active state.
+
+        Removal, visibility, and presentation-only updates operate on the
+        authoritative collection.  Adding a missing overlay, or changing a
+        provider-backed variant, still requires the normal provider path.
+        """
+
+        command_list = list(commands)
+        return bool(command_list) and len(
+            cls.locally_applicable_commands(
+                collection,
+                command_list,
+                current_view=current_view,
+            )
+        ) == len(command_list)
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def locally_applicable_commands(
+        cls,
+        collection: OverlayCollectionState,
+        commands: Iterable[OverlayCommand],
+        *,
+        current_view: dict[str, Any] | None = None,
+    ) -> list[OverlayCommand]:
+        """Select commands that need no provider fetch from active state."""
+
+        applicable: list[OverlayCommand] = []
+        for command in commands:
+            if command.action in {"remove", "keep_only", "hide"}:
+                applicable.append(command)
+                continue
+            if command.action not in {"show", "update"}:
+                continue
+            if not cls.has_matching_instances(
+                collection,
+                command,
+                current_view=current_view,
+            ):
+                continue
+            if command.action == "update" and any(
+                value is not None
+                for value in (
+                    command.patch.time,
+                    command.patch.style,
+                    command.patch.format,
+                )
+            ):
+                continue
+            applicable.append(command)
+        return applicable
 
     # -------------------------------------------------------------------------
     @classmethod

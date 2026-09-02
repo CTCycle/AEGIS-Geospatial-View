@@ -46,6 +46,26 @@ def estimate_json_tokens(value: object) -> int:
 
 
 ###############################################################################
+def calculate_context_usage_percent(
+    effective_input: int | None,
+    model_context_limit: int | None,
+) -> float | None:
+    """Calculate usage against the model's exact context limit.
+
+    ``usable_prompt_budget`` includes output and safety reservations and is
+    intentionally reserved for request preparation.  The user-facing usage
+    indicator describes how much of the model context window the request
+    consumes, so it must use the model limit itself.
+    """
+
+    if effective_input is None or model_context_limit is None:
+        return None
+    if effective_input < 0 or model_context_limit <= 0:
+        return None
+    return round((effective_input / model_context_limit) * 100, 1)
+
+
+###############################################################################
 def resolve_model_context_limit(model: str) -> int | None:
     """Return no limit without an exact catalog or provider metadata record.
 
@@ -204,9 +224,7 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
     )
     estimated = message_tokens + tool_tokens + schema_tokens
     limit = profile.context_window_tokens if profile is not None else None
-    percent = (
-        round((estimated / max(usable, 1)) * 100, 1) if usable is not None else None
-    )
+    percent = calculate_context_usage_percent(estimated, limit)
     return ContextUsage(
         estimated_input_tokens=estimated,
         selected_context_window=limit,
@@ -291,13 +309,9 @@ def apply_reported_usage(
     effective_input = (
         input_tokens if input_tokens is not None else usage.estimated_input_tokens
     )
-    percent = (
-        round(
-            (effective_input / max(usage.usable_prompt_budget_tokens, 1)) * 100,
-            1,
-        )
-        if usage.usable_prompt_budget_tokens is not None
-        else None
+    percent = calculate_context_usage_percent(
+        effective_input,
+        usage.model_context_limit,
     )
     return replace(
         usage,
