@@ -86,7 +86,9 @@ class LLMStructuredOutput(dict[str, Any]):
         context_usage: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(payload)
-        self.context_usage = dict(context_usage) if context_usage is not None else None
+        self.context_usage = (
+            dict(context_usage) if context_usage is not None else None
+        )
 
 
 ###############################################################################
@@ -100,9 +102,7 @@ class LLMTextStream(Iterator[str]):
         context_usage: dict[str, Any] | None = None,
     ) -> None:
         self._iterator = iter(chunks)
-        self.context_usage = (
-            dict(context_usage) if context_usage is not None else None
-        )
+        self.context_usage = dict(context_usage) if context_usage is not None else None
 
     def __iter__(self) -> "LLMTextStream":
         return self
@@ -177,6 +177,9 @@ class ContextUsage:
     expected_output_tokens: int | None = None
     context_profile_source: str = "unknown"
     compaction_applied: bool = False
+    peak_request_tokens: int | None = None
+    total_input_tokens: int | None = None
+    total_output_tokens: int | None = None
 
     # -------------------------------------------------------------------------
     @property
@@ -210,4 +213,7 @@ class ContextUsage:
             "expected_output_tokens": self.expected_output_tokens,
             "context_profile_source": self.context_profile_source,
             "compaction_applied": self.compaction_applied,
+            "peak_request_tokens": self.peak_request_tokens,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
         }

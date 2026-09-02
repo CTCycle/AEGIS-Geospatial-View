@@ -70,15 +70,17 @@
             [attr.title]="contextUsageDetail"
           >
             <span class="context-window-row__label">Context</span>
-            <progress
-              class="context-window-row__progress"
-              max="100"
-              [attr.value]="contextUsage?.usage_percent !== null && contextUsage?.usage_percent !== undefined ? contextUsagePercent : null"
-              [attr.aria-valuenow]="contextUsage?.usage_percent !== null && contextUsage?.usage_percent !== undefined ? contextUsagePercent : null"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              [attr.aria-valuetext]="contextUsageDetail"
-            ></progress>
+            @if (hasContextMeasurement && contextUsage?.usage_percent !== null && contextUsage?.usage_percent !== undefined) {
+              <progress
+                class="context-window-row__progress"
+                max="100"
+                [attr.value]="contextUsagePercent"
+                [attr.aria-valuenow]="contextUsagePercent"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                [attr.aria-valuetext]="contextUsageDetail"
+              ></progress>
+            }
             <span class="context-window-row__value">{{ contextUsageLabel }}</span>
           </div>
           @if (composerError) {

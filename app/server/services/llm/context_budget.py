@@ -245,6 +245,8 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
         compaction_applied=bool(
             _request_metadata(request).get("_context_compaction_applied")
         ),
+        peak_request_tokens=estimated,
+        total_input_tokens=estimated,
     )
 
 
@@ -317,6 +319,15 @@ def apply_reported_usage(
         usage,
         reported_input_tokens=input_tokens,
         reported_output_tokens=output_tokens,
+        peak_request_tokens=(
+            input_tokens if input_tokens is not None else usage.peak_request_tokens
+        ),
+        total_input_tokens=(
+            input_tokens if input_tokens is not None else usage.total_input_tokens
+        ),
+        total_output_tokens=(
+            output_tokens if output_tokens is not None else usage.total_output_tokens
+        ),
         usage_percent=percent,
         usage_source=source,
     )
