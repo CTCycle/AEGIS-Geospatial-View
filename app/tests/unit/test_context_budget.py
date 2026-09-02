@@ -51,6 +51,8 @@ def test_static_catalog_profile_is_exact_and_provider_scoped() -> None:
     assert usage.usable_prompt_budget_tokens == 398_464
     assert usage.context_profile_source == "openai_model_catalog"
     assert usage.provider == "openai"
+    assert usage.peak_request_tokens == usage.estimated_input_tokens
+    assert usage.total_input_tokens == usage.estimated_input_tokens
 
 
 ###############################################################################
@@ -176,6 +178,9 @@ def test_provider_reported_input_and_output_replace_estimate_without_losing_it()
     assert updated.reported_input_tokens == 700
     assert updated.reported_output_tokens == 42
     assert updated.effective_input_tokens == 700
+    assert updated.peak_request_tokens == 700
+    assert updated.total_input_tokens == 700
+    assert updated.total_output_tokens == 42
     assert updated.usage_source == "provider_reported"
     assert updated.usage_percent == round(700 / 4096 * 100, 1)
 
@@ -189,6 +194,7 @@ def test_output_only_provider_usage_is_hybrid() -> None:
     assert updated.reported_output_tokens == 19
     assert updated.usage_source == "hybrid"
     assert updated.estimated_input_tokens == updated.effective_input_tokens
+    assert updated.total_output_tokens == 19
 
 
 ###############################################################################

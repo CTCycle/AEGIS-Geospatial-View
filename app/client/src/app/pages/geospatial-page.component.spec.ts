@@ -643,7 +643,7 @@ describe('pages/geospatial-page.component', () => {
     expect(footer?.textContent).toContain('Weather');
     expect(footer?.textContent).toContain('Optional Keys');
     expect(fixture.nativeElement.querySelector('.context-window-row')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('.context-window-row progress')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.context-window-row progress')).toBeNull();
     expect(fixture.nativeElement.querySelector('.chat-status-strip')).toBeNull();
     expect(fixture.nativeElement.querySelector('.rail-capability-card')).toBeNull();
     expect(fixture.nativeElement.querySelector('.rail-context-strip')).toBeNull();
@@ -716,7 +716,7 @@ describe('pages/geospatial-page.component', () => {
     expect(component.contextUsageLabel).toBe('Context limit unavailable');
     expect(component.contextUsageDetail).toContain('max context unavailable');
     expect(component.contextUsageDetail.toLowerCase()).not.toContain('token');
-    expect((fixture.nativeElement.querySelector('.context-window-row progress') as HTMLProgressElement).getAttribute('value')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.context-window-row progress')).toBeNull();
 
     component.contextUsage = {
       estimated_input_tokens: 0,
@@ -729,7 +729,32 @@ describe('pages/geospatial-page.component', () => {
     };
     expect(component.contextUsageLabel).toBe('No request measured');
     fixture.detectChanges();
-    expect((fixture.nativeElement.querySelector('.context-window-row progress') as HTMLProgressElement).getAttribute('value')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.context-window-row progress')).toBeNull();
+  });
+
+  it('uses peak request telemetry for the visible context status', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    component.contextUsage = {
+      estimated_input_tokens: 300,
+      reported_input_tokens: 280,
+      peak_request_tokens: 900,
+      total_input_tokens: 1180,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: 22,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'provider_reported',
+    };
+    fixture.detectChanges();
+
+    expect(component.contextUsageLabel).toBe('22%');
+    expect(component.contextUsageDetail).toContain('900 peak');
+    expect(component.contextUsageDetail).toMatch(/remaining 3[,.]?196/);
+    expect((fixture.nativeElement.querySelector('.context-window-row progress') as HTMLProgressElement).getAttribute('value')).toBe('22');
   });
 
   it('shows raw over-cap context percentage while clamping only the progress bar', () => {
@@ -836,6 +861,21 @@ describe('pages/geospatial-page.component', () => {
       },
     }), component.conversationNonce);
     expect(component.contextUsage).toEqual(previous);
+
+    component['applyTurnResponse'](makeTurnResponse({
+      operation: { kind: 'error', status: 'failed', message: 'Measured failure.', warnings: [] },
+      context_usage: {
+        estimated_input_tokens: 900,
+        peak_request_tokens: 640,
+        selected_context_window: 4096,
+        model_context_limit: 4096,
+        usage_percent: 15.6,
+        provider: 'test',
+        model: 'runtime-model',
+        usage_source: 'provider_reported',
+      },
+    }), component.conversationNonce);
+    expect(component.contextUsage?.peak_request_tokens).toBe(640);
   });
 
   it('switches the active session to a catalog-provided satellite descriptor', async () => {

@@ -249,16 +249,17 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return 'No request measured';
     }
     const source = this.contextUsage.usage_source || 'estimated';
-    const isUnmeasured = source === 'not_measured'
-      || ((this.contextUsage.reported_input_tokens ?? this.contextUsage.estimated_input_tokens) <= 0
-        && this.contextUsage.usage_percent === null);
-    if (isUnmeasured) {
-      return 'No request measured';
+    const peak = this.contextUsageTokens(this.contextUsage);
+    if (peak === null) {
+      if (source === 'not_measured' || this.contextUsage.usage_percent === null) {
+        return 'No request measured';
+      }
+      return 'Context limit unavailable';
     }
-    const approximate = source !== 'provider_reported';
     if (this.contextUsage.usage_percent === null) {
       return 'Context limit unavailable';
     }
+    const approximate = source !== 'provider_reported';
     return `${approximate ? '~' : ''}${Math.round(this.contextUsage.usage_percent)}%`;
   }
 
@@ -270,33 +271,62 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     const selected = this.contextUsage.selected_context_window;
     const model = [this.contextUsage.provider, this.contextUsage.model].filter(Boolean).join(' / ');
     const source = this.contextUsage.usage_source || 'estimated';
-    const inputValue = this.contextUsage.reported_input_tokens ?? this.contextUsage.estimated_input_tokens;
-    const estimateText = this.contextUsage.reported_input_tokens === null || this.contextUsage.reported_input_tokens === undefined
-      ? 'estimated'
-      : 'provider-reported';
+    const peak = this.contextUsageTokens(this.contextUsage);
+    const approximate = source !== 'provider_reported';
+    const estimateText = approximate ? 'approximate' : 'provider-reported';
     const limitText = modelLimit
       ? `max context ${modelLimit.toLocaleString()}`
       : 'max context unavailable';
-    const usageText = modelLimit && this.contextUsage.usage_percent !== null
-      ? `${inputValue.toLocaleString()} / ${modelLimit.toLocaleString()} (${this.contextUsage.usage_percent}%)`
-      : `${inputValue.toLocaleString()} used`;
+    const usageText = peak === null
+      ? 'no request measured'
+      : `${approximate ? '~' : ''}${peak.toLocaleString()} peak`;
+    const remainingText = peak !== null && modelLimit
+      ? `; remaining ${Math.max(0, modelLimit - peak).toLocaleString()}`
+      : '';
+    const utilizationText = peak !== null && this.contextUsage.usage_percent !== null
+      ? ` (${this.contextUsage.usage_percent}%)`
+      : '';
     const phases = this.contextUsage.phases && Object.keys(this.contextUsage.phases).length > 0
       ? `; phases: ${Object.entries(this.contextUsage.phases).map(([name, value]) => {
         const phase = value && typeof value === 'object' ? value as Record<string, unknown> : {};
-        const phaseInput = typeof phase['reported_input_tokens'] === 'number'
-          ? phase['reported_input_tokens']
-          : typeof phase['estimated_input_tokens'] === 'number'
-            ? phase['estimated_input_tokens']
-            : undefined;
+        const phaseInput = typeof phase['peak_request_tokens'] === 'number'
+          ? phase['peak_request_tokens']
+          : typeof phase['reported_input_tokens'] === 'number'
+            ? phase['reported_input_tokens']
+            : typeof phase['estimated_input_tokens'] === 'number'
+              ? phase['estimated_input_tokens']
+              : undefined;
         const phaseSource = typeof phase['usage_source'] === 'string' ? phase['usage_source'] : undefined;
-        return `${name}${phaseInput === undefined ? '' : ` ${phaseInput.toLocaleString()} used`}${phaseSource ? ` (${phaseSource})` : ''}`;
+        return `${name}${phaseInput === undefined ? '' : ` ${phaseInput.toLocaleString()} peak`}${phaseSource ? ` (${phaseSource})` : ''}`;
       }).join(', ')}`
       : '';
     const compaction = this.contextUsage.compaction_applied ? '; compaction applied' : '';
     const selectedText = selected && selected !== modelLimit
       ? `; selected context ${selected.toLocaleString()}`
       : '';
-    return `Context used: ${usageText} (${estimateText}); ${limitText}${selectedText}${model ? ` - ${model}` : ''}; source: ${source}${phases}${compaction}`;
+    return `Peak request: ${usageText}${utilizationText}; ${limitText}${remainingText}${selectedText}${model ? ` - ${model}` : ''}; source: ${source} (${estimateText})${phases}${compaction}`;
+  }
+
+  get hasContextMeasurement(): boolean {
+    return this.contextUsageTokens(this.contextUsage) !== null;
+  }
+
+  private contextUsageTokens(usage: ContextUsage | null | undefined): number | null {
+    if (!usage || usage.usage_source === 'not_measured') {
+      return null;
+    }
+    const candidates = [usage.peak_request_tokens, usage.reported_input_tokens];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'number' && Number.isFinite(candidate) && candidate >= 0) {
+        return candidate;
+      }
+    }
+    if (typeof usage.estimated_input_tokens === 'number'
+      && Number.isFinite(usage.estimated_input_tokens)
+      && usage.estimated_input_tokens > 0) {
+      return usage.estimated_input_tokens;
+    }
+    return null;
   }
 
   get contextUsageTone(): 'neutral' | 'warning' | 'critical' {
@@ -313,11 +343,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private hasMeasuredContextUsage(): boolean {
-    if (!this.contextUsage) {
-      return false;
-    }
-    const tokens = this.contextUsage.reported_input_tokens ?? this.contextUsage.estimated_input_tokens;
-    return this.contextUsage.usage_source !== 'not_measured' && tokens > 0;
+    return this.hasContextMeasurement;
   }
 
   startNewChat(): void {
@@ -760,7 +786,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       case 'context_usage': {
         const usage = parseContextUsage(event.payload['context_usage']);
         if (usage) {
-          this.applyContextUsage(usage, false);
+          this.applyContextUsage(usage);
         }
         break;
       }
@@ -788,7 +814,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.progressLabel = undefined;
         {
           const parsed = parseRunCompletionPayload(event.payload);
-          this.applyContextUsage(parsed.contextUsage, true);
+          this.applyContextUsage(parsed.contextUsage);
           const message = String(event.payload['message'] ?? 'Failed');
           this.agentReadiness = {
             status: 'needs_attention',
@@ -874,9 +900,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (parsed.memorySnapshot !== undefined) {
       this.memorySnapshot = parsed.memorySnapshot;
     }
-    const failedTurn = parsed.operation?.status === 'failed'
-      || parsed.operation?.status === 'partial';
-    this.applyContextUsage(parsed.contextUsage, failedTurn);
+    this.applyContextUsage(parsed.contextUsage);
   }
 
   private readString(value: unknown): string | undefined {
@@ -887,12 +911,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
   }
 
-  private applyContextUsage(
-    usage: ContextUsage | null | undefined,
-    failedTurn: boolean,
-  ): void {
+  private applyContextUsage(usage: ContextUsage | null | undefined): void {
     if (usage !== null && usage !== undefined
-      && (!failedTurn || !this.hasMeasuredContextUsage())) {
+      && (this.contextUsageTokens(usage) !== null || !this.hasMeasuredContextUsage())) {
       this.contextUsage = usage;
     }
   }
@@ -920,8 +941,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.lastDecision = result.decision;
     this.lastOperation = operation;
     this.memorySnapshot = result.memory_snapshot ?? {};
-    const failedTurn = operation?.status === 'failed' || operation?.status === 'partial';
-    this.applyContextUsage(result.context_usage, failedTurn);
+    this.applyContextUsage(result.context_usage);
     this.assistantDraft = '';
     this.status = 'Agent ready';
     this.progressPercent = 100;

@@ -265,9 +265,8 @@ class AgentOrchestrator:
             return numeric_value(item, "estimated_input_tokens") or 0
 
         def phase_peak_value(item: dict[str, Any]) -> int:
-            return numeric_value(item, "peak_request_tokens") or effective_input_value(
-                item
-            )
+            peak = numeric_value(item, "peak_request_tokens")
+            return peak if peak is not None else effective_input_value(item)
 
         phases: dict[str, dict[str, Any]] = {}
         if response.context_usage is not None:
