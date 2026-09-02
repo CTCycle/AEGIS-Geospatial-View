@@ -8,6 +8,10 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+# Configure application logging before importing modules that may emit startup
+# diagnostics (for example, Alembic plugin discovery).
+from server.common.logger import logger as _application_logger  # noqa: F401
+
 from server.api.chat import router as chat_router
 from server.api.conversations import router as conversations_router
 from server.api.realtime import metrics_router as realtime_metrics_router

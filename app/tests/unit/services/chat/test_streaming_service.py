@@ -206,6 +206,39 @@ class FinalMessageAgentOrchestrator:
 
 
 ###############################################################################
+class ContextUsageAgentOrchestrator:
+    # -------------------------------------------------------------------------
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None],
+    ) -> ChatTurnResponse:
+        progress_callback(
+            "context_usage",
+            {
+                "phase": "parser",
+                "context_usage": {
+                    "estimated_input_tokens": 700,
+                    "selected_context_window": 4096,
+                    "model_context_limit": 4096,
+                    "usage_percent": 17.1,
+                    "provider": "test",
+                    "model": "runtime-model",
+                    "usage_source": "estimated",
+                },
+            },
+        )
+        return chat_response(
+            payload,
+            operation=ChatOperationResult(
+                kind="direct_answer",
+                status="success",
+                message="hello world",
+            ),
+        )
+
+
+###############################################################################
 class ConfigurationErrorAgentOrchestrator:
     # -------------------------------------------------------------------------
     async def run_turn(
@@ -270,6 +303,15 @@ def test_stream_turn_final_assistant_event_emits_final_payload() -> None:
     )
     assert events[-1].data["decision"]["plan"]["state"] == "direct_response"
     assert events[-1].data["operation"]["kind"] == "direct_answer"
+
+
+###############################################################################
+def test_stream_turn_emits_context_usage_before_final_event() -> None:
+    events = stream_events(ContextUsageAgentOrchestrator())
+
+    assert [event.event for event in events] == ["status", "context_usage", "final"]
+    assert events[1].data["phase"] == "parser"
+    assert events[1].data["context_usage"]["usage_percent"] == 17.1
 
 
 ###############################################################################

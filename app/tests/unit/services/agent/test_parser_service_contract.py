@@ -156,6 +156,99 @@ def test_parser_normalizes_explicit_null_overlay_patch() -> None:
 
 
 ###############################################################################
+def test_parser_retains_map_mutation_alongside_unsupported_direct_concept() -> None:
+    class _Provider:
+        def structured_output(self, request, schema):  # noqa: ANN001
+            _ = request, schema
+            return {
+                "task_class": "direct_query",
+                "action_id": "map_external_source_combination",
+                "requested_concepts": ["house_prices"],
+                "overlay_commands": [
+                    {
+                        "action": "remove",
+                        "scope": {"kind": "current_view"},
+                        "selector": {"visibility": "visible"},
+                    }
+                ],
+                "requires_location": False,
+                "parser_confidence": 0.9,
+            }
+
+    class _Factory:
+        def get_provider(self, provider: str):  # noqa: ANN001
+            _ = provider
+            return _Provider()
+
+    result = ParserService(
+        llm_factory=_Factory(),  # type: ignore[arg-type]
+        settings_repo=object(),
+        provider="test",
+        model="test-model",
+    ).parse_turn(
+        user_message="Remove the visible overlays and show average house prices.",
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+
+    assert result.requested_concepts == ["house_prices"]
+    assert len(result.overlay_commands) == 1
+    assert result.overlay_commands[0].action == "remove"
+    assert result.overlay_commands[0].scope.kind == "current_view"
+    assert result.overlay_commands[0].selector.visibility == "visible"
+
+
+###############################################################################
+def test_parser_recovers_bulk_overlay_mutation_from_typed_task_graph() -> None:
+    class _Provider:
+        def structured_output(self, request, schema):  # noqa: ANN001
+            _ = request, schema
+            return {
+                "task_class": "direct_query",
+                "action_id": "map_external_source_combination",
+                "requested_concepts": ["house_prices"],
+                "atomic_tasks": [
+                    {
+                        "summary": "Remove active overlays",
+                        "task_type": "overlay_removal",
+                        "intent": "remove_overlays",
+                        "input_refs": ["active_map_session"],
+                        "output_refs": ["overlay_removed"],
+                        "visualization_changes": {
+                            "action": "remove",
+                            "instance_ids": ["stale-instance-id"],
+                        },
+                    }
+                ],
+                "requires_location": False,
+                "parser_confidence": 0.9,
+            }
+
+    class _Factory:
+        def get_provider(self, provider: str):  # noqa: ANN001
+            _ = provider
+            return _Provider()
+
+    result = ParserService(
+        llm_factory=_Factory(),  # type: ignore[arg-type]
+        settings_repo=object(),
+        provider="test",
+        model="test-model",
+    ).parse_turn(
+        user_message="Remove active overlays and show average house prices.",
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+
+    assert len(result.overlay_commands) == 1
+    command = result.overlay_commands[0]
+    assert command.action == "remove"
+    assert command.scope.kind == "current_view"
+    assert command.selector.visibility == "visible"
+    assert command.selector.instance_ids == []
+
+
+###############################################################################
 def test_parser_maps_unknown_model_action_to_generic_data_action_with_semantics() -> None:
     class _Provider:
         def structured_output(self, request, schema):  # noqa: ANN001

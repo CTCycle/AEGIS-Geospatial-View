@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
+from contextlib import suppress
+from typing import Any
+
 from server.contracts.runs import AgentRunSnapshot
 from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
 from server.contracts.chat import ChatTurnRequest, ChatTurnResponse
@@ -14,9 +20,6 @@ from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent_runs.events import RunEventPublisher
-
-import hashlib
-import json
 
 
 ###############################################################################
@@ -69,6 +72,31 @@ class AgentRunOrchestrator:
                 },
             ),
         )
+        context_events: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+        async def publish_context_events() -> None:
+            while True:
+                payload = await context_events.get()
+                try:
+                    await self.event_publisher.publish(
+                        conversation_id=snapshot.conversation_id,
+                        run_id=snapshot.run_id,
+                        run_version=snapshot.active_run_version,
+                        type=RunEventType.CONTEXT_USAGE,
+                        payload=payload,
+                    )
+                except Exception:
+                    # Context telemetry must not turn a valid agent result into
+                    # a failed run when the event sink is unavailable.
+                    pass
+                finally:
+                    context_events.task_done()
+
+        def on_agent_progress(event: str, payload: dict[str, Any]) -> None:
+            if event == "context_usage":
+                context_events.put_nowait(dict(payload))
+
+        context_event_task = asyncio.create_task(publish_context_events())
         try:
             response = await self.agent_orchestrator.run_turn(
                 ChatTurnRequest(
@@ -76,7 +104,8 @@ class AgentRunOrchestrator:
                     request_id=run_id,
                     title=snapshot.original_request[:120],
                     conversation_id=snapshot.conversation_id,
-                )
+                ),
+                progress_callback=on_agent_progress,
             )
         except Exception as exc:
             latest = self.run_repository.get_run(run_id) or snapshot
@@ -119,6 +148,11 @@ class AgentRunOrchestrator:
                 ),
             )
             return
+        finally:
+            await context_events.join()
+            context_event_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await context_event_task
 
         latest = self.run_repository.get_run(run_id) or snapshot
         if latest.cancel_requested_at is not None:

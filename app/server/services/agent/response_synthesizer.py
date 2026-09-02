@@ -186,7 +186,6 @@ class GroundedResponseSynthesizer:
             LOGGER.warning(
                 "Grounded response synthesis failed category=%s",
                 exc.category,
-                exc_info=True,
             )
             return fallback_text
         except LLMProviderRequestError as exc:
@@ -198,7 +197,6 @@ class GroundedResponseSynthesizer:
             LOGGER.warning(
                 "Grounded response synthesis failed category=%s",
                 exc.category,
-                exc_info=True,
             )
             return fallback_text
         except Exception:

@@ -222,7 +222,7 @@ class ProviderRegistry:
         last_error: ProviderError | None = None
         for attempt in range(attempts):
             started = monotonic()
-            LOGGER.info(
+            LOGGER.debug(
                 "provider_request provider=%s capability=%s attempt=%s bbox=%s zoom=%s time=%s params=%s",
                 normalized,
                 request.capability_id,
@@ -255,7 +255,7 @@ class ProviderRegistry:
             else:
                 self._failures[normalized] = 0
                 self._circuit_opened_at.pop(normalized, None)
-                LOGGER.info(
+                LOGGER.debug(
                     "provider_response provider=%s capability=%s attempt=%s status=%s type=%s stale=%s partial=%s elapsed_ms=%s",
                     normalized,
                     request.capability_id,

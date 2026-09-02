@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from tests.conftest import run_async_in_thread
 from typing import Any
@@ -21,6 +22,7 @@ from server.domain.llm.types import LLMToolResult
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
+from server.services.llm.errors import LLMProviderRequestError
 
 
 ###############################################################################
@@ -98,6 +100,7 @@ def test_native_tool_loop_keeps_usage_with_concurrent_invocations() -> None:
         )
 
         async def run_model(model: str) -> object:
+            samples: list[dict[str, Any]] = []
             request = AgentToolLoopRequest(
                 provider="test",
                 model=model,
@@ -105,30 +108,36 @@ def test_native_tool_loop_keeps_usage_with_concurrent_invocations() -> None:
                 tools=[],
                 temperature=0,
                 context=AgentExecutionContext(),
+                context_usage_callback=samples.append,
             )
-            return await asyncio.to_thread(
+            result = await asyncio.to_thread(
                 lambda: asyncio.run(loop.run(request))
             )
+            return result, samples
 
         first, second = await asyncio.gather(
             run_model("model-a"),
             run_model("model-b"),
         )
 
-        assert first.context_usages == [
+        first_result, first_samples = first
+        second_result, second_samples = second
+        assert first_result.context_usages == [
             {
                 "provider": "test",
                 "model": "model-a",
                 "estimated_input_tokens": 10,
             }
         ]
-        assert second.context_usages == [
+        assert first_samples == first_result.context_usages
+        assert second_result.context_usages == [
             {
                 "provider": "test",
                 "model": "model-b",
                 "estimated_input_tokens": 10,
             }
         ]
+        assert second_samples == second_result.context_usages
 
     run_async_in_thread(_run())
 
@@ -358,6 +367,47 @@ def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> No
         assert result.tool_results[0].content["error"]["code"] == "tool_rejected"
 
     run_async_in_thread(_run())
+
+
+###############################################################################
+def test_expected_provider_failure_is_logged_without_traceback(caplog) -> None:  # noqa: ANN001
+    class _FailingProvider:
+        def chat(self, request):  # noqa: ANN001
+            _ = request
+            raise LLMProviderRequestError(
+                provider="test",
+                model="model",
+                stage="chat",
+                code="provider_timeout",
+            )
+
+    async def _run() -> None:
+        loop = NativeToolLoop(
+            provider_factory=_Factory(_FailingProvider()),  # type: ignore[arg-type]
+            tool_registry=_registry(),
+        )
+        result = await loop.run(
+            AgentToolLoopRequest(
+                provider="test",
+                model="model",
+                messages=[{"role": "user", "content": "lookup"}],
+                tools=[],
+                temperature=0,
+            )
+        )
+        assert result.stopped_reason == "provider_error"
+
+    caplog.set_level(logging.WARNING, logger="server.services.agent.native_tool_loop")
+    run_async_in_thread(_run())
+
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "server.services.agent.native_tool_loop"
+    ]
+    assert len(records) == 1
+    assert records[0].message == "tool_loop_failed category=provider_api provider=test model=model"
+    assert records[0].exc_info is None
 
 
 ###############################################################################

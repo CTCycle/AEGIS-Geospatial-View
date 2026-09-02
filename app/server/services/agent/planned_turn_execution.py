@@ -89,32 +89,11 @@ class PlannedTurnExecutionService:
         if not turn_contract.overlay_commands or active_map is None:
             return False
         collection = OverlayCollectionService.from_map_session(active_map)
-        current_view = active_map.viewport.model_dump(mode="json")
-        for command in turn_contract.overlay_commands:
-            if command.action in {"remove", "keep_only", "hide"}:
-                continue
-            if command.action in {
-                "show",
-                "update",
-            } and not OverlayCollectionService.has_matching_instances(
-                collection,
-                command,
-                current_view=current_view,
-            ):
-                # An absent show/update target may need a catalog lookup or
-                # provider fetch. Let the normal plan build that map.
-                return False
-            if command.action == "show":
-                continue
-            if (
-                command.action == "update"
-                and command.patch.time is None
-                and command.patch.style is None
-                and command.patch.format is None
-            ):
-                continue
-            return False
-        return True
+        return OverlayCollectionService.can_apply_locally(
+            collection,
+            turn_contract.overlay_commands,
+            current_view=active_map.viewport.model_dump(mode="json"),
+        )
 
     # -------------------------------------------------------------------------
     async def execute(

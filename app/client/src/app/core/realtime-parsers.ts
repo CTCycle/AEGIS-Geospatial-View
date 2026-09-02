@@ -17,6 +17,7 @@ import type {
 
 const RUN_EVENT_TYPES: readonly RunEventType[] = [
   'progress',
+  'context_usage',
   'assistant_text_delta',
   'assistant_text_completed',
   'tool_started',

@@ -448,8 +448,9 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.length).toBe(1);
     expect(component.status).toBe('Agent needs attention');
     expect(component.contextUsage?.estimated_input_tokens).toBe(321);
-    expect(component.contextUsageLabel).toBe('~321 tokens');
-    expect(component.contextUsageDetail).toContain('limit unavailable');
+    expect(component.contextUsageLabel).toBe('Context limit unavailable');
+    expect(component.contextUsageDetail).toContain('max context unavailable');
+    expect(component.contextUsageDetail.toLowerCase()).not.toContain('token');
     expect(component.agentReadiness).toEqual({
       status: 'needs_attention',
       label: 'Needs attention',
@@ -634,7 +635,7 @@ describe('pages/geospatial-page.component', () => {
     const component = fixture.componentInstance;
 
     expect(component.contextUsage?.selected_context_window).toBe(1_047_576);
-    expect(component.contextUsageDetail).toMatch(/1[,.]047[,.]576 token cap/);
+    expect(component.contextUsageDetail).toMatch(/max context 1[,.]047[,.]576/);
     const footer = fixture.nativeElement.querySelector('.workspace-status-bar') as HTMLElement | null;
     expect(footer).not.toBeNull();
     expect(footer?.textContent).toContain('Agent model');
@@ -712,8 +713,9 @@ describe('pages/geospatial-page.component', () => {
       usage_source: 'estimated',
     };
     fixture.detectChanges();
-    expect(component.contextUsageLabel).toBe('~321 tokens');
-    expect(component.contextUsageDetail).toContain('limit unavailable');
+    expect(component.contextUsageLabel).toBe('Context limit unavailable');
+    expect(component.contextUsageDetail).toContain('max context unavailable');
+    expect(component.contextUsageDetail.toLowerCase()).not.toContain('token');
     expect((fixture.nativeElement.querySelector('.context-window-row progress') as HTMLProgressElement).getAttribute('value')).toBeNull();
 
     component.contextUsage = {
@@ -728,6 +730,67 @@ describe('pages/geospatial-page.component', () => {
     expect(component.contextUsageLabel).toBe('No request measured');
     fixture.detectChanges();
     expect((fixture.nativeElement.querySelector('.context-window-row progress') as HTMLProgressElement).getAttribute('value')).toBeNull();
+  });
+
+  it('shows raw over-cap context percentage while clamping only the progress bar', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    component.contextUsage = {
+      estimated_input_tokens: 5000,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: 122.1,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'estimated',
+    };
+    fixture.detectChanges();
+
+    expect(component.contextUsageLabel).toBe('~122%');
+    expect(component.contextUsagePercent).toBe(100);
+    expect(component.contextUsageDetail).toContain('(122.1%)');
+    expect((fixture.nativeElement.querySelector('.context-window-row progress') as HTMLProgressElement).getAttribute('value')).toBe('100');
+  });
+
+  it('applies live context events without changing progress status', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.status = 'Calling a relevant tool';
+    component.progressStage = 'calling_tool';
+    component.progressLabel = 'Calling a relevant tool';
+
+    component['handleRunEvent']({
+      event_id: 'context-1',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'context_usage',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: {
+        phase: 'parser',
+        context_usage: {
+          estimated_input_tokens: 700,
+          selected_context_window: 4096,
+          model_context_limit: 4096,
+          usage_percent: 17.1,
+          provider: 'test',
+          model: 'runtime-model',
+          usage_source: 'estimated',
+        },
+      },
+    });
+
+    expect(component.contextUsageLabel).toBe('~17%');
+    expect(component.status).toBe('Calling a relevant tool');
+    expect(component.progressStage).toBe('calling_tool');
+    expect(component.progressLabel).toBe('Calling a relevant tool');
   });
 
   it('retains the last measured context sample after failed or partial turns', () => {

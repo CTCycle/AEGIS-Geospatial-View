@@ -64,6 +64,33 @@ describe('realtime parsers', () => {
     }, 'conversation-1')).toBeUndefined();
   });
 
+  it('accepts context usage as a sequenced non-progress run event', () => {
+    const event = parseRunEvent({
+      event_id: 'context-1',
+      sequence: 5,
+      conversation_id: 'conversation-1',
+      run_id: 'run-1',
+      run_version: 2,
+      type: 'context_usage',
+      timestamp: '2026-08-17T08:00:00Z',
+      visibility: 'user',
+      payload: {
+        phase: 'parser',
+        context_usage: {
+          estimated_input_tokens: 700,
+          model_context_limit: 4096,
+          usage_percent: 17.1,
+          provider: 'test',
+          model: 'runtime-model',
+        },
+      },
+    }, 'conversation-1');
+
+    expect(event?.type).toBe('context_usage');
+    const phase: unknown = event?.payload['phase'];
+    expect(phase).toBe('parser');
+  });
+
   it('normalizes valid terminal fields and ignores malformed optional fields', () => {
     const parsed = parseRunCompletionPayload({
       context_revision: 3,

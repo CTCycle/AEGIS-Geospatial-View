@@ -130,6 +130,7 @@ class ChatStreamEvent(BaseModel):
 
     event: Literal[
         "status",
+        "context_usage",
         "parsed",
         "policy",
         "tool_call_started",

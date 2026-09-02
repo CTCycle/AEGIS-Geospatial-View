@@ -417,6 +417,7 @@ export type AgentRunState =
 
 export type RunEventType =
   | 'progress'
+  | 'context_usage'
   | 'assistant_text_delta'
   | 'assistant_text_completed'
   | 'tool_started'
@@ -768,6 +769,7 @@ export interface ChatTurnResponse {
 
 export type ChatStreamEventType =
   | 'status'
+  | 'context_usage'
   | 'parsed'
   | 'policy'
   | 'tool_call_started'

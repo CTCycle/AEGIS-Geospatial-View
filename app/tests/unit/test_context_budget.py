@@ -7,6 +7,7 @@ from server.services.llm.errors import LLMContextLimitError
 from server.services.llm.context_budget import (
     RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY,
     apply_reported_usage,
+    calculate_context_usage_percent,
     compute_context_usage,
     compute_ollama_context_usage,
     estimate_message_tokens,
@@ -176,7 +177,7 @@ def test_provider_reported_input_and_output_replace_estimate_without_losing_it()
     assert updated.reported_output_tokens == 42
     assert updated.effective_input_tokens == 700
     assert updated.usage_source == "provider_reported"
-    assert updated.usage_percent == round(700 / 3072 * 100, 1)
+    assert updated.usage_percent == round(700 / 4096 * 100, 1)
 
 
 ###############################################################################
@@ -213,7 +214,13 @@ def test_nested_provider_usage_is_preserved_from_stream_completion_payload() -> 
     assert updated.reported_input_tokens == 700
     assert updated.reported_output_tokens == 42
     assert updated.usage_source == "provider_reported"
-    assert updated.usage_percent == round(700 / 3072 * 100, 1)
+    assert updated.usage_percent == round(700 / 4096 * 100, 1)
+
+
+def test_context_usage_percent_uses_model_limit_and_can_show_overage() -> None:
+    assert calculate_context_usage_percent(700, 4096) == round(700 / 4096 * 100, 1)
+    assert calculate_context_usage_percent(5000, 4096) == round(5000 / 4096 * 100, 1)
+    assert calculate_context_usage_percent(700, None) is None
 
 
 ###############################################################################
