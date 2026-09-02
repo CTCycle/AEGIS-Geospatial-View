@@ -50,6 +50,7 @@
       @if (activeTooltipIndex === $index) {
         <span
           class="status-tooltip"
+          [class.status-tooltip--below]="tooltipPlacement === 'below'"
           role="tooltip"
           [id]="tooltipId($index)"
           [style.left.px]="tooltipLeft"

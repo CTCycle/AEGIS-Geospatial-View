@@ -24,6 +24,16 @@ export class OverlayControlsComponent {
   @Output() overlayVisibilityChange = new EventEmitter<OverlayVisibilityChange>();
   @Output() overlayOpacityChange = new EventEmitter<OverlayOpacityChange>();
 
+  isExpanded = false;
+
+  toggleExpanded(): void {
+    this.isExpanded = !this.isExpanded;
+  }
+
+  get visibleOverlayCount(): number {
+    return this.overlays.filter((overlay) => this.overlayVisibility[overlay.id] ?? true).length;
+  }
+
   trackOverlay(_: number, overlay: MapOverlayEntry): string {
     return overlay.id;
   }
@@ -38,6 +48,10 @@ export class OverlayControlsComponent {
 
   getRenderMessage(overlayId: string): string | undefined {
     return this.overlayRenderStatuses.find((status) => status.overlayId === overlayId)?.message;
+  }
+
+  getOpacityLabel(overlay: MapOverlayEntry): string {
+    return `Opacity for ${overlay.label}: ${this.getOpacityPercent(overlay)} percent`;
   }
 
   isOpacityDisabled(overlayId: string): boolean {

@@ -7,7 +7,10 @@
 }
 
 .capabilities-page__header {
-    display: block;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
     padding: 0.95rem 1.35rem;
     border-bottom: 1px solid #263640;
     background: #101c23;
@@ -17,10 +20,49 @@
     margin: 0;
 }
 
-.capabilities-page__header p {
+.capabilities-page__heading {
+    min-width: 0;
+}
+
+.page-kicker {
+    margin: 0 0 0.22rem;
+    color: #8fb9cc;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.capabilities-page__heading h1 {
+    margin: 0;
+    color: #f0f7fa;
+    font-size: 1.15rem;
+    line-height: 1.2;
+}
+
+.capabilities-page__heading > p:last-child {
+    margin: 0.28rem 0 0;
     max-width: 72rem;
     color: #a9bac2;
-    font-size: 0.92rem;
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.capabilities-page__summary {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.65rem;
+    color: #9fc9df;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.capabilities-page__summary span + span {
+    padding-left: 0.65rem;
+    border-left: 1px solid #344953;
+    color: #9fb1ba;
 }
 
 .capabilities-page__content {
@@ -73,9 +115,6 @@
 
 .capability-section__empty {
     margin: 0;
-    border: 1px solid #263a45;
-    background: #101c23;
-    padding: 0.8rem;
     color: #9fb1ba;
     font-size: 0.82rem;
 }
@@ -169,6 +208,13 @@
     word-break: break-word;
 }
 
+.capability-table__source a {
+    color: #75bef0;
+    text-decoration: underline;
+    text-decoration-color: rgb(117 190 240 / 35%);
+    text-underline-offset: 0.12rem;
+}
+
 .access-status {
     display: block;
     max-width: 18rem;
@@ -185,8 +231,36 @@
 }
 
 .capabilities-empty {
-    border: 1px solid #263a45;
+    display: grid;
+    gap: 0.35rem;
+    border-left: 2px solid #5d879b;
     background: #101c23;
     padding: 1rem;
     color: #a9bac2;
+}
+
+.capabilities-empty h2,
+.capabilities-empty p {
+    margin: 0;
+}
+
+.capabilities-empty h2 {
+    color: #e6f1f5;
+    font-size: 0.98rem;
+}
+
+.capabilities-empty p {
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.capabilities-empty--error {
+    border-left-color: #e76f76;
+    color: #ffd9dc;
+}
+
+.capabilities-page__empty-groups {
+    margin: -0.25rem 0 0;
+    color: #8fa6b0;
+    font-size: 0.76rem;
 }

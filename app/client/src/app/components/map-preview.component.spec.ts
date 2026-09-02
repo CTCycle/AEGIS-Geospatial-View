@@ -1,8 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import maplibregl from 'maplibre-gl';
 
 import { DEFAULT_BASE_TILE_MAX_ZOOM, DEFAULT_BASE_TILE_PROXY_URL, DEFAULT_MAP_FIT_MAX_ZOOM } from '../core/constants';
 import { MapPreviewComponent } from './map-preview.component';
+import { OverlayControlsComponent } from './overlay-controls.component';
 
 describe('components/map-preview.component', () => {
   let fixture: ComponentFixture<MapPreviewComponent>;
@@ -504,6 +506,10 @@ describe('components/map-preview.component', () => {
       }) as never,
     };
 
+    fixture.detectChanges();
+
+    const overlayControls = fixture.debugElement.query(By.directive(OverlayControlsComponent)).componentInstance as OverlayControlsComponent;
+    overlayControls.isExpanded = true;
     fixture.detectChanges();
 
     const opacityInput = fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement | null;

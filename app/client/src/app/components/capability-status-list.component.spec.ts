@@ -74,4 +74,24 @@ describe('CapabilityStatusListComponent', () => {
     fixture.detectChanges();
     expect(host.querySelector('[role="tooltip"]')).toBeNull();
   });
+
+  it('places a tooltip below a status item near the top edge', () => {
+    component.items = [{ label: 'Top status', statusLabel: 'Ready', tone: 'ok' }];
+    fixture.detectChanges();
+    const item = fixture.nativeElement.querySelector('li') as HTMLElement;
+    spyOn(item, 'getBoundingClientRect').and.returnValue({
+      top: 12,
+      bottom: 34,
+      left: 24,
+      width: 80,
+      height: 22,
+    } as DOMRect);
+
+    item.dispatchEvent(new MouseEvent('mouseenter'));
+    fixture.detectChanges();
+
+    const tooltip = fixture.nativeElement.querySelector('[role="tooltip"]') as HTMLElement;
+    expect(tooltip.classList.contains('status-tooltip--below')).toBeTrue();
+    expect(tooltip.style.top).toBe('42px');
+  });
 });

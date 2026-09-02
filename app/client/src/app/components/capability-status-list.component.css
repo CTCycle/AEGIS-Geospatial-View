@@ -114,6 +114,10 @@ ul.status-list--nowrap {
     white-space: normal;
 }
 
+.status-tooltip--below {
+    transform: translateX(-50%);
+}
+
 .status-tooltip__action {
     color: #8dc8ea;
     font-size: 0.66rem;

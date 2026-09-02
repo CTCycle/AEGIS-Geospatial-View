@@ -18,7 +18,7 @@
       </div>
     } @else {
       <div class="maplibre-wrap">
-        <div #mapContainer class="maplibre-container"></div>
+        <div #mapContainer class="maplibre-container" tabindex="0" aria-label="Interactive map"></div>
 
         @if (availableBasemaps.length) {
           <label class="basemap-selector">
@@ -127,14 +127,13 @@
             #inspectionPanel
             class="map-inspection-panel"
             role="dialog"
-            aria-label="Map feature details"
+            aria-labelledby="map-inspection-panel-title"
             tabindex="-1"
-            (keydown.escape)="closeInspection()"
           >
             <header class="map-inspection-panel__header">
               <div>
                 <p class="map-inspection-panel__eyebrow">{{ selectedInspection.association }}</p>
-                <h2>{{ selectedInspection.title }}</h2>
+                <h2 id="map-inspection-panel-title">{{ selectedInspection.title }}</h2>
               </div>
               <button type="button" class="map-inspection-panel__close" aria-label="Close details" title="Close details" (click)="closeInspection()">×</button>
             </header>

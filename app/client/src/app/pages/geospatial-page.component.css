@@ -12,7 +12,7 @@
     grid-template-columns: minmax(20rem, var(--toolbar-width, 30vw)) 0.42rem minmax(0, 1fr);
     width: 100%;
     height: 100%;
-    grid-template-rows: minmax(0, 1fr) 24px;
+    grid-template-rows: minmax(0, 1fr) 2.1rem;
     background: #0d171d;
 }
 
@@ -67,38 +67,110 @@
 .canvas-panel { background: #0d171d; }
 
 .canvas-header {
-    display: none;
-    height: 0;
-    padding: 0;
+    position: relative;
+    flex: 0 0 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.42rem 0.85rem;
+    border-bottom: 1px solid #263640;
+    background: #101c23;
+    z-index: 12;
+    flex-wrap: wrap;
+}
+
+.canvas-header__title {
+    display: grid;
+    gap: 0.04rem;
+    min-width: 0;
+}
+
+.canvas-header__eyebrow {
+    margin: 0;
+    color: #8fb9cc;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.canvas-header__title h1,
+.canvas-header__title span {
+    margin: 0;
     overflow: hidden;
-    border: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.canvas-header__title h1 {
+    color: #f0f7fa;
+    font-size: 0.98rem;
+    line-height: 1.2;
+}
+
+.canvas-header__title span {
+    color: #9fb5bf;
+    font-size: 0.7rem;
 }
 
 .canvas-header__actions {
     display: flex;
     align-items: center;
     gap: 0.65rem;
+    min-width: 0;
+    flex: 0 0 auto;
 }
 
-.canvas-header__icon-button {
-    width: 2.25rem;
-    height: 2.25rem;
+.canvas-header__text-button,
+.canvas-header__alert-button {
+    min-height: 2rem;
     border-radius: 0.35rem;
-    border: 1px solid transparent;
-    display: grid;
-    place-items: center;
+    border: 1px solid #344953;
+    background: #162833;
     color: #d6e3e8;
+    font-size: 0.72rem;
+    font-weight: 700;
 }
 
-.canvas-header__icon-button:hover {
-    border-color: #344953;
-    background: #172831;
+.canvas-header__text-button {
+    padding: 0.28rem 0.55rem;
+}
+
+.canvas-header__alert-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.28rem 0.55rem;
+}
+
+.canvas-header__text-button:hover,
+.canvas-header__text-button:focus-visible,
+.canvas-header__alert-button:hover,
+.canvas-header__alert-button:focus-visible {
+    border-color: #2f9bd7;
+    background: #1b3340;
 }
 
 .canvas-header__icon-button--active {
     border-color: #2f9bd7;
     background: #172f3a;
     color: #e8f7ff;
+}
+
+.canvas-header__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: min(18rem, 28vw);
+    overflow: hidden;
+    color: #9fc9df;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .canvas-panel__body {
@@ -292,11 +364,12 @@
     grid-column: 1 / -1;
     grid-row: 2;
     min-width: 0;
-    min-height: 24px;
-    height: 24px;
+    min-height: 2.1rem;
+    height: 2.1rem;
     display: flex;
     align-items: center;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
     padding: 0 0.72rem;
     border-top: 1px solid #263a45;
     background: #101c23;
@@ -305,7 +378,7 @@
 
 .workspace-status-bar app-capability-status-list {
     min-width: 0;
-    overflow: hidden;
+    min-width: max-content;
 }
 
 .composer-stop-icon {
@@ -370,29 +443,12 @@
     border: 0;
 }
 
-.chat-progress-indicator {
-    position: absolute;
-    right: 1rem;
-    bottom: 0.8rem;
-    z-index: 6;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    border-radius: 999px;
-    border: 1px solid #344953;
-    background: rgb(15 26 33 / 92%);
-    color: #dce8ed;
-    padding: 0.35rem 0.58rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-}
-
 .workspace-alerts {
-    position: absolute;
-    top: 0.85rem;
-    right: 1rem;
+    position: static;
+    flex: 1 1 100%;
+    order: 3;
     z-index: 7;
-    width: min(24rem, calc(100% - 2rem));
+    width: min(100%, 38rem);
     display: grid;
     gap: 0.65rem;
     padding: 0.8rem 0.9rem;

@@ -3,6 +3,7 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  HostListener,
   EventEmitter,
   Input,
   OnChanges,
@@ -89,6 +90,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   restoreNotice = '';
   selectedInspection?: MapInspection;
 
+  private inspectionTrigger: HTMLElement | null = null;
   private mapRef: Map | null = null;
   private activeMapContainer: HTMLDivElement | null = null;
   private activeBasemapId: string | null = null;
@@ -226,6 +228,9 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   openInspection(inspection: MapInspection): void {
+    this.inspectionTrigger = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+      ? document.activeElement
+      : null;
     this.selectedInspection = inspection;
     this.changeDetector.detectChanges();
     queueMicrotask(() => this.inspectionPanelRef?.nativeElement.focus());
@@ -237,6 +242,23 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   closeInspection(): void {
     this.selectedInspection = undefined;
+    const restoreTarget = this.inspectionTrigger;
+    this.inspectionTrigger = null;
+    queueMicrotask(() => {
+      if (restoreTarget?.isConnected) {
+        restoreTarget.focus();
+      } else {
+        this.mapContainerRef?.nativeElement.focus();
+      }
+    });
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && this.selectedInspection) {
+      event.preventDefault();
+      this.closeInspection();
+    }
   }
 
   isSafeInspectionUrl(value: string | null | undefined): boolean {
@@ -650,8 +672,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         }
         const handler = (event: unknown): void => {
           const point = (event as { point?: unknown } | null)?.point;
-          const lngLat = (event as { lngLat?: { lng: number; lat: number } } | null)?.lngLat;
-          if (!point || !lngLat || typeof map.queryRenderedFeatures !== 'function') {
+          if (!point || typeof map.queryRenderedFeatures !== 'function') {
             return;
           }
           const features = map.queryRenderedFeatures(point as Parameters<Map['queryRenderedFeatures']>[0], { layers: [layerId] });
@@ -664,11 +685,6 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
             return;
           }
           this.openInspection(inspection);
-          const popupContent = this.buildPopupContent(inspection);
-          new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '280px' })
-            .setLngLat([lngLat.lng, lngLat.lat])
-            .setDOMContent(popupContent)
-            .addTo(map);
         };
         this.registerLayerClickListener(map, layerId, handler);
         this.inspectionListeners.push({ map, layerId, handler });
@@ -767,17 +783,4 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     };
   }
 
-  private buildPopupContent(inspection: MapInspection): HTMLElement {
-    const root = document.createElement('div');
-    root.className = 'map-inspection-popup';
-    const heading = document.createElement('strong');
-    heading.textContent = inspection.title;
-    root.appendChild(heading);
-    inspection.fields.slice(0, 5).forEach((field) => {
-      const row = document.createElement('div');
-      row.textContent = `${field.label}: ${field.value ?? '—'}${field.unit ? ` ${field.unit}` : ''}`;
-      root.appendChild(row);
-    });
-    return root;
-  }
 }

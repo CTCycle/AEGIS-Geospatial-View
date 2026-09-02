@@ -161,6 +161,23 @@ const optionalApiRecord = (
   return requireApiRecord(record[field], endpoint, field);
 };
 
+const safeStringRecord = (value: unknown): Record<string, string> | undefined => {
+  if (!isRecord(value) || Array.isArray(value)) {
+    return undefined;
+  }
+  const entries = Object.entries(value).filter(([, entry]) => typeof entry === 'string');
+  return entries.length === Object.keys(value).length
+    ? Object.fromEntries(entries) as Record<string, string>
+    : undefined;
+};
+
+const safeJsonRecord = (value: unknown): Record<string, JsonValue> | null | undefined => {
+  if (value === null) {
+    return null;
+  }
+  return isJsonObject(value) ? value : undefined;
+};
+
 export const parseBooleanCredentialMap = (
   value: unknown,
   endpoint = 'model settings',
@@ -739,6 +756,17 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
     style: stringOrNull(value.style ?? render?.style),
     time: stringOrNull(value.time ?? render?.time),
     default_time: stringOrNull(value.default_time ?? render?.default_time),
+    result_status: stringOrNull(value.result_status),
+    fetched_at: stringOrNull(value.fetched_at),
+    observation_time: stringOrNull(value.observation_time),
+    coverage: safeJsonRecord(value.coverage),
+    spatial_resolution: stringOrNull(value.spatial_resolution),
+    units: safeStringRecord(value.units),
+    source_url: stringOrNull(value.source_url),
+    partial: typeof value.partial === 'boolean' ? value.partial : undefined,
+    stale: typeof value.stale === 'boolean' ? value.stale : undefined,
+    requested_variables: isStringArray(value.requested_variables) ? value.requested_variables : undefined,
+    request_parameters: safeJsonRecord(value.request_parameters) ?? undefined,
     warnings: isStringArray(value.warnings) ? value.warnings : render?.warnings,
     data: normalizedData,
     inspections: Array.isArray(value.inspections)
