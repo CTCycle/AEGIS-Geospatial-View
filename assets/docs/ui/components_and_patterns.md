@@ -1,6 +1,6 @@
 # Components And Patterns
 
-Last updated: 2026-08-20
+Last updated: 2026-09-02
 
 ## Reusable Components
 
@@ -35,6 +35,7 @@ All interactive components must provide:
 - Use persistent status text for settings operations.
 - Use inline alerts for map and session concerns.
 - Keep progress indicators visible during in-flight chat requests.
+- Workspace capability indicators expose their description on hover and keyboard focus. Only indicators with a clear destination are interactive; those links open the relevant settings, access, or geodata page rather than mutating map state implicitly.
 - During active agent runs, keep the chat composer enabled. Additional messages are refinements for the active run and should use compact steering presentation.
 - Render assistant messages as sanitized Markdown and user messages as escaped plain text.
 - Keep agent availability shown as ready between requests; use run progress labels only while work is active.

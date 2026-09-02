@@ -54,7 +54,7 @@
               } @else {
                 <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
                   <path
-                    d="M21.7 3.3a1 1 0 0 0-1-.2L3.6 9.7a1 1 0 0 0 0 1.9l7.8 2.6 2.6 7.8a1 1 0 0 0 .9.7h.1a.9 0 0 0 .9-.6l6.8-17.8a1 1 0 0 0-.2-1zM15 18.8l-1.8-5.5 4.6-4.6-5.9 3.6-5.5-1.8L19.2 5 15 18.8z"
+                    d="M21.7 3.3a1 1 0 0 0-1-.2L3.6 9.7a1 1 0 0 0 0 1.9l7.8 2.6 2.6 7.8a1 1 0 0 0 .9.7h.1a.9.9 0 0 0 .9-.6l6.8-17.8a1 1 0 0 0-.2-1zM15 18.8l-1.8-5.5 4.6-4.6-5.9 3.6-5.5-1.8L19.2 5 15 18.8z"
                     fill="currentColor"
                   />
                 </svg>
@@ -150,7 +150,26 @@
     </section>
 
     <footer class="workspace-status-bar" aria-label="Workspace status">
-      <app-capability-status-list [items]="capabilityStatusItems" [nowrap]="true"></app-capability-status-list>
+      <app-capability-status-list
+        [items]="capabilityStatusItems"
+        [nowrap]="true"
+        [interactions]="{
+          'Agent model': {
+            route: '/settings',
+            actionLabel: 'Open model settings',
+            description: agentReadiness.message || 'Review the configured agent model and provider.'
+          },
+          'Weather': {
+            route: '/geodata',
+            actionLabel: 'Browse geodata'
+          },
+          'Optional Keys': {
+            route: '/access-configurations',
+            actionLabel: 'Open access configurations',
+            description: 'Optional provider credentials are managed in Access Configurations.'
+          }
+        }"
+      ></app-capability-status-list>
     </footer>
 
     @if (showProgressIndicator) {
