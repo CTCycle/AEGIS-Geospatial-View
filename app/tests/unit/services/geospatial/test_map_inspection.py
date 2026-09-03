@@ -49,6 +49,46 @@ def test_feature_metadata_is_bounded_and_allowlisted() -> None:
 
 
 ###############################################################################
+def test_feature_provenance_links_are_exposed_as_approved_source() -> None:
+    inspections = MapInspectionService.build_for_descriptor(
+        {
+            "id": "gbif-species-occurrences",
+            "label": "GBIF occurrences",
+            "provider": "gbif",
+            "rendering_mode": "clustered-points",
+            "data": {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "id": "123",
+                        "type": "Feature",
+                        "geometry": {"type": "Point", "coordinates": [8.8, 46.2]},
+                        "properties": {
+                            "name": "Lynx lynx",
+                            "basisOfRecord": "HUMAN_OBSERVATION",
+                            "datasetKey": "dataset-1",
+                            "datasetTitle": "Alpine observations",
+                            "occurrenceUrl": "https://www.gbif.org/occurrence/123",
+                            "datasetUrl": "https://www.gbif.org/dataset/dataset-1",
+                        },
+                    }
+                ],
+            },
+        }
+    )
+
+    assert len(inspections) == 1
+    inspection = inspections[0]
+    assert inspection.source_url == "https://www.gbif.org/occurrence/123"
+    assert {field.key for field in inspection.fields} >= {
+        "name",
+        "basisOfRecord",
+        "datasetKey",
+        "datasetTitle",
+    }
+
+
+###############################################################################
 def test_location_metadata_gets_point_association() -> None:
     inspections = MapInspectionService.build_for_descriptor(
         {

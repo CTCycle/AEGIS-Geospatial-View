@@ -615,6 +615,7 @@ class RenderDescriptorService:
         )
         if response.attribution:
             descriptor["attribution"] = response.attribution[0]
+        warnings.extend(response.warnings)
         inspection_metadata = json_object(descriptor.get("inspection_metadata"))
         inspection_metadata.update(
             {

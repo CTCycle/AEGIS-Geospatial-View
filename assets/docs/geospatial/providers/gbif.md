@@ -26,6 +26,14 @@ AEGIS preserves provenance and quality metadata where supplied, including:
 - `coordinateUncertaintyInMeters`
 - `issues`
 - per-record `license`
+- direct `occurrenceUrl` and `datasetUrl` links derived from GBIF identifiers
+
+Occurrence-search responses are marked as citation-required. GBIF search API
+results retain the citation and licensing obligations of their contributing
+datasets, so `GBIF.org` attribution alone is not a substitute for dataset-level
+acknowledgement. Search results do not receive the single DOI that GBIF creates
+for a download workflow; use the preserved occurrence and dataset references
+when exporting or reporting results.
 
 If GBIF reports more matching records than the current interactive page contains, the normalized response is explicitly marked as sampled and reports the total matched count.
 
