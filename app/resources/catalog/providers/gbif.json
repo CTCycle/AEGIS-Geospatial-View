@@ -35,7 +35,7 @@
     "official_docs_url": "https://techdocs.gbif.org/en/openapi/v1/occurrence",
     "source_protocol": "provider-api",
     "data_format": "JSON/API",
-    "geometry_type": "point",
+    "geometry_type": "not-applicable",
     "queryable": true,
     "vectorizable": true,
     "endpoint_health": "validated-by-official-contract",
@@ -100,6 +100,6 @@
     "idPath": null,
     "timestampPath": null,
     "fieldMap": {},
-    "expectedGeometry": "point"
+    "expectedGeometry": "not-applicable"
   }
 }

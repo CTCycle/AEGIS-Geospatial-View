@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from server.common.typing import is_json_array, is_json_object, json_object
 from server.services.geospatial.providers.base import (
@@ -47,13 +47,13 @@ class GBIFProvider(GeospatialProvider):
         }
         taxon_key = _optional_positive_int(request.params.get("taxonKey"))
         if taxon_key is not None:
-            params["taxon_key"] = taxon_key
+            params["taxonKey"] = taxon_key
         year = _optional_text(request.params.get("year"))
         if year is not None:
             params["year"] = year
         basis_of_record = _optional_text(request.params.get("basisOfRecord"))
         if basis_of_record is not None:
-            params["basis_of_record"] = basis_of_record
+            params["basisOfRecord"] = basis_of_record
 
         source_url = f"{self.OCCURRENCE_SEARCH_URL}?{urlencode(params)}"
         payload = await call_json_fetcher(self.fetcher, source_url)
@@ -62,6 +62,10 @@ class GBIFProvider(GeospatialProvider):
         end_of_records = bool(json_object(payload).get("endOfRecords"))
         sampled = total_matched is not None and total_matched > len(features)
         warnings: list[str] = []
+        warnings.append(
+            "GBIF occurrence-search results require acknowledgement of contributing "
+            "datasets and their licences; no single download DOI applies."
+        )
         if sampled:
             warnings.append(
                 f"GBIF matched {total_matched} records; this interactive result is limited to {limit}."
@@ -79,13 +83,18 @@ class GBIFProvider(GeospatialProvider):
                 "sampled": sampled,
                 "endOfRecords": end_of_records,
                 "sourceUrl": source_url,
+                "provenance": {
+                    "citationRequired": True,
+                    "citationGuidanceUrl": "https://www.gbif.org/citation-guidelines",
+                    "downloadDoi": None,
+                },
                 "legend": {
                     "type": "category",
                     "label": "GBIF species occurrences",
                 },
                 "freshnessLabel": "GBIF indexed occurrence records",
             },
-            attribution=["GBIF.org"],
+            attribution=["GBIF.org and contributing datasets"],
             warnings=warnings,
             result_status="valid_empty" if not features else "ok",
             result_type="features",
@@ -118,7 +127,9 @@ def _normalize_occurrences(payload: object) -> list[dict[str, object]]:
         scientific_name = _optional_text(occurrence.get("scientificName"))
         species = _optional_text(occurrence.get("species"))
         display_name = species or scientific_name or "GBIF occurrence"
-        record_url = f"https://www.gbif.org/occurrence/{gbif_id}" if gbif_id else None
+        record_url = _gbif_url("occurrence", gbif_id)
+        dataset_key = _optional_text(occurrence.get("datasetKey"))
+        dataset_url = _gbif_url("dataset", dataset_key)
         features.append(
             {
                 "id": gbif_id,
@@ -129,14 +140,18 @@ def _normalize_occurrences(payload: object) -> list[dict[str, object]]:
                 "longitude": longitude,
                 "timestamp": occurrence.get("eventDate"),
                 "url": record_url,
+                "occurrenceUrl": record_url,
+                "datasetUrl": dataset_url,
                 "metadata": {
                     "scientificName": scientific_name,
                     "species": species,
                     "taxonKey": occurrence.get("taxonKey"),
                     "basisOfRecord": occurrence.get("basisOfRecord"),
                     "eventDate": occurrence.get("eventDate"),
-                    "datasetKey": occurrence.get("datasetKey"),
+                    "datasetKey": dataset_key,
                     "datasetTitle": occurrence.get("datasetTitle"),
+                    "occurrenceUrl": record_url,
+                    "datasetUrl": dataset_url,
                     "coordinateUncertaintyInMeters": occurrence.get(
                         "coordinateUncertaintyInMeters"
                     ),
@@ -157,6 +172,12 @@ def _bbox_wkt(*, west: float, south: float, east: float, north: float) -> str:
         f"{west} {south},{east} {south},{east} {north},{west} {north},{west} {south}"
         "))"
     )
+
+
+###############################################################################
+def _gbif_url(resource: str, identifier: object) -> str | None:
+    value = _optional_text(identifier)
+    return f"https://www.gbif.org/{resource}/{quote(value, safe='')}" if value else None
 
 
 ###############################################################################
