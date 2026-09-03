@@ -64,13 +64,16 @@ describe('OverlayControlsComponent', () => {
     fixture.detectChanges();
 
     const toggle = fixture.nativeElement.querySelector('.overlay-controls__toggle') as HTMLButtonElement | null;
+    const panel = fixture.nativeElement.querySelector('#map-layers-panel') as HTMLDivElement | null;
     expect(toggle?.getAttribute('aria-expanded')).toBe('false');
-    expect(fixture.nativeElement.querySelector('input[type="range"]')).toBeNull();
+    expect(toggle?.getAttribute('aria-controls')).toBe('map-layers-panel');
+    expect(panel?.hidden).toBeTrue();
 
     toggle?.click();
     fixture.detectChanges();
 
     expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+    expect(panel?.hidden).toBeFalse();
     expect((fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement).getAttribute('aria-label')).toBe('Opacity for Overlay 1');
   });
 });

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_object, json_object
+from server.common.typing import is_json_object, json_array, json_object
 
 import asyncio
 import json
@@ -233,14 +233,14 @@ class OpenMeteoService:
         for key in ("current_units", "hourly_units"):
             declared = json_object(payload.get(key))
             for name, unit in declared.items():
-                if isinstance(name, str) and isinstance(unit, str) and unit.strip():
+                if isinstance(unit, str) and unit.strip():
                     units.setdefault(name, unit.strip())
         return units
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _series(value: object) -> list[Any]:
-        return list(value) if isinstance(value, list) else []
+        return list(json_array(value))
 
     # -------------------------------------------------------------------------
     @staticmethod

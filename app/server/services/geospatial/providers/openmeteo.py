@@ -3,7 +3,7 @@ from __future__ import annotations
 from server.common.typing import is_json_object, json_array, json_object
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal, cast
 
 from server.services.geospatial.openmeteo import OpenMeteoService, OpenMeteoServiceError
 from server.services.geospatial.providers._request import request_center
@@ -14,6 +14,8 @@ from server.services.geospatial.providers.base import (
     ProviderUnavailableError,
     safe_request_params,
 )
+
+ResultStatus = Literal["ok", "valid_empty", "partial", "stale"]
 
 
 ###############################################################################
@@ -46,8 +48,10 @@ class OpenMeteoProvider(GeospatialProvider):
         rendering_mode = "clustered-points"
         normalized = self._payload(payload, rendering_mode=rendering_mode)
         partial = bool(payload.get("partial"))
-        result_status = str(payload.get("result_status") or "").strip()
-        if result_status not in {"ok", "valid_empty", "partial", "stale"}:
+        raw_result_status = str(payload.get("result_status") or "").strip()
+        if raw_result_status in {"ok", "valid_empty", "partial", "stale"}:
+            result_status = cast(ResultStatus, raw_result_status)
+        else:
             result_status = "partial" if partial else "ok"
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -70,7 +74,7 @@ class OpenMeteoProvider(GeospatialProvider):
             units={
                 str(key): str(value)
                 for key, value in json_object(payload.get("units")).items()
-                if isinstance(key, str) and isinstance(value, str)
+                if isinstance(value, str)
             },
             source_url=(
                 str(payload.get("source_url"))

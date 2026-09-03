@@ -34,7 +34,7 @@ from server.services.agent.native_tool_loop import (
     NativeToolLoop,
 )
 from server.services.agent.pipeline_router import DeterministicAgentRouter
-from server.services.agent.parser_service import ParserService
+from server.services.agent.parser_service import ParserRunResult, ParserService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.response_builder import AgentResponseBuilder
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
@@ -273,13 +273,12 @@ class AgentOrchestrator:
             phases["parser"] = response.context_usage.model_dump(
                 mode="json", exclude={"phases"}
             )
-        loop_usages = []
+        loop_usages: list[dict[str, Any]] = []
         if is_json_object(response.tool_payload):
             raw_loop_usages = response.tool_payload.get("context_usages")
-            if isinstance(raw_loop_usages, list):
-                loop_usages = [
-                    item for item in raw_loop_usages if is_json_object(item)
-                ]
+            loop_usages = [
+                item for item in json_array(raw_loop_usages) if is_json_object(item)
+            ]
         if loop_usages:
             native_phase: dict[str, Any] = {
                 "iterations": loop_usages,
@@ -352,12 +351,13 @@ class AgentOrchestrator:
             for item in phases.values()
             if is_json_object(item)
         ]
-        output_values = [
-            numeric_value(item, "reported_output_tokens")
-            for item in phases.values()
-            if is_json_object(item)
-            and numeric_value(item, "reported_output_tokens") is not None
-        ]
+        output_values: list[int] = []
+        for item in phases.values():
+            if not is_json_object(item):
+                continue
+            value = numeric_value(item, "reported_output_tokens")
+            if value is not None:
+                output_values.append(value)
         peak_inputs = [
             phase_peak_value(item)
             for item in phases.values()
@@ -493,7 +493,7 @@ class AgentOrchestrator:
             )
         ]
         parser_kwargs["task_snapshot"] = state_before.model_dump(mode="json")
-        parser_run = None
+        parser_run: ParserRunResult | None = None
         parser_usage: dict[str, object] | None = None
         parser_timeout_seconds = float(
             getattr(self.parser_service, "PARSER_TIMEOUT_SECONDS", 35.0)
@@ -504,13 +504,16 @@ class AgentOrchestrator:
                 self.parser_service, "parse_turn_with_usage", None
             )
             if callable(parse_with_usage):
-                parser_run = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        parse_with_usage,
-                        **parser_kwargs,
-                        deadline_monotonic=parser_deadline,
+                parser_run = cast(
+                    ParserRunResult,
+                    await asyncio.wait_for(
+                        asyncio.to_thread(
+                            parse_with_usage,
+                            **parser_kwargs,
+                            deadline_monotonic=parser_deadline,
+                        ),
+                        timeout=parser_timeout_seconds + 1.0,
                     ),
-                    timeout=parser_timeout_seconds + 1.0,
                 )
                 turn_contract = parser_run.turn_contract
                 parser_usage = parser_run.context_usage
@@ -598,7 +601,7 @@ class AgentOrchestrator:
         )
         context_usage = (
             ContextUsageResponse.model_validate(parser_usage)
-            if is_json_object(parser_usage)
+            if parser_usage is not None
             else None
         )
         if progress_callback is not None and context_usage is not None:

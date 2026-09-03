@@ -14,8 +14,7 @@
       {{ isExpanded ? 'Collapse' : 'Expand' }}
     </button>
   </header>
-  @if (isExpanded) {
-    <div id="map-layers-panel" class="overlay-controls__list">
+  <div id="map-layers-panel" class="overlay-controls__list" [hidden]="!isExpanded">
       @for (overlay of overlays; track trackOverlay($index, overlay)) {
         <div class="overlay-control-row">
           <label [attr.data-render-status]="getRenderStatus(overlay.id)">
@@ -51,6 +50,5 @@
           }
         </div>
       }
-    </div>
-  }
+  </div>
 </div>

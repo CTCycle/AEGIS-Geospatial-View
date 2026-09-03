@@ -604,6 +604,25 @@ describe('pages/geospatial-page.component', () => {
     expect(cancelActiveRun).toHaveBeenCalled();
   });
 
+  it('only enables the composer scrollbar when content exceeds its maximum height', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector('.chat-composer textarea') as HTMLTextAreaElement;
+    let scrollHeight = 60;
+    Object.defineProperty(input, 'scrollHeight', {
+      configurable: true,
+      get: () => scrollHeight,
+    });
+
+    fixture.componentInstance['resizeComposer'](input);
+    expect(input.style.overflowX).toBe('hidden');
+    expect(input.style.overflowY).toBe('hidden');
+
+    scrollHeight = 180;
+    fixture.componentInstance['resizeComposer'](input);
+    expect(input.style.overflowY).toBe('auto');
+  });
+
   it('honors a stop request made before the run acknowledgement arrives', async () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();

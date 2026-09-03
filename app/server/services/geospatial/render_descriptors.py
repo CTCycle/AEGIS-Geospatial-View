@@ -641,7 +641,7 @@ class RenderDescriptorService:
             not bounds
             or len(bounds) != 4
             or not all(
-                isinstance(item, int | float) and not isinstance(item, bool)
+                not isinstance(item, bool)
                 for item in bounds
             )
         ):

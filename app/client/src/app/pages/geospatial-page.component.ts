@@ -1209,6 +1209,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     resolvedTarget.style.height = 'auto';
     const maxHeight = 144;
     resolvedTarget.style.height = `${Math.min(resolvedTarget.scrollHeight, maxHeight)}px`;
+    resolvedTarget.style.overflowX = 'hidden';
     resolvedTarget.style.overflowY = resolvedTarget.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }
 

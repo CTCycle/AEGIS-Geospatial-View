@@ -39,7 +39,7 @@ class TestChatFlow:
         expect(page).to_have_url(f"{base_url.rstrip('/')}/settings")
         expect(
             page.get_by_text(
-                re.compile(r"Select one AEGIS agent model across cloud providers")
+                re.compile(r"Select the agent model used for structured extraction")
             )
         ).to_be_visible()
         expect(page.get_by_placeholder("Search models")).to_be_visible()
@@ -59,7 +59,7 @@ class TestChatFlow:
         page.go_forward()
         expect(
             page.get_by_text(
-                re.compile(r"Select one AEGIS agent model across cloud providers")
+                re.compile(r"Select the agent model used for structured extraction")
             )
         ).to_be_visible()
         expect(search).to_have_value("gpt")

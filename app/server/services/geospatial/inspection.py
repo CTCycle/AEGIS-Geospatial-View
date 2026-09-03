@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 from urllib.parse import urlsplit
 
+from server.common.typing import json_object
 from server.contracts.geospatial import (
     InspectionAssociation,
     InspectionField,
@@ -207,16 +208,14 @@ class MapInspectionService:
             allow_keys if allow_keys is not None else set(cls._FIELD_LABELS)
         )
         flattened = dict(payload)
-        nested_metadata = payload.get("metadata")
-        if isinstance(nested_metadata, dict):
-            for key, raw_value in nested_metadata.items():
-                if key in effective_keys and key not in flattened:
-                    flattened[key] = raw_value
+        nested_metadata = json_object(payload.get("metadata"))
+        for key, raw_value in nested_metadata.items():
+            if key in effective_keys and key not in flattened:
+                flattened[key] = raw_value
         for key, raw_value in flattened.items():
             if key in cls._URL_KEYS:
                 source_url = source_url or cls._safe_url(raw_value)
-        units = flattened.get("units")
-        declared_units = units if isinstance(units, dict) else {}
+        declared_units = json_object(flattened.get("units"))
         for key, raw_value in flattened.items():
             if key in cls._URL_KEYS:
                 continue
