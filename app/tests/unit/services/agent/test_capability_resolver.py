@@ -349,6 +349,27 @@ def test_resolves_semantic_direct_request_to_direct_tool_capability() -> None:
 
 
 ###############################################################################
+def test_resolves_gbif_occurrence_capability() -> None:
+    resolved = _resolver().resolve(
+        _turn("Show species observations around Zurich", "gbif_species_occurrences")
+    )
+
+    assert resolved.requested_layers == ["gbif_species_occurrences"]
+    assert resolved.clarification_plan is None
+
+
+###############################################################################
+def test_resolves_openmeteo_elevation_after_explicit_usage_opt_in(monkeypatch) -> None:
+    monkeypatch.setenv("AEGIS_ALLOW_RESTRICTED_SOURCES", "true")
+    resolved = _resolver().resolve(
+        _turn("Show point elevation around Zurich", "openmeteo_elevation")
+    )
+
+    assert resolved.requested_layers == ["openmeteo_elevation"]
+    assert resolved.clarification_plan is None
+
+
+###############################################################################
 def test_resolves_humidity_direct_request_to_weather_tool() -> None:
     turn = _turn("What is the humidity in Sanremo?", "")
     turn = turn.model_copy(
