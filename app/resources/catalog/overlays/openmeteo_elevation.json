@@ -1,0 +1,141 @@
+{
+  "id": "openmeteo_elevation",
+  "name": "Open-Meteo Terrain Elevation",
+  "provider": "openmeteo",
+  "type": "point-insight",
+  "description": "Numeric point elevation from Open-Meteo using the Copernicus DEM GLO-90 global 90 m elevation model.",
+  "capabilities": [
+    "terrain",
+    "elevation",
+    "point-sample"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Open-Meteo Terrain Elevation",
+    "default_opacity": 0.72,
+    "requires_key": false,
+    "url": "https://api.open-meteo.com/v1/elevation?latitude={lat}&longitude={lon}",
+    "attribution": "Open-Meteo; Copernicus DEM GLO-90",
+    "keywords": [
+      "elevation",
+      "altitude",
+      "terrain height",
+      "dem",
+      "copernicus",
+      "open-meteo"
+    ],
+    "action_tags": [
+      "terrain",
+      "elevation",
+      "point sample"
+    ],
+    "task_tags": [
+      "elevation lookup",
+      "terrain context",
+      "site screening"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static",
+    "constraints": "Returns modeled terrain elevation from Copernicus DEM GLO-90 at approximately 90 m resolution. Do not treat it as survey-grade or parcel-scale elevation.",
+    "content_hash": "openmeteo_elevation_overlay_v1",
+    "human_summary": "Numeric terrain elevation at the selected point, sampled from the Copernicus DEM GLO-90 through Open-Meteo.",
+    "primary_use_cases": [
+      "point elevation lookup",
+      "terrain context",
+      "coarse site screening"
+    ],
+    "search_examples": [
+      "what is the elevation here",
+      "show terrain height near Lugano",
+      "how high is this point"
+    ],
+    "disambiguation_notes": [
+      "Use this for numeric point elevation. Do not substitute visual hillshade or terrain basemaps for a numeric elevation request."
+    ],
+    "location_dependency": "Requires a point or selected map location.",
+    "integration_requirements": [
+      "No API key required for eligible free Open-Meteo use",
+      "Attribution to Open-Meteo and Copernicus required"
+    ],
+    "official_docs_url": "https://open-meteo.com/en/docs/elevation-api",
+    "source_protocol": "JSON API",
+    "data_format": "JSON",
+    "geometry_type": "point",
+    "render_backend": "provider",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "validated-by-official-contract",
+    "auth_mode": "none",
+    "rate_limit_notes": "Free hosted access is appropriate for low-volume local use but is restricted to non-commercial use.",
+    "retrieval_mode": "direct",
+    "last_validated": "2026-09-03",
+    "spatial_resolution": "90 m"
+  },
+  "version": 1,
+  "last_modified": "2026-09-03T13:05:00+00:00",
+  "capabilityKind": "analysis-tool",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://open-meteo.com/en/docs/elevation-api",
+    "https://open-meteo.com/en/terms"
+  ],
+  "license": {
+    "name": "Open-Meteo free hosted API terms",
+    "url": "https://open-meteo.com/en/terms",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": true,
+    "manualToggle": false,
+    "plannerHints": [
+      "elevation",
+      "altitude",
+      "terrain height",
+      "terrain",
+      "dem",
+      "point elevation",
+      "open-meteo"
+    ],
+    "requiredUserAction": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context",
+      "survey-grade elevation",
+      "slope or aspect analysis"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-09-03",
+    "knownLimitations": [
+      "Approximately 90 m source resolution.",
+      "Free hosted API is restricted to non-commercial use.",
+      "Point elevation does not provide slope, aspect, or local terrain profiles."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {
+      "elevation": "elevation"
+    },
+    "expectedGeometry": "point"
+  }
+}
