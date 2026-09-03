@@ -110,6 +110,13 @@ class RuntimeRegistry:
 
     # -------------------------------------------------------------------------
     def _is_restricted_public_source(self, capability_id: str) -> bool:
+        profile = self._profile(capability_id)
+        if not is_json_object(profile):
+            return False
+        if str(profile.get("health_policy") or "").strip().casefold() != (
+            "restricted_usage_opt_in"
+        ):
+            return False
         manifest = self._ensure().manifests.get(str(capability_id))
         if not is_json_object(manifest):
             return False

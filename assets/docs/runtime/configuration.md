@@ -21,7 +21,8 @@ Common keys include:
 - `REALTIME_ALLOW_MISSING_ORIGIN` (default `false`; test-only exception for
   non-browser clients)
 - `AEGIS_ALLOW_RESTRICTED_SOURCES` (default `false`; explicitly opts the
-  deployment into manifest-marked restricted public sources)
+  deployment into public capabilities marked with the
+  `restricted_usage_opt_in` runtime policy)
 
 The SQLite database path is always derived as:
 
