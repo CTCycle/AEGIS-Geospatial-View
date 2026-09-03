@@ -1,0 +1,131 @@
+{
+  "id": "gbif_species_occurrences",
+  "name": "GBIF Species Occurrences",
+  "provider": "gbif",
+  "type": "point-insight",
+  "description": "Bounded, sampled species-occurrence records from the Global Biodiversity Information Facility.",
+  "capabilities": [
+    "biodiversity",
+    "species-occurrence",
+    "ecology"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "GBIF Species Occurrences",
+    "default_opacity": 0.8,
+    "requires_key": false,
+    "attribution": "GBIF.org and contributing datasets",
+    "keywords": [
+      "biodiversity",
+      "species",
+      "occurrence",
+      "observed species",
+      "ecology",
+      "gbif"
+    ],
+    "action_tags": [
+      "species search",
+      "biodiversity"
+    ],
+    "task_tags": [
+      "species observed in an area",
+      "biodiversity context",
+      "ecological occurrence search"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "historical-observation",
+    "constraints": "Requires a bounded extent. Interactive results are capped at 300 records per GBIF page and AEGIS defaults to 100. Results are observations/occurrences, not a complete species inventory. Preserve basis of record, event date, dataset key, coordinate uncertainty, issues, and licence metadata.",
+    "content_hash": "gbif_species_occurrences_v1",
+    "human_summary": "Species occurrence records reported to GBIF inside the selected map extent.",
+    "primary_use_cases": [
+      "species observation lookup",
+      "biodiversity screening",
+      "ecological context"
+    ],
+    "search_examples": [
+      "which species have been observed here",
+      "show biodiversity observations in this area",
+      "find GBIF species records around Lugano"
+    ],
+    "disambiguation_notes": [
+      "Occurrence records indicate reported observations or specimens. They do not prove current presence, absence, abundance, or a complete species inventory."
+    ],
+    "location_dependency": "Requires a bounded geographic extent.",
+    "official_docs_url": "https://techdocs.gbif.org/en/openapi/v1/occurrence",
+    "source_protocol": "JSON API",
+    "data_format": "JSON",
+    "geometry_type": "point",
+    "render_backend": "provider",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "validated-by-official-contract",
+    "auth_mode": "none",
+    "rate_limit_notes": "GBIF may rate-limit intensive search traffic; use bounded queries and small interactive limits.",
+    "retrieval_mode": "direct",
+    "last_validated": "2026-09-03"
+  },
+  "version": 1,
+  "last_modified": "2026-09-03T13:26:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://techdocs.gbif.org/en/openapi/v1/occurrence",
+    "https://techdocs.gbif.org/en/openapi/"
+  ],
+  "license": {
+    "name": "Dataset-specific GBIF occurrence licences",
+    "url": "https://www.gbif.org/terms",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": true,
+    "manualToggle": true,
+    "plannerHints": [
+      "biodiversity",
+      "species occurrence",
+      "species observed",
+      "species records",
+      "ecology",
+      "gbif"
+    ],
+    "requiredUserAction": [],
+    "avoidWhen": [
+      "no geographic context",
+      "exhaustive species inventory",
+      "species absence claims",
+      "bulk export"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-09-03",
+    "knownLimitations": [
+      "Interactive results are sampled and capped.",
+      "Occurrence quality, coordinate uncertainty, and record licensing vary by contributing dataset.",
+      "Absence of returned records must not be interpreted as species absence."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "point"
+  }
+}
