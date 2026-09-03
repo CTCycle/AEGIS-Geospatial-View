@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_array, is_json_object
+from server.common.typing import is_json_array, is_json_object, json_array
 
 from datetime import datetime
 
@@ -14,6 +14,15 @@ async def execute(plan: ExecutionPlan, location: ResolvedLocation) -> dict[str, 
     result = await service.get_weather_forecast(
         latitude=location.latitude, longitude=location.longitude
     )
+    requested_attributes = [
+        str(item).strip()
+        for item in json_array(
+            (plan.tool_arguments or {}).get("requested_attributes")
+        )
+        if str(item).strip()
+    ]
+    if requested_attributes:
+        result["requested_attributes"] = list(dict.fromkeys(requested_attributes))
     selected = _select_requested_forecast(result, plan)
     if selected is not None:
         result["selected_forecast"] = selected

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
+
 from collections.abc import Callable
 from typing import Any
 
@@ -24,6 +26,9 @@ from server.services.agent.turn_state_assembler import AgentTurnStateAssembler
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.chat.history_service import ChatHistoryService
+from server.services.agent.deterministic_intent_recovery import (
+    DeterministicIntentRecoveryService,
+)
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 
@@ -254,6 +259,21 @@ class PlannedTurnExecutionService:
                         tool_payload=tool_payload,
                     )
                 map_session = map_result
+            if (
+                map_session is not None
+                and is_json_object(turn_contract.provider_error)
+                and turn_contract.provider_error.get("recovered") is True
+                and DeterministicIntentRecoveryService.RECOVERY_WARNING
+                not in map_session.compliance_warnings
+            ):
+                map_session = map_session.model_copy(
+                    update={
+                        "compliance_warnings": [
+                            *map_session.compliance_warnings,
+                            DeterministicIntentRecoveryService.RECOVERY_WARNING,
+                        ]
+                    }
+                )
             if map_session is not None and turn_contract.overlay_commands:
                 active_state_session = self._active_map_session(latest_memory)
                 map_session, overlay_mutation_results = self._apply_overlay_commands(
