@@ -130,8 +130,8 @@
     "staleWhileRevalidateSeconds": 86400
   },
   "normalization": {
-    "geometryPath": "features[].geometry",
-    "idPath": "features[].id",
+    "geometryPath": null,
+    "idPath": null,
     "timestampPath": null,
     "fieldMap": {
       "elevation": "elevation"
