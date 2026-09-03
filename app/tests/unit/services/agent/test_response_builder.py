@@ -119,6 +119,38 @@ def test_map_response_preserves_and_renders_companion_direct_result() -> None:
 
 
 ###############################################################################
+def test_direct_weather_message_reports_requested_measurements_and_units() -> None:
+    message = AgentResponseBuilder.compose_direct_tool_message(
+        "get_weather_forecast",
+        {
+            "result": {
+                "location": "Sanremo",
+                "result": {
+                    "current": {
+                        "time": "2026-09-03T10:30",
+                        "temperature_2m": 22.0,
+                        "relative_humidity_2m": 0,
+                        "surface_pressure": 1013.3,
+                        "wind_speed_10m": 0.0,
+                        "precipitation": 0.0,
+                    },
+                    "requested_attributes": ["humidity", "pressure", "wind"],
+                    "units": {
+                        "relative_humidity_2m": "%",
+                        "surface_pressure": "hPa",
+                        "wind_speed_10m": "km/h",
+                    },
+                },
+            }
+        },
+    )
+
+    assert "humidity 0 %" in message
+    assert "pressure 1013.3 hPa" in message
+    assert "wind speed 0 km/h" in message
+
+
+###############################################################################
 def test_infer_failure_category_classifies_provider_warnings_in_success_envelope() -> None:
     category = AgentResponseBuilder.infer_failure_category(
         {

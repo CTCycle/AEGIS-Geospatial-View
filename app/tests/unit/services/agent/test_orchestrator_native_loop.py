@@ -40,6 +40,7 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.search.request_builder import RequestBuilder
 from server.services.llm.types import LLMToolCall, LLMToolDefinition, LLMToolResult
+from server.services.agent.parser_service import ParserRunResult, ParserService
 
 
 ###############################################################################
@@ -144,6 +145,35 @@ class _Parser:
                 requires_location=True,
             ),
             parser_confidence=0.9,
+        )
+
+
+###############################################################################
+class _TimedOutStructuredParser:
+    PARSER_TIMEOUT_SECONDS = 1.0
+    last_context_usage = None
+
+    # -------------------------------------------------------------------------
+    def parse_turn_with_usage(
+        self,
+        user_message: str,
+        memory_snapshot: dict,
+        conversation_messages: list[dict],
+        **_kwargs: Any,
+    ) -> ParserRunResult:
+        return ParserRunResult(
+            turn_contract=ParserService.build_parser_failure_turn_result(
+                user_message=user_message,
+                memory_snapshot=memory_snapshot,
+                conversation_messages=conversation_messages,
+                provider_error={
+                    "code": "provider_timeout",
+                    "category": "provider_api",
+                    "provider": "openai",
+                    "model": "gpt-4.1",
+                },
+            ),
+            context_usage=None,
         )
 
 
@@ -2324,5 +2354,59 @@ def test_orchestrator_returns_error_operation_for_tool_timeout() -> None:
         assert "timed out" in response.operation.message
         assert response.map_session is None
         assert response.memory_snapshot == {}
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_orchestrator_recovers_explicit_map_request_after_parser_timeout() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        search_orchestrator = _SearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="unused",
+                tool_calls=[],
+                tool_results=[],
+                iterations=0,
+                stopped_reason="not_needed",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_TimedOutStructuredParser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_Catalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_service=history,
+            conversation_repository=history,  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(
+                conversation_id="test-conversation",
+                message="Show humidity and pressure as a map around Sanremo.",
+            )
+        )
+
+        assert response.map_session is not None
+        assert response.operation is not None
+        assert response.operation.kind == "map_session"
+        assert response.operation.status == "success"
+        assert response.turn_contract.requested_layers == [
+            "openmeteo_pressure_humidity_wind"
+        ]
+        assert response.turn_contract.provider_error is not None
+        assert response.turn_contract.provider_error["recovered"] is True
+        assert any(
+            "structured agent extraction timed out" in warning.casefold()
+            for warning in response.operation.warnings
+        )
+        assert native_loop.requests == []
 
     run_async_in_thread(_run())

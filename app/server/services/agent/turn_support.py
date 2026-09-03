@@ -179,7 +179,8 @@ class AgentTurnSupport:
         # clarification, not evidence that structured extraction failed. A
         # parser failure always carries either a parser marker or the
         # provider error produced by the extraction adapter.
-        if is_json_object(getattr(turn_contract, "provider_error", None)):
+        provider_error = getattr(turn_contract, "provider_error", None)
+        if is_json_object(provider_error) and not provider_error.get("recovered"):
             return True
         return (
             "parser_unavailable" in ambiguities

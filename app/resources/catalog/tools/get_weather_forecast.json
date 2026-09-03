@@ -3,24 +3,34 @@
   "name": "Weather Forecast",
   "provider": "openmeteo",
   "type": "direct-tool",
-  "description": "Fetch weather forecast for a resolved location.",
+  "description": "Fetch current or forecast weather measurements for a resolved location, including temperature, precipitation, humidity, pressure, and wind.",
   "capabilities": [
     "weather",
-    "forecast"
+    "forecast",
+    "temperature",
+    "precipitation",
+    "humidity",
+    "pressure",
+    "wind"
   ],
   "coverage": "global",
   "metadata": {
     "action_tags": [
       "weather",
       "forecast",
-      "precipitation"
+      "precipitation",
+      "humidity",
+      "pressure",
+      "wind"
     ],
     "task_tags": [
       "direct_query",
       "environment"
     ],
     "search_examples": [
-      "weather around Milan"
+      "weather around Milan",
+      "show current humidity near Sanremo",
+      "check wind and pressure in Rome"
     ],
     "handler_name": "weather",
     "requires_location": true,
@@ -41,7 +51,12 @@
     "keywords": [
       "openmeteo",
       "direct-tool",
-      "Weather Forecast"
+      "Weather Forecast",
+      "temperature",
+      "precipitation",
+      "humidity",
+      "pressure",
+      "wind"
     ],
     "location_dependency": "Depends on selected map extent or requested location.",
     "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
@@ -73,11 +88,18 @@
       "weather",
       "forecast",
       "precipitation",
+      "humidity",
+      "pressure",
+      "wind",
       "direct_query",
       "environment",
       "openmeteo",
       "direct-tool",
-      "Weather Forecast"
+      "Weather Forecast",
+      "temperature",
+      "humidity",
+      "pressure",
+      "wind"
     ],
     "requiredUserAction": [],
     "avoidWhen": [

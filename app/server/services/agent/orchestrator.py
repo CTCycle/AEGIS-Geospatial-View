@@ -20,6 +20,9 @@ from server.services.agent.agent_tool_catalog_service import AgentToolCatalogSer
 from server.services.agent.capability_resolver import CapabilityResolver
 from server.domain.agent.decision import ClarificationRequest
 from server.services.agent.direct_turn_response import DirectTurnResponseService
+from server.services.agent.deterministic_intent_recovery import (
+    DeterministicIntentRecoveryService,
+)
 from server.services.agent.conversation_state import (
     ConversationTaskStateService,
 )
@@ -115,6 +118,9 @@ class AgentOrchestrator:
         self.capability_resolver = capability_resolver
         self.response_synthesizer = response_synthesizer
         self.direct_turn_response_service = direct_turn_response_service
+        self.deterministic_intent_recovery_service = (
+            DeterministicIntentRecoveryService()
+        )
         self.turn_history_service = AgentTurnHistoryService(
             history_service=self.history_service,
             location_memory_service=self.location_memory_service,
@@ -545,6 +551,29 @@ class AgentOrchestrator:
                     "retryable": False,
                 },
             )
+        recovered_turn_contract = (
+            self.deterministic_intent_recovery_service.recover_explicit_request(
+                user_message=payload.message,
+                memory_snapshot=latest_memory,
+                conversation_messages=recent_messages,
+                provider_error=(
+                    turn_contract.provider_error
+                    if is_json_object(turn_contract.provider_error)
+                    else None
+                ),
+            )
+            if is_json_object(getattr(turn_contract, "provider_error", None))
+            else None
+        )
+        if recovered_turn_contract is not None:
+            LOGGER.warning(
+                "parser_recovery_applied request_id=%s provider=%s model=%s action=%s",
+                request_id,
+                settings.agent_model_provider,
+                settings.agent_model_name,
+                recovered_turn_contract.normalized_action.action_id,
+            )
+            turn_contract = recovered_turn_contract
         turn_contract = self.turn_history_service.merge_memory_location_signals(
             turn_contract=turn_contract,
             latest_memory=latest_memory,

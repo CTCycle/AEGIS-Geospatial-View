@@ -141,4 +141,12 @@ class ToolArgumentBuilder:
                 arguments["query"] = turn.entity_target
             elif turn.poi_categories:
                 arguments["query"] = ", ".join(turn.poi_categories)
+        if turn.requested_attributes:
+            arguments["requested_attributes"] = list(
+                dict.fromkeys(
+                    str(item).strip()
+                    for item in turn.requested_attributes
+                    if str(item).strip()
+                )
+            )
         return {key: value for key, value in arguments.items() if value is not None}

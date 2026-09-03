@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_object, json_array, json_object
+from server.common.typing import (
+    is_json_array,
+    is_json_object,
+    json_array,
+    json_object,
+)
 
 from typing import Any, Literal
 
@@ -106,13 +111,13 @@ class AgentResponseBuilder:
             def collect_warnings(value: Any, *, depth: int = 0) -> None:
                 if depth > 3:
                     return
-                if isinstance(value, dict):
+                if is_json_object(value):
                     for key, nested in value.items():
                         normalized_key = str(key).casefold()
                         if normalized_key in {"warning", "warnings"}:
                             if isinstance(nested, str):
                                 warning_texts.append(nested)
-                            elif isinstance(nested, list):
+                            elif is_json_array(nested):
                                 warning_texts.extend(
                                     str(item)
                                     for item in nested
@@ -125,7 +130,7 @@ class AgentResponseBuilder:
                             "provenance",
                         }:
                             collect_warnings(nested, depth=depth + 1)
-                elif isinstance(value, list):
+                elif is_json_array(value):
                     for nested in value:
                         collect_warnings(nested, depth=depth + 1)
 
@@ -387,14 +392,33 @@ class AgentResponseBuilder:
                 payload.get("location")
             )
             if is_json_object(current):
-                temperature = current.get("temperature_2m")
-                precipitation = current.get("precipitation")
+                units = json_object(nested_result.get("units"))
+                measurements = (
+                    ("temperature_2m", "temperature", "C"),
+                    ("relative_humidity_2m", "humidity", "%"),
+                    ("surface_pressure", "pressure", "hPa"),
+                    ("wind_speed_10m", "wind speed", "km/h"),
+                    ("wind_direction_10m", "wind direction", "°"),
+                    ("wind_gusts_10m", "wind gusts", "km/h"),
+                    ("precipitation", "precipitation", "mm"),
+                    ("precipitation_probability", "precipitation probability", "%"),
+                )
                 weather_time = current.get("time")
                 details: list[str] = []
-                if isinstance(temperature, (int, float)):
-                    details.append(f"temperature {temperature:g} C")
-                if isinstance(precipitation, (int, float)):
-                    details.append(f"precipitation {precipitation:g} mm")
+                requested_attributes = {
+                    str(item).strip().casefold()
+                    for item in json_array(nested_result.get("requested_attributes"))
+                    if str(item).strip()
+                }
+                for key, label, default_unit in measurements:
+                    value = current.get(key)
+                    if not isinstance(value, (int, float)):
+                        if label in requested_attributes:
+                            details.append(f"{label} unavailable")
+                        continue
+                    unit = str(units.get(key) or default_unit).strip()
+                    suffix = f" {unit}" if unit else ""
+                    details.append(f"{label} {value:g}{suffix}")
                 if details:
                     suffix = (
                         f" at {weather_time}"

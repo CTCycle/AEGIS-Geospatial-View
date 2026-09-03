@@ -349,6 +349,24 @@ def test_resolves_semantic_direct_request_to_direct_tool_capability() -> None:
 
 
 ###############################################################################
+def test_resolves_humidity_direct_request_to_weather_tool() -> None:
+    turn = _turn("What is the humidity in Sanremo?", "")
+    turn = turn.model_copy(
+        update={
+            "task_class": "direct_query",
+            "requested_layers": [],
+            "requested_concepts": ["humidity"],
+            "requested_attributes": ["humidity"],
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.requested_layers == ["get_weather_forecast"]
+    assert resolved.clarification_plan is None
+
+
+###############################################################################
 def test_ignores_presentation_action_tags_as_dataset_concepts() -> None:
     turn = _turn("Show Springfield", "")
     turn = turn.model_copy(
