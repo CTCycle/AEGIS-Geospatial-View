@@ -1,6 +1,6 @@
 # Public And Optional Sources
 
-Last updated: 2026-08-02
+Last updated: 2026-09-03
 
 ## Canonical POI path
 
@@ -26,11 +26,18 @@ Use for POI and amenity discovery through OSM tags.
 
 ### Open-Meteo
 
-Use for weather and air-quality forecasts.
+Use for weather and air-quality forecasts and numeric point elevation.
 
-- No API key is required in the default flow.
+- No API key is required in the eligible free hosted flow.
+- The free hosted service is restricted to non-commercial use; anonymous access
+  does not imply commercial-use permission.
 - Request only required variables.
-- Confirm high-volume and commercial-use limits before production scale.
+- `openmeteo_elevation` samples the Open-Meteo Elevation API backed by the
+  Copernicus DEM GLO-90 at approximately 90 m resolution.
+- Treat elevation as coarse terrain context, not survey-grade or parcel-scale
+  measurement.
+- Point elevation does not provide slope, aspect, hillshade, terrain profiles,
+  or zonal terrain statistics.
 
 ### NASA GIBS
 
