@@ -3,21 +3,23 @@
   "name": "RainViewer",
   "provider": "rainviewer",
   "type": "provider",
-  "description": "RainViewer precipitation radar tiles and time-aware metadata feeds.",
+  "description": "RainViewer recent precipitation radar history and time-aware metadata feeds for personal, educational, and small-community use.",
   "capabilities": [
     "radar",
     "precipitation",
+    "recent-history",
     "tile"
   ],
   "coverage": "global-partial",
   "metadata": {
     "docs_url": "https://www.rainviewer.com/api.html",
-    "commercial_notes": "Validate commercial usage rights and tile caching terms before production use.",
+    "commercial_notes": "The free public API is intended for personal, educational, and small-community use; do not treat anonymous access as commercial-use permission.",
     "warning_level": "medium",
     "keywords": [
       "rainviewer",
       "radar",
       "precipitation",
+      "recent radar history",
       "weather tiles"
     ],
     "action_tags": [
@@ -25,16 +27,16 @@
       "precipitation"
     ],
     "task_tags": [
-      "storm tracking",
+      "recent storm tracking",
       "rainfall context"
     ],
     "map_type_tags": [
       "thematic"
     ],
     "coverage_scope": "global-partial",
-    "temporal_behavior": "dynamic",
-    "constraints": "Respect update cadence and provider terms for high-frequency requests.",
-    "content_hash": "rainviewer-provider-v1",
+    "temporal_behavior": "near-real-time-history",
+    "constraints": "The 2026 free API exposes recent past radar only. Future nowcast and satellite IR are not available. Public tiles are limited to zoom 7 and the service is best-effort with no SLA.",
+    "content_hash": "rainviewer-provider-v2",
     "requires_key": false,
     "official_docs_url": "https://www.rainviewer.com/api.html",
     "source_protocol": "provider-api",
@@ -44,27 +46,27 @@
     "vectorizable": false,
     "endpoint_health": "validated-by-sampled-health-check",
     "auth_mode": "none",
-    "rate_limit_notes": "Respect update cadence and provider terms for high-frequency requests.",
+    "rate_limit_notes": "Free public API limit documented as 100 requests per IP per minute; cache metadata and tiles conservatively.",
     "retrieval_mode": "direct",
-    "last_validated": "2026-04-27",
+    "last_validated": "2026-09-03",
     "search_examples": [
-      "show RainViewer",
-      "find RainViewer near a selected location"
+      "show recent RainViewer radar",
+      "show recent precipitation radar near a selected location"
     ],
     "location_dependency": "Depends on selected map extent or requested location."
   },
-  "version": 1,
-  "last_modified": "2026-04-10T16:45:00+00:00",
+  "version": 2,
+  "last_modified": "2026-09-03T12:55:00+00:00",
   "capabilityKind": "metadata-only",
   "renderingMode": "metadata-only",
   "sourceOfficialDocs": [
     "https://www.rainviewer.com/api.html"
   ],
   "license": {
-    "name": "rainviewer attribution required where provider terms require it",
+    "name": "RainViewer public API terms",
     "url": "https://www.rainviewer.com/api.html",
     "attributionRequired": true,
-    "commercialUse": "unknown",
+    "commercialUse": "restricted",
     "embeddingAllowed": "unknown"
   },
   "auth": {
@@ -79,27 +81,34 @@
     "plannerHints": [
       "rain radar",
       "precipitation",
-      "storm tracking",
+      "recent storm tracking",
       "rainfall context",
       "rainviewer",
-      "radar",
+      "recent radar history",
       "weather tiles"
     ],
     "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
-      "no geographic context"
+      "no geographic context",
+      "future radar nowcast",
+      "satellite infrared imagery"
     ]
   },
   "reliability": {
     "status": "partial",
-    "lastAudited": "2026-05-11",
-    "knownLimitations": []
+    "lastAudited": "2026-09-03",
+    "knownLimitations": [
+      "Free public API provides recent past radar only, not future nowcast.",
+      "Satellite IR is not available in the free API.",
+      "Public tile zoom is capped at 7.",
+      "Best-effort public service has no SLA."
+    ]
   },
   "cachePolicy": {
     "mode": "memory",
-    "ttlSeconds": 86400,
-    "staleWhileRevalidateSeconds": 86400
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 3600
   },
   "normalization": {
     "geometryPath": null,
