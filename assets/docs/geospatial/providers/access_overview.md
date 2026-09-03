@@ -38,6 +38,11 @@ Credentialed provider requests remain server-mediated: credentials are sent in
 request headers or used to construct an internal proxy request, never exposed
 in a frontend URL, render descriptor, or public provider payload.
 
+Restricted public sources are fail-closed. `AEGIS_ALLOW_RESTRICTED_SOURCES`
+defaults to `false`; set it to `true` only when the deployment owner has
+confirmed that the provider terms permit the intended use. Anonymous or
+keyless access does not satisfy this eligibility check.
+
 Non-secret deployment configuration variables include:
 
 - `LOCAL_OPEN_DATA_SOURCES`

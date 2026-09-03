@@ -96,8 +96,8 @@
     "accessPageProviderId": null
   },
   "agenticUse": {
-    "defaultEnabled": true,
-    "manualToggle": false,
+    "defaultEnabled": false,
+    "manualToggle": true,
     "plannerHints": [
       "elevation",
       "altitude",
