@@ -29,6 +29,7 @@ from server.services.geospatial.providers.eea import EEAProvider
 from server.services.geospatial.providers.esa import ESAProvider
 from server.services.geospatial.providers.eurostat import EurostatProvider
 from server.services.geospatial.providers.fema import FEMAProvider
+from server.services.geospatial.providers.gbif import GBIFProvider
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
@@ -66,6 +67,7 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "eea": lambda _credential: EEAProvider(),
     "esa": lambda _credential: ESAProvider(),
     "eurostat": lambda _credential: EurostatProvider(),
+    "gbif": lambda _credential: GBIFProvider(),
     "rainviewer": lambda _credential: RainViewerProvider(),
     "openmeteo": lambda _credential: OpenMeteoProvider(),
     "overpass": lambda _credential: OverpassProvider(),
