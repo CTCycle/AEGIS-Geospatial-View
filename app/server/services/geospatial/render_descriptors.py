@@ -13,6 +13,7 @@ from server.services.geospatial.api_service import (
     GeospatialProviderResponseError,
     normalize_geojson_feature_collection,
 )
+from server.services.geospatial.attribution import AttributionService
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.provider_registry import (
@@ -41,6 +42,7 @@ class RenderDescriptorService:
         provider_registry: ProviderRegistry | None = None,
         rainviewer_service: RainViewerService | None = None,
         credential_resolver: GeospatialCredentialResolver | None = None,
+        attribution_service: AttributionService | None = None,
     ) -> None:
         self.capability_registry = capability_registry or CapabilityRegistry()
         self.provider_registry = provider_registry or ProviderRegistry()
@@ -48,6 +50,7 @@ class RenderDescriptorService:
         self.credential_resolver = (
             credential_resolver or self.provider_registry.credential_resolver
         )
+        self.attribution_service = attribution_service or AttributionService()
 
     # -------------------------------------------------------------------------
     async def build_basemap_descriptor(
@@ -649,8 +652,8 @@ class RenderDescriptorService:
         return (float(bounds[0]), float(bounds[1]), float(bounds[2]), float(bounds[3]))
 
     # -------------------------------------------------------------------------
-    @staticmethod
     def _base_overlay_descriptor(
+        self,
         capability: dict[str, Any],
         metadata: dict[str, Any],
         overlay_id: str,
@@ -673,6 +676,7 @@ class RenderDescriptorService:
         concepts = string_list(metadata.get("concepts")) or string_list(
             capability.get("capabilities")
         )
+        attribution = self.attribution_service.from_manifest(capability)
         inspection_metadata = {
             key: value
             for key, value in metadata.items()
@@ -732,6 +736,7 @@ class RenderDescriptorService:
             "type": overlay_type,
             "rendering_mode": rendering_mode,
             "attribution": str(metadata.get("attribution") or ""),
+            "attribution_url": attribution.url or None,
             "source_protocol": metadata.get("source_protocol"),
             "data_format": metadata.get("data_format"),
             "geometry_type": metadata.get("geometry_type"),
