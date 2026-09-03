@@ -3,7 +3,7 @@
   "name": "Open-Meteo",
   "provider": "openmeteo",
   "type": "provider",
-  "description": "Open-Meteo weather and air-quality forecast APIs suitable for location-based overlays.",
+  "description": "Open-Meteo weather and air-quality forecast APIs suitable for location-based analysis in eligible non-commercial deployments.",
   "capabilities": [
     "weather",
     "air-quality",
@@ -11,8 +11,9 @@
   ],
   "coverage": "global",
   "metadata": {
-    "docs_url": "https://open-meteo.com/",
-    "commercial_notes": "Free tier is typically intended for non-commercial use; validate usage terms before production rollout.",
+    "docs_url": "https://open-meteo.com/en/docs",
+    "terms_url": "https://open-meteo.com/en/terms",
+    "commercial_notes": "The free hosted API is limited to non-commercial use. Anonymous access does not imply commercial-use permission.",
     "warning_level": "medium",
     "keywords": [
       "weather",
@@ -32,9 +33,9 @@
       "thematic"
     ],
     "coverage_scope": "global",
-    "temporal_behavior": "dynamic",
-    "constraints": "Check non-commercial limits and attribution obligations before high-scale use.",
-    "content_hash": "openmeteo-provider-v1",
+    "temporal_behavior": "forecast",
+    "constraints": "Free hosted access is keyless but non-commercial. Commercial deployments require a commercially eligible Open-Meteo service arrangement.",
+    "content_hash": "openmeteo-provider-v2",
     "requires_key": false,
     "official_docs_url": "https://open-meteo.com/en/docs",
     "source_protocol": "provider-api",
@@ -44,27 +45,28 @@
     "vectorizable": false,
     "endpoint_health": "validated-by-sampled-health-check",
     "auth_mode": "none",
-    "rate_limit_notes": "Check non-commercial limits and attribution obligations before high-scale use.",
+    "rate_limit_notes": "Free hosted limits are generous for local single-user use, but eligibility is governed separately by the non-commercial terms.",
     "retrieval_mode": "direct",
-    "last_validated": "2026-04-27",
+    "last_validated": "2026-09-03",
     "search_examples": [
-      "show Open-Meteo",
-      "find Open-Meteo near a selected location"
+      "show Open-Meteo forecast",
+      "find Open-Meteo weather near a selected location"
     ],
     "location_dependency": "Depends on selected map extent or requested location."
   },
-  "version": 1,
-  "last_modified": "2026-04-10T16:45:00+00:00",
+  "version": 2,
+  "last_modified": "2026-09-03T12:58:00+00:00",
   "capabilityKind": "metadata-only",
   "renderingMode": "metadata-only",
   "sourceOfficialDocs": [
-    "https://open-meteo.com/en/docs"
+    "https://open-meteo.com/en/docs",
+    "https://open-meteo.com/en/terms"
   ],
   "license": {
-    "name": "openmeteo attribution required where provider terms require it",
-    "url": "https://open-meteo.com/en/docs",
+    "name": "Open-Meteo free hosted API terms",
+    "url": "https://open-meteo.com/en/terms",
     "attributionRequired": true,
-    "commercialUse": "unknown",
+    "commercialUse": "restricted",
     "embeddingAllowed": "unknown"
   },
   "auth": {
@@ -87,13 +89,17 @@
     "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
-      "no geographic context"
+      "no geographic context",
+      "commercial use without an eligible service arrangement"
     ]
   },
   "reliability": {
     "status": "partial",
-    "lastAudited": "2026-05-11",
-    "knownLimitations": []
+    "lastAudited": "2026-09-03",
+    "knownLimitations": [
+      "Free hosted access is restricted to non-commercial use.",
+      "Forecast and modeled data must not be represented as in-situ observations."
+    ]
   },
   "cachePolicy": {
     "mode": "memory",
