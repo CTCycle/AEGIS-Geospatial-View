@@ -80,3 +80,25 @@ def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
 
     assert registry.credentials_present("tomtom_traffic_flow")
     assert registry.provider_health("tomtom_traffic_flow") == "healthy"
+
+
+def test_restricted_capability_is_disabled_without_explicit_opt_in(monkeypatch) -> None:
+    monkeypatch.delenv("AEGIS_ALLOW_RESTRICTED_SOURCES", raising=False)
+    registry = RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_CredentialRepo(False),
+    )
+
+    assert not registry.is_enabled("openmeteo_elevation")
+    assert registry.provider_health("openmeteo_elevation") == "disabled"
+
+
+def test_restricted_capability_requires_explicit_opt_in(monkeypatch) -> None:
+    monkeypatch.setenv("AEGIS_ALLOW_RESTRICTED_SOURCES", "true")
+    registry = RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_CredentialRepo(False),
+    )
+
+    assert registry.is_enabled("openmeteo_elevation")
+    assert registry.provider_health("openmeteo_elevation") == "healthy"

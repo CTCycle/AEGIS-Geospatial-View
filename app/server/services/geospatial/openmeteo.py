@@ -4,6 +4,7 @@ from server.common.typing import is_json_object, json_array, json_object
 
 import asyncio
 import json
+import math
 import threading
 import time
 from datetime import UTC, datetime
@@ -13,6 +14,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from server.configurations import get_server_settings
+
+OPENMETEO_ELEVATION_BASE_URL = "https://api.open-meteo.com/v1/elevation"
 
 
 ###############################################################################
@@ -63,6 +66,7 @@ class OpenMeteoService:
         *,
         weather_base_url: str | None = None,
         air_quality_base_url: str | None = None,
+        elevation_base_url: str | None = None,
         user_agent: str | None = None,
         timeout_s: float | None = None,
         cache_ttl_s: float | None = None,
@@ -73,6 +77,7 @@ class OpenMeteoService:
         self.air_quality_base_url = (
             air_quality_base_url or settings.air_quality_base_url
         )
+        self.elevation_base_url = elevation_base_url or OPENMETEO_ELEVATION_BASE_URL
         self.user_agent = user_agent or settings.user_agent
         self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
         self.cache_ttl_s = max(
@@ -224,6 +229,65 @@ class OpenMeteoService:
                 "longitude": longitude,
             },
             "attribution": "Data from Open-Meteo",
+        }
+
+    # -------------------------------------------------------------------------
+    async def get_elevation(
+        self, *, latitude: float, longitude: float
+    ) -> dict[str, Any]:
+        params = {
+            "latitude": f"{latitude:.6f}",
+            "longitude": f"{longitude:.6f}",
+        }
+        payload = await asyncio.to_thread(
+            self._get_json,
+            endpoint=self.elevation_base_url,
+            params=params,
+            provider_key="openmeteo_elevation",
+        )
+        fetched_at = datetime.now(UTC).isoformat()
+        raw_elevations = payload.get("elevation")
+        if raw_elevations is not None and not isinstance(raw_elevations, list):
+            raise OpenMeteoRequestError(
+                "Open-Meteo elevation response field must be an array."
+            )
+        elevations = json_array(raw_elevations)
+        raw_elevation = elevations[0] if elevations else None
+        if raw_elevation is None:
+            elevation = None
+        elif (
+            isinstance(raw_elevation, (int, float))
+            and not isinstance(raw_elevation, bool)
+            and math.isfinite(float(raw_elevation))
+        ):
+            elevation = float(raw_elevation)
+        else:
+            raise OpenMeteoRequestError(
+                "Open-Meteo elevation response must contain a finite numeric value."
+            )
+        return {
+            "provider": "openmeteo",
+            "kind": "terrain_elevation",
+            "source_url": self.elevation_base_url,
+            "fetched_at": fetched_at,
+            "result_status": "ok" if elevation is not None else "valid_empty",
+            "result_type": "metadata",
+            "partial": False,
+            "latitude": latitude,
+            "longitude": longitude,
+            "elevation": elevation,
+            "resolved_at": fetched_at,
+            "observation_time": None,
+            "units": {"elevation": "m"},
+            "requested_variables": ["elevation"],
+            "request_parameters": dict(params),
+            "spatial_resolution": "90 m Copernicus DEM GLO-90",
+            "coverage": {
+                "type": "point",
+                "latitude": latitude,
+                "longitude": longitude,
+            },
+            "attribution": "Data from Open-Meteo; Copernicus DEM GLO-90",
         }
 
     # -------------------------------------------------------------------------

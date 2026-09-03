@@ -54,6 +54,6 @@ def test_rainviewer_service_rejects_malformed_payload() -> None:
     try:
         run_async_in_thread(service.get_latest_radar_metadata())
     except RainViewerRequestError as exc:
-        assert "did not return radar frames" in str(exc)
+        assert "recent radar history frames" in str(exc)
     else:
         raise AssertionError("RainViewerRequestError was not raised.")

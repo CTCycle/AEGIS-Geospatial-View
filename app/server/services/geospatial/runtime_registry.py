@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from server.common.typing import is_json_object, json_object
 
+import os
 from typing import Any
 
 from server.domain.geospatial.registry import (
@@ -25,6 +26,7 @@ class RuntimeRegistry:
         manifest_loader: GeospatialManifestLoader | None = None,
         credentials_repo: CredentialStore | None = None,
         credential_resolver: GeospatialCredentialResolver | None = None,
+        allow_restricted_sources: bool | None = None,
     ) -> None:
         loader = manifest_loader or GeospatialManifestLoader()
         self.catalog_snapshot = (
@@ -34,6 +36,11 @@ class RuntimeRegistry:
         self._credentials_repo = credentials_repo
         self._credential_resolver = credential_resolver or GeospatialCredentialResolver(
             credentials_repo=credentials_repo,
+        )
+        self.allow_restricted_sources = (
+            allow_restricted_sources
+            if allow_restricted_sources is not None
+            else _read_boolean_env("AEGIS_ALLOW_RESTRICTED_SOURCES")
         )
         self._snapshot = self._build_snapshot(self.catalog_snapshot)
 
@@ -94,7 +101,32 @@ class RuntimeRegistry:
         profile = self._profile(capability_id)
         if not is_json_object(profile):
             return False
-        return bool(profile.get("enabled_by_default", False))
+        restricted_public = self._is_restricted_public_source(capability_id)
+        if restricted_public and not self.allow_restricted_sources:
+            return False
+        if bool(profile.get("enabled_by_default", False)):
+            return True
+        return bool(profile.get("manual_toggle", False)) and restricted_public
+
+    # -------------------------------------------------------------------------
+    def _is_restricted_public_source(self, capability_id: str) -> bool:
+        profile = self._profile(capability_id)
+        if not is_json_object(profile):
+            return False
+        if str(profile.get("health_policy") or "").strip().casefold() != (
+            "restricted_usage_opt_in"
+        ):
+            return False
+        manifest = self._ensure().manifests.get(str(capability_id))
+        if not is_json_object(manifest):
+            return False
+        license_data = json_object(manifest.get("license"))
+        restricted = (
+            str(license_data.get("commercialUse") or "").strip().casefold()
+            == "restricted"
+        )
+        auth = json_object(manifest.get("auth"))
+        return restricted and not bool(auth.get("required", False))
 
     # -------------------------------------------------------------------------
     def credentials_present(self, capability_id: str) -> bool:
@@ -154,3 +186,8 @@ class RuntimeRegistry:
         if not is_json_object(profile):
             return "global"
         return str(profile.get("coverage_policy") or "global")
+
+
+###############################################################################
+def _read_boolean_env(name: str) -> bool:
+    return os.getenv(name, "").strip().casefold() in {"1", "true", "yes", "on"}

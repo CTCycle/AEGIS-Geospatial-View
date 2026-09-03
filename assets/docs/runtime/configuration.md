@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-08-20
+Last updated: 2026-09-03
 
 ## Environment file
 
@@ -20,6 +20,9 @@ Common keys include:
 - `BACKEND_LOGS_VISIBLE`
 - `REALTIME_ALLOW_MISSING_ORIGIN` (default `false`; test-only exception for
   non-browser clients)
+- `AEGIS_ALLOW_RESTRICTED_SOURCES` (default `false`; explicitly opts the
+  deployment into public capabilities marked with the
+  `restricted_usage_opt_in` runtime policy)
 
 The SQLite database path is always derived as:
 

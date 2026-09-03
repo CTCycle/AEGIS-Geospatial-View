@@ -95,6 +95,7 @@ class _SanremoWeatherProvider:
                 "wind_speed_10m": "km/h",
             },
             source_url="https://api.open-meteo.com/v1/forecast",
+            warnings=["Provider warning"],
         )
 
 
@@ -131,7 +132,8 @@ def test_provider_backed_sanremo_weather_descriptor_contains_renderable_data() -
 
     assert result is not None
     descriptor, warnings = result
-    assert warnings == []
+    assert warnings == ["Provider warning"]
+    assert descriptor["warnings"] == ["Provider warning"]
     assert descriptor["rendering_mode"] == "clustered-points"
     assert str(descriptor["url"]).startswith(
         "/api/geospatial/layers/openmeteo_pressure_humidity_wind/geojson?"
