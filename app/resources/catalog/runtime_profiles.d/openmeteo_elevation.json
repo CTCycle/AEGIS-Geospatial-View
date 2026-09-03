@@ -1,0 +1,24 @@
+{
+  "capability_id": "openmeteo_elevation",
+  "enabled_by_default": true,
+  "credential_provider": null,
+  "supports_map": true,
+  "supports_direct_text": true,
+  "coverage_policy": "global",
+  "health_policy": "best_effort",
+  "handler_name": null,
+  "capability_kind": "analysis-tool",
+  "rendering_mode": "clustered-points",
+  "health_status": "functional",
+  "planner_hints": [
+    "elevation",
+    "altitude",
+    "terrain height",
+    "terrain",
+    "dem",
+    "point elevation",
+    "open-meteo"
+  ],
+  "manual_toggle": false,
+  "auth_required": false
+}
