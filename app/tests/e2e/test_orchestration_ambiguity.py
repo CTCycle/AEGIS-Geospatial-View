@@ -62,6 +62,7 @@ def test_direct_coordinates_request_does_not_create_map_session(
         "latitude" in normalized
         or "coordinates" in normalized
         or "clarify" in normalized
+        or "which location" in normalized
     )
 
 

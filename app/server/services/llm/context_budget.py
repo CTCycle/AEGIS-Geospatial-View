@@ -5,6 +5,7 @@ import math
 from dataclasses import replace
 from typing import Any
 
+from server.common.typing import json_object
 from server.services.llm.cloud_catalog import get_model_context_profile
 from server.services.llm.errors import LLMContextLimitError
 from server.services.llm.types import ContextUsage, LLMRequest, ModelContextProfile
@@ -258,23 +259,13 @@ def apply_reported_usage(
     """Overlay provider-reported token counts without losing the estimate."""
 
     payload = raw_response if isinstance(raw_response, dict) else {}
-    usage_payload = payload.get("usage")
-    usage_payload = usage_payload if isinstance(usage_payload, dict) else {}
-    nested_response = payload.get("response")
-    nested_response = nested_response if isinstance(nested_response, dict) else {}
+    usage_payload = json_object(payload.get("usage"))
+    nested_response = json_object(payload.get("response"))
     if not usage_payload:
-        nested_usage = nested_response.get("usage")
-        usage_payload = (
-            nested_usage if isinstance(nested_usage, dict) else {}
-        )
-    usage_metadata = payload.get("usage_metadata")
-    if not isinstance(usage_metadata, dict):
-        nested_usage_metadata = nested_response.get("usage_metadata")
-        usage_metadata = (
-            nested_usage_metadata
-            if isinstance(nested_usage_metadata, dict)
-            else {}
-        )
+        usage_payload = json_object(nested_response.get("usage"))
+    usage_metadata = json_object(payload.get("usage_metadata"))
+    if not usage_metadata:
+        usage_metadata = json_object(nested_response.get("usage_metadata"))
 
     def first_non_negative(*values: object) -> int | None:
         for value in values:

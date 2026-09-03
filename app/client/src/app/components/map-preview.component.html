@@ -66,14 +66,6 @@
           ></app-overlay-controls>
         }
 
-        @if (complianceWarnings.length) {
-          <div class="compliance-panel">
-            @for (warning of complianceWarnings; track warning) {
-              <p>{{ warning }}</p>
-            }
-          </div>
-        }
-
         @if (metadataOnlyOverlays.length) {
           <div class="metadata-panel" aria-label="Metadata-only layers">
             @for (overlay of metadataOnlyOverlays; track overlay.id) {
@@ -108,17 +100,26 @@
           </div>
         }
 
-        @if (attributionEntries.length) {
-          <div class="attribution-panel" aria-label="Map attribution">
-            @for (entry of attributionEntries; track entry) {
-              <span>{{ entry }}</span>
+        @if (complianceWarnings.length || restoreNotice || attributionEntries.length) {
+          <div class="map-bottom-bar">
+            @if (complianceWarnings.length || restoreNotice) {
+              <div class="compliance-panel" role="status" aria-live="polite">
+                @for (warning of complianceWarnings; track warning) {
+                  <p>{{ warning }}</p>
+                }
+                @if (restoreNotice) {
+                  <p>{{ restoreNotice }}</p>
+                }
+              </div>
             }
-          </div>
-        }
 
-        @if (restoreNotice) {
-          <div class="compliance-panel" role="status" aria-live="polite">
-            <p>{{ restoreNotice }}</p>
+            @if (attributionEntries.length) {
+              <div class="attribution-panel" aria-label="Map attribution">
+                @for (entry of attributionEntries; track entry) {
+                  <span>{{ entry }}</span>
+                }
+              </div>
+            }
           </div>
         }
 

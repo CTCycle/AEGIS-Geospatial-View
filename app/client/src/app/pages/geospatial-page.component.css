@@ -298,6 +298,8 @@
     color: #dce8ed;
     font-size: 0.84rem;
     line-height: 1.42;
+    overflow-x: hidden;
+    overflow-y: hidden;
 }
 
 .toolbar-panel,

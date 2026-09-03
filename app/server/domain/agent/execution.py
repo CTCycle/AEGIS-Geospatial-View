@@ -51,7 +51,9 @@ class AgentToolLoopResult:
     model_calls: int = 0
     duplicate_tool_calls: int = 0
     no_progress_steps: int = 0
-    context_usages: list[dict[str, Any]] = field(default_factory=list)
+    context_usages: list[dict[str, Any]] = field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     failure_category: (
         Literal[
             "model_capability",
