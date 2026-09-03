@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-08-30
+Last updated: 2026-09-03
 
 ## Summary
 
@@ -84,9 +84,16 @@ planner hints, rendering modes, and temporal compatibility.
 
 Current radar requests prefer `rainviewer_precipitation_radar`, rainfall-rate
 requests prefer `IMERG_Precipitation_Rate`, and forecast requests prefer
-`openmeteo_weather_forecast`. Historical monthly precipitation means are not
-available in the current catalog, so those requests produce a structured
-clarification with supported current and forecast alternatives.
+`openmeteo_weather_forecast`. Numeric point-elevation requests prefer
+`openmeteo_elevation`; visual terrain, hillshade, and imagery layers must not be
+used as substitutes for a numeric elevation result. The current elevation
+capability is a coarse approximately 90 m point sample and does not satisfy
+slope, aspect, terrain-profile, zonal-statistics, parcel-scale, or survey-grade
+requests.
+
+Historical monthly precipitation means are not available in the current catalog,
+so those requests produce a structured clarification with supported current and
+forecast alternatives.
 
 ## Stable Action Catalog
 
