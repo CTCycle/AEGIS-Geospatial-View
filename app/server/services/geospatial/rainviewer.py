@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.common.typing import is_json_object, json_array, json_object
 
 import asyncio
+import math
 import threading
 import time
 from datetime import UTC, datetime
@@ -74,30 +75,65 @@ class RainViewerService:
     async def get_latest_radar_metadata(self) -> dict[str, Any]:
         payload = await self._fetch_metadata_payload()
         radar = json_object(payload.get("radar"))
-        past = json_array(radar.get("past"))
-        nowcast = json_array(radar.get("nowcast"))
-        frames = [frame for frame in [*past, *nowcast] if is_json_object(frame)]
-        if not frames:
-            raise RainViewerRequestError("RainViewer did not return radar frames.")
-        latest = max(frames, key=lambda frame: int(frame.get("time") or 0))
-        latest_time = int(latest.get("time") or 0)
+        past_frames = self._validated_past_frames(radar.get("past"))
+        if not past_frames:
+            raise RainViewerRequestError("RainViewer did not return recent radar history frames.")
+
+        latest, latest_time = max(past_frames, key=lambda item: item[1])
         latest_path = str(latest.get("path") or "").strip()
         if not latest_path:
             raise RainViewerRequestError("RainViewer radar frame path is missing.")
+
+        frame_times = sorted(timestamp for _, timestamp in past_frames)
         tile_url_template = (
             f"https://tilecache.rainviewer.com{latest_path}/256/{{z}}/{{x}}/{{y}}/"
             f"{self.tile_color_scheme}/{self.tile_smooth}_{self.tile_snow}.png"
         )
         return {
             "provider": "rainviewer",
-            "kind": "precipitation_radar",
+            "kind": "recent_precipitation_radar",
             "latest_time": latest_time,
+            "history_start_time": frame_times[0] if frame_times else None,
+            "history_end_time": frame_times[-1] if frame_times else latest_time,
             "tile_url_template": tile_url_template,
-            "frame_count": len(frames),
+            "frame_count": len(past_frames),
+            "max_zoom": 7,
             "host": payload.get("host"),
             "resolved_at": datetime.now(UTC).isoformat(),
             "attribution": "© RainViewer",
         }
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _validated_past_frames(
+        cls, value: object
+    ) -> list[tuple[dict[str, Any], int]]:
+        validated: list[tuple[dict[str, Any], int]] = []
+        for raw_frame in json_array(value):
+            if not is_json_object(raw_frame):
+                continue
+            timestamp = cls._frame_timestamp(raw_frame.get("time"))
+            if timestamp is not None:
+                validated.append((raw_frame, timestamp))
+        return validated
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _frame_timestamp(value: object) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            timestamp = value
+        elif isinstance(value, float) and math.isfinite(value) and value.is_integer():
+            timestamp = int(value)
+        elif isinstance(value, str):
+            try:
+                timestamp = int(value.strip())
+            except ValueError:
+                return None
+        else:
+            return None
+        return timestamp if timestamp > 0 else None
 
     # -------------------------------------------------------------------------
     async def _fetch_metadata_payload(self) -> dict[str, Any]:

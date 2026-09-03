@@ -187,6 +187,7 @@ class GeospatialLayerRenderDescriptor(BaseModel):
     min_zoom: int | None = None
     max_zoom: int | None = None
     attribution: list[str] = Field(default_factory=lambda: list[str]())
+    attribution_url: str | None = None
     warnings: list[str] = Field(default_factory=lambda: list[str]())
 
 

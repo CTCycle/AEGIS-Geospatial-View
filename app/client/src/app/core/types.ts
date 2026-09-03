@@ -118,6 +118,7 @@ export interface GeospatialLayerRenderDescriptor {
   min_zoom?: number | null;
   max_zoom?: number | null;
   attribution?: string[];
+  attribution_url?: string | null;
   warnings?: string[];
 }
 
@@ -323,6 +324,7 @@ export interface MapOverlayEntry {
   max_zoom?: number;
   bounds?: [number, number, number, number];
   attribution?: string;
+  attribution_url?: string | null;
   source_protocol?: string;
   data_format?: string;
   geometry_type?: string;

@@ -1,10 +1,10 @@
 # Access Overview
 
-Last updated: 2026-08-27
+Last updated: 2026-09-03
 
 ## Purpose
 
-This file covers credential handling, provider-setup boundaries, and provider exclusions.
+This file covers credential handling, provider-setup boundaries, access-policy semantics, and provider exclusions.
 
 ## Credential Configuration
 
@@ -38,6 +38,12 @@ Credentialed provider requests remain server-mediated: credentials are sent in
 request headers or used to construct an internal proxy request, never exposed
 in a frontend URL, render descriptor, or public provider payload.
 
+Public sources with the explicit runtime policy
+`restricted_usage_opt_in` are fail-closed. `AEGIS_ALLOW_RESTRICTED_SOURCES`
+defaults to `false`; set it to `true` only when the deployment owner has
+confirmed that the provider terms permit the intended use. Anonymous or
+keyless access does not satisfy this eligibility check.
+
 Non-secret deployment configuration variables include:
 
 - `LOCAL_OPEN_DATA_SOURCES`
@@ -46,6 +52,31 @@ Non-secret deployment configuration variables include:
 `LOCAL_OPEN_DATA_SOURCES` maps trusted source IDs to HTTPS URLs or local files.
 The runtime accepts a configured source ID rather than an arbitrary caller URL,
 and rejects private or loopback network targets.
+
+## Anonymous Access Is Not A License Decision
+
+A provider with `auth.type = none` is only credential-free. It is not
+necessarily eligible for every deployment or use case.
+
+Catalog review must evaluate authentication and reuse rights independently:
+
+- `auth` describes whether credentials are required to access the service.
+- `license.commercialUse` describes whether the documented source terms allow
+  commercial use under the cataloged access path.
+- attribution, embedding, redistribution, caching, and provider-specific terms
+  remain separate obligations.
+
+Current examples:
+
+- Open-Meteo free hosted access is anonymous but restricted to non-commercial
+  use. A commercial deployment requires a commercially eligible service
+  arrangement.
+- RainViewer public access is anonymous but intended for personal, educational,
+  and small-community use. It must not be treated as a generic commercial data
+  entitlement.
+
+Agent and UI copy must not infer `commercialUse = allowed` from `auth.type =
+none`.
 
 ## Secret Safety Rules
 

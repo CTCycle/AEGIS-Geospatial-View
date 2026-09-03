@@ -30,7 +30,12 @@ class OpenMeteoProvider(GeospatialProvider):
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         latitude, longitude = request_center(request)
         try:
-            if "air_quality" in request.capability_id:
+            if "elevation" in request.capability_id:
+                payload = await self.service.get_elevation(
+                    latitude=latitude,
+                    longitude=longitude,
+                )
+            elif "air_quality" in request.capability_id:
                 payload = await self.service.get_air_quality_forecast(
                     latitude=latitude,
                     longitude=longitude,
@@ -79,11 +84,7 @@ class OpenMeteoProvider(GeospatialProvider):
             source_url=(
                 str(payload.get("source_url"))
                 if payload.get("source_url") is not None
-                else (
-                    getattr(self.service, "air_quality_base_url", None)
-                    if "air_quality" in request.capability_id
-                    else getattr(self.service, "weather_base_url", None)
-                )
+                else self._service_source_url(request.capability_id)
             ),
             result_type="features",
             partial=partial,
@@ -99,6 +100,7 @@ class OpenMeteoProvider(GeospatialProvider):
             "kind": payload.get("kind"),
             "latitude": payload.get("latitude"),
             "longitude": payload.get("longitude"),
+            "elevation": payload.get("elevation"),
             "timezone": payload.get("timezone"),
             "current": json_object(payload.get("current")),
             "hourlyPreview": json_array(payload.get("hourly_preview")),
@@ -151,6 +153,24 @@ class OpenMeteoProvider(GeospatialProvider):
             "units": json_object(payload.get("units")),
             "request_parameters": json_object(payload.get("request_parameters")),
         }
+        if "elevation" in kind:
+            elevation = payload.get("elevation")
+            return [
+                {
+                    "id": f"openmeteo:elevation:{latitude:.4f}:{longitude:.4f}",
+                    "name": "Open-Meteo terrain elevation",
+                    "category": "terrain",
+                    "source": self.provider_id,
+                    "latitude": float(latitude),
+                    "longitude": float(longitude),
+                    "elevation": elevation,
+                    "metadata": {
+                        "elevation": elevation,
+                        "spatial_resolution": payload.get("spatial_resolution"),
+                        **common,
+                    },
+                }
+            ]
         if "air_quality" in kind:
             pollutant_values = {
                 key: self._prefer(current.get(key), first_hour.get(key))
@@ -219,6 +239,14 @@ class OpenMeteoProvider(GeospatialProvider):
                 },
             }
         ]
+
+    # -------------------------------------------------------------------------
+    def _service_source_url(self, capability_id: str) -> str | None:
+        if "elevation" in capability_id:
+            return getattr(self.service, "elevation_base_url", None)
+        if "air_quality" in capability_id:
+            return getattr(self.service, "air_quality_base_url", None)
+        return getattr(self.service, "weather_base_url", None)
 
     # -------------------------------------------------------------------------
     @staticmethod

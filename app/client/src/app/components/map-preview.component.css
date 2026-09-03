@@ -389,6 +389,12 @@
     color: #b9d5df;
 }
 
+.attribution-panel a {
+    color: #d7f2ff;
+    text-decoration: underline;
+    text-underline-offset: 0.12rem;
+}
+
 .map-bottom-bar > * {
     pointer-events: auto;
 }

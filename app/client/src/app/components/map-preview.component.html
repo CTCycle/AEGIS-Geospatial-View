@@ -115,8 +115,12 @@
 
             @if (attributionEntries.length) {
               <div class="attribution-panel" aria-label="Map attribution">
-                @for (entry of attributionEntries; track entry) {
-                  <span>{{ entry }}</span>
+                @for (entry of attributionEntries; track entry.label + (entry.url || '')) {
+                  @if (entry.url) {
+                    <a [href]="entry.url" target="_blank" rel="noopener noreferrer">{{ entry.label }}</a>
+                  } @else {
+                    <span>{{ entry.label }}</span>
+                  }
                 }
               </div>
             }
