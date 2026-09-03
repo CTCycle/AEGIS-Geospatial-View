@@ -1,13 +1,10 @@
 # Capability Catalog
 
-Last updated: 2026-08-02
+Last updated: 2026-09-03
 
 ## Purpose
 
-This file is the reviewable inventory of geospatial capabilities implemented by AEGIS. The runtime source of truth remains `app/resources/catalog`.
-
-The current catalog snapshot contains 6 basemaps, 45 overlays, 16 provider
-descriptors, 4 direct tools, 7 camera networks, and 3 transit capabilities.
+This file is the reviewable inventory of geospatial capabilities implemented by AEGIS. The runtime source of truth remains `app/resources/catalog`; avoid maintaining a second authoritative capability count in documentation because the manifest inventory evolves independently.
 
 ## Providers
 
@@ -17,7 +14,7 @@ descriptors, 4 direct tools, 7 camera networks, and 3 transit capabilities.
 | `esa` | WorldCover land-use context | public |
 | `gibs` | satellite and earth-observation layers | public |
 | `openaq` | air-quality station observations | credentialed |
-| `openmeteo` | weather and air-quality forecasts | public |
+| `openmeteo` | weather, air-quality forecasts, and numeric point elevation | public for eligible non-commercial use |
 | `overpass` | OpenStreetMap POI queries | public |
 | `pvgis` | solar irradiation and photovoltaic estimates | public |
 | `rainviewer` | precipitation radar tiles | public |
@@ -60,6 +57,7 @@ Representative implemented layers include:
 - `OMPS_Ozone_Total_Column`
 - `openaq_air_quality`
 - `openmeteo_air_quality_forecast`
+- `openmeteo_elevation`
 - `openmeteo_weather_forecast`
 - `overpass_poi_amenities`
 - `overture_maps_places`
