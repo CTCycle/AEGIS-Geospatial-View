@@ -1,15 +1,15 @@
 {
   "capability_id": "openmeteo_elevation",
-  "enabled_by_default": true,
+  "enabled_by_default": false,
   "credential_provider": null,
   "supports_map": true,
   "supports_direct_text": true,
   "coverage_policy": "global",
-  "health_policy": "best_effort",
+  "health_policy": "restricted_usage_opt_in",
   "handler_name": null,
   "capability_kind": "analysis-tool",
   "rendering_mode": "clustered-points",
-  "health_status": "functional",
+  "health_status": "disabled",
   "planner_hints": [
     "elevation",
     "altitude",
@@ -19,6 +19,6 @@
     "point elevation",
     "open-meteo"
   ],
-  "manual_toggle": false,
+  "manual_toggle": true,
   "auth_required": false
 }

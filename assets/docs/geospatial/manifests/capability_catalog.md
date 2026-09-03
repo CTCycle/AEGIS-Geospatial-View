@@ -14,7 +14,7 @@ This file is the reviewable inventory of geospatial capabilities implemented by 
 | `esa` | WorldCover land-use context | public |
 | `gibs` | satellite and earth-observation layers | public |
 | `openaq` | air-quality station observations | credentialed |
-| `openmeteo` | weather, air-quality forecasts, and numeric point elevation | public for eligible non-commercial use |
+| `openmeteo` | weather, air-quality forecasts, and numeric point elevation | public for eligible non-commercial use; restricted capabilities require explicit opt-in |
 | `overpass` | OpenStreetMap POI queries | public |
 | `pvgis` | solar irradiation and photovoltaic estimates | public |
 | `rainviewer` | precipitation radar tiles | public |

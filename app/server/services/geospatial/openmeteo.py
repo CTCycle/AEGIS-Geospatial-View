@@ -4,6 +4,7 @@ from server.common.typing import is_json_object, json_array, json_object
 
 import asyncio
 import json
+import math
 import threading
 import time
 from datetime import UTC, datetime
@@ -245,13 +246,25 @@ class OpenMeteoService:
             provider_key="openmeteo_elevation",
         )
         fetched_at = datetime.now(UTC).isoformat()
-        elevations = json_array(payload.get("elevation"))
+        raw_elevations = payload.get("elevation")
+        if raw_elevations is not None and not isinstance(raw_elevations, list):
+            raise OpenMeteoRequestError(
+                "Open-Meteo elevation response field must be an array."
+            )
+        elevations = json_array(raw_elevations)
         raw_elevation = elevations[0] if elevations else None
-        elevation = (
-            float(raw_elevation)
-            if isinstance(raw_elevation, (int, float)) and not isinstance(raw_elevation, bool)
-            else None
-        )
+        if raw_elevation is None:
+            elevation = None
+        elif (
+            isinstance(raw_elevation, (int, float))
+            and not isinstance(raw_elevation, bool)
+            and math.isfinite(float(raw_elevation))
+        ):
+            elevation = float(raw_elevation)
+        else:
+            raise OpenMeteoRequestError(
+                "Open-Meteo elevation response must contain a finite numeric value."
+            )
         return {
             "provider": "openmeteo",
             "kind": "terrain_elevation",
