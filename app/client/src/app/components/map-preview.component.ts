@@ -141,11 +141,22 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     return this.overlays.filter((overlay) => metadataOnlyIds.has(overlay.id));
   }
 
-  get attributionEntries(): string[] {
+  get attributionEntries(): Array<{ label: string; url?: string }> {
     const entries = this.overlays
-      .map((overlay) => overlay.attribution || overlay.provider)
-      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
-    return Array.from(new Set(entries));
+      .map((overlay) => ({
+        label: overlay.attribution || overlay.provider,
+        url: overlay.attribution_url || undefined,
+      }))
+      .filter((entry) => entry.label.trim().length > 0);
+    const seen = new Set<string>();
+    return entries.filter((entry) => {
+      const key = `${entry.label}\u0000${entry.url || ''}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
   }
 
   get legendEntries(): Array<{ id: string; label: string; mode: string }> {

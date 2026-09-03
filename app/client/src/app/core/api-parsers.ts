@@ -708,6 +708,7 @@ export const normalizeLayerRenderDescriptor = (
     min_zoom: numberOrNull(value.min_zoom),
     max_zoom: numberOrNull(value.max_zoom),
     attribution: isStringArray(value.attribution) ? value.attribution : [],
+    attribution_url: safeHttpUrl(value.attribution_url),
     warnings: isStringArray(value.warnings) ? value.warnings : [],
   };
 };
@@ -748,6 +749,7 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
     max_zoom: numberOrNull(value.max_zoom ?? render?.max_zoom) ?? undefined,
     bounds: normalizedBounds,
     attribution: stringOrNull(value.attribution) ?? render?.attribution?.join('; '),
+    attribution_url: safeHttpUrl(value.attribution_url ?? render?.attribution_url),
     source_protocol: stringOrNull(value.source_protocol ?? render?.source_protocol) ?? undefined,
     data_format: stringOrNull(value.data_format) ?? undefined,
     geometry_type: stringOrNull(value.geometry_type) ?? undefined,

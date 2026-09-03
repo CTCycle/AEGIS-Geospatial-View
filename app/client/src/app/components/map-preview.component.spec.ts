@@ -460,7 +460,32 @@ describe('components/map-preview.component', () => {
       .find((layer) => layer.id === 'overlay-layer-natural_earth');
     expect(vectorLayer?.['source-layer']).toBe('admin_boundaries');
     expect(component.metadataOnlyOverlays.map((overlay) => overlay.id)).toContain('parcel_template');
-    expect(component.attributionEntries).toContain('Natural Earth');
+    expect(component.attributionEntries.map((entry) => entry.label)).toContain('Natural Earth');
+  });
+
+  it('renders attribution labels as links when a safe attribution URL is provided', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          {
+            id: 'rainviewer_precipitation_radar',
+            label: 'RainViewer Recent Precipitation Radar',
+            type: 'tile',
+            rendering_mode: 'raster-tile',
+            provider: 'rainviewer',
+            url: 'https://example.test/radar/{z}/{x}/{y}.png',
+            attribution: '© RainViewer',
+            attribution_url: 'https://www.rainviewer.com/api.html',
+          },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('.attribution-panel a') as HTMLAnchorElement | null;
+    expect(link?.textContent).toContain('RainViewer');
+    expect(link?.href).toBe('https://www.rainviewer.com/api.html');
   });
 
   it('surfaces a layer-specific failure when vector source_layer metadata is missing', () => {
