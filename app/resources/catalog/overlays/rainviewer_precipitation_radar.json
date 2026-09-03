@@ -1,59 +1,64 @@
 {
   "id": "rainviewer_precipitation_radar",
-  "name": "RainViewer Precipitation Radar",
+  "name": "RainViewer Recent Precipitation Radar",
   "provider": "rainviewer",
   "type": "tile",
-  "description": "Near real-time precipitation radar tile overlay from RainViewer for storm and rain intensity visualization.",
+  "description": "Recent precipitation radar history from RainViewer for rain and storm intensity context. The free 2026 API does not provide future nowcast frames.",
   "capabilities": [
     "tile",
     "radar",
-    "precipitation"
+    "precipitation",
+    "recent-history"
   ],
   "coverage": "global-partial",
   "metadata": {
-    "label": "RainViewer Precipitation Radar",
+    "label": "RainViewer Recent Precipitation Radar",
     "default_opacity": 0.7,
     "requires_key": false,
     "attribution": "© RainViewer",
     "url_template": "https://tilecache.rainviewer.com/v2/radar/{time}/{z}/{x}/{y}/2/1_1.png",
+    "max_zoom": 7,
     "keywords": [
       "rainviewer",
       "radar",
       "precipitation",
-      "rain intensity"
+      "rain intensity",
+      "recent radar history"
     ],
     "action_tags": [
       "precipitation",
-      "storm tracking"
+      "recent storm tracking"
     ],
     "task_tags": [
       "rain monitoring",
-      "storm awareness",
+      "recent storm awareness",
       "commute weather checks"
     ],
     "map_type_tags": [
       "thematic"
     ],
     "coverage_scope": "global-partial",
-    "temporal_behavior": "dynamic",
-    "constraints": "Time-indexed radar tiles; coverage and licensing vary by region and usage scenario.",
-    "content_hash": "rainviewer_precipitation_radar_overlay_v1",
-    "human_summary": "Radar precipitation overlay for rapid rain and storm intensity context in a selected area.",
+    "temporal_behavior": "near-real-time-history",
+    "constraints": "Free public RainViewer access provides recent past radar only, no future nowcast or satellite IR, with public tiles capped at zoom 7.",
+    "content_hash": "rainviewer_precipitation_radar_overlay_v2",
+    "human_summary": "Recent radar precipitation overlay for rain and storm intensity context in a selected area.",
     "primary_use_cases": [
-      "storm monitoring",
+      "recent storm monitoring",
       "rainfall awareness",
-      "short-horizon weather decisions"
+      "short-horizon weather context"
     ],
     "search_examples": [
-      "show rain radar over Naples",
-      "display precipitation intensity near Venice"
+      "show recent rain radar over Naples",
+      "display recent precipitation radar near Venice"
     ],
     "disambiguation_notes": [
-      "Use this for near real-time rain intensity. For broader forecast trends, use forecast weather layers."
+      "Use this for recent observed radar history. Do not present it as a future radar nowcast. For forecast conditions, use forecast weather layers."
     ],
     "location_dependency": "Location-specific and strongly time-dependent.",
     "integration_requirements": [
-      "No API key required for basic RainViewer usage"
+      "No API key required for the RainViewer free public API",
+      "Attribution required",
+      "Public use limits and non-commercial scope must be respected"
     ],
     "official_docs_url": "https://www.rainviewer.com/api.html",
     "source_protocol": "raster-tile",
@@ -63,22 +68,22 @@
     "vectorizable": false,
     "endpoint_health": "validated-by-sampled-health-check",
     "auth_mode": "none",
-    "rate_limit_notes": "Time-indexed radar tiles; coverage and licensing vary by region and usage scenario.",
+    "rate_limit_notes": "Free public API limit documented as 100 requests per IP per minute; cache metadata and tiles conservatively.",
     "retrieval_mode": "direct",
-    "last_validated": "2026-04-27"
+    "last_validated": "2026-09-03"
   },
-  "version": 1,
-  "last_modified": "2026-04-10T16:45:00+00:00",
+  "version": 2,
+  "last_modified": "2026-09-03T12:55:00+00:00",
   "capabilityKind": "raster-overlay",
   "renderingMode": "raster-tile",
   "sourceOfficialDocs": [
     "https://www.rainviewer.com/api.html"
   ],
   "license": {
-    "name": "© RainViewer",
+    "name": "RainViewer public API terms",
     "url": "https://www.rainviewer.com/api.html",
     "attributionRequired": true,
-    "commercialUse": "unknown",
+    "commercialUse": "restricted",
     "embeddingAllowed": "unknown"
   },
   "auth": {
@@ -92,24 +97,31 @@
     "manualToggle": true,
     "plannerHints": [
       "precipitation",
-      "storm tracking",
+      "recent storm tracking",
       "rain monitoring",
-      "storm awareness",
+      "recent storm awareness",
       "commute weather checks",
       "rainviewer",
       "radar",
-      "rain intensity"
+      "rain intensity",
+      "recent radar history"
     ],
     "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
-      "no geographic context"
+      "no geographic context",
+      "future radar nowcast",
+      "satellite infrared imagery"
     ]
   },
   "reliability": {
     "status": "partial",
-    "lastAudited": "2026-05-11",
-    "knownLimitations": []
+    "lastAudited": "2026-09-03",
+    "knownLimitations": [
+      "Free public API provides recent past radar only, not future nowcast.",
+      "Public tile zoom is capped at 7.",
+      "Best-effort public service has no SLA."
+    ]
   },
   "cachePolicy": {
     "mode": "memory",
