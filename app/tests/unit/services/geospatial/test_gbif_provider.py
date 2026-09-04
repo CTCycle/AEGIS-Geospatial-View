@@ -153,6 +153,25 @@ def test_gbif_provider_clamps_interactive_limit_to_300() -> None:
 
 
 ###############################################################################
+def test_gbif_provider_defaults_to_maximum_interactive_page() -> None:
+    provider, requested_urls = _provider_for_payload(
+        {"count": 0, "endOfRecords": True, "results": []}
+    )
+
+    response = asyncio.run(
+        provider.fetch(
+            ProviderRequest(
+                capability_id="gbif_species_occurrences",
+                bbox=(8.0, 46.0, 9.0, 47.0),
+            )
+        )
+    )
+
+    assert response.payload["sampleLimit"] == 300
+    assert parse_qs(urlparse(requested_urls[0]).query)["limit"] == ["300"]
+
+
+###############################################################################
 def test_gbif_provider_marks_sampled_results() -> None:
     provider, _requested_urls = _provider_for_payload(
         {

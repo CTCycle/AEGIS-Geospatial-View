@@ -29,8 +29,8 @@
     ],
     "coverage_scope": "global",
     "temporal_behavior": "historical-observation",
-    "constraints": "Interactive occurrence search is bounded and sampled. Record and dataset licences vary and must be preserved per occurrence. Authenticated asynchronous bulk downloads are outside the core AEGIS capability.",
-    "content_hash": "gbif-provider-v1",
+    "constraints": "Interactive occurrence search is bounded and sampled at up to 300 records per page. Record and dataset licences vary and must be preserved per occurrence. Authenticated asynchronous bulk downloads are outside the core AEGIS capability.",
+    "content_hash": "gbif-provider-v2",
     "requires_key": false,
     "official_docs_url": "https://techdocs.gbif.org/en/openapi/v1/occurrence",
     "source_protocol": "provider-api",
@@ -40,13 +40,13 @@
     "vectorizable": true,
     "endpoint_health": "validated-by-official-contract",
     "auth_mode": "none",
-    "rate_limit_notes": "GBIF may rate-limit intensive search traffic. Keep interactive queries bounded and use small result limits.",
+    "rate_limit_notes": "GBIF may rate-limit intensive search traffic. Keep interactive queries bounded and use at most 300 records per page.",
     "retrieval_mode": "direct",
-    "last_validated": "2026-09-03",
+    "last_validated": "2026-09-04",
     "location_dependency": "Requires a bounded geographic extent."
   },
-  "version": 1,
-  "last_modified": "2026-09-03T13:25:00+00:00",
+  "version": 2,
+  "last_modified": "2026-09-04T00:00:00+00:00",
   "capabilityKind": "metadata-only",
   "renderingMode": "metadata-only",
   "sourceOfficialDocs": [
@@ -84,7 +84,7 @@
   },
   "reliability": {
     "status": "functional",
-    "lastAudited": "2026-09-03",
+    "lastAudited": "2026-09-04",
     "knownLimitations": [
       "Interactive search is sampled and does not imply exhaustive biodiversity coverage.",
       "Coordinate uncertainty, data quality issues, and per-record licences vary by occurrence."
