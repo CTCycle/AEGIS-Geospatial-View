@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 # Configure application logging before importing modules that may emit startup
 # diagnostics (for example, Alembic plugin discovery).
-from server.common.logger import logger as _application_logger  # noqa: F401
+from server.common.logger import logger as _application_logger
 
 from server.api.chat import router as chat_router
 from server.api.conversations import router as conversations_router
@@ -106,6 +106,7 @@ def redirect_root_to_docs() -> RedirectResponse:
 ###############################################################################
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
+    _application_logger.debug("Application logging configured.")
     settings = get_server_settings()
     database = SQLiteRepository(settings.database)
 

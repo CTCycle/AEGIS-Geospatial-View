@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from time import monotonic
 from typing import Any
 
+from server.common.typing import json_object
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.chat.model_library import ChatModelLibraryService
 from server.services.llm.context_budget import resolve_model_context_profile
@@ -104,8 +105,7 @@ class ModelContextProfileResolver:
     # -------------------------------------------------------------------------
     @staticmethod
     def _descriptor_metadata(descriptor: dict[str, Any]) -> dict[str, Any]:
-        metadata = descriptor.get("metadata")
-        merged = dict(metadata) if isinstance(metadata, dict) else {}
+        merged: dict[str, Any] = dict(json_object(descriptor.get("metadata")))
         for key in (
             "context_window_tokens",
             "context_length",

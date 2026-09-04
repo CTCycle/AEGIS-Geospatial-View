@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from server.common.typing import json_array
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.services.geospatial.overpass import OverpassService
 
@@ -32,9 +33,9 @@ async def execute(plan: ExecutionPlan, location: ResolvedLocation) -> dict[str, 
 
 
 def _string_list(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return list(dict.fromkeys(str(item).strip() for item in value if str(item).strip()))
+    return list(
+        dict.fromkeys(str(item).strip() for item in json_array(value) if str(item).strip())
+    )
 
 
 def _positive_float(value: object) -> float | None:

@@ -5,7 +5,7 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 from collections.abc import Iterator
 from datetime import datetime
 import math
-from typing import Any
+from typing import Any, TypeGuard
 from urllib.parse import quote
 
 from server.contracts.geospatial import (
@@ -154,7 +154,7 @@ def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
 
 
 ###############################################################################
-def _valid_latitude(value: object) -> bool:
+def _valid_latitude(value: object) -> TypeGuard[int | float]:
     return (
         isinstance(value, int | float)
         and not isinstance(value, bool)
@@ -164,7 +164,7 @@ def _valid_latitude(value: object) -> bool:
 
 
 ###############################################################################
-def _valid_longitude(value: object) -> bool:
+def _valid_longitude(value: object) -> TypeGuard[int | float]:
     return (
         isinstance(value, int | float)
         and not isinstance(value, bool)
@@ -627,9 +627,7 @@ class GeospatialApiService:
         fetched_at = getattr(response, "fetched_at", None)
         if not isinstance(fetched_at, datetime):
             fetched_at = datetime.now().astimezone()
-        units = getattr(response, "units", {})
-        if not isinstance(units, dict):
-            units = {}
+        units = response.units
         return {
             "status": "ok",
             "provider": provider_id,

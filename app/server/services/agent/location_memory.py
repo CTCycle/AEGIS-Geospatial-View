@@ -99,7 +99,7 @@ class LocationMemoryService:
 def _finite_number(
     value: object, *, minimum: float, maximum: float
 ) -> float | None:
-    if isinstance(value, bool):
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
         return None
     try:
         number = float(value)

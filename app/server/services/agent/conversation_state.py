@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, cast
 
+from server.common.typing import is_json_object, json_array, json_object
 from server.common.time import utc_now
 from server.domain.agent.pipeline import (
     ConversationTaskRecord,
@@ -351,9 +352,9 @@ class ConversationTaskStateService:
                 if normalized:
                     data_sources.append(normalized)
         evidence_refs: list[str] = []
-        payload = tool_payload if isinstance(tool_payload, dict) else {}
-        for event in payload.get("provider_events", []):
-            if not isinstance(event, dict):
+        payload = json_object(tool_payload)
+        for event in json_array(payload.get("provider_events")):
+            if not is_json_object(event):
                 continue
             capability_id = str(event.get("capability_id") or "").strip()
             provider = str(event.get("provider") or "").strip()
@@ -363,11 +364,11 @@ class ConversationTaskStateService:
                 data_sources.append(provider)
             if capability_id and provider:
                 evidence_refs.append(f"{capability_id}:{provider}")
-        for result in payload.get("tool_results", []):
-            if not isinstance(result, dict) or result.get("is_error"):
+        for result in json_array(payload.get("tool_results")):
+            if not is_json_object(result) or result.get("is_error"):
                 continue
             provenance = result.get("provenance")
-            if not isinstance(provenance, dict):
+            if not is_json_object(provenance):
                 continue
             capability_id = str(provenance.get("capability_id") or "").strip()
             provider = str(provenance.get("provider") or "").strip()
