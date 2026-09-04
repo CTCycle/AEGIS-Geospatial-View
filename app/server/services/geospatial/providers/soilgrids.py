@@ -111,7 +111,7 @@ class SoilGridsProvider(GeospatialProvider):
                 ),
             },
             attribution=["ISRIC - World Soil Information, SoilGrids"],
-            result_type="coverage-descriptor",
+            result_type="metadata",
         )
 
 

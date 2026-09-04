@@ -249,9 +249,15 @@ def _filter_features_to_bbox(
     if bbox is None:
         return features
     west, south, east, north = bbox
-    return [
-        feature
-        for feature in features
-        if south <= float(feature["latitude"]) <= north
-        and west <= float(feature["longitude"]) <= east
-    ]
+    filtered: list[dict[str, object]] = []
+    for feature in features:
+        latitude = _float_or_none(feature.get("latitude"))
+        longitude = _float_or_none(feature.get("longitude"))
+        if (
+            latitude is not None
+            and longitude is not None
+            and south <= latitude <= north
+            and west <= longitude <= east
+        ):
+            filtered.append(feature)
+    return filtered

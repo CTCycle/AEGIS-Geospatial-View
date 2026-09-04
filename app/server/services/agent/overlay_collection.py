@@ -290,7 +290,7 @@ class OverlayCollectionService:
             return float(latitude), float(longitude)
         nested_location = location.get("location")
         if isinstance(nested_location, dict):
-            return cls._location_point(nested_location)
+            return cls._location_point(cast(dict[str, Any], nested_location))
         return None
 
     # -------------------------------------------------------------------------

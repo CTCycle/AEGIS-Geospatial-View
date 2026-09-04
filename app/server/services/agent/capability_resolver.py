@@ -117,7 +117,6 @@ class CapabilityResolver:
         atomic_layer_refs = {
             self._normalize_text(str(item))
             for task in turn.atomic_tasks
-            if isinstance(task, dict)
             for item in json_array(task.get("required_layers"))
             if str(item).strip()
         }
@@ -347,12 +346,8 @@ class CapabilityResolver:
         if not turn.atomic_tasks:
             return bool(turn.location_signals or turn.map_target or turn.entity_target)
         for task in turn.atomic_tasks:
-            if not isinstance(task, dict):
-                continue
             required_layers = task.get("required_layers")
-            if isinstance(required_layers, list) and any(
-                str(item).strip() for item in required_layers
-            ):
+            if any(str(item).strip() for item in json_array(required_layers)):
                 return False
             task_type = str(task.get("task_type") or "").strip().casefold()
             if task_type and not any(
@@ -411,7 +406,6 @@ class CapabilityResolver:
                 for marker in ("geocode", "location", "map", "viewport", "focus")
             )
             for task in turn.atomic_tasks
-            if isinstance(task, dict)
         ):
             return True
         if (

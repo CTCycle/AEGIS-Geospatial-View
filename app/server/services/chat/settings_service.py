@@ -8,6 +8,7 @@ from server.contracts.chat import (
     ModelProviderMode,
     ModelSettingsResponse,
     ModelSettingsUpdateRequest,
+    SelectedModelContextResponse,
 )
 from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
@@ -82,21 +83,19 @@ class ChatSettingsService:
                 record.agent_model_name,
             )
         )
-        selected_model_context = {
-            "provider": record.agent_model_provider,
-            "model": record.agent_model_name,
-            "context_window_tokens": None,
-            "maximum_output_tokens": None,
-            "context_profile_source": "unknown",
-        }
-        if profile is not None:
-            selected_model_context.update(
-                {
-                    "context_window_tokens": profile.context_window_tokens,
-                    "maximum_output_tokens": profile.maximum_output_tokens,
-                    "context_profile_source": profile.metadata_source,
-                }
-            )
+        selected_model_context = SelectedModelContextResponse(
+            provider=record.agent_model_provider,
+            model=record.agent_model_name,
+            context_window_tokens=(
+                profile.context_window_tokens if profile is not None else None
+            ),
+            maximum_output_tokens=(
+                profile.maximum_output_tokens if profile is not None else None
+            ),
+            context_profile_source=(
+                profile.metadata_source if profile is not None else "unknown"
+            ),
+        )
         return ModelSettingsResponse(
             active_provider_mode=active_provider_mode,
             agent_model_provider=record.agent_model_provider,
