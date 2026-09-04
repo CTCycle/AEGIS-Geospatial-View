@@ -1,6 +1,6 @@
 # Public And Optional Sources
 
-Last updated: 2026-09-03
+Last updated: 2026-09-04
 
 ## Canonical POI path
 
@@ -73,6 +73,35 @@ Use for EU or EEA environmental noise layers.
 
 - No API key is required for public services.
 - Verify service availability and licensing before operational use.
+
+### NOAA Radar
+
+Use `noaa_radar` for CONUS precipitation radar context.
+
+- The public NOAA WMS-backed raster service is exposed through an explicit
+  bounded `{bbox-epsg-3857}` tile template in the catalog.
+- Keep NOAA/NCEP attribution visible and treat coverage as CONUS radar context,
+  not a global radar product.
+
+### FEMA NFHL
+
+Use `fema_nfhl_flood_zones` for National Flood Hazard Layer map context.
+
+- The public FEMA MapServer export is exposed through an explicit bounded
+  `{bbox-epsg-3857}` raster template in the catalog.
+- Keep FEMA attribution visible; authoritative flood-zone interpretation still
+  requires FEMA source context and applicable local regulation.
+
+### GBIF
+
+Use `gbif_species_occurrences` for bounded biodiversity occurrence context.
+
+- AEGIS requests up to 300 records per interactive page, matching the
+  [GBIF occurrence API page limit](https://techdocs.gbif.org/en/openapi/v1/occurrence).
+- Interactive results remain a sampled page rather than an exhaustive species
+  inventory; use GBIF paging or downloads for larger result sets.
+- Preserve contributing-dataset attribution, per-record licences, event dates,
+  basis of record, coordinate uncertainty, and data-quality issues.
 
 ## Optional Credentialed Sources
 

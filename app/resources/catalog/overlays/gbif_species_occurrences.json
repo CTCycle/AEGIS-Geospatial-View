@@ -37,8 +37,8 @@
     ],
     "coverage_scope": "global",
     "temporal_behavior": "historical-observation",
-    "constraints": "Requires a bounded extent. Interactive results are capped at 300 records per GBIF page and AEGIS defaults to 100. Results are observations/occurrences, not a complete species inventory. Preserve basis of record, event date, dataset key, coordinate uncertainty, issues, and licence metadata.",
-    "content_hash": "gbif_species_occurrences_v1",
+    "constraints": "Requires a bounded extent. AEGIS requests up to 300 records per interactive GBIF page, matching the documented page ceiling. Results are observations/occurrences, not a complete species inventory; use GBIF downloads or paging for larger result sets. Preserve basis of record, event date, dataset key, coordinate uncertainty, issues, and licence metadata.",
+    "content_hash": "gbif_species_occurrences_v2",
     "human_summary": "Species occurrence records reported to GBIF inside the selected map extent.",
     "primary_use_cases": [
       "species observation lookup",
@@ -63,12 +63,12 @@
     "vectorizable": true,
     "endpoint_health": "validated-by-official-contract",
     "auth_mode": "none",
-    "rate_limit_notes": "GBIF may rate-limit intensive search traffic; use bounded queries and small interactive limits.",
+    "rate_limit_notes": "GBIF may rate-limit intensive search traffic; use bounded queries and at most 300 records per interactive page.",
     "retrieval_mode": "direct",
-    "last_validated": "2026-09-03"
+    "last_validated": "2026-09-04"
   },
-  "version": 1,
-  "last_modified": "2026-09-03T13:26:00+00:00",
+  "version": 2,
+  "last_modified": "2026-09-04T00:00:00+00:00",
   "capabilityKind": "vector-overlay",
   "renderingMode": "clustered-points",
   "sourceOfficialDocs": [
@@ -109,9 +109,9 @@
   },
   "reliability": {
     "status": "functional",
-    "lastAudited": "2026-09-03",
+    "lastAudited": "2026-09-04",
     "knownLimitations": [
-      "Interactive results are sampled and capped.",
+      "Interactive results are sampled at up to the documented 300-record page ceiling; larger result sets require paging or downloads.",
       "Occurrence quality, coordinate uncertainty, and record licensing vary by contributing dataset.",
       "Absence of returned records must not be interpreted as species absence."
     ]

@@ -22,6 +22,8 @@ from server.services.geospatial.providers.http import (
 class GBIFProvider(GeospatialProvider):
     provider_id = "gbif"
     OCCURRENCE_SEARCH_URL = "https://api.gbif.org/v1/occurrence/search"
+    DEFAULT_INTERACTIVE_LIMIT = 300
+    MAX_INTERACTIVE_LIMIT = 300
 
     # -------------------------------------------------------------------------
     def __init__(self, *, fetcher: JsonFetcher | None = None) -> None:
@@ -39,7 +41,11 @@ class GBIFProvider(GeospatialProvider):
                 "GBIF occurrence search does not support antimeridian-crossing extents."
             )
 
-        limit = _bounded_int(request.params.get("limit"), default=100, maximum=300)
+        limit = _bounded_int(
+            request.params.get("limit"),
+            default=self.DEFAULT_INTERACTIVE_LIMIT,
+            maximum=self.MAX_INTERACTIVE_LIMIT,
+        )
         params: dict[str, str | int] = {
             "geometry": _bbox_wkt(west=west, south=south, east=east, north=north),
             "hasCoordinate": "true",
