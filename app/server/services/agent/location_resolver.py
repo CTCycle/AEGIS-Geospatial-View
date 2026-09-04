@@ -467,9 +467,9 @@ class LocationResolver:
                     str(address.get("country") or address.get("country_name") or "")
                 )
                 code = self._normalize_text(str(address.get("country_code") or ""))
-                if actual and not self._contains_location_text(actual, expected):
+                if actual and not self._context_matches(actual, expected):
                     return False
-                if not actual and not self._contains_location_text(display, expected):
+                if not actual and not self._context_matches(display, expected):
                     return False
                 if code and len(expected) == 2 and code != expected:
                     return False
@@ -488,9 +488,9 @@ class LocationResolver:
                         or ""
                     )
                 )
-                if actual and not self._contains_location_text(actual, expected):
+                if actual and not self._context_matches(actual, expected):
                     return False
-                if not actual and not self._contains_location_text(display, expected):
+                if not actual and not self._context_matches(display, expected):
                     return False
             elif context.signal_type in {"region", "state", "province", "county"}:
                 actual = self._normalize_text(
@@ -502,9 +502,9 @@ class LocationResolver:
                         or ""
                     )
                 )
-                if actual and not self._contains_location_text(actual, expected):
+                if actual and not self._context_matches(actual, expected):
                     return False
-                if not actual and not self._contains_location_text(display, expected):
+                if not actual and not self._context_matches(display, expected):
                     return False
         return True
 
@@ -594,6 +594,22 @@ class LocationResolver:
         ):
             return True
         return all(token in set(haystack_tokens) for token in needle_tokens)
+
+    # -------------------------------------------------------------------------
+    def _context_matches(self, actual: str, expected: str) -> bool:
+        """Match a geocoder component against a canonical parent signal.
+
+        Extraction may normalize a parent signal to a hierarchical label such
+        as Rome, Roma Capitale, Lazio, Italy while the geocoder returns only
+        the locality component Rome. Accept either direction of token
+        containment so a verified locality is not rejected merely because the
+        two systems use different label granularity. Unrelated compounds
+        still fail because neither complete token set contains the other.
+        """
+
+        return self._contains_location_text(
+            actual, expected
+        ) or self._contains_location_text(expected, actual)
 
     # -------------------------------------------------------------------------
     @classmethod

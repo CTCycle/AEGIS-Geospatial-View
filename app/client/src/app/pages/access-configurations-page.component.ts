@@ -27,7 +27,7 @@ interface GeoProviderAccess {
 })
 export class AccessConfigurationsPageComponent implements OnInit {
   settings?: ModelSettingsResponse;
-  statusText = 'Loading access configuration';
+  statusText = '';
   isSaving = false;
   isLoadingAccountSetups = false;
   drafts: Record<GeoProviderId, string> = {};
@@ -173,7 +173,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
   private async loadSettings(): Promise<void> {
     try {
       this.settings = await this.credentialSettingsService.fetchSettings();
-      this.statusText = 'Default workflow uses free and open providers. Optional keys are only used when configured.';
+      this.statusText = '';
     } catch {
       this.statusText = 'Could not load access configuration.';
     }
