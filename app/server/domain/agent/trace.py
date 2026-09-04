@@ -20,6 +20,7 @@ TraceKind = Literal[
     "state_delta",
     "checkpoint",
     "model_usage",
+    "stage",
     "completion",
 ]
 

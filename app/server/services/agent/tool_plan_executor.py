@@ -7,9 +7,10 @@ import copy
 import logging
 import re
 import time
+from contextlib import nullcontext as _nullcontext
 from datetime import datetime
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from server.domain.agent.execution import AgentExecutionContext
 from server.domain.agent.pipeline import (
@@ -150,17 +151,35 @@ class ToolPlanExecutor:
                 on_tool_completed(result)
             return result
         fingerprints.add(fingerprint)
+        execution_budget = context.execution_budget
         for attempt in range(1, step.retry_policy.max_attempts + 1):
             started = time.perf_counter()
             try:
-                envelope = await asyncio.wait_for(
-                    self.tool_registry.execute_native_tool(
-                        step.tool_name,
-                        arguments,
-                        context,
-                    ),
-                    timeout=step.timeout_seconds,
-                )
+                if execution_budget is not None:
+                    execution_budget.record_tool_call()
+                timeout = float(step.timeout_seconds)
+                if execution_budget is not None:
+                    timeout = min(timeout, execution_budget.remaining_seconds())
+                with (
+                    execution_budget.observe(
+                        "tool_execution",
+                        metadata={
+                            "tool": step.tool_name,
+                            "step": step.step_id,
+                            "attempt": attempt,
+                        },
+                    )
+                    if execution_budget is not None
+                    else _nullcontext()
+                ):
+                    envelope = await asyncio.wait_for(
+                        self.tool_registry.execute_native_tool(
+                            step.tool_name,
+                            arguments,
+                            context,
+                        ),
+                        timeout=max(0.001, timeout),
+                    )
                 payload = envelope.to_dict()
             except TimeoutError:
                 payload = {
@@ -244,7 +263,33 @@ class ToolPlanExecutor:
                 attempt,
                 error_code,
             )
-            await asyncio.sleep(0.25)
+            if execution_budget is not None:
+                execution_budget.record_retry()
+                if execution_budget.remaining_seconds() <= 0.25:
+                    result = PlannedToolResult(
+                        step_id=step.step_id,
+                        ok=False,
+                        error_code="application_deadline_exceeded",
+                        error_message="The shared agent deadline expired before the tool retry could start.",
+                        provenance=ToolResultProvenance(
+                            tool_name=step.tool_name,
+                            capability_id=step.capability_id,
+                            attempt=attempt,
+                            elapsed_ms=elapsed_ms,
+                            call_fingerprint=fingerprint,
+                            **self._provenance_fields(
+                                data, capability_id=step.capability_id
+                            ),
+                        ),
+                    )
+                    if on_tool_completed is not None:
+                        on_tool_completed(result)
+                    return result
+            await asyncio.sleep(
+                min(0.25, execution_budget.remaining_seconds())
+                if execution_budget is not None
+                else 0.25
+            )
         raise AssertionError("unreachable")
 
     # -------------------------------------------------------------------------
@@ -303,17 +348,19 @@ class ToolPlanExecutor:
     # -------------------------------------------------------------------------
     @classmethod
     def _lookup_path(cls, value: Any, path: str) -> Any:
-        current = value
+        current: object = value
         for part in cls._path_parts(path):
             if isinstance(current, dict):
-                if part not in current:
+                current_dict = cast(dict[str, Any], current)
+                if part not in current_dict:
                     return None
-                current = current[part]
+                current = current_dict[part]
             elif isinstance(current, list) and part.isdigit():
+                current_list = cast(list[Any], current)
                 index = int(part)
-                if index >= len(current):
+                if index >= len(current_list):
                     return None
-                current = current[index]
+                current = current_list[index]
             else:
                 return None
         return current
@@ -324,17 +371,14 @@ class ToolPlanExecutor:
         parts = cls._path_parts(path)
         if not parts:
             return
-        current: Any = target
+        current: dict[str, Any] = target
         for part in parts[:-1]:
-            if not isinstance(current, dict):
-                return
             nested = current.get(part)
             if not isinstance(nested, dict):
                 nested = {}
                 current[part] = nested
-            current = nested
-        if isinstance(current, dict):
-            current[parts[-1]] = value
+            current = cast(dict[str, Any], nested)
+        current[parts[-1]] = value
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -378,7 +422,7 @@ class ToolPlanExecutor:
         units = {
             str(key): str(value)
             for key, value in units_value.items()
-            if isinstance(key, str) and isinstance(value, str)
+            if isinstance(value, str)
         }
         result_status = (
             cls._first_string(candidates, "result_status", "resultStatus") or "unknown"

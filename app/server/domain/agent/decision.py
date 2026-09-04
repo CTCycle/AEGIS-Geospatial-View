@@ -35,6 +35,32 @@ class LocationResolutionProvenance(BaseModel):
 
 
 ###############################################################################
+class LocationHierarchyEntry(BaseModel):
+    """One user/entity signal retained in the resolved location hierarchy."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    signal_type: str
+    raw_value: str
+    normalized_value: str | None = None
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    source: str = "text"
+    canonical_label: str | None = None
+
+
+###############################################################################
+class LocationHierarchy(BaseModel):
+    """The single target and its geographic parent context."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target: LocationHierarchyEntry
+    parents: list[LocationHierarchyEntry] = Field(
+        default_factory=list[LocationHierarchyEntry]
+    )
+
+
+###############################################################################
 class CapabilityCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -63,6 +89,7 @@ class ResolvedLocation(BaseModel):
     bbox: list[float] | None = None
     bbox_source: str | None = None
     provenance: LocationResolutionProvenance | None = None
+    hierarchy: LocationHierarchy | None = None
 
 
 ###############################################################################

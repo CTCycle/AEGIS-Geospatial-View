@@ -122,6 +122,7 @@ class ChatTurnResponse(BaseModel):
     failure_diagnostic: TaskFailureDetail | None = None
     visualization_update: VisualizationUpdate | None = None
     context_revision: int | None = None
+    execution_trace: dict[str, Any] | None = None
 
 
 ###############################################################################
@@ -136,6 +137,7 @@ class ChatStreamEvent(BaseModel):
         "tool_call_started",
         "tool_call_completed",
         "map_session_created",
+        "stage",
         "final",
         "error",
     ]

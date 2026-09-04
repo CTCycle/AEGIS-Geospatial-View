@@ -411,7 +411,9 @@ def test_ignores_presentation_action_tags_as_dataset_concepts() -> None:
     assert resolved.clarification_plan is None
 
 
-@pytest.mark.parametrize("action_tag", ["show_map", "map_center", "navigate"])
+@pytest.mark.parametrize(
+    "action_tag", ["show_map", "map_center", "navigate", "relocate"]
+)
 def test_ignores_structured_map_interaction_tags_as_dataset_concepts(
     action_tag: str,
 ) -> None:

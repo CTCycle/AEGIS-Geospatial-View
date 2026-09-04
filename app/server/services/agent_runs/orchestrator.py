@@ -72,17 +72,20 @@ class AgentRunOrchestrator:
                 },
             ),
         )
-        context_events: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        context_events: asyncio.Queue[
+            tuple[RunEventType, dict[str, Any], RunEventVisibility]
+        ] = asyncio.Queue()
 
         async def publish_context_events() -> None:
             while True:
-                payload = await context_events.get()
+                event_type, payload, visibility = await context_events.get()
                 try:
                     await self.event_publisher.publish(
                         conversation_id=snapshot.conversation_id,
                         run_id=snapshot.run_id,
                         run_version=snapshot.active_run_version,
-                        type=RunEventType.CONTEXT_USAGE,
+                        type=event_type,
+                        visibility=visibility,
                         payload=payload,
                     )
                 except Exception:
@@ -94,7 +97,17 @@ class AgentRunOrchestrator:
 
         def on_agent_progress(event: str, payload: dict[str, Any]) -> None:
             if event == "context_usage":
-                context_events.put_nowait(dict(payload))
+                context_events.put_nowait(
+                    (RunEventType.CONTEXT_USAGE, dict(payload), RunEventVisibility.USER)
+                )
+            elif event == "stage":
+                context_events.put_nowait(
+                    (
+                        RunEventType.TRACE,
+                        {"kind": "stage", **dict(payload)},
+                        RunEventVisibility.INTERNAL,
+                    )
+                )
 
         context_event_task = asyncio.create_task(publish_context_events())
         try:
@@ -250,6 +263,7 @@ class AgentRunOrchestrator:
                     "context_usage": response.context_usage.model_dump(mode="json")
                     if response.context_usage is not None
                     else None,
+                    "execution_trace": response.execution_trace,
                 },
             )
             return
@@ -285,6 +299,7 @@ class AgentRunOrchestrator:
                     "context_usage": response.context_usage.model_dump(mode="json")
                     if response.context_usage is not None
                     else None,
+                    "execution_trace": response.execution_trace,
                 },
             )
             return
@@ -327,9 +342,10 @@ class AgentRunOrchestrator:
                 "visualization_update": response.visualization_update.model_dump(
                     mode="json"
                 )
-                if response.visualization_update is not None
-                else None,
+                    if response.visualization_update is not None
+                    else None,
                 "context_revision": response.context_revision,
+                "execution_trace": response.execution_trace,
             },
         )
 
@@ -369,6 +385,20 @@ class AgentRunOrchestrator:
                 if response.operation is not None
                 else None,
             },
+        )
+        await self._publish_trace(
+            snapshot,
+            AgentTraceEvent(
+                kind="stage",
+                run_id=snapshot.run_id,
+                run_version=snapshot.active_run_version,
+                sequence=3,
+                payload={
+                    "stage": "frontend_delivery",
+                    "status": "completed",
+                    "request_id": response.request_id,
+                },
+            ),
         )
 
     # -------------------------------------------------------------------------

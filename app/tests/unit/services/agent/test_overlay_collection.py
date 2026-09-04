@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+from tests.conftest import run_async_in_thread
 from server.contracts.extraction import (
     OverlayCommand,
     OverlaySelector,
@@ -591,7 +594,10 @@ def test_provider_candidate_is_committed_against_active_revision_without_droppin
     )
     command = OverlayCommand(
         action="show",
-        selector=OverlaySelector(capability_ids=["openmeteo_weather_forecast"]),
+        selector=OverlaySelector(
+            capability_ids=["openmeteo_weather_forecast"],
+            concepts=["environmental"],
+        ),
         scope=OverlayScope(
             kind="location",
             location={"label": "Zurich", "latitude": 47.37, "longitude": 8.54},
@@ -642,3 +648,85 @@ def test_merge_replaces_only_the_authoritative_collection() -> None:
     assert "overlay_ids" not in serialized
     assert "overlays" not in serialized
     assert "failed_overlays" not in serialized
+
+
+def test_tool_map_session_is_merged_into_active_map_without_refetch() -> None:
+    location = ResolvedLocation(
+        label="Rome",
+        latitude=41.9028,
+        longitude=12.4964,
+        country="Italy",
+    )
+    active_overlay = _instance(
+        "weather-rome",
+        "openmeteo_weather_forecast",
+        label="Weather",
+        scope_key="Rome",
+        latitude=location.latitude,
+        longitude=location.longitude,
+    )
+    active = MapSession(
+        session_id="active",
+        resolved_location=location,
+        basemap_id="esri_world_imagery",
+        basemap={"id": "esri_world_imagery", "label": "Satellite Imagery"},
+        viewport=ViewportPolicy(
+            center_latitude=location.latitude,
+            center_longitude=location.longitude,
+        ),
+        overlay_collection=OverlayCollectionState(instances=[active_overlay]),
+    )
+    fetched_overlay = _instance(
+        "hydrography-rome",
+        "census_tigerweb_hydrography",
+        label="Hydrography",
+        scope_key="Rome",
+        latitude=location.latitude,
+        longitude=location.longitude,
+    )
+    fetched = active.model_copy(
+        update={
+            "session_id": "fetched",
+            "basemap_id": "osm_default",
+            "basemap": {"id": "osm_default", "label": "OpenStreetMap"},
+            "payload": {"source": "provider-tool"},
+            "overlay_collection": OverlayCollectionState(instances=[fetched_overlay]),
+        }
+    )
+    assembler = object.__new__(AgentTurnStateAssembler)
+    contract = SimpleNamespace(
+        location_signals=[],
+        requested_basemap=None,
+        overlay_commands=[],
+    )
+
+    merged = run_async_in_thread(
+        assembler.build_combined_map_session_from_tool_results(
+            tool_payload={
+                "tool_results": [
+                    {
+                        "content": {
+                            "ok": True,
+                            "data": {"map_session": fetched.model_dump(mode="json")},
+                        }
+                    }
+                ]
+            },
+            turn_contract=contract,
+            latest_memory={"active_visualization": active.model_dump(mode="json")},
+            resolved_location=location,
+        )
+    )
+
+    assert isinstance(merged, MapSession)
+    assert merged.payload == {"source": "provider-tool"}
+    assert merged.resolved_location == location
+    assert merged.basemap_id == "esri_world_imagery"
+    assert merged.basemap == {"id": "esri_world_imagery", "label": "Satellite Imagery"}
+    assert {
+        instance.capability_id for instance in merged.overlay_collection.instances
+    } == {
+        "openmeteo_weather_forecast",
+        "census_tigerweb_hydrography",
+    }
+    assert merged.overlay_collection.revision == 1

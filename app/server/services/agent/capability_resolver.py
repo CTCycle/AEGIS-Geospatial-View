@@ -81,6 +81,7 @@ _NON_DATA_CONCEPT_TAGS = frozenset(
         "map_display",
         "map_navigation",
         "navigate",
+        "relocate",
         "focus",
         "center",
         "zoom",

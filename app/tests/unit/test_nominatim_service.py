@@ -180,6 +180,93 @@ def test_nominatim_surfaces_unqualified_same_level_city_ambiguity() -> None:
 
 
 ###############################################################################
+def test_nominatim_accepts_a_dominant_unqualified_city_candidate() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    ranked = [
+        {
+            "display_name": "Rome, Lazio, Italy",
+            "lat": 41.9,
+            "lon": 12.5,
+            "confidence": 0.84,
+            "geocoder_importance": 0.86,
+            "selected_result_type": "administrative",
+            "selected_address_type": "city",
+            "address": {"city": "Rome", "country": "Italy"},
+        },
+        {
+            "display_name": "Rome, Georgia, United States",
+            "lat": 34.2,
+            "lon": -85.1,
+            "confidence": 0.81,
+            "geocoder_importance": 0.52,
+            "selected_result_type": "administrative",
+            "selected_address_type": "city",
+            "address": {"city": "Rome", "country": "United States"},
+        },
+    ]
+
+    assert service._find_ambiguous_candidates(
+        ranked,
+        expected_location_type="city",
+        query="Rome",
+        has_parent_context=False,
+    ) == []
+
+
+###############################################################################
+def test_nominatim_deduplicates_city_boundary_and_centroid() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    ranked = service.rank_candidates(
+        [
+            {
+                "lat": "52.1975",
+                "lon": "0.1391",
+                "display_name": (
+                    "Cambridge, Cambridgeshire, England, United Kingdom"
+                ),
+                "class": "boundary",
+                "type": "administrative",
+                "addresstype": "city",
+                "importance": 0.85,
+                "address": {
+                    "city": "Cambridge",
+                    "county": "Cambridgeshire",
+                    "state": "England",
+                    "country": "United Kingdom",
+                },
+            },
+            {
+                "lat": "52.2055",
+                "lon": "0.1186",
+                "display_name": (
+                    "Cambridge, Cambridgeshire, England, CB2 3NR, United Kingdom"
+                ),
+                "class": "place",
+                "type": "city",
+                "addresstype": "city",
+                "importance": 0.8,
+                "address": {
+                    "city": "Cambridge",
+                    "county": "Cambridgeshire",
+                    "state": "England",
+                    "country": "United Kingdom",
+                    "postcode": "CB2 3NR",
+                },
+            },
+        ],
+        address="Cambridge",
+        city=None,
+        country_name="United Kingdom",
+        country_code="GB",
+        query="Cambridge, United Kingdom",
+        expected_location_type="city",
+    )
+
+    assert len(ranked) == 2
+    assert "ambiguous_candidates" not in ranked[0]
+
+
+###############################################################################
 def test_nominatim_prepares_language_and_name_metadata_for_validation() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
     captured: dict[str, str] = {}
@@ -285,3 +372,39 @@ def test_nominatim_rejects_partial_acronym_child_for_named_target() -> None:
     )
 
     assert ranked == []
+
+
+###############################################################################
+def test_nominatim_district_ranking_rejects_nearby_child_features() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    ranked = service.rank_candidates(
+        [
+            {
+                "lat": "41.8338",
+                "lon": "12.4709",
+                "display_name": "E.U.R., Municipio Roma IX, Rome, Italy",
+                "class": "place",
+                "type": "suburb",
+                "importance": 0.5,
+                "address": {"suburb": "E.U.R.", "city": "Rome", "country": "Italy"},
+            },
+            {
+                "lat": "41.8566",
+                "lon": "12.4759",
+                "display_name": "Centro Primario di distribuzione Roma EUR, Rome, Italy",
+                "class": "amenity",
+                "type": "post_depot",
+                "importance": 0.8,
+                "address": {"quarter": "San Paolo", "city": "Rome", "country": "Italy"},
+            },
+        ],
+        address="EUR district",
+        city="Rome",
+        country_name="Italy",
+        country_code=None,
+        query="EUR district, Rome, Italy",
+        expected_location_type="district",
+    )
+
+    assert len(ranked) == 1
+    assert ranked[0]["selected_result_type"] == "suburb"

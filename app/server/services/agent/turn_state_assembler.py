@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from server.common.typing import is_json_object, json_array, json_object
 
-from typing import Any
+from typing import Any, Literal, cast
 
 from server.common.logger import logger as LOGGER
 from server.domain.agent.decision import (
@@ -19,16 +19,32 @@ from server.domain.agent.pipeline import (
 )
 from server.contracts.chat import ChatOperationResult, ChatTurnResponse
 from server.contracts.extraction import OverlayCommand
-from server.contracts.geospatial import MapSession, OverlayMutationResult
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    OverlayInstance,
+    OverlayMutationResult,
+)
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.response_builder import AgentResponseBuilder
-from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
+from server.services.agent.response_synthesizer import (
+    GroundedResponseSynthesizer,
+    synthesize_response_async,
+)
 from server.services.chat.history_service import ChatHistoryService
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
+
+TaskTimeoutOrigin = Literal[
+    "provider_transport",
+    "application_deadline",
+    "cancelled",
+    "frontend_or_stale_run",
+    "unknown",
+]
 
 
 ###############################################################################
@@ -101,6 +117,7 @@ class AgentTurnStateAssembler:
         turn_contract: Any,
         latest_memory: dict[str, Any],
         context_usage: Any,
+        resolved_location: ResolvedLocation | None = None,
     ) -> ChatTurnResponse:
         clarification = turn_contract.clarification_plan
         if not is_json_object(clarification):
@@ -176,12 +193,7 @@ class AgentTurnStateAssembler:
                 )
         question = str(clarification.get("question") or "Can you clarify the request?")
         updated_memory = json_object(latest_memory)
-        resolved_for_memory = (
-            await self.policy_engine.location_resolver.resolve_location_signals(
-                turn_contract.location_signals,
-                updated_memory,
-            )
-        )
+        resolved_for_memory = resolved_location
         if isinstance(resolved_for_memory, ResolvedLocation):
             updated_memory = self.location_memory_service.update_memory_snapshot(
                 updated_memory,
@@ -252,7 +264,8 @@ class AgentTurnStateAssembler:
             provider_error=turn_contract.provider_error,
             failure_category=turn_contract.failure_category,
         )
-        assistant_message = self.response_synthesizer.synthesize(
+        assistant_message = await synthesize_response_async(
+            self.response_synthesizer,
             user_text=turn_contract.user_text,
             fallback_text=assistant_message,
             operation=operation,
@@ -385,7 +398,8 @@ class AgentTurnStateAssembler:
                 else None
             ),
         )
-        assistant_message = self.response_synthesizer.synthesize(
+        assistant_message = await synthesize_response_async(
+            self.response_synthesizer,
             user_text=turn_contract.user_text,
             fallback_text=clarification.question,
             operation=operation,
@@ -469,6 +483,23 @@ class AgentTurnStateAssembler:
         if is_json_object(failed_result):
             tool_name = str(failed_result.get("name") or "") or None
             error_message = str(failed_result.get("error") or error_message)
+        raw_timeout_origin = (
+            operation.provider_error.get("timeout_origin")
+            if is_json_object(operation.provider_error)
+            else None
+        )
+        timeout_origin = (
+            cast(TaskTimeoutOrigin, raw_timeout_origin)
+            if raw_timeout_origin
+            in {
+                "provider_transport",
+                "application_deadline",
+                "cancelled",
+                "frontend_or_stale_run",
+                "unknown",
+            }
+            else None
+        )
         return TaskFailureDetail(
             stage="tool_execution" if failed_result else "response_planning",
             component="agent_pipeline",
@@ -478,6 +509,7 @@ class AgentTurnStateAssembler:
             recovery_suggestion="Clarify the request or retry after the provider is available.",
             user_explanation=operation.message,
             provider_error=operation.provider_error,
+            timeout_origin=timeout_origin,
             failure_category=operation.failure_category,
         )
 
@@ -505,7 +537,8 @@ class AgentTurnStateAssembler:
             for item in json_array(tool_payload.get("provider_events"))
             if is_json_object(item)
         ]
-        event = {
+        resolved = map_session.resolved_location
+        event: dict[str, Any] = {
             "kind": "location_resolution",
             "capability_id": "location",
             "provider": provenance.provider,
@@ -514,18 +547,18 @@ class AgentTurnStateAssembler:
             "result_status": provenance.result_status,
             "result_type": provenance.result_type,
             "location": {
-                "label": map_session.resolved_location.label,
-                "latitude": map_session.resolved_location.latitude,
-                "longitude": map_session.resolved_location.longitude,
-                "bbox": map_session.resolved_location.bbox,
+                "label": resolved.label,
+                "latitude": resolved.latitude,
+                "longitude": resolved.longitude,
+                "bbox": resolved.bbox,
             },
         }
-        event_key = (
+        event_key: tuple[object, ...] = (
             event["kind"],
             event["provider"],
             event["fetched_at"],
-            event["location"]["latitude"],
-            event["location"]["longitude"],
+            resolved.latitude,
+            resolved.longitude,
         )
         if not any(
             (
@@ -534,8 +567,7 @@ class AgentTurnStateAssembler:
                 item.get("fetched_at"),
                 json_object(item.get("location")).get("latitude"),
                 json_object(item.get("location")).get("longitude"),
-            )
-            == event_key
+            ) == event_key
             for item in existing_events
         ):
             existing_events.append(event)
@@ -590,17 +622,16 @@ class AgentTurnStateAssembler:
         capability_selection: dict[str, Any],
         turn_contract: Any,
         latest_memory: dict[str, Any] | None,
+        resolved_location: ResolvedLocation | None = None,
     ) -> MapSession | ClarificationRequest | None:
-        resolved_location = (
-            await self.policy_engine.location_resolver.resolve_location_signals(
+        if resolved_location is None:
+            resolution = await self.policy_engine.location_resolver.resolve_location_signals(
                 turn_contract.location_signals,
                 latest_memory or {},
             )
-        )
-        if isinstance(resolved_location, ClarificationRequest):
-            return resolved_location
-        if not isinstance(resolved_location, ResolvedLocation):
-            return None
+            if isinstance(resolution, ClarificationRequest):
+                return resolution
+            resolved_location = resolution
         active_visualization = (
             latest_memory.get("active_visualization")
             if is_json_object(latest_memory)
@@ -653,17 +684,16 @@ class AgentTurnStateAssembler:
         self,
         turn_contract: Any,
         latest_memory: dict[str, Any] | None,
+        resolved_location: ResolvedLocation | None = None,
     ) -> MapSession | ClarificationRequest | None:
-        resolved_location = (
-            await self.policy_engine.location_resolver.resolve_location_signals(
+        if resolved_location is None:
+            resolution = await self.policy_engine.location_resolver.resolve_location_signals(
                 turn_contract.location_signals,
                 latest_memory or {},
             )
-        )
-        if isinstance(resolved_location, ClarificationRequest):
-            return resolved_location
-        if not isinstance(resolved_location, ResolvedLocation):
-            return None
+            if isinstance(resolution, ClarificationRequest):
+                return resolution
+            resolved_location = resolution
         active_visualization = (
             latest_memory.get("active_visualization")
             if is_json_object(latest_memory)
@@ -700,6 +730,7 @@ class AgentTurnStateAssembler:
         map_session: MapSession | None,
         direct_result: dict[str, Any] | None,
         tool_payload: dict[str, Any] | None,
+        resolved_location: ResolvedLocation | None = None,
     ) -> dict[str, Any]:
         base_snapshot = json_object(latest_memory)
         resolved_location = await self.resolve_verified_location_for_memory(
@@ -708,6 +739,7 @@ class AgentTurnStateAssembler:
             map_session=map_session,
             direct_result=direct_result,
             tool_payload=tool_payload,
+            resolved_location=resolved_location,
         )
         if resolved_location is None:
             return base_snapshot
@@ -726,6 +758,7 @@ class AgentTurnStateAssembler:
         map_session: MapSession | None,
         direct_result: dict[str, Any] | None,
         tool_payload: dict[str, Any] | None,
+        resolved_location: ResolvedLocation | None = None,
     ) -> Any:
         if map_session is not None:
             return map_session.resolved_location
@@ -733,6 +766,8 @@ class AgentTurnStateAssembler:
             return None
         if AgentResponseBuilder.tool_payload_has_error(tool_payload):
             return None
+        if resolved_location is not None:
+            return resolved_location
         resolved = await self.policy_engine.location_resolver.resolve_location_signals(
             turn_contract.location_signals,
             latest_memory,
@@ -748,6 +783,7 @@ class AgentTurnStateAssembler:
         tool_payload: dict[str, Any] | None,
         turn_contract: Any,
         latest_memory: dict[str, Any] | None,
+        resolved_location: ResolvedLocation | None = None,
     ) -> MapSession | ClarificationRequest | None:
         if not is_json_object(tool_payload):
             return None
@@ -818,37 +854,40 @@ class AgentTurnStateAssembler:
                     if isinstance(overlay_id, str) and overlay_id not in overlay_ids:
                         overlay_ids.append(overlay_id)
 
-        # A successful geospatial tool already returns a validated map session.
-        # Re-querying the search orchestrator here duplicates provider work and
-        # can make the final response depend on a second, different snapshot.
-        # Reuse the single complete result when there is no prior map to merge.
-        if not active_map_session and len(candidate_map_sessions) == 1:
-            candidate = candidate_map_sessions[0]
-            candidate_overlay_ids = set(self._overlay_capability_ids(candidate))
-            requested_basemap = getattr(turn_contract, "requested_basemap", None)
-            if (
-                set(overlay_ids).issubset(candidate_overlay_ids)
-                and (basemap_id is None or basemap_id == candidate.basemap_id)
-                and (
-                    not isinstance(requested_basemap, str)
-                    or not requested_basemap.strip()
-                    or requested_basemap == candidate.basemap_id
-                )
-            ):
-                return candidate
+        # A native geospatial tool returns a validated map session together
+        # with the provider-backed descriptor it fetched. Keep that result as
+        # the single data authority. When a prior map exists, merge sessions
+        # only when they represent the same location; a session for a new
+        # location replaces the old viewport and scoped overlays so stale data
+        # cannot follow the user to the new place.
+        if candidate_map_sessions:
+            LOGGER.info(
+                "map_tool_session_merge candidates=%d active=%s candidate_overlays=%d",
+                len(candidate_map_sessions),
+                active_map_session is not None,
+                sum(
+                    len(session.overlay_collection.instances)
+                    for session in candidate_map_sessions
+                ),
+            )
+            return self._merge_tool_map_sessions(
+                candidate_map_sessions,
+                active_map_session=active_map_session,
+                resolved_location=resolved_location,
+                requested_basemap_id=self.infer_basemap_id(turn_contract),
+            )
 
         if not overlay_ids and basemap_id is None:
             return None
 
-        resolved_location = (
-            await self.policy_engine.location_resolver.resolve_location_signals(
+        if resolved_location is None:
+            resolution = await self.policy_engine.location_resolver.resolve_location_signals(
                 turn_contract.location_signals,
                 latest_memory or {},
             )
-        )
-        if isinstance(resolved_location, ClarificationRequest):
-            return resolved_location
-
+            if isinstance(resolution, ClarificationRequest):
+                return resolution
+            resolved_location = resolution
         plan = ExecutionPlan(
             state="map_search",
             mode="map",
@@ -871,6 +910,160 @@ class AgentTurnStateAssembler:
             active_visualization=(active_visualization),
         )
         return await self.search_orchestrator.execute(request)
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _merge_tool_map_sessions(
+        cls,
+        candidates: list[MapSession],
+        *,
+        active_map_session: MapSession | None,
+        resolved_location: ResolvedLocation | None,
+        requested_basemap_id: str | None = None,
+    ) -> MapSession:
+        """Merge validated tool output without re-running the data search."""
+        candidate = candidates[-1]
+        canonical_location = resolved_location or candidate.resolved_location
+        candidate = cls._with_canonical_location(candidate, canonical_location)
+
+        # The basemap is map-session state, not a property of the fetched
+        # overlay.  A layer-only follow-up must retain the active basemap;
+        # an explicit basemap request remains authoritative for this turn.
+        if (
+            not requested_basemap_id
+            and active_map_session is not None
+            and active_map_session.basemap_id
+        ):
+            candidate = candidate.model_copy(
+                update={
+                    "basemap_id": active_map_session.basemap_id,
+                    "basemap": active_map_session.basemap,
+                },
+                deep=True,
+            )
+
+        # Multiple successful tool calls in one bounded loop can contribute
+        # different overlays. The last result owns the viewport and payload;
+        # earlier results contribute only their validated overlay instances.
+        candidate_instances: list[OverlayInstance] = []
+        for session in candidates:
+            normalized = cls._with_canonical_location(session, canonical_location)
+            candidate_instances.extend(normalized.overlay_collection.instances)
+        candidate_collection = cls._merge_overlay_instances(
+            OverlayCollectionState(), candidate_instances
+        )
+        candidate = OverlayCollectionService.merge_into_map_session(
+            candidate, candidate_collection
+        )
+
+        if active_map_session is None or not cls._same_resolved_location(
+            active_map_session.resolved_location, canonical_location
+        ):
+            return candidate
+
+        active = cls._with_canonical_location(active_map_session, canonical_location)
+        merged_collection = cls._merge_overlay_instances(
+            active.overlay_collection,
+            [*active.overlay_collection.instances, *candidate_collection.instances],
+        )
+        warnings = list(
+            dict.fromkeys(
+                [*active.compliance_warnings, *candidate.compliance_warnings]
+            )
+        )
+        return candidate.model_copy(
+            update={
+                "resolved_location": canonical_location,
+                "compliance_warnings": warnings,
+                "overlay_collection": merged_collection,
+            },
+            deep=True,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _with_canonical_location(
+        session: MapSession,
+        resolved_location: ResolvedLocation,
+    ) -> MapSession:
+        instances = [
+            instance.model_copy(update={"resolved_location": resolved_location})
+            for instance in session.overlay_collection.instances
+        ]
+        collection = session.overlay_collection.model_copy(
+            update={"instances": instances},
+            deep=True,
+        )
+        return session.model_copy(
+            update={
+                "resolved_location": resolved_location,
+                "overlay_collection": collection,
+            },
+            deep=True,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _same_resolved_location(
+        left: ResolvedLocation,
+        right: ResolvedLocation,
+    ) -> bool:
+        return (
+            abs(left.latitude - right.latitude) <= 1e-6
+            and abs(left.longitude - right.longitude) <= 1e-6
+        )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _merge_overlay_instances(
+        cls,
+        base: OverlayCollectionState,
+        additions: list[OverlayInstance],
+    ) -> OverlayCollectionState:
+        """Union instances by stable id, then by capability and location."""
+        instances = [item.model_copy(deep=True) for item in base.instances]
+        changed = False
+        for addition in additions:
+            matching_index = next(
+                (
+                    index
+                    for index, current in enumerate(instances)
+                    if current.instance_id == addition.instance_id
+                    or (
+                        current.capability_id == addition.capability_id
+                        and cls._same_overlay_location(current, addition)
+                    )
+                ),
+                None,
+            )
+            if matching_index is None:
+                instances.append(addition.model_copy(deep=True))
+                changed = True
+            elif instances[matching_index] != addition:
+                # Provider-backed data from the current tool result is newer
+                # than an active snapshot with the same scoped capability.
+                instances[matching_index] = addition.model_copy(deep=True)
+                changed = True
+        next_revision = base.revision + 1 if changed else base.revision
+        return base.model_copy(
+            update={"instances": instances, "revision": next_revision},
+            deep=True,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _same_overlay_location(
+        left: OverlayInstance,
+        right: OverlayInstance,
+    ) -> bool:
+        left_location = left.resolved_location
+        right_location = right.resolved_location
+        if left_location is None or right_location is None:
+            return left.scope_key == right.scope_key
+        return (
+            abs(left_location.latitude - right_location.latitude) <= 1e-6
+            and abs(left_location.longitude - right_location.longitude) <= 1e-6
+        )
 
     # -------------------------------------------------------------------------
     def infer_overlay_ids(

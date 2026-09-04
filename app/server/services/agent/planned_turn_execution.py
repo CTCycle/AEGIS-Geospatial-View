@@ -21,7 +21,10 @@ from server.services.agent.conversation_state import ConversationTaskStateServic
 from server.services.agent.capability_resolver import CapabilityResolver
 from server.services.agent.instruction_state import ConversationInstructionService
 from server.services.agent.response_builder import AgentResponseBuilder
-from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
+from server.services.agent.response_synthesizer import (
+    GroundedResponseSynthesizer,
+    synthesize_response_async,
+)
 from server.services.agent.turn_state_assembler import AgentTurnStateAssembler
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.overlay_collection import OverlayCollectionService
@@ -220,11 +223,25 @@ class PlannedTurnExecutionService:
             )
         ]
         if not local_overlay_mutation:
-            map_result = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
-                tool_payload=tool_payload,
-                turn_contract=turn_contract,
-                latest_memory=latest_memory,
-            )
+            budget = native_context.execution_budget
+            if budget is not None:
+                with budget.observe(
+                    "map_assembly",
+                    metadata={"request_id": request_id, "conversation_id": conversation_id},
+                ):
+                    map_result = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
+                        tool_payload=tool_payload,
+                        turn_contract=turn_contract,
+                        latest_memory=latest_memory,
+                        resolved_location=native_context.resolved_location,
+                    )
+            else:
+                map_result = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
+                    tool_payload=tool_payload,
+                    turn_contract=turn_contract,
+                    latest_memory=latest_memory,
+                    resolved_location=native_context.resolved_location,
+                )
             if isinstance(map_result, ClarificationRequest):
                 return await self.turn_state_assembler.build_location_clarification_response(
                     request_id=request_id,
@@ -243,9 +260,22 @@ class PlannedTurnExecutionService:
                 and CapabilityResolver.is_location_focus_only(turn_contract)
                 and turn_contract.clarification_plan is None
             ):
-                map_result = await self.turn_state_assembler.build_map_session_from_turn_contract(
-                    turn_contract, latest_memory
-                )
+                if budget is not None:
+                    with budget.observe(
+                        "map_assembly",
+                        metadata={"request_id": request_id, "conversation_id": conversation_id},
+                    ):
+                        map_result = await self.turn_state_assembler.build_map_session_from_turn_contract(
+                            turn_contract,
+                            latest_memory,
+                            native_context.resolved_location,
+                        )
+                else:
+                    map_result = await self.turn_state_assembler.build_map_session_from_turn_contract(
+                        turn_contract,
+                        latest_memory,
+                        native_context.resolved_location,
+                    )
                 if isinstance(map_result, ClarificationRequest):
                     return await self.turn_state_assembler.build_location_clarification_response(
                         request_id=request_id,
@@ -275,11 +305,16 @@ class PlannedTurnExecutionService:
                     }
                 )
             if map_session is not None and turn_contract.overlay_commands:
-                active_state_session = self._active_map_session(latest_memory)
+                # The map assembler has already merged provider-backed
+                # overlay instances into the validated map result. Rebinding
+                # an add/show command to the pre-fetch active collection can
+                # discard that result (and can misclassify a multi-capability
+                # selector as ambiguous). Local hide/remove/update mutations
+                # are still applied here, while fetched additions remain
+                # authoritative in ``map_session``.
                 map_session, overlay_mutation_results = self._apply_overlay_commands(
                     map_session,
                     turn_contract,
-                    state_session=active_state_session,
                 )
         self.turn_state_assembler.append_provider_events(tool_payload, map_session)
         mutation_clarification = next(
@@ -392,7 +427,8 @@ class PlannedTurnExecutionService:
             self.task_state_service.set_active_visualization(
                 conversation_key, map_session, tool_payload=tool_payload
             )
-            assistant_message = self.response_synthesizer.synthesize(
+            assistant_message = await synthesize_response_async(
+                self.response_synthesizer,
                 user_text=turn_contract.user_text,
                 fallback_text=assistant_message,
                 operation=operation,
@@ -407,6 +443,8 @@ class PlannedTurnExecutionService:
                     )
                 ],
                 task_snapshot=self.task_state_service.serialize(conversation_key),
+                execution_budget=native_context.execution_budget,
+                skip_verified_map_only=True,
             )
             synthesis_category = getattr(
                 self.response_synthesizer, "last_failure_category", None
@@ -471,6 +509,7 @@ class PlannedTurnExecutionService:
             map_session=map_session,
             direct_result=direct_result,
             tool_payload=tool_payload,
+            resolved_location=native_context.resolved_location,
         )
         failure = self.turn_state_assembler.failure_from_operation(
             operation, tool_payload
@@ -555,6 +594,13 @@ class PlannedTurnExecutionService:
                     "map_session": map_session.model_dump(mode="json"),
                 },
             )
+        execution_trace = (
+            native_context.execution_budget.snapshot()
+            if native_context.execution_budget is not None
+            else None
+        )
+        if execution_trace is not None:
+            tool_payload["execution_trace"] = execution_trace
         self.history_service.append_message(
             conversation_id=conversation_id,
             role="assistant",
@@ -570,6 +616,7 @@ class PlannedTurnExecutionService:
                 else None,
                 "previous_turn_contract": latest_contract,
                 "request_id": request_id,
+                "execution_trace": execution_trace,
             },
             tool_payload=tool_payload,
             map_session=map_session.model_dump(mode="json") if map_session else None,
@@ -595,4 +642,5 @@ class PlannedTurnExecutionService:
             tool_plan=tool_plan,
             failure_diagnostic=failure,
             visualization_update=visualization_update,
+            execution_trace=execution_trace,
         )

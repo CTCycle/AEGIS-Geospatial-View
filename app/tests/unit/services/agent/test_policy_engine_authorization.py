@@ -143,6 +143,31 @@ def test_preflight_formats_arbitrary_location_candidates() -> None:
 
 
 ###############################################################################
+def test_preflight_defers_model_location_ambiguity_to_deterministic_resolver() -> None:
+    turn = TurnParseResult(
+        user_text="Show Cambridge",
+        conversation_context=ConversationContextSnapshot(),
+        task_class="map_search",
+        normalized_action=NormalizedAction(
+            action_id="map_search",
+            action_label="Map Search",
+            requires_location=True,
+        ),
+        location_signals=[
+            LocationSignal(
+                signal_type="city",
+                raw_value="Cambridge",
+                normalized_value="Cambridge",
+                source="model",
+            )
+        ],
+        ambiguities=["Cambridge could refer to multiple possible locations."],
+    )
+
+    assert _engine().evaluate_preflight(turn) is None
+
+
+###############################################################################
 def test_preflight_uses_structured_location_clarification_plan() -> None:
     turn = TurnParseResult(
         user_text="Show the airport.",

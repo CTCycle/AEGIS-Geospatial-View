@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from server.domain.agent.extraction_schemas import LLMParserExtraction
@@ -441,3 +443,63 @@ def test_parser_does_not_recover_catalog_category_without_poi_intent() -> None:
     )
 
     assert extracted.poi_categories == []
+
+
+###############################################################################
+def test_parser_projection_omits_stale_map_payload_for_explicit_location() -> None:
+    parser = ParserService(
+        llm_factory=_FactoryStub(),
+        settings_repo=object(),
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+    )
+    old_location = "New York" * 400
+    payload = parser._parser_prompt_payload(
+        user_message="Show me the EUR district in Rome",
+        memory_snapshot={
+            "active_location": {
+                "label": "New York",
+                "latitude": 40.7128,
+                "longitude": -74.006,
+            },
+            "active_visualization": {
+                "session_id": "old-session",
+                "basemap_id": "osm_default",
+                "tool_payload": {"raw_provider_payload": old_location},
+                "overlay_collection": {
+                    "instances": [
+                        {
+                            "instance_id": "old-layer",
+                            "capability_id": "old-layer",
+                            "label": old_location,
+                            "visible": True,
+                        }
+                    ]
+                },
+            },
+        },
+        recent_messages=[
+            {
+                "role": "assistant",
+                "content": old_location,
+                "id": "1",
+                "conversation_id": "c",
+                "turn_index": "1",
+                "created_at": "now",
+            }
+        ],
+        active_instructions=[{"normalized_text": "Use the current request location."}],
+        task_snapshot={
+            "active_task_id": "old-task",
+            "goal": {"id": "old-goal", "text": old_location, "status": "done"},
+            "tasks": [{"id": "old-task", "description": old_location}],
+            "geospatial_state": {"resolved_locations": [old_location] * 20},
+        },
+    )
+
+    serialized = json.dumps(payload, ensure_ascii=True)
+    assert payload["recent_messages"] == []
+    assert "raw_provider_payload" not in serialized
+    assert "New York" not in serialized
+    assert "EUR district" in serialized
+    assert len(serialized) < 8_000

@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-08-30
+Last updated: 2026-09-04
 
 ## Layering
 
@@ -78,18 +78,19 @@ Geospatial API services are composed during application startup and accessed thr
 
 ## Chat Orchestration Pipeline
 
-1. `AgentOrchestrator` loads volatile conversation task and visualization state.
-2. `ParserService` produces structured intent, relationship, entities, typed overlay commands, visualization changes, and ambiguities using the selected agent model and the canonical parser builder.
-3. `ConversationTaskStateService` creates or updates the current task record.
-4. `CapabilityResolver` converts semantic layer concepts into enabled executable manifest IDs or returns a structured clarification when no temporally compatible capability exists.
-5. `DeterministicAgentRouter` selects one specialist group.
-6. `DeterministicToolPlanner` creates a typed, deduplicated dependency plan.
-7. `PolicyEngine` restricts native tools and capability IDs to the routed scope.
-8. `ToolPlanExecutor` applies timeouts, bounded transient retries, validation, and partial-failure tracking.
-9. `NativeToolLoop` remains the bounded fallback when catalog discovery is required; its native-agent and replaceable working-state messages come from the canonical prompt builders.
-10. Verified results become a map session, direct answer, clarification, or diagnostic response.
-11. Successful and partial outcomes are passed to the same selected agent model through a validated `GroundedSynthesisResult` structured-output schema; deterministic prose remains the fallback.
-12. Overlay changes are applied to the revisioned `OverlayCollectionState` by
+1. `AgentOrchestrator` creates a run-local execution budget and loads volatile conversation task and visualization state.
+2. `ParserService` receives a bounded projection of the current request, compact active location/map state, relevant capability identities, and only minimal follow-up history. It produces structured intent, relationship, entities, typed overlay commands, visualization changes, and ambiguities using the selected agent model and the canonical parser builder.
+3. A deterministic location-resolution stage resolves coordinates, addresses/POIs, districts, cities, regions, and countries into one `ResolvedLocation` with a target and ordered geographic parents. That object is stored in `AgentExecutionContext` and is the only run-scoped location authority.
+4. `ConversationTaskStateService` creates or updates the current task record.
+5. `CapabilityResolver` converts semantic layer concepts into enabled executable manifest IDs or returns a structured clarification when no temporally compatible capability exists.
+6. `DeterministicAgentRouter` selects one specialist group.
+7. `DeterministicToolPlanner` creates a typed, deduplicated dependency plan using the resolved location.
+8. `PolicyEngine` restricts native tools and capability IDs to the routed scope.
+9. `ToolPlanExecutor` applies the shared deadline, targeted transient retries, validation, and partial-failure tracking.
+10. `NativeToolLoop` remains the bounded fallback when catalog discovery is required; its native-agent and replaceable working-state messages come from the canonical prompt builders, and active providers are called through their native async transport.
+11. Verified results become a map session, direct answer, clarification, or diagnostic response.
+12. Verified map-only results use deterministic response text; only narrative or direct-data answers invoke the selected agent model through one bounded `GroundedSynthesisResult` structured-output call. Deterministic prose remains the fallback.
+13. Overlay changes are applied to the revisioned `OverlayCollectionState` by
     deterministic selector resolution. Additions resolve against the catalog;
     remove/keep-only/show/hide/update operate on active instances first, and
     stale or ambiguous commands preserve the current collection with a focused
@@ -102,9 +103,15 @@ preflight rejection/clarification) are handled by
 `DirectTurnResponseService`. The orchestrator delegates these branches while
 retaining the normal tool execution path.
 
-Location resolution ranks coordinate, address, city, deictic, and country
-signals. Similar-confidence candidates with no clear specificity winner produce
-a structured ambiguity clarification instead of silently selecting a place.
+Location resolution ranks coordinates first, then address/POI/street, district or
+neighborhood, city or municipality, region/state, and country. Deictic words are
+context references rather than competing targets. A more-specific entity becomes
+the target and lower-level entities become ordered parents, so a district plus
+city is resolved as one hierarchy. Similar-confidence same-level candidates with
+no geocoder-supported parent relationship produce a structured ambiguity
+clarification instead of silently selecting a place. The geocoder result type,
+parent match, confidence, and bounding box are retained for downstream planning,
+rendering, and persistence.
 
 `AgentOrchestrator` remains the chat-turn entrypoint, while helper services keep non-routing responsibilities isolated:
 
@@ -132,6 +139,16 @@ map memory, summarized older turns, recent verbatim turns, verified tool outcome
 and policy constraints through the relevant canonical prompt builder. The current
 user message is supplied exactly once. Business services do not define free-form
 model instructions inline.
+
+Each run carries one absolute deadline and stage observations for context
+assembly, parsing, resolution, planning, tool execution, provider calls, map
+assembly, synthesis, persistence, and frontend delivery. Observations contain
+bounded durations, call/retry counts, safe identifiers, timeout origin, and the
+terminal reason; prompts, credentials, and large provider payloads are excluded.
+Provider transport timeouts, application deadline expiry, cancellation, and stale
+frontend runs are surfaced as distinct failure origins. Realtime stream cleanup
+cancels and awaits the active turn task so a disconnected client cannot publish a
+late result into a newer run.
 
 ## Geospatial Capability Pipeline
 

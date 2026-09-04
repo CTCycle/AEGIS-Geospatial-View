@@ -5,6 +5,7 @@ import unicodedata
 
 from tests.conftest import run_async_in_thread
 
+from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.location_resolver import LocationResolver
 from server.contracts.extraction import LocationSignal
 
@@ -448,5 +449,343 @@ def test_location_resolver_accepts_localized_named_poi_with_generic_descriptor()
         )
         assert result.label.startswith("Centre de recherche")
         assert result.location_type == "attraction"
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_location_resolver_builds_district_city_country_hierarchy_once() -> None:
+    calls: list[dict[str, object]] = []
+
+    class _HierarchyGeocoder:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            calls.append(kwargs)
+            return {
+                "display_name": "EUR, Rome, Lazio, Italy",
+                "lat": 41.831,
+                "lon": 12.466,
+                "selected_result_type": "suburb",
+                "selected_address_type": "suburb",
+                "selected_result_class": "place",
+                "confidence": 0.93,
+                "bbox": [12.43, 41.80, 12.50, 41.86],
+                "address": {
+                    "suburb": "EUR",
+                    "city": "Rome",
+                    "state": "Lazio",
+                    "country": "Italy",
+                    "country_code": "it",
+                },
+                "provider": "nominatim",
+                "source_url": "https://example.test/search",
+            }
+
+    resolver = LocationResolver(nominatim_service=_HierarchyGeocoder())
+
+    async def _run() -> None:
+        result = await resolver.resolve_location_signals(
+            [
+                LocationSignal(
+                    signal_type="district",
+                    raw_value="EUR district",
+                    normalized_value="EUR",
+                    confidence=0.9,
+                ),
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="Rome",
+                    normalized_value="Rome",
+                    confidence=0.9,
+                ),
+                LocationSignal(
+                    signal_type="country",
+                    raw_value="Italy",
+                    normalized_value="Italy",
+                    confidence=0.9,
+                ),
+            ],
+            {},
+        )
+
+        assert isinstance(result, ResolvedLocation)
+        assert len(calls) == 1
+        assert calls[0]["address"] == "EUR"
+        assert calls[0]["city"] == "Rome"
+        assert calls[0]["country_name"] == "Italy"
+        assert calls[0]["expected_location_type"] == "district"
+        assert result.bbox == [12.43, 41.80, 12.50, 41.86]
+        assert result.hierarchy is not None
+        assert result.hierarchy.target.signal_type == "district"
+        assert result.hierarchy.target.raw_value == "EUR district"
+        assert [item.signal_type for item in result.hierarchy.parents[:3]] == [
+            "city",
+            "region",
+            "country",
+        ]
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_named_signal_coordinates_are_hints_not_a_hierarchy_bypass() -> None:
+    calls: list[dict[str, object]] = []
+
+    class _NamedEntityGeocoder:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            calls.append(kwargs)
+            return {
+                "display_name": "EUR, Rome, Italy",
+                "lat": 41.8338,
+                "lon": 12.4709,
+                "selected_result_type": "suburb",
+                "selected_address_type": "suburb",
+                "address": {
+                    "suburb": "EUR",
+                    "city": "Rome",
+                    "country": "Italy",
+                },
+            }
+
+    resolver = LocationResolver(nominatim_service=_NamedEntityGeocoder())
+
+    async def _run() -> None:
+        result = await resolver.resolve_location_signals(
+            [
+                LocationSignal(
+                    signal_type="district",
+                    raw_value="EUR district",
+                    normalized_value="EUR, Rome, Italy",
+                    latitude=41.8322,
+                    longitude=12.4706,
+                    confidence=0.8,
+                    source="model",
+                ),
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="Rome",
+                    normalized_value="Rome",
+                    confidence=0.9,
+                    source="model",
+                ),
+            ],
+            {},
+        )
+
+        assert isinstance(result, ResolvedLocation)
+        assert len(calls) == 1
+        assert calls[0]["address"] == "EUR, Rome, Italy"
+        assert calls[0]["city"] == "Rome"
+        assert result.latitude == 41.8338
+        assert result.hierarchy is not None
+        assert result.hierarchy.target.signal_type == "district"
+        assert [item.signal_type for item in result.hierarchy.parents[:2]] == [
+            "city",
+            "country",
+        ]
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_location_resolver_repairs_model_same_level_district_city_conflict() -> None:
+    calls: list[dict[str, object]] = []
+
+    class _RelationshipGeocoder:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            calls.append(kwargs)
+            if kwargs["address"] == "EUR" and kwargs["city"] == "Rome":
+                return {
+                    "display_name": "EUR, Rome, Italy",
+                    "lat": 41.831,
+                    "lon": 12.466,
+                    "selected_result_type": "suburb",
+                    "selected_address_type": "suburb",
+                    "address": {
+                        "suburb": "EUR",
+                        "city": "Rome",
+                        "country": "Italy",
+                        "country_code": "it",
+                    },
+                }
+            return {
+                "display_name": "Rome, Italy",
+                "lat": 41.9028,
+                "lon": 12.4964,
+                "selected_result_type": "city",
+                "address": {"city": "Rome", "country": "Italy"},
+            }
+
+    resolver = LocationResolver(nominatim_service=_RelationshipGeocoder())
+
+    async def _run() -> None:
+        result = await resolver.resolve_location_signals(
+            [
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="EUR",
+                    normalized_value="EUR",
+                    source="model",
+                ),
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="Rome",
+                    normalized_value="Rome",
+                    source="model",
+                ),
+            ],
+            {},
+        )
+
+        assert isinstance(result, ResolvedLocation)
+        assert result.label.startswith("EUR")
+        assert result.hierarchy is not None
+        assert result.hierarchy.target.signal_type == "district"
+        assert len(calls) == 2
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_location_resolver_accepts_country_alias_and_preserves_raw_span() -> None:
+    calls: list[dict[str, object]] = []
+
+    class _AliasGeocoder:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            calls.append(kwargs)
+            return {
+                "display_name": "Cambridge, England, United Kingdom",
+                "lat": 52.2053,
+                "lon": 0.1218,
+                "selected_result_type": "city",
+                "address": {
+                    "city": "Cambridge",
+                    "state": "England",
+                    "country": "United Kingdom",
+                    "country_code": "gb",
+                },
+            }
+
+    resolver = LocationResolver(nominatim_service=_AliasGeocoder())
+
+    async def _run() -> None:
+        result = await resolver.resolve_location_signals(
+            [
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="Cambridge",
+                    normalized_value="Cambridge, UK",
+                    confidence=0.9,
+                ),
+                LocationSignal(
+                    signal_type="country",
+                    raw_value="UK",
+                    normalized_value="UK",
+                    confidence=0.9,
+                ),
+            ],
+            {},
+        )
+
+        assert isinstance(result, ResolvedLocation)
+        assert result.hierarchy is not None
+        assert result.hierarchy.target.raw_value == "Cambridge"
+        assert calls[0]["address"] == "Cambridge, UK"
+        assert calls[0]["country_name"] == "UK"
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_location_resolver_uses_deictic_signal_as_memory_context() -> None:
+    class _ShouldNotGeocode:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            raise AssertionError("deictic-only follow-up must reuse memory")
+
+    resolver = LocationResolver(nominatim_service=_ShouldNotGeocode())
+
+    async def _run() -> None:
+        result = await resolver.resolve_location_signals(
+            [LocationSignal(signal_type="deictic", raw_value="there")],
+            {
+                "active_location": {
+                    "label": "Trastevere, Rome",
+                    "latitude": 41.889,
+                    "longitude": 12.469,
+                    "location_type": "district",
+                    "hierarchy": {
+                        "target": {
+                            "signal_type": "district",
+                            "raw_value": "Trastevere",
+                            "normalized_value": "Trastevere",
+                        },
+                        "parents": [],
+                    },
+                }
+            },
+        )
+
+        assert isinstance(result, ResolvedLocation)
+        assert result.source == "memory"
+        assert result.hierarchy is not None
+        assert result.hierarchy.target.raw_value == "Trastevere"
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_location_resolver_uses_active_city_as_parent_for_finer_follow_up() -> None:
+    calls: list[dict[str, object]] = []
+
+    class _FollowUpGeocoder:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            calls.append(kwargs)
+            return {
+                "display_name": "EUR district, Rome, Italy",
+                "lat": 41.8338,
+                "lon": 12.4709,
+                "selected_result_type": "suburb",
+                "selected_address_type": "suburb",
+                "address": {
+                    "suburb": "EUR",
+                    "city": "Rome",
+                    "country": "Italy",
+                },
+            }
+
+    resolver = LocationResolver(nominatim_service=_FollowUpGeocoder())
+
+    async def _run() -> None:
+        result = await resolver.resolve_location_signals(
+            [
+                LocationSignal(
+                    signal_type="district",
+                    raw_value="EUR district",
+                    normalized_value="EUR district",
+                    confidence=0.9,
+                    source="model",
+                )
+            ],
+            {
+                "active_location": {
+                    "label": "Rome, Italy",
+                    "latitude": 41.9,
+                    "longitude": 12.5,
+                    "city": "Rome",
+                    "country": "Italy",
+                    "location_type": "city",
+                    "confidence": 0.9,
+                }
+            },
+        )
+
+        assert isinstance(result, ResolvedLocation)
+        assert len(calls) == 1
+        assert calls[0]["city"] == "Rome"
+        assert calls[0]["country_name"] == "Italy"
+        assert result.hierarchy is not None
+        assert [item.signal_type for item in result.hierarchy.parents[:2]] == [
+            "city",
+            "country",
+        ]
 
     run_async_in_thread(_run())

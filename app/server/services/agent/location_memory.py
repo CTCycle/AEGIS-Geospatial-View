@@ -77,6 +77,11 @@ class LocationMemoryService:
             "source": resolved_location.source,
             "confidence": resolved_location.confidence,
             "action_id": action.action_id,
+            "hierarchy": (
+                resolved_location.hierarchy.model_dump(mode="json")
+                if resolved_location.hierarchy is not None
+                else None
+            ),
         }
         slots = [
             entry

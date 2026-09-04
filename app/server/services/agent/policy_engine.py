@@ -324,7 +324,11 @@ class PolicyEngine:
                 for item in clarification_plan.get("blocking_fields", [])
             }
             question = str(clarification_plan.get("question") or "").strip()
-            if "location" in blocking_fields and question:
+            if (
+                "location" in blocking_fields
+                and question
+                and not self._has_model_location_signal(turn.location_signals)
+            ):
                 return ClarificationRequest(
                     question=question,
                     reason=str(
@@ -335,6 +339,16 @@ class PolicyEngine:
                 )
 
         if not self._contains_location_ambiguity(turn.ambiguities):
+            return None
+
+        if self._has_model_location_signal(turn.location_signals) or self._signals_form_hierarchy(
+            turn.location_signals
+        ):
+            # A district/neighborhood plus its city, or a city plus its
+            # country, is contextual hierarchy rather than two competing
+            # targets.  Same-level model signals are also deferred so the
+            # resolver can test a bounded parent/child relationship before
+            # asking the user to clarify.
             return None
 
         if len(turn.location_signals) > 1:
@@ -357,6 +371,37 @@ class PolicyEngine:
             question=question,
             reason="The request has multiple plausible location interpretations.",
             missing_fields=["location"],
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _signals_form_hierarchy(signals: list[Any]) -> bool:
+        explicit = [
+            signal
+            for signal in signals
+            if getattr(signal, "signal_type", None) != "deictic"
+            and str(getattr(signal, "raw_value", "") or "").strip()
+        ]
+        if len(explicit) < 2:
+            return False
+        if any(getattr(signal, "source", None) == "model" for signal in explicit):
+            return True
+        ranks = [
+            LocationResolver.SPECIFICITY_BY_SIGNAL_TYPE.get(
+                getattr(signal, "signal_type", ""), 0
+            )
+            for signal in explicit
+        ]
+        return len(set(ranks)) > 1
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _has_model_location_signal(signals: list[Any]) -> bool:
+        return any(
+            getattr(signal, "source", None) == "model"
+            and getattr(signal, "signal_type", None) != "deictic"
+            and str(getattr(signal, "raw_value", "") or "").strip()
+            for signal in signals
         )
 
     # -------------------------------------------------------------------------

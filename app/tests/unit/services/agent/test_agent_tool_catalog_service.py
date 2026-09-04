@@ -164,6 +164,25 @@ class _LocationResolver:
 
 
 ###############################################################################
+class _CountingLocationResolver:
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.calls = 0
+
+    # -------------------------------------------------------------------------
+    async def resolve_location_signals(self, location_signals, memory_snapshot):  # noqa: ANN001
+        self.calls += 1
+        _ = location_signals, memory_snapshot
+        return ResolvedLocation(
+            label="Unexpected fallback",
+            latitude=0.0,
+            longitude=0.0,
+            source="test",
+            confidence=1.0,
+        )
+
+
+###############################################################################
 class _SearchOrchestrator:
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
@@ -408,6 +427,28 @@ def test_execute_map_capability_returns_real_map_session() -> None:
     assert result["operation"] == "map_session_created"
     assert result["map_session"] is not None
     assert result["map_session"]["resolved_location"]["label"] == "Rome"
+
+
+###############################################################################
+def test_catalog_reuses_run_scoped_location_without_resolving_tool_argument() -> None:
+    service = _service()
+    resolver = _CountingLocationResolver()
+    service.location_resolver = resolver  # type: ignore[assignment]
+    resolved = ResolvedLocation(
+        label="EUR, Rome",
+        latitude=41.83,
+        longitude=12.47,
+        source="nominatim",
+        confidence=0.96,
+    )
+    context = AgentExecutionContext(resolved_location=resolved)
+
+    result = run_async_in_thread(
+        service._resolve_location({"location": "a different city"}, context)
+    )
+
+    assert result is resolved
+    assert resolver.calls == 0
 
 
 ###############################################################################

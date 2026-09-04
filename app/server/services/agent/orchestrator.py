@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from server.common.typing import is_json_object, json_array, json_object
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 import asyncio
+from contextlib import contextmanager
+import inspect
 from time import monotonic
-from typing import Any, cast
+from typing import Any, Generator, cast
 from uuid import uuid4
 
 from server.common.logger import logger as LOGGER
@@ -18,7 +20,12 @@ from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.capability_resolver import CapabilityResolver
-from server.domain.agent.decision import ClarificationRequest
+from server.domain.agent.decision import (
+    ClarificationRequest,
+    ExecutionPlan,
+    PolicyDecision,
+    ResolvedLocation,
+)
 from server.services.agent.direct_turn_response import DirectTurnResponseService
 from server.services.agent.deterministic_intent_recovery import (
     DeterministicIntentRecoveryService,
@@ -31,6 +38,11 @@ from server.services.agent.instruction_state import ConversationInstructionServi
 from server.services.agent.context_assembler import AgentContextAssembler
 from server.domain.agent.context import ConversationDirective
 from server.domain.agent.pipeline import VisualizationUpdate
+from server.domain.agent.reliability import (
+    DEFAULT_RUN_SECONDS,
+    AgentExecutionBudget,
+    StageObservation,
+)
 from server.services.agent.native_tool_loop import (
     AgentExecutionContext,
     AgentToolLoopRequest,
@@ -40,7 +52,10 @@ from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.parser_service import ParserRunResult, ParserService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.response_builder import AgentResponseBuilder
-from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
+from server.services.agent.response_synthesizer import (
+    GroundedResponseSynthesizer,
+    synthesize_response_async,
+)
 from server.services.agent.turn_history import AgentTurnHistoryService
 from server.services.agent.turn_state_assembler import AgentTurnStateAssembler
 from server.services.agent.planned_turn_execution import PlannedTurnExecutionService
@@ -60,6 +75,7 @@ from server.contracts.geospatial import MapSession
 
 ###############################################################################
 class AgentOrchestrator:
+    RUN_TIMEOUT_SECONDS = DEFAULT_RUN_SECONDS
     _compose_map_session_message = staticmethod(
         AgentResponseBuilder.compose_map_session_message
     )
@@ -112,6 +128,7 @@ class AgentOrchestrator:
         self.context_assembler = AgentContextAssembler(context_profile_resolver)
         self._context_packages: dict[str, Any] = {}
         self._persisted_context_state: dict[str, dict[str, Any]] = {}
+        self._conversation_locks: dict[str, asyncio.Lock] = {}
         self.pipeline_router = pipeline_router
         self.tool_planner = tool_planner
         self.tool_plan_executor = tool_plan_executor
@@ -150,6 +167,22 @@ class AgentOrchestrator:
         payload: ChatTurnRequest,
         progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> ChatTurnResponse:
+        # Conversation state, task state, and persistence revisions are
+        # mutable by design. Serialize turns for one conversation so a stale
+        # async request cannot publish or overwrite a newer turn's context.
+        lock = self._conversation_locks.setdefault(
+            payload.conversation_id, asyncio.Lock()
+        )
+        async with lock:
+            return await self._run_turn_serialized(payload, progress_callback)
+
+    # -------------------------------------------------------------------------
+    async def _run_turn_serialized(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
+    ) -> ChatTurnResponse:
+        execution_budget = AgentExecutionBudget(total_seconds=self.RUN_TIMEOUT_SECONDS)
         conversation_id = payload.conversation_id
         if hasattr(self.response_synthesizer, "last_context_usage"):
             try:
@@ -175,7 +208,11 @@ class AgentOrchestrator:
             + 1,
         )
         self._active_directives[conversation_id] = directives
-        response = await self._run_turn(payload, progress_callback)
+        response = await self._run_turn(
+            payload,
+            progress_callback,
+            execution_budget=execution_budget,
+        )
         synthesis_usage = getattr(self.response_synthesizer, "last_context_usage", None)
         self._emit_context_usage(
             progress_callback,
@@ -185,25 +222,114 @@ class AgentOrchestrator:
             usage=synthesis_usage,
         )
         response = self._with_phase_usage(response)
-        revision = repository.write_state(
-            conversation_id,
-            expected_revision=int(persisted["context_revision"]),
-            active_instructions=[item.model_dump(mode="json") for item in directives],
-            task_snapshot=self.task_state_service.serialize(conversation_id),
-            memory_snapshot=response.memory_snapshot,
-            conversation_summary=(
-                self._context_packages[conversation_id].conversation_summary
-                if conversation_id in self._context_packages
-                else None
-            ),
-            summary_through_turn_index=(
-                self._context_packages[conversation_id].summarized_through_turn_index
-                if conversation_id in self._context_packages
-                else None
-            ),
+        with self._stage_scope(
+            execution_budget,
+            "persistence",
+            progress_callback,
+            request_id=response.request_id,
+            conversation_id=conversation_id,
+        ):
+            revision = repository.write_state(
+                conversation_id,
+                expected_revision=int(persisted["context_revision"]),
+                active_instructions=[item.model_dump(mode="json") for item in directives],
+                task_snapshot=self.task_state_service.serialize(conversation_id),
+                memory_snapshot=response.memory_snapshot,
+                conversation_summary=(
+                    self._context_packages[conversation_id].conversation_summary
+                    if conversation_id in self._context_packages
+                    else None
+                ),
+                summary_through_turn_index=(
+                    self._context_packages[conversation_id].summarized_through_turn_index
+                    if conversation_id in self._context_packages
+                    else None
+                ),
+            )
+        if execution_budget.terminal_reason is None:
+            if response.operation is not None and response.operation.kind == "clarification":
+                execution_budget.terminal_reason = "clarification_required"
+            elif (
+                response.operation is not None
+                and (
+                    response.operation.status == "failed"
+                    or response.operation.kind == "error"
+                )
+            ):
+                execution_budget.terminal_reason = "operation_failed"
+            else:
+                execution_budget.terminal_reason = "completed"
+        response = response.model_copy(
+            update={
+                "context_revision": revision,
+                "execution_trace": execution_budget.snapshot(),
+            }
         )
-        response = response.model_copy(update={"context_revision": revision})
         return response
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    @contextmanager
+    def _stage_scope(
+        budget: AgentExecutionBudget,
+        stage: str,
+        progress_callback: Callable[[str, dict[str, Any]], None] | None,
+        *,
+        request_id: str,
+        conversation_id: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> Generator[None, None, None]:
+        def emit(event: str, payload: dict[str, Any]) -> None:
+            if progress_callback is None:
+                return
+            try:
+                progress_callback(event, payload)
+            except Exception:
+                # Telemetry must not change the request's execution semantics.
+                return
+
+        emit(
+            "stage",
+            {
+                "request_id": request_id,
+                "conversation_id": conversation_id,
+                "stage": stage,
+                "status": "started",
+                "remaining_deadline_ms": int(budget.remaining_seconds() * 1000),
+            },
+        )
+        try:
+            with budget.observe(stage, metadata=metadata):
+                yield
+        finally:
+            observation: StageObservation | None = next(
+                (
+                    item
+                    for item in reversed(budget.observations)
+                    if item.stage == stage
+                ),
+                None,
+            )
+            emit(
+                "stage",
+                {
+                    "request_id": request_id,
+                    "conversation_id": conversation_id,
+                    "stage": stage,
+                    "status": observation.status if observation else "unknown",
+                    "observation": observation.to_dict() if observation else None,
+                    "execution_trace": budget.snapshot(),
+                },
+            )
+            LOGGER.info(
+                "agent_stage request_id=%s conversation_id=%s stage=%s status=%s duration_ms=%s remaining_ms=%s",
+                request_id,
+                conversation_id,
+                stage,
+                observation.status if observation else "unknown",
+                observation.duration_ms if observation else None,
+                observation.deadline_remaining_ms if observation else None,
+            )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -418,7 +544,12 @@ class AgentOrchestrator:
         self,
         payload: ChatTurnRequest,
         progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
+        *,
+        execution_budget: AgentExecutionBudget | None = None,
     ) -> ChatTurnResponse:
+        execution_budget = execution_budget or AgentExecutionBudget(
+            total_seconds=self.RUN_TIMEOUT_SECONDS
+        )
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
         LOGGER.info(
             "chat_turn_start request_id=%s conversation_id=%s message_length=%s",
@@ -468,22 +599,29 @@ class AgentOrchestrator:
         )
 
         settings = self.settings_repo.get_required()
-        context_package = self.context_assembler.assemble(
-            provider=settings.agent_model_provider,
-            model=settings.agent_model_name,
-            current_user_message=payload.message,
-            messages=recent_messages,
-            directives=self.instruction_state_service.active(
-                self._active_directives.get(conversation_key, [])
-            ),
-            task_state=state_before.model_dump(mode="json"),
-            map_memory=latest_memory,
-            prior_summary=(
-                self._persisted_context_state.get(conversation_key, {}).get(
-                    "conversation_summary"
-                )
-            ),
-        )
+        with self._stage_scope(
+            execution_budget,
+            "context_assembly",
+            progress_callback,
+            request_id=request_id,
+            conversation_id=conversation_id,
+        ):
+            context_package = self.context_assembler.assemble(
+                provider=settings.agent_model_provider,
+                model=settings.agent_model_name,
+                current_user_message=payload.message,
+                messages=recent_messages,
+                directives=self.instruction_state_service.active(
+                    self._active_directives.get(conversation_key, [])
+                ),
+                task_state=state_before.model_dump(mode="json"),
+                map_memory=latest_memory,
+                prior_summary=(
+                    self._persisted_context_state.get(conversation_key, {}).get(
+                        "conversation_summary"
+                    )
+                ),
+            )
         self._context_packages[conversation_key] = context_package
         recent_messages = context_package.recent_messages
 
@@ -501,56 +639,109 @@ class AgentOrchestrator:
         parser_kwargs["task_snapshot"] = state_before.model_dump(mode="json")
         parser_run: ParserRunResult | None = None
         parser_usage: dict[str, object] | None = None
-        parser_timeout_seconds = float(
-            getattr(self.parser_service, "PARSER_TIMEOUT_SECONDS", 35.0)
+        parser_deadline = execution_budget.stage_deadline(
+            "structured_intent_extraction"
         )
-        parser_deadline = monotonic() + parser_timeout_seconds
         try:
+            parser_timeout_seconds = max(
+                0.001,
+                min(
+                    execution_budget.remaining_seconds(),
+                    parser_deadline - monotonic(),
+                ),
+            )
+            parse_with_usage_async = getattr(
+                self.parser_service, "parse_turn_with_usage_async", None
+            )
             parse_with_usage = getattr(
                 self.parser_service, "parse_turn_with_usage", None
             )
-            if callable(parse_with_usage):
-                parser_run = cast(
-                    ParserRunResult,
-                    await asyncio.wait_for(
-                        asyncio.to_thread(
-                            parse_with_usage,
+            with self._stage_scope(
+                execution_budget,
+                "structured_intent_extraction",
+                progress_callback,
+                request_id=request_id,
+                conversation_id=conversation_id,
+                metadata={
+                    "provider": settings.agent_model_provider,
+                    "model": settings.agent_model_name,
+                },
+            ):
+                async with asyncio.timeout(parser_timeout_seconds):
+                    if callable(parse_with_usage_async):
+                        parser_run = await cast(
+                            Callable[..., Awaitable[ParserRunResult]],
+                            parse_with_usage_async,
+                        )(
                             **parser_kwargs,
                             deadline_monotonic=parser_deadline,
-                        ),
-                        timeout=parser_timeout_seconds + 1.0,
-                    ),
+                        )
+                        turn_contract = parser_run.turn_contract
+                        parser_usage = parser_run.context_usage
+                    elif callable(parse_with_usage):
+                        # Compatibility path for adapters that have not yet
+                        # migrated to the async provider boundary.
+                        parser_run = cast(
+                            ParserRunResult,
+                            await asyncio.to_thread(
+                                parse_with_usage,
+                                **parser_kwargs,
+                                deadline_monotonic=parser_deadline,
+                            ),
+                        )
+                        turn_contract = parser_run.turn_contract
+                        parser_usage = parser_run.context_usage
+                    else:
+                        turn_contract = await asyncio.to_thread(
+                            self.parser_service.parse_turn,
+                            **parser_kwargs,
+                        )
+        except TimeoutError as exc:
+            timeout_origin = str(getattr(exc, "timeout_origin", "") or "")
+            if not timeout_origin:
+                timeout_origin = (
+                    "application_deadline"
+                    if monotonic() >= parser_deadline
+                    or execution_budget.remaining_seconds() <= 0.0
+                    else "provider_transport"
                 )
-                turn_contract = parser_run.turn_contract
-                parser_usage = parser_run.context_usage
-            else:
-                turn_contract = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        self.parser_service.parse_turn,
-                        **parser_kwargs,
-                    ),
-                    timeout=parser_timeout_seconds + 1.0,
-                )
-        except asyncio.TimeoutError:
+            application_deadline = timeout_origin == "application_deadline"
+            execution_budget.terminal_reason = (
+                "application_deadline" if application_deadline else "provider_timeout"
+            )
             LOGGER.warning(
-                "parser_budget_exhausted request_id=%s provider=%s model=%s",
+                "parser_timeout request_id=%s provider=%s model=%s origin=%s",
                 request_id,
                 settings.agent_model_provider,
                 settings.agent_model_name,
+                timeout_origin,
             )
             turn_contract = self.parser_service.build_parser_failure_turn_result(
                 user_message=payload.message,
                 memory_snapshot=latest_memory,
                 conversation_messages=recent_messages,
                 provider_error={
-                    "code": "provider_timeout",
+                    "code": (
+                        "application_deadline_exceeded"
+                        if application_deadline
+                        else "provider_timeout"
+                    ),
                     "category": "provider_api",
                     "provider": settings.agent_model_provider,
                     "model": settings.agent_model_name,
                     "stage": "structured_intent_extraction",
                     "retryable": False,
+                    "timeout_origin": timeout_origin,
                 },
             )
+        parser_model_calls = max(
+            int(getattr(parser_run, "model_calls", 0) or 0)
+            if parser_run is not None
+            else 0,
+            int(getattr(self.parser_service, "last_model_calls", 0) or 0),
+        )
+        for _ in range(max(0, parser_model_calls)):
+            execution_budget.record_model_call()
         recovered_turn_contract = (
             self.deterministic_intent_recovery_service.recover_explicit_request(
                 user_message=payload.message,
@@ -642,6 +833,67 @@ class AgentOrchestrator:
                 usage=context_usage.model_dump(mode="json"),
             )
         preflight_decision = self.policy_engine.evaluate_preflight(turn_contract)
+        resolved_location: ResolvedLocation | None = None
+        if (
+            preflight_decision is None
+            and turn_contract.task_class in {"map_search", "direct_query"}
+            and turn_contract.normalized_action.requires_location
+        ):
+            try:
+                resolution_deadline = execution_budget.stage_deadline(
+                    "location_resolution"
+                )
+                resolution_timeout = max(
+                    0.001,
+                    min(
+                        execution_budget.remaining_seconds(),
+                        resolution_deadline - monotonic(),
+                    ),
+                )
+                with self._stage_scope(
+                    execution_budget,
+                    "location_resolution",
+                    progress_callback,
+                    request_id=request_id,
+                    conversation_id=conversation_id,
+                ):
+                    async with asyncio.timeout(resolution_timeout):
+                        location_result = (
+                            await self.policy_engine.location_resolver.resolve_location_signals(
+                                list(turn_contract.location_signals),
+                                json_object(latest_memory),
+                            )
+                        )
+                if isinstance(location_result, ResolvedLocation):
+                    resolved_location = location_result
+                    LOGGER.info(
+                        "location_resolved request_id=%s location_type=%s confidence=%.3f has_bbox=%s",
+                        request_id,
+                        location_result.location_type,
+                        location_result.confidence,
+                        location_result.bbox is not None,
+                    )
+                else:
+                    preflight_decision = PolicyDecision(
+                        plan=ExecutionPlan(
+                            state="clarify",
+                            action_id=turn_contract.normalized_action.action_id,
+                        ),
+                        clarification=location_result,
+                    )
+            except TimeoutError:
+                execution_budget.terminal_reason = "location_resolution_deadline"
+                preflight_decision = PolicyDecision(
+                    plan=ExecutionPlan(
+                        state="clarify",
+                        action_id=turn_contract.normalized_action.action_id,
+                    ),
+                    clarification=ClarificationRequest(
+                        question="I could not resolve the location before the request deadline. Which specific location should I use?",
+                        reason="Location resolution exceeded the bounded request deadline.",
+                        missing_fields=["location"],
+                    ),
+                )
         direct_response = await self.direct_turn_response_service.handle(
             request_id=request_id,
             conversation_id=conversation_id,
@@ -653,6 +905,7 @@ class AgentOrchestrator:
             recent_messages=recent_messages,
             context_usage=context_usage,
             preflight_decision=preflight_decision,
+            execution_budget=execution_budget,
         )
         if direct_response is not None:
             return direct_response
@@ -669,14 +922,38 @@ class AgentOrchestrator:
                 turn_contract=turn_contract,
                 latest_memory=latest_memory,
                 context_usage=context_usage,
+                resolved_location=resolved_location,
             )
 
         settings = self.settings_repo.get_required()
-        tool_plan = self.tool_planner.build_plan(
-            turn_contract,
-            specialist,
-            latest_memory,
-        )
+        with self._stage_scope(
+            execution_budget,
+            "planning",
+            progress_callback,
+            request_id=request_id,
+            conversation_id=conversation_id,
+        ):
+            planner_parameters = inspect.signature(
+                self.tool_planner.build_plan
+            ).parameters
+            if "resolved_location" in planner_parameters or any(
+                parameter.kind is inspect.Parameter.VAR_KEYWORD
+                for parameter in planner_parameters.values()
+            ):
+                tool_plan = self.tool_planner.build_plan(
+                    turn_contract,
+                    specialist,
+                    latest_memory,
+                    resolved_location=resolved_location,
+                )
+            else:
+                # Keep injected planners with the pre-resolution signature
+                # usable while the production planner owns the resolved value.
+                tool_plan = self.tool_planner.build_plan(
+                    turn_contract,
+                    specialist,
+                    latest_memory,
+                )
         LOGGER.debug(
             "chat_turn_plan request_id=%s specialist=%s tools=%s steps=%d visualization_update=%s",
             request_id,
@@ -739,6 +1016,8 @@ class AgentOrchestrator:
                     else "complex"
                 ),
             },
+            resolved_location=resolved_location,
+            execution_budget=execution_budget,
         )
         deterministic_tools_available = (
             bool(tool_plan.steps) or bool(tool_plan.visualization_update)
@@ -789,7 +1068,7 @@ class AgentOrchestrator:
                 ),
                 tools=native_tools,
                 temperature=0.2,
-                max_tokens=None,
+                max_tokens=1536,
                 context=native_context,
                 context_usage_callback=(
                     lambda usage: self._emit_context_usage(
@@ -809,7 +1088,7 @@ class AgentOrchestrator:
             f"4.stop:{tool_loop_result.stopped_reason}",
         ]
         assistant_message = tool_loop_result.final_text or "Done."
-        tool_payload = {
+        tool_payload: dict[str, Any] = {
             "tool_calls": [
                 {
                     "id": call.id,
@@ -832,13 +1111,22 @@ class AgentOrchestrator:
             "stopped_reason": tool_loop_result.stopped_reason,
             "failure_category": tool_loop_result.failure_category,
             "failure_detail": tool_loop_result.failure_detail,
+            "timeout_origin": tool_loop_result.timeout_origin,
             "context_usages": tool_loop_result.context_usages,
         }
-        map_result = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
-            tool_payload=tool_payload,
-            turn_contract=turn_contract,
-            latest_memory=latest_memory,
-        )
+        with self._stage_scope(
+            execution_budget,
+            "map_assembly",
+            progress_callback,
+            request_id=request_id,
+            conversation_id=conversation_id,
+        ):
+            map_result = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
+                tool_payload=tool_payload,
+                turn_contract=turn_contract,
+                latest_memory=latest_memory,
+                resolved_location=resolved_location,
+            )
         if isinstance(map_result, ClarificationRequest) and (
             tool_loop_result.failure_category is None
         ):
@@ -856,6 +1144,14 @@ class AgentOrchestrator:
         map_session = map_result if isinstance(map_result, MapSession) else None
         if map_session is None:
             map_session = tool_loop_result.map_session
+        LOGGER.info(
+            "map_assembly_result request_id=%s overlays=%d source=%s",
+            request_id,
+            len(map_session.overlay_collection.instances)
+            if map_session is not None
+            else 0,
+            "assembled" if isinstance(map_result, MapSession) else "tool_loop",
+        )
         overlay_mutation_results = []
         if map_session is None and turn_contract.overlay_commands:
             # A visibility/removal follow-up can be resolved entirely against
@@ -886,11 +1182,19 @@ class AgentOrchestrator:
             )
         )
         if map_session is None and capability_selection is not None:
-            map_result = await self.turn_state_assembler.build_map_session_from_capability_selection(
-                capability_selection=capability_selection,
-                turn_contract=turn_contract,
-                latest_memory=latest_memory,
-            )
+            with self._stage_scope(
+                execution_budget,
+                "map_assembly",
+                progress_callback,
+                request_id=request_id,
+                conversation_id=conversation_id,
+            ):
+                map_result = await self.turn_state_assembler.build_map_session_from_capability_selection(
+                    capability_selection=capability_selection,
+                    turn_contract=turn_contract,
+                    latest_memory=latest_memory,
+                    resolved_location=resolved_location,
+                )
             if isinstance(map_result, ClarificationRequest) and (
                 tool_loop_result.failure_category is None
             ):
@@ -917,6 +1221,12 @@ class AgentOrchestrator:
                     list(turn_contract.overlay_commands),
                 )
             )
+            LOGGER.info(
+                "map_overlay_mutation request_id=%s overlays=%d mutations=%d",
+                request_id,
+                len(map_session.overlay_collection.instances),
+                len(overlay_mutation_results),
+            )
         self.turn_state_assembler.append_provider_events(tool_payload, map_session)
         memory_snapshot = await self.turn_state_assembler.build_updated_memory_snapshot(
             turn_contract=turn_contract,
@@ -924,6 +1234,7 @@ class AgentOrchestrator:
             map_session=map_session,
             direct_result=direct_result,
             tool_payload=tool_payload,
+            resolved_location=resolved_location,
         )
         assistant_message = AgentResponseBuilder.build_verified_assistant_message(
             tool_loop_result.final_text,
@@ -957,6 +1268,7 @@ class AgentOrchestrator:
                         "category": tool_loop_result.failure_category,
                         "detail": tool_loop_result.failure_detail,
                         "stage": "native_tool_loop",
+                        "timeout_origin": tool_loop_result.timeout_origin,
                     },
                 }
             )
@@ -982,7 +1294,8 @@ class AgentOrchestrator:
         self.task_state_service.set_active_visualization(
             conversation_key, map_session, tool_payload=tool_payload
         )
-        assistant_message = self.response_synthesizer.synthesize(
+        assistant_message = await synthesize_response_async(
+            self.response_synthesizer,
             user_text=turn_contract.user_text,
             fallback_text=assistant_message,
             operation=operation,
@@ -996,6 +1309,8 @@ class AgentOrchestrator:
                 )
             ],
             task_snapshot=self.task_state_service.serialize(conversation_key),
+            execution_budget=execution_budget,
+            skip_verified_map_only=True,
         )
         synthesis_category = getattr(
             self.response_synthesizer, "last_failure_category", None
@@ -1100,6 +1415,7 @@ class AgentOrchestrator:
                 None,
             ),
         )
+        tool_payload["execution_trace"] = execution_budget.snapshot()
 
         self.history_service.append_message(
             conversation_id=conversation_id,
@@ -1116,6 +1432,7 @@ class AgentOrchestrator:
                 else None,
                 "previous_turn_contract": latest_contract,
                 "request_id": request_id,
+                "execution_trace": execution_budget.snapshot(),
             },
             tool_payload=tool_payload,
             map_session=map_session.model_dump(mode="json")

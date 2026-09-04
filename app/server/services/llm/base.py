@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from typing import Any
@@ -42,6 +44,38 @@ class LLMProvider(ABC):
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]: ...
+
+    # -------------------------------------------------------------------------
+    async def achat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
+        """Async agent boundary for providers without a native async client.
+
+        OpenAI-compatible providers override this with a cancellable network
+        request.  The fallback keeps less common adapters off the event loop
+        while their existing transport is migrated.
+        """
+
+        return await asyncio.to_thread(
+            self.chat,
+            request,
+            tools=tools,
+            tool_choice=tool_choice,
+            response_json_schema=response_json_schema,
+        )
+
+    # -------------------------------------------------------------------------
+    async def astructured_output(
+        self, request: LLMRequest, schema: type[object]
+    ) -> dict[str, Any]:
+        """Async structured-output boundary used by the agent runtime."""
+
+        return await asyncio.to_thread(self.structured_output, request, schema)
 
     # -------------------------------------------------------------------------
     @abstractmethod
