@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_array, is_json_object
+from server.common.typing import is_json_array, is_json_object, json_object
 
 import asyncio
 import json
 import math
+import re
 import socket
 import threading
 import time
@@ -38,6 +39,14 @@ class NominatimService:
             "office",
             "headquarters",
             "hq",
+            "district",
+            "neighborhood",
+            "neighbourhood",
+            "quarter",
+            "borough",
+            "area",
+            "zona",
+            "quartiere",
         }
     )
     ACRONYM_STOP_WORDS = frozenset(
@@ -116,7 +125,10 @@ class NominatimService:
             expected_location_type=expected_location_type,
             query=selected_query,
             has_parent_context=bool(
-                city or country_name or country_code or "," in params["q"]
+                city
+                or country_name
+                or country_code
+                or any("," in item for item in queries)
             ),
         )
         if ambiguous_candidates:
@@ -204,11 +216,12 @@ class NominatimService:
                 ) >= 0.6
             if candidate_type not in {"administrative", "boundary"}:
                 return False
-            address = (
-                dict(candidate.get("address"))
-                if is_json_object(candidate.get("address"))
-                else {}
-            )
+            address_type = str(
+                candidate.get("selected_address_type") or ""
+            ).lower()
+            if address_type and address_type not in city_types:
+                return False
+            address: dict[str, Any] = json_object(candidate.get("address"))
             locality = next(
                 (
                     str(address.get(key) or "")
@@ -241,6 +254,12 @@ class NominatimService:
                 if str(candidate.get("selected_result_class") or "").lower()
                 not in {"administrative", "boundary"}
             ]
+        elif expected in {"neighborhood", "neighbourhood", "district"}:
+            same_level_candidates = [
+                candidate
+                for candidate in ranked
+                if self._district_candidate(candidate)
+            ]
         elif expected == "country":
             same_level_candidates = [
                 candidate
@@ -257,6 +276,9 @@ class NominatimService:
                 and str(candidate.get("selected_result_type") or "").lower()
                 == first_type
             ]
+        same_level_candidates = self._deduplicate_named_entities(
+            same_level_candidates
+        )
         if len(same_level_candidates) < 2:
             return []
 
@@ -274,13 +296,17 @@ class NominatimService:
         first_confidence = float(first.get("confidence") or 0.0)
         second_confidence = float(second.get("confidence") or 0.0)
         confidence_gap = abs(first_confidence - second_confidence)
-        # An unqualified city name is ambiguous whenever two distinct,
-        # same-level candidates survive target matching.  Ranking is useful
-        # for ordering, but it is not evidence that the user intended the
-        # highest-ranked city.  With explicit parent context, require closer
-        # scores so duplicate/low-quality representations do not create
-        # needless stops.
+        first_importance = float(first.get("geocoder_importance") or 0.0)
+        second_importance = float(second.get("geocoder_importance") or 0.0)
+        provider_importance_gap = first_importance - second_importance
+        # An unqualified city name is ambiguous when same-level candidates
+        # remain comparably supported.  A large provider-importance gap plus
+        # a strong top confidence is deterministic evidence for a dominant
+        # candidate; this avoids stopping on well-ranked global places while
+        # preserving clarification for close candidates such as Cambridge.
         if not has_parent_context:
+            if first_confidence >= 0.8 and provider_importance_gap >= 0.25:
+                return []
             confidence_gap = 0.0
         if has_parent_context and confidence_gap >= 0.08:
             return []
@@ -320,6 +346,78 @@ class NominatimService:
             return False
 
     # -------------------------------------------------------------------------
+    def _deduplicate_named_entities(
+        self, candidates: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        distinct: list[dict[str, Any]] = []
+        for candidate in candidates:
+            if any(
+                self._same_named_entity(candidate, existing)
+                for existing in distinct
+            ):
+                continue
+            distinct.append(candidate)
+        return distinct
+
+    # -------------------------------------------------------------------------
+    def _same_named_entity(
+        self, left: dict[str, Any], right: dict[str, Any]
+    ) -> bool:
+        """Recognize alternate geocoder representations of one locality.
+
+        A boundary result and a point result can describe the same city while
+        differing by a postcode or centroid.  Treating those as competing
+        places creates false clarification prompts.  Require the locality,
+        country, and at least one administrative parent to agree so separate
+        same-named cities remain ambiguous.
+        """
+
+        locality_keys = ("city", "town", "village", "municipality")
+        parent_keys = (
+            "county",
+            "state_district",
+            "state",
+            "region",
+            "province",
+        )
+
+        def components(candidate: dict[str, Any]) -> tuple[str, str, str]:
+            address = json_object(candidate.get("address"))
+            locality = next(
+                (
+                    str(address.get(key) or "")
+                    for key in locality_keys
+                    if address.get(key)
+                ),
+                "",
+            )
+            country = str(address.get("country") or "")
+            parent = next(
+                (
+                    str(address.get(key) or "")
+                    for key in parent_keys
+                    if address.get(key)
+                ),
+                "",
+            )
+            return (
+                self.normalize_component(locality),
+                self.normalize_component(country),
+                self.normalize_component(parent),
+            )
+
+        left_locality, left_country, left_parent = components(left)
+        right_locality, right_country, right_parent = components(right)
+        return bool(
+            left_locality
+            and left_parent
+            and left_locality == right_locality
+            and left_country
+            and left_country == right_country
+            and left_parent == right_parent
+        )
+
+    # -------------------------------------------------------------------------
     async def extract_bbox_from_coordinates(
         self,
         latitude: float,
@@ -353,12 +451,12 @@ class NominatimService:
         self, address: str | None, city: str | None, country_name: str | None
     ) -> str:
         normalized_address = (address or "").strip()
-        components = [normalized_address] if normalized_address else []
+        components: list[str] = [normalized_address] if normalized_address else []
         normalized_city = self.normalize_component(city or "")
         if normalized_city and normalized_city not in self.normalize_component(
             normalized_address
         ):
-            components.append(city)
+            components.append(city or "")
         if country_name:
             normalized_components = self.normalize_component(" ".join(components))
             normalized_country = self.normalize_component(country_name)
@@ -514,6 +612,10 @@ class NominatimService:
         )
         if confidence is not None:
             result["confidence"] = confidence
+        try:
+            result["geocoder_importance"] = float(data["importance"])
+        except KeyError, TypeError, ValueError:
+            pass
         return result
 
     # -------------------------------------------------------------------------
@@ -535,6 +637,10 @@ class NominatimService:
             address_data = {}
         if expected == "coordinates":
             return 3.0
+        if expected in {"neighborhood", "neighbourhood", "district"}:
+            if self._district_candidate(data):
+                return 3.0
+            return 0.0
         address_type = str(data.get("addresstype") or "").strip().lower()
         if expected in {"city", "municipality"} and address_type in {
             "country",
@@ -628,6 +734,23 @@ class NominatimService:
         return 1.0
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _district_candidate(data: dict[str, Any]) -> bool:
+        district_types = {
+            "neighbourhood",
+            "neighborhood",
+            "suburb",
+            "quarter",
+            "city_district",
+            "district",
+            "borough",
+            "locality",
+        }
+        result_type = str(data.get("type") or "").strip().lower()
+        address_type = str(data.get("addresstype") or "").strip().lower()
+        return result_type in district_types or address_type in district_types
+
+    # -------------------------------------------------------------------------
     def rank_candidates(
         self,
         candidates: list[dict[str, Any]],
@@ -702,6 +825,18 @@ class NominatimService:
         """
 
         expected = str(expected_location_type or "").strip().lower()
+        if expected in {"neighborhood", "neighbourhood", "district"}:
+            if not self._district_candidate(candidate):
+                return False
+            target_tokens = [
+                token
+                for token in self.tokenize(address)
+                if token not in self.GENERIC_QUERY_DESCRIPTORS
+            ]
+            if not target_tokens:
+                return False
+            candidate_tokens = self.tokenize(self._candidate_text(candidate))
+            return self.compute_token_overlap(target_tokens, candidate_tokens) >= 0.8
         if expected not in {"address", "poi", "street"}:
             return True
         target_tokens = self.tokenize(address)
@@ -1135,6 +1270,14 @@ class NominatimService:
     def normalize_component(self, value: str) -> str:
         normalized = unicodedata.normalize("NFKD", value)
         ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+        # Geocoders commonly render acronyms with an interpunctuated form
+        # (for example ``E.U.R.``) while the request uses ``EUR``.  Collapse
+        # those internal dots before removing the remaining punctuation so
+        # raw-span matching remains useful without hardcoding a place name.
+        ascii_text = re.sub(
+            r"(?<=[A-Za-z0-9])\.(?=[A-Za-z0-9])", "", ascii_text
+        )
+        ascii_text = re.sub(r"[^A-Za-z0-9]+", " ", ascii_text)
         return " ".join(ascii_text.lower().split())
 
     # -------------------------------------------------------------------------

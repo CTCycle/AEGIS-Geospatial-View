@@ -34,6 +34,7 @@ class ChatStreamingService:
                         "tool_call_started",
                         "tool_call_completed",
                         "map_session_created",
+                        "stage",
                         "final",
                         "error",
                     ],
@@ -52,6 +53,7 @@ class ChatStreamingService:
             event="status",
             data={"message": "received", "request_id": request_id},
         )
+        task: asyncio.Task[ChatTurnResponse] | None = None
         try:
             queue: asyncio.Queue[ChatStreamEvent] = asyncio.Queue()
 
@@ -103,6 +105,10 @@ class ChatStreamingService:
                     "request_id": request_id,
                 },
             )
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -124,4 +130,5 @@ class ChatStreamingService:
             "context_usage": response.context_usage.model_dump(mode="json")
             if response.context_usage is not None
             else None,
+            "execution_trace": response.execution_trace,
         }

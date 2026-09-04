@@ -4,6 +4,7 @@ from server.common.typing import is_json_array, is_json_object, json_object
 
 from typing import Any
 
+from server.domain.agent.decision import ResolvedLocation
 from server.contracts.extraction import TurnParseResult
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
@@ -19,8 +20,22 @@ class ToolArgumentBuilder:
         self,
         turn: TurnParseResult,
         memory_snapshot: dict[str, Any] | None,
+        resolved_location: ResolvedLocation | None = None,
     ) -> dict[str, Any]:
-        for signal in turn.location_signals:
+        if resolved_location is not None:
+            arguments: dict[str, Any] = {
+                "latitude": resolved_location.latitude,
+                "longitude": resolved_location.longitude,
+                "location": resolved_location.label,
+            }
+            return arguments
+        for signal in sorted(
+            turn.location_signals,
+            key=self._location_signal_priority,
+            reverse=True,
+        ):
+            if signal.signal_type == "deictic":
+                continue
             if signal.latitude is not None and signal.longitude is not None:
                 return {
                     "latitude": signal.latitude,
@@ -48,9 +63,14 @@ class ToolArgumentBuilder:
         self,
         turn: TurnParseResult,
         memory_snapshot: dict[str, Any] | None,
+        resolved_location: ResolvedLocation | None = None,
     ) -> dict[str, Any]:
+        if resolved_location is not None and resolved_location.bbox is not None:
+            return {"bbox": list(resolved_location.bbox)}
         if self._has_explicit_location_signal(turn):
-            return self.build_location_arguments(turn, memory_snapshot)
+            return self.build_location_arguments(
+                turn, memory_snapshot, resolved_location=resolved_location
+            )
         memory = memory_snapshot or {}
         for candidate in (
             memory.get("bbox"),
@@ -63,7 +83,33 @@ class ToolArgumentBuilder:
                 and all(isinstance(value, int | float) for value in candidate)
             ):
                 return {"bbox": candidate}
-        return self.build_location_arguments(turn, memory_snapshot)
+        return self.build_location_arguments(
+            turn, memory_snapshot, resolved_location=resolved_location
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _location_signal_priority(signal: Any) -> tuple[int, float]:
+        priorities = {
+            "coordinates": 6,
+            "address": 5,
+            "poi": 5,
+            "street": 5,
+            "neighborhood": 4,
+            "district": 4,
+            "municipality": 3,
+            "city": 3,
+            "county": 2,
+            "province": 2,
+            "state": 2,
+            "region": 2,
+            "country": 1,
+            "deictic": 0,
+        }
+        return (
+            priorities.get(getattr(signal, "signal_type", ""), 0),
+            float(getattr(signal, "confidence", 0.0) or 0.0),
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -108,6 +154,7 @@ class ToolArgumentBuilder:
         capability_id: str,
         turn: TurnParseResult,
         memory_snapshot: dict[str, Any] | None,
+        resolved_location: ResolvedLocation | None = None,
     ) -> dict[str, Any]:
         capability = (
             self.capability_registry.get_capability(capability_id)
@@ -120,9 +167,13 @@ class ToolArgumentBuilder:
             or str(metadata.get("retrieval_mode") or "").casefold() == "direct"
         )
         arguments = (
-            self.build_location_arguments(turn, memory_snapshot)
+            self.build_location_arguments(
+                turn, memory_snapshot, resolved_location=resolved_location
+            )
             if is_direct
-            else self.build_bbox_arguments(turn, memory_snapshot)
+            else self.build_bbox_arguments(
+                turn, memory_snapshot, resolved_location=resolved_location
+            )
         )
         arguments.update(self.build_temporal_arguments(turn))
         if turn.poi_categories:

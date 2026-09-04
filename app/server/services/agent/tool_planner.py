@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 from server.domain.agent.pipeline import (
     SpecialistGroup,
@@ -9,6 +9,7 @@ from server.domain.agent.pipeline import (
     ToolPlan,
     ToolPlanStep,
 )
+from server.domain.agent.decision import ResolvedLocation
 from server.contracts.extraction import TurnParseResult
 from server.services.agent.tool_argument_builder import ToolArgumentBuilder
 
@@ -25,6 +26,7 @@ class DeterministicToolPlanner:
         turn: TurnParseResult,
         specialist: SpecialistGroup,
         memory_snapshot: dict[str, Any] | None = None,
+        resolved_location: ResolvedLocation | None = None,
     ) -> ToolPlan:
         steps: list[ToolPlanStep] = []
         visualization_update = self._build_visualization_update(turn)
@@ -43,6 +45,7 @@ class DeterministicToolPlanner:
                             capability_id,
                             turn,
                             memory_snapshot,
+                            resolved_location,
                         ),
                     },
                 )
@@ -200,15 +203,14 @@ class DeterministicToolPlanner:
         task_steps: dict[str, list[str]] = {}
         task_payloads: dict[str, dict[str, Any]] = {}
         for index, raw_task in enumerate(turn.atomic_tasks):
-            if not isinstance(raw_task, dict):
-                continue
             task_id = cls._task_id(raw_task, index)
             task_payloads[task_id] = raw_task
             references = raw_task.get("required_layers")
+            reference_items = (
+                cast(list[Any], references) if isinstance(references, list) else []
+            )
             layer_refs = (
-                [str(item).strip() for item in references if str(item).strip()]
-                if isinstance(references, list)
-                else []
+                [str(item).strip() for item in reference_items if str(item).strip()]
             )
             if layer_refs:
                 matched = [
@@ -286,7 +288,10 @@ class DeterministicToolPlanner:
     def _string_list(value: object) -> list[str]:
         if not isinstance(value, list):
             return []
-        return list(dict.fromkeys(str(item).strip() for item in value if str(item).strip()))
+        items = cast(list[Any], value)
+        return list(
+            dict.fromkeys(str(item).strip() for item in items if str(item).strip())
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

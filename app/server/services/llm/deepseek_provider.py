@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
+import asyncio
 import json
+import time
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
 from typing import Any
 
 import httpx
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 
 from server.services.llm.base import LLMProvider
 from server.services.llm.context_budget import (
@@ -51,6 +53,15 @@ class DeepSeekProvider(LLMProvider):
     # -------------------------------------------------------------------------
     def _client(self) -> Any:
         return OpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=30.0,
+            max_retries=0,
+        )
+
+    # -------------------------------------------------------------------------
+    def _async_client(self) -> Any:
+        return AsyncOpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
             timeout=30.0,
@@ -234,6 +245,98 @@ class DeepSeekProvider(LLMProvider):
         )
 
     # -------------------------------------------------------------------------
+    async def achat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
+        native_tools = list(tools or request.tools or [])
+        schema = response_json_schema or request.response_json_schema
+        metadata = dict(request.metadata)
+        if schema and not native_tools:
+            metadata[RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY] = True
+        effective_request = replace(
+            request,
+            tools=native_tools or None,
+            response_json_schema=schema,
+            metadata=metadata,
+        )
+        if schema and not native_tools:
+            effective_request = replace(
+                effective_request,
+                messages=self._messages_with_json_schema(
+                    effective_request.messages, schema
+                ),
+            )
+        effective_request = prepare_request(
+            effective_request, provider=self.provider_name
+        )
+        usage = compute_context_usage(effective_request, provider=self.provider_name)
+        try:
+            self._validate_request_capabilities(effective_request)
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
+        kwargs: dict[str, Any] = {}
+        max_tokens = self._request_max_tokens(effective_request)
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        if native_tools:
+            kwargs["tools"] = [
+                self.tool_to_openai_schema(tool) for tool in native_tools
+            ]
+            kwargs["tool_choice"] = tool_choice or request.tool_choice or "auto"
+        if schema and not native_tools:
+            kwargs["response_format"] = {"type": "json_object"}
+        client = self._async_client()
+        started = time.perf_counter()
+        try:
+            request_client: Any = client
+            remaining = remaining_request_seconds(effective_request)
+            if remaining is not None:
+                if remaining <= 0:
+                    raise TimeoutError("The bounded LLM request deadline has expired.")
+                with_options = getattr(client, "with_options", None)
+                if callable(with_options):
+                    request_client = with_options(timeout=remaining)
+            response = await request_client.chat.completions.create(
+                model=effective_request.model,
+                messages=self.normalize_tool_messages(effective_request.messages),
+                temperature=effective_request.temperature,
+                stream=False,
+                **kwargs,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=request.model,
+                stage="chat",
+                context_usage=usage.to_dict(),
+                elapsed_ms=max(0, int((time.perf_counter() - started) * 1000)),
+            ) from exc
+        finally:
+            try:
+                await client.close()
+            except Exception:
+                pass
+        raw = dump_response_payload(response)
+        usage = apply_reported_usage(usage, raw)
+        content, tool_calls = self._parse_choice(response)
+        return LLMResult(
+            content=content,
+            raw=raw,
+            tool_calls=tool_calls,
+            finish_reason=self._finish_reason(response),
+            context_usage=usage.to_dict(),
+        )
+
+    # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
         request = prepare_request(request, provider=self.provider_name)
         usage = compute_context_usage(request, provider=self.provider_name)
@@ -358,6 +461,107 @@ class DeepSeekProvider(LLMProvider):
         try:
             validated = validator(loaded)
         except Exception as exc:  # noqa: BLE001
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                detail="The provider response did not match the requested extraction schema.",
+                context_usage=usage.to_dict(),
+            ) from exc
+        dumper = getattr(validated, "model_dump", None)
+        payload = json_object(dumper(mode="json")) if callable(dumper) else loaded
+        return LLMStructuredOutput(payload, context_usage=usage.to_dict())
+
+    # -------------------------------------------------------------------------
+    async def astructured_output(
+        self, request: LLMRequest, schema: type[Any]
+    ) -> dict[str, Any]:
+        model_json_schema = getattr(schema, "model_json_schema", None)
+        json_schema = (
+            json_object(model_json_schema()) if callable(model_json_schema) else {}
+        )
+        metadata = dict(request.metadata)
+        metadata[RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY] = True
+        request = prepare_request(
+            replace(
+                request,
+                response_json_schema=json_schema,
+                messages=self._messages_with_json_schema(request.messages, json_schema),
+                metadata=metadata,
+            ),
+            provider=self.provider_name,
+        )
+        usage = compute_context_usage(request, provider=self.provider_name)
+        try:
+            self._validate_request_capabilities(
+                replace(request, response_json_schema=json_schema)
+            )
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
+        max_tokens = self._request_max_tokens(request)
+        client = self._async_client()
+        started = time.perf_counter()
+        try:
+            request_client: Any = client
+            remaining = remaining_request_seconds(request)
+            if remaining is not None:
+                if remaining <= 0:
+                    raise TimeoutError("The bounded LLM request deadline has expired.")
+                with_options = getattr(client, "with_options", None)
+                if callable(with_options):
+                    request_client = with_options(timeout=remaining)
+            response = await request_client.chat.completions.create(
+                model=request.model,
+                messages=self.normalize_tool_messages(request.messages),
+                temperature=request.temperature,
+                response_format={"type": "json_object"},
+                stream=False,
+                **({"max_tokens": max_tokens} if max_tokens is not None else {}),
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                context_usage=usage.to_dict(),
+                elapsed_ms=max(0, int((time.perf_counter() - started) * 1000)),
+            ) from exc
+        finally:
+            try:
+                await client.close()
+            except Exception:
+                pass
+        raw = dump_response_payload(response)
+        usage = apply_reported_usage(usage, raw)
+        content, _ = self._parse_choice(response)
+        try:
+            loaded = json.loads(content or "{}")
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                detail="The provider returned invalid JSON for structured extraction.",
+                context_usage=usage.to_dict(),
+            ) from exc
+        if not is_json_object(loaded):
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                detail="The provider returned a JSON value instead of an object.",
+                context_usage=usage.to_dict(),
+            )
+        validator = getattr(schema, "model_validate", None)
+        if not callable(validator):
+            return LLMStructuredOutput(loaded, context_usage=usage.to_dict())
+        try:
+            validated = validator(loaded)
+        except Exception as exc:
             raise LLMResponseParsingError(
                 provider=self.provider_name,
                 model=request.model,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from server.common.typing import is_json_array, is_json_object, json_array
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
 import json
 import re
@@ -50,12 +50,17 @@ from server.services.agent.turn_support import AgentTurnSupport
 class ParserRunResult:
     turn_contract: TurnParseResult
     context_usage: dict[str, object] | None
+    model_calls: int = 0
 
 
 ###############################################################################
 class ParserService:
     PARSER_TIMEOUT_SECONDS = 35.0
     RETRY_MIN_REMAINING_SECONDS = 1.0
+    PARSER_MAX_OUTPUT_TOKENS = 2048
+    MAX_HISTORY_MESSAGES = 4
+    MAX_HISTORY_CONTENT_CHARS = 640
+    MAX_CATALOG_IDENTITIES = 24
     _FAILURE_CATEGORIES = frozenset(
         {
             "model_capability",
@@ -88,6 +93,15 @@ class ParserService:
         self._last_context_usage: ContextVar[dict[str, object] | None] = ContextVar(
             "aegis_parser_context_usage", default=None
         )
+        self._last_model_calls: ContextVar[int] = ContextVar(
+            "aegis_parser_model_calls", default=0
+        )
+        self._extraction_override: ContextVar[LLMParserExtraction | None] = ContextVar(
+            "aegis_parser_extraction_override", default=None
+        )
+        self._extraction_override_error: ContextVar[Exception | None] = ContextVar(
+            "aegis_parser_extraction_override_error", default=None
+        )
 
     # -------------------------------------------------------------------------
     @property
@@ -98,6 +112,15 @@ class ParserService:
     @last_context_usage.setter
     def last_context_usage(self, value: dict[str, object] | None) -> None:
         self._last_context_usage.set(value)
+
+    # -------------------------------------------------------------------------
+    @property
+    def last_model_calls(self) -> int:
+        return self._last_model_calls.get()
+
+    # -------------------------------------------------------------------------
+    def _record_model_call(self) -> None:
+        self._last_model_calls.set(self.last_model_calls + 1)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -129,6 +152,295 @@ class ParserService:
                 }
             )
         return normalized
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _compact_history_content(cls, role: str, content: object) -> str:
+        text = cls._to_text(content).strip()
+        if len(text) <= cls.MAX_HISTORY_CONTENT_CHARS:
+            return text
+        if role == "assistant":
+            try:
+                payload = json.loads(text)
+            except (TypeError, json.JSONDecodeError):
+                payload = None
+            if is_json_object(payload):
+                operation = json_object(payload.get("operation"))
+                map_session = json_object(payload.get("map_session"))
+                resolved = json_object(map_session.get("resolved_location"))
+                turn_contract = json_object(payload.get("turn_contract"))
+                normalized_action = json_object(
+                    turn_contract.get("normalized_action")
+                )
+                summary = {
+                    "assistant_message": str(
+                        payload.get("assistant_message") or ""
+                    )[:240],
+                    "task_class": turn_contract.get("task_class"),
+                    "action_id": normalized_action.get("action_id"),
+                    "operation": {
+                        "kind": operation.get("kind"),
+                        "status": operation.get("status"),
+                    },
+                    "location": {
+                        key: resolved.get(key)
+                        for key in (
+                            "label",
+                            "city",
+                            "country",
+                            "location_type",
+                        )
+                        if resolved.get(key) is not None
+                    },
+                }
+                return json.dumps(summary, ensure_ascii=True, separators=(",", ":"))
+        return text[: cls.MAX_HISTORY_CONTENT_CHARS]
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _compact_recent_messages(
+        cls, messages: list[dict[str, str]], *, include_history: bool
+    ) -> list[dict[str, str]]:
+        if not include_history:
+            return []
+        compacted: list[dict[str, str]] = []
+        for message in messages[-cls.MAX_HISTORY_MESSAGES :]:
+            compacted.append(
+                {
+                    "id": str(message.get("id") or ""),
+                    "conversation_id": str(message.get("conversation_id") or ""),
+                    "turn_index": str(message.get("turn_index") or ""),
+                    "role": str(message.get("role") or "unknown"),
+                    "content": cls._compact_history_content(
+                        str(message.get("role") or "unknown"),
+                        message.get("content"),
+                    ),
+                    "created_at": str(message.get("created_at") or ""),
+                }
+            )
+        return compacted
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _context_is_required(user_message: str) -> bool:
+        return bool(
+            re.search(
+                r"\b(?:now|again|there|here|nearby|same|that|this|previous|before|add|remove|hide|keep|continue|also)\b",
+                str(user_message or ""),
+                flags=re.IGNORECASE,
+            )
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _compact_location(value: object) -> dict[str, Any] | None:
+        location = json_object(value)
+        if not location:
+            return None
+        keys = (
+            "label",
+            "latitude",
+            "longitude",
+            "country",
+            "city",
+            "address",
+            "location_type",
+            "location_class",
+            "bbox",
+            "confidence",
+        )
+        return {
+            key: location.get(key)
+            for key in keys
+            if location.get(key) is not None
+        }
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _compact_memory_snapshot(
+        cls, snapshot: dict[str, Any], *, include_active_context: bool
+    ) -> dict[str, Any]:
+        active_location = cls._compact_location(snapshot.get("active_location"))
+        compacted: dict[str, Any] = {}
+        if include_active_context:
+            compacted["location_slots"] = [
+                item
+                for raw in json_array(snapshot.get("location_slots"))
+                if (item := cls._compact_location(raw)) is not None
+            ][:4]
+            if active_location is not None:
+                compacted["active_location"] = active_location
+            active_visualization = json_object(snapshot.get("active_visualization"))
+            if active_visualization:
+                overlays = json_object(active_visualization.get("overlay_collection"))
+                instances = [
+                    {
+                        key: item.get(key)
+                        for key in ("instance_id", "capability_id", "label", "visible")
+                        if item.get(key) is not None
+                    }
+                    for raw in json_array(overlays.get("instances"))
+                    if (item := json_object(raw))
+                ][:24]
+                compacted["active_visualization"] = {
+                    key: active_visualization.get(key)
+                    for key in (
+                        "session_id",
+                        "basemap_id",
+                        "center",
+                        "bounds",
+                        "viewport",
+                    )
+                    if active_visualization.get(key) is not None
+                }
+                compacted["active_visualization"]["overlay_collection"] = {
+                    "collection_id": overlays.get("collection_id"),
+                    "revision": overlays.get("revision"),
+                    "instances": instances,
+                }
+        return compacted
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _compact_task_snapshot(
+        snapshot: dict[str, Any] | None,
+        *,
+        include_details: bool = True,
+    ) -> dict[str, Any] | None:
+        if not is_json_object(snapshot):
+            return None
+        goal = json_object(snapshot.get("goal"))
+        task_keys = (
+            ("id", "description", "kind", "status", "depends_on")
+            if include_details
+            else ("id", "kind", "status")
+        )
+        tasks = [
+            {
+                key: (
+                    str(item.get(key) or "")[:240]
+                    if key in {"description"}
+                    else item.get(key)
+                )
+                for key in task_keys
+                if item.get(key) is not None
+            }
+            for raw in json_array(snapshot.get("tasks"))
+            if (item := json_object(raw))
+        ][:6]
+        return {
+            "active_task_id": snapshot.get("active_task_id"),
+            "goal": {
+                key: (
+                    str(goal.get(key) or "")[:240]
+                    if key == "text"
+                    else goal.get(key)
+                )
+                for key in (("id", "text", "status") if include_details else ("id", "status"))
+                if goal.get(key) is not None
+            },
+            "tasks": tasks,
+            "assumptions": [
+                str(item)[:240]
+                for item in json_array(snapshot.get("assumptions"))
+                if str(item).strip()
+            ][:8],
+            "unresolved_questions": [
+                str(item)[:240]
+                for item in json_array(snapshot.get("unresolved_questions"))
+                if str(item).strip()
+            ][:8],
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _compact_catalog_evidence(
+        evidence: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        compacted: list[dict[str, Any]] = []
+        for item in evidence:
+            compacted.append(
+                {
+                    "id": item.get("id"),
+                    "label": str(item.get("label") or "")[:160],
+                    "capability_kind": item.get("capability_kind"),
+                    "rendering_mode": item.get("rendering_mode"),
+                    "capabilities": list(item.get("capabilities") or [])[:8],
+                    "keywords": [
+                        str(value)[:80]
+                        for value in list(item.get("keywords") or [])[:8]
+                    ],
+                    "supported_categories": [
+                        str(value)[:80]
+                        for value in list(item.get("supported_categories") or [])[:8]
+                    ],
+                }
+            )
+        return compacted
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _compact_instructions(
+        instructions: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]]:
+        compacted: list[dict[str, Any]] = []
+        for raw in list(instructions or [])[:8]:
+            item = json_object(raw)
+            if not item:
+                continue
+            compacted.append(
+                {
+                    key: (
+                        str(item.get(key) or "")[:240]
+                        if key in {"normalized_text", "original_user_text"}
+                        else item.get(key)
+                    )
+                    for key in (
+                        "directive_id",
+                        "normalized_text",
+                        "original_user_text",
+                        "scope",
+                        "status",
+                    )
+                    if item.get(key) is not None
+                }
+            )
+        return compacted
+
+    # -------------------------------------------------------------------------
+    def _parser_prompt_payload(
+        self,
+        *,
+        user_message: str,
+        memory_snapshot: dict[str, Any],
+        recent_messages: list[dict[str, str]],
+        active_instructions: list[dict[str, Any]] | None,
+        task_snapshot: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        include_active_context = self._context_is_required(user_message)
+        return {
+            "user_message": user_message,
+            "memory_snapshot": self._compact_memory_snapshot(
+                memory_snapshot,
+                include_active_context=include_active_context,
+            ),
+            "recent_messages": self._compact_recent_messages(
+                recent_messages,
+                include_history=include_active_context,
+            ),
+            "active_instructions": self._compact_instructions(active_instructions),
+            "task_snapshot": self._compact_task_snapshot(
+                task_snapshot,
+                include_details=include_active_context,
+            ),
+            "capability_catalog": self._compact_catalog_evidence(
+                self._relevant_catalog_evidence(user_message)
+            ),
+            "context_policy": {
+                "explicit_current_turn_overrides_history": True,
+                "hierarchical_location_signals_are_complementary": True,
+            },
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -188,6 +500,36 @@ class ParserService:
                     }
                 )
         return evidence
+
+    # -------------------------------------------------------------------------
+    def _relevant_catalog_evidence(self, user_message: str) -> list[dict[str, Any]]:
+        """Return only bounded capability identities useful for this turn."""
+
+        evidence = self._catalog_evidence()
+        if len(evidence) <= self.MAX_CATALOG_IDENTITIES:
+            return evidence
+        terms = {
+            token
+            for token in re.findall(r"[a-z0-9_]+", user_message.casefold())
+            if len(token) >= 3
+        }
+
+        def score(item: dict[str, Any]) -> tuple[int, int]:
+            searchable = " ".join(
+                [
+                    str(item.get("id") or ""),
+                    str(item.get("label") or ""),
+                    str(item.get("capability_kind") or ""),
+                    *(str(value) for value in item.get("capabilities", [])),
+                    *(str(value) for value in item.get("keywords", [])),
+                    *(str(value) for value in item.get("supported_categories", [])),
+                ]
+            ).casefold()
+            matches = sum(1 for term in terms if term in searchable)
+            return matches, -evidence.index(item)
+
+        ranked = sorted(evidence, key=score, reverse=True)
+        return ranked[: self.MAX_CATALOG_IDENTITIES]
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -322,11 +664,7 @@ class ParserService:
         action = changes.get("action")
         if action not in {"add", "remove", "keep_only", "show", "hide", "update"}:
             return None
-        selector = (
-            dict(changes.get("selector"))
-            if is_json_object(changes.get("selector"))
-            else {}
-        )
+        selector: dict[str, Any] = dict(json_object(changes.get("selector")))
         for field_name in (
             "instance_ids",
             "capability_ids",
@@ -340,20 +678,10 @@ class ParserService:
         ):
             if field_name in changes and field_name not in selector:
                 selector[field_name] = changes[field_name]
-        scope = (
-            dict(changes.get("scope"))
-            if is_json_object(changes.get("scope"))
-            else {}
-        )
-        patch = (
-            dict(changes.get("patch"))
-            if is_json_object(changes.get("patch"))
-            else {}
-        )
-        state_reference = (
-            dict(changes.get("state_reference"))
-            if is_json_object(changes.get("state_reference"))
-            else {}
+        scope: dict[str, Any] = dict(json_object(changes.get("scope")))
+        patch: dict[str, Any] = dict(json_object(changes.get("patch")))
+        state_reference: dict[str, Any] = dict(
+            json_object(changes.get("state_reference"))
         )
         if action == "remove" and cls._has_active_overlay_output(payload):
             selector = {"visibility": "visible"}
@@ -428,17 +756,17 @@ class ParserService:
         )
 
     # -------------------------------------------------------------------------
-    def _extract_turn(
+    def _build_extraction_request(
         self,
         *,
         user_message: str,
         memory_snapshot: dict[str, Any],
         recent_messages: list[dict[str, str]],
-        active_instructions: list[dict[str, Any]] | None = None,
-        task_snapshot: dict[str, Any] | None = None,
-        schema_correction: bool = False,
-        deadline_monotonic: float | None = None,
-    ) -> LLMParserExtraction:
+        active_instructions: list[dict[str, Any]] | None,
+        task_snapshot: dict[str, Any] | None,
+        schema_correction: bool,
+        deadline_monotonic: float | None,
+    ) -> tuple[str, str, Any, LLMRequest]:
         settings = None
         if self.provider is None or self.model is None:
             settings = self.settings_repo.get_required()
@@ -459,18 +787,15 @@ class ParserService:
                 stage="structured_intent_extraction",
                 code="provider_timeout",
                 retryable=False,
+                timeout_origin="application_deadline",
             )
-        parser_provider = self.llm_factory.get_provider(provider_name)
-        self.last_context_usage = None
-        prompt_payload = {
-            "user_message": user_message,
-            "memory_snapshot": memory_snapshot,
-            "recent_messages": recent_messages[-6:],
-            "active_instructions": active_instructions or [],
-            "task_snapshot": task_snapshot,
-            "capability_catalog": self._catalog_evidence(),
-        }
-        parser_prompt = build_parser_prompt(schema_correction=schema_correction)
+        prompt_payload = self._parser_prompt_payload(
+            user_message=user_message,
+            memory_snapshot=memory_snapshot,
+            recent_messages=recent_messages,
+            active_instructions=active_instructions,
+            task_snapshot=task_snapshot,
+        )
         request = LLMRequest(
             model=model_name,
             temperature=0.0,
@@ -486,7 +811,7 @@ class ParserService:
                     if self.context_profile_resolver is not None
                     else {}
                 ),
-                "max_tokens": 4096,
+                "max_tokens": self.PARSER_MAX_OUTPUT_TOKENS,
                 "purpose": "structured_intent_extraction",
                 **(
                     {REQUEST_DEADLINE_METADATA_KEY: deadline_monotonic}
@@ -497,7 +822,7 @@ class ParserService:
             messages=[
                 {
                     "role": "system",
-                    "content": parser_prompt,
+                    "content": build_parser_prompt(schema_correction=schema_correction),
                 },
                 {
                     "role": "user",
@@ -505,6 +830,38 @@ class ParserService:
                 },
             ],
         )
+        return (
+            provider_name,
+            model_name,
+            self.llm_factory.get_provider(provider_name),
+            request,
+        )
+
+    # -------------------------------------------------------------------------
+    def _extract_turn(
+        self,
+        *,
+        user_message: str,
+        memory_snapshot: dict[str, Any],
+        recent_messages: list[dict[str, str]],
+        active_instructions: list[dict[str, Any]] | None = None,
+        task_snapshot: dict[str, Any] | None = None,
+        schema_correction: bool = False,
+        deadline_monotonic: float | None = None,
+    ) -> LLMParserExtraction:
+        provider_name, model_name, parser_provider, request = (
+            self._build_extraction_request(
+                user_message=user_message,
+                memory_snapshot=memory_snapshot,
+                recent_messages=recent_messages,
+                active_instructions=active_instructions,
+                task_snapshot=task_snapshot,
+                schema_correction=schema_correction,
+                deadline_monotonic=deadline_monotonic,
+            )
+        )
+        self.last_context_usage = None
+        self._record_model_call()
         payload = parser_provider.structured_output(
             request=request, schema=LLMParserExtraction
         )
@@ -541,6 +898,59 @@ class ParserService:
             extracted.viewport_intent.scope
             if extracted.viewport_intent is not None
             else None,
+        )
+        return extracted
+
+    # -------------------------------------------------------------------------
+    async def _extract_turn_async(
+        self,
+        *,
+        user_message: str,
+        memory_snapshot: dict[str, Any],
+        recent_messages: list[dict[str, str]],
+        active_instructions: list[dict[str, Any]] | None = None,
+        task_snapshot: dict[str, Any] | None = None,
+        schema_correction: bool = False,
+        deadline_monotonic: float | None = None,
+    ) -> LLMParserExtraction:
+        provider_name, model_name, parser_provider, request = (
+            self._build_extraction_request(
+                user_message=user_message,
+                memory_snapshot=memory_snapshot,
+                recent_messages=recent_messages,
+                active_instructions=active_instructions,
+                task_snapshot=task_snapshot,
+                schema_correction=schema_correction,
+                deadline_monotonic=deadline_monotonic,
+            )
+        )
+        self.last_context_usage = None
+        self._record_model_call()
+        payload = await parser_provider.astructured_output(
+            request=request, schema=LLMParserExtraction
+        )
+        usage = getattr(payload, "context_usage", None)
+        self.last_context_usage = dict(usage) if is_json_object(usage) else None
+        try:
+            extracted = LLMParserExtraction.model_validate(payload)
+        except Exception as exc:  # noqa: BLE001
+            raise LLMResponseParsingError(
+                provider=provider_name,
+                model=model_name,
+                stage="structured_intent_extraction",
+                detail="The provider response did not match the AEGIS extraction schema.",
+                context_usage=(
+                    dict(self.last_context_usage)
+                    if is_json_object(self.last_context_usage)
+                    else None
+                ),
+            ) from exc
+        LOGGER.debug(
+            "Parser async extraction: provider=%s model=%s task=%s action=%s",
+            provider_name,
+            model_name,
+            extracted.task_class,
+            extracted.action_id,
         )
         return extracted
 
@@ -758,6 +1168,7 @@ class ParserService:
         deadline_monotonic: float | None = None,
     ) -> ParserRunResult:
         self.last_context_usage = None
+        self._last_model_calls.set(0)
         normalized_recent = self._normalize_recent_messages(conversation_messages)
         parser_failure_ambiguity: str | None = None
         parser_provider_error: dict[str, object] | None = None
@@ -809,6 +1220,8 @@ class ParserService:
                     "http_status": exc.http_status,
                     "retryable": exc.retryable,
                     "detail": str(exc),
+                    "timeout_origin": exc.timeout_origin,
+                    "elapsed_ms": exc.elapsed_ms,
                 }
             else:
                 failure_ambiguity = (
@@ -971,8 +1384,14 @@ class ParserService:
         result = TurnParseResult(
             user_text=user_message,
             conversation_context=ConversationContextSnapshot(
-                recent_messages=normalized_recent,
-                memory_snapshot=memory_snapshot,
+                recent_messages=self._compact_recent_messages(
+                    normalized_recent,
+                    include_history=True,
+                ),
+                memory_snapshot=self._compact_memory_snapshot(
+                    memory_snapshot,
+                    include_active_context=True,
+                ),
             ),
             task_class=extracted.task_class,
             location_signals=location_signals,
@@ -1048,10 +1467,17 @@ class ParserService:
                 if is_json_object(self.last_context_usage)
                 else None
             ),
+            model_calls=self.last_model_calls,
         )
 
     # -------------------------------------------------------------------------
     def _extract_turn_with_retry(self, **kwargs: Any) -> LLMParserExtraction:
+        override_error = self._extraction_override_error.get()
+        if override_error is not None:
+            raise override_error
+        override = self._extraction_override.get()
+        if override is not None:
+            return override
         deadline = kwargs.get("deadline_monotonic")
 
         def retry_allowed() -> bool:
@@ -1081,6 +1507,103 @@ class ParserService:
                 exc.code,
             )
             return self._extract_turn(**kwargs)
+
+    # -------------------------------------------------------------------------
+    async def parse_turn_with_usage_async(
+        self,
+        user_message: str,
+        memory_snapshot: dict[str, Any],
+        conversation_messages: list[dict[str, Any]],
+        active_instructions: list[dict[str, Any]] | None = None,
+        task_snapshot: dict[str, Any] | None = None,
+        deadline_monotonic: float | None = None,
+    ) -> ParserRunResult:
+        """Parse a turn without running the blocking provider on the event loop."""
+
+        extracted: LLMParserExtraction | None = None
+        provider_error: Exception | None = None
+        usage: dict[str, object] | None = None
+        model_calls = 0
+        try:
+            self._last_model_calls.set(0)
+            extracted = await self._extract_turn_with_retry_async(
+                user_message=user_message,
+                memory_snapshot=memory_snapshot,
+                recent_messages=self._normalize_recent_messages(conversation_messages),
+                active_instructions=active_instructions,
+                task_snapshot=task_snapshot,
+                deadline_monotonic=deadline_monotonic,
+            )
+            current_usage = self.last_context_usage
+            usage = dict(current_usage) if is_json_object(current_usage) else None
+        except LLMConfigurationError:
+            raise
+        except Exception as exc:
+            provider_error = exc
+        model_calls = self.last_model_calls
+
+        extraction_token = self._extraction_override.set(extracted)
+        error_token = self._extraction_override_error.set(provider_error)
+        try:
+            result = self.parse_turn_with_usage(
+                user_message=user_message,
+                memory_snapshot=memory_snapshot,
+                conversation_messages=conversation_messages,
+                active_instructions=active_instructions,
+                task_snapshot=task_snapshot,
+                deadline_monotonic=deadline_monotonic,
+            )
+        finally:
+            self._extraction_override.reset(extraction_token)
+            self._extraction_override_error.reset(error_token)
+        if usage is not None:
+            self.last_context_usage = usage
+            result = ParserRunResult(
+                turn_contract=result.turn_contract,
+                context_usage=usage,
+                model_calls=model_calls,
+            )
+        else:
+            result = ParserRunResult(
+                turn_contract=result.turn_contract,
+                context_usage=result.context_usage,
+                model_calls=model_calls,
+            )
+        return result
+
+    # -------------------------------------------------------------------------
+    async def _extract_turn_with_retry_async(
+        self, **kwargs: Any
+    ) -> LLMParserExtraction:
+        deadline = kwargs.get("deadline_monotonic")
+
+        def retry_allowed() -> bool:
+            if not isinstance(deadline, (int, float)):
+                return True
+            return monotonic() + self.RETRY_MIN_REMAINING_SECONDS < float(deadline)
+
+        try:
+            return await self._extract_turn_async(**kwargs)
+        except LLMResponseParsingError as exc:
+            if not retry_allowed():
+                raise
+            LOGGER.warning(
+                "Retrying async parser schema correction provider=%s model=%s code=%s",
+                exc.provider,
+                exc.model,
+                exc.code,
+            )
+            return await self._extract_turn_async(**kwargs, schema_correction=True)
+        except LLMProviderRequestError as exc:
+            if not exc.retryable or not retry_allowed():
+                raise
+            LOGGER.warning(
+                "Retrying transient async parser provider failure provider=%s model=%s code=%s",
+                exc.provider,
+                exc.model,
+                exc.code,
+            )
+            return await self._extract_turn_async(**kwargs)
 
     # -------------------------------------------------------------------------
     @classmethod

@@ -241,24 +241,30 @@ class OverlayCollectionService:
         cls, instance: OverlayInstance, selector: OverlaySelector
     ) -> bool:
         concepts = cls._instance_concepts(instance)
-        if selector.concepts:
+        # An exact instance/capability identity is authoritative. Parser
+        # outputs may include a broad semantic hint alongside the allowlisted
+        # capability id (for example ``environmental`` for a hydrography
+        # layer); requiring that hint to be repeated in every descriptor makes
+        # a valid fetched layer look absent.
+        identity_bound = bool(selector.instance_ids or selector.capability_ids)
+        if selector.concepts and not identity_bound:
             if not any(
                 cls._concept_matches(concepts, value) for value in selector.concepts
             ):
                 return False
-        if selector.providers and cls._norm(instance.provider) not in {
+        if selector.providers and not identity_bound and cls._norm(instance.provider) not in {
             cls._norm(item) for item in selector.providers
         }:
             return False
-        if selector.overlay_types and cls._norm(instance.overlay_type) not in {
+        if selector.overlay_types and not identity_bound and cls._norm(instance.overlay_type) not in {
             cls._norm(item) for item in selector.overlay_types
         }:
             return False
-        if selector.rendering_modes and cls._norm(instance.rendering_mode) not in {
+        if selector.rendering_modes and not identity_bound and cls._norm(instance.rendering_mode) not in {
             cls._norm(item) for item in selector.rendering_modes
         }:
             return False
-        if selector.tags:
+        if selector.tags and not identity_bound:
             tags = {
                 cls._norm(item)
                 for item in instance.descriptor.get("tags", [])
@@ -608,19 +614,20 @@ class OverlayCollectionService:
                 cls._norm(value) for value in selector.capability_ids
             }:
                 continue
-            if selector.providers and cls._norm(provider) not in {
+            identity_bound = bool(selector.instance_ids or selector.capability_ids)
+            if selector.providers and not identity_bound and cls._norm(provider) not in {
                 cls._norm(value) for value in selector.providers
             }:
                 continue
-            if selector.overlay_types and cls._norm(overlay_type) not in {
+            if selector.overlay_types and not identity_bound and cls._norm(overlay_type) not in {
                 cls._norm(value) for value in selector.overlay_types
             }:
                 continue
-            if selector.rendering_modes and cls._norm(rendering_mode) not in {
+            if selector.rendering_modes and not identity_bound and cls._norm(rendering_mode) not in {
                 cls._norm(value) for value in selector.rendering_modes
             }:
                 continue
-            if selector.tags:
+            if selector.tags and not identity_bound:
                 candidate_tags = {
                     cls._norm(value)
                     for value in (*tag_values, *concepts, label)
@@ -631,11 +638,11 @@ class OverlayCollectionService:
                     for value in selector.tags
                 ):
                     continue
-            if selector.concepts and not any(
+            if selector.concepts and not identity_bound and not any(
                 cls._concept_matches(haystack, value) for value in selector.concepts
             ):
                 continue
-            if selector.labels and not any(
+            if selector.labels and not identity_bound and not any(
                 cls._concept_matches(label_haystack, value) for value in selector.labels
             ):
                 continue

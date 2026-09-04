@@ -42,6 +42,34 @@ def test_provider_timeouts_are_terminal_and_preserve_context_usage() -> None:
     assert error.code == "provider_timeout"
     assert error.retryable is False
     assert error.context_usage == context_usage
+    assert error.timeout_origin == "provider_transport"
+
+
+###############################################################################
+def test_bounded_deadline_timeout_is_classified_as_application_deadline() -> None:
+    error = LLMProviderRequestError.from_exception(
+        TimeoutError("The bounded LLM request deadline has expired."),
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+        stage="structured_output",
+    )
+
+    assert error.code == "provider_timeout"
+    assert error.timeout_origin == "application_deadline"
+
+
+###############################################################################
+def test_timeout_origin_can_preserve_cancellation_classification() -> None:
+    error = LLMProviderRequestError(
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+        stage="structured_output",
+        code="provider_timeout",
+        retryable=False,
+        timeout_origin="cancelled",
+    )
+
+    assert error.timeout_origin == "cancelled"
 
 
 ###############################################################################

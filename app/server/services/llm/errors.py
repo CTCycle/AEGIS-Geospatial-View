@@ -1,9 +1,16 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from server.services.llm.types import FailureCategory
 
+
+TimeoutOrigin = Literal[
+    "provider_transport",
+    "application_deadline",
+    "cancelled",
+    "unknown",
+]
 
 ###############################################################################
 class LLMConfigurationError(ValueError):
@@ -135,6 +142,8 @@ class LLMProviderRequestError(RuntimeError):
         retryable: bool = False,
         category: FailureCategory = "provider_api",
         context_usage: dict[str, Any] | None = None,
+        timeout_origin: TimeoutOrigin | None = None,
+        elapsed_ms: int | None = None,
     ) -> None:
         self.provider = provider
         self.model = model
@@ -143,6 +152,8 @@ class LLMProviderRequestError(RuntimeError):
         self.http_status = http_status
         self.retryable = retryable
         self.category = category
+        self.timeout_origin = timeout_origin
+        self.elapsed_ms = elapsed_ms
         self.context_usage = (
             dict(context_usage) if context_usage is not None else None
         )
@@ -161,6 +172,8 @@ class LLMProviderRequestError(RuntimeError):
         model: str,
         stage: str,
         context_usage: dict[str, Any] | None = None,
+        timeout_origin: TimeoutOrigin | None = None,
+        elapsed_ms: int | None = None,
     ) -> "LLMProviderRequestError":
         status = getattr(getattr(exc, "response", None), "status_code", None)
         if not isinstance(status, int):
@@ -215,6 +228,14 @@ class LLMProviderRequestError(RuntimeError):
         elif cls._is_timeout_error(exc) or status in {408, 504, 524}:
             code, retryable = "provider_timeout", False
             category = "provider_api"
+            if timeout_origin is None:
+                detail = str(exc).casefold()
+                timeout_origin = (
+                    "application_deadline"
+                    if "bounded llm request deadline" in detail
+                    or "agent run deadline" in detail
+                    else "provider_transport"
+                )
         elif isinstance(status, int) and status >= 500:
             code, retryable = "provider_unavailable", True
             category = "provider_api"
@@ -233,6 +254,8 @@ class LLMProviderRequestError(RuntimeError):
             retryable=retryable,
             category=category,
             context_usage=context_usage,
+            timeout_origin=timeout_origin,
+            elapsed_ms=elapsed_ms,
         )
 
     # -------------------------------------------------------------------------

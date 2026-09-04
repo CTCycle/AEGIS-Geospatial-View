@@ -6,7 +6,9 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any
+from contextlib import nullcontext as _nullcontext
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 from server.contracts.geospatial import MapSession
 
@@ -24,6 +26,7 @@ from server.services.llm.context_profile_resolver import ModelContextProfileReso
 from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
 from server.services.llm.types import (
     LLMRequest,
+    LLMResult,
     LLMToolCall,
     LLMToolResult,
 )
@@ -87,7 +90,12 @@ class NativeToolLoop:
         tool_budget = 2 if simple_run else self.max_tool_calls
         transition_budget = 6 if simple_run else self.max_state_transitions
         context_usages: list[dict[str, Any]] = []
-        run_deadline = time.monotonic() + (45.0 if simple_run else self.max_run_seconds)
+        execution_budget = request.context.execution_budget
+        run_deadline = (
+            execution_budget.deadline_monotonic
+            if execution_budget is not None
+            else time.monotonic() + (45.0 if simple_run else self.max_run_seconds)
+        )
 
         def record_context_usage(raw_usage: object) -> None:
             if not is_json_object(raw_usage):
@@ -104,7 +112,13 @@ class NativeToolLoop:
                 or iteration + len(all_results) > transition_budget
                 or time.perf_counter() - started_run
                 > (45.0 if simple_run else self.max_run_seconds)
+                or (
+                    execution_budget is not None
+                    and execution_budget.remaining_seconds() <= 0.0
+                )
             ):
+                if execution_budget is not None:
+                    execution_budget.terminal_reason = "agent_loop_budget_exhausted"
                 return AgentToolLoopResult(
                     final_text="The agent reached its execution budget before completing the request.",
                     tool_calls=all_calls,
@@ -167,7 +181,30 @@ class NativeToolLoop:
                 )
                 messages = list(llm_request.messages)
                 working_state = messages[1]
-                response = provider.chat(llm_request)
+                if execution_budget is not None:
+                    execution_budget.record_model_call()
+                with (
+                    execution_budget.observe(
+                        "agent_model_call",
+                        metadata={
+                            "iteration": iteration,
+                            "provider": request.provider,
+                            "model": request.model,
+                        },
+                    )
+                    if execution_budget is not None
+                    else _nullcontext()
+                ):
+                    async_chat = getattr(provider, "achat", None)
+                    if callable(async_chat):
+                        response = await cast(
+                            Callable[[LLMRequest], Awaitable[LLMResult]], async_chat
+                        )(llm_request)
+                    else:
+                        # Only detached/test adapters should reach this
+                        # compatibility branch. Production OpenCode/DeepSeek
+                        # providers implement achat with a cancellable client.
+                        response = await asyncio.to_thread(provider.chat, llm_request)
                 record_context_usage(getattr(response, "context_usage", None))
             except Exception as exc:
                 category = getattr(exc, "category", None)
@@ -212,6 +249,8 @@ class NativeToolLoop:
                     )
                 else:
                     final_text = "The agent tool loop failed before it could complete the request."
+                if execution_budget is not None:
+                    execution_budget.terminal_reason = "provider_error"
                 record_context_usage(getattr(exc, "context_usage", None))
                 return AgentToolLoopResult(
                     final_text=final_text,
@@ -225,6 +264,7 @@ class NativeToolLoop:
                     no_progress_steps=no_progress_steps,
                     failure_category=category,
                     failure_detail=detail,
+                    timeout_origin=getattr(exc, "timeout_origin", None),
                     context_usages=list(context_usages),
                 )
 
@@ -392,13 +432,27 @@ class NativeToolLoop:
                 is_error=True,
                 error=rejection,
             )
+        execution_budget = context.execution_budget
+        if execution_budget is not None:
+            execution_budget.record_tool_call()
+        timeout = self.tool_timeout_seconds
+        if execution_budget is not None:
+            timeout = min(timeout, execution_budget.remaining_seconds())
         try:
-            envelope = await asyncio.wait_for(
-                self.tool_registry.execute_native_tool(
-                    call.name, call.arguments, context
-                ),
-                timeout=self.tool_timeout_seconds,
-            )
+            with (
+                execution_budget.observe(
+                    "tool_execution",
+                    metadata={"tool": call.name, "iteration": iteration},
+                )
+                if execution_budget is not None
+                else _nullcontext()
+            ):
+                envelope = await asyncio.wait_for(
+                    self.tool_registry.execute_native_tool(
+                        call.name, call.arguments, context
+                    ),
+                    timeout=max(0.001, timeout),
+                )
         except TimeoutError:
             envelope_payload = {
                 "ok": False,

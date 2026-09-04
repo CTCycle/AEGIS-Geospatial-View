@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from tests.conftest import run_async_in_thread
 
 from server.contracts.chat import ChatOperationResult
 from server.domain.agent.decision import ResolvedLocation
@@ -14,7 +15,10 @@ from server.prompts.response import (
     VERIFIED_EVIDENCE_USER_TEMPLATE,
     build_grounded_response_system_prompt,
 )
-from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
+from server.services.agent.response_synthesizer import (
+    GroundedResponseSynthesizer,
+    synthesize_response_async,
+)
 
 
 ###############################################################################
@@ -246,6 +250,46 @@ def test_synthesizer_does_not_rewrite_failed_or_policy_responses() -> None:
     )
 
     assert result == "Credential rejected."
+    assert provider.requests == []
+
+
+###############################################################################
+def test_async_synthesizer_skips_verified_map_only_response() -> None:
+    provider = _Provider("This provider call must be skipped.")
+    synthesizer = GroundedResponseSynthesizer(
+        settings_repo=_SettingsRepo(),
+        llm_factory=_Factory(provider),  # type: ignore[arg-type]
+        enabled=True,
+    )
+    operation = ChatOperationResult(
+        kind="map_session",
+        status="success",
+        message="Map ready.",
+    )
+    map_session = MapSession(
+        session_id="map-1",
+        resolved_location=ResolvedLocation(
+            label="Rome", latitude=41.9, longitude=12.5
+        ),
+        basemap_id="osm_default",
+        viewport=ViewportPolicy(
+            center_latitude=41.9, center_longitude=12.5, radius_m=2500.0
+        ),
+        overlay_collection=OverlayCollectionState(),
+    )
+
+    result = run_async_in_thread(
+        synthesize_response_async(
+            synthesizer,
+            user_text="Show Rome",
+            fallback_text="Map ready.",
+            operation=operation,
+            map_session=map_session,
+            skip_verified_map_only=True,
+        )
+    )
+
+    assert result == "Map ready."
     assert provider.requests == []
 
 

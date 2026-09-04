@@ -2260,6 +2260,18 @@
               }
             ],
             "title": "Context Revision"
+          },
+          "execution_trace": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Trace"
           }
         },
         "additionalProperties": false,
@@ -3315,6 +3327,17 @@
             "type": "array",
             "title": "Attribution"
           },
+          "attribution_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attribution Url"
+          },
           "warnings": {
             "items": {
               "type": "string"
@@ -4224,6 +4247,81 @@
         "additionalProperties": false,
         "type": "object",
         "title": "LayerAuditReport"
+      },
+      "LocationHierarchy": {
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/LocationHierarchyEntry"
+          },
+          "parents": {
+            "items": {
+              "$ref": "#/components/schemas/LocationHierarchyEntry"
+            },
+            "type": "array",
+            "title": "Parents"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "title": "LocationHierarchy",
+        "description": "The single target and its geographic parent context."
+      },
+      "LocationHierarchyEntry": {
+        "properties": {
+          "signal_type": {
+            "type": "string",
+            "title": "Signal Type"
+          },
+          "raw_value": {
+            "type": "string",
+            "title": "Raw Value"
+          },
+          "normalized_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalized Value"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "default": 0.0
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "text"
+          },
+          "canonical_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "signal_type",
+          "raw_value"
+        ],
+        "title": "LocationHierarchyEntry",
+        "description": "One user/entity signal retained in the resolved location hierarchy."
       },
       "LocationResolutionProvenance": {
         "properties": {
@@ -5581,6 +5679,16 @@
                 "type": "null"
               }
             ]
+          },
+          "hierarchy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocationHierarchy"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -5719,6 +5827,24 @@
               }
             ],
             "title": "Provider Error"
+          },
+          "timeout_origin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "provider_transport",
+                  "application_deadline",
+                  "cancelled",
+                  "frontend_or_stale_run",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Origin"
           },
           "failure_category": {
             "anyOf": [

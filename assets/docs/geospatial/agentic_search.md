@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-09-03
+Last updated: 2026-09-04
 
 ## Summary
 
@@ -16,8 +16,19 @@ The chat workflow separates structured parsing from provider-native tool calling
 8. Verified results update the revisioned overlay collection, task status, and structured diagnostics.
 9. The configured agent model converts only those verified results into concise Markdown, with deterministic text retained as fallback.
 
-Location ambiguity is explicit: similar-confidence city/address/country signals
-produce a clarification with candidate choices. Overlay intent is represented
+Location resolution is hierarchical and deterministic where evidence permits:
+coordinates take precedence, followed by address/POI/street, district or
+neighborhood, city or municipality, region/state, and country. The most-specific
+entity is the target and less-specific entities are ordered parents, so `EUR
+district, Rome` is one location hierarchy rather than two competing cities. The
+resolved target, parent entities, result type, confidence, parent match, and
+bounding box are carried through the run as one canonical `ResolvedLocation`.
+Deictic references use the active location as context and do not become new
+targets. Same-level candidates still produce a clarification when bounded
+geocoder evidence cannot establish a relationship.
+
+Location ambiguity is explicit: unresolved similar-confidence candidates produce
+a clarification with candidate choices. Overlay intent is represented
 as typed `OverlayCommand` values. Each command keeps action, selector,
 geographic scope, presentation patch, and collection revision independent.
 `OverlayCollectionService` resolves active instances before catalog
@@ -51,7 +62,15 @@ defines free-form model instructions inline.
 `conversation_id` isolates history, directives, tasks, map memory, summaries, and
 tool outcomes. Explicit durable instructions enter a structured directive ledger;
 later conflicts supersede earlier directives. Context is rebuilt for the selected
-model using declared input/output limits, schema overhead, and safety margin.
+model using declared input/output limits, schema overhead, and safety margin. The
+parser receives a bounded projection rather than full prior task/map snapshots or
+raw tool payloads; explicit locations suppress stale location history, while only
+explicit follow-ups receive minimal recent context.
+
+Every request also has a run-scoped absolute deadline, bounded stage budgets, and
+safe stage telemetry. Provider calls use the async OpenAI-compatible transport for
+OpenCode Go and DeepSeek Flash, with cancellation cleanup. Retries are limited to
+the failed operation and remaining deadline; the full pipeline is not restarted.
 
 ## Parser Contract
 
@@ -153,6 +172,7 @@ Stable high-level fields:
 - `map_session`
 - `memory_snapshot`
 - `context_usage`
+- `execution_trace`
 
 `operation` is the frontend-facing summary of verified backend outcome. It exists so clients do not need to infer success mode by inspecting `decision`, `tool_payload`, or `map_session`.
 
@@ -185,6 +205,10 @@ errors. They do not create successful empty layers or overwrite the last-known-
 good visible map state.
 
 `tool_payload` remains available for raw tool trace and debugging, but it is not the primary source of truth for user-visible outcome.
+
+`execution_trace` contains bounded stage observations, durations, model/tool/retry
+counts, remaining deadline, timeout origin, and terminal reason. It is diagnostic
+metadata only and excludes prompts, credentials, and large external payloads.
 
 ## Overlay Collection And Inspection
 

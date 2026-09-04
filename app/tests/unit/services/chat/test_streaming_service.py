@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 from tests.conftest import run_async_in_thread
 from collections.abc import AsyncIterator, Callable
 from typing import Any
@@ -261,12 +262,57 @@ class UnexpectedErrorAgentOrchestrator:
 
 
 ###############################################################################
+class CancellableAgentOrchestrator:
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.cancelled = False
+
+    # -------------------------------------------------------------------------
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None],
+    ) -> ChatTurnResponse:
+        del payload, progress_callback
+        self.started.set()
+        try:
+            await asyncio.Future()
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+
+
+###############################################################################
 def stream_events(agent_orchestrator: object) -> list[ChatStreamEvent]:
     service = ChatStreamingService(agent_orchestrator)  # type: ignore[arg-type]
     payload = ChatTurnRequest(
         conversation_id="test-conversation", message="hi", request_id="chat-123"
     )
     return run_async_in_thread(collect_stream_events(service.stream_turn(payload)))
+
+
+###############################################################################
+async def cancel_stream_and_check_orchestrator() -> bool:
+    orchestrator = CancellableAgentOrchestrator()
+    service = ChatStreamingService(orchestrator)  # type: ignore[arg-type]
+    payload = ChatTurnRequest(
+        conversation_id="test-conversation", message="hi", request_id="chat-123"
+    )
+    consumer = asyncio.create_task(consume_stream(service, payload))
+    await orchestrator.started.wait()
+    consumer.cancel()
+    await asyncio.gather(consumer, return_exceptions=True)
+    return orchestrator.cancelled
+
+
+###############################################################################
+async def consume_stream(
+    service: ChatStreamingService,
+    payload: ChatTurnRequest,
+) -> None:
+    async for _event in service.stream_turn(payload):
+        pass
 
 
 ###############################################################################
@@ -328,6 +374,11 @@ def test_stream_turn_unexpected_exception_maps_to_500_error_event() -> None:
 
     assert events[-1].event == "error"
     assert events[-1].data["status"] == 500
+
+
+###############################################################################
+def test_stream_turn_cancels_backend_work_when_consumer_disconnects() -> None:
+    assert run_async_in_thread(cancel_stream_and_check_orchestrator()) is True
 
 
 ###############################################################################

@@ -15,7 +15,11 @@ from server.domain.agent.decision import (
     ResolvedLocation,
 )
 from server.domain.agent.execution import AgentExecutionContext
-from server.contracts.extraction import LocationSignal, TurnParseResult
+from server.contracts.extraction import (
+    LocationSignal,
+    LocationSignalType,
+    TurnParseResult,
+)
 from server.contracts.geospatial import MapSession, ProviderLayerSelection
 from server.domain.agent.policies import ToolAuthorizationResult
 from server.services.agent.location_resolver import LocationResolver
@@ -765,8 +769,15 @@ class AgentToolCatalogService:
         arguments: dict[str, Any],
         context: AgentExecutionContext | None,
     ) -> ResolvedLocation | GeospatialCapabilityExecutionResult:
-        argument_signals = self._build_argument_location_signals(arguments)
+        if context is not None and context.resolved_location is not None:
+            # A run has one location owner.  Tool arguments are execution
+            # parameters, not a second parser or geocoder input.
+            return context.resolved_location
         parsed_request = self._parsed_request_from_context(context)
+        argument_signals = self._build_argument_location_signals(
+            arguments,
+            allow_untyped_city=context is None or parsed_request is None,
+        )
         parsed_signals = (
             parsed_request.location_signals if parsed_request is not None else []
         )
@@ -810,7 +821,14 @@ class AgentToolCatalogService:
             state="map_search",
             mode="map",
             action_id=action_id,
-            basemap_id=None,
+            # A capability fetch still belongs to the current map request.
+            # Preserve an explicit basemap intent instead of letting the
+            # standalone tool plan silently fall back to the catalog default.
+            basemap_id=(
+                parsed_request.requested_basemap
+                if parsed_request is not None
+                else None
+            ),
             overlay_ids=[capability_id],
         )
 
@@ -854,7 +872,10 @@ class AgentToolCatalogService:
 
     # -------------------------------------------------------------------------
     def _build_argument_location_signals(
-        self, arguments: dict[str, Any]
+        self,
+        arguments: dict[str, Any],
+        *,
+        allow_untyped_city: bool = True,
     ) -> list[LocationSignal]:
         signals: list[LocationSignal] = []
         location_text = (
@@ -863,15 +884,41 @@ class AgentToolCatalogService:
             or arguments.get("query")
         )
         if isinstance(location_text, str) and location_text.strip():
-            signals.append(
-                LocationSignal(
-                    signal_type="city",
-                    raw_value=location_text.strip(),
-                    normalized_value=location_text.strip(),
-                    confidence=0.9,
-                    source="model",
-                )
+            requested_type = str(
+                arguments.get("location_signal_type")
+                or arguments.get("location_type")
+                or ""
+            ).strip().lower()
+            valid_types: set[LocationSignalType] = {
+                "address",
+                "city",
+                "country",
+                "poi",
+                "region",
+                "street",
+                "neighborhood",
+                "district",
+                "municipality",
+                "county",
+                "province",
+                "state",
+            }
+            signal_type: LocationSignalType | None = (
+                requested_type
+                if requested_type in valid_types
+                else None
             )
+            resolved_signal_type: LocationSignalType = signal_type or "city"
+            if signal_type is not None or allow_untyped_city:
+                signals.append(
+                    LocationSignal(
+                        signal_type=resolved_signal_type,
+                        raw_value=location_text.strip(),
+                        normalized_value=location_text.strip(),
+                        confidence=0.9,
+                        source="model",
+                    )
+                )
         latitude = arguments.get("latitude")
         longitude = arguments.get("longitude")
         if isinstance(latitude, int | float) and isinstance(longitude, int | float):

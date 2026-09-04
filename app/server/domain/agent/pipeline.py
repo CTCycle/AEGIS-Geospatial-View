@@ -55,6 +55,13 @@ class TaskFailureDetail(BaseModel):
     recovery_suggestion: str | None = None
     user_explanation: str
     provider_error: dict[str, object] | None = None
+    timeout_origin: Literal[
+        "provider_transport",
+        "application_deadline",
+        "cancelled",
+        "frontend_or_stale_run",
+        "unknown",
+    ] | None = None
     failure_category: (
         Literal[
             "model_capability",

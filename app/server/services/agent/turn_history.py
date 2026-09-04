@@ -49,6 +49,7 @@ class AgentTurnHistoryService:
             "map_session": existing.get("map_session"),
             "memory_snapshot": payload.get("memory_snapshot") or {},
             "context_usage": payload.get("context_usage"),
+            "execution_trace": payload.get("execution_trace"),
         }
         return ChatTurnResponse.model_validate(response_payload)
 

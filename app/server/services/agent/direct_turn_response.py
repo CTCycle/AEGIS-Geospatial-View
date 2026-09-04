@@ -2,16 +2,28 @@ from __future__ import annotations
 
 from server.common.typing import is_json_object
 
-from typing import Any
+from typing import Any, Literal, cast
 
 from server.domain.agent.decision import PolicyDecision
 from server.domain.agent.pipeline import ConversationTaskRecord, TaskFailureDetail
+from server.domain.agent.reliability import AgentExecutionBudget
 from server.contracts.chat import ChatOperationResult, ChatTurnResponse
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.response_builder import AgentResponseBuilder
-from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
+from server.services.agent.response_synthesizer import (
+    GroundedResponseSynthesizer,
+    synthesize_response_async,
+)
 from server.services.agent.turn_support import AgentTurnSupport
 from server.services.chat.history_service import ChatHistoryService
+
+TaskTimeoutOrigin = Literal[
+    "provider_transport",
+    "application_deadline",
+    "cancelled",
+    "frontend_or_stale_run",
+    "unknown",
+]
 
 
 ###############################################################################
@@ -28,7 +40,21 @@ class DirectTurnResponseService:
             or "provider_api"
         )
         code = str((provider_error or {}).get("code") or "")
-        if category == "provider_api" and code == "provider_timeout":
+        timeout_origin = str((provider_error or {}).get("timeout_origin") or "")
+        if timeout_origin == "application_deadline" or code == "application_deadline_exceeded":
+            return (
+                "AEGIS reached its bounded execution deadline while extracting the request. "
+                "The provider call was stopped without restarting the full workflow.",
+                category,
+            )
+        if timeout_origin == "cancelled":
+            return (
+                "The request was cancelled before structured extraction completed.",
+                category,
+            )
+        if category == "provider_api" and (
+            code == "provider_timeout" or timeout_origin == "provider_transport"
+        ):
             return (
                 "The agent provider timed out before returning a structured response. "
                 "Check the provider service and retry the same model.",
@@ -87,6 +113,7 @@ class DirectTurnResponseService:
         recent_messages: list[dict[str, Any]],
         context_usage: Any,
         preflight_decision: PolicyDecision | None = None,
+        execution_budget: AgentExecutionBudget | None = None,
     ) -> ChatTurnResponse | None:
         context_query_kind = getattr(
             getattr(turn_contract, "context_query", None),
@@ -126,6 +153,23 @@ class DirectTurnResponseService:
             provider_error_object = (
                 provider_error if is_json_object(provider_error) else None
             )
+            raw_timeout_origin = (
+                provider_error_object.get("timeout_origin")
+                if provider_error_object
+                else None
+            )
+            timeout_origin = (
+                cast(TaskTimeoutOrigin, raw_timeout_origin)
+                if raw_timeout_origin
+                in {
+                    "provider_transport",
+                    "application_deadline",
+                    "cancelled",
+                    "frontend_or_stale_run",
+                    "unknown",
+                }
+                else None
+            )
             assistant_message, failure_category = self._parser_failure_message(
                 turn_contract,
                 provider_error_object,
@@ -144,6 +188,7 @@ class DirectTurnResponseService:
                 ),
                 user_explanation=assistant_message,
                 provider_error=getattr(turn_contract, "provider_error", None),
+                timeout_origin=timeout_origin,
                 failure_category=failure_category,  # type: ignore[arg-type]
             )
             return self._persist_failure_response(
@@ -240,11 +285,13 @@ class DirectTurnResponseService:
                 status="success",
                 message=fallback_message,
             )
-            assistant_message = self.response_synthesizer.synthesize(
+            assistant_message = await synthesize_response_async(
+                self.response_synthesizer,
                 user_text=turn_contract.user_text,
                 fallback_text=fallback_message,
                 operation=operation,
                 task_status="completed",
+                execution_budget=execution_budget,
             )
             operation = operation.model_copy(update={"message": assistant_message})
             self.history_service.append_message(
@@ -301,7 +348,8 @@ class DirectTurnResponseService:
             assistant_message=assistant_message,
         )
         if preflight_decision.plan.state == "clarify":
-            assistant_message = self.response_synthesizer.synthesize(
+            assistant_message = await synthesize_response_async(
+                self.response_synthesizer,
                 user_text=turn_contract.user_text,
                 fallback_text=assistant_message,
                 operation=operation,
@@ -319,6 +367,7 @@ class DirectTurnResponseService:
                     ),
                 },
                 task_status="needs_clarification",
+                execution_budget=execution_budget,
             )
             operation = operation.model_copy(update={"message": assistant_message})
         self.task_state_service.update_task(

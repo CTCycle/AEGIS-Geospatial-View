@@ -219,7 +219,13 @@ class RequestBuilder:
             return "street"
         if location_class == "highway":
             return "street"
-        if location_type in {"neighbourhood", "suburb", "quarter"}:
+        if location_type in {
+            "neighbourhood",
+            "neighborhood",
+            "suburb",
+            "quarter",
+            "district",
+        }:
             return "neighborhood"
         if location_type in {"city", "town", "village", "municipality"}:
             return "city"
