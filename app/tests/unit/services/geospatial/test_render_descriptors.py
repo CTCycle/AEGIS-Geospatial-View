@@ -222,6 +222,33 @@ def test_render_descriptor_service_builds_complete_wmts_template() -> None:
 
 
 ###############################################################################
+@pytest.mark.parametrize(
+    ("overlay_id", "expected_host"),
+    [
+        ("noaa_radar", "opengeo.ncep.noaa.gov"),
+        ("fema_nfhl_flood_zones", "hazards.fema.gov"),
+    ],
+)
+def test_catalog_raster_overlays_expose_provider_tile_templates(
+    overlay_id: str, expected_host: str
+) -> None:
+    service = RenderDescriptorService(capability_registry=CapabilityRegistry())
+
+    result = run_async_in_thread(
+        service.build_overlay_descriptor(overlay_id, request=_request())
+    )
+
+    assert result is not None
+    descriptor, warnings = result
+    assert warnings == []
+    assert descriptor["rendering_mode"] == "raster-tile"
+    tile_url_template = str(descriptor["tile_url_template"])
+    assert expected_host in tile_url_template
+    assert "{bbox-epsg-3857}" in tile_url_template
+    assert descriptor["render"]["tile_url_template"] == tile_url_template
+
+
+###############################################################################
 def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
     service = RenderDescriptorService(
         capability_registry=_CapabilityRegistry(

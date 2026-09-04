@@ -34,18 +34,19 @@
     "source_protocol": "ArcGIS REST export",
     "data_format": "PNG",
     "geometry_type": "Raster",
+    "url_template": "https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image",
     "queryable": true,
     "vectorizable": false,
     "endpoint_health": "functional",
     "auth_mode": "none",
     "official_docs_url": "https://hazards.fema.gov/femaportal/wps/portal/NFHLWMS",
-    "last_validated": "2026-05-11",
+    "last_validated": "2026-09-04",
     "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
-  "last_modified": "2026-05-11T00:00:00+00:00",
+  "last_modified": "2026-09-04T00:00:00+00:00",
   "capabilityKind": "raster-overlay",
-  "renderingMode": "wms",
+  "renderingMode": "raster-tile",
   "sourceOfficialDocs": [
     "https://hazards.fema.gov/femaportal/wps/portal/NFHLWMS"
   ],

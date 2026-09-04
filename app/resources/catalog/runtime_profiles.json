@@ -238,7 +238,7 @@
       "health_policy": "best_effort",
       "handler_name": "fema_nfhl_flood_zones",
       "capability_kind": "raster-overlay",
-      "rendering_mode": "wms",
+      "rendering_mode": "raster-tile",
       "health_status": "functional",
       "planner_hints": [
         "flood",
@@ -301,7 +301,7 @@
       "health_policy": "best_effort",
       "handler_name": "noaa_radar",
       "capability_kind": "raster-overlay",
-      "rendering_mode": "wms",
+      "rendering_mode": "raster-tile",
       "health_status": "partial",
       "planner_hints": [
         "radar",
