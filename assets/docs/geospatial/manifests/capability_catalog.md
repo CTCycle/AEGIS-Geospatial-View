@@ -1,6 +1,6 @@
 # Capability Catalog
 
-Last updated: 2026-09-03
+Last updated: 2026-09-04
 
 ## Purpose
 
@@ -28,6 +28,9 @@ This file is the reviewable inventory of geospatial capabilities implemented by 
 | `geoss` | European geospatial discovery metadata | public |
 | `google_maps` | optional commercial mapping services | credentialed |
 | `inspire` | European INSPIRE discovery metadata | public |
+| `fema` | National Flood Hazard Layer map context | public |
+| `gbif` | biodiversity occurrence records | public |
+| `noaa` | CONUS weather radar and observations | public |
 
 ## Basemaps
 

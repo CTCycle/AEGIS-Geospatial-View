@@ -32,18 +32,19 @@
     "source_protocol": "WMS",
     "data_format": "PNG",
     "geometry_type": "Raster",
+    "url_template": "https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&version=1.3.0&request=GetMap&layers=conus_bref_qcd&styles=&format=image/png&transparent=true&width=256&height=256&crs=EPSG:3857&bbox={bbox-epsg-3857}",
     "queryable": true,
     "vectorizable": false,
     "endpoint_health": "partial",
     "auth_mode": "none",
     "official_docs_url": "https://nowcoast.noaa.gov/",
-    "last_validated": "2026-05-11",
+    "last_validated": "2026-09-04",
     "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
-  "last_modified": "2026-05-11T00:00:00+00:00",
+  "last_modified": "2026-09-04T00:00:00+00:00",
   "capabilityKind": "raster-overlay",
-  "renderingMode": "wms",
+  "renderingMode": "raster-tile",
   "sourceOfficialDocs": [
     "https://nowcoast.noaa.gov/"
   ],
@@ -79,9 +80,9 @@
   },
   "reliability": {
     "status": "partial",
-    "lastAudited": "2026-05-11",
+    "lastAudited": "2026-09-04",
     "knownLimitations": [
-      "WMS layer names and regional availability may need provider metadata refresh."
+      "Coverage is limited to the CONUS radar mosaic exposed by the public NOAA service."
     ]
   },
   "cachePolicy": {

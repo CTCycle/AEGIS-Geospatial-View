@@ -17,7 +17,7 @@ class FEMAProvider(GeospatialProvider):
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload={
-                "renderingMode": "wms",
+                "renderingMode": "raster-tile",
                 "tileUrl": "https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image",
                 "layer": "NFHL",
                 "legend": {"type": "flood-zone", "label": "NFHL flood hazard zone"},
