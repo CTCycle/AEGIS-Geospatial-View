@@ -120,6 +120,58 @@ def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
 
 
 ###############################################################################
+def test_location_resolver_accepts_poi_when_parent_signal_is_canonicalized() -> None:
+    class _CanonicalizedParent:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            assert kwargs["city"] == "Rome, Roma Capitale, Lazio, Italy"
+            return {
+                "display_name": (
+                    "Colosseum, Celio, Municipio Roma I, Rome, "
+                    "Roma Capitale, Lazio, 00184, Italy"
+                ),
+                "lat": 41.8909421,
+                "lon": 12.491903,
+                "selected_result_type": "pedestrian",
+                "selected_result_class": "highway",
+                "selected_address_type": "road",
+                "address": {
+                    "pedestrian": "Colosseum",
+                    "city": "Rome",
+                    "state": "Lazio",
+                    "country": "Italy",
+                    "country_code": "it",
+                },
+                "namedetails": {"name:en": "Colosseum"},
+            }
+
+    resolver = LocationResolver(nominatim_service=_CanonicalizedParent())
+
+    async def _run() -> None:
+        result = await resolver.resolve_location_signals(
+            [
+                LocationSignal(
+                    signal_type="poi",
+                    raw_value="Colosseum",
+                    normalized_value="Colosseum",
+                ),
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="Rome, Italy",
+                    normalized_value="Rome, Roma Capitale, Lazio, Italy",
+                    latitude=41.8933203,
+                    longitude=12.4829321,
+                ),
+            ],
+            {},
+        )
+        assert result.label.startswith("Colosseum")
+        assert result.latitude == 41.8909421
+        assert result.longitude == 12.491903
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
 @pytest.mark.parametrize(
     ("signal_type", "raw_value", "display_name"),
     [

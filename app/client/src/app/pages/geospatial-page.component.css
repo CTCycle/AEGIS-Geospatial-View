@@ -87,28 +87,11 @@
     min-width: 0;
 }
 
-.canvas-header__eyebrow {
-    margin: 0;
-    color: #8fb9cc;
-    font-size: 0.6rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    line-height: 1;
-    text-transform: uppercase;
-}
-
-.canvas-header__title h1,
 .canvas-header__title span {
     margin: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.canvas-header__title h1 {
-    color: #f0f7fa;
-    font-size: 0.98rem;
-    line-height: 1.2;
 }
 
 .canvas-header__title span {

@@ -92,7 +92,7 @@ describe('pages/access-configurations-page.component', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Manage optional API keys');
-    expect(fixture.nativeElement.textContent).toContain('Default workflow uses free and open providers.');
+    expect(fixture.nativeElement.querySelector('.access-page__status')).toBeNull();
     const triggers = fixture.debugElement.queryAll(By.css('.access-signup-trigger'));
     expect(triggers.length).toBeGreaterThanOrEqual(2);
     expect(fixture.nativeElement.textContent).toContain('Get API');
