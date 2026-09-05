@@ -1,6 +1,7 @@
 from server.services.agent.context_assembler import AgentContextAssembler
 from server.services.agent.instruction_state import ConversationInstructionService
 from server.services.llm.types import ModelContextProfile
+from server.services.llm.context_budget import estimate_json_tokens
 
 
 ###############################################################################
@@ -84,3 +85,43 @@ def test_later_conflicting_instruction_supersedes_prior_directive() -> None:
     assert len(service.active(directives)) == 1
     assert service.active(directives)[0].source_turn_index == 2
     assert any(item.status == "superseded" for item in directives)
+
+
+def test_oversized_newest_history_is_compacted_without_losing_location_state() -> None:
+    location = {"active_location": {"name": "Rome", "lat": 41.9, "lon": 12.5}}
+    package = AgentContextAssembler(_ExplicitProfileResolver()).assemble(
+        provider="ollama",
+        model="4k-local",
+        current_user_message="Zoom there",
+        messages=[{"id": 1, "turn_index": 1, "role": "user", "content": "x" * 100_000}],
+        directives=[],
+        task_state={},
+        map_memory=location,
+    )
+    assert package.recent_messages == []
+    assert package.omitted_message_ids == [1]
+    assert package.map_memory == location
+    assert estimate_json_tokens(package.model_dump(mode="json")) < 3072
+
+
+def test_unknown_model_history_is_bounded_and_excludes_renderer_payloads() -> None:
+    for turns in (10, 25, 50):
+        messages = _messages(turns)
+        for message in messages:
+            message["tool_payload"] = {"features": ["geometry" * 10_000]}
+            message["map_session"] = {"geometry": "coordinates" * 10_000}
+        package = AgentContextAssembler().assemble(
+            provider="unknown",
+            model="unknown",
+            current_user_message="Back to Rome",
+            messages=messages,
+            directives=[],
+            task_state={},
+            map_memory={},
+        )
+        assert estimate_json_tokens(package.model_dump(mode="json")) < 16_384
+        assert all(
+            "tool_payload" not in item and "map_session" not in item
+            for item in package.recent_messages
+        )
+        assert package.relevant_tool_outcomes == []

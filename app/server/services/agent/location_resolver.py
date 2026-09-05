@@ -67,9 +67,7 @@ class LocationResolver:
     ADMINISTRATIVE_RESULT_TYPES = frozenset(
         {"country", "state", "region", "county", "province", "administrative"}
     )
-    CITY_RESULT_TYPES = frozenset(
-        {"city", "town", "village", "municipality", "hamlet"}
-    )
+    CITY_RESULT_TYPES = frozenset({"city", "town", "village", "municipality", "hamlet"})
     GENERIC_TARGET_DESCRIPTORS = frozenset(
         {
             "site",
@@ -239,7 +237,9 @@ class LocationResolver:
         """
 
         candidates = list(signals)[: self.MAX_RELATIONSHIP_PROBES]
-        if len(candidates) < 2 or not any(item.source == "model" for item in candidates):
+        if len(candidates) < 2 or not any(
+            item.source == "model" for item in candidates
+        ):
             return None
         resolved: list[ResolvedLocation] = []
         for candidate in candidates:
@@ -273,7 +273,9 @@ class LocationResolver:
         )
 
     # -------------------------------------------------------------------------
-    def _dedupe_signals(self, signals: Sequence[LocationSignal]) -> list[LocationSignal]:
+    def _dedupe_signals(
+        self, signals: Sequence[LocationSignal]
+    ) -> list[LocationSignal]:
         seen: set[tuple[str, str]] = set()
         result: list[LocationSignal] = []
         for signal in signals:
@@ -309,9 +311,9 @@ class LocationResolver:
         inherited: list[LocationSignal] = []
         active_city = str(active.get("city") or "").strip()
         active_country = str(active.get("country") or "").strip()
-        target_is_finer_place = target_specificity >= self.SPECIFICITY_BY_SIGNAL_TYPE[
-            "neighborhood"
-        ]
+        target_is_finer_place = (
+            target_specificity >= self.SPECIFICITY_BY_SIGNAL_TYPE["neighborhood"]
+        )
         if (
             target_is_finer_place
             and active_city
@@ -324,26 +326,18 @@ class LocationResolver:
                     signal_type="city",
                     raw_value=active_city,
                     normalized_value=active_city,
-                    confidence=self._bounded_confidence(
-                        active.get("confidence"), 0.85
-                    ),
+                    confidence=self._bounded_confidence(active.get("confidence"), 0.85),
                     source="memory",
                 )
             )
         inherited_city = any(signal.signal_type == "city" for signal in inherited)
-        if (
-            inherited_city
-            and active_country
-            and "country" not in explicit_types
-        ):
+        if inherited_city and active_country and "country" not in explicit_types:
             inherited.append(
                 LocationSignal(
                     signal_type="country",
                     raw_value=active_country,
                     normalized_value=active_country,
-                    confidence=self._bounded_confidence(
-                        active.get("confidence"), 0.85
-                    ),
+                    confidence=self._bounded_confidence(active.get("confidence"), 0.85),
                     source="memory",
                 )
             )
@@ -446,7 +440,18 @@ class LocationResolver:
         )
         address = target_value
         if regional_values and signal.signal_type != "country":
-            address = ", ".join([target_value, *regional_values])
+            components = [
+                part.strip() for part in target_value.split(",") if part.strip()
+            ]
+            seen = {self._normalize_text(part) for part in components}
+            for region in regional_values:
+                for part in region.split(","):
+                    part = part.strip()
+                    normalized = self._normalize_text(part)
+                    if normalized and normalized not in seen:
+                        components.append(part)
+                        seen.add(normalized)
+            address = ", ".join(components)
         if signal.signal_type == "country":
             country = None
             city = None
@@ -506,17 +511,13 @@ class LocationResolver:
         resolved_type = geocoder_type or None
         if signal.signal_type in {"district", "neighborhood"} and (
             geocoder_type in self.DISTRICT_RESULT_TYPES
-            or self._normalize_text(
-                str(geocoded.get("selected_address_type") or "")
-            )
+            or self._normalize_text(str(geocoded.get("selected_address_type") or ""))
             in self.DISTRICT_ADDRESS_TYPES
         ):
             resolved_type = signal.signal_type
         elif allow_related_type and (
             geocoder_type in self.DISTRICT_RESULT_TYPES
-            or self._normalize_text(
-                str(geocoded.get("selected_address_type") or "")
-            )
+            or self._normalize_text(str(geocoded.get("selected_address_type") or ""))
             in self.DISTRICT_ADDRESS_TYPES
         ):
             resolved_type = "district"
@@ -552,8 +553,7 @@ class LocationResolver:
                     geocoded.get("confidence"), signal.confidence
                 ),
                 location_type=resolved_type,
-                location_class=str(geocoded.get("selected_result_class") or "")
-                or None,
+                location_class=str(geocoded.get("selected_result_class") or "") or None,
                 country=self._address_component(geocoded, "country"),
                 city=self._address_component(
                     geocoded, "city", "town", "village", "municipality"
@@ -566,7 +566,7 @@ class LocationResolver:
                 provenance=self._provenance_from_geocoded(geocoded),
                 hierarchy=hierarchy,
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------
@@ -602,8 +602,12 @@ class LocationResolver:
         ):
             return False
 
-        result_type = self._normalize_text(str(candidate.get("selected_result_type") or ""))
-        result_class = self._normalize_text(str(candidate.get("selected_result_class") or ""))
+        result_type = self._normalize_text(
+            str(candidate.get("selected_result_type") or "")
+        )
+        result_class = self._normalize_text(
+            str(candidate.get("selected_result_class") or "")
+        )
         address_type = self._normalize_text(
             str(candidate.get("selected_address_type") or "")
         )
@@ -692,7 +696,9 @@ class LocationResolver:
                 code = self._normalize_text(str(address.get("country_code") or ""))
                 if actual and not self._context_matches(actual, expected, country=True):
                     return False
-                if not actual and not self._context_matches(display, expected, country=True):
+                if not actual and not self._context_matches(
+                    display, expected, country=True
+                ):
                     return False
                 if code and not self._country_codes(expected).intersection({code}):
                     return False
@@ -782,13 +788,17 @@ class LocationResolver:
             candidate_text, target_without_country
         ):
             return True
-        if signal_type not in {
-            "address",
-            "poi",
-            "street",
-            "neighborhood",
-            "district",
-        } and not allow_related_type:
+        if (
+            signal_type
+            not in {
+                "address",
+                "poi",
+                "street",
+                "neighborhood",
+                "district",
+            }
+            and not allow_related_type
+        ):
             return False
         target_tokens = re.findall(r"[a-z0-9]+", target.casefold())
         core_tokens = [
@@ -832,16 +842,20 @@ class LocationResolver:
                 "locality",
             )
         )
-        if result_type in self.DISTRICT_RESULT_TYPES or address_type in self.DISTRICT_ADDRESS_TYPES:
+        if (
+            result_type in self.DISTRICT_RESULT_TYPES
+            or address_type in self.DISTRICT_ADDRESS_TYPES
+        ):
             return True
         if has_named_child:
             return result_type in {"administrative", "boundary"}
         # Boundary responses can still be valid when Nominatim omitted the
         # granular address key but retained the named district in the display
         # name.  Do not accept a plain city/country parent as a district.
-        return result_type in {"administrative", "boundary"} and self._contains_location_text(
-            candidate_text, target
-        )
+        return result_type in {
+            "administrative",
+            "boundary",
+        } and self._contains_location_text(candidate_text, target)
 
     # -------------------------------------------------------------------------
     def _context_value(
@@ -942,11 +956,7 @@ class LocationResolver:
             "canada": "ca",
         }
         values = self._country_aliases(normalized) or {normalized}
-        return {
-            codes.get(item, item)
-            for item in values
-            if item
-        }
+        return {codes.get(item, item) for item in values if item}
 
     # -------------------------------------------------------------------------
     def _hierarchy_entry(
@@ -988,8 +998,7 @@ class LocationResolver:
             hierarchy_signal_type = "district"
         target = self._hierarchy_entry(
             signal,
-            canonical_label=str(geocoded.get("display_name") or "").strip()
-            or None,
+            canonical_label=str(geocoded.get("display_name") or "").strip() or None,
             # Keep the user's semantic granularity in the hierarchy even
             # when the provider uses a related result type such as ``suburb``
             # for a district/neighborhood.
@@ -998,26 +1007,45 @@ class LocationResolver:
         parents: list[LocationHierarchyEntry] = []
         seen: set[tuple[str, str]] = set()
         for parent in sorted(
-            (item for item in context_signals if item.signal_type not in self.DEICTIC_SIGNAL_TYPES),
+            (
+                item
+                for item in context_signals
+                if item.signal_type not in self.DEICTIC_SIGNAL_TYPES
+            ),
             key=lambda item: self.SPECIFICITY_BY_SIGNAL_TYPE.get(item.signal_type, 0),
             reverse=True,
         ):
             value = parent.normalized_value or parent.raw_value
-            key = (parent.signal_type, self._canonical_context_value(parent.signal_type, value))
+            key = (
+                parent.signal_type,
+                self._canonical_context_value(parent.signal_type, value),
+            )
             if not key[1] or key in seen:
                 continue
             seen.add(key)
             parents.append(
                 self._hierarchy_entry(
                     parent,
-                    canonical_label=self._geocoder_parent_label(geocoded, parent.signal_type)
+                    canonical_label=self._geocoder_parent_label(
+                        geocoded, parent.signal_type
+                    )
                     or value,
                 )
             )
 
         inferred = (
-            ("city", self._address_component(geocoded, "city", "town", "village", "municipality")),
-            ("region", self._address_component(geocoded, "state", "region", "province", "county")),
+            (
+                "city",
+                self._address_component(
+                    geocoded, "city", "town", "village", "municipality"
+                ),
+            ),
+            (
+                "region",
+                self._address_component(
+                    geocoded, "state", "region", "province", "county"
+                ),
+            ),
             ("country", self._address_component(geocoded, "country")),
         )
         for parent_type, label in inferred:
@@ -1154,7 +1182,7 @@ class LocationResolver:
                     else None
                 ),
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------
@@ -1164,15 +1192,13 @@ class LocationResolver:
             return None
         try:
             number = float(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return number if math.isfinite(number) else None
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _valid_coordinates(
-        latitude: float | None, longitude: float | None
-    ) -> bool:
+    def _valid_coordinates(latitude: float | None, longitude: float | None) -> bool:
         return (
             latitude is not None
             and longitude is not None
@@ -1231,7 +1257,7 @@ class LocationResolver:
                     "result_type": value.get("result_type") or "location",
                 }
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------
@@ -1244,7 +1270,7 @@ class LocationResolver:
             return None
         try:
             return LocationResolutionProvenance.model_validate(raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------
