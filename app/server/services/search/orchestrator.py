@@ -17,6 +17,7 @@ from server.services.geospatial.providers.base import (
     ProviderInvalidQueryError,
     ProviderMalformedPayloadError,
     ProviderRateLimitError,
+    ProviderUnavailableError,
 )
 
 
@@ -93,6 +94,11 @@ class LocationSearchOrchestrator:
                 warnings.append(f"Overlay '{overlay_id}' is {reason}.")
                 continue
             descriptor, overlay_warnings = overlay_result
+            if descriptor.get("result_status") == "unavailable":
+                raise ProviderUnavailableError(
+                    f"{descriptor.get('label', 'Requested layer')}: provider data is unavailable. "
+                    "Check provider access and availability before retrying."
+                )
             descriptor = MapInspectionService.attach_to_descriptor(descriptor)
             overlays.append(descriptor)
             warnings.extend(overlay_warnings)

@@ -173,7 +173,7 @@ def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
         FEMAProvider().fetch(ProviderRequest(capability_id="fema_nfhl_flood_zones"))
     )
 
-    assert response.payload["renderingMode"] == "wms"
+    assert response.payload["renderingMode"] == "raster-tile"
     assert "hazards.fema.gov" in response.payload["tileUrl"]
     assert response.payload["legend"]["type"]
 
