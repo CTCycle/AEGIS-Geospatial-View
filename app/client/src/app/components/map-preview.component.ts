@@ -494,23 +494,30 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         }
         return;
       }
-      candidateSettled = true;
-      clearCandidate();
-      this.mapPreparing = false;
-      this.mapRef = candidate;
-      this.activeMapContainer = candidateContainer;
-      this.activeBasemapId = nextBasemapId;
-      this.activeCenterKey = nextCenterKey;
-      this.applyOverlayStateToMap();
-      if (previousMap && previousMap !== candidate) {
-        previousMap.remove();
-        if (previousContainer && previousContainer !== originalContainer) {
-          previousContainer.remove();
+      // `load` precedes the requests initiated by addOverlayLayers. Keep the
+      // candidate and its error handler alive until those sources settle.
+      candidate.on('idle', () => {
+        if (!isCurrentCandidate()) {
+          return;
         }
-      }
-      this.emitRenderState('ready');
-      this.changeDetector.detectChanges();
-      this.scheduleMapResize();
+        candidateSettled = true;
+        clearCandidate();
+        this.mapPreparing = false;
+        this.mapRef = candidate;
+        this.activeMapContainer = candidateContainer;
+        this.activeBasemapId = nextBasemapId;
+        this.activeCenterKey = nextCenterKey;
+        this.applyOverlayStateToMap();
+        if (previousMap && previousMap !== candidate) {
+          previousMap.remove();
+          if (previousContainer && previousContainer !== originalContainer) {
+            previousContainer.remove();
+          }
+        }
+        this.emitRenderState('ready');
+        this.changeDetector.detectChanges();
+        this.scheduleMapResize();
+      });
     });
   }
 
@@ -590,10 +597,11 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   private safeRenderError(error: unknown): string {
-    if (error instanceof Error && error.message.trim()) {
-      return `Map rendering failed: ${error.message}`;
+    const message = error instanceof Error ? error.message : '';
+    if (/\b(401|403)\b/.test(message)) {
+      return 'Map layer access was denied. Check the provider credentials in Access.';
     }
-    return 'Map rendering failed. The previous map remains available.';
+    return 'A map data source could not be loaded. Check provider availability and try again.';
   }
 
   private applyOverlayStateToMap(): void {
