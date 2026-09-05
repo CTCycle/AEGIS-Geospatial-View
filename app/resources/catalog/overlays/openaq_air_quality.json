@@ -10,6 +10,7 @@
   ],
   "coverage": "global-partial",
   "metadata": {
+    "render_backend": "provider",
     "label": "OpenAQ Air Quality",
     "default_opacity": 1,
     "requires_key": true,

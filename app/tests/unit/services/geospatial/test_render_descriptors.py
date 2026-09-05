@@ -12,6 +12,7 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.search.request_builder import RequestBuilder
+from server.services.geospatial.providers.base import ProviderAuthError
 
 
 ###############################################################################
@@ -23,6 +24,21 @@ class _CapabilityRegistry:
     # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict | None:
         return self.capability if self.capability["id"] == capability_id else None
+
+
+def test_openaq_auth_failure_cannot_be_a_deferred_success(monkeypatch) -> None:
+    registry = ProviderRegistry()
+
+    async def unavailable(*args, **kwargs):
+        raise ProviderAuthError("OpenAQ API key is required.")
+
+    monkeypatch.setattr(registry, "fetch", unavailable)
+    with pytest.raises(ProviderAuthError, match="Configure them in Access"):
+        run_async_in_thread(
+            RenderDescriptorService(
+                provider_registry=registry
+            ).build_overlay_descriptor("openaq_air_quality", request=_request())
+        )
 
 
 ###############################################################################

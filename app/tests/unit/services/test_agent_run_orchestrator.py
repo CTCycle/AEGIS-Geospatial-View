@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from server.services.geospatial.providers.base import ProviderAuthError
+
+
 from tests.conftest import run_async_in_thread
 from datetime import UTC, datetime
 
@@ -288,3 +291,13 @@ def test_execute_run_publishes_context_samples_before_terminal_event() -> None:
         if event["type"] == RunEventType.COMPLETED
     )
     assert context_index < terminal_index
+
+def test_geospatial_auth_failure_points_to_access_without_exposing_provider_text():
+    message = AgentRunOrchestrator._safe_failure_message(
+        ProviderAuthError("invalid credential secret-token")
+    )
+    assert "Access" in message
+    assert "Model Settings" not in message
+    assert "secret-token" not in message
+
+

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 import pytest
 
 from server.contracts.extraction import (
@@ -420,9 +421,7 @@ def test_ignores_structured_map_interaction_tags_as_dataset_concepts(
     turn = _turn("Show a location", "")
     turn = turn.model_copy(
         update={
-            "location_signals": [
-                LocationSignal(signal_type="city", raw_value="Rome")
-            ],
+            "location_signals": [LocationSignal(signal_type="city", raw_value="Rome")],
             "normalized_action": NormalizedAction(
                 action_id="map_search",
                 action_label="Location map",
@@ -440,7 +439,9 @@ def test_ignores_structured_map_interaction_tags_as_dataset_concepts(
 
 
 ###############################################################################
-def test_location_focus_drops_catalog_keyword_layers_without_typed_data_request() -> None:
+def test_location_focus_drops_catalog_keyword_layers_without_typed_data_request() -> (
+    None
+):
     turn = _turn("Map the agency site", "esa_worldcover").model_copy(
         update={
             "location_signals": [
@@ -490,3 +491,27 @@ def test_retains_semantic_action_tags_for_catalog_resolution() -> None:
 
     assert resolved.requested_layers == ["openmeteo_weather_forecast"]
     assert resolved.clarification_plan is None
+
+
+def test_explicit_boundary_concept_is_not_location_only() -> None:
+    turn = _turn(
+        "Show the geographic boundary of Canton Ticino.", "boundary"
+    ).model_copy(
+        update={
+            "requested_layers": [],
+            "requested_concepts": ["boundary"],
+            "map_target": "Ticino",
+            "atomic_tasks": [],
+        }
+    )
+    turn.normalized_action.action_id = "geospatial_data_retrieval"
+    assert not CapabilityResolver.is_location_focus_only(turn, [])
+
+
+def test_district_concept_remains_location_navigation() -> None:
+    turn = _turn("Show EUR district in Rome", "district").model_copy(update={
+        "requested_layers": [], "requested_concepts": ["district"],
+        "map_target": "EUR, Rome", "atomic_tasks": [],
+    })
+    turn.normalized_action.action_id = "geospatial_data_retrieval"
+    assert CapabilityResolver.is_location_focus_only(turn, [])

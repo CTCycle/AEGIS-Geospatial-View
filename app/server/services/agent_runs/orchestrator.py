@@ -20,6 +20,7 @@ from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent_runs.events import RunEventPublisher
+from server.services.geospatial.providers.base import ProviderAuthError, ProviderError
 
 
 ###############################################################################
@@ -465,6 +466,10 @@ class AgentRunOrchestrator:
     # -------------------------------------------------------------------------
     @staticmethod
     def _safe_failure_message(exc: Exception) -> str:
+        if isinstance(exc, ProviderAuthError):
+            return "The map data provider requires valid credentials. Configure them in Access."
+        if isinstance(exc, ProviderError):
+            return "The map data provider could not complete this request. Try again later."
         text = str(exc).strip().lower()
         if "credential" in text or "api key" in text or "authentication" in text:
             return "The configured agent provider is not ready. Open Model Settings and configure its credential."

@@ -29,7 +29,11 @@ from server.services.geospatial.normalizers import (
     NormalizationError,
     normalize_poi_feature,
 )
-from server.services.geospatial.providers.base import ProviderError, ProviderRequest
+from server.services.geospatial.providers.base import (
+    ProviderAuthError,
+    ProviderError,
+    ProviderRequest,
+)
 
 
 ###############################################################################
@@ -563,6 +567,11 @@ class RenderDescriptorService:
         try:
             response = await self.provider_registry.fetch(provider_id, provider_request)
             data = normalize_geojson_feature_collection(response.payload)
+        except ProviderAuthError:
+            raise ProviderAuthError(
+                f"{capability.get('name', 'Requested layer')} requires valid provider credentials. "
+                "Configure them in Access."
+            ) from None
         except (
             GeospatialProviderResponseError,
             ProviderError,
@@ -644,10 +653,7 @@ class RenderDescriptorService:
         if (
             not bounds
             or len(bounds) != 4
-            or not all(
-                not isinstance(item, bool)
-                for item in bounds
-            )
+            or not all(not isinstance(item, bool) for item in bounds)
         ):
             return None
         return (float(bounds[0]), float(bounds[1]), float(bounds[2]), float(bounds[3]))

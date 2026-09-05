@@ -88,6 +88,16 @@ _NON_DATA_CONCEPT_TAGS = frozenset(
         "locate",
         "city",
         "country",
+        "district",
+        "neighborhood",
+        "neighbourhood",
+        "municipality",
+        "region",
+        "state",
+        "province",
+        "county",
+        "landmark",
+        "address",
     }
 )
 
@@ -145,9 +155,7 @@ class CapabilityResolver:
                 if self._is_location_focus_capability(item, capabilities, turn)
             ]
         requested_concepts = [
-            str(item).strip()
-            for item in turn.requested_concepts
-            if str(item).strip()
+            str(item).strip() for item in turn.requested_concepts if str(item).strip()
         ]
         if not location_focus_only:
             requested.extend(requested_concepts)
@@ -295,6 +303,8 @@ class CapabilityResolver:
 
         if turn.task_class != "map_search":
             return False
+        if any(cls._is_data_concept(concept) for concept in turn.requested_concepts):
+            return False
         if turn.poi_categories or turn.required_data_sources:
             return False
         if turn.required_tool_category:
@@ -325,8 +335,7 @@ class CapabilityResolver:
                     (
                         item
                         for item in capabilities
-                        if cls._normalize_text(str(item.get("id") or ""))
-                        == normalized
+                        if cls._normalize_text(str(item.get("id") or "")) == normalized
                     ),
                     None,
                 )
@@ -336,11 +345,15 @@ class CapabilityResolver:
                     # genuinely requested unavailable layer receives an
                     # explicit capability clarification.
                     return False
-                kind = str(
-                    capability.get("capabilityKind")
-                    or capability.get("capability_kind")
-                    or ""
-                ).strip().casefold()
+                kind = (
+                    str(
+                        capability.get("capabilityKind")
+                        or capability.get("capability_kind")
+                        or ""
+                    )
+                    .strip()
+                    .casefold()
+                )
                 if kind != "basemap":
                     return False
         if not turn.atomic_tasks:
@@ -371,11 +384,15 @@ class CapabilityResolver:
             capability_id = str(capability.get("id") or "").strip()
             if self._normalize_text(capability_id) != normalized:
                 continue
-            kind = str(
-                capability.get("capabilityKind")
-                or capability.get("capability_kind")
-                or ""
-            ).strip().casefold()
+            kind = (
+                str(
+                    capability.get("capabilityKind")
+                    or capability.get("capability_kind")
+                    or ""
+                )
+                .strip()
+                .casefold()
+            )
             if kind == "basemap":
                 return self._is_usable(capability, turn)
         return False
@@ -469,9 +486,7 @@ class CapabilityResolver:
         }
         for evidence in evidence_values:
             evidence_tokens = {
-                token
-                for token in self._tokens(evidence)
-                if token not in generic_tokens
+                token for token in self._tokens(evidence) if token not in generic_tokens
             }
             if evidence_tokens & user_tokens:
                 return True

@@ -627,7 +627,8 @@ class GeospatialApiService:
         fetched_at = getattr(response, "fetched_at", None)
         if not isinstance(fetched_at, datetime):
             fetched_at = datetime.now().astimezone()
-        units = response.units
+        units_value = getattr(response, "units", {})
+        units = units_value if is_json_object(units_value) else {}
         return {
             "status": "ok",
             "provider": provider_id,
