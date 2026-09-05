@@ -1,0 +1,44 @@
+{
+  "generated_at": "2026-09-05T07:40:00Z",
+  "deterministic_context": [
+    {
+      "turns": 10,
+      "input_history_tokens": 201532,
+      "projected_package_tokens": 1542,
+      "included_messages": 10,
+      "omitted_messages": 0,
+      "exact_location_preserved": true
+    },
+    {
+      "turns": 25,
+      "input_history_tokens": 503841,
+      "projected_package_tokens": 3738,
+      "included_messages": 25,
+      "omitted_messages": 0,
+      "exact_location_preserved": true
+    },
+    {
+      "turns": 50,
+      "input_history_tokens": 1007687,
+      "projected_package_tokens": 7340,
+      "included_messages": 42,
+      "omitted_messages": 8,
+      "exact_location_preserved": true
+    }
+  ],
+  "live_25": {
+    "elapsed_seconds": 296.2625,
+    "turn_count": 25,
+    "usable_turns": 21,
+    "bounded_timeouts": 4,
+    "measured_context_usage": "unknown from provider; UI displayed Context limit unavailable",
+    "peak_context_usage_percent": null,
+    "note": "0.0 from runner is a missing-value default and is not treated as a measurement."
+  },
+  "browser_workflows": {
+    "rome_first": "captured after rendering settled",
+    "eur_district": "captured after rendering settled",
+    "openaq": "captured after provider failure",
+    "weather": "captured after rendering settled"
+  }
+}

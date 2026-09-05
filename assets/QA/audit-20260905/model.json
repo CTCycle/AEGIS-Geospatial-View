@@ -1,0 +1,4 @@
+{
+  "agent_model_provider": "opencode-go",
+  "agent_model_name": "deepseek-v4-flash"
+}

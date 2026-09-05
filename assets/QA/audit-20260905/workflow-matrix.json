@@ -1,0 +1,120 @@
+[
+  {
+    "id": "simple-location",
+    "query": "Show me Rome.",
+    "resolved_location": "Rome, Roma Capitale, Lazio, Italy",
+    "tools": [
+      "location_to_coordinates"
+    ],
+    "result": "basemap rendered",
+    "rendered": true,
+    "status": "passed",
+    "screenshot": "final2-rome-1.png",
+    "diagnostics": "No browser warnings recorded."
+  },
+  {
+    "id": "district",
+    "query": "Show me the EUR district in Rome.",
+    "resolved_location": "E.U.R., Municipio Roma IX, Rome, Roma Capitale, Lazio, 00144, Italy",
+    "tools": [
+      "location_to_coordinates"
+    ],
+    "result": "district viewport rendered",
+    "rendered": true,
+    "status": "passed",
+    "screenshot": "final2-eur-1.png",
+    "diagnostics": "Post-fix live UI; no browser warnings recorded."
+  },
+  {
+    "id": "points",
+    "query": "Show parks around Central Station Amsterdam.",
+    "resolved_location": "Amsterdam Central Station, Middentunnel, Centrum, Amsterdam, North Holland, Netherlands",
+    "tools": [
+      "get_nearby_poi"
+    ],
+    "result": "partial provider-backed point result",
+    "rendered": true,
+    "status": "passed",
+    "screenshot": "live-long-final-25/benchmark.json",
+    "diagnostics": "Live benchmark turn 22; partial response."
+  },
+  {
+    "id": "polygon-region",
+    "query": "Show geographic boundary Canton Ticino.",
+    "resolved_location": "Ticino, Switzerland",
+    "tools": [
+      "execute_geospatial_capability"
+    ],
+    "result": "Natural Earth boundaries overlay",
+    "rendered": true,
+    "status": "passed",
+    "screenshot": "live-long-final-25/benchmark.json",
+    "diagnostics": "Live benchmark turn 21; warning retained."
+  },
+  {
+    "id": "dynamic-layer",
+    "query": "Show pressure, humidity and wind in Zurich.",
+    "resolved_location": "Zurich, District Zurich, Zurich, Switzerland",
+    "tools": [
+      "openmeteo_pressure_humidity_wind"
+    ],
+    "result": "Weather Forecast marked metadata-only in UI but assistant claimed visible overlay",
+    "rendered": false,
+    "status": "failed",
+    "screenshot": "weather-metadata-reproduction.png",
+    "diagnostics": "Reproduced response/rendering mismatch; source patch blocked by Codex rate limit."
+  },
+  {
+    "id": "multi-tool",
+    "query": "Show parks and weather in Rome.",
+    "resolved_location": "not separately isolated",
+    "tools": [
+      "get_nearby_poi",
+      "get_weather_forecast"
+    ],
+    "result": "not run as isolated post-fix workflow",
+    "rendered": false,
+    "status": "unrun",
+    "screenshot": null,
+    "diagnostics": "Live 25-turn coverage included POI and weather separately."
+  },
+  {
+    "id": "contextual-followup",
+    "query": "What about Lugano?",
+    "resolved_location": "Lugano, Circolo di Lugano ovest, Distretto di Lugano, Ticino, Switzerland",
+    "tools": [
+      "location_to_coordinates"
+    ],
+    "result": "map rendered",
+    "rendered": true,
+    "status": "passed",
+    "screenshot": "live-long-final-25/benchmark.json",
+    "diagnostics": "Live benchmark turns 2 and 20; parser context fix loaded."
+  },
+  {
+    "id": "location-replacement",
+    "query": "Actually I meant Milan, Michigan.",
+    "resolved_location": "Milan, Washtenaw County, Michigan, 48160, United States",
+    "tools": [
+      "location_to_coordinates"
+    ],
+    "result": "map rendered with prior overlay state",
+    "rendered": true,
+    "status": "passed",
+    "screenshot": "live-long-final-25/benchmark.json",
+    "diagnostics": "Live benchmark turn 10."
+  },
+  {
+    "id": "unavailable-recovery",
+    "query": "Show air quality in Zurich.",
+    "resolved_location": "Zurich, District Zurich, Zurich, Switzerland",
+    "tools": [
+      "openaq"
+    ],
+    "result": "provider auth failure preserved Rome map",
+    "rendered": true,
+    "status": "passed",
+    "screenshot": "final-openaq-recovery.png",
+    "diagnostics": "Provider failure distinguished from valid empty data; user-facing classification still points to model settings."
+  }
+]

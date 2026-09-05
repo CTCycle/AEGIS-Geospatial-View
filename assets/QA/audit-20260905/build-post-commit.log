@@ -1,0 +1,12 @@
+> Building...
+√ Building...
+Initial chunk files | Names         | Raw size | Estimated transfer size
+main-GW3EKOLH.js    | main          |  1.44 MB |               337.78 kB
+styles-NFZPBYYM.css | styles        | 68.72 kB |                 8.48 kB
+
+                    | Initial total |  1.51 MB |               346.26 kB
+
+Application bundle generation complete. [6.241 seconds] - 2026-09-05T07:48:57.416Z
+
+Output location: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\client\dist
+
