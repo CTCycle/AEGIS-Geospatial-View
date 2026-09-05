@@ -94,7 +94,9 @@ def test_provider_metadata_supplies_the_local_cap_and_schema_reservation() -> No
 
 
 ###############################################################################
-def test_complete_request_counts_messages_tools_and_response_schema_before_compaction() -> None:
+def test_complete_request_counts_messages_tools_and_response_schema_before_compaction() -> (
+    None
+):
     tool = LLMToolDefinition(
         name="execute",
         description="Execute a geospatial operation.",
@@ -155,7 +157,9 @@ def test_embedded_response_schema_is_counted_once_as_a_message() -> None:
 
 
 ###############################################################################
-def test_provider_reported_input_and_output_replace_estimate_without_losing_it() -> None:
+def test_provider_reported_input_and_output_replace_estimate_without_losing_it() -> (
+    None
+):
     usage = compute_context_usage(
         _request(
             "hello",
@@ -230,7 +234,9 @@ def test_context_usage_percent_uses_model_limit_and_can_show_overage() -> None:
 
 
 ###############################################################################
-def test_prepare_request_compacts_explicitly_bounded_history_and_preserves_current_input() -> None:
+def test_prepare_request_compacts_explicitly_bounded_history_and_preserves_current_input() -> (
+    None
+):
     request = LLMRequest(
         model="custom-alias",
         messages=[
@@ -269,6 +275,35 @@ def test_prepare_request_does_not_invent_limit_for_unknown_model() -> None:
     prepared = prepare_request(request, provider="test")
 
     assert prepared.messages == request.messages
+
+
+def test_unknown_model_rejects_oversized_current_request_without_inventing_capacity() -> (
+    None
+):
+    request = _request("x" * 200_000)
+    with pytest.raises(LLMContextLimitError):
+        prepare_request(request, provider="unknown")
+    usage = compute_context_usage(request, provider="unknown")
+    assert usage.model_context_limit is None
+    assert usage.usage_percent is None
+
+
+def test_unknown_model_compacts_history_to_application_input_ceiling() -> None:
+    request = LLMRequest(
+        model="unknown",
+        messages=[
+            {"role": "system", "content": "Stable instructions"},
+            *[{"role": "user", "content": "old" * 4000} for _ in range(50)],
+            {"role": "user", "content": "Show Rome"},
+        ],
+    )
+    prepared = prepare_request(request, provider="unknown")
+    assert (
+        compute_context_usage(prepared, provider="unknown").estimated_input_tokens
+        <= 32_768
+    )
+    assert prepared.messages[-1]["content"] == "Show Rome"
+    assert prepared.metadata["_context_compaction_applied"] is True
 
 
 ###############################################################################

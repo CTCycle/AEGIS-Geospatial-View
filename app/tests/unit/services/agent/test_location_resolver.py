@@ -10,6 +10,51 @@ from server.services.agent.location_resolver import LocationResolver
 from server.contracts.extraction import LocationSignal
 
 
+def test_hierarchical_normalized_location_does_not_duplicate_parent_query() -> None:
+    calls = []
+
+    class Geocoder:
+        async def extract_coordinates(self, **kwargs):
+            calls.append(kwargs["address"])
+            if kwargs["address"] != "Paris, Texas, USA":
+                return None
+            return {
+                "display_name": "Paris, Lamar County, Texas, United States",
+                "lat": 33.6609,
+                "lon": -95.5555,
+                "confidence": 0.9,
+                "type": "city",
+                "address": {
+                    "city": "Paris",
+                    "state": "Texas",
+                    "country": "United States",
+                    "country_code": "us",
+                },
+            }
+
+    result = run_async_in_thread(
+        LocationResolver(nominatim_service=Geocoder()).resolve_location_signals(
+            [
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="Paris",
+                    normalized_value="Paris, Texas, USA",
+                    confidence=0.95,
+                ),
+                LocationSignal(
+                    signal_type="state",
+                    raw_value="Texas",
+                    normalized_value="Texas, USA",
+                    confidence=0.95,
+                ),
+            ],
+            {},
+        )
+    )
+    assert result.longitude == -95.5555
+    assert calls == ["Paris, Texas, USA"]
+
+
 ###############################################################################
 def test_location_resolver_uses_coordinates_without_geocoder() -> None:
     resolver = LocationResolver()
@@ -219,10 +264,16 @@ def test_location_resolver_preserves_specific_target_with_parent_context(
                 "lat": 48.1,
                 "lon": 11.5,
                 "selected_result_type": "city" if signal_type == "city" else "station",
-                "selected_result_class": "place" if signal_type == "city" else "railway",
+                "selected_result_class": "place"
+                if signal_type == "city"
+                else "railway",
                 "address": {
                     "city": "München" if "München" in display_name else "Metro City",
-                    "country": "Deutschland" if "Deutschland" in display_name else "Brasil" if "Brasil" in display_name else "Countryland",
+                    "country": "Deutschland"
+                    if "Deutschland" in display_name
+                    else "Brasil"
+                    if "Brasil" in display_name
+                    else "Countryland",
                 },
             }
 
@@ -230,7 +281,11 @@ def test_location_resolver_preserves_specific_target_with_parent_context(
     parents = [
         LocationSignal(
             signal_type="country",
-            raw_value="Deutschland" if "Deutschland" in display_name else "Brasil" if "Brasil" in display_name else "Countryland",
+            raw_value="Deutschland"
+            if "Deutschland" in display_name
+            else "Brasil"
+            if "Brasil" in display_name
+            else "Countryland",
             confidence=0.99,
         )
     ]
@@ -419,7 +474,9 @@ def test_location_resolver_surfaces_geocoder_same_level_ambiguity() -> None:
 
 
 ###############################################################################
-def test_location_resolver_accepts_localized_named_poi_with_generic_descriptor() -> None:
+def test_location_resolver_accepts_localized_named_poi_with_generic_descriptor() -> (
+    None
+):
     class _LocalizedPoi:
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             return {

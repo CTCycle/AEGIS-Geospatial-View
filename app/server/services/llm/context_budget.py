@@ -12,6 +12,8 @@ from server.services.llm.types import ContextUsage, LLMRequest, ModelContextProf
 from server.prompts.context import build_compacted_history_summary
 
 CONTEXT_HEADROOM_TOKENS = 512
+# Application resource policy, not a claim about an unknown model's capacity.
+UNKNOWN_MODEL_INPUT_CEILING = 32_768
 RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY = "_response_schema_embedded_in_messages"
 
 
@@ -19,7 +21,7 @@ RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY = "_response_schema_embedded_in_messages"
 def _positive_int(value: object) -> int | None:
     try:
         number = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return number if number > 0 else None
 
@@ -119,18 +121,18 @@ def _profile_for_request(
     if context_limit is None:
         context_limit = None
     default_output_reserve = _positive_int(metadata.get("default_output_reserve"))
-    if context_limit is None and maximum_output is None and default_output_reserve is None:
+    if (
+        context_limit is None
+        and maximum_output is None
+        and default_output_reserve is None
+    ):
         return None
     return ModelContextProfile(
         provider=normalized_provider,
         model=request.model,
         context_window_tokens=context_limit,
         maximum_output_tokens=maximum_output,
-        default_output_reserve=(
-            default_output_reserve
-            or maximum_output
-            or 0
-        ),
+        default_output_reserve=(default_output_reserve or maximum_output or 0),
         tokenizer_strategy=str(
             metadata.get("tokenizer_strategy") or "chars_per_token_4"
         ),
@@ -205,9 +207,7 @@ def _context_components(
     usable = (
         max(
             0,
-            limit
-            - expected_output
-            - CONTEXT_HEADROOM_TOKENS,
+            limit - expected_output - CONTEXT_HEADROOM_TOKENS,
         )
         if limit is not None
         else None
@@ -271,7 +271,7 @@ def apply_reported_usage(
         for value in values:
             try:
                 parsed = int(value)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             if parsed >= 0:
                 return parsed
@@ -468,14 +468,11 @@ def _compact_messages(
 
 ###############################################################################
 def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:
-    profile = _profile_for_request(provider, request)
-    if profile is None or profile.context_window_tokens is None:
-        # Unknown provider limits must be attempted and diagnosed from the
-        # provider response; do not apply a fabricated local ceiling.
-        return request
     usage = compute_context_usage(request, provider=provider)
     usable = usage.usable_prompt_budget_tokens
-    if usable is None or usage.estimated_input_tokens <= usable:
+    if usable is None:
+        usable = UNKNOWN_MODEL_INPUT_CEILING
+    if usage.estimated_input_tokens <= usable:
         return request
     message_budget = max(
         0,
@@ -497,17 +494,14 @@ def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:
     metadata["_context_compaction_applied"] = compacted
     prepared = replace(request, messages=messages, metadata=metadata)
     prepared_usage = compute_context_usage(prepared, provider=provider)
-    if prepared_usage.usable_prompt_budget_tokens is not None and (
-        prepared_usage.estimated_input_tokens
-        > prepared_usage.usable_prompt_budget_tokens
-    ):
+    if prepared_usage.estimated_input_tokens > usable:
         raise LLMContextLimitError(
             provider=provider,
             model=request.model,
             stage="context_preparation",
             detail=(
                 "The required conversation context still exceeds the usable prompt budget "
-                f"of {prepared_usage.usable_prompt_budget_tokens:,} tokens for {request.model}."
+                f"of {usable:,} tokens for {request.model}."
             ),
             context_usage=prepared_usage.to_dict(),
         )

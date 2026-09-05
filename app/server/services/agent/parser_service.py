@@ -225,7 +225,7 @@ class ParserService:
     def _context_is_required(user_message: str) -> bool:
         return bool(
             re.search(
-                r"\b(?:now|again|there|here|nearby|same|that|this|previous|before|add|remove|hide|keep|continue|also)\b",
+                r"\b(?:now|again|there|here|nearby|same|that|this|previous|before|add|remove|hide|keep|continue|also|back|first|second|third|last|former|latter|them|it|compare|about)\b",
                 str(user_message or ""),
                 flags=re.IGNORECASE,
             )

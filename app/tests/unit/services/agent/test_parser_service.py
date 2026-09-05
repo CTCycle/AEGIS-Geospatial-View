@@ -14,6 +14,20 @@ from server.services.llm.errors import (
 )
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Go back to the first city.",
+        "What about Lugano?",
+        "Compare them.",
+        "Only show the second one.",
+        "Zoom into it.",
+    ],
+)
+def test_follow_up_references_require_structured_context(query: str) -> None:
+    assert ParserService._context_is_required(query)
+
+
 ###############################################################################
 class _ProviderStub:
     # -------------------------------------------------------------------------
