@@ -1,0 +1,26 @@
+[
+  {
+    "turns": 10,
+    "input_history_tokens": 201532,
+    "projected_package_tokens": 1542,
+    "included_messages": 10,
+    "omitted_messages": 0,
+    "exact_location_preserved": true
+  },
+  {
+    "turns": 25,
+    "input_history_tokens": 503841,
+    "projected_package_tokens": 3738,
+    "included_messages": 25,
+    "omitted_messages": 0,
+    "exact_location_preserved": true
+  },
+  {
+    "turns": 50,
+    "input_history_tokens": 1007687,
+    "projected_package_tokens": 7340,
+    "included_messages": 42,
+    "omitted_messages": 8,
+    "exact_location_preserved": true
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "lane": "model_in_loop",
+  "status": "blocked",
+  "scenario_count": 1,
+  "passed_scenarios": 0,
+  "failed_scenarios": 0,
+  "blocked_scenarios": 1,
+  "available_scenarios": 0,
+  "task_success_rate": 0.0,
+  "available_success_rate": null,
+  "assertion_pass_rate": 0.875,
+  "correct_tool_selection_rate": 1.0,
+  "total_tool_calls": 6,
+  "duplicate_tool_calls": 0,
+  "unnecessary_tool_calls": 0,
+  "failed_tool_calls": 0,
+  "invalid_tool_call_rate": 0.0,
+  "peak_context_usage_percent": 0.0,
+  "context_usage_sample_count": 20
+}

@@ -1,0 +1,75 @@
+{
+  "generated_at": "2026-09-05T07:40:00Z",
+  "lanes": {
+    "deterministic": {
+      "status": "passed",
+      "unit_tests": "825 passed, 3 warnings",
+      "frontend_tests": "202 passed",
+      "build": "passed",
+      "ruff": "passed with Windows ACL warnings",
+      "pyright": "0 errors, 0 warnings",
+      "catalog_strict": "0 errors",
+      "fault_benchmark": "3/3 passed"
+    },
+    "controlled_browser": {
+      "status": "passed",
+      "tests": "20 passed",
+      "duration_seconds": 72.63,
+      "browser": "Chrome headless 152",
+      "caveat": "Controlled browser suites use deterministic/stubbed providers and do not establish live provider compatibility."
+    },
+    "live_ui_provider_map": {
+      "status": "blocked",
+      "model": "opencode-go/deepseek-v4-flash",
+      "frontend": "http://127.0.0.1:4512",
+      "backend": "http://127.0.0.1:7059",
+      "conversation_id": "conv_c311390a0261410f8f3c0c08f6f13c6b",
+      "live_25_turn_status": "blocked",
+      "live_25_turns": 25,
+      "live_25_usable": 21,
+      "live_25_bounded_timeouts": 4,
+      "live_25_elapsed_seconds": 296.26,
+      "caveat": "Repeated provider extraction deadlines prevent a compatibility pass."
+    }
+  },
+  "context": {
+    "measurements_file": "context-stress.json",
+    "unknown_model_limit": "preserved as unknown",
+    "application_unknown_input_ceiling": 32768,
+    "history_ceiling": 8192,
+    "ten_turn_projected_tokens": 1542,
+    "twentyfive_turn_projected_tokens": 3738,
+    "fifty_turn_projected_tokens": 7340,
+    "fifty_turn_included_messages": 42,
+    "fifty_turn_omitted_messages": 8,
+    "exact_location_preserved": true
+  },
+  "live_turn_summary": {
+    "turn_1": "blocked: application deadline",
+    "turn_2": "passed: Lugano",
+    "turn_3": "blocked: application deadline",
+    "turn_4": "blocked: application deadline",
+    "turn_5": "partial: city center clarification",
+    "turn_6": "passed: Rome",
+    "turn_7": "passed: EUR",
+    "turn_8": "passed: Open-Meteo air quality",
+    "turn_9": "passed: Milan clarification",
+    "turn_10": "passed: Milan Michigan",
+    "turn_11": "passed: Paris France",
+    "turn_12": "passed: Paris Texas",
+    "turn_13": "partial: Cambridge ambiguity",
+    "turn_14": "passed: Cambridge Massachusetts",
+    "turn_15": "passed: north offset",
+    "turn_16": "passed: direct explanation",
+    "turn_17": "blocked: first city",
+    "turn_18": "passed: retain layer",
+    "turn_19": "blocked: application deadline",
+    "turn_20": "passed: Lugano",
+    "turn_21": "passed: Ticino boundary",
+    "turn_22": "partial: Amsterdam parks",
+    "turn_23": "partial: removal",
+    "turn_24": "partial: border clarification",
+    "turn_25": "partial: around here"
+  }
+}
+
