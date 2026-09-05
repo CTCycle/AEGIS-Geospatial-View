@@ -143,6 +143,7 @@ describe('components/map-preview.component', () => {
 
   it('keeps the active map when a replacement candidate fails', () => {
     let candidateError: ((event: unknown) => void) | undefined;
+    let candidateLoad: (() => void) | undefined;
     const candidateMap = {
       ...fakeMap,
       on: jasmine.createSpy('candidateOn'),
@@ -151,6 +152,9 @@ describe('components/map-preview.component', () => {
     candidateMap.on.and.callFake((event: string, callback: (value?: unknown) => void) => {
       if (event === 'error') {
         candidateError = callback as (event: unknown) => void;
+      }
+      if (event === 'load') {
+        candidateLoad = callback;
       }
     });
     (maplibregl.Map as unknown as jasmine.Spy).and.returnValues(fakeMap as never, candidateMap as never);
@@ -173,6 +177,8 @@ describe('components/map-preview.component', () => {
       }) as never,
     });
     fixture.detectChanges();
+    candidateLoad?.();
+    expect(states.at(-1)).toBe('preparing');
     candidateError?.({ error: new Error('candidate failed') });
 
     expect(candidateMap.remove).toHaveBeenCalledTimes(1);
