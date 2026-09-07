@@ -9,7 +9,6 @@ from server.services.geospatial.composition import (
 from server.services.search.composition import build_search_runtime
 from server.services.chat.composition import build_chat_runtime
 
-
 ###############################################################################
 def test_build_geospatial_runtime_reuses_shared_services(sqlite_backend) -> None:
     seed_credential_encryption_material(sqlite_backend)
@@ -31,7 +30,6 @@ def test_build_geospatial_runtime_reuses_shared_services(sqlite_backend) -> None
         runtime.api_service.provider_registry.catalog_snapshot
         is runtime.catalog_snapshot
     )
-
 
 ###############################################################################
 def test_search_and_chat_consume_shared_geospatial_runtime(sqlite_backend) -> None:

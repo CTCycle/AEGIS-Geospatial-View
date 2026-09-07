@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from typing import TextIO
 
-
 ###############################################################################
 class SafeStreamHandler(logging.StreamHandler[TextIO]):
     """Write console diagnostics without failing on a legacy code page."""

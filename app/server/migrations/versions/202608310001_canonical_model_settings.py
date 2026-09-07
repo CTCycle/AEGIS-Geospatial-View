@@ -12,14 +12,12 @@ down_revision: Union[str, None] = "202608200001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-
 ###############################################################################
 def upgrade() -> None:
     op.drop_column("model_provider_settings", "capabilities_json")
     op.drop_column("model_provider_settings", "supports_tools")
     op.drop_column("model_provider_settings", "supports_structured_output")
     op.drop_column("model_provider_settings", "tool_support_source")
-
 
 ###############################################################################
 def downgrade() -> None:

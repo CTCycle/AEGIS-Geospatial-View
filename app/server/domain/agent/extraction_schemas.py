@@ -6,7 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from server.domain.agent.actions import AgentAction
 
-
 ###############################################################################
 class LLMTemporalSignal(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -23,7 +22,6 @@ class LLMTemporalSignal(BaseModel):
         "none"
     )
 
-
 ###############################################################################
 class LLMGeographicRelationship(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -33,7 +31,6 @@ class LLMGeographicRelationship(BaseModel):
     reference: str | None = None
     analysis_scope: str = "bbox"
     distance_m: float | None = Field(default=None, gt=0.0)
-
 
 ###############################################################################
 class LLMContextQuery(BaseModel):
@@ -48,7 +45,6 @@ class LLMContextQuery(BaseModel):
         "capabilities",
         "failure",
     ] = "none"
-
 
 ###############################################################################
 class LLMLocationSignal(BaseModel):
@@ -82,7 +78,6 @@ class LLMLocationSignal(BaseModel):
     longitude: float | None = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
-
 ###############################################################################
 class LLMDisallowedPattern(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -90,7 +85,6 @@ class LLMDisallowedPattern(BaseModel):
     pattern_id: str
     reason: str
     matched_text: str
-
 
 ###############################################################################
 class LLMAtomicTask(BaseModel):
@@ -111,7 +105,6 @@ class LLMAtomicTask(BaseModel):
         default_factory=lambda: dict[str, Any]()
     )
 
-
 ###############################################################################
 class LLMClarificationOption(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -119,7 +112,6 @@ class LLMClarificationOption(BaseModel):
     option_id: str
     label: str
     description: str | None = None
-
 
 ###############################################################################
 class LLMClarificationPlan(BaseModel):
@@ -133,7 +125,6 @@ class LLMClarificationPlan(BaseModel):
     )
     preserve_valid_results: bool = True
     apply_visualization_changes: bool = False
-
 
 ###############################################################################
 class LLMViewportIntent(BaseModel):
@@ -154,7 +145,6 @@ class LLMViewportIntent(BaseModel):
     radius_hint_m: float | None = Field(default=None, gt=0.0)
     reason: str | None = None
 
-
 ###############################################################################
 class LLMOverlaySelector(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -169,7 +159,6 @@ class LLMOverlaySelector(BaseModel):
     tags: list[str] = Field(default_factory=lambda: list[str]())
     visibility: Literal["any", "visible", "hidden"] = "any"
 
-
 ###############################################################################
 class LLMOverlayScope(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -177,7 +166,6 @@ class LLMOverlayScope(BaseModel):
     kind: Literal["global", "current_view", "location"] = "global"
     location: dict[str, Any] | None = None
     label: str | None = None
-
 
 ###############################################################################
 class LLMOverlayPatch(BaseModel):
@@ -188,14 +176,12 @@ class LLMOverlayPatch(BaseModel):
     style: str | None = None
     format: str | None = None
 
-
 ###############################################################################
 class LLMOverlayStateReference(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     collection_id: str = "active-map"
     revision: int = Field(default=0, ge=0)
-
 
 ###############################################################################
 class LLMOverlayCommand(BaseModel):
@@ -210,7 +196,6 @@ class LLMOverlayCommand(BaseModel):
     state_reference: LLMOverlayStateReference = Field(
         default_factory=LLMOverlayStateReference
     )
-
 
 ###############################################################################
 class LLMParserExtraction(BaseModel):

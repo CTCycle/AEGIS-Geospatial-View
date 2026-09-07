@@ -26,9 +26,9 @@ from server.services.agent_runs.render_completion import (
 )
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderError
 
-
 ###############################################################################
 class AgentRunOrchestrator:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

@@ -13,9 +13,9 @@ from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDec
 from server.contracts.chat import ChatOperationResult
 from server.contracts.geospatial import MapSession, OverlayInstance
 
-
 ###############################################################################
 class AgentResponseBuilder:
+
     # -------------------------------------------------------------------------
     @staticmethod
     def build_final_decision(

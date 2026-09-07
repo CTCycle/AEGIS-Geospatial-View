@@ -23,7 +23,6 @@ from server.services.geospatial.providers.http import (
 
 MOBILITY_DATABASE_CSV_URL = "https://files.mobilitydatabase.org/feeds_v2.csv"
 
-
 ###############################################################################
 class MobilityDatabaseProvider(GeospatialProvider):
     """Search the locally cached Mobility Database feed catalog."""
@@ -211,7 +210,6 @@ class MobilityDatabaseProvider(GeospatialProvider):
                 return False
         return True
 
-
 ###############################################################################
 def _first(row: dict[str, str], *names: str) -> str | None:
     for name in names:
@@ -220,7 +218,6 @@ def _first(row: dict[str, str], *names: str) -> str | None:
             return str(value).strip()
     return None
 
-
 ###############################################################################
 def _float(value: str | None) -> float | None:
     try:
@@ -228,13 +225,11 @@ def _float(value: str | None) -> float | None:
     except TypeError, ValueError:
         return None
 
-
 ###############################################################################
 def _bool(value: str | None) -> bool | None:
     if value is None or not value.strip():
         return None
     return value.strip().casefold() in {"true", "1", "yes"}
-
 
 ###############################################################################
 def _bounded_limit(value: object) -> int:
@@ -242,7 +237,6 @@ def _bounded_limit(value: object) -> int:
         return max(1, min(200, int(str(value or 50))))
     except TypeError, ValueError:
         return 50
-
 
 ###############################################################################
 def _is_true(value: object) -> bool:

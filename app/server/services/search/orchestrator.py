@@ -20,7 +20,6 @@ from server.services.geospatial.providers.base import (
     ProviderUnavailableError,
 )
 
-
 ###############################################################################
 def _provider_failure_code(error: Exception) -> str:
     if isinstance(error, ProviderAuthError):
@@ -33,9 +32,9 @@ def _provider_failure_code(error: Exception) -> str:
         return "malformed_response"
     return "provider_unavailable"
 
-
 ###############################################################################
 class LocationSearchOrchestrator:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -169,6 +168,7 @@ class LocationSearchOrchestrator:
             },
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _annotate_descriptor_with_request(
         descriptor: dict[str, object], payload: LocationSearchRequest

@@ -96,19 +96,17 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
 
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 class ProviderRegistryError(Exception):
     """Base provider registry error."""
-
 
 ###############################################################################
 class ProviderNotRegisteredError(ProviderRegistryError):
     """Raised when no provider is registered for a provider id."""
 
-
 ###############################################################################
 class ProviderRegistry:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

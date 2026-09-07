@@ -6,7 +6,6 @@ import json
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
 
-
 ###############################################################################
 def test_openchargemap_requires_key_for_hosted_access() -> None:
     try:
@@ -22,7 +21,6 @@ def test_openchargemap_requires_key_for_hosted_access() -> None:
         assert "OPENCHARGEMAP_API_KEY" in str(exc)
     else:
         raise AssertionError("Hosted Open Charge Map access must not be anonymous.")
-
 
 ###############################################################################
 def test_openchargemap_reads_local_snapshot(tmp_path) -> None:

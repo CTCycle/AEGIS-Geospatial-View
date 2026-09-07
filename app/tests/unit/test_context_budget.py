@@ -17,7 +17,6 @@ from server.services.llm.context_budget import (
 )
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
-
 ###############################################################################
 def _request(
     content: str,
@@ -33,7 +32,6 @@ def _request(
         ],
         metadata=dict(metadata or {}),
     )
-
 
 ###############################################################################
 def test_static_catalog_profile_is_exact_and_provider_scoped() -> None:
@@ -54,7 +52,6 @@ def test_static_catalog_profile_is_exact_and_provider_scoped() -> None:
     assert usage.peak_request_tokens == usage.estimated_input_tokens
     assert usage.total_input_tokens == usage.estimated_input_tokens
 
-
 ###############################################################################
 def test_model_name_alone_never_creates_a_local_context_cap() -> None:
     assert resolve_model_context_limit("llama3.2") is None
@@ -66,7 +63,6 @@ def test_model_name_alone_never_creates_a_local_context_cap() -> None:
     assert usage.usage_percent is None
     assert usage.usage_source == "estimated"
     assert usage.estimated_input_tokens > 0
-
 
 ###############################################################################
 def test_provider_metadata_supplies_the_local_cap_and_schema_reservation() -> None:
@@ -91,7 +87,6 @@ def test_provider_metadata_supplies_the_local_cap_and_schema_reservation() -> No
     assert usage.reserved_output_tokens == 4096
     assert usage.context_profile_source == "ollama_show_model_info"
     assert usage.usable_prompt_budget_tokens == 36_352
-
 
 ###############################################################################
 def test_complete_request_counts_messages_tools_and_response_schema_before_compaction() -> (
@@ -129,7 +124,6 @@ def test_complete_request_counts_messages_tools_and_response_schema_before_compa
     assert usage.usable_prompt_budget_tokens == 1280
     assert usage.usage_percent is not None
 
-
 ###############################################################################
 def test_embedded_response_schema_is_counted_once_as_a_message() -> None:
     messages = [
@@ -154,7 +148,6 @@ def test_embedded_response_schema_is_counted_once_as_a_message() -> None:
 
     assert usage.response_schema_tokens == 0
     assert usage.estimated_input_tokens == estimate_message_tokens(messages)
-
 
 ###############################################################################
 def test_provider_reported_input_and_output_replace_estimate_without_losing_it() -> (
@@ -188,7 +181,6 @@ def test_provider_reported_input_and_output_replace_estimate_without_losing_it()
     assert updated.usage_source == "provider_reported"
     assert updated.usage_percent == round(700 / 4096 * 100, 1)
 
-
 ###############################################################################
 def test_output_only_provider_usage_is_hybrid() -> None:
     usage = compute_context_usage(_request("hello"), provider="test")
@@ -199,7 +191,6 @@ def test_output_only_provider_usage_is_hybrid() -> None:
     assert updated.usage_source == "hybrid"
     assert updated.estimated_input_tokens == updated.effective_input_tokens
     assert updated.total_output_tokens == 19
-
 
 ###############################################################################
 def test_nested_provider_usage_is_preserved_from_stream_completion_payload() -> None:
@@ -227,11 +218,11 @@ def test_nested_provider_usage_is_preserved_from_stream_completion_payload() -> 
     assert updated.usage_percent == round(700 / 4096 * 100, 1)
 
 
+###############################################################################
 def test_context_usage_percent_uses_model_limit_and_can_show_overage() -> None:
     assert calculate_context_usage_percent(700, 4096) == round(700 / 4096 * 100, 1)
     assert calculate_context_usage_percent(5000, 4096) == round(5000 / 4096 * 100, 1)
     assert calculate_context_usage_percent(700, None) is None
-
 
 ###############################################################################
 def test_prepare_request_compacts_explicitly_bounded_history_and_preserves_current_input() -> (
@@ -260,7 +251,6 @@ def test_prepare_request_compacts_explicitly_bounded_history_and_preserves_curre
     )
     assert prepared.metadata["_context_compaction_applied"] is True
 
-
 ###############################################################################
 def test_prepare_request_does_not_invent_limit_for_unknown_model() -> None:
     request = LLMRequest(
@@ -277,6 +267,7 @@ def test_prepare_request_does_not_invent_limit_for_unknown_model() -> None:
     assert prepared.messages == request.messages
 
 
+###############################################################################
 def test_unknown_model_rejects_oversized_current_request_without_inventing_capacity() -> (
     None
 ):
@@ -288,6 +279,7 @@ def test_unknown_model_rejects_oversized_current_request_without_inventing_capac
     assert usage.usage_percent is None
 
 
+###############################################################################
 def test_unknown_model_compacts_history_to_application_input_ceiling() -> None:
     request = LLMRequest(
         model="unknown",
@@ -304,7 +296,6 @@ def test_unknown_model_compacts_history_to_application_input_ceiling() -> None:
     )
     assert prepared.messages[-1]["content"] == "Show Rome"
     assert prepared.metadata["_context_compaction_applied"] is True
-
 
 ###############################################################################
 def test_context_limit_failure_preserves_preflight_usage() -> None:

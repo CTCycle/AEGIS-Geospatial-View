@@ -42,26 +42,21 @@ from server.services.llm.errors import LLMConfigurationError
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 def get_chat_runtime(request: Request) -> ChatRuntime:
     return request.app.state.chat_runtime
-
 
 ###############################################################################
 def get_job_service(request: Request) -> BackgroundJobService:
     return request.app.state.job_service
 
-
 ###############################################################################
 def get_chat_streaming_service(request: Request) -> ChatStreamingService:
     return request.app.state.chat_streaming_service
 
-
 ###############################################################################
 def _stream_event(event: ChatStreamEvent) -> str:
     return json.dumps(event.model_dump(mode="json")) + "\n"
-
 
 ###############################################################################
 async def _serialize_chat_event_stream(
@@ -70,7 +65,6 @@ async def _serialize_chat_event_stream(
 ) -> AsyncIterator[str]:
     async for event in streaming_service.stream_turn(payload):
         yield _stream_event(event)
-
 
 ###############################################################################
 @router.post(
@@ -83,7 +77,6 @@ async def create_chat_job(
     job_service: BackgroundJobService = Depends(get_job_service),
 ) -> BackgroundJobCreateResponse:
     return job_service.create_chat_job(payload)
-
 
 ###############################################################################
 @router.post(
@@ -102,7 +95,6 @@ async def chat_turn(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
 
-
 ###############################################################################
 @router.post(
     CHAT_STREAM_ROUTE,
@@ -116,7 +108,6 @@ async def chat_stream(
         _serialize_chat_event_stream(streaming_service, payload),
         media_type="application/x-ndjson",
     )
-
 
 ###############################################################################
 @router.get(
@@ -160,7 +151,6 @@ def get_models(
             ),
         ) from exc
 
-
 ###############################################################################
 @router.get(
     CHAT_SETTINGS_ROUTE,
@@ -171,7 +161,6 @@ def get_settings(
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ModelSettingsResponse:
     return runtime.settings_service.get_settings()
-
 
 ###############################################################################
 @router.patch(
@@ -193,7 +182,6 @@ def update_settings(
             detail=str(exc),
         ) from exc
 
-
 ###############################################################################
 @router.post(
     CHAT_OLLAMA_REFRESH_ROUTE,
@@ -204,7 +192,6 @@ def refresh_ollama_models(
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> OllamaRefreshResponse:
     return runtime.maintenance_service.refresh_ollama_models()
-
 
 ###############################################################################
 @router.post(
@@ -233,7 +220,6 @@ def pull_ollama_model(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Ollama pull failed.",
         ) from exc
-
 
 ###############################################################################
 @router.get(

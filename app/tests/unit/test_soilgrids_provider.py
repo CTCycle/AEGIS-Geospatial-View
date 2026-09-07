@@ -10,7 +10,6 @@ from server.services.geospatial.providers.base import ProviderRequest, ProviderU
 from server.services.geospatial.providers.soilgrids import SoilGridsProvider
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 def test_soilgrids_provider_builds_default_wcs_descriptors() -> None:
     response = asyncio.run(
@@ -29,7 +28,6 @@ def test_soilgrids_provider_builds_default_wcs_descriptors() -> None:
     assert "REQUEST=DescribeCoverage" in response.payload["describeCoverageUrl"]
     assert response.payload["coverageDownloadUrl"] is None
     assert response.payload["spatialResolution"] == "250 m"
-
 
 ###############################################################################
 def test_soilgrids_provider_builds_bounded_geotiff_coverage_url() -> None:
@@ -59,7 +57,6 @@ def test_soilgrids_provider_builds_bounded_geotiff_coverage_url() -> None:
     assert "SUBSETTINGCRS=" in coverage_url
     assert coverage_url.count("SUBSET=") == 2
 
-
 ###############################################################################
 def test_soilgrids_provider_handles_organic_carbon_stock_depth_constraints() -> None:
     response = asyncio.run(
@@ -75,7 +72,6 @@ def test_soilgrids_provider_handles_organic_carbon_stock_depth_constraints() -> 
     assert response.payload["availableDepths"] == ["0-30cm"]
     assert response.payload["availableQuantiles"] == ["mean"]
 
-
 ###############################################################################
 def test_soilgrids_provider_rejects_unknown_property() -> None:
     with pytest.raises(ProviderUnavailableError, match="Unsupported SoilGrids property"):
@@ -87,7 +83,6 @@ def test_soilgrids_provider_rejects_unknown_property() -> None:
                 )
             )
         )
-
 
 ###############################################################################
 def test_soilgrids_manifest_and_runtime_profile_are_loaded() -> None:
@@ -111,7 +106,6 @@ def test_soilgrids_manifest_and_runtime_profile_are_loaded() -> None:
     assert profile["supports_map"] is False
     assert profile["supports_direct_text"] is True
     assert profile["auth_required"] is False
-
 
 ###############################################################################
 def test_soilgrids_is_available_to_runtime_and_provider_registries() -> None:

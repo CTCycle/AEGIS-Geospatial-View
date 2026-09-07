@@ -11,7 +11,6 @@ from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.request_interpreter import RequestInterpreter
 from server.services.agent.tool_planner import DeterministicToolPlanner
 
-
 ###############################################################################
 def _turn(
     text: str,
@@ -47,13 +46,11 @@ def _turn(
         tools_needed=True,
     )
 
-
 ###############################################################################
 def test_location_only_map_does_not_invent_a_basemap_in_the_planner() -> None:
     plan = DeterministicToolPlanner().build_plan(_turn("Show Rome"), "place_resolution")
     assert plan.steps == []
     assert plan.visualization_update == {}
-
 
 ###############################################################################
 def test_layer_plan_contains_location_arguments() -> None:
@@ -63,7 +60,6 @@ def test_layer_plan_contains_location_arguments() -> None:
     )
     assert plan.steps[0].arguments["capability_id"] == "rainviewer_precipitation_radar"
     assert plan.steps[0].arguments["arguments"]["location"] == "Rome"
-
 
 ###############################################################################
 def test_provider_layer_selection_uses_provider_render_tool() -> None:
@@ -83,7 +79,6 @@ def test_provider_layer_selection_uses_provider_render_tool() -> None:
         "layer_id": "MODIS_Terra_CorrectedReflectance_TrueColor",
     }
 
-
 ###############################################################################
 def test_typed_capability_is_selected_without_prose_keyword_inference() -> None:
     plan = DeterministicToolPlanner().build_plan(
@@ -98,7 +93,6 @@ def test_typed_capability_is_selected_without_prose_keyword_inference() -> None:
         "openmeteo_air_quality_forecast"
     ]
 
-
 ###############################################################################
 def test_basemap_replacement_is_deterministic() -> None:
     plan = DeterministicToolPlanner().build_plan(
@@ -107,7 +101,6 @@ def test_basemap_replacement_is_deterministic() -> None:
     )
     assert plan.steps == []
     assert plan.visualization_update == {"basemap_replacement": "esri_world_imagery"}
-
 
 ###############################################################################
 def test_non_additive_overlay_command_does_not_emit_provider_layer_addition() -> None:
@@ -125,7 +118,6 @@ def test_non_additive_overlay_command_does_not_emit_provider_layer_addition() ->
     assert plan.steps == []
     assert "add_layer_ids" not in plan.visualization_update
     assert "overlay_commands" in plan.visualization_update
-
 
 ###############################################################################
 def test_atomic_task_dependencies_and_bindings_reach_executable_plan() -> None:
@@ -163,7 +155,6 @@ def test_atomic_task_dependencies_and_bindings_reach_executable_plan() -> None:
     assert second.input_bindings[0].source_step_id == first.step_id
     assert first.output_refs == ["air-quality-result"]
 
-
 ###############################################################################
 def test_atomic_tasks_without_layer_refs_do_not_create_inferred_dependencies() -> None:
     turn = _turn(
@@ -183,6 +174,7 @@ def test_atomic_tasks_without_layer_refs_do_not_create_inferred_dependencies() -
     assert [step.depends_on for step in plan.steps] == [[], []]
 
 
+###############################################################################
 def test_peer_targets_create_independent_capability_steps() -> None:
     turn = _turn(
         "Compare earthquakes in Paris and London",
@@ -232,6 +224,7 @@ def test_peer_targets_create_independent_capability_steps() -> None:
     ] == ["Paris, France", "London, United Kingdom"]
 
 
+###############################################################################
 def test_peer_targets_create_independent_provider_layer_steps() -> None:
     turn = _turn(
         "Compare the selected layer in Paris and London",

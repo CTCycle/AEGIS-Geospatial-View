@@ -7,7 +7,6 @@ from server.services.geospatial.rainviewer import (
     RainViewerService,
 )
 
-
 ###############################################################################
 def test_rainviewer_service_returns_cached_metadata_without_refetch() -> None:
     calls: list[str] = []
@@ -39,7 +38,6 @@ def test_rainviewer_service_returns_cached_metadata_without_refetch() -> None:
     )
     assert second["latest_time"] == 200
     assert calls == ["https://api.rainviewer.com/public/weather-maps.json"]
-
 
 ###############################################################################
 def test_rainviewer_service_rejects_malformed_payload() -> None:

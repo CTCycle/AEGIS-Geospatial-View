@@ -13,7 +13,6 @@ from server.contracts.geospatial import CapabilityManifestV2
 
 type JsonDict = dict[str, Any]
 
-
 ###############################################################################
 class CatalogIndex(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -30,7 +29,6 @@ class CatalogIndex(BaseModel):
     source_catalog_version: str
     capability_groups: list[str]
     health_summary: dict[str, int]
-
 
 ###############################################################################
 class RuntimeProfile(BaseModel):
@@ -51,7 +49,6 @@ class RuntimeProfile(BaseModel):
     manual_toggle: bool
     auth_required: bool
 
-
 ###############################################################################
 class RuntimeProfilesDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -60,11 +57,9 @@ class RuntimeProfilesDocument(BaseModel):
     profiles: list[RuntimeProfile]
     routing_profiles: list[str]
 
-
 ###############################################################################
 class ManifestValidationError(ValueError):
     pass
-
 
 ###############################################################################
 class GeospatialManifestLoader:

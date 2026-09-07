@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.domain.agent.actions import AgentAction
 from server.domain.llm.types import LLMToolDefinition
 
-
 ###############################################################################
 class AgentToolName(str, Enum):
     SEARCH_MAPS = "search_maps"
@@ -21,7 +20,6 @@ class AgentToolName(str, Enum):
     DISPLAY_DATASET_ON_MAP = "display_dataset_on_map"
     INTERROGATE_VISIBLE_LAYERS = "interrogate_visible_layers"
     COMBINE_MAP_DATA_WITH_EXTERNAL_SOURCES = "combine_map_data_with_external_sources"
-
 
 ###############################################################################
 class AgentToolDefinition(BaseModel):
@@ -37,7 +35,6 @@ class AgentToolDefinition(BaseModel):
     source_manifest_id: str | None = None
     source_capability_id: str | None = None
 
-
 ###############################################################################
 class AgentToolCall(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -45,7 +42,6 @@ class AgentToolCall(BaseModel):
     id: str | None = None
     name: str
     arguments: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
-
 
 ###############################################################################
 class AgentToolResult(BaseModel):
@@ -56,13 +52,11 @@ class AgentToolResult(BaseModel):
     result: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     error: str | None = None
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ToolError:
     code: str
     message: str
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -82,7 +76,6 @@ class ToolExecutionEnvelope:
             else {"code": self.error.code, "message": self.error.message},
             "metadata": self.metadata,
         }
-
 
 ###############################################################################
 @dataclass(frozen=True)

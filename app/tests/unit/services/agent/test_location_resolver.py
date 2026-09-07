@@ -10,10 +10,14 @@ from server.services.agent.location_resolver import LocationResolver
 from server.contracts.extraction import LocationSignal
 
 
+###############################################################################
 def test_hierarchical_normalized_location_does_not_duplicate_parent_query() -> None:
     calls = []
 
+    ###############################################################################
     class Geocoder:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):
             calls.append(kwargs["address"])
             if kwargs["address"] != "Paris, Texas, USA":
@@ -54,7 +58,6 @@ def test_hierarchical_normalized_location_does_not_duplicate_parent_query() -> N
     assert result.longitude == -95.5555
     assert calls == ["Paris, Texas, USA"]
 
-
 ###############################################################################
 def test_location_resolver_uses_coordinates_without_geocoder() -> None:
     resolver = LocationResolver()
@@ -77,12 +80,14 @@ def test_location_resolver_uses_coordinates_without_geocoder() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_resolves_same_level_peer_targets_independently() -> None:
     calls: list[str] = []
 
+    ###############################################################################
     class _Peers:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             calls.append(kwargs["address"])
             return {
@@ -119,7 +124,6 @@ def test_location_resolver_resolves_same_level_peer_targets_independently() -> N
     run_async_in_thread(_run())
     assert calls == ["Paris", "London"]
 
-
 ###############################################################################
 def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
 
@@ -127,6 +131,7 @@ def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
 
     ###############################################################################
     class _FakeNominatim:
+
         # -------------------------------------------------------------------------
         async def extract_coordinates(
             self,
@@ -206,10 +211,13 @@ def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_accepts_poi_when_parent_signal_is_canonicalized() -> None:
+
+    ###############################################################################
     class _CanonicalizedParent:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             assert kwargs["city"] == "Rome, Roma Capitale, Lazio, Italy"
             return {
@@ -258,7 +266,6 @@ def test_location_resolver_accepts_poi_when_parent_signal_is_canonicalized() -> 
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     ("signal_type", "raw_value", "display_name"),
@@ -275,7 +282,10 @@ def test_location_resolver_preserves_specific_target_with_parent_context(
 ) -> None:
     calls: list[dict[str, object]] = []
 
+    ###############################################################################
     class _FakeNominatim:
+
+        # -------------------------------------------------------------------------
         @staticmethod
         def normalize_component(value: str) -> str:
             decomposed = unicodedata.normalize("NFKD", value)
@@ -283,6 +293,7 @@ def test_location_resolver_preserves_specific_target_with_parent_context(
                 decomposed.encode("ascii", "ignore").decode("ascii").lower().split()
             )
 
+        # -------------------------------------------------------------------------
         async def extract_coordinates(
             self,
             *,
@@ -361,10 +372,13 @@ def test_location_resolver_preserves_specific_target_with_parent_context(
     if signal_type == "address":
         assert calls[0]["city"] == "Metro City"
 
-
 ###############################################################################
 def test_location_resolver_accepts_compound_city_signal_from_city_boundary() -> None:
+
+    ###############################################################################
     class _CityBoundary:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             return {
                 "display_name": "Harborview, Coastal Province, Republicland",
@@ -398,10 +412,13 @@ def test_location_resolver_accepts_compound_city_signal_from_city_boundary() -> 
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_rejects_parent_only_geocoder_result() -> None:
+
+    ###############################################################################
     class _ParentOnly:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             return {
                 "display_name": "Example City, Example Country",
@@ -422,10 +439,13 @@ def test_location_resolver_rejects_parent_only_geocoder_result() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_clarifies_conflicting_parent_context() -> None:
+
+    ###############################################################################
     class _ShouldNotGeocode:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             raise AssertionError("conflicting parents must be rejected before lookup")
 
@@ -445,7 +465,6 @@ def test_location_resolver_clarifies_conflicting_parent_context() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_clarifies_same_level_targets() -> None:
     resolver = LocationResolver(nominatim_service=None)
@@ -464,7 +483,6 @@ def test_location_resolver_clarifies_same_level_targets() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     "response",
@@ -473,7 +491,11 @@ def test_location_resolver_clarifies_same_level_targets() -> None:
 def test_location_resolver_clarifies_empty_or_malformed_geocoder_response(
     response: dict[str, object] | None,
 ) -> None:
+
+    ###############################################################################
     class _Malformed:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             return response
 
@@ -487,10 +509,13 @@ def test_location_resolver_clarifies_empty_or_malformed_geocoder_response(
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_surfaces_geocoder_same_level_ambiguity() -> None:
+
+    ###############################################################################
     class _Ambiguous:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             return {
                 "display_name": "Springfield, North",
@@ -514,12 +539,15 @@ def test_location_resolver_surfaces_geocoder_same_level_ambiguity() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_accepts_localized_named_poi_with_generic_descriptor() -> (
     None
 ):
+
+    ###############################################################################
     class _LocalizedPoi:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             return {
                 "display_name": "Centre de recherche du port, Port Azure, Pays Exemple",
@@ -551,12 +579,14 @@ def test_location_resolver_accepts_localized_named_poi_with_generic_descriptor()
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_builds_district_city_country_hierarchy_once() -> None:
     calls: list[dict[str, object]] = []
 
+    ###############################################################################
     class _HierarchyGeocoder:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             calls.append(kwargs)
             return {
@@ -624,12 +654,14 @@ def test_location_resolver_builds_district_city_country_hierarchy_once() -> None
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_named_signal_coordinates_are_hints_not_a_hierarchy_bypass() -> None:
     calls: list[dict[str, object]] = []
 
+    ###############################################################################
     class _NamedEntityGeocoder:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             calls.append(kwargs)
             return {
@@ -684,12 +716,14 @@ def test_named_signal_coordinates_are_hints_not_a_hierarchy_bypass() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_repairs_model_same_level_district_city_conflict() -> None:
     calls: list[dict[str, object]] = []
 
+    ###############################################################################
     class _RelationshipGeocoder:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             calls.append(kwargs)
             if kwargs["address"] == "EUR" and kwargs["city"] == "Rome":
@@ -743,12 +777,14 @@ def test_location_resolver_repairs_model_same_level_district_city_conflict() -> 
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_accepts_country_alias_and_preserves_raw_span() -> None:
     calls: list[dict[str, object]] = []
 
+    ###############################################################################
     class _AliasGeocoder:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             calls.append(kwargs)
             return {
@@ -793,10 +829,13 @@ def test_location_resolver_accepts_country_alias_and_preserves_raw_span() -> Non
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_uses_deictic_signal_as_memory_context() -> None:
+
+    ###############################################################################
     class _ShouldNotGeocode:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             raise AssertionError("deictic-only follow-up must reuse memory")
 
@@ -830,12 +869,14 @@ def test_location_resolver_uses_deictic_signal_as_memory_context() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_uses_active_city_as_parent_for_finer_follow_up() -> None:
     calls: list[dict[str, object]] = []
 
+    ###############################################################################
     class _FollowUpGeocoder:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             calls.append(kwargs)
             return {

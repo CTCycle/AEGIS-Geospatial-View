@@ -40,6 +40,7 @@ ALLOWED_INVARIANTS = frozenset(
 )
 
 
+###############################################################################
 def _string_set(value: object) -> set[str] | None:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         return None
@@ -47,6 +48,7 @@ def _string_set(value: object) -> set[str] | None:
     return normalized
 
 
+###############################################################################
 def validate_scenario_matrix(document: object) -> list[str]:
     """Return actionable validation errors without executing any scenario."""
 
@@ -161,6 +163,7 @@ def validate_scenario_matrix(document: object) -> list[str]:
     return errors
 
 
+###############################################################################
 def load_scenario_matrix(path: Path | None = None) -> dict[str, Any]:
     """Load the checked-in matrix and fail closed when its contract is invalid."""
 

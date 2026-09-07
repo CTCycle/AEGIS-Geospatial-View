@@ -20,23 +20,22 @@ from server.services.agent.response_synthesizer import (
     synthesize_response_async,
 )
 
-
 ###############################################################################
 @dataclass
 class _Settings:
     agent_model_provider: str = "test"
     agent_model_name: str = "test-model"
 
-
 ###############################################################################
 class _SettingsRepo:
+
     # -------------------------------------------------------------------------
     def get_required(self) -> _Settings:
         return _Settings()
 
-
 ###############################################################################
 class _Provider:
+
     # -------------------------------------------------------------------------
     def __init__(self, content: str = "**Map ready.**") -> None:
         self.content = content
@@ -52,9 +51,9 @@ class _Provider:
             "warnings": [],
         }
 
-
 ###############################################################################
 class _Factory:
+
     # -------------------------------------------------------------------------
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
@@ -63,7 +62,6 @@ class _Factory:
     def get_provider(self, provider: str) -> _Provider:
         assert provider == "test"
         return self.provider
-
 
 ###############################################################################
 def test_synthesizer_returns_grounded_markdown_and_bounded_evidence() -> None:
@@ -102,7 +100,6 @@ def test_synthesizer_returns_grounded_markdown_and_bounded_evidence() -> None:
         VERIFIED_EVIDENCE_USER_TEMPLATE.split("{", maxsplit=1)[0]
     )
 
-
 ###############################################################################
 def test_synthesizer_evidence_retains_nested_provider_measurements() -> None:
     provider = _Provider("The current temperature is verified.")
@@ -137,7 +134,6 @@ def test_synthesizer_evidence_retains_nested_provider_measurements() -> None:
 
     request_text = provider.requests[0].messages[1]["content"]
     assert '"temperature_2m":27.3' in request_text
-
 
 ###############################################################################
 def test_synthesizer_evidence_marks_metadata_only_overlays() -> None:
@@ -197,12 +193,12 @@ def test_synthesizer_evidence_marks_metadata_only_overlays() -> None:
     assert '"status":"metadata_only"' in request_text
     assert "not a live rendered map layer" in system_text
 
-
 ###############################################################################
 def test_synthesizer_falls_back_when_model_fails() -> None:
 
     ###############################################################################
     class _FailingProvider(_Provider):
+
         # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             _ = request, schema
@@ -228,7 +224,6 @@ def test_synthesizer_falls_back_when_model_fails() -> None:
         == "Choose a supported time basis."
     )
 
-
 ###############################################################################
 def test_synthesizer_does_not_rewrite_failed_or_policy_responses() -> None:
     provider = _Provider("This must not be used.")
@@ -251,7 +246,6 @@ def test_synthesizer_does_not_rewrite_failed_or_policy_responses() -> None:
 
     assert result == "Credential rejected."
     assert provider.requests == []
-
 
 ###############################################################################
 def test_async_synthesizer_skips_verified_map_only_response() -> None:
@@ -292,12 +286,12 @@ def test_async_synthesizer_skips_verified_map_only_response() -> None:
     assert result == "Map ready."
     assert provider.requests == []
 
-
 ###############################################################################
 def test_synthesizer_falls_back_on_invalid_structured_output() -> None:
 
     ###############################################################################
     class _InvalidProvider(_Provider):
+
         # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             self.requests.append(request)
@@ -322,7 +316,6 @@ def test_synthesizer_falls_back_on_invalid_structured_output() -> None:
         )
         == "Verified fallback."
     )
-
 
 ###############################################################################
 def test_synthesizer_falls_back_when_successful_overlay_is_called_failed() -> None:
@@ -370,7 +363,6 @@ def test_synthesizer_falls_back_when_successful_overlay_is_called_failed() -> No
         )
         == "Map ready with the verified POI overlay."
     )
-
 
 ###############################################################################
 def test_synthesizer_rejects_absence_claim_when_overlay_has_features() -> None:

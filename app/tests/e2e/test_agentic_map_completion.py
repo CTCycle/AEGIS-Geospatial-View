@@ -40,6 +40,7 @@ VISIBLE_TILE = base64.b64decode(
 )
 
 
+###############################################################################
 def _envelope(
     *,
     message_type: str,
@@ -69,6 +70,7 @@ def _envelope(
     return json.dumps(envelope)
 
 
+###############################################################################
 def _map_session() -> dict[str, Any]:
     session = deepcopy(ROME_MAP_SESSION)
     session["session_id"] = MAP_SESSION_ID
@@ -115,6 +117,7 @@ def _map_session() -> dict[str, Any]:
     return session
 
 
+###############################################################################
 def _prepared_presentation(map_session: dict[str, Any]) -> dict[str, Any]:
     return {
         "status": "pending",
@@ -140,6 +143,7 @@ def _prepared_presentation(map_session: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> None:
     map_session = _map_session()
     presentation = _prepared_presentation(map_session)
@@ -269,6 +273,7 @@ def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> Non
     )
 
 
+###############################################################################
 def _setup_controlled_routes(page: Page, acknowledgments: list[dict[str, Any]]) -> None:
     def fulfill(route: Route, payload: dict[str, Any]) -> None:
         route.fulfill(
@@ -314,6 +319,7 @@ def _setup_controlled_routes(page: Page, acknowledgments: list[dict[str, Any]]) 
     )
 
 
+###############################################################################
 def test_controlled_map_completion_requires_and_records_visible_rendering(
     page: Page,
     base_url: str,

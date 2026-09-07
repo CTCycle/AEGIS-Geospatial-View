@@ -10,13 +10,11 @@ from server.services.chat.model_library import ChatModelLibraryService
 from server.services.llm.context_budget import resolve_model_context_profile
 from server.services.llm.types import ModelContextProfile
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class _CachedProfile:
     expires_at: float
     profile: ModelContextProfile | None
-
 
 ###############################################################################
 class ModelContextProfileResolver:
@@ -27,6 +25,7 @@ class ModelContextProfileResolver:
     unknown rather than becoming a model-name heuristic.
     """
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

@@ -102,7 +102,6 @@ _NON_DATA_CONCEPT_TAGS = frozenset(
     }
 )
 
-
 ###############################################################################
 class CapabilityResolver:
     """Resolve parser concepts against the executable catalog.
@@ -671,6 +670,7 @@ class CapabilityResolver:
                         return False
         return True
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
         raw = capability.get("executionContract") or capability.get(

@@ -64,7 +64,6 @@ OPENCODE_BASE_URLS = {
     OPENCODE_GO_PROVIDER: DEFAULT_OPENCODE_GO_BASE_URL,
 }
 
-
 ###############################################################################
 class OpenCodeProvider(DeepSeekProvider):
     """OpenCode Go/Zen adapter for their OpenAI-compatible model subset."""

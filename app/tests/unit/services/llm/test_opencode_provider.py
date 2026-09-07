@@ -14,14 +14,13 @@ from server.services.llm.opencode_provider import (
 from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.types import LLMRequest
 
-
 ###############################################################################
 class _StructuredPayload(BaseModel):
     answer: str
 
-
 ###############################################################################
 class _Response:
+
     # -------------------------------------------------------------------------
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
@@ -34,9 +33,9 @@ class _Response:
     def json(self) -> dict[str, object]:
         return self.payload
 
-
 ###############################################################################
 class _Completions:
+
     # -------------------------------------------------------------------------
     def __init__(self, error: Exception | None = None) -> None:
         self.calls: list[dict[str, object]] = []
@@ -65,9 +64,9 @@ class _Completions:
             choices=[SimpleNamespace(message=message, finish_reason="stop")]
         )
 
-
 ###############################################################################
 class _Client:
+
     # -------------------------------------------------------------------------
     def __init__(self, error: Exception | None = None) -> None:
         self.completions = _Completions(error)
@@ -78,7 +77,6 @@ class _Client:
     def with_options(self, **kwargs):  # noqa: ANN003, ANN201
         self.timeout_options.append(kwargs)
         return self
-
 
 ###############################################################################
 def test_zen_catalog_keeps_live_models_even_when_static_capabilities_are_unknown(
@@ -110,7 +108,6 @@ def test_zen_catalog_keeps_live_models_even_when_static_capabilities_are_unknown
     assert captured["url"] == "https://opencode.ai/zen/v1/models"
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer test-key"
 
-
 ###############################################################################
 def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
@@ -119,7 +116,6 @@ def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     assert provider.supports_tools("deepseek-v4-flash") is True
     assert provider.supports_structured_output("deepseek-v4-flash") is True
     assert provider.supports_tools("claude-opus-5") is None
-
 
 ###############################################################################
 def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -> None:
@@ -144,7 +140,6 @@ def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -
     assert "JSON schema" in call["messages"][-1]["content"]
     assert result.context_usage["response_schema_tokens"] == 0
 
-
 ###############################################################################
 def test_chat_forwards_bounded_output_tokens(monkeypatch) -> None:
     client = _Client()
@@ -160,7 +155,6 @@ def test_chat_forwards_bounded_output_tokens(monkeypatch) -> None:
 
     assert client.completions.calls[0]["max_tokens"] == 77
 
-
 ###############################################################################
 def test_stream_forwards_bounded_output_tokens(monkeypatch) -> None:
     client = _Client()
@@ -174,7 +168,6 @@ def test_stream_forwards_bounded_output_tokens(monkeypatch) -> None:
 
     assert list(provider.stream_chat(request)) == ["streamed"]
     assert client.completions.calls[0]["max_tokens"] == 88
-
 
 ###############################################################################
 def test_bounded_deadline_is_forwarded_without_the_old_thirty_second_cap(
@@ -196,7 +189,6 @@ def test_bounded_deadline_is_forwarded_without_the_old_thirty_second_cap(
     )
 
     assert client.timeout_options == [{"timeout": 47.5}]
-
 
 ###############################################################################
 def test_timeout_failure_keeps_preflight_context_usage(monkeypatch) -> None:

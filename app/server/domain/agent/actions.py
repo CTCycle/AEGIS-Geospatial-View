@@ -4,7 +4,6 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
 
-
 ###############################################################################
 class AgentAction(str, Enum):
     MAP_SEARCH = "map_search"
@@ -17,7 +16,6 @@ class AgentAction(str, Enum):
     MAP_EXTERNAL_SOURCE_COMBINATION = "map_external_source_combination"
     CHAT_RESPONSE = "chat_response"
     UNKNOWN = "unknown"
-
 
 ###############################################################################
 class ActionDefinition(BaseModel):

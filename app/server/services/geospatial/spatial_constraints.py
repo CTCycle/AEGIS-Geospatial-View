@@ -10,6 +10,7 @@ from shapely.geometry import Point, shape
 from shapely.ops import transform
 
 
+###############################################################################
 class SpatialConstraintError(ValueError):
     """Raised when a requested scope or geometry cannot be trusted."""
 
@@ -17,6 +18,7 @@ class SpatialConstraintError(ValueError):
 _GEOD = Geod(ellps="WGS84")
 
 
+###############################################################################
 def normalize_bbox(value: Iterable[object]) -> list[float]:
     """Normalize a bbox to [west, south, east, north] without hiding wraps."""
 
@@ -41,6 +43,7 @@ def normalize_bbox(value: Iterable[object]) -> list[float]:
     return [west, south, east, north]
 
 
+###############################################################################
 def validate_point(latitude: object, longitude: object) -> tuple[float, float]:
     """Validate a WGS84 point and return it as (latitude, longitude)."""
 
@@ -58,6 +61,7 @@ def validate_point(latitude: object, longitude: object) -> tuple[float, float]:
     return latitude_value, longitude_value
 
 
+###############################################################################
 def validate_geojson_geometry(geometry: object) -> dict[str, Any]:
     """Reject malformed or invalid GeoJSON geometry before map assembly."""
 
@@ -75,6 +79,7 @@ def validate_geojson_geometry(geometry: object) -> dict[str, Any]:
     return geometry_object
 
 
+###############################################################################
 def geodesic_distance_m(
     first_latitude: float,
     first_longitude: float,
@@ -89,6 +94,7 @@ def geodesic_distance_m(
     return float(distance)
 
 
+###############################################################################
 def feature_matches_constraint(
     feature: object,
     *,

@@ -15,7 +15,6 @@ from server.services.geospatial.rainviewer import (
     RainViewerServiceError,
 )
 
-
 ###############################################################################
 class RainViewerProvider(GeospatialProvider):
     provider_id = "rainviewer"

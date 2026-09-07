@@ -35,9 +35,9 @@ from server.services.llm.types import (
 
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 class NativeToolLoop:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -381,6 +381,7 @@ class NativeToolLoop:
             context_usages=list(context_usages),
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _call_fingerprint(call: LLMToolCall, context: AgentExecutionContext) -> str:
         """Include canonical scope in duplicate detection for native calls."""
@@ -528,6 +529,7 @@ class NativeToolLoop:
             else None,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _validate_geospatial_tool_output(
         call: LLMToolCall,

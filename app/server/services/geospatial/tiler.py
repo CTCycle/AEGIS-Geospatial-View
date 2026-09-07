@@ -8,11 +8,9 @@ from typing import Any
 
 from server.domain.geospatial.tiler import TileBuildResult
 
-
 ###############################################################################
 class TileBuildError(RuntimeError):
     """Raised when a geospatial dataset cannot be prepared for tile delivery."""
-
 
 ###############################################################################
 def build_vector_tile_manifest(
@@ -53,7 +51,6 @@ def build_vector_tile_manifest(
         warnings=warnings,
     )
 
-
 ###############################################################################
 def build_raster_tile_manifest(
     *,
@@ -89,7 +86,6 @@ def build_raster_tile_manifest(
         feature_count=0,
         warnings=warnings,
     )
-
 
 ###############################################################################
 def _feature_count(source_path: Path | None) -> int:

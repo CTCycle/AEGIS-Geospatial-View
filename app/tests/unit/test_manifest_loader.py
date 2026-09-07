@@ -4,7 +4,6 @@ from pathlib import Path
 
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
-
 ###############################################################################
 def test_manifest_loader_reads_core_collections() -> None:
     loader = GeospatialManifestLoader()
@@ -18,7 +17,6 @@ def test_manifest_loader_reads_core_collections() -> None:
     assert basemap.get("source_filename")
     assert basemap.get("source_path")
 
-
 ###############################################################################
 def test_priority_provider_manifests_include_temporal_metadata() -> None:
     payload = GeospatialManifestLoader().load_all()
@@ -28,7 +26,6 @@ def test_priority_provider_manifests_include_temporal_metadata() -> None:
         assert metadata["dataset_time_reference"]
         assert metadata["source_freshness"]
         assert metadata["query_mode"]
-
 
 ###############################################################################
 def test_manifest_loader_accepts_path_root_argument() -> None:

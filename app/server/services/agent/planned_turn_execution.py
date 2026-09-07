@@ -35,9 +35,9 @@ from server.services.agent.deterministic_intent_recovery import (
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 
-
 ###############################################################################
 class PlannedTurnExecutionService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

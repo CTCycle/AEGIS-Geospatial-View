@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.services.llm.types import ModelContextProfile, ModelDescriptor
 
-
 ###############################################################################
 def _catalog_model(
     *,
@@ -148,7 +147,6 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
     ),
 )
 
-
 ###############################################################################
 def _positive_int(value: object) -> int | None:
     try:
@@ -156,7 +154,6 @@ def _positive_int(value: object) -> int | None:
     except TypeError, ValueError:
         return None
     return number if number > 0 else None
-
 
 ###############################################################################
 def get_model_context_profile(provider: str, model: str) -> ModelContextProfile | None:
@@ -194,7 +191,6 @@ def get_model_context_profile(provider: str, model: str) -> ModelContextProfile 
                 ),
             )
     return None
-
 
 ###############################################################################
 def get_cloud_model_catalog() -> list[ModelDescriptor]:

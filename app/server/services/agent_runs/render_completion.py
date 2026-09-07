@@ -15,18 +15,22 @@ from server.services.agent.completion import CompletionEvaluator
 from server.services.agent_runs.events import RunEventPublisher
 
 
+###############################################################################
 class RenderAcknowledgementError(ValueError):
     """Raised when browser evidence cannot be applied to the prepared run."""
 
 
+###############################################################################
 def _json_object(value: object) -> dict[str, Any]:
     return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
+###############################################################################
 def _json_list(value: object) -> list[Any]:
     return cast(list[Any], value) if isinstance(value, list) else []
 
 
+###############################################################################
 @dataclass(frozen=True)
 class RenderAcknowledgementResult:
     run_id: str
@@ -36,9 +40,11 @@ class RenderAcknowledgementResult:
     duplicate: bool
 
 
+###############################################################################
 class RenderCompletionService:
     """Prepare candidates and atomically promote acknowledged map sessions."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -48,6 +54,7 @@ class RenderCompletionService:
         self.run_repository = run_repository
         self.event_publisher = event_publisher
 
+    # -------------------------------------------------------------------------
     def prepare(
         self,
         *,
@@ -104,6 +111,7 @@ class RenderCompletionService:
         )
         return presentation, transitioned
 
+    # -------------------------------------------------------------------------
     @classmethod
     def requires_browser_ack(cls, map_session: MapSession) -> bool:
         """Whether this candidate contains a browser-visible requirement.
@@ -117,6 +125,7 @@ class RenderCompletionService:
         instances = map_session.overlay_collection.instances
         return not instances or any(not cls._metadata_only(instance) for instance in instances)
 
+    # -------------------------------------------------------------------------
     @classmethod
     def has_blocking_data_failure(cls, map_session: MapSession) -> bool:
         """Return true when a candidate contains a provider/data failure.
@@ -145,6 +154,7 @@ class RenderCompletionService:
                 return True
         return False
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _metadata_only(instance: Any) -> bool:
         rendering_mode = str(getattr(instance, "rendering_mode", "")).casefold()
@@ -161,6 +171,7 @@ class RenderCompletionService:
             or render_status in {"metadata-only", "metadata_only"}
         )
 
+    # -------------------------------------------------------------------------
     async def acknowledge(
         self,
         conversation_id: str,

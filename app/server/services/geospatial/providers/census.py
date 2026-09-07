@@ -20,7 +20,6 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
-
 ###############################################################################
 class CensusProvider(GeospatialProvider):
     provider_id = "census"
@@ -301,7 +300,6 @@ class CensusProvider(GeospatialProvider):
     async def _fetch_json(self, url: str) -> object:
         return await call_json_fetcher(self.fetcher, url, None)
 
-
 ###############################################################################
 def _arcgis_query_url(service_url: str, request: ProviderRequest) -> str:
     params: dict[str, str] = {
@@ -319,7 +317,6 @@ def _arcgis_query_url(service_url: str, request: ProviderRequest) -> str:
         params["geometry"] = f"{min_lon},{min_lat},{max_lon},{max_lat}"
     return f"{service_url}?{urlencode(params)}"
 
-
 ###############################################################################
 def _geojson_features(payload: object, *, provider_label: str) -> list[dict[str, Any]]:
     if not is_json_object(payload) or payload.get("type") != "FeatureCollection":
@@ -334,7 +331,6 @@ def _geojson_features(payload: object, *, provider_label: str) -> list[dict[str,
     return [
         dict(json_object(item)) for item in json_array(features) if is_json_object(item)
     ]
-
 
 ###############################################################################
 def _geography_for_request(request: ProviderRequest) -> str:
@@ -359,7 +355,6 @@ def _geography_for_request(request: ProviderRequest) -> str:
         )
     return geography
 
-
 ###############################################################################
 def _acs_vintage(request: ProviderRequest) -> str:
     vintage = str(
@@ -373,13 +368,11 @@ def _acs_vintage(request: ProviderRequest) -> str:
         raise ProviderInvalidQueryError("Census ACS vintage must be a four-digit year.")
     return vintage
 
-
 ###############################################################################
 def _acs_geography(geography: str) -> str:
     return {"county": "county", "tract": "tract", "block_group": "block group"}[
         geography
     ]
-
 
 ###############################################################################
 def _feature_geoid(feature: dict[str, Any]) -> str | None:
@@ -390,7 +383,6 @@ def _feature_geoid(feature: dict[str, Any]) -> str | None:
     feature_id = feature.get("id")
     return str(feature_id) if feature_id is not None else None
 
-
 ###############################################################################
 def _normalize_geoid(value: str | None) -> str:
     if not value:
@@ -400,7 +392,6 @@ def _normalize_geoid(value: str | None) -> str:
     if "US" in upper:
         text = text[upper.index("US") + 2 :]
     return "".join(character for character in text if character.isdigit())
-
 
 ###############################################################################
 def _acs_row_key(row: dict[str, str], geography: str) -> str:
@@ -414,7 +405,6 @@ def _acs_row_key(row: dict[str, str], geography: str) -> str:
         return state + county + tract
     return state + county + tract + block_group
 
-
 ###############################################################################
 def _float_or_none(value: object) -> float | None:
     if not isinstance(value, int | float | str):
@@ -425,7 +415,6 @@ def _float_or_none(value: object) -> float | None:
         return float(value)
     except TypeError, ValueError:
         return None
-
 
 ###############################################################################
 def _public_number(value: float | None) -> int | float | None:

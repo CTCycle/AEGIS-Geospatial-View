@@ -27,7 +27,6 @@ from server.services.llm.types import LLMRequest
 
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 class GroundedSynthesisResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -47,11 +46,11 @@ class GroundedSynthesisResult(BaseModel):
     ] = Field(min_length=1, max_length=20)
     warnings: list[str] = Field(default_factory=list, max_length=20)
 
-
 ###############################################################################
 class GroundedResponseSynthesizer:
     SYNTHESIS_TIMEOUT_SECONDS = 35.0
     SYNTHESIS_MAX_OUTPUT_TOKENS = 1024
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -546,6 +545,7 @@ class GroundedResponseSynthesizer:
         return str(value)[:500]
 
 
+###############################################################################
 async def synthesize_response_async(
     synthesizer: Any,
     **kwargs: Any,

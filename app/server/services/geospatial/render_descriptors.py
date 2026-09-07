@@ -35,9 +35,9 @@ from server.services.geospatial.providers.base import (
     ProviderRequest,
 )
 
-
 ###############################################################################
 class RenderDescriptorService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

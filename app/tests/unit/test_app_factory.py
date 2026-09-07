@@ -9,7 +9,6 @@ import pytest
 import server.app as app_module
 from server.common.paths import FASTAPI_API_PREFIX
 
-
 ###############################################################################
 def _settings():  # noqa: ANN202
     return SimpleNamespace(
@@ -20,7 +19,6 @@ def _settings():  # noqa: ANN202
         credential_master_key="dev-key",
         credential_key_version="v1",
     )
-
 
 ###############################################################################
 def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
@@ -35,7 +33,6 @@ def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
         maintenance_service=SimpleNamespace(),
     )
 
-
 ###############################################################################
 def _build_geospatial_runtime() -> SimpleNamespace:
     return SimpleNamespace(
@@ -45,9 +42,9 @@ def _build_geospatial_runtime() -> SimpleNamespace:
         credential_resolver=object(),
     )
 
-
 ###############################################################################
 class _LifecycleStub:
+
     # -------------------------------------------------------------------------
     def __init__(self, call_order: list[str]) -> None:
         self.call_order = call_order
@@ -56,12 +53,10 @@ class _LifecycleStub:
     async def shutdown(self) -> None:
         self.call_order.append("run_lifecycle.shutdown")
 
-
 ###############################################################################
 def _response_schema_ref(schema: dict, path: str, method: str, status_code: str) -> str:
     response = schema["paths"][path][method]["responses"][status_code]
     return response["content"]["application/json"]["schema"]["$ref"]
-
 
 ###############################################################################
 def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
@@ -83,7 +78,6 @@ def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
     assert f"{FASTAPI_API_PREFIX}/chat/turn" in route_paths
     assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}" in route_paths
     assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}/cancel" in route_paths
-
 
 ###############################################################################
 def test_openapi_declares_stable_response_models(monkeypatch) -> None:
@@ -125,7 +119,6 @@ def test_openapi_declares_stable_response_models(monkeypatch) -> None:
     ]["200"]
     assert "$ref" not in str(stream_schema)
     assert schema["info"]["version"] == "1.0.0"
-
 
 ###############################################################################
 def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
@@ -207,7 +200,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         "run_startup_validations",
         "job_service.stop",
     ]
-
 
 ###############################################################################
 def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> None:

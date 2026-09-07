@@ -5,7 +5,6 @@ from typing import Any, TypedDict
 
 CATALOG_PAGE_LIMIT = 50
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class CapabilityCatalogFilter:
@@ -15,7 +14,6 @@ class CapabilityCatalogFilter:
     bbox: list[float] | None = None
     limit: int = CATALOG_PAGE_LIMIT
     cursor: str | None = None
-
 
 ###############################################################################
 class GeospatialCapabilityExecutionResult(TypedDict, total=False):

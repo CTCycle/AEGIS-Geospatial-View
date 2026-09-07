@@ -8,9 +8,9 @@ from server.services.llm.ollama import OllamaProvider
 from server.services.llm.request_deadline import remaining_request_seconds
 from server.services.llm.types import LLMRequest
 
-
 ###############################################################################
 class _Provider(OllamaProvider):
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__(base_url="http://ollama-deadline.test")
@@ -27,7 +27,6 @@ class _Provider(OllamaProvider):
         self.stream_calls += 1
         yield {}
 
-
 ###############################################################################
 def _expired_request() -> LLMRequest:
     return LLMRequest(
@@ -35,7 +34,6 @@ def _expired_request() -> LLMRequest:
         messages=[],
         metadata={"deadline_monotonic": monotonic() - 1.0},
     )
-
 
 ###############################################################################
 def test_expired_ollama_request_never_starts_transport() -> None:
@@ -49,7 +47,6 @@ def test_expired_ollama_request_never_starts_transport() -> None:
 
     assert provider.post_calls == 0
     assert provider.stream_calls == 0
-
 
 ###############################################################################
 @pytest.mark.parametrize("value", [None, True, False, "not-a-number", float("nan")])

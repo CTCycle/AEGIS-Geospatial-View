@@ -19,7 +19,6 @@ FailureCategory = Literal[
     "context_limit",
 ]
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ModelDescriptor:
@@ -28,7 +27,6 @@ class ModelDescriptor:
     provider: str
     capabilities: list[str] = field(default_factory=lambda: list[str]())
     metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -42,7 +40,6 @@ class ModelContextProfile:
     supports_context_caching: bool = False
     supports_server_compaction: bool = False
     metadata_source: str = "catalog"
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -62,7 +59,6 @@ class LLMRequest:
         # can be reported with a categorized diagnostic at the LLM boundary.
         return None
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class LLMResult:
@@ -74,11 +70,11 @@ class LLMResult:
     finish_reason: str | None = None
     context_usage: dict[str, Any] | None = None
 
-
 ###############################################################################
 class LLMStructuredOutput(dict[str, Any]):
     """Validated structured data with invocation-local provider telemetry."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         payload: dict[str, Any],
@@ -90,11 +86,11 @@ class LLMStructuredOutput(dict[str, Any]):
             dict(context_usage) if context_usage is not None else None
         )
 
-
 ###############################################################################
 class LLMTextStream(Iterator[str]):
     """Text iterator carrying usage for the request that produced the stream."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         chunks: Iterable[str],
@@ -104,12 +100,13 @@ class LLMTextStream(Iterator[str]):
         self._iterator = iter(chunks)
         self.context_usage = dict(context_usage) if context_usage is not None else None
 
+    # -------------------------------------------------------------------------
     def __iter__(self) -> "LLMTextStream":
         return self
 
+    # -------------------------------------------------------------------------
     def __next__(self) -> str:
         return next(self._iterator)
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -118,14 +115,12 @@ class LLMToolDefinition:
     description: str
     parameters_json_schema: dict[str, Any]
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class LLMToolCall:
     id: str | None = None
     name: str = ""
     arguments: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -138,14 +133,12 @@ class LLMToolResult:
     error: str | None = None
     is_error: bool = False
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class LLMAssistantToolCallMessage:
     role: Literal["assistant"] = "assistant"
     content: str | None = None
     tool_calls: list[LLMToolCall] = field(default_factory=lambda: list[LLMToolCall]())
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -154,7 +147,6 @@ class LLMToolResultMessage:
     tool_call_id: str | None = None
     name: str = ""
     content: str = ""
-
 
 ###############################################################################
 @dataclass(frozen=True)

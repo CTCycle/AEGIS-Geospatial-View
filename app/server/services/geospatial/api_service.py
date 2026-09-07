@@ -40,36 +40,29 @@ from server.services.geospatial.providers.http import fetch_bytes_url
 from server.services.geospatial.providers.tomtom import build_tomtom_tile_url
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 class GeospatialApiServiceError(Exception):
     """Base exception for geospatial API service failures."""
-
 
 ###############################################################################
 class GeospatialCapabilityNotFoundError(GeospatialApiServiceError):
     """Raised when a requested manifest capability does not exist."""
 
-
 ###############################################################################
 class GeospatialInvalidRequestError(GeospatialApiServiceError):
     """Raised when query parameters cannot be parsed safely."""
-
 
 ###############################################################################
 class GeospatialTileCredentialError(GeospatialApiServiceError):
     """Raised when a tile provider credential is missing or rejected."""
 
-
 ###############################################################################
 class GeospatialTileRequestError(GeospatialApiServiceError):
     """Raised when a tile provider request fails."""
 
-
 ###############################################################################
 class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
-
 
 ###############################################################################
 class GeospatialProviderResponseError(GeospatialApiServiceError):
@@ -80,7 +73,6 @@ class GeospatialProviderResponseError(GeospatialApiServiceError):
         super().__init__(message)
         self.error_code = error_code
         self.status_code = status_code
-
 
 ###############################################################################
 def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
@@ -106,7 +98,6 @@ def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
         "type": "FeatureCollection",
         "features": [_normalize_geojson_feature(item) for item in json_array(features)],
     }
-
 
 ###############################################################################
 def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
@@ -152,7 +143,6 @@ def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
         "properties": properties,
     }
 
-
 ###############################################################################
 def _valid_latitude(value: object) -> TypeGuard[int | float]:
     return (
@@ -162,7 +152,6 @@ def _valid_latitude(value: object) -> TypeGuard[int | float]:
         and -90.0 <= float(value) <= 90.0
     )
 
-
 ###############################################################################
 def _valid_longitude(value: object) -> TypeGuard[int | float]:
     return (
@@ -171,7 +160,6 @@ def _valid_longitude(value: object) -> TypeGuard[int | float]:
         and math.isfinite(float(value))
         and -180.0 <= float(value) <= 180.0
     )
-
 
 ###############################################################################
 def _valid_geojson_geometry(value: dict[str, Any]) -> bool:
@@ -193,7 +181,6 @@ def _valid_geojson_geometry(value: dict[str, Any]) -> bool:
         return False
     return _valid_coordinate_array(value.get("coordinates"))
 
-
 ###############################################################################
 def _valid_coordinate_array(value: object) -> bool:
     if not is_json_array(value) or not value:
@@ -208,7 +195,6 @@ def _valid_coordinate_array(value: object) -> bool:
             and _valid_latitude(value[1])
         )
     return all(_valid_coordinate_array(item) for item in value)
-
 
 ###############################################################################
 def _provider_response_error(
@@ -230,9 +216,9 @@ def _provider_response_error(
         status_code=error_status[error_code],
     )
 
-
 ###############################################################################
 class GeospatialApiService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

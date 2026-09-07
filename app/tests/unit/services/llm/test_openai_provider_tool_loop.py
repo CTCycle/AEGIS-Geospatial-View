@@ -6,7 +6,6 @@ from server.services.llm.errors import LLMRequestSchemaError
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
-
 ###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
@@ -14,7 +13,6 @@ def _tool() -> LLMToolDefinition:
         description="List catalog",
         parameters_json_schema={"type": "object", "properties": {}},
     )
-
 
 ###############################################################################
 def test_openai_converts_tool_definitions() -> None:
@@ -31,7 +29,6 @@ def test_openai_converts_tool_definitions() -> None:
         },
         "strict": True,
     }
-
 
 ###############################################################################
 def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
@@ -65,7 +62,6 @@ def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
         "call_id": "call-1",
         "output": '{"ok":true}',
     }
-
 
 ###############################################################################
 def test_openai_classifies_tools_plus_response_schema_at_provider_boundary() -> None:

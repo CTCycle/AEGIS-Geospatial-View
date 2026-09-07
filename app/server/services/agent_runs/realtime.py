@@ -61,7 +61,6 @@ OUTBOUND_QUEUE_SIZE = 256
 OUTBOUND_ENQUEUE_TIMEOUT_SECONDS = 5.0
 MAX_COMMANDS_PER_MINUTE = 60
 
-
 ###############################################################################
 class RealtimeConnectionRegistry:
     """Tracks live sockets so shutdown can close them deterministically."""
@@ -98,9 +97,9 @@ class RealtimeConnectionRegistry:
         async with self._lock:
             return len(self._connections)
 
-
 ###############################################################################
 class RealtimeConnection:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -584,7 +583,6 @@ class RealtimeConnection:
         if isinstance(exc, RunConflictError):
             return "run_conflict"
         return "run_service_failure"
-
 
 ###############################################################################
 def is_realtime_origin_allowed(websocket: WebSocket) -> bool:

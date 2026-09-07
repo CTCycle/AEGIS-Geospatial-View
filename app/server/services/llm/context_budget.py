@@ -16,7 +16,6 @@ CONTEXT_HEADROOM_TOKENS = 512
 UNKNOWN_MODEL_INPUT_CEILING = 32_768
 RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY = "_response_schema_embedded_in_messages"
 
-
 ###############################################################################
 def _positive_int(value: object) -> int | None:
     try:
@@ -24,7 +23,6 @@ def _positive_int(value: object) -> int | None:
     except TypeError, ValueError:
         return None
     return number if number > 0 else None
-
 
 ###############################################################################
 def estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
@@ -38,7 +36,6 @@ def estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
         total += estimate_json_tokens(message.get("tool_calls"))
     return max(total, 1)
 
-
 ###############################################################################
 def estimate_json_tokens(value: object) -> int:
     if value is None:
@@ -46,7 +43,6 @@ def estimate_json_tokens(value: object) -> int:
     return max(
         1, math.ceil(len(json.dumps(value, default=str, separators=(",", ":"))) / 4)
     )
-
 
 ###############################################################################
 def calculate_context_usage_percent(
@@ -67,7 +63,6 @@ def calculate_context_usage_percent(
         return None
     return round((effective_input / model_context_limit) * 100, 1)
 
-
 ###############################################################################
 def resolve_model_context_limit(model: str) -> int | None:
     """Return no limit without an exact catalog or provider metadata record.
@@ -81,11 +76,9 @@ def resolve_model_context_limit(model: str) -> int | None:
     _ = model
     return None
 
-
 ###############################################################################
 def _request_metadata(request: LLMRequest) -> dict[str, Any]:
     return request.metadata
-
 
 ###############################################################################
 def _profile_for_request(
@@ -143,7 +136,6 @@ def _profile_for_request(
         ),
     )
 
-
 ###############################################################################
 def resolve_model_context_profile(
     provider: str,
@@ -162,7 +154,6 @@ def resolve_model_context_profile(
         provider,
         LLMRequest(model=model, messages=[], metadata=dict(metadata or {})),
     )
-
 
 ###############################################################################
 def _expected_output_tokens(
@@ -185,7 +176,6 @@ def _expected_output_tokens(
     # metadata; inventing a cap here would make both compaction and the UI
     # falsely determinate.
     return 0
-
 
 ###############################################################################
 def _context_components(
@@ -213,7 +203,6 @@ def _context_components(
         else None
     )
     return expected_output, tool_tokens, schema_tokens, CONTEXT_HEADROOM_TOKENS, usable
-
 
 ###############################################################################
 def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage:
@@ -249,7 +238,6 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
         peak_request_tokens=estimated,
         total_input_tokens=estimated,
     )
-
 
 ###############################################################################
 def apply_reported_usage(
@@ -323,7 +311,6 @@ def apply_reported_usage(
         usage_source=source,
     )
 
-
 ###############################################################################
 def compute_ollama_context_usage(
     request: LLMRequest,
@@ -336,7 +323,6 @@ def compute_ollama_context_usage(
         else request
     )
     return compute_context_usage(effective, provider="ollama")
-
 
 ###############################################################################
 def _message_blocks(
@@ -361,7 +347,6 @@ def _message_blocks(
         blocks.append(([index], [message]))
         index += 1
     return blocks
-
 
 ###############################################################################
 def _compact_messages(
@@ -464,7 +449,6 @@ def _compact_messages(
     if estimate_message_tokens(selected) > budget:
         return [], True
     return selected, True
-
 
 ###############################################################################
 def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:

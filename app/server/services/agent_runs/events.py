@@ -13,16 +13,15 @@ from server.contracts.events import (
 )
 from server.repositories.agent_run_events import AgentRunEventRepository
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class RunEventSubscription:
     run_id: str
     queue: asyncio.Queue[RunEvent | None]
 
-
 ###############################################################################
 class RunEventPublisher:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

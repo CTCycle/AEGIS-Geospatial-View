@@ -9,7 +9,6 @@ from server.services.geospatial.providers.base import (
     ProviderUnavailableError,
 )
 
-
 ###############################################################################
 class ArcGISRestProvider(GeospatialProvider):
     provider_id = "arcgis"

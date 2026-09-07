@@ -81,7 +81,6 @@ PROVIDER_SOURCE_ALIASES = {
 }
 BASEMAP_TEST_MARKERS = ("basemap", "tile")
 
-
 ###############################################################################
 def _read_json(path: Path) -> JsonDict:
     with path.open("r", encoding="utf-8") as handle:
@@ -89,7 +88,6 @@ def _read_json(path: Path) -> JsonDict:
     if not is_json_object(payload):
         raise ValueError("JSON document must be an object.")
     return payload
-
 
 ###############################################################################
 def _add_issue(
@@ -113,7 +111,6 @@ def _add_issue(
     else:
         report.warning_count += 1
 
-
 ###############################################################################
 def _manifest_paths(root_path: Path) -> list[Path]:
     paths: list[Path] = []
@@ -124,13 +121,11 @@ def _manifest_paths(root_path: Path) -> list[Path]:
         paths.extend(sorted(folder.glob("*.json")))
     return paths
 
-
 ###############################################################################
 def _read_text_if_exists(path: Path) -> str:
     if not path.is_file():
         return ""
     return path.read_text(encoding="utf-8")
-
 
 ###############################################################################
 def _combined_text(paths: list[Path]) -> str:
@@ -138,7 +133,6 @@ def _combined_text(paths: list[Path]) -> str:
     for path in paths:
         chunks.append(_read_text_if_exists(path))
     return "\n".join(chunks)
-
 
 ###############################################################################
 def _python_files(root: Path) -> list[Path]:
@@ -150,7 +144,6 @@ def _python_files(root: Path) -> list[Path]:
         for path in root.rglob("*.py")
         if not any(part in ignored_parts for part in path.parts)
     ]
-
 
 ###############################################################################
 def _client_files(root: Path) -> list[Path]:
@@ -164,7 +157,6 @@ def _client_files(root: Path) -> list[Path]:
         and not any(part in ignored_parts for part in path.parts)
     ]
 
-
 ###############################################################################
 def _provider_source(provider_id: str) -> str:
     provider_filename = PROVIDER_SOURCE_ALIASES.get(
@@ -173,11 +165,9 @@ def _provider_source(provider_id: str) -> str:
     )
     return _read_text_if_exists(PROVIDER_SOURCE_DIR / f"{provider_filename}.py")
 
-
 ###############################################################################
 def _placeholder_statuses(source: str) -> list[str]:
     return sorted(status for status in PLACEHOLDER_STATUSES if status in source)
-
 
 ###############################################################################
 def _basemap_fetch_implemented(manifest: CapabilityManifestV2) -> bool:
@@ -194,11 +184,9 @@ def _basemap_fetch_implemented(manifest: CapabilityManifestV2) -> bool:
         )
     )
 
-
 ###############################################################################
 def _basemap_unit_tested(test_source: str) -> bool:
     return all(marker in test_source for marker in BASEMAP_TEST_MARKERS)
-
 
 ###############################################################################
 def _status_for_manifest(
@@ -242,7 +230,6 @@ def _status_for_manifest(
         placeholder_statuses=placeholders,
     )
 
-
 ###############################################################################
 def _contains_secret_value(value: Any) -> bool:
     if is_json_object(value):
@@ -259,11 +246,9 @@ def _contains_secret_value(value: Any) -> bool:
         return any(_contains_secret_value(item) for item in value)
     return False
 
-
 ###############################################################################
 def _increment(counter: dict[str, int], key: str) -> None:
     counter[key] = counter.get(key, 0) + 1
-
 
 ###############################################################################
 def _record_coverage(manifest: CapabilityManifestV2, report: LayerAuditReport) -> None:
@@ -275,7 +260,6 @@ def _record_coverage(manifest: CapabilityManifestV2, report: LayerAuditReport) -
         report.source_doc_coverage,
         "with_source_docs" if manifest.source_official_docs else "missing_source_docs",
     )
-
 
 ###############################################################################
 def _validate_index(root_path: Path, report: LayerAuditReport) -> None:
@@ -293,7 +277,6 @@ def _validate_index(root_path: Path, report: LayerAuditReport) -> None:
             severity="error",
             message=f"Manifest index is missing schema v2 fields: {', '.join(missing)}",
         )
-
 
 ###############################################################################
 def _validate_auth_policy(
@@ -316,7 +299,6 @@ def _validate_auth_policy(
             manifest_id=manifest.id,
             message="Credential-gated manifest must declare auth.accessPageProviderId.",
         )
-
 
 ###############################################################################
 def _validate_renderability(
@@ -385,7 +367,6 @@ def _validate_renderability(
             message="Renderable manifest must use a concrete expectedGeometry.",
         )
 
-
 ###############################################################################
 def _validate_manifest(path: Path, report: LayerAuditReport) -> None:
     try:
@@ -433,7 +414,6 @@ def _validate_manifest(path: Path, report: LayerAuditReport) -> None:
         )
     _validate_auth_policy(path, manifest, report)
     _validate_renderability(path, manifest, report)
-
 
 ###############################################################################
 def audit_all_manifests(
@@ -558,12 +538,10 @@ def audit_all_manifests(
         report.error_count += report.warning_count
     return report
 
-
 ###############################################################################
 def _format_report(report: LayerAuditReport) -> str:
     payload = report.model_dump()
     return json.dumps(payload, indent=2, sort_keys=True)
-
 
 ###############################################################################
 def main(argv: list[str] | None = None) -> int:

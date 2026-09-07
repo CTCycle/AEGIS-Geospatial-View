@@ -10,7 +10,6 @@ from server.services.chat.model_library import (
 from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.types import ModelDescriptor
 
-
 ###############################################################################
 @dataclass
 class _DeepSeekProviderStub:
@@ -20,9 +19,9 @@ class _DeepSeekProviderStub:
     def list_models(self) -> list[ModelDescriptor]:
         return self.models
 
-
 ###############################################################################
 class _ProviderFactoryStub:
+
     # -------------------------------------------------------------------------
     def __init__(self, provider: _DeepSeekProviderStub | Exception) -> None:
         self.provider = provider
@@ -33,7 +32,6 @@ class _ProviderFactoryStub:
         if isinstance(self.provider, Exception):
             raise self.provider
         return self.provider
-
 
 ###############################################################################
 class _OllamaProviderUnavailableStub:
@@ -50,14 +48,12 @@ class _OllamaProviderUnavailableStub:
         type(self).calls += 1
         return []
 
-
 ###############################################################################
 def _build_service() -> ChatModelLibraryService:
     return ChatModelLibraryService(
         provider_factory=_ProviderFactoryStub(_DeepSeekProviderStub([])),
         ollama_unavailable_ttl_s=30.0,
     )
-
 
 ###############################################################################
 def test_list_models_reports_ollama_unreachable_without_dropping_cloud_catalog(
@@ -77,7 +73,6 @@ def test_list_models_reports_ollama_unreachable_without_dropping_cloud_catalog(
     assert response["sources"]["ollama"]["reachable"] is False
     assert response["sources"]["ollama"]["ok"] is False
 
-
 ###############################################################################
 def test_list_models_caches_ollama_unavailable_result(monkeypatch) -> None:
     _OllamaProviderUnavailableStub.calls = 0
@@ -94,7 +89,6 @@ def test_list_models_caches_ollama_unavailable_result(monkeypatch) -> None:
     assert first["sources"]["ollama"]["reachable"] is False
     assert second["sources"]["ollama"]["reachable"] is False
     assert _OllamaProviderUnavailableStub.calls == 1
-
 
 ###############################################################################
 def test_list_models_reports_deepseek_failure_in_sources(monkeypatch) -> None:
@@ -117,7 +111,6 @@ def test_list_models_reports_deepseek_failure_in_sources(monkeypatch) -> None:
     assert response["cloud"]
     assert response["sources"]["deepseek"]["ok"] is False
     assert "DeepSeek credentials" in str(response["sources"]["deepseek"]["message"])
-
 
 ###############################################################################
 def test_find_model_raises_when_deepseek_catalog_cannot_be_loaded(monkeypatch) -> None:
@@ -145,7 +138,6 @@ def test_find_model_raises_when_deepseek_catalog_cannot_be_loaded(monkeypatch) -
         raise AssertionError(
             "Expected ModelLibrarySourceError for unavailable DeepSeek catalog."
         )
-
 
 ###############################################################################
 def test_normalize_ollama_url_rewrites_localhost() -> None:

@@ -12,7 +12,6 @@ from server.services.geospatial.providers.base import (
 )
 from server.services.geospatial.providers.gbif import GBIFProvider
 
-
 ###############################################################################
 def _provider_for_payload(
     payload: object,
@@ -24,7 +23,6 @@ def _provider_for_payload(
         return payload
 
     return GBIFProvider(fetcher=fetcher), requested_urls
-
 
 ###############################################################################
 def test_gbif_provider_normalizes_occurrence_provenance() -> None:
@@ -105,7 +103,6 @@ def test_gbif_provider_normalizes_occurrence_provenance() -> None:
     assert query["basisOfRecord"] == ["HUMAN_OBSERVATION"]
     assert query["geometry"][0].startswith("POLYGON((8.0 46.0")
 
-
 ###############################################################################
 def test_gbif_provider_requires_bounded_non_antimeridian_extent() -> None:
     provider, _requested_urls = _provider_for_payload({})
@@ -130,7 +127,6 @@ def test_gbif_provider_requires_bounded_non_antimeridian_extent() -> None:
             )
         )
 
-
 ###############################################################################
 def test_gbif_provider_clamps_interactive_limit_to_300() -> None:
     provider, requested_urls = _provider_for_payload(
@@ -151,7 +147,6 @@ def test_gbif_provider_clamps_interactive_limit_to_300() -> None:
     assert response.payload["sampleLimit"] == 300
     assert parse_qs(urlparse(requested_urls[0]).query)["limit"] == ["300"]
 
-
 ###############################################################################
 def test_gbif_provider_defaults_to_maximum_interactive_page() -> None:
     provider, requested_urls = _provider_for_payload(
@@ -169,7 +164,6 @@ def test_gbif_provider_defaults_to_maximum_interactive_page() -> None:
 
     assert response.payload["sampleLimit"] == 300
     assert parse_qs(urlparse(requested_urls[0]).query)["limit"] == ["300"]
-
 
 ###############################################################################
 def test_gbif_provider_marks_sampled_results() -> None:
@@ -206,7 +200,6 @@ def test_gbif_provider_marks_sampled_results() -> None:
     assert response.payload["totalMatched"] == 301
     assert response.payload["sampleLimit"] == 2
     assert any("limited to 2" in warning for warning in response.warnings)
-
 
 ###############################################################################
 def test_gbif_provider_filters_invalid_coordinates_and_supports_empty_results() -> None:
@@ -249,7 +242,6 @@ def test_gbif_provider_filters_invalid_coordinates_and_supports_empty_results() 
     )
     assert empty_response.result_status == "valid_empty"
     assert empty_response.payload["features"] == []
-
 
 ###############################################################################
 @pytest.mark.parametrize("payload", [[], {}, {"results": {}}])

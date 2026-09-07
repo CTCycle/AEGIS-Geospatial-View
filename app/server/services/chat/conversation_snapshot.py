@@ -14,11 +14,9 @@ from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.chat.history_service import ChatHistoryService
 
-
 ###############################################################################
 class ConversationSnapshotContractError(RuntimeError):
     """Raised when durable conversation state is not current-contract data."""
-
 
 ###############################################################################
 class ConversationSnapshotService:

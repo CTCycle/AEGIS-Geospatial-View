@@ -10,7 +10,6 @@ from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.domain.agent.reliability import AgentExecutionBudget
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class AgentExecutionContext:
@@ -24,7 +23,6 @@ class AgentExecutionContext:
     canonical_request: CanonicalRequestInterpretation | None = None
     execution_budget: AgentExecutionBudget | None = None
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class AgentToolLoopRequest:
@@ -36,7 +34,6 @@ class AgentToolLoopRequest:
     max_tokens: int | None = None
     context: AgentExecutionContext = field(default_factory=AgentExecutionContext)
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
-
 
 ###############################################################################
 @dataclass(frozen=True)

@@ -16,7 +16,6 @@ TimeoutOrigin = Literal[
 class LLMConfigurationError(ValueError):
     """Raised when a selected LLM provider cannot be used due to local settings."""
 
-
 ###############################################################################
 class LLMStructuredOutputError(RuntimeError):
     """Safe structured-output failure with a user-actionable category."""
@@ -50,7 +49,6 @@ class LLMStructuredOutputError(RuntimeError):
         )
         super().__init__(detail)
 
-
 ###############################################################################
 class LLMContextLimitError(LLMStructuredOutputError):
     """Raised when the selected model cannot accept the prepared context."""
@@ -74,7 +72,6 @@ class LLMContextLimitError(LLMStructuredOutputError):
             detail=detail,
             context_usage=context_usage,
         )
-
 
 ###############################################################################
 class LLMRequestSchemaError(LLMStructuredOutputError):
@@ -100,7 +97,6 @@ class LLMRequestSchemaError(LLMStructuredOutputError):
             context_usage=context_usage,
         )
 
-
 ###############################################################################
 class LLMResponseParsingError(LLMStructuredOutputError):
     """Raised when a provider response cannot satisfy the requested schema."""
@@ -124,7 +120,6 @@ class LLMResponseParsingError(LLMStructuredOutputError):
             detail=detail,
             context_usage=context_usage,
         )
-
 
 ###############################################################################
 class LLMProviderRequestError(RuntimeError):

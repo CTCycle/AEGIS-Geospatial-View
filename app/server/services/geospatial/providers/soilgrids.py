@@ -39,7 +39,6 @@ SOILGRIDS_STANDARD_DEPTHS = {
 }
 SOILGRIDS_QUANTILES = {"mean", "Q0.05", "Q0.5", "Q0.95"}
 
-
 ###############################################################################
 class SoilGridsProvider(GeospatialProvider):
     provider_id = "soilgrids"
@@ -113,7 +112,6 @@ class SoilGridsProvider(GeospatialProvider):
             attribution=["ISRIC - World Soil Information, SoilGrids"],
             result_type="metadata",
         )
-
 
 ###############################################################################
 def _coverage_download_url(

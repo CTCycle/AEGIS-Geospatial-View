@@ -20,7 +20,6 @@ from server.domain.agent.interpretation import normalize_target_key
 from server.contracts.extraction import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
 
-
 ###############################################################################
 class LocationResolver:
     SPECIFICITY_BY_SIGNAL_TYPE = {
@@ -230,6 +229,7 @@ class LocationResolver:
             missing_fields=["location"],
         )
 
+    # -------------------------------------------------------------------------
     async def resolve_location_targets(
         self,
         location_signals: list[LocationSignal],
@@ -462,6 +462,7 @@ class LocationResolver:
         first = signals[0]
         return all(self._same_resolved_point(first, signal) for signal in signals[1:])
 
+    # -------------------------------------------------------------------------
     def _same_resolved_point(self, left: LocationSignal, right: LocationSignal) -> bool:
         if any(
             value is None

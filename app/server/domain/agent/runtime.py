@@ -37,7 +37,6 @@ CompletionReason = Literal[
     "superseded_by_steering",
 ]
 
-
 ###############################################################################
 class AgentGoal(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -46,7 +45,6 @@ class AgentGoal(BaseModel):
     text: str
     status: Literal["active", "completed", "partial", "superseded"] = "active"
     revision: int = Field(default=0, ge=0)
-
 
 ###############################################################################
 class GeographicScope(BaseModel):
@@ -59,7 +57,6 @@ class GeographicScope(BaseModel):
         default_factory=lambda: list[dict[str, Any]]()
     )
     crs: str = "EPSG:4326"
-
 
 ###############################################################################
 class GeospatialWorkingState(BaseModel):
@@ -77,7 +74,6 @@ class GeospatialWorkingState(BaseModel):
     temporal_constraints: dict[str, Any] = Field(default_factory=dict)
     renderable_refs: list[str] = Field(default_factory=list)
 
-
 ###############################################################################
 class AgentTask(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -93,7 +89,6 @@ class AgentTask(BaseModel):
     attempt_count: int = Field(default=0, ge=0)
     last_failure: dict[str, Any] | None = None
     scope_revision: int = Field(default=0, ge=0)
-
 
 ###############################################################################
 class AgentThreadState(BaseModel):
@@ -114,7 +109,6 @@ class AgentThreadState(BaseModel):
     unresolved_questions: list[str] = Field(default_factory=list)
     conversation_summary: dict[str, Any] | None = None
 
-
 ###############################################################################
 class AgentBudgets(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -124,7 +118,6 @@ class AgentBudgets(BaseModel):
     state_transitions: int
     plan_revisions: int = 0
     wall_clock_seconds: float
-
 
 ###############################################################################
 class AgentRunState(BaseModel):
@@ -143,7 +136,6 @@ class AgentRunState(BaseModel):
     consecutive_no_progress_steps: int = Field(default=0, ge=0)
     completion_reason: CompletionReason | None = None
 
-
 ###############################################################################
 class ToolCapabilityProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -160,11 +152,9 @@ class ToolCapabilityProfile(BaseModel):
     expected_latency_seconds: float = Field(default=1.0, ge=0)
     healthy: bool = True
 
-
 ###############################################################################
 class RuntimeValidationError(ValueError):
     """Raised when an application-owned runtime invariant is violated."""
-
 
 ###############################################################################
 def validate_task_graph(tasks: list[AgentTask]) -> None:
@@ -200,7 +190,6 @@ def validate_task_graph(tasks: list[AgentTask]) -> None:
     for task in tasks:
         visit(task.id)
 
-
 ###############################################################################
 def runnable_tasks(tasks: list[AgentTask]) -> list[AgentTask]:
     """Return pending tasks whose required dependencies completed successfully."""
@@ -214,7 +203,6 @@ def runnable_tasks(tasks: list[AgentTask]) -> list[AgentTask]:
             by_id[dependency].status == "completed" for dependency in task.depends_on
         )
     ]
-
 
 ###############################################################################
 def block_tasks_with_failed_dependencies(tasks: list[AgentTask]) -> int:
@@ -237,7 +225,6 @@ def block_tasks_with_failed_dependencies(tasks: list[AgentTask]) -> int:
             changed += 1
     return changed
 
-
 ###############################################################################
 def canonical_call_fingerprint(tool_name: str, arguments: dict[str, Any]) -> str:
     payload = json.dumps(
@@ -248,7 +235,6 @@ def canonical_call_fingerprint(tool_name: str, arguments: dict[str, Any]) -> str
         default=str,
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
 
 ###############################################################################
 def select_tools(
@@ -270,7 +256,6 @@ def select_tools(
         and (not require_rendering or profile.supports_rendering)
     ]
 
-
 ###############################################################################
 def state_fingerprint(state: AgentThreadState) -> str:
     payload = state.model_dump(mode="json", exclude={"conversation_summary"})
@@ -279,7 +264,6 @@ def state_fingerprint(state: AgentThreadState) -> str:
             "utf-8"
         )
     ).hexdigest()
-
 
 ###############################################################################
 def compact_task_context(
@@ -323,7 +307,6 @@ def compact_task_context(
     compact["completed_tasks_omitted"] = max(0, len(completed) - completed_limit)
     return compact
 
-
 ###############################################################################
 def evaluate_completion(state: AgentThreadState) -> CompletionReason | None:
     """Return a completion reason only when required tasks are terminal."""
@@ -341,13 +324,11 @@ def evaluate_completion(state: AgentThreadState) -> CompletionReason | None:
         return "partial"
     return "completed"
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ScopeInvalidation:
     invalidated_evidence_refs: tuple[str, ...]
     retained_evidence_refs: tuple[str, ...]
-
 
 ###############################################################################
 def invalidate_scope_evidence(
@@ -372,7 +353,6 @@ def invalidate_scope_evidence(
         state.geospatial_state.geographic_scope = new_scope
     state.revision += 1
     return ScopeInvalidation(invalidated, retained)
-
 
 ###############################################################################
 def apply_steering_delta(state: AgentThreadState, delta: Any) -> AgentThreadState:

@@ -11,9 +11,9 @@ from server.services.agent.native_tool_loop import AgentExecutionContext
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.location_resolver import LocationResolver
 
-
 ###############################################################################
 class _CapabilityRegistry:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.capabilities = {
@@ -35,9 +35,9 @@ class _CapabilityRegistry:
     def get_capability(self, capability_id: str):
         return self.capabilities.get(capability_id)
 
-
 ###############################################################################
 class _RuntimeRegistry:
+
     # -------------------------------------------------------------------------
     def provider_health(self, capability_id: str) -> str:
         if capability_id == "tomtom_traffic_flow":
@@ -55,7 +55,6 @@ class _RuntimeRegistry:
         }
         return mode in supported.get(capability_id, set())
 
-
 ###############################################################################
 def _engine() -> PolicyEngine:
     return PolicyEngine(
@@ -63,7 +62,6 @@ def _engine() -> PolicyEngine:
         capability_registry=_CapabilityRegistry(),  # type: ignore[arg-type]
         runtime_registry=_RuntimeRegistry(),  # type: ignore[arg-type]
     )
-
 
 ###############################################################################
 def test_policy_constraints_include_catalog_tools_only() -> None:
@@ -83,7 +81,6 @@ def test_policy_constraints_include_catalog_tools_only() -> None:
         "describe_geospatial_capability",
         "execute_geospatial_capability",
     ]
-
 
 ###############################################################################
 def test_preflight_builds_generic_clarification_for_ambiguous_location() -> None:
@@ -114,7 +111,6 @@ def test_preflight_builds_generic_clarification_for_ambiguous_location() -> None
     assert "Springfield" in decision.clarification.question
     assert "city, region, country, or coordinates" in decision.clarification.question
 
-
 ###############################################################################
 def test_preflight_formats_arbitrary_location_candidates() -> None:
     turn = TurnParseResult(
@@ -141,7 +137,6 @@ def test_preflight_formats_arbitrary_location_candidates() -> None:
         "Which location do you mean: Cairo, Egypt, Cairo, Illinois?"
     )
 
-
 ###############################################################################
 def test_preflight_defers_model_location_ambiguity_to_deterministic_resolver() -> None:
     turn = TurnParseResult(
@@ -165,7 +160,6 @@ def test_preflight_defers_model_location_ambiguity_to_deterministic_resolver() -
     )
 
     assert _engine().evaluate_preflight(turn) is None
-
 
 ###############################################################################
 def test_preflight_uses_structured_location_clarification_plan() -> None:
@@ -192,7 +186,6 @@ def test_preflight_uses_structured_location_clarification_plan() -> None:
     assert decision.clarification.question == "Which airport and city should I use?"
     assert decision.clarification.reason == "The airport name is not unique."
 
-
 ###############################################################################
 def test_authorize_tool_call_rejects_disallowed_tool() -> None:
     context = AgentExecutionContext(
@@ -200,7 +193,6 @@ def test_authorize_tool_call_rejects_disallowed_tool() -> None:
     )
     result = _engine().authorize_tool_call("execute_geospatial_capability", {}, context)
     assert result.allowed is False
-
 
 ###############################################################################
 def test_validate_tool_result_flags_error_envelope() -> None:
@@ -211,7 +203,6 @@ def test_validate_tool_result_flags_error_envelope() -> None:
     )
     assert result.valid is False
     assert result.reason == "bad input"
-
 
 ###############################################################################
 def test_authorize_capability_execution_rejects_missing_credentials() -> None:
@@ -243,7 +234,6 @@ def test_authorize_capability_execution_rejects_missing_credentials() -> None:
     assert result.allowed is False
     assert result.metadata["code"] == "missing_credentials"
 
-
 ###############################################################################
 def test_authorize_capability_execution_rejects_mode_mismatch() -> None:
     turn = TurnParseResult(
@@ -272,7 +262,6 @@ def test_authorize_capability_execution_rejects_mode_mismatch() -> None:
     assert result.allowed is False
     assert result.metadata["code"] == "unsupported_capability"
 
-
 ###############################################################################
 def test_authorize_capability_execution_rejects_missing_location_context() -> None:
     turn = TurnParseResult(
@@ -297,7 +286,6 @@ def test_authorize_capability_execution_rejects_missing_location_context() -> No
     assert result.allowed is False
     assert result.metadata["code"] == "invalid_arguments"
 
-
 ###############################################################################
 def test_evaluate_preflight_rejects_unknown_task_class() -> None:
     turn = TurnParseResult(
@@ -317,7 +305,6 @@ def test_evaluate_preflight_rejects_unknown_task_class() -> None:
     assert result.plan.state == "reject"
     assert result.clarification is not None
     assert result.clarification.missing_fields == ["task"]
-
 
 ###############################################################################
 def test_evaluate_preflight_clarifies_missing_location() -> None:
@@ -339,7 +326,6 @@ def test_evaluate_preflight_clarifies_missing_location() -> None:
     assert result.plan.state == "clarify"
     assert result.clarification is not None
     assert result.clarification.missing_fields == ["location"]
-
 
 ###############################################################################
 def test_evaluate_preflight_rejects_blocked_patterns() -> None:
@@ -367,7 +353,6 @@ def test_evaluate_preflight_rejects_blocked_patterns() -> None:
     assert result.plan.state == "reject"
     assert result.clarification is not None
     assert "Policy bypass attempt." in result.clarification.reason
-
 
 ###############################################################################
 def test_evaluate_preflight_passes_valid_request() -> None:

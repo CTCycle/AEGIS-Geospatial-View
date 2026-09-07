@@ -17,7 +17,6 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
-
 ###############################################################################
 class GBIFProvider(GeospatialProvider):
     provider_id = "gbif"
@@ -111,7 +110,6 @@ class GBIFProvider(GeospatialProvider):
             },
         )
 
-
 ###############################################################################
 def _normalize_occurrences(payload: object) -> list[dict[str, object]]:
     if not is_json_object(payload):
@@ -170,7 +168,6 @@ def _normalize_occurrences(payload: object) -> list[dict[str, object]]:
         )
     return features
 
-
 ###############################################################################
 def _bbox_wkt(*, west: float, south: float, east: float, north: float) -> str:
     return (
@@ -179,12 +176,10 @@ def _bbox_wkt(*, west: float, south: float, east: float, north: float) -> str:
         "))"
     )
 
-
 ###############################################################################
 def _gbif_url(resource: str, identifier: object) -> str | None:
     value = _optional_text(identifier)
     return f"https://www.gbif.org/{resource}/{quote(value, safe='')}" if value else None
-
 
 ###############################################################################
 def _finite_float(value: object) -> float | None:
@@ -196,12 +191,10 @@ def _finite_float(value: object) -> float | None:
         return None
     return number if math.isfinite(number) else None
 
-
 ###############################################################################
 def _bounded_int(value: object, *, default: int, maximum: int) -> int:
     parsed = _optional_positive_int(value)
     return min(parsed if parsed is not None else default, maximum)
-
 
 ###############################################################################
 def _optional_positive_int(value: object) -> int | None:
@@ -213,7 +206,6 @@ def _optional_positive_int(value: object) -> int | None:
         return None
     return parsed if parsed > 0 else None
 
-
 ###############################################################################
 def _non_negative_int(value: object) -> int | None:
     if isinstance(value, bool):
@@ -223,7 +215,6 @@ def _non_negative_int(value: object) -> int | None:
     except (TypeError, ValueError):
         return None
     return parsed if parsed >= 0 else None
-
 
 ###############################################################################
 def _optional_text(value: object) -> str | None:

@@ -18,9 +18,9 @@ if TYPE_CHECKING:
 # in their authoritative stores. This cap is independent of model capacity.
 HISTORY_TOKEN_CEILING = 8192
 
-
 ###############################################################################
 class AgentContextAssembler:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

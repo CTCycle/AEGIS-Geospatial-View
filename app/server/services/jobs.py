@@ -33,14 +33,13 @@ from server.services.chat.streaming import ChatStreamingService
 
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 def _utc_now() -> datetime:
     return datetime.now(UTC)
 
-
 ###############################################################################
 class BackgroundJobService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

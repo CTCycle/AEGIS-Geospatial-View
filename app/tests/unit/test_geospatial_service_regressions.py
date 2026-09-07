@@ -3,7 +3,6 @@ from __future__ import annotations
 from server.domain.catalog import GeospatialLayerReferenceEntry
 from server.services.geospatial.layers import LayerProviderService
 
-
 ###############################################################################
 def test_layer_provider_maps_active_fires_to_supported_provider_layer() -> None:
     service = LayerProviderService(

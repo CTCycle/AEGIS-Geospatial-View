@@ -4,7 +4,6 @@ import pytest
 
 from server.repositories.model_settings import ModelSettingsRepository
 
-
 ###############################################################################
 def test_get_required_fails_when_initialization_has_not_seeded_settings(
     sqlite_backend,
@@ -13,7 +12,6 @@ def test_get_required_fails_when_initialization_has_not_seeded_settings(
 
     with pytest.raises(RuntimeError, match="database initialization must seed it"):
         repo.get_required()
-
 
 ###############################################################################
 def test_seed_required_creates_singleton_and_is_idempotent(sqlite_backend) -> None:
@@ -27,7 +25,6 @@ def test_seed_required_creates_singleton_and_is_idempotent(sqlite_backend) -> No
     assert current.active_provider_mode == "cloud"
     assert current.agent_model_provider == ""
     assert current.agent_model_name == ""
-
 
 ###############################################################################
 def test_update_persists_selected_agent_model(sqlite_backend) -> None:

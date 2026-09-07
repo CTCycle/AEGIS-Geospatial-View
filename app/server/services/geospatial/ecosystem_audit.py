@@ -61,14 +61,12 @@ OVERLAP_GROUPS = {
     "basemap": {"openfreemap", "osm_tiles", "cartodb_tiles", "terrain_tiles", "arcgis"},
 }
 
-
 ###############################################################################
 def _read_text(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8")
     except OSError:
         return ""
-
 
 ###############################################################################
 def _safe_url(value: object) -> str | None:
@@ -88,7 +86,6 @@ def _safe_url(value: object) -> str | None:
     ]
     return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urlencode(query), ""))
 
-
 ###############################################################################
 def _manifest_urls(manifest: dict[str, Any]) -> list[str]:
     metadata = json_object(manifest.get("metadata"))
@@ -106,7 +103,6 @@ def _manifest_urls(manifest: dict[str, Any]) -> list[str]:
         if safe and safe not in urls:
             urls.append(safe)
     return urls
-
 
 ###############################################################################
 def _native_tools() -> list[dict[str, Any]]:
@@ -130,7 +126,6 @@ def _native_tools() -> list[dict[str, Any]]:
         for name in names
     ]
 
-
 ###############################################################################
 def _provider_overlaps(provider_id: str, capabilities: set[str]) -> list[str]:
     matches: list[str] = []
@@ -141,7 +136,6 @@ def _provider_overlaps(provider_id: str, capabilities: set[str]) -> list[str]:
             matches.append(group)
     return matches
 
-
 ###############################################################################
 def _adapter_path(provider_id: str) -> str | None:
     filename = PROVIDER_SOURCE_ALIASES.get(provider_id, provider_id.replace("-", "_"))
@@ -149,7 +143,6 @@ def _adapter_path(provider_id: str) -> str | None:
     if provider_id in PROVIDER_FACTORIES and path.is_file():
         return str(path.relative_to(PROJECT_DIR.parent))
     return None
-
 
 ###############################################################################
 def _endpoint_validation(
@@ -209,7 +202,6 @@ def _endpoint_validation(
         )
     return results
 
-
 ###############################################################################
 def _status_for_provider(
     provider_id: str,
@@ -238,7 +230,6 @@ def _status_for_provider(
     ):
         return "active"
     return "registered_not_enabled"
-
 
 ###############################################################################
 def build_inventory(
@@ -462,7 +453,6 @@ def build_inventory(
         "findings": findings,
     }
 
-
 ###############################################################################
 def _markdown(report: dict[str, Any]) -> str:
     lines = [
@@ -536,7 +526,6 @@ def _markdown(report: dict[str, Any]) -> str:
             f"- `{finding['id']}` ({finding['severity']}, {finding['status']}): {finding['detail']}"
         )
     return "\n".join(lines) + "\n"
-
 
 ###############################################################################
 def main(argv: list[str] | None = None) -> int:

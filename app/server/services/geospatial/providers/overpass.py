@@ -37,7 +37,6 @@ AMENITY_GROUPS = {
     "fuel": ["fuel", "charging_station"],
 }
 
-
 ###############################################################################
 class OverpassProvider(GeospatialProvider):
     provider_id = "overpass"
@@ -163,7 +162,6 @@ class OverpassProvider(GeospatialProvider):
             ),
             partial=bool(payload.get("truncated")),
         )
-
 
 ###############################################################################
 def _optional_int(value: Any) -> int | None:

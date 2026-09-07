@@ -9,9 +9,9 @@ from server.contracts.chat import ChatStreamEvent, ChatTurnRequest, ChatTurnResp
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.llm.errors import LLMConfigurationError
 
-
 ###############################################################################
 class ChatStreamingService:
+
     # -------------------------------------------------------------------------
     def __init__(self, agent_orchestrator: AgentOrchestrator) -> None:
         self.agent_orchestrator = agent_orchestrator

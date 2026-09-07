@@ -9,6 +9,7 @@ from server.services.llm.types import LLMRequest
 REQUEST_DEADLINE_METADATA_KEY = "deadline_monotonic"
 
 
+###############################################################################
 def remaining_request_seconds(request: LLMRequest) -> float | None:
     """Return the bounded request time left, if the caller supplied one."""
 
@@ -24,6 +25,7 @@ def remaining_request_seconds(request: LLMRequest) -> float | None:
     return deadline - monotonic()
 
 
+###############################################################################
 def request_is_expired(request: LLMRequest) -> bool:
     remaining = remaining_request_seconds(request)
     return remaining is not None and remaining <= 0.0

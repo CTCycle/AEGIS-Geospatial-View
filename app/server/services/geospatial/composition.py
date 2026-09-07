@@ -17,7 +17,6 @@ from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.cryptography import CredentialEncryptionService
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class GeospatialRuntime:
@@ -30,7 +29,6 @@ class GeospatialRuntime:
     credential_resolver: GeospatialCredentialResolver
     credentials_repo: CredentialRepository
     crypto_service: CredentialEncryptionService
-
 
 ###############################################################################
 def build_geospatial_runtime(database: SQLiteRepository) -> GeospatialRuntime:

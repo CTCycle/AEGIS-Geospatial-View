@@ -7,7 +7,6 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.repositories.credentials import CredentialRepository
 
-
 ###############################################################################
 def run_startup_validations(credentials_repo: CredentialRepository) -> None:
     loader = GeospatialManifestLoader()

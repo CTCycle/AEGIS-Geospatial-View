@@ -15,7 +15,6 @@ from server.contracts.extraction import (
 )
 from server.domain.agent.actions import AgentAction
 
-
 ###############################################################################
 class DeterministicIntentRecoveryService:
     """Recover explicit location/data requests when structured parsing times out.

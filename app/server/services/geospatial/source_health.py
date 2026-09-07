@@ -5,9 +5,9 @@ from server.common.typing import is_json_object
 from server.contracts.geospatial import LayerHealthStatus
 from server.domain.geospatial.health import SourceHealthRecord
 
-
 ###############################################################################
 class SourceHealthMonitor:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._records: dict[str, SourceHealthRecord] = {}

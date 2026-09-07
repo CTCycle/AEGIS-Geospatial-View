@@ -5,7 +5,6 @@ import logging
 from server.common.logger import LOG_CONFIG
 from server.common.logging_handlers import SafeStreamHandler
 
-
 ###############################################################################
 class _LegacyCodePageStream:
     encoding = "cp1252"
@@ -23,7 +22,6 @@ class _LegacyCodePageStream:
     # -------------------------------------------------------------------------
     def flush(self) -> None:
         return None
-
 
 ###############################################################################
 def test_console_handler_escapes_unrepresentable_units_without_logging_error() -> None:
@@ -44,7 +42,6 @@ def test_console_handler_escapes_unrepresentable_units_without_logging_error() -
     )
 
     assert stream.values == ["PM2.5 \\u03bcg/m³\n"]
-
 
 ###############################################################################
 def test_normal_logging_is_concise_and_file_output_is_utf8() -> None:

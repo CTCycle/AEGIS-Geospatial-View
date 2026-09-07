@@ -11,7 +11,6 @@ from playwright.sync_api import Page, WebSocketRoute
 
 TurnPayloadFactory = Callable[[str, int], dict[str, Any]]
 
-
 ###############################################################################
 def _envelope(
     *,
@@ -31,7 +30,6 @@ def _envelope(
     if correlation_id is not None:
         envelope["correlation_id"] = correlation_id
     return json.dumps(envelope)
-
 
 ###############################################################################
 def register_realtime_stub(

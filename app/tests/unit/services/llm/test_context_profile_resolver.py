@@ -4,16 +4,16 @@ from types import SimpleNamespace
 
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 
-
 ###############################################################################
 class _SettingsRepository:
+
     # -------------------------------------------------------------------------
     def get_required(self):  # noqa: ANN201
         return SimpleNamespace(ollama_url="http://ollama.test")
 
-
 ###############################################################################
 class _ModelLibrary:
+
     # -------------------------------------------------------------------------
     def __init__(self, descriptor: dict[str, object] | None) -> None:
         self.descriptor = descriptor
@@ -30,7 +30,6 @@ class _ModelLibrary:
         assert kwargs["ollama_url"] == "http://ollama.test"
         return self.descriptor
 
-
 ###############################################################################
 def test_resolver_prefers_exact_static_catalog_without_dynamic_lookup() -> None:
     library = _ModelLibrary(None)
@@ -45,7 +44,6 @@ def test_resolver_prefers_exact_static_catalog_without_dynamic_lookup() -> None:
     assert profile.context_window_tokens == 1_047_576
     assert profile.metadata_source == "openai_model_catalog"
     assert library.find_calls == 0
-
 
 ###############################################################################
 def test_resolver_caches_exact_dynamic_provider_metadata() -> None:
@@ -74,7 +72,6 @@ def test_resolver_caches_exact_dynamic_provider_metadata() -> None:
     assert first.maximum_output_tokens == 512
     assert first.metadata_source == "provider_models_api"
     assert library.find_calls == 1
-
 
 ###############################################################################
 def test_resolver_keeps_missing_dynamic_context_unknown() -> None:

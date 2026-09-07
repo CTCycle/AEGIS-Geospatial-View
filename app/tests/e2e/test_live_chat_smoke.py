@@ -16,7 +16,6 @@ from tests.e2e.helpers.artifacts import (
 )
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
-
 ###############################################################################
 def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
     conversation_response = page.request.post(
@@ -52,13 +51,11 @@ def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
         return False, f"Live provider precondition failed with status {response.status}"
     return False, f"Unexpected provider precondition status {response.status}"
 
-
 ###############################################################################
 def _assert_clean_backend_tail(tail: str) -> None:
     normalized = tail.lower()
     assert "traceback" not in normalized
     assert "unhandled exception" not in normalized
-
 
 ###############################################################################
 def _read_conversation_id(page: Page) -> str | None:
@@ -74,7 +71,6 @@ def _read_conversation_id(page: Page) -> str | None:
         if isinstance(conversation_id, str) and conversation_id
         else None
     )
-
 
 ###############################################################################
 def test_live_chat_happy_path(
@@ -122,7 +118,6 @@ def test_live_chat_happy_path(
         backend_log_status="clean" if tail.strip() else "empty",
     )
 
-
 ###############################################################################
 def test_live_follow_up_same_conversation(
     page: Page,
@@ -169,7 +164,6 @@ def test_live_follow_up_same_conversation(
         backend_log_status="clean" if tail.strip() else "empty",
     )
 
-
 ###############################################################################
 def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> None:
     ready, reason = _check_live_provider(page, api_base_url)
@@ -182,7 +176,6 @@ def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> No
     page.get_by_role("button", name="Start new chat").click()
     expect(page.get_by_text("Map Workspace")).to_be_visible()
     expect(page.locator(".overlay-controls")).not_to_be_visible()
-
 
 ###############################################################################
 def test_live_degraded_path_shows_user_failure_without_crash(

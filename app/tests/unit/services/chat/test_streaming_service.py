@@ -28,13 +28,11 @@ from server.contracts.geospatial import (
 from server.services.chat.streaming import ChatStreamingService
 from server.services.llm.errors import LLMConfigurationError
 
-
 ###############################################################################
 async def collect_stream_events(
     stream: AsyncIterator[ChatStreamEvent],
 ) -> list[ChatStreamEvent]:
     return [event async for event in stream]
-
 
 ###############################################################################
 def turn_contract() -> TurnParseResult:
@@ -59,7 +57,6 @@ def turn_contract() -> TurnParseResult:
         ),
     )
 
-
 ###############################################################################
 def policy_decision() -> PolicyDecision:
     return PolicyDecision(
@@ -70,7 +67,6 @@ def policy_decision() -> PolicyDecision:
         ),
         trace=DecisionTrace(steps=["test"]),
     )
-
 
 ###############################################################################
 def chat_response(
@@ -92,9 +88,9 @@ def chat_response(
         memory_snapshot={"k": "v"},
     )
 
-
 ###############################################################################
 class ToolStatusAgentOrchestrator:
+
     # -------------------------------------------------------------------------
     async def run_turn(
         self,
@@ -185,9 +181,9 @@ class ToolStatusAgentOrchestrator:
             ),
         )
 
-
 ###############################################################################
 class FinalMessageAgentOrchestrator:
+
     # -------------------------------------------------------------------------
     async def run_turn(
         self,
@@ -205,9 +201,9 @@ class FinalMessageAgentOrchestrator:
             ),
         )
 
-
 ###############################################################################
 class ContextUsageAgentOrchestrator:
+
     # -------------------------------------------------------------------------
     async def run_turn(
         self,
@@ -238,9 +234,9 @@ class ContextUsageAgentOrchestrator:
             ),
         )
 
-
 ###############################################################################
 class ConfigurationErrorAgentOrchestrator:
+
     # -------------------------------------------------------------------------
     async def run_turn(
         self,
@@ -249,9 +245,9 @@ class ConfigurationErrorAgentOrchestrator:
     ) -> ChatTurnResponse:
         raise LLMConfigurationError("provider unavailable")
 
-
 ###############################################################################
 class UnexpectedErrorAgentOrchestrator:
+
     # -------------------------------------------------------------------------
     async def run_turn(
         self,
@@ -260,9 +256,9 @@ class UnexpectedErrorAgentOrchestrator:
     ) -> ChatTurnResponse:
         raise RuntimeError("boom")
 
-
 ###############################################################################
 class CancellableAgentOrchestrator:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.started = asyncio.Event()
@@ -282,7 +278,6 @@ class CancellableAgentOrchestrator:
             self.cancelled = True
             raise
 
-
 ###############################################################################
 def stream_events(agent_orchestrator: object) -> list[ChatStreamEvent]:
     service = ChatStreamingService(agent_orchestrator)  # type: ignore[arg-type]
@@ -290,7 +285,6 @@ def stream_events(agent_orchestrator: object) -> list[ChatStreamEvent]:
         conversation_id="test-conversation", message="hi", request_id="chat-123"
     )
     return run_async_in_thread(collect_stream_events(service.stream_turn(payload)))
-
 
 ###############################################################################
 async def cancel_stream_and_check_orchestrator() -> bool:
@@ -305,7 +299,6 @@ async def cancel_stream_and_check_orchestrator() -> bool:
     await asyncio.gather(consumer, return_exceptions=True)
     return orchestrator.cancelled
 
-
 ###############################################################################
 async def consume_stream(
     service: ChatStreamingService,
@@ -313,7 +306,6 @@ async def consume_stream(
 ) -> None:
     async for _event in service.stream_turn(payload):
         pass
-
 
 ###############################################################################
 def test_stream_turn_emits_lifecycle_and_map_events() -> None:
@@ -332,7 +324,6 @@ def test_stream_turn_emits_lifecycle_and_map_events() -> None:
     assert events[4].data["ok"] is True
     assert events[5].data["map_session"]["resolved_location"]["label"] == "Rome"
 
-
 ###############################################################################
 def test_stream_turn_final_assistant_event_emits_final_payload() -> None:
     events = stream_events(FinalMessageAgentOrchestrator())
@@ -350,7 +341,6 @@ def test_stream_turn_final_assistant_event_emits_final_payload() -> None:
     assert events[-1].data["decision"]["plan"]["state"] == "direct_response"
     assert events[-1].data["operation"]["kind"] == "direct_answer"
 
-
 ###############################################################################
 def test_stream_turn_emits_context_usage_before_final_event() -> None:
     events = stream_events(ContextUsageAgentOrchestrator())
@@ -359,14 +349,12 @@ def test_stream_turn_emits_context_usage_before_final_event() -> None:
     assert events[1].data["phase"] == "parser"
     assert events[1].data["context_usage"]["usage_percent"] == 17.1
 
-
 ###############################################################################
 def test_stream_turn_llm_configuration_error_maps_to_error_event() -> None:
     events = stream_events(ConfigurationErrorAgentOrchestrator())
 
     assert events[-1].event == "error"
     assert events[-1].data["status"] == 503
-
 
 ###############################################################################
 def test_stream_turn_unexpected_exception_maps_to_500_error_event() -> None:
@@ -375,11 +363,9 @@ def test_stream_turn_unexpected_exception_maps_to_500_error_event() -> None:
     assert events[-1].event == "error"
     assert events[-1].data["status"] == 500
 
-
 ###############################################################################
 def test_stream_turn_cancels_backend_work_when_consumer_disconnects() -> None:
     assert run_async_in_thread(cancel_stream_and_check_orchestrator()) is True
-
 
 ###############################################################################
 def test_streaming_service_test_file_contains_no_nested_functions() -> None:

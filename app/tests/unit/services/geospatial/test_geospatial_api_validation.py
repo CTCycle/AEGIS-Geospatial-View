@@ -11,7 +11,6 @@ from server.services.geospatial.api_service import (
     normalize_geojson_feature_collection,
 )
 
-
 ###############################################################################
 def test_geojson_normalization_preserves_valid_geometry_and_coordinates() -> None:
     result = normalize_geojson_feature_collection(
@@ -40,7 +39,6 @@ def test_geojson_normalization_preserves_valid_geometry_and_coordinates() -> Non
 
     assert len(result["features"]) == 2
     assert result["features"][0]["geometry"]["coordinates"] == [12.5, 41.9]
-
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -82,7 +80,6 @@ def test_geojson_normalization_rejects_invalid_geometry(payload: dict) -> None:
     with pytest.raises(GeospatialProviderResponseError, match="invalid geometry"):
         normalize_geojson_feature_collection(payload)
 
-
 ###############################################################################
 def test_geojson_normalization_converts_latitude_longitude_records() -> None:
     result = normalize_geojson_feature_collection(
@@ -104,7 +101,6 @@ def test_geojson_normalization_converts_latitude_longitude_records() -> None:
         "coordinates": [12.5, 41.9],
     }
     assert feature["properties"]["value"] == 4.2
-
 
 ###############################################################################
 def test_bbox_parser_enforces_west_south_east_north_and_finite_values() -> None:

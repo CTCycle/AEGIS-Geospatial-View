@@ -14,9 +14,9 @@ from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.contracts.extraction import TurnParseResult
 from server.services.agent.tool_argument_builder import ToolArgumentBuilder
 
-
 ###############################################################################
 class DeterministicToolPlanner:
+
     # -------------------------------------------------------------------------
     def __init__(self, argument_builder: ToolArgumentBuilder | None = None) -> None:
         self.argument_builder = argument_builder or ToolArgumentBuilder()
@@ -134,6 +134,7 @@ class DeterministicToolPlanner:
             ),
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _target_specs(
         canonical_request: CanonicalRequestInterpretation | None,

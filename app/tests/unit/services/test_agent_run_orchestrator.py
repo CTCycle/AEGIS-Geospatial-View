@@ -17,9 +17,9 @@ from server.contracts.events import RunEventType
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 from server.services.agent.orchestrator import AgentOrchestrator as ChatAgentOrchestrator
 
-
 ###############################################################################
 class _FakeAgentOrchestrator:
+
     # -------------------------------------------------------------------------
     def __init__(self, response: ChatTurnResponse) -> None:
         self.response = response
@@ -41,9 +41,9 @@ class _FakeAgentOrchestrator:
             )
         return self.response
 
-
 ###############################################################################
 class _FakeRunRepository:
+
     # -------------------------------------------------------------------------
     def __init__(self, snapshot: AgentRunSnapshot) -> None:
         self.snapshot = snapshot
@@ -117,9 +117,9 @@ class _FakeRunRepository:
     def request_cancel_once(self, run_id: str) -> tuple[AgentRunSnapshot, bool]:
         return self.request_cancel(run_id), True
 
-
 ###############################################################################
 class _FakeEventPublisher:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.events: list[dict[str, object]] = []
@@ -127,7 +127,6 @@ class _FakeEventPublisher:
     # -------------------------------------------------------------------------
     async def publish(self, **kwargs):  # noqa: ANN003
         self.events.append(kwargs)
-
 
 ###############################################################################
 def _snapshot() -> AgentRunSnapshot:
@@ -140,7 +139,6 @@ def _snapshot() -> AgentRunSnapshot:
         state=AgentRunState.PENDING,
         created_at=datetime.now(UTC),
     )
-
 
 ###############################################################################
 def _failed_response() -> ChatTurnResponse:
@@ -193,7 +191,6 @@ def _failed_response() -> ChatTurnResponse:
         ),
     )
 
-
 ###############################################################################
 def test_execute_run_marks_failed_operation_as_failed_run() -> None:
     repository = _FakeRunRepository(_snapshot())
@@ -225,7 +222,6 @@ def test_execute_run_marks_failed_operation_as_failed_run() -> None:
         if event["type"] == RunEventType.CONTEXT_USAGE
     )
     assert context_event["payload"]["phase"] == "parser"
-
 
 ###############################################################################
 def test_execute_run_includes_context_usage_in_clarification_event() -> None:
@@ -260,6 +256,7 @@ def test_execute_run_includes_context_usage_in_clarification_event() -> None:
     ] == 321
 
 
+###############################################################################
 def test_execute_run_publishes_context_samples_before_terminal_event() -> None:
     response = _failed_response().model_copy(
         update={
@@ -293,6 +290,7 @@ def test_execute_run_publishes_context_samples_before_terminal_event() -> None:
     )
     assert context_index < terminal_index
 
+###############################################################################
 def test_geospatial_auth_failure_points_to_access_without_exposing_provider_text():
     message = AgentRunOrchestrator._safe_failure_message(
         ProviderAuthError("invalid credential secret-token")
@@ -302,6 +300,7 @@ def test_geospatial_auth_failure_points_to_access_without_exposing_provider_text
     assert "secret-token" not in message
 
 
+###############################################################################
 def test_unacknowledged_map_candidate_does_not_replace_committed_task_state():
     candidate = {
         "schema_version": 3,

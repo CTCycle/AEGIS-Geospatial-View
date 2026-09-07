@@ -17,16 +17,13 @@ from server.configurations import get_server_settings
 
 OPENMETEO_ELEVATION_BASE_URL = "https://api.open-meteo.com/v1/elevation"
 
-
 ###############################################################################
 class OpenMeteoServiceError(Exception):
     """Base exception for Open-Meteo failures."""
 
-
 ###############################################################################
 class OpenMeteoRequestError(OpenMeteoServiceError):
     """Raised when Open-Meteo cannot fulfill a request."""
-
 
 ###############################################################################
 class OpenMeteoService:

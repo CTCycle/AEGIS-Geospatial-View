@@ -17,7 +17,6 @@ from server.services.geospatial.providers.base import (
 
 ResultStatus = Literal["ok", "valid_empty", "partial", "stale"]
 
-
 ###############################################################################
 class OpenMeteoProvider(GeospatialProvider):
     provider_id = "openmeteo"

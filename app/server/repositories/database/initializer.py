@@ -11,7 +11,6 @@ from server.repositories.database.migration_runner import (
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.model_settings import ModelSettingsRepository
 
-
 ###############################################################################
 def initialize_database(
     database: SQLiteRepository,

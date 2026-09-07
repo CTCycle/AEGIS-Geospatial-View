@@ -21,14 +21,13 @@ from server.services.cryptography import CredentialEncryptionService
 from server.services.llm.context_budget import resolve_model_context_profile
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 
-
 ###############################################################################
 class ChatSettingsValidationError(ValueError):
     pass
 
-
 ###############################################################################
 class ChatSettingsService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

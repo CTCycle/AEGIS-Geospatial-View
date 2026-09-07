@@ -32,9 +32,9 @@ from server.services.geospatial.spatial_constraints import (
 
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 class ToolPlanExecutor:
+
     # -------------------------------------------------------------------------
     def __init__(self, *, tool_registry: ToolRegistry) -> None:
         self.tool_registry = tool_registry
@@ -313,6 +313,7 @@ class ToolPlanExecutor:
             )
         raise AssertionError("unreachable")
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _context_for_step(
         context: AgentExecutionContext,
@@ -461,6 +462,7 @@ class ToolPlanExecutor:
                         return "Required map output has no renderable geometry or valid empty-result bounds."
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def validate_result(
         step: ToolPlanStep,
@@ -471,6 +473,7 @@ class ToolPlanExecutor:
 
         return ToolPlanExecutor._validate_result(step, data, canonical_request)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _validate_map_geometry(data: dict[str, Any]) -> str | None:
         """Reject invalid WGS84 coordinates before map state is assembled."""

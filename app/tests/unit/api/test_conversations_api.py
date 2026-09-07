@@ -20,7 +20,6 @@ from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.chat.conversation_snapshot import ConversationSnapshotService
 from server.services.chat.history_service import ChatHistoryService
 
-
 ###############################################################################
 class _InMemoryBackend:
     db_path = None
@@ -34,7 +33,6 @@ class _InMemoryBackend:
             future=True,
         )
         self.session = sessionmaker(bind=self.engine, future=True)
-
 
 ###############################################################################
 @pytest.fixture()
@@ -63,7 +61,6 @@ def conversations_api_client() -> TestClient:
     yield client
     client.close()
 
-
 ###############################################################################
 def test_create_conversation_returns_persisted_conversation(
     conversations_api_client: TestClient,
@@ -91,7 +88,6 @@ def test_create_conversation_returns_persisted_conversation(
     assert snapshot_payload["task_snapshot"] is None
     assert snapshot_payload["map_session"] is None
     assert snapshot_payload["active_run"] is None
-
 
 ###############################################################################
 def test_get_conversation_snapshot_returns_not_found_for_unknown_conversation(

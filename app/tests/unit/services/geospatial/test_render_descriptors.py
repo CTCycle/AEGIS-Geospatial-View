@@ -14,9 +14,9 @@ from server.services.geospatial.render_descriptors import RenderDescriptorServic
 from server.services.search.request_builder import RequestBuilder
 from server.services.geospatial.providers.base import ProviderAuthError
 
-
 ###############################################################################
 class _CapabilityRegistry:
+
     # -------------------------------------------------------------------------
     def __init__(self, capability: dict) -> None:
         self.capability = capability
@@ -26,6 +26,7 @@ class _CapabilityRegistry:
         return self.capability if self.capability["id"] == capability_id else None
 
 
+###############################################################################
 def test_openaq_auth_failure_cannot_be_a_deferred_success(monkeypatch) -> None:
     registry = ProviderRegistry()
 
@@ -39,7 +40,6 @@ def test_openaq_auth_failure_cannot_be_a_deferred_success(monkeypatch) -> None:
                 provider_registry=registry
             ).build_overlay_descriptor("openaq_air_quality", request=_request())
         )
-
 
 ###############################################################################
 def _request():
@@ -59,6 +59,7 @@ def _request():
     )
 
 
+###############################################################################
 def _sanremo_request():
     return RequestBuilder().build_location_search_request(
         ExecutionPlan(
@@ -76,9 +77,11 @@ def _sanremo_request():
     )
 
 
+###############################################################################
 class _SanremoWeatherProvider:
     provider_id = "openmeteo"
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request):  # noqa: ANN001
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -113,7 +116,6 @@ class _SanremoWeatherProvider:
             source_url="https://api.open-meteo.com/v1/forecast",
             warnings=["Provider warning"],
         )
-
 
 ###############################################################################
 def test_provider_backed_sanremo_weather_descriptor_contains_renderable_data() -> None:
@@ -161,7 +163,6 @@ def test_provider_backed_sanremo_weather_descriptor_contains_renderable_data() -
     assert feature["geometry"]["coordinates"] == [7.777, 43.817]
     assert feature["properties"]["relative_humidity_2m"] == 68
 
-
 ###############################################################################
 def test_render_descriptor_service_exposes_configurable_openfreemap_style(
     monkeypatch,
@@ -189,7 +190,6 @@ def test_render_descriptor_service_exposes_configurable_openfreemap_style(
     assert result is not None
     assert result["style_url"] == "https://maps.internal.example/styles/liberty"
 
-
 ###############################################################################
 def test_render_descriptor_service_builds_complete_wms_template() -> None:
     template = RenderDescriptorService.build_wms_tile_template(
@@ -213,7 +213,6 @@ def test_render_descriptor_service_builds_complete_wms_template() -> None:
     assert "transparent=true" in template
     assert "time=2026-06-18" in template
 
-
 ###############################################################################
 def test_render_descriptor_service_builds_complete_wmts_template() -> None:
     template = RenderDescriptorService.build_wmts_tile_template(
@@ -235,7 +234,6 @@ def test_render_descriptor_service_builds_complete_wmts_template() -> None:
     assert "tilecol={x}" in template
     assert "format=image/png" in template
     assert "time=2026-06-18" in template
-
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -262,7 +260,6 @@ def test_catalog_raster_overlays_expose_provider_tile_templates(
     assert expected_host in tile_url_template
     assert "{bbox-epsg-3857}" in tile_url_template
     assert descriptor["render"]["tile_url_template"] == tile_url_template
-
 
 ###############################################################################
 def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
@@ -293,7 +290,6 @@ def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
     descriptor, _warnings = result
     assert descriptor["max_zoom"] == 7
 
-
 ###############################################################################
 def test_census_demographic_render_uses_server_provider_endpoint() -> None:
     service = RenderDescriptorService(capability_registry=CapabilityRegistry())
@@ -313,7 +309,6 @@ def test_census_demographic_render_uses_server_provider_endpoint() -> None:
     assert "live=true" in str(descriptor["url"])
     assert descriptor["rendering_mode"] == "choropleth"
     assert warnings == []
-
 
 ###############################################################################
 @pytest.mark.parametrize(

@@ -5,7 +5,6 @@ from server.services.geospatial.poi_benchmark import (
     load_poi_records,
 )
 
-
 ###############################################################################
 def test_poi_parity_report_matches_by_id_and_tracks_completeness() -> None:
     baseline = [
@@ -24,7 +23,6 @@ def test_poi_parity_report_matches_by_id_and_tracks_completeness() -> None:
     assert report.precision == 1.0
     assert report.meets_thresholds is True
 
-
 ###############################################################################
 def test_poi_parity_report_rejects_missing_candidate_coverage_and_duplicates() -> None:
     baseline = [
@@ -41,7 +39,6 @@ def test_poi_parity_report_rejects_missing_candidate_coverage_and_duplicates() -
     assert report.recall == 0.5
     assert report.duplicate_rate == 0.5
     assert report.meets_thresholds is False
-
 
 ###############################################################################
 def test_load_poi_records_accepts_geojson_feature_collections(tmp_path) -> None:

@@ -7,9 +7,9 @@ from server.common.typing import json_array, json_object
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 class GeospatialCatalogService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

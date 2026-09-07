@@ -11,13 +11,11 @@ from server.services.chat.settings_service import (
     ChatSettingsValidationError,
 )
 
-
 ###############################################################################
 @dataclass
 class EncryptedValue:
     value: str
     key_version: str
-
 
 ###############################################################################
 @dataclass
@@ -25,7 +23,6 @@ class FakeCredentialRecord:
     provider: str
     label: str
     encrypted_value: str
-
 
 ###############################################################################
 @dataclass
@@ -38,9 +35,9 @@ class FakeSettingsRecord:
     google_base_url: str | None = "https://google.example/v1"
     deepseek_base_url: str | None = "https://deepseek.example/v1"
 
-
 ###############################################################################
 class FakeSettingsRepository:
+
     # -------------------------------------------------------------------------
     def __init__(self, record: FakeSettingsRecord | None = None) -> None:
         self.record = record or FakeSettingsRecord()
@@ -57,9 +54,9 @@ class FakeSettingsRepository:
             setattr(self.record, key, value)
         return self.record
 
-
 ###############################################################################
 class FakeCredentialsRepository:
+
     # -------------------------------------------------------------------------
     def __init__(self, active_items: list[FakeCredentialRecord] | None = None) -> None:
         self.active_items = active_items or []
@@ -80,9 +77,9 @@ class FakeCredentialsRepository:
     ) -> None:
         self.upserts.append((provider, label, encrypted_value, key_version))
 
-
 ###############################################################################
 class FakeCryptoService:
+
     # -------------------------------------------------------------------------
     def encrypt(self, value: str) -> EncryptedValue:
         return EncryptedValue(value=f"enc:{value}", key_version="v1")
@@ -91,9 +88,9 @@ class FakeCryptoService:
     def decrypt(self, value: str) -> str:
         return value
 
-
 ###############################################################################
 class FakeModelLibraryService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -162,14 +159,13 @@ class FakeModelLibraryService:
                     return item
         return None
 
-
 ###############################################################################
 class NoLiveCatalogModelLibraryService(FakeModelLibraryService):
+
     # -------------------------------------------------------------------------
     def find_model(self, **kwargs: Any) -> dict[str, object] | None:
         _ = kwargs
         raise AssertionError("reading settings must not query a live model catalog")
-
 
 ###############################################################################
 def build_service(
@@ -184,7 +180,6 @@ def build_service(
         crypto_service=FakeCryptoService(),  # type: ignore[arg-type]
         model_library_service=model_library_service or FakeModelLibraryService(),  # type: ignore[arg-type]
     )
-
 
 ###############################################################################
 def test_partial_agent_update_preserves_urls_and_credentials_shape() -> None:
@@ -203,7 +198,6 @@ def test_partial_agent_update_preserves_urls_and_credentials_shape() -> None:
         "deepseek_base_url": "https://deepseek.example/v1",
     }
 
-
 ###############################################################################
 def test_update_settings_rejects_blank_agent_selection() -> None:
     service = build_service()
@@ -212,7 +206,6 @@ def test_update_settings_rejects_blank_agent_selection() -> None:
         service.update_settings(
             ModelSettingsUpdateRequest(agent_model_provider="", agent_model_name="")
         )
-
 
 ###############################################################################
 def test_get_settings_preserves_blank_agent_when_no_models_are_available() -> None:
@@ -227,7 +220,6 @@ def test_get_settings_preserves_blank_agent_when_no_models_are_available() -> No
     assert response.agent_model_name == ""
     assert settings_repo.last_update is None
 
-
 ###############################################################################
 def test_get_settings_uses_canonical_static_context_without_live_catalog() -> None:
     service = build_service(model_library_service=NoLiveCatalogModelLibraryService())
@@ -241,7 +233,6 @@ def test_get_settings_uses_canonical_static_context_without_live_catalog() -> No
         "maximum_output_tokens": 32_768,
         "context_profile_source": "openai_model_catalog",
     }
-
 
 ###############################################################################
 def test_updating_only_credentials_is_allowed_before_first_agent_selection() -> None:
@@ -262,7 +253,6 @@ def test_updating_only_credentials_is_allowed_before_first_agent_selection() -> 
     assert settings_repo.last_update["agent_model_provider"] == ""
     assert settings_repo.last_update["agent_model_name"] == ""
 
-
 ###############################################################################
 def test_updating_only_credentials_preserves_selected_agent_and_base_urls() -> None:
     settings_repo = FakeSettingsRepository()
@@ -280,7 +270,6 @@ def test_updating_only_credentials_preserves_selected_agent_and_base_urls() -> N
     assert settings_repo.last_update["agent_model_provider"] == "openai"
     assert settings_repo.last_update["agent_model_name"] == "gpt-4.1"
     assert settings_repo.last_update["openai_base_url"] == "https://openai.example/v1"
-
 
 ###############################################################################
 def test_updating_only_credentials_skips_unrelated_local_model_validation() -> None:
@@ -306,7 +295,6 @@ def test_updating_only_credentials_skips_unrelated_local_model_validation() -> N
     assert settings_repo.last_update is not None
     assert settings_repo.last_update["agent_model_name"] == "missing-agent"
 
-
 ###############################################################################
 def test_local_model_validation_rejects_unavailable_agent_model() -> None:
     service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
@@ -317,7 +305,6 @@ def test_local_model_validation_rejects_unavailable_agent_model() -> None:
                 agent_model_provider="ollama", agent_model_name="missing-agent"
             )
         )
-
 
 ###############################################################################
 def test_available_local_model_allows_update() -> None:
@@ -339,7 +326,6 @@ def test_available_local_model_allows_update() -> None:
     assert settings_repo.last_update["agent_model_provider"] == "ollama"
     assert settings_repo.last_update["agent_model_name"] == "llama3.2"
 
-
 ###############################################################################
 def test_agent_model_without_tools_is_rejected() -> None:
     service = build_service(
@@ -360,7 +346,6 @@ def test_agent_model_without_tools_is_rejected() -> None:
             )
         )
 
-
 ###############################################################################
 def test_agent_model_without_structured_output_is_rejected() -> None:
     service = build_service(
@@ -380,7 +365,6 @@ def test_agent_model_without_structured_output_is_rejected() -> None:
                 agent_model_provider="google", agent_model_name="no-structured"
             )
         )
-
 
 ###############################################################################
 def test_agent_model_with_tools_and_structured_output_is_accepted() -> None:
