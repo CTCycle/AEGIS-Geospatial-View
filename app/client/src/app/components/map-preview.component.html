@@ -79,6 +79,14 @@
           </div>
         }
 
+        @if (noResultsOverlays.length) {
+          <div class="metadata-panel metadata-panel--no-results" role="status" aria-live="polite" aria-label="No results">
+            @for (overlay of noResultsOverlays; track overlay.id) {
+              <p><strong>{{ overlay.label }}</strong> has no results in the requested area or time window.</p>
+            }
+          </div>
+        }
+
         @if (failedOverlayStatuses.length) {
           <div class="metadata-panel metadata-panel--errors" aria-label="Failed layers">
             @for (status of failedOverlayStatuses; track status.overlayId) {

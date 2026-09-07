@@ -69,6 +69,8 @@ Defined in `app/server/api/chat.py`:
 
 - `POST /api/chat/turn`
   Executes a chat turn and returns the structured result. `conversation_id` is required.
+  This direct path retains its immediate response behavior; no second headless
+  render-ack transport is provided for it.
 - `POST /api/chat/jobs`
   Starts an asynchronous chat turn and returns `BackgroundJobCreateResponse`. `conversation_id` is required.
 - `POST /api/chat/stream`
@@ -174,6 +176,20 @@ return `400` for an unsupported provider and `502` when the upstream catalog
 cannot be loaded. Provider request failures are normalized into safe provider,
 stage, code, HTTP-status, and retryability metadata without exposing response
 bodies or credentials.
+
+### Intentional limitation contract
+
+- Antimeridian handling remains provider-dependent.
+- Point or metadata-only weather sampling cannot claim an area overlay.
+- Flood comparisons require verified comparable measures, units, and time
+  windows; otherwise the existing clarification operation asks for separate
+  layers or a comparable data contract.
+- FIRMS and other provider credential failures remain structured limitations;
+  provider fallback is not implied.
+- Valid empty results are distinct from unavailable providers and produce an
+  explicit no-results state.
+- Browser acknowledgment is client-reported rendering evidence; backend
+  semantic validation remains authoritative.
 
 Planned tool execution, aggregation, synthesis, persistence, progress events,
 and final response construction are owned by `PlannedTurnExecutionService`.

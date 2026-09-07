@@ -44,6 +44,16 @@ const toMessage = (error: unknown): string => {
   return 'Overlay rendering failed.';
 };
 
+const noResultsStatus = (overlay: OverlayEntry): OverlayRenderStatus => (
+  String(overlay.result_status || '').toLowerCase() === 'valid_empty'
+    ? {
+      overlayId: overlay.id,
+      status: 'no-results',
+      message: 'No results in the requested area or time window.',
+    }
+    : { overlayId: overlay.id, status: 'loaded' }
+);
+
 export const recordBooleanEqual = (a: Record<string, boolean>, b: Record<string, boolean>): boolean => {
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
@@ -240,7 +250,7 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
         && typeof map.getSource === 'function'
         && layerIds.some((id) => map.getLayer(id))
       ) {
-        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        statuses.push(noResultsStatus(overlay));
         return;
       }
       if (renderingMode === 'metadata-only' || overlay.type === 'metadata-only') {
@@ -256,7 +266,7 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
         ['xyz', 'raster-tile', 'wmts', 'wms', 'tile'].includes(renderingMode)
         && addRasterOverlayLayer(map, overlay, sourceId, layerId, opacity, sourceBounds)
       ) {
-        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        statuses.push(noResultsStatus(overlay));
         return;
       }
 
@@ -264,12 +274,12 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
         ['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points'].includes(renderingMode)
         && addGeoJsonOverlayLayer(map, overlay, sourceId, layerId, opacity)
       ) {
-        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        statuses.push(noResultsStatus(overlay));
         return;
       }
 
       if (renderingMode === 'vector-tile' && addVectorTileOverlayLayer(map, overlay, sourceId, layerId, opacity)) {
-        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        statuses.push(noResultsStatus(overlay));
         return;
       }
 
@@ -306,7 +316,7 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
             'circle-stroke-color': '#111827',
           },
         });
-        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        statuses.push(noResultsStatus(overlay));
         return;
       }
 

@@ -150,6 +150,26 @@ def test_map_session_message_reports_render_status_failure_as_unavailable() -> N
 
 
 ###############################################################################
+def test_map_session_message_reports_valid_empty_as_no_results() -> None:
+    message = AgentOrchestrator._compose_map_session_message(
+        _map_session(
+            location="Zurich",
+            basemap_label="OpenStreetMap",
+            overlays=[("flood-zurich", "Flood Zones", True, "geojson")],
+            descriptors=[{"result_status": "valid_empty", "result_type": "features"}],
+        )
+    )
+
+    assert message == (
+        "Map ready for Zurich using OpenStreetMap. "
+        "No results for the Flood Zones overlay in the requested area or time window."
+    )
+    assert "Visible overlays:" not in message
+    assert "Unavailable overlays:" not in message
+    assert "Available as metadata only:" not in message
+
+
+###############################################################################
 def test_direct_coordinate_message_includes_coordinates() -> None:
     message = AgentOrchestrator._compose_direct_tool_message(
         "location_to_coordinates",

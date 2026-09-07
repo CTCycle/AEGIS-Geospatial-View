@@ -219,6 +219,13 @@
     color: #fee2e2;
 }
 
+.metadata-panel--no-results {
+    top: 6.9rem;
+    background: rgb(20 48 59 / 92%);
+    border-color: rgb(111 190 226 / 45%);
+    color: #dff5ff;
+}
+
 .metadata-panel p,
 .legend-panel p {
     margin: 0;

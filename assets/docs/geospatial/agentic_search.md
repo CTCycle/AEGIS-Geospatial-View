@@ -261,3 +261,13 @@ The deterministic completion contract tracks `location_resolved`,
 or other sampled values remain inspectable but cannot satisfy a required visual
 layer. A valid empty result is data retrieval with an explicit no-results map
 state, not provider success with fabricated features.
+
+Flood-related `compare` operations are deterministically clarified before
+provider or tool execution unless comparable measure, unit, and time-window
+semantics have been verified. The current contract supports requesting the
+layers separately; it does not add a comparison engine.
+
+The direct `/api/chat/turn` path remains an immediate response path because no
+second headless render-ack transport exists. Realtime map runs continue to use
+the browser acknowledgment flow: the acknowledgment is client-reported
+rendering evidence, while backend semantic validation is authoritative.

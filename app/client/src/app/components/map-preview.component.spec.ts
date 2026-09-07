@@ -551,6 +551,58 @@ describe('components/map-preview.component', () => {
     expect(component.attributionEntries.map((entry) => entry.label)).toContain('Natural Earth');
   });
 
+  it('renders valid-empty overlays as accessible no-results and successful evidence', () => {
+    const renderEvents: Array<{
+      state: string;
+      overlayResults?: Array<Record<string, string | number | boolean | null>>;
+    }> = [];
+    component.renderStateChange.subscribe((change) => renderEvents.push(change));
+    component.payload = {
+      map_session: makeMapSession({
+        bounds: [12.4, 41.8, 12.6, 42.0],
+        overlays: [{
+          id: 'empty_flood_zones',
+          label: 'Flood Zones',
+          type: 'geojson',
+          rendering_mode: 'choropleth',
+          provider: 'fixture',
+          data_format: 'GeoJSON',
+          geometry_type: 'Polygon',
+          result_status: 'valid_empty',
+          data: { type: 'FeatureCollection', features: [] },
+        }],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(component.overlayRenderStatuses).toEqual([
+      jasmine.objectContaining({
+        overlayId: 'empty_flood_zones',
+        status: 'no-results',
+      }),
+    ]);
+    expect(component.noResultsOverlays.map((overlay) => overlay.id)).toEqual(['empty_flood_zones']);
+    const noResultsPanel = fixture.nativeElement.querySelector('[aria-label="No results"]') as HTMLElement | null;
+    expect(noResultsPanel?.getAttribute('role')).toBe('status');
+    expect(noResultsPanel?.textContent).toContain('Flood Zones');
+    expect(noResultsPanel?.textContent).toContain('no results');
+
+    const overlayControls = fixture.debugElement.query(By.directive(OverlayControlsComponent)).componentInstance as OverlayControlsComponent;
+    overlayControls.isExpanded = true;
+    fixture.detectChanges();
+    const layerNote = fixture.nativeElement.querySelector('.overlay-render-note') as HTMLElement | null;
+    expect(layerNote?.getAttribute('role')).toBe('status');
+    expect(layerNote?.textContent).toContain('no-results');
+    expect(layerNote?.textContent).toContain('No results in the requested area or time window.');
+
+    const readyEvent = renderEvents.filter((event) => event.state === 'ready').at(-1);
+    expect(readyEvent?.overlayResults?.[0]).toEqual(jasmine.objectContaining({
+      overlay_id: 'empty_flood_zones',
+      loaded: true,
+    }));
+  });
+
   it('renders attribution labels as links when a safe attribution URL is provided', () => {
     component.payload = {
       map_session: makeMapSession({

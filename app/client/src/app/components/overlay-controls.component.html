@@ -41,7 +41,11 @@
             />
           </label>
           @if (getRenderStatus(overlay.id) !== 'loaded') {
-            <p class="overlay-render-note">
+            <p
+              class="overlay-render-note"
+              [attr.role]="getRenderStatus(overlay.id) === 'no-results' ? 'status' : null"
+              [attr.aria-live]="getRenderStatus(overlay.id) === 'no-results' ? 'polite' : null"
+            >
               {{ getRenderStatus(overlay.id) }}
               @if (getRenderMessage(overlay.id)) {
                 : {{ getRenderMessage(overlay.id) }}

@@ -60,6 +60,25 @@ describe('OverlayControlsComponent', () => {
     expect(note?.textContent).toContain('metadata-only');
   });
 
+  it('announces a valid-empty overlay as no-results', () => {
+    component.overlayRenderStatuses = [
+      {
+        overlayId: 'ov1',
+        status: 'no-results',
+        message: 'No results in the requested area or time window.',
+      },
+    ];
+    component.isExpanded = true;
+
+    fixture.detectChanges();
+
+    const note = fixture.nativeElement.querySelector('.overlay-render-note') as HTMLElement | null;
+    expect(note?.getAttribute('role')).toBe('status');
+    expect(note?.getAttribute('aria-live')).toBe('polite');
+    expect(note?.textContent).toContain('no-results');
+    expect(note?.textContent).toContain('No results in the requested area or time window.');
+  });
+
   it('starts collapsed and exposes an accessible disclosure control', () => {
     fixture.detectChanges();
 

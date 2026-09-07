@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Last updated: 2026-08-20
+Last updated: 2026-09-07
 
 ## Basics
 
@@ -35,3 +35,26 @@ Last updated: 2026-08-20
   duplicate event IDs. A browser must use the configured UI origin and
   `aegis.realtime.v1` subprotocol; a rejected origin or missing subprotocol is
   an intentional protocol failure.
+
+## Known Limitations
+
+These limitations are intentional and remain part of the current product
+contract:
+
+- Direct `POST /api/chat/turn` keeps its existing immediate response behavior;
+  AEGIS does not provide a second headless render-ack transport for that path.
+- Antimeridian handling is provider-dependent. Providers may accept, reject, or
+  interpret a bounding box crossing the antimeridian differently.
+- Weather products that provide only point or metadata sampling cannot claim an
+  area overlay.
+- Flood comparisons require verified comparable measures, units, and time
+  windows. When those semantics are not established, AEGIS asks for the layers
+  separately or a clearly comparable data contract.
+- FIRMS and other provider credential failures remain structured limitations;
+  AEGIS does not silently replace the provider or invent a successful result.
+- A valid empty result is distinct from an unavailable provider and is shown as
+  an explicit no-results state in the assistant response, map panel, and layer
+  controls.
+- Browser acknowledgment is client-reported rendering evidence. Backend
+  semantic validation remains authoritative for completion and committed map
+  state.

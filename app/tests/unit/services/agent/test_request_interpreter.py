@@ -9,7 +9,10 @@ from server.contracts.extraction import (
     TurnParseResult,
 )
 from server.domain.agent.decision import ResolvedLocation
-from server.services.agent.request_interpreter import RequestInterpreter
+from server.services.agent.request_interpreter import (
+    FLOOD_COMPARISON_AMBIGUITY,
+    RequestInterpreter,
+)
 
 
 def _location(label: str, latitude: float, longitude: float) -> ResolvedLocation:
@@ -120,6 +123,51 @@ def test_peer_targets_keep_distinct_locations_and_scopes() -> None:
         item.target_id for item in canonical.targets
     }
     assert canonical.operations == ["compare", "geospatial_data_retrieval"]
+    assert FLOOD_COMPARISON_AMBIGUITY in canonical.ambiguities
+
+
+def test_ordinary_flood_map_request_is_not_guarded_as_a_comparison() -> None:
+    canonical = RequestInterpreter().compile(
+        request_id="request-flood-map-1",
+        turn=_turn(
+            user_text="Show flood zones in Rome",
+            requested_concepts=["flood zones"],
+            requested_layers=["fema_nfhl_flood_zones"],
+        ),
+        resolved_location=_location("Rome, Italy", 41.9028, 12.4964),
+    )
+
+    assert FLOOD_COMPARISON_AMBIGUITY not in canonical.ambiguities
+
+
+def test_non_flood_comparison_is_not_guarded() -> None:
+    canonical = RequestInterpreter().compile(
+        request_id="request-non-flood-comparison-1",
+        turn=_turn(
+            user_text="Compare earthquakes in Rome and Milan",
+            requested_concepts=["earthquakes"],
+            requested_layers=["usgs_earthquakes"],
+            operations=["compare"],
+        ),
+        resolved_location=_location("Rome, Italy", 41.9028, 12.4964),
+    )
+
+    assert FLOOD_COMPARISON_AMBIGUITY not in canonical.ambiguities
+
+
+def test_water_level_catalog_comparison_is_guarded() -> None:
+    canonical = RequestInterpreter().compile(
+        request_id="request-water-level-comparison-1",
+        turn=_turn(
+            user_text="Compare water levels in Rome and Milan",
+            requested_concepts=["water levels"],
+            requested_layers=["noaa_coops_water_levels"],
+            operations=["compare layers"],
+        ),
+        resolved_location=_location("Rome, Italy", 41.9028, 12.4964),
+    )
+
+    assert FLOOD_COMPARISON_AMBIGUITY in canonical.ambiguities
 
 
 def test_explicit_new_location_is_not_replaced_by_stale_memory() -> None:

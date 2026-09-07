@@ -437,6 +437,7 @@ class AgentResponseBuilder:
         )
         instances = map_session.overlay_collection.instances
         metadata_labels: list[str] = []
+        no_result_labels: list[str] = []
         unavailable_labels: list[str] = []
         renderable_instances: list[OverlayInstance] = []
         for instance in instances:
@@ -469,6 +470,9 @@ class AgentResponseBuilder:
                 if instance.visible:
                     metadata_labels.append(label)
                 continue
+            if result_status == "valid_empty":
+                no_result_labels.append(label)
+                continue
             renderable_instances.append(instance)
         visible_labels = [
             instance.label or cls.humanize_identifier(instance.capability_id)
@@ -497,6 +501,12 @@ class AgentResponseBuilder:
                 + cls.format_label_list(metadata_labels)
                 + "."
             )
+        if no_result_labels:
+            parts.append(
+                "No results for "
+                + cls.format_label_list(no_result_labels)
+                + " in the requested area or time window."
+            )
         if unavailable_labels:
             parts.append(
                 "Unavailable overlays: "
@@ -507,6 +517,7 @@ class AgentResponseBuilder:
             not visible_labels
             and not hidden_labels
             and not metadata_labels
+            and not no_result_labels
             and not unavailable_labels
         ):
             parts.append("No overlays are currently active.")
