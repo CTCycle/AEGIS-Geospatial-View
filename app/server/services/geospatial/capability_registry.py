@@ -8,9 +8,9 @@ from server.domain.geospatial.registry import (
 )
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
-
 ###############################################################################
 class CapabilityRegistry:
+
     # -------------------------------------------------------------------------
     def __init__(
         self, *, manifest_loader: GeospatialManifestLoader | None = None

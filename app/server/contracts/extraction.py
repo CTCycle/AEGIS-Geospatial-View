@@ -49,7 +49,6 @@ OverlayAction = Literal["add", "remove", "keep_only", "show", "hide", "update"]
 OverlayScopeKind = Literal["global", "current_view", "location"]
 OverlayVisibility = Literal["any", "visible", "hidden"]
 
-
 ###############################################################################
 class ConversationContextSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -60,7 +59,6 @@ class ConversationContextSnapshot(BaseModel):
     memory_snapshot: dict[str, object] = Field(
         default_factory=lambda: dict[str, object]()
     )
-
 
 ###############################################################################
 class LocationSignal(BaseModel):
@@ -74,7 +72,6 @@ class LocationSignal(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     source: Literal["text", "memory", "model"] = "text"
 
-
 ###############################################################################
 class TemporalSignal(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -86,7 +83,6 @@ class TemporalSignal(BaseModel):
     end_time_iso: str | None = None
     granularity: TemporalGranularity = "none"
     aggregation: TemporalAggregation = "none"
-
 
 ###############################################################################
 class GeographicRelationship(BaseModel):
@@ -120,13 +116,11 @@ class GeographicRelationship(BaseModel):
     ] = "bbox"
     distance_m: float | None = Field(default=None, gt=0.0)
 
-
 ###############################################################################
 class ContextQuery(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: ContextQueryKind = "none"
-
 
 ###############################################################################
 class NormalizedAction(BaseModel):
@@ -139,7 +133,6 @@ class NormalizedAction(BaseModel):
     requested_visualizations: list[str] = Field(default_factory=lambda: list[str]())
     requires_location: bool = True
 
-
 ###############################################################################
 class DisallowedPattern(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -147,7 +140,6 @@ class DisallowedPattern(BaseModel):
     pattern_id: str
     reason: str
     matched_text: str
-
 
 ###############################################################################
 class ViewportIntent(BaseModel):
@@ -167,7 +159,6 @@ class ViewportIntent(BaseModel):
     tighten_relative_to_active: bool = False
     radius_hint_m: float | None = Field(default=None, gt=0.0)
     reason: str | None = None
-
 
 ###############################################################################
 class OverlaySelector(BaseModel):
@@ -190,7 +181,6 @@ class OverlaySelector(BaseModel):
     tags: list[str] = Field(default_factory=lambda: list[str]())
     visibility: OverlayVisibility = "any"
 
-
 ###############################################################################
 class OverlayScope(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -201,7 +191,6 @@ class OverlayScope(BaseModel):
     location: dict[str, Any] | None = None
     label: str | None = None
 
-
 ###############################################################################
 class OverlayPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -211,14 +200,12 @@ class OverlayPatch(BaseModel):
     style: str | None = None
     format: str | None = None
 
-
 ###############################################################################
 class OverlayStateReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     collection_id: str = "active-map"
     revision: int = Field(default=0, ge=0)
-
 
 ###############################################################################
 class OverlayCommand(BaseModel):
@@ -231,7 +218,6 @@ class OverlayCommand(BaseModel):
     state_reference: OverlayStateReference = Field(
         default_factory=OverlayStateReference
     )
-
 
 ###############################################################################
 class TurnParseResult(BaseModel):

@@ -21,9 +21,9 @@ from server.services.agent_runs.exceptions import (
 )
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 
-
 ###############################################################################
 class RunLifecycleService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

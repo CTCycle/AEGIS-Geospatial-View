@@ -14,6 +14,7 @@ from server.services.llm.errors import (
 )
 
 
+###############################################################################
 @pytest.mark.parametrize(
     "query",
     [
@@ -27,9 +28,9 @@ from server.services.llm.errors import (
 def test_follow_up_references_require_structured_context(query: str) -> None:
     assert ParserService._context_is_required(query)
 
-
 ###############################################################################
 class _ProviderStub:
+
     # -------------------------------------------------------------------------
     def __init__(self, payload: dict[str, object] | None = None) -> None:
         self.payload = payload or {
@@ -51,9 +52,9 @@ class _ProviderStub:
         _ = request, schema
         return dict(self.payload)
 
-
 ###############################################################################
 class _FactoryStub:
+
     # -------------------------------------------------------------------------
     def __init__(self, payload: dict[str, object] | None = None) -> None:
         self.provider = _ProviderStub(payload)
@@ -62,18 +63,18 @@ class _FactoryStub:
     def get_provider(self, provider: str):  # noqa: ARG002
         return self.provider
 
-
 ###############################################################################
 class _ConfigErrorFactoryStub:
+
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str):  # noqa: ARG002
         raise LLMConfigurationError(
             "OpenAI credentials are saved but cannot be decrypted."
         )
 
-
 ###############################################################################
 class _RetryProviderStub(_ProviderStub):
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__()
@@ -92,9 +93,9 @@ class _RetryProviderStub(_ProviderStub):
             )
         return super().structured_output(request, schema)
 
-
 ###############################################################################
 class _RetryFactoryStub:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.provider = _RetryProviderStub()
@@ -103,9 +104,9 @@ class _RetryFactoryStub:
     def get_provider(self, provider: str):  # noqa: ARG002
         return self.provider
 
-
 ###############################################################################
 class _SchemaCorrectionProviderStub(_ProviderStub):
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__()
@@ -123,9 +124,9 @@ class _SchemaCorrectionProviderStub(_ProviderStub):
             )
         return super().structured_output(request, schema)
 
-
 ###############################################################################
 class _SchemaCorrectionFactoryStub:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.provider = _SchemaCorrectionProviderStub()
@@ -133,7 +134,6 @@ class _SchemaCorrectionFactoryStub:
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str):  # noqa: ARG002
         return self.provider
-
 
 ###############################################################################
 def test_parser_service_classifies_direct_query() -> None:
@@ -172,7 +172,6 @@ def test_parser_service_classifies_direct_query() -> None:
     assert result.task_class == "direct_query"
     assert result.normalized_action.action_id == "geospatial_data_retrieval"
 
-
 ###############################################################################
 def test_parser_service_retries_transient_provider_failure() -> None:
     factory = _RetryFactoryStub()
@@ -192,7 +191,6 @@ def test_parser_service_retries_transient_provider_failure() -> None:
     assert result.task_class == "general_question"
     assert factory.provider.calls == 2
 
-
 ###############################################################################
 def test_parser_service_retries_schema_correction_on_the_same_model() -> None:
     factory = _SchemaCorrectionFactoryStub()
@@ -211,7 +209,6 @@ def test_parser_service_retries_schema_correction_on_the_same_model() -> None:
 
     assert result.failure_category is None
     assert factory.provider.calls == 2
-
 
 ###############################################################################
 def test_parser_schema_accepts_poi_region_and_street_location_signals() -> None:
@@ -246,7 +243,6 @@ def test_parser_schema_accepts_poi_region_and_street_location_signals() -> None:
         "street",
     ]
 
-
 ###############################################################################
 def test_parser_service_normalizes_recent_messages_to_strings() -> None:
     parser = ParserService(
@@ -276,7 +272,6 @@ def test_parser_service_normalizes_recent_messages_to_strings() -> None:
     assert recent[0]["turn_index"] == "0"
     assert recent[0]["content"] == ""
 
-
 ###############################################################################
 def test_parser_service_does_not_hide_configuration_errors() -> None:
     parser = ParserService(
@@ -293,7 +288,6 @@ def test_parser_service_does_not_hide_configuration_errors() -> None:
             conversation_messages=[],
         )
 
-
 ###############################################################################
 def test_parser_prompt_enforces_multilingual_and_verbatim_location_rules() -> None:
     assert "The user may write in any language" in PARSER_SYSTEM_PROMPT
@@ -302,7 +296,6 @@ def test_parser_prompt_enforces_multilingual_and_verbatim_location_rules() -> No
         "requested_visualizations must use only canonical ids" in PARSER_SYSTEM_PROMPT
     )
     assert "viewport_intent" in PARSER_SYSTEM_PROMPT
-
 
 ###############################################################################
 def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
@@ -348,7 +341,6 @@ def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
     assert [item.raw_value for item in result.location_signals] == ["القاهرة"]
     assert result.ambiguities == []
 
-
 ###############################################################################
 def test_parser_service_does_not_create_heuristic_location_fallbacks() -> None:
     parser = ParserService(
@@ -379,7 +371,6 @@ def test_parser_service_does_not_create_heuristic_location_fallbacks() -> None:
     assert result.location_signals == []
     assert result.ambiguities == ["missing_location"]
 
-
 ###############################################################################
 def test_parser_domain_boundary_preserves_typed_fields_without_prose_inference() -> (
     None
@@ -407,7 +398,6 @@ def test_parser_domain_boundary_preserves_typed_fields_without_prose_inference()
         "unrelated place"
     ]
 
-
 ###############################################################################
 def test_parser_domain_boundary_does_not_invent_intent_from_prose() -> None:
     extracted = ParserService._apply_domain_rules(
@@ -421,7 +411,6 @@ def test_parser_domain_boundary_does_not_invent_intent_from_prose() -> None:
     assert extracted.requested_layers == []
     assert extracted.requested_basemap is None
     assert extracted.overlay_commands == []
-
 
 ###############################################################################
 def test_parser_recovers_explicit_catalog_poi_category_for_poi_intent() -> None:
@@ -444,7 +433,6 @@ def test_parser_recovers_explicit_catalog_poi_category_for_poi_intent() -> None:
 
     assert extracted.poi_categories == ["hospitals"]
 
-
 ###############################################################################
 def test_parser_does_not_recover_catalog_category_without_poi_intent() -> None:
     extracted = ParserService._apply_domain_rules(
@@ -457,7 +445,6 @@ def test_parser_does_not_recover_catalog_category_without_poi_intent() -> None:
     )
 
     assert extracted.poi_categories == []
-
 
 ###############################################################################
 def test_parser_projection_omits_stale_map_payload_for_explicit_location() -> None:

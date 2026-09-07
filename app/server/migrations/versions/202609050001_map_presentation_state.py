@@ -13,6 +13,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+###############################################################################
 def upgrade() -> None:
     op.add_column(
         "agent_runs",
@@ -29,6 +30,7 @@ def upgrade() -> None:
     )
 
 
+###############################################################################
 def downgrade() -> None:
     op.drop_column("agent_runs", "presentation_json")
     op.drop_column("agent_runs", "presentation_status")

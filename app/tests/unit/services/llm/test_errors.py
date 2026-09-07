@@ -6,7 +6,6 @@ from server.services.llm.errors import LLMProviderRequestError, LLMRequestSchema
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
-
 ###############################################################################
 def test_provider_connection_errors_are_retryable() -> None:
     error = LLMProviderRequestError.from_exception(
@@ -18,7 +17,6 @@ def test_provider_connection_errors_are_retryable() -> None:
 
     assert error.code == "provider_request_failed"
     assert error.retryable is True
-
 
 ###############################################################################
 def test_provider_timeouts_are_terminal_and_preserve_context_usage() -> None:
@@ -44,7 +42,6 @@ def test_provider_timeouts_are_terminal_and_preserve_context_usage() -> None:
     assert error.context_usage == context_usage
     assert error.timeout_origin == "provider_transport"
 
-
 ###############################################################################
 def test_bounded_deadline_timeout_is_classified_as_application_deadline() -> None:
     error = LLMProviderRequestError.from_exception(
@@ -56,7 +53,6 @@ def test_bounded_deadline_timeout_is_classified_as_application_deadline() -> Non
 
     assert error.code == "provider_timeout"
     assert error.timeout_origin == "application_deadline"
-
 
 ###############################################################################
 def test_timeout_origin_can_preserve_cancellation_classification() -> None:
@@ -71,9 +67,10 @@ def test_timeout_origin_can_preserve_cancellation_classification() -> None:
 
     assert error.timeout_origin == "cancelled"
 
-
 ###############################################################################
 def test_gateway_timeout_is_terminal_and_not_retryable() -> None:
+
+    ###############################################################################
     class _GatewayTimeout(Exception):
         response = SimpleNamespace(status_code=504)
 
@@ -87,7 +84,6 @@ def test_gateway_timeout_is_terminal_and_not_retryable() -> None:
     assert error.code == "provider_timeout"
     assert error.retryable is False
 
-
 ###############################################################################
 def test_non_transient_provider_errors_are_not_retryable() -> None:
     error = LLMProviderRequestError.from_exception(
@@ -98,7 +94,6 @@ def test_non_transient_provider_errors_are_not_retryable() -> None:
     )
 
     assert error.retryable is False
-
 
 ###############################################################################
 def test_provider_context_overflow_is_not_misclassified_as_capability_failure() -> None:
@@ -117,7 +112,6 @@ def test_provider_context_overflow_is_not_misclassified_as_capability_failure() 
     assert error.category == "context_limit"
     assert error.code == "context_limit_exceeded"
 
-
 ###############################################################################
 def test_provider_bad_request_without_capability_evidence_stays_provider_api() -> None:
 
@@ -134,7 +128,6 @@ def test_provider_bad_request_without_capability_evidence_stays_provider_api() -
 
     assert error.category == "provider_api"
     assert error.code == "provider_bad_request"
-
 
 ###############################################################################
 def test_explicit_provider_capability_rejection_is_classified_as_model_capability() -> (
@@ -154,7 +147,6 @@ def test_explicit_provider_capability_rejection_is_classified_as_model_capabilit
 
     assert error.category == "model_capability"
     assert error.code == "provider_model_incompatible"
-
 
 ###############################################################################
 def test_malformed_tool_definition_is_classified_at_provider_boundary() -> None:

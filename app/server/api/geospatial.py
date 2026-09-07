@@ -39,7 +39,6 @@ GEOSPATIAL_ERROR_STATUS = {
     GeospatialTileRequestError: status.HTTP_502_BAD_GATEWAY,
 }
 
-
 ###############################################################################
 def get_geospatial_api_service(request: Request) -> GeospatialApiService:
     runtime = getattr(request.app.state, "geospatial_runtime", None)
@@ -49,7 +48,6 @@ def get_geospatial_api_service(request: Request) -> GeospatialApiService:
             detail="Geospatial runtime is not initialized.",
         )
     return runtime.api_service
-
 
 ###############################################################################
 def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
@@ -79,7 +77,6 @@ def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
         detail="Geospatial service request failed.",
     ) from error
 
-
 ###############################################################################
 @router.get(
     "/capabilities",
@@ -91,7 +88,6 @@ async def get_geospatial_capabilities(
 ) -> GeospatialCatalogResponse:
     return GeospatialCatalogResponse.model_validate(service.list_capabilities())
 
-
 ###############################################################################
 @router.get(
     "/layers",
@@ -102,7 +98,6 @@ async def get_geospatial_layers(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialLayersResponse:
     return GeospatialLayersResponse.model_validate(service.list_layers())
-
 
 ###############################################################################
 @router.get(
@@ -127,7 +122,6 @@ async def list_provider_layers(
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
-
 ###############################################################################
 @router.get(
     "/providers/{provider_id}/layers/{layer_id:path}",
@@ -149,7 +143,6 @@ async def get_provider_layer(
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
-
 ###############################################################################
 @router.get(
     "/layers/{layer_id}/health",
@@ -166,7 +159,6 @@ async def get_layer_health(
         )
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
-
 
 ###############################################################################
 @router.get(
@@ -197,7 +189,6 @@ async def get_layer_features(
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
-
 ###############################################################################
 @router.get(
     "/layers/{layer_id}/geojson",
@@ -224,7 +215,6 @@ async def get_layer_geojson(
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
-
 ###############################################################################
 @router.get(
     "/tiles/{capability_id}/{z}/{x}/{y}.png",
@@ -247,7 +237,6 @@ async def proxy_capability_tile(
         headers={"Cache-Control": "private, max-age=60"},
     )
 
-
 ###############################################################################
 @router.get(
     "/proxy/tomtom/{kind}/{z}/{x}/{y}.png",
@@ -269,7 +258,6 @@ async def proxy_tomtom_tile(
         media_type="image/png",
         headers={"Cache-Control": "private, max-age=60"},
     )
-
 
 ###############################################################################
 @router.get(
@@ -294,7 +282,6 @@ async def get_geospatial_cameras(
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
-
 ###############################################################################
 @router.get(
     "/cameras.geojson",
@@ -315,7 +302,6 @@ async def get_geospatial_cameras_geojson(
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
-
 ###############################################################################
 @router.get(
     "/cameras/{camera_id:path}",
@@ -333,7 +319,6 @@ async def get_geospatial_camera(
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
-
 ###############################################################################
 @router.get(
     "/sources/{provider_id}/credential-status",
@@ -348,7 +333,6 @@ async def get_credential_status(
         service.get_credential_status(provider_id)
     )
 
-
 ###############################################################################
 @router.get(
     "/providers/account-setup",
@@ -361,7 +345,6 @@ async def get_provider_account_setups(
     return GeospatialProviderAccountSetupListResponse.model_validate(
         service.list_provider_account_setup()
     )
-
 
 ###############################################################################
 @router.get(
@@ -379,7 +362,6 @@ async def get_provider_account_setup(
         )
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
-
 
 ###############################################################################
 @router.post(

@@ -8,7 +8,6 @@ from server.prompts.parser import PARSER_SCHEMA_CORRECTION, build_parser_prompt
 from server.services.agent.parser_service import ParserService
 from server.services.llm.errors import LLMProviderRequestError, LLMResponseParsingError
 
-
 ###############################################################################
 def _failure():  # noqa: ANN202
     return ParserService.build_parser_failure_turn_result(
@@ -24,7 +23,6 @@ def _failure():  # noqa: ANN202
         },
     )
 
-
 ###############################################################################
 def test_parser_failure_contract_is_non_executable_and_diagnostic() -> None:
     result = _failure()
@@ -38,7 +36,6 @@ def test_parser_failure_contract_is_non_executable_and_diagnostic() -> None:
     assert result.expected_frontend_update == "failure_diagnostic"
     assert result.failure_category == "provider_api"
 
-
 ###############################################################################
 def test_structural_coordinate_extraction_is_independent_of_execution_planning() -> (
     None
@@ -50,9 +47,9 @@ def test_structural_coordinate_extraction_is_independent_of_execution_planning()
     assert extracted.latitude == 41.9
     assert extracted.longitude == 12.5
 
-
 ###############################################################################
 class _PromptProvider:
+
     # -------------------------------------------------------------------------
     def __init__(self, *, invalid_first: bool = False) -> None:
         self.invalid_first = invalid_first
@@ -75,9 +72,9 @@ class _PromptProvider:
             requires_location=False,
         ).model_dump(mode="json")
 
-
 ###############################################################################
 class _PromptFactory:
+
     # -------------------------------------------------------------------------
     def __init__(self, provider: _PromptProvider) -> None:
         self.provider = provider
@@ -86,7 +83,6 @@ class _PromptFactory:
     def get_provider(self, provider: str) -> _PromptProvider:
         _ = provider
         return self.provider
-
 
 ###############################################################################
 def test_parser_uses_canonical_prompt_for_normal_and_schema_correction_calls() -> None:
@@ -110,10 +106,13 @@ def test_parser_uses_canonical_prompt_for_normal_and_schema_correction_calls() -
     assert corrected_prompt == build_parser_prompt(schema_correction=True)
     assert corrected_prompt.count(PARSER_SCHEMA_CORRECTION) == 1
 
-
 ###############################################################################
 def test_parser_normalizes_explicit_null_overlay_patch() -> None:
+
+    ###############################################################################
     class _Provider:
+
+        # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             _ = request, schema
             return {
@@ -130,7 +129,10 @@ def test_parser_normalizes_explicit_null_overlay_patch() -> None:
                 "parser_confidence": 0.9,
             }
 
+    ###############################################################################
     class _Factory:
+
+        # -------------------------------------------------------------------------
         def get_provider(self, provider: str):  # noqa: ANN001
             _ = provider
             return _Provider()
@@ -154,10 +156,13 @@ def test_parser_normalizes_explicit_null_overlay_patch() -> None:
         "format": None,
     }
 
-
 ###############################################################################
 def test_parser_retains_map_mutation_alongside_unsupported_direct_concept() -> None:
+
+    ###############################################################################
     class _Provider:
+
+        # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             _ = request, schema
             return {
@@ -175,7 +180,10 @@ def test_parser_retains_map_mutation_alongside_unsupported_direct_concept() -> N
                 "parser_confidence": 0.9,
             }
 
+    ###############################################################################
     class _Factory:
+
+        # -------------------------------------------------------------------------
         def get_provider(self, provider: str):  # noqa: ANN001
             _ = provider
             return _Provider()
@@ -197,10 +205,13 @@ def test_parser_retains_map_mutation_alongside_unsupported_direct_concept() -> N
     assert result.overlay_commands[0].scope.kind == "current_view"
     assert result.overlay_commands[0].selector.visibility == "visible"
 
-
 ###############################################################################
 def test_parser_recovers_bulk_overlay_mutation_from_typed_task_graph() -> None:
+
+    ###############################################################################
     class _Provider:
+
+        # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             _ = request, schema
             return {
@@ -224,7 +235,10 @@ def test_parser_recovers_bulk_overlay_mutation_from_typed_task_graph() -> None:
                 "parser_confidence": 0.9,
             }
 
+    ###############################################################################
     class _Factory:
+
+        # -------------------------------------------------------------------------
         def get_provider(self, provider: str):  # noqa: ANN001
             _ = provider
             return _Provider()
@@ -247,10 +261,13 @@ def test_parser_recovers_bulk_overlay_mutation_from_typed_task_graph() -> None:
     assert command.selector.visibility == "visible"
     assert command.selector.instance_ids == []
 
-
 ###############################################################################
 def test_parser_maps_unknown_model_action_to_generic_data_action_with_semantics() -> None:
+
+    ###############################################################################
     class _Provider:
+
+        # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             _ = request, schema
             return {
@@ -265,7 +282,10 @@ def test_parser_maps_unknown_model_action_to_generic_data_action_with_semantics(
                 "parser_confidence": 0.9,
             }
 
+    ###############################################################################
     class _Factory:
+
+        # -------------------------------------------------------------------------
         def get_provider(self, provider: str):  # noqa: ANN001
             _ = provider
             return _Provider()
@@ -284,10 +304,13 @@ def test_parser_maps_unknown_model_action_to_generic_data_action_with_semantics(
     assert result.normalized_action.action_id == "geospatial_data_retrieval"
     assert result.requested_concepts == ["weather"]
 
-
 ###############################################################################
 def test_parser_prioritizes_actionable_data_over_context_query_label() -> None:
+
+    ###############################################################################
     class _Provider:
+
+        # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             _ = request, schema
             return {
@@ -310,7 +333,10 @@ def test_parser_prioritizes_actionable_data_over_context_query_label() -> None:
                 "parser_confidence": 0.9,
             }
 
+    ###############################################################################
     class _Factory:
+
+        # -------------------------------------------------------------------------
         def get_provider(self, provider: str):  # noqa: ANN001
             _ = provider
             return _Provider()
@@ -331,8 +357,13 @@ def test_parser_prioritizes_actionable_data_over_context_query_label() -> None:
     assert result.requested_concepts == ["temperature"]
 
 
+###############################################################################
 def test_parser_recovers_omitted_deictic_reference_for_memory_resolution() -> None:
+
+    ###############################################################################
     class _Provider:
+
+        # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             _ = request, schema
             return {
@@ -346,7 +377,10 @@ def test_parser_recovers_omitted_deictic_reference_for_memory_resolution() -> No
                 "parser_confidence": 0.9,
             }
 
+    ###############################################################################
     class _Factory:
+
+        # -------------------------------------------------------------------------
         def get_provider(self, provider: str):  # noqa: ANN001
             _ = provider
             return _Provider()
@@ -373,6 +407,7 @@ def test_parser_recovers_omitted_deictic_reference_for_memory_resolution() -> No
     assert result.ambiguities == []
 
 
+###############################################################################
 @pytest.mark.parametrize(
     ("task_class", "action_id", "typed_fields", "requires_location"),
     [
@@ -422,7 +457,6 @@ def test_typed_execution_invariants_override_inconsistent_model_flags(
     assert normalized.direct_response_sufficient is False
     assert normalized.requires_location is requires_location
 
-
 ###############################################################################
 def test_parser_retry_does_not_start_after_deadline(monkeypatch) -> None:
     parser = ParserService(
@@ -455,16 +489,20 @@ def test_parser_retry_does_not_start_after_deadline(monkeypatch) -> None:
 
     assert calls == 1
 
-
 ###############################################################################
 def test_unexpected_parser_exception_has_categorized_provider_diagnostic() -> None:
+
+    ###############################################################################
     class _BrokenProvider:
+
         # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             _ = request, schema
             raise RuntimeError("provider returned an unusable response")
 
+    ###############################################################################
     class _Factory:
+
         # -------------------------------------------------------------------------
         def get_provider(self, provider: str):  # noqa: ANN001
             _ = provider
@@ -486,7 +524,6 @@ def test_unexpected_parser_exception_has_categorized_provider_diagnostic() -> No
     assert result.provider_error["code"] == "parser_unavailable"
     assert result.provider_error["category"] == "provider_api"
 
-
 ###############################################################################
 def test_parser_failure_preserves_provider_context_usage() -> None:
     context_usage = {
@@ -498,9 +535,11 @@ def test_parser_failure_preserves_provider_context_usage() -> None:
         "model": "deepseek-v4-flash",
     }
 
+    ###############################################################################
     class _TimeoutProvider:
         calls = 0
 
+        # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             _ = request, schema
             self.calls += 1
@@ -515,7 +554,10 @@ def test_parser_failure_preserves_provider_context_usage() -> None:
 
     provider = _TimeoutProvider()
 
+    ###############################################################################
     class _Factory:
+
+        # -------------------------------------------------------------------------
         def get_provider(self, provider_name: str) -> _TimeoutProvider:
             _ = provider_name
             return provider

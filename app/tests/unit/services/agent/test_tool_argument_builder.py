@@ -17,7 +17,6 @@ from server.domain.agent.interpretation import (
 from server.services.agent.request_interpreter import RequestInterpreter
 from server.services.agent.tool_argument_builder import ToolArgumentBuilder
 
-
 ###############################################################################
 def _turn(temporal: TemporalSignal) -> TurnParseResult:
     return TurnParseResult(
@@ -42,7 +41,6 @@ def _turn(temporal: TemporalSignal) -> TurnParseResult:
         temporal_signal=temporal,
     )
 
-
 ###############################################################################
 def test_current_mode_does_not_forward_non_temporal_parser_text() -> None:
     arguments = ToolArgumentBuilder.build_temporal_arguments(
@@ -51,7 +49,6 @@ def test_current_mode_does_not_forward_non_temporal_parser_text() -> None:
 
     assert arguments == {"temporal_mode": "current"}
 
-
 ###############################################################################
 def test_forecast_mode_preserves_temporal_phrase_for_selection() -> None:
     arguments = ToolArgumentBuilder.build_temporal_arguments(
@@ -59,7 +56,6 @@ def test_forecast_mode_preserves_temporal_phrase_for_selection() -> None:
     )
 
     assert arguments == {"temporal_mode": "forecast", "time": "tomorrow"}
-
 
 ###############################################################################
 def test_explicit_correction_location_precedes_remembered_bbox() -> None:
@@ -88,7 +84,6 @@ def test_explicit_correction_location_precedes_remembered_bbox() -> None:
     assert arguments["longitude"] == 8.5417
     assert "bbox" not in arguments
 
-
 ###############################################################################
 def test_poi_constraints_reach_the_direct_tool_arguments() -> None:
     turn = _turn(TemporalSignal(mode="current")).model_copy(
@@ -114,6 +109,7 @@ def test_poi_constraints_reach_the_direct_tool_arguments() -> None:
     assert arguments["limit"] == 25
 
 
+###############################################################################
 def test_canonical_radius_does_not_fall_back_to_geocoder_bbox() -> None:
     turn = _turn(TemporalSignal(mode="current")).model_copy(
         update={
@@ -149,6 +145,7 @@ def test_canonical_radius_does_not_fall_back_to_geocoder_bbox() -> None:
     assert "bbox" not in arguments
 
 
+###############################################################################
 def test_canonical_iso_temporal_window_is_authoritative() -> None:
     turn = _turn(
         TemporalSignal(
@@ -176,6 +173,7 @@ def test_canonical_iso_temporal_window_is_authoritative() -> None:
     assert "time" not in arguments
 
 
+###############################################################################
 def test_unresolved_canonical_target_does_not_fall_back_to_raw_or_memory() -> None:
     turn = _turn(TemporalSignal(mode="current")).model_copy(
         update={"user_text": "Show weather in an unresolved place"}
@@ -209,6 +207,7 @@ def test_unresolved_canonical_target_does_not_fall_back_to_raw_or_memory() -> No
     assert arguments == {}
 
 
+###############################################################################
 def test_canonical_viewport_radius_hint_is_not_an_analysis_radius() -> None:
     turn = _turn(TemporalSignal(mode="current")).model_copy(
         update={
@@ -241,6 +240,7 @@ def test_canonical_viewport_radius_hint_is_not_an_analysis_radius() -> None:
     assert "radius_m" not in arguments
 
 
+###############################################################################
 def test_canonical_point_scope_does_not_become_geocoder_bbox() -> None:
     location = ResolvedLocation(
         label="Zurich",
@@ -283,6 +283,7 @@ def test_canonical_point_scope_does_not_become_geocoder_bbox() -> None:
     assert "bbox" not in arguments
 
 
+###############################################################################
 def test_canonical_viewport_scope_does_not_use_target_bbox_as_analysis_area() -> None:
     location = ResolvedLocation(
         label="Zurich",

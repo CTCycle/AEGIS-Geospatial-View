@@ -76,7 +76,6 @@ from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 from server.contracts.geospatial import MapSession
 
-
 ###############################################################################
 class AgentOrchestrator:
     RUN_TIMEOUT_SECONDS = DEFAULT_RUN_SECONDS

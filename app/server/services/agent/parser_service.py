@@ -45,14 +45,12 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.agent.turn_support import AgentTurnSupport
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ParserRunResult:
     turn_contract: TurnParseResult
     context_usage: dict[str, object] | None
     model_calls: int = 0
-
 
 ###############################################################################
 class ParserService:

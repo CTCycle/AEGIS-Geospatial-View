@@ -14,7 +14,6 @@ from server.services.geospatial.providers.base import (
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
 
-
 ###############################################################################
 def _gtfs_zip() -> bytes:
     buffer = io.BytesIO()
@@ -45,7 +44,6 @@ def _gtfs_zip() -> bytes:
         )
     return buffer.getvalue()
 
-
 ###############################################################################
 def test_gtfs_static_provider_normalizes_stops_routes_and_shapes() -> None:
     response = run_async_in_thread(
@@ -65,7 +63,6 @@ def test_gtfs_static_provider_normalizes_stops_routes_and_shapes() -> None:
     assert response.payload["shapes"][0]["geometry"]["type"] == "LineString"
     assert response.payload["summary"]["shapePointCount"] == 2
 
-
 ###############################################################################
 def test_gtfs_static_provider_rejects_bad_zip() -> None:
     with pytest.raises(ProviderUnavailableError):
@@ -77,7 +74,6 @@ def test_gtfs_static_provider_rejects_bad_zip() -> None:
                 )
             )
         )
-
 
 ###############################################################################
 def test_gtfs_realtime_provider_normalizes_decoded_feed() -> None:
@@ -120,7 +116,6 @@ def test_gtfs_realtime_provider_normalizes_decoded_feed() -> None:
     }
     assert response.payload["feedTimestamp"]
     assert response.payload["vehicleRenderingAllowed"] is True
-
 
 ###############################################################################
 def test_gtfs_realtime_provider_suppresses_stale_vehicle_rendering() -> None:

@@ -32,7 +32,6 @@ from server.contracts.geospatial import MapSession
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.conversation_state import ConversationTaskStateService
 
-
 ###############################################################################
 def test_task_graph_requires_successful_predecessors() -> None:
     tasks = [
@@ -52,7 +51,6 @@ def test_task_graph_requires_successful_predecessors() -> None:
         == "required_task_failed"
     )
 
-
 ###############################################################################
 def test_task_graph_rejects_cycles() -> None:
     tasks = [
@@ -61,7 +59,6 @@ def test_task_graph_rejects_cycles() -> None:
     ]
     with pytest.raises(RuntimeValidationError, match="cycle"):
         validate_task_graph(tasks)
-
 
 ###############################################################################
 def test_fingerprints_are_canonical_and_scope_invalidation_is_selective() -> None:
@@ -80,7 +77,6 @@ def test_fingerprints_are_canonical_and_scope_invalidation_is_selective() -> Non
     assert change.invalidated_evidence_refs == ("weather",)
     assert state.evidence_refs == ["location", "air"]
     assert state_fingerprint(state)
-
 
 ###############################################################################
 def test_tool_selection_is_deterministic() -> None:
@@ -102,7 +98,6 @@ def test_tool_selection_is_deterministic() -> None:
         "render"
     ]
 
-
 ###############################################################################
 def test_domain_validation_rejects_invalid_bounds_and_temporal_ranges() -> None:
     assert "between -90" in (
@@ -111,7 +106,6 @@ def test_domain_validation_rejects_invalid_bounds_and_temporal_ranges() -> None:
     assert "ordered" in (
         ToolRegistry._validate_domain_arguments({"bbox": [10, 1, -10, 2]}) or ""
     )
-
 
 ###############################################################################
 def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
@@ -160,7 +154,6 @@ def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
         or ""
     )
 
-
 ###############################################################################
 def test_hydration_accepts_v3_only_and_restores_active_task() -> None:
     service = ConversationTaskStateService()
@@ -201,7 +194,6 @@ def test_hydration_accepts_v3_only_and_restores_active_task() -> None:
     )
     assert service.snapshot("conversation").current_task_id is None
 
-
 ###############################################################################
 def test_terminal_task_update_finalizes_its_atomic_execution_graph() -> None:
     service = ConversationTaskStateService()
@@ -237,7 +229,6 @@ def test_terminal_task_update_finalizes_its_atomic_execution_graph() -> None:
     assert {item.status for item in snapshot.tasks} == {"completed"}
     assert snapshot.goal is not None
     assert snapshot.goal.status == "completed"
-
 
 ###############################################################################
 def test_verified_map_projects_location_sources_and_evidence_into_task_state() -> None:

@@ -6,7 +6,6 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
-
 ###############################################################################
 def test_windy_webcam_provider_builds_bbox_camera_request() -> None:
     calls: list[tuple[str, dict[str, str] | None]] = []
@@ -29,7 +28,6 @@ def test_windy_webcam_provider_builds_bbox_camera_request() -> None:
     assert "category=traffic" in calls[0][0]
     assert calls[0][1] == {"x-windy-api-key": "windy-test"}
     assert response.payload["renderingMode"] == "camera-points"
-
 
 ###############################################################################
 def test_local_open_data_camera_template_fetches_configured_source() -> None:

@@ -26,9 +26,9 @@ TaskTimeoutOrigin = Literal[
     "unknown",
 ]
 
-
 ###############################################################################
 class DirectTurnResponseService:
+
     # -------------------------------------------------------------------------
     @staticmethod
     def _parser_failure_message(

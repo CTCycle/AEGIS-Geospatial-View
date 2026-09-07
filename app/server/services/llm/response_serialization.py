@@ -4,14 +4,12 @@ from server.common.typing import is_json_object
 
 from typing import Any
 
-
 ###############################################################################
 def _object_mapping(value: object) -> dict[str, Any]:
     if is_json_object(value):
         return dict(value)
     attributes = getattr(value, "__dict__", None)
     return dict(attributes) if is_json_object(attributes) else {}
-
 
 ###############################################################################
 def dump_response_payload(response: object) -> dict[str, Any]:

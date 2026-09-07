@@ -15,7 +15,6 @@ from server.services.llm.types import (
 )
 from server.services.llm.errors import LLMRequestSchemaError, LLMStructuredOutputError
 
-
 ###############################################################################
 class LLMProvider(ABC):
     provider_name: str

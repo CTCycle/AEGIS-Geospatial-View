@@ -23,9 +23,11 @@ REQUIRED_COMPLETION_NAMES = (
 )
 
 
+###############################################################################
 class CompletionEvaluator:
     """Keep task completion independent of provider or model wording."""
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def candidate_requirements(
         canonical_request: CanonicalRequestInterpretation | None,
@@ -97,6 +99,7 @@ class CompletionEvaluator:
             )
         return requirements
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _data_retrieved(
         canonical_request: CanonicalRequestInterpretation | None,
@@ -142,6 +145,7 @@ class CompletionEvaluator:
                 return False
         return True
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _spatial_filter_applied(
         canonical_request: CanonicalRequestInterpretation | None,
@@ -165,6 +169,7 @@ class CompletionEvaluator:
                 return False
         return True
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _temporal_filter_applied(
         canonical_request: CanonicalRequestInterpretation | None,
@@ -194,6 +199,7 @@ class CompletionEvaluator:
                         return False
         return True
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def acknowledge_requirements(
         requirements: list[dict[str, Any]],
@@ -220,6 +226,7 @@ class CompletionEvaluator:
             updated.append(item)
         return updated
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _has_renderable_output(map_session: MapSession) -> bool:
         instances = map_session.overlay_collection.instances

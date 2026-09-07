@@ -7,6 +7,7 @@ from typing import Any
 E2E_CONVERSATION_ID = "conversation-e2e"
 
 
+###############################################################################
 def map_overlay_instance(
     *,
     instance_id: str,
@@ -85,7 +86,6 @@ ROME_MAP_SESSION = {
     },
 }
 
-
 ###############################################################################
 def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
     return {
@@ -106,7 +106,6 @@ def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
         "parser_confidence": 1.0,
     }
 
-
 ###############################################################################
 def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
     return {
@@ -117,7 +116,6 @@ def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
         },
         "trace": {"steps": ["stub"]},
     }
-
 
 ###############################################################################
 def chat_completion_map_payload(
@@ -138,7 +136,6 @@ def chat_completion_map_payload(
         },
     }
 
-
 ###############################################################################
 def chat_completion_clarification_payload(
     turn_number: int, message: str
@@ -155,7 +152,6 @@ def chat_completion_clarification_payload(
         },
     }
 
-
 ###############################################################################
 def chat_completion_text_payload(turn_number: int, message: str) -> dict[str, Any]:
     return {
@@ -167,7 +163,6 @@ def chat_completion_text_payload(turn_number: int, message: str) -> dict[str, An
         "map_session": None,
         "tool_payload": {"execution": "location_to_coordinates"},
     }
-
 
 ###############################################################################
 def model_settings_payload() -> dict[str, Any]:
@@ -189,7 +184,6 @@ def model_settings_payload() -> dict[str, Any]:
             "context_profile_source": "fixture",
         },
     }
-
 
 ###############################################################################
 def model_catalog_payload() -> dict[str, Any]:
@@ -253,7 +247,6 @@ def model_catalog_payload() -> dict[str, Any]:
         "sources": {},
     }
 
-
 ###############################################################################
 def selected_agent_settings_payload() -> dict[str, Any]:
     return {
@@ -274,7 +267,6 @@ def selected_agent_settings_payload() -> dict[str, Any]:
             "context_profile_source": "fixture",
         },
     }
-
 
 ###############################################################################
 def _catalog_capability(
@@ -333,7 +325,6 @@ def _catalog_capability(
     if render is not None:
         payload["render"] = render
     return payload
-
 
 ###############################################################################
 def geospatial_catalog_payload() -> dict[str, Any]:
@@ -440,7 +431,6 @@ def geospatial_catalog_payload() -> dict[str, Any]:
         "transit": [],
         "tools": [],
     }
-
 
 ###############################################################################
 def conversation_snapshot_payload(

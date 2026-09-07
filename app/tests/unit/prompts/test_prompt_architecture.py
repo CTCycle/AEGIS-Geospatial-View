@@ -60,12 +60,10 @@ PROMPT_MODULES = (
     "server.prompts.providers",
 )
 
-
 ###############################################################################
 @pytest.mark.parametrize("module_name", PROMPT_MODULES)
 def test_prompt_modules_are_importable(module_name: str) -> None:
     assert import_module(module_name)
-
 
 ###############################################################################
 def _template_fields(template: str) -> set[str]:
@@ -74,7 +72,6 @@ def _template_fields(template: str) -> set[str]:
         for _, field_name, _, _ in Formatter().parse(template)
         if field_name is not None
     }
-
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -101,7 +98,6 @@ def test_prompt_templates_expose_only_their_intended_variables(
     expected_fields: set[str],
 ) -> None:
     assert _template_fields(template) == expected_fields
-
 
 ###############################################################################
 def test_prompt_builders_substitute_every_template_variable() -> None:
@@ -139,7 +135,6 @@ def test_prompt_builders_substitute_every_template_variable() -> None:
         "Write the final response using only this verified evidence:"
     )
 
-
 ###############################################################################
 def _prompt_constant_assignments(tree: ast.Module) -> list[tuple[str, ast.expr]]:
     assignments: list[tuple[str, ast.expr]] = []
@@ -171,7 +166,6 @@ def _prompt_constant_assignments(tree: ast.Module) -> list[tuple[str, ast.expr]]
                 assignments.append((target.id, value))
     return assignments
 
-
 ###############################################################################
 def test_prompt_constants_are_literal_module_level_strings() -> None:
     for path in PROMPTS_ROOT.glob("*.py"):
@@ -179,7 +173,6 @@ def test_prompt_constants_are_literal_module_level_strings() -> None:
         for name, value in _prompt_constant_assignments(tree):
             assert isinstance(value, ast.Constant), f"{path.name}:{name} is not literal"
             assert isinstance(value.value, str), f"{path.name}:{name} is not a string"
-
 
 ###############################################################################
 def test_backend_has_no_obsolete_prompt_api_references() -> None:
@@ -197,7 +190,6 @@ def test_backend_has_no_obsolete_prompt_api_references() -> None:
             continue
         contents = path.read_text(encoding="utf-8")
         assert not any(marker in contents for marker in obsolete_markers), path
-
 
 ###############################################################################
 def test_model_instructions_are_not_fragmented_outside_prompt_package() -> None:
@@ -218,7 +210,6 @@ def test_model_instructions_are_not_fragmented_outside_prompt_package() -> None:
     }
     assert not findings
 
-
 ###############################################################################
 def test_composed_prompts_include_shared_rules_once() -> None:
     parser_prompt = build_parser_prompt()
@@ -236,7 +227,6 @@ def test_composed_prompts_include_shared_rules_once() -> None:
     )
     assert PARSER_SYSTEM_PROMPT in parser_prompt
     assert GROUNDED_RESPONSE_SYSTEM_PROMPT in response_prompt
-
 
 ###############################################################################
 def test_prompt_budget_uses_runtime_context_budget_estimator() -> None:

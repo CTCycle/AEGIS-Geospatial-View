@@ -20,7 +20,6 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
-
 ###############################################################################
 class NOAAProvider(GeospatialProvider):
     provider_id = "noaa"
@@ -211,7 +210,6 @@ class NOAAProvider(GeospatialProvider):
                 )
             raise
 
-
 ###############################################################################
 def _coops_query(request: ProviderRequest) -> dict[str, str]:
     today = datetime.now(UTC).strftime("%Y%m%d")
@@ -225,7 +223,6 @@ def _coops_query(request: ProviderRequest) -> dict[str, str]:
         "format": "json",
         "application": "AEGIS-Geospatial-View",
     }
-
 
 ###############################################################################
 def _normalize_coops_stations(payload: object) -> list[dict[str, object]]:
@@ -265,7 +262,6 @@ def _normalize_coops_stations(payload: object) -> list[dict[str, object]]:
         )
     return stations
 
-
 ###############################################################################
 def _filter_stations(
     stations: list[dict[str, object]], request: ProviderRequest
@@ -286,7 +282,6 @@ def _filter_stations(
         ]
     limit = max(1, min(int(request.params.get("station_limit") or 25), 100))
     return filtered[:limit]
-
 
 ###############################################################################
 def _normalize_coops_observation(
@@ -330,7 +325,6 @@ def _normalize_coops_observation(
         }
     return None
 
-
 ###############################################################################
 def _float_or_none(value: object) -> float | None:
     if not isinstance(value, int | float | str):
@@ -339,7 +333,6 @@ def _float_or_none(value: object) -> float | None:
         return float(value)
     except TypeError, ValueError:
         return None
-
 
 ###############################################################################
 def _station_in_bbox(
@@ -355,7 +348,6 @@ def _station_in_bbox(
     if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
         return False
     return south <= latitude <= north and west <= longitude <= east
-
 
 ###############################################################################
 def _normalize_noaa_alerts(payload: object) -> list[dict[str, object]]:

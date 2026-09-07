@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.services.geospatial.ecosystem_audit import build_inventory
 
-
 ###############################################################################
 def test_ecosystem_inventory_covers_catalog_runtime_and_native_tools() -> None:
     report = build_inventory(

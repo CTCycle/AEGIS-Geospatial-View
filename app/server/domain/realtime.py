@@ -19,7 +19,6 @@ RealtimeClientMessageType = Literal[
     "map.render_ack",
 ]
 
-
 ###############################################################################
 class RealtimeClientMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -29,14 +28,12 @@ class RealtimeClientMessage(BaseModel):
     message_id: str = Field(min_length=1, max_length=MAX_REALTIME_MESSAGE_ID_LENGTH)
     payload: dict[str, Any] = Field(default_factory=dict)
 
-
 ###############################################################################
 class RealtimeResumePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_id: str | None = Field(default=None, max_length=160)
     after_sequence: int = Field(default=0, ge=0)
-
 
 ###############################################################################
 class RealtimeStartPayload(BaseModel):
@@ -64,7 +61,6 @@ class RealtimeStartPayload(BaseModel):
             raise ValueError("client_request_id must not be empty")
         return normalized
 
-
 ###############################################################################
 class RealtimeSteerPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -91,14 +87,12 @@ class RealtimeSteerPayload(BaseModel):
             raise ValueError("message must not be empty")
         return normalized
 
-
 ###############################################################################
 class RealtimeCancelPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_id: str = Field(min_length=1, max_length=160)
     reason: str | None = Field(default=None, max_length=400)
-
 
 ###############################################################################
 class RealtimeRenderAckPayload(BaseModel):
@@ -118,12 +112,14 @@ class RealtimeRenderAckPayload(BaseModel):
     )
     failure_code: str | None = Field(default=None, max_length=120)
 
+    # -------------------------------------------------------------------------
     @model_validator(mode="after")
     def require_viewport_for_ready(self) -> "RealtimeRenderAckPayload":
         if self.status == "ready" and self.viewport_bounds is None:
             raise ValueError("A ready render acknowledgment must include viewport bounds")
         return self
 
+    # -------------------------------------------------------------------------
     @field_validator("viewport_bounds")
     @classmethod
     def validate_viewport_bounds(cls, value: list[float] | None) -> list[float] | None:
@@ -141,6 +137,7 @@ class RealtimeRenderAckPayload(BaseModel):
             raise ValueError("viewport_bounds longitude order is invalid")
         return normalized
 
+    # -------------------------------------------------------------------------
     @field_validator("checks")
     @classmethod
     def validate_checks(cls, value: dict[str, bool]) -> dict[str, bool]:
@@ -148,6 +145,7 @@ class RealtimeRenderAckPayload(BaseModel):
             raise ValueError("checks are too large")
         return value
 
+    # -------------------------------------------------------------------------
     @field_validator("overlay_results")
     @classmethod
     def sanitize_overlay_results(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -187,7 +185,6 @@ class RealtimeRenderAckPayload(BaseModel):
                 raise ValueError("overlay failure code is invalid")
             sanitized.append(item)
         return sanitized
-
 
 ###############################################################################
 class RealtimeServerMessage(BaseModel):

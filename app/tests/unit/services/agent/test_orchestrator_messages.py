@@ -8,7 +8,6 @@ from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent.turn_support import AgentTurnSupport
 
-
 ###############################################################################
 def _map_session(
     *,
@@ -54,7 +53,6 @@ def _map_session(
         ),
     )
 
-
 ###############################################################################
 def test_map_session_message_uses_human_readable_labels() -> None:
     message = AgentOrchestrator._compose_map_session_message(
@@ -71,7 +69,6 @@ def test_map_session_message_uses_human_readable_labels() -> None:
     )
     assert "osm_default" not in message
     assert "tomtom_traffic_flow" not in message
-
 
 ###############################################################################
 def test_map_session_message_humanizes_missing_label_fallbacks() -> None:
@@ -93,7 +90,6 @@ def test_map_session_message_humanizes_missing_label_fallbacks() -> None:
     assert "osm_default" not in message
     assert "rainviewer_precipitation_radar" not in message
 
-
 ###############################################################################
 def test_map_session_message_includes_readable_warnings() -> None:
     message = AgentOrchestrator._compose_map_session_message(
@@ -114,7 +110,6 @@ def test_map_session_message_includes_readable_warnings() -> None:
     )
     assert "TOMTOM_API_KEY" not in message
 
-
 ###############################################################################
 def test_map_session_message_reports_current_visibility_state() -> None:
     message = AgentOrchestrator._compose_map_session_message(
@@ -132,7 +127,6 @@ def test_map_session_message_reports_current_visibility_state() -> None:
     assert "Hidden overlays: the Weather Forecast overlay." in message
     assert "I added" not in message
 
-
 ###############################################################################
 def test_map_session_message_reports_render_status_failure_as_unavailable() -> None:
     message = AgentOrchestrator._compose_map_session_message(
@@ -147,7 +141,6 @@ def test_map_session_message_reports_render_status_failure_as_unavailable() -> N
     assert "Unavailable overlays: the Weather Forecast overlay." in message
     assert "Visible overlays:" not in message
     assert "Available as metadata only:" not in message
-
 
 ###############################################################################
 def test_map_session_message_reports_valid_empty_as_no_results() -> None:
@@ -167,7 +160,6 @@ def test_map_session_message_reports_valid_empty_as_no_results() -> None:
     assert "Visible overlays:" not in message
     assert "Unavailable overlays:" not in message
     assert "Available as metadata only:" not in message
-
 
 ###############################################################################
 def test_direct_coordinate_message_includes_coordinates() -> None:
@@ -192,7 +184,6 @@ def test_direct_coordinate_message_includes_coordinates() -> None:
 
     assert message == "Coordinates for Shibuya Crossing: 35.659495, 139.700498."
     assert "Executed direct tool" not in message
-
 
 ###############################################################################
 def test_direct_weather_message_summarizes_current_conditions() -> None:
@@ -220,7 +211,6 @@ def test_direct_weather_message_summarizes_current_conditions() -> None:
     )
     assert "Executed direct tool" not in message
 
-
 ###############################################################################
 def test_parser_runtime_failure_message_is_actionable() -> None:
 
@@ -229,7 +219,6 @@ def test_parser_runtime_failure_message_is_actionable() -> None:
         ambiguities = ["parser_unavailable"]
 
     assert AgentOrchestrator._has_parser_runtime_failure(_TurnContract())
-
 
 ###############################################################################
 def test_provider_parser_failure_is_terminal_even_after_heuristic_extraction() -> None:
@@ -240,7 +229,6 @@ def test_provider_parser_failure_is_terminal_even_after_heuristic_extraction() -
         task_class = "map_search"
 
     assert AgentOrchestrator._has_parser_runtime_failure(_TurnContract())
-
 
 ###############################################################################
 def test_typed_context_query_can_answer_previous_user_request() -> None:
@@ -254,7 +242,6 @@ def test_typed_context_query_can_answer_previous_user_request() -> None:
 
     assert message == "You just asked: Show me Rome"
 
-
 ###############################################################################
 def test_typed_context_query_can_answer_active_map_location() -> None:
     message = AgentTurnSupport.compose_context_query_message(
@@ -265,7 +252,6 @@ def test_typed_context_query_can_answer_active_map_location() -> None:
 
     assert message == "The map is currently centered on Lugano."
 
-
 ###############################################################################
 def test_typed_context_query_accepts_active_map_location() -> None:
     message = AgentTurnSupport.compose_context_query_message(
@@ -275,7 +261,6 @@ def test_typed_context_query_accepts_active_map_location() -> None:
     )
 
     assert message == "The map is currently centered on Zurich."
-
 
 ###############################################################################
 def test_typed_context_query_can_answer_active_map_overlays() -> None:
@@ -301,7 +286,6 @@ def test_typed_context_query_can_answer_active_map_overlays() -> None:
         "The current map includes these overlays: Open-Meteo Air Quality Forecast."
     )
 
-
 ###############################################################################
 def test_typed_context_query_can_summarize_active_map_with_overlays() -> None:
     message = AgentTurnSupport.compose_context_query_message(
@@ -320,7 +304,6 @@ def test_typed_context_query_can_summarize_active_map_with_overlays() -> None:
         "The map is centered on Zurich using Satellite Imagery. "
         "The current map has no overlays requested."
     )
-
 
 ###############################################################################
 def test_typed_context_query_can_summarize_active_map() -> None:

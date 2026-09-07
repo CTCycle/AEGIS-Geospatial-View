@@ -17,7 +17,6 @@ from server.contracts.extraction import (
 )
 from server.services.search.request_builder import RequestBuilder
 
-
 ###############################################################################
 def test_request_builder_uses_wide_radius_for_city_level_intent() -> None:
     builder = RequestBuilder()
@@ -33,7 +32,6 @@ def test_request_builder_uses_wide_radius_for_city_level_intent() -> None:
     )
 
     assert viewport.radius_m == 18000.0
-
 
 ###############################################################################
 def test_request_builder_uses_tighter_radius_for_exact_address_intent() -> None:
@@ -59,7 +57,6 @@ def test_request_builder_uses_tighter_radius_for_exact_address_intent() -> None:
     assert viewport.radius_m <= 350.0
     assert viewport.bbox is not None
 
-
 ###############################################################################
 def test_request_builder_prefers_explicit_viewport_intent_over_generic_defaults() -> (
     None
@@ -77,7 +74,6 @@ def test_request_builder_prefers_explicit_viewport_intent_over_generic_defaults(
     )
 
     assert viewport.radius_m == 350.0
-
 
 ###############################################################################
 def test_request_builder_tightens_relative_to_active_viewport() -> None:
@@ -107,7 +103,6 @@ def test_request_builder_tightens_relative_to_active_viewport() -> None:
     assert viewport.radius_m < 2500.0
     assert viewport.radius_m <= 875.0
 
-
 ###############################################################################
 def test_request_builder_uses_geocoder_bbox_when_parser_intent_is_absent() -> None:
     builder = RequestBuilder()
@@ -130,7 +125,6 @@ def test_request_builder_uses_geocoder_bbox_when_parser_intent_is_absent() -> No
 
     assert viewport.bbox is not None
     assert viewport.radius_m <= 400.0
-
 
 ###############################################################################
 def test_request_builder_preserves_current_viewport_for_basemap_only_follow_up() -> (
@@ -160,7 +154,6 @@ def test_request_builder_preserves_current_viewport_for_basemap_only_follow_up()
 
     assert viewport.radius_m == 640.0
     assert viewport.bbox == [8.94, 44.4, 8.95, 44.41]
-
 
 ###############################################################################
 def test_request_builder_recenters_when_follow_up_changes_location() -> None:
@@ -200,6 +193,7 @@ def test_request_builder_recenters_when_follow_up_changes_location() -> None:
     assert viewport.radius_m == 18000.0
 
 
+###############################################################################
 def test_request_builder_preserves_temporal_mode_and_analysis_radius() -> None:
     builder = RequestBuilder()
     turn = TurnParseResult(
@@ -242,6 +236,7 @@ def test_request_builder_preserves_temporal_mode_and_analysis_radius() -> None:
     assert request.viewport.radius_m >= 5000.0
 
 
+###############################################################################
 def test_request_builder_ignores_native_bbox_override_for_canonical_scope() -> None:
     builder = RequestBuilder()
     location = ResolvedLocation(
@@ -304,6 +299,7 @@ def test_request_builder_ignores_native_bbox_override_for_canonical_scope() -> N
     assert request.poi_categories == []
 
 
+###############################################################################
 def test_request_builder_uses_canonical_scope_and_time_over_stale_turn_fields() -> None:
     builder = RequestBuilder()
     location = ResolvedLocation(
@@ -379,7 +375,6 @@ def test_request_builder_uses_canonical_scope_and_time_over_stale_turn_fields() 
     assert request.time_mode == "historical"
     assert request.start_time_iso == "2026-08-24T00:00:00+00:00"
     assert request.end_time_iso == "2026-08-31T00:00:00+00:00"
-
 
 ###############################################################################
 def test_request_builder_uses_canonical_location_and_viewport_over_stale_turn() -> None:

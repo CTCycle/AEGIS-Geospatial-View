@@ -50,7 +50,6 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.llm.types import LLMToolDefinition
 from server.services.search.request_builder import RequestBuilder
 
-
 ###############################################################################
 def _turn(
     text: str,
@@ -116,7 +115,6 @@ def _turn(
         viewport_intent=viewport_intent,
     )
 
-
 ###############################################################################
 class _SequenceParser:
     last_context_usage = None
@@ -140,9 +138,9 @@ class _SequenceParser:
             }
         )
 
-
 ###############################################################################
 class _Resolver:
+
     # -------------------------------------------------------------------------
     async def resolve_location_signals(self, signals, memory):  # noqa: ANN001
         if signals:
@@ -157,9 +155,9 @@ class _Resolver:
         active = memory["active_location"]
         return ResolvedLocation.model_validate(active)
 
-
 ###############################################################################
 class _Search:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.capability_registry = CapabilityRegistry()
@@ -191,9 +189,9 @@ class _Search:
             ),
         )
 
-
 ###############################################################################
 class _History:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.messages: list[dict[str, Any]] = []
@@ -232,44 +230,42 @@ class _History:
         _ = conversation_id
         return {}
 
-
 ###############################################################################
 @dataclass
 class _Settings:
     agent_model_provider: str = "test"
     agent_model_name: str = "test"
 
-
 ###############################################################################
 class _SettingsRepo:
+
     # -------------------------------------------------------------------------
     def get_required(self):
         return _Settings()
 
-
 ###############################################################################
 class _Credentials:
+
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN001
         _ = provider, label
         return None
 
-
 ###############################################################################
 class _NativeLoop:
+
     # -------------------------------------------------------------------------
     async def run(self, request):  # noqa: ANN001
         raise AssertionError(
             "deterministic business tests must not use the native loop"
         )
 
-
 ###############################################################################
 class _ResponseSynthesizer:
+
     # -------------------------------------------------------------------------
     def synthesize(self, *, fallback_text: str, **_: Any) -> str:
         return fallback_text
-
 
 ###############################################################################
 def _runtime() -> RuntimeRegistry:
@@ -278,9 +274,9 @@ def _runtime() -> RuntimeRegistry:
         credentials_repo=_Credentials(),  # type: ignore[arg-type]
     )
 
-
 ###############################################################################
 class _ConversationRepository:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._state: dict[str, dict[str, object]] = {}
@@ -298,7 +294,6 @@ class _ConversationRepository:
         current.update(kwargs)
         current["context_revision"] = int(current["context_revision"]) + 1
         return current["context_revision"]
-
 
 ###############################################################################
 def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
@@ -353,7 +348,6 @@ def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
         ),
     )
 
-
 ###############################################################################
 def test_domain_rules_do_not_infer_layers_from_example_prose() -> None:
     extracted = ParserService._apply_domain_rules(
@@ -378,7 +372,6 @@ def test_domain_rules_do_not_infer_layers_from_example_prose() -> None:
     assert typed.requested_layers == ["overpass_residential_buildings"]
     assert typed.requested_basemap == "esri_world_imagery"
     assert typed.entity_target == "residential_buildings"
-
 
 ###############################################################################
 def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() -> None:
@@ -446,7 +439,6 @@ def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() ->
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_ambiguity_precedes_unsupported_layer_clarification() -> None:
     async def _run() -> None:
@@ -483,7 +475,6 @@ def test_location_ambiguity_precedes_unsupported_layer_clarification() -> None:
         assert response.tool_payload is None
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_partial_clarification_retains_verified_location_memory() -> None:
@@ -522,7 +513,6 @@ def test_partial_clarification_retains_verified_location_memory() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_partial_capability_plan_executes_resolved_layers_before_clarifying() -> None:
     async def _run() -> None:
@@ -560,7 +550,6 @@ def test_partial_capability_plan_executes_resolved_layers_before_clarifying() ->
         assert response.operation.status == "partial"
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_compound_partial_request_mutates_active_overlays_and_reports_unsupported_values() -> None:
@@ -671,7 +660,6 @@ def test_compound_partial_request_mutates_active_overlays_and_reports_unsupporte
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_follow_up_zoom_refinement_tightens_existing_viewport() -> None:
     async def _run() -> None:
@@ -716,7 +704,6 @@ def test_follow_up_zoom_refinement_tightens_existing_viewport() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_failure_inquiry_uses_structured_failure_without_tools() -> None:
     async def _run() -> None:
@@ -758,7 +745,6 @@ def test_failure_inquiry_uses_structured_failure_without_tools() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_tool_planner_deduplicates_semantically_identical_calls() -> None:
     turn = _turn(
@@ -770,7 +756,6 @@ def test_tool_planner_deduplicates_semantically_identical_calls() -> None:
     )
     plan = DeterministicToolPlanner().build_plan(turn, "geospatial_features")
     assert len(plan.steps) == 1
-
 
 ###############################################################################
 def test_tool_plan_executor_orders_dependencies_and_retains_partial_success() -> None:
@@ -825,7 +810,6 @@ def test_tool_plan_executor_orders_dependencies_and_retains_partial_success() ->
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_tool_output_validation_rejects_wrong_capability() -> None:
     async def _run() -> None:
@@ -873,7 +857,6 @@ def test_tool_output_validation_rejects_wrong_capability() -> None:
         assert result.error_code == "invalid_tool_output"
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_tool_plan_executor_binds_verified_predecessor_output() -> None:
@@ -944,7 +927,6 @@ def test_tool_plan_executor_binds_verified_predecessor_output() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_tool_plan_executor_extracts_nested_provider_provenance() -> None:
     async def _run() -> None:
@@ -1002,7 +984,6 @@ def test_tool_plan_executor_extracts_nested_provider_provenance() -> None:
         assert result.provenance.units == {"temperature": "C"}
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_tool_plan_executor_scopes_provenance_to_requested_capability() -> None:
@@ -1064,7 +1045,6 @@ def test_tool_plan_executor_scopes_provenance_to_requested_capability() -> None:
         assert result.provenance.result_type == "feature_collection"
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_map_state_assembler_reuses_single_verified_tool_map_session() -> None:
@@ -1131,7 +1111,6 @@ def test_map_state_assembler_reuses_single_verified_tool_map_session() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_memory_projection_uses_canonical_location_without_regeocoding() -> None:
     async def _run() -> None:
@@ -1161,7 +1140,10 @@ def test_memory_projection_uses_canonical_location_without_regeocoding() -> None
             ],
         )
 
+        ###############################################################################
         class _Resolver:
+
+            # -------------------------------------------------------------------------
             async def resolve_location_signals(self, *_args: Any, **_kwargs: Any) -> Any:
                 raise AssertionError("canonical memory projection must not geocode again")
 

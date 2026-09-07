@@ -12,9 +12,9 @@ from server.repositories.schemas.models import (
     AgentSteeringMessageRecord,
 )
 
-
 ###############################################################################
 class AgentSteeringRepository:
+
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session

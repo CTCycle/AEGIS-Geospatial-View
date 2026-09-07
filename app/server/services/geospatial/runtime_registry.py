@@ -15,9 +15,9 @@ from server.services.geospatial.credential_resolver import (
 )
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
-
 ###############################################################################
 class RuntimeRegistry:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -186,7 +186,6 @@ class RuntimeRegistry:
         if not is_json_object(profile):
             return "global"
         return str(profile.get("coverage_policy") or "global")
-
 
 ###############################################################################
 def _read_boolean_env(name: str) -> bool:

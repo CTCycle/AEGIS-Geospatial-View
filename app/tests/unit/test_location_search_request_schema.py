@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from server.contracts.geospatial import LocationSearchRequest
 
-
 ###############################################################################
 def _base_payload() -> dict[str, object]:
     return {
@@ -24,7 +23,6 @@ def _base_payload() -> dict[str, object]:
             "radius_m": 2500.0,
         },
     }
-
 
 ###############################################################################
 def test_accepts_canonical_request_fields() -> None:
@@ -50,7 +48,6 @@ def test_accepts_canonical_request_fields() -> None:
     assert request.resolved_location.city == "Rome"
     assert request.viewport_intent is not None
     assert request.viewport_intent.scope == "street"
-
 
 ###############################################################################
 @pytest.mark.parametrize(

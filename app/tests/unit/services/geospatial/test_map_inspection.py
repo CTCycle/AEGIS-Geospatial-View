@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.services.geospatial.inspection import MapInspectionService
 
-
 ###############################################################################
 def test_feature_metadata_is_bounded_and_allowlisted() -> None:
     inspections = MapInspectionService.build_for_descriptor(
@@ -47,7 +46,6 @@ def test_feature_metadata_is_bounded_and_allowlisted() -> None:
         for field in inspection.fields
     )
 
-
 ###############################################################################
 def test_feature_provenance_links_are_exposed_as_approved_source() -> None:
     inspections = MapInspectionService.build_for_descriptor(
@@ -87,7 +85,6 @@ def test_feature_provenance_links_are_exposed_as_approved_source() -> None:
         "datasetTitle",
     }
 
-
 ###############################################################################
 def test_location_metadata_gets_point_association() -> None:
     inspections = MapInspectionService.build_for_descriptor(
@@ -110,7 +107,6 @@ def test_location_metadata_gets_point_association() -> None:
     assert inspection.association == "location"
     assert inspection.geometry == {"type": "Point", "coordinates": [8.5417, 47.3769]}
     assert inspection.source_url == "https://example.test/camera/1"
-
 
 ###############################################################################
 def test_raster_metadata_is_overlay_level_and_rejects_unsafe_links() -> None:
@@ -136,7 +132,6 @@ def test_raster_metadata_is_overlay_level_and_rejects_unsafe_links() -> None:
     assert inspection.source_url is None
     assert any(field.key == "units" for field in inspection.fields)
     assert inspection.warnings == ["Values are not available per raster cell."]
-
 
 ###############################################################################
 def test_non_spatial_dataset_metadata_remains_inspectable() -> None:
@@ -166,7 +161,6 @@ def test_non_spatial_dataset_metadata_remains_inspectable() -> None:
         "license",
         "update_time",
     }
-
 
 ###############################################################################
 def test_weather_feature_inspection_exposes_bounded_measurements_and_provenance() -> (

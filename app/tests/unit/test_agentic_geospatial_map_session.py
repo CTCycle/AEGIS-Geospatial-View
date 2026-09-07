@@ -23,9 +23,9 @@ from server.services.search.request_builder import RequestBuilder
 
 T = TypeVar("T")
 
-
 ###############################################################################
 class _TomTomCredentialRepository:
+
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str) -> object | None:
         if provider == "tomtom" and label == "api_key":
@@ -36,14 +36,13 @@ class _TomTomCredentialRepository:
     def mark_used(self, *, provider: str, label: str) -> None:
         del provider, label
 
-
 ###############################################################################
 class _TomTomCredentialDecryptor:
+
     # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:
         assert encrypted_value == "encrypted-tomtom-key"
         return "tomtom-secret-forbidden"
-
 
 ###############################################################################
 def _run_async(awaitable) -> T:  # type: ignore[no-untyped-def]
@@ -62,7 +61,6 @@ def _run_async(awaitable) -> T:  # type: ignore[no-untyped-def]
     if "value" in error:
         raise error["value"]
     return result["value"]
-
 
 ###############################################################################
 def test_agentic_geospatial_selected_capabilities_flow_into_map_session() -> None:
@@ -91,7 +89,6 @@ def test_agentic_geospatial_selected_capabilities_flow_into_map_session() -> Non
     assert session.overlay_collection.revision == 0
     assert all(instance.visible for instance in instances)
 
-
 ###############################################################################
 def test_map_session_rejects_legacy_overlay_projection_fields() -> None:
     location = ResolvedLocation(
@@ -110,7 +107,6 @@ def test_map_session_rejects_legacy_overlay_projection_fields() -> None:
             overlay_collection=OverlayCollectionState(),
             overlays=[],  # type: ignore[call-arg]
         )
-
 
 ###############################################################################
 def test_agentic_geospatial_map_session_surfaces_missing_overlay_warning() -> None:
@@ -139,9 +135,9 @@ def test_agentic_geospatial_map_session_surfaces_missing_overlay_warning() -> No
         for warning in session.compliance_warnings
     )
 
-
 ###############################################################################
 class _ProviderLayerRenderService:
+
     # -------------------------------------------------------------------------
     async def build_basemap_descriptor(self, basemap_id: str) -> dict[str, object]:
         return {"id": basemap_id, "tile_url": "https://tiles.example/{z}/{x}/{y}.png"}
@@ -180,9 +176,9 @@ class _ProviderLayerRenderService:
             [],
         )
 
-
 ###############################################################################
 class _FailedProviderLayerRenderService(_ProviderLayerRenderService):
+
     # -------------------------------------------------------------------------
     async def build_provider_layer_overlay(
         self,
@@ -194,7 +190,6 @@ class _FailedProviderLayerRenderService(_ProviderLayerRenderService):
     ) -> tuple[dict[str, object], list[str]]:
         _ = provider_id, layer_id, request, refresh
         raise ProviderRateLimitError("provider rate limit reached")
-
 
 ###############################################################################
 def test_agentic_geospatial_provider_layer_selection_flows_into_map_session() -> None:
@@ -235,7 +230,6 @@ def test_agentic_geospatial_provider_layer_selection_flows_into_map_session() ->
     )
     assert session.compliance_warnings == []
 
-
 ###############################################################################
 def test_agentic_geospatial_provider_layer_failure_preserves_error_code() -> None:
     location = ResolvedLocation(
@@ -269,7 +263,6 @@ def test_agentic_geospatial_provider_layer_failure_preserves_error_code() -> Non
         "Provider layer 'gibs:broken-layer' failed (rate_limited): provider rate limit reached."
     ]
 
-
 ###############################################################################
 def test_agentic_geospatial_map_session_uses_public_openfreemap_basemap() -> None:
     location = ResolvedLocation(
@@ -292,7 +285,6 @@ def test_agentic_geospatial_map_session_uses_public_openfreemap_basemap() -> Non
     assert not any(
         "provider API key is required" in item for item in session.compliance_warnings
     )
-
 
 ###############################################################################
 def test_agentic_geospatial_map_session_never_serializes_provider_api_keys() -> None:
@@ -327,7 +319,6 @@ def test_agentic_geospatial_map_session_never_serializes_provider_api_keys() -> 
     assert "tomtom-secret-forbidden" not in serialized
     assert "api_key=" not in serialized
     assert "/api/geospatial/tiles/tomtom_traffic_flow/" in serialized
-
 
 ###############################################################################
 def test_agentic_geospatial_wms_and_wmts_descriptors_include_backend_render_templates() -> (
@@ -367,7 +358,6 @@ def test_agentic_geospatial_wms_and_wmts_descriptors_include_backend_render_temp
     assert "request=GetTile" in esa["tile_url_template"]
     assert "tilematrixset=EPSG:3857" in esa["tile_url_template"]
     assert "tilematrix=EPSG:3857:{z}" in esa["tile_url_template"]
-
 
 ###############################################################################
 def test_agentic_geospatial_metadata_only_descriptors_stay_non_renderable() -> None:

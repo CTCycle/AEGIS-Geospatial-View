@@ -11,14 +11,13 @@ from server.prompts.providers import build_deepseek_json_schema_instruction
 from server.services.llm.deepseek_provider import DeepSeekProvider
 from server.services.llm.types import LLMRequest
 
-
 ###############################################################################
 class _StructuredPayload(BaseModel):
     answer: str
 
-
 ###############################################################################
 class _Completions:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
@@ -34,17 +33,17 @@ class _Completions:
             choices=[SimpleNamespace(message=message, finish_reason="stop")]
         )
 
-
 ###############################################################################
 class _Client:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.completions = _Completions()
         self.chat = SimpleNamespace(completions=self.completions)
 
-
 ###############################################################################
 class _AsyncCompletions:
+
     # -------------------------------------------------------------------------
     def __init__(self, response: object | None = None) -> None:
         self.calls: list[dict[str, object]] = []
@@ -70,9 +69,9 @@ class _AsyncCompletions:
             await asyncio.Future()
         return self.response
 
-
 ###############################################################################
 class _AsyncClient:
+
     # -------------------------------------------------------------------------
     def __init__(self, completions: _AsyncCompletions) -> None:
         self.completions = completions
@@ -88,7 +87,6 @@ class _AsyncClient:
     # -------------------------------------------------------------------------
     async def close(self) -> None:
         self.closed = True
-
 
 ###############################################################################
 def test_structured_output_uses_deepseek_json_object_mode(monkeypatch) -> None:
@@ -114,7 +112,6 @@ def test_structured_output_uses_deepseek_json_object_mode(monkeypatch) -> None:
     assert call["messages"][-1]["content"] == build_deepseek_json_schema_instruction(
         _StructuredPayload.model_json_schema()
     )
-
 
 ###############################################################################
 def test_async_chat_uses_native_transport_and_closes_client(monkeypatch) -> None:
@@ -149,7 +146,6 @@ def test_async_chat_uses_native_transport_and_closes_client(monkeypatch) -> None
     assert completions.calls[0]["max_tokens"] == 7
     assert client.closed is True
 
-
 ###############################################################################
 def test_async_structured_output_uses_native_transport(monkeypatch) -> None:
     completions = _AsyncCompletions()
@@ -174,7 +170,6 @@ def test_async_structured_output_uses_native_transport(monkeypatch) -> None:
     assert completions.calls[0]["response_format"] == {"type": "json_object"}
     assert completions.calls[0]["max_tokens"] == 9
     assert client.closed is True
-
 
 ###############################################################################
 def test_async_chat_cancellation_closes_native_client(monkeypatch) -> None:

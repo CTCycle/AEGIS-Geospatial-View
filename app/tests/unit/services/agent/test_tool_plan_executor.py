@@ -10,6 +10,7 @@ from server.domain.agent.pipeline import ToolPlanStep
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 
 
+###############################################################################
 def _step() -> ToolPlanStep:
     return ToolPlanStep(
         step_id="step-1",
@@ -21,6 +22,7 @@ def _step() -> ToolPlanStep:
     )
 
 
+###############################################################################
 def test_invalid_map_coordinates_are_rejected_before_commit() -> None:
     data = {
         "ok": True,
@@ -39,6 +41,7 @@ def test_invalid_map_coordinates_are_rejected_before_commit() -> None:
     )
 
 
+###############################################################################
 def test_reversed_or_malformed_bbox_is_rejected() -> None:
     data = {
         "ok": True,
@@ -54,6 +57,7 @@ def test_reversed_or_malformed_bbox_is_rejected() -> None:
     )
 
 
+###############################################################################
 def test_wrong_target_and_scope_are_rejected_when_declared() -> None:
     wrong_target = {
         "ok": True,
@@ -72,6 +76,7 @@ def test_wrong_target_and_scope_are_rejected_when_declared() -> None:
     assert "scope" in (ToolPlanExecutor._validate_result(_step(), wrong_scope) or "")
 
 
+###############################################################################
 def test_step_context_binds_each_multi_target_to_its_own_location() -> None:
     paris = ResolvedLocation(
         label="Paris, France",

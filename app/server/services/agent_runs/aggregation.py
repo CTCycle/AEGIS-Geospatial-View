@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-
 ###############################################################################
 class AggregatedRequestService:
+
     # -------------------------------------------------------------------------
     def build_aggregated_request(
         self,

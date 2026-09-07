@@ -42,16 +42,15 @@ from server.services.search.request_builder import RequestBuilder
 from server.services.llm.types import LLMToolCall, LLMToolDefinition, LLMToolResult
 from server.services.agent.parser_service import ParserRunResult, ParserService
 
-
 ###############################################################################
 @dataclass
 class _Settings:
     agent_model_provider: str = "openai"
     agent_model_name: str = "gpt-4.1"
 
-
 ###############################################################################
 class _HistoryRepo:
+
     # -------------------------------------------------------------------------
     def __init__(self, latest_memory: dict[str, Any] | None = None) -> None:
         self.messages: list[dict[str, Any]] = []
@@ -107,7 +106,6 @@ class _HistoryRepo:
         _ = conversation_id
         return self.latest_memory
 
-
 ###############################################################################
 class _Parser:
     last_context_usage = None
@@ -147,9 +145,9 @@ class _Parser:
             parser_confidence=0.9,
         )
 
-
 ###############################################################################
 class _FloodComparisonParser(_Parser):
+
     # -------------------------------------------------------------------------
     def parse_turn(
         self,
@@ -172,7 +170,6 @@ class _FloodComparisonParser(_Parser):
                 "tools_needed": True,
             }
         )
-
 
 ###############################################################################
 class _TimedOutStructuredParser:
@@ -201,7 +198,6 @@ class _TimedOutStructuredParser:
             ),
             context_usage=None,
         )
-
 
 ###############################################################################
 class _StructuredParser:
@@ -263,9 +259,9 @@ class _StructuredParser:
             tools_needed=bool(self.layers),
         )
 
-
 ###############################################################################
 class _DeicticParser(_Parser):
+
     # -------------------------------------------------------------------------
     def parse_turn(
         self,
@@ -300,9 +296,9 @@ class _DeicticParser(_Parser):
             parser_confidence=0.9,
         )
 
-
 ###############################################################################
 class _ParisParser(_Parser):
+
     # -------------------------------------------------------------------------
     def parse_turn(
         self,
@@ -338,9 +334,9 @@ class _ParisParser(_Parser):
             parser_confidence=0.9,
         )
 
-
 ###############################################################################
 class _ZurichParser(_Parser):
+
     # -------------------------------------------------------------------------
     def parse_turn(
         self,
@@ -376,9 +372,9 @@ class _ZurichParser(_Parser):
             parser_confidence=0.9,
         )
 
-
 ###############################################################################
 class _TimesSquareParser(_Parser):
+
     # -------------------------------------------------------------------------
     def parse_turn(
         self,
@@ -414,9 +410,9 @@ class _TimesSquareParser(_Parser):
             parser_confidence=0.9,
         )
 
-
 ###############################################################################
 class _CoordinateParser(_Parser):
+
     # -------------------------------------------------------------------------
     def parse_turn(
         self,
@@ -458,9 +454,9 @@ class _CoordinateParser(_Parser):
             tools_needed=True,
         )
 
-
 ###############################################################################
 class _MemoryMapParser(_Parser):
+
     # -------------------------------------------------------------------------
     def parse_turn(
         self,
@@ -498,9 +494,9 @@ class _MemoryMapParser(_Parser):
             tools_needed=True,
         )
 
-
 ###############################################################################
 class _DirectToolParser(_Parser):
+
     # -------------------------------------------------------------------------
     def parse_turn(
         self,
@@ -536,9 +532,9 @@ class _DirectToolParser(_Parser):
             parser_confidence=0.9,
         )
 
-
 ###############################################################################
 class _LocationResolver:
+
     # -------------------------------------------------------------------------
     async def resolve_location_signals(self, location_signals, memory_snapshot):  # noqa: ANN001
         if not location_signals and memory_snapshot.get("active_location"):
@@ -570,9 +566,9 @@ class _LocationResolver:
             confidence=signal.confidence,
         )
 
-
 ###############################################################################
 class _Policy:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.preflight_calls = 0
@@ -593,9 +589,9 @@ class _Policy:
         self.preflight_calls += 1
         return None
 
-
 ###############################################################################
 class _ClarifyingPolicy(_Policy):
+
     # -------------------------------------------------------------------------
     def evaluate_preflight(self, turn):
         self.preflight_calls += 1
@@ -613,9 +609,9 @@ class _ClarifyingPolicy(_Policy):
             trace=DecisionTrace(steps=["clarify"]),
         )
 
-
 ###############################################################################
 class _RejectingPolicy(_Policy):
+
     # -------------------------------------------------------------------------
     def evaluate_preflight(self, turn):
         self.preflight_calls += 1
@@ -633,9 +629,9 @@ class _RejectingPolicy(_Policy):
             trace=DecisionTrace(steps=["reject"]),
         )
 
-
 ###############################################################################
 class _Catalog:
+
     # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
         registry.register_native_tool(
@@ -743,9 +739,9 @@ class _Catalog:
             "metadata": {},
         }
 
-
 ###############################################################################
 class _FallbackCatalog:
+
     # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
         registry.register_native_tool(
@@ -762,16 +758,16 @@ class _FallbackCatalog:
         _ = arguments, context
         return {"items": []}
 
-
 ###############################################################################
 class _NoOpCatalog:
+
     # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
         _ = registry
 
-
 ###############################################################################
 class _NativeLoop:
+
     # -------------------------------------------------------------------------
     def __init__(self, result: AgentToolLoopResult) -> None:
         self.result = result
@@ -782,28 +778,27 @@ class _NativeLoop:
         self.requests.append(request)
         return self.result
 
-
 ###############################################################################
 class _SettingsRepo:
+
     # -------------------------------------------------------------------------
     def get_required(self) -> _Settings:
         return _Settings()
 
-
 ###############################################################################
 class _Credentials:
+
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN001
         _ = provider, label
         return None
 
-
 ###############################################################################
 class _ResponseSynthesizer:
+
     # -------------------------------------------------------------------------
     def synthesize(self, *, fallback_text: str, **_: Any) -> str:
         return fallback_text
-
 
 ###############################################################################
 def _test_tool_registry() -> ToolRegistry:
@@ -813,7 +808,6 @@ def _test_tool_registry() -> ToolRegistry:
             credentials_repo=_Credentials(),  # type: ignore[arg-type]
         )
     )
-
 
 ###############################################################################
 def _test_agent_tool_catalog(
@@ -836,7 +830,6 @@ def _test_agent_tool_catalog(
 
 ###############################################################################
 _ProductionAgentOrchestrator = AgentOrchestrator
-
 
 ###############################################################################
 def _build_test_orchestrator(**kwargs: Any) -> AgentOrchestrator:
@@ -870,7 +863,6 @@ def _build_test_orchestrator(**kwargs: Any) -> AgentOrchestrator:
 ###############################################################################
 AgentOrchestrator = _build_test_orchestrator
 
-
 ###############################################################################
 def map_overlay_capability_ids(map_session: MapSession | None) -> list[str]:
     return (
@@ -882,9 +874,9 @@ def map_overlay_capability_ids(map_session: MapSession | None) -> list[str]:
         else []
     )
 
-
 ###############################################################################
 class _SearchOrchestrator:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.requests: list[Any] = []
@@ -914,17 +906,17 @@ class _SearchOrchestrator:
             bounds=[12.0, 41.0, 13.0, 42.0],
         )
 
-
 ###############################################################################
 class _NoResultSearchOrchestrator(_SearchOrchestrator):
+
     # -------------------------------------------------------------------------
     async def execute(self, payload):  # noqa: ANN001
         self.requests.append(payload)
         return None
 
-
 ###############################################################################
 class _FailingCatalog:
+
     # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
         registry.register_native_tool(
@@ -960,9 +952,9 @@ class _FailingCatalog:
             "metadata": {},
         }
 
-
 ###############################################################################
 class _DirectResultCatalog:
+
     # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
         registry.register_native_tool(
@@ -1003,9 +995,9 @@ class _DirectResultCatalog:
             "metadata": {},
         }
 
-
 ###############################################################################
 class _VisualizationOnlyPlanner:
+
     # -------------------------------------------------------------------------
     def build_plan(self, turn, specialist, memory_snapshot=None):  # noqa: ANN001
         _ = turn, memory_snapshot
@@ -1016,7 +1008,6 @@ class _VisualizationOnlyPlanner:
             steps=[],
             visualization_update={"basemap_replacement": "osm_default"},
         )
-
 
 ###############################################################################
 def test_orchestrator_uses_verified_tool_map_session() -> None:
@@ -1084,7 +1075,6 @@ def test_orchestrator_uses_verified_tool_map_session() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_clarifies_flood_comparison_before_provider_or_tool_execution() -> None:
     async def _run() -> None:
@@ -1132,7 +1122,6 @@ def test_orchestrator_clarifies_flood_comparison_before_provider_or_tool_executi
         assert native_loop.requests == []
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_orchestrator_does_not_build_a_map_when_tool_loop_only_chats() -> None:
@@ -1199,7 +1188,6 @@ def test_orchestrator_does_not_build_a_map_when_tool_loop_only_chats() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_does_not_infer_requested_overlay_from_user_text() -> None:
     async def _run() -> None:
@@ -1259,7 +1247,6 @@ def test_orchestrator_does_not_infer_requested_overlay_from_user_text() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap() -> (
     None
@@ -1315,7 +1302,6 @@ def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap(
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_stage10_show_rome_with_traffic_reuses_tool_map_session() -> (
     None
@@ -1370,7 +1356,6 @@ def test_orchestrator_stage10_show_rome_with_traffic_reuses_tool_map_session() -
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainviewer() -> (
     None
@@ -1423,7 +1408,6 @@ def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainvi
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -> None:
     async def _run() -> None:
@@ -1473,7 +1457,6 @@ def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -
         ]
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_orchestrator_stage10_show_webcams_around_times_square_reuses_tool_map_session() -> (
@@ -1526,12 +1509,12 @@ def test_orchestrator_stage10_show_webcams_around_times_square_reuses_tool_map_s
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
 
     ###############################################################################
     class _MultiOverlayCatalog:
+
         # -------------------------------------------------------------------------
         def register_with(self, registry: ToolRegistry) -> None:
             registry.register_native_tool(
@@ -1675,7 +1658,6 @@ def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_order() -> (
     None
@@ -1683,6 +1665,7 @@ def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_orde
 
     ###############################################################################
     class _SelectionCatalog:
+
         # -------------------------------------------------------------------------
         def register_with(self, registry: ToolRegistry) -> None:
             registry.register_native_tool(
@@ -1819,7 +1802,6 @@ def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_orde
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_resolves_memory_follow_up_and_preserves_active_location() -> None:
     async def _run() -> None:
@@ -1904,7 +1886,6 @@ def test_orchestrator_resolves_memory_follow_up_and_preserves_active_location() 
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() -> None:
     async def _run() -> None:
@@ -1966,7 +1947,6 @@ def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() 
         ]
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_orchestrator_updates_active_location_when_user_switches_places() -> None:
@@ -2052,7 +2032,6 @@ def test_orchestrator_updates_active_location_when_user_switches_places() -> Non
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_without_clarification() -> (
     None
@@ -2104,7 +2083,6 @@ def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_withou
         assert response.decision.plan.state != "clarify"
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_orchestrator_does_not_update_memory_after_provider_failure() -> None:
@@ -2186,7 +2164,6 @@ def test_orchestrator_does_not_update_memory_after_provider_failure() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_returns_clarification_operation_for_preflight_question() -> None:
     async def _run() -> None:
@@ -2224,7 +2201,6 @@ def test_orchestrator_returns_clarification_operation_for_preflight_question() -
         assert response.operation.message == "Which location should I use?"
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_orchestrator_returns_rejection_operation_for_blocked_request() -> None:
@@ -2266,7 +2242,6 @@ def test_orchestrator_returns_rejection_operation_for_blocked_request() -> None:
         assert "policy constraints" in response.operation.message.lower()
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_orchestrator_returns_direct_answer_operation_for_verified_direct_tool() -> (
@@ -2336,7 +2311,6 @@ def test_orchestrator_returns_direct_answer_operation_for_verified_direct_tool()
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_returns_error_when_planned_map_request_has_no_map_session() -> (
     None
@@ -2403,7 +2377,6 @@ def test_orchestrator_returns_error_when_planned_map_request_has_no_map_session(
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_orchestrator_returns_error_operation_for_tool_timeout() -> None:
     async def _run() -> None:
@@ -2468,7 +2441,6 @@ def test_orchestrator_returns_error_operation_for_tool_timeout() -> None:
         assert response.memory_snapshot == {}
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_orchestrator_recovers_explicit_map_request_after_parser_timeout() -> None:

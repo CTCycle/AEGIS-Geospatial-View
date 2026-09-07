@@ -7,7 +7,6 @@ from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.tiler import build_vector_tile_manifest
 
-
 ###############################################################################
 def test_ingestion_only_providers_return_graceful_state() -> None:
     registry = ProviderRegistry()
@@ -22,7 +21,6 @@ def test_ingestion_only_providers_return_graceful_state() -> None:
 
     assert response.payload["status"] == "source-ready"
     assert response.payload["downloadUrl"].startswith("https://")
-
 
 ###############################################################################
 def test_mobility_database_search_uses_local_snapshot(tmp_path) -> None:
@@ -52,7 +50,6 @@ def test_mobility_database_search_uses_local_snapshot(tmp_path) -> None:
     assert response.payload["feedCount"] == 1
     assert response.payload["feeds"][0]["staticFeedUrl"].endswith("gtfs.zip")
     assert response.payload["feeds"][0]["license"].endswith("license")
-
 
 ###############################################################################
 def test_vector_tile_manifest_records_feature_count(tmp_path) -> None:

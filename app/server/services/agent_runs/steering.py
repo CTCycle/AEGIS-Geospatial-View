@@ -17,9 +17,9 @@ from server.services.agent.conversation_state import ConversationTaskStateServic
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.exceptions import RunConflictError, RunNotFoundError
 
-
 ###############################################################################
 class RunSteeringService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

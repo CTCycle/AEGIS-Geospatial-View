@@ -30,7 +30,6 @@ _ASYNC_HTTP_CLIENT = httpx.AsyncClient(
     follow_redirects=False,
 )
 
-
 ###############################################################################
 async def fetch_json_url(url: str, headers: dict[str, str] | None = None) -> Any:
     body = await fetch_bytes_url(url, headers)
@@ -40,7 +39,6 @@ async def fetch_json_url(url: str, headers: dict[str, str] | None = None) -> Any
         raise ProviderMalformedPayloadError(
             "Provider returned malformed JSON."
         ) from exc
-
 
 ###############################################################################
 async def fetch_bytes_url(
@@ -76,7 +74,6 @@ async def fetch_bytes_url(
     except httpx.HTTPError as exc:
         raise ProviderUnavailableError("Provider request failed.") from exc
 
-
 ###############################################################################
 def _raise_for_status(response: httpx.Response) -> None:
     status_code = response.status_code
@@ -95,7 +92,6 @@ def _raise_for_status(response: httpx.Response) -> None:
         raise ProviderInvalidQueryError("Provider rejected the requested query.")
     raise ProviderUnavailableError(f"Provider HTTP error {status_code}.")
 
-
 ###############################################################################
 def _valid_content_length(value: str) -> int:
     try:
@@ -103,7 +99,6 @@ def _valid_content_length(value: str) -> int:
     except ValueError:
         return 0
     return max(0, parsed)
-
 
 ###############################################################################
 def _retry_after_seconds(headers: httpx.Headers) -> float | None:
@@ -122,12 +117,10 @@ def _retry_after_seconds(headers: httpx.Headers) -> float | None:
     except TypeError, ValueError, OverflowError:
         return None
 
-
 ###############################################################################
 async def fetch_text_url(url: str, headers: dict[str, str] | None = None) -> str:
     body = await fetch_bytes_url(url, headers)
     return body.decode("utf-8", errors="replace")
-
 
 ###############################################################################
 async def call_json_fetcher(
@@ -138,7 +131,6 @@ async def call_json_fetcher(
         return await value
     return value
 
-
 ###############################################################################
 async def call_text_fetcher(
     fetcher: TextFetcher, url: str, headers: dict[str, str] | None = None
@@ -147,7 +139,6 @@ async def call_text_fetcher(
     if inspect.isawaitable(value):
         return await value
     return value
-
 
 ###############################################################################
 async def call_bytes_fetcher(

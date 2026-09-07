@@ -5,7 +5,6 @@ from tests.conftest import run_async_in_thread
 from server.services.geospatial.openmeteo import OpenMeteoService
 from server.services.geospatial.overpass import OverpassService
 
-
 ###############################################################################
 def test_openmeteo_direct_service_results_carry_source_and_measurement_metadata() -> (
     None
@@ -76,7 +75,6 @@ def test_openmeteo_direct_service_results_carry_source_and_measurement_metadata(
     assert result["current"]["relative_humidity_2m"] == 0
     assert result["hourly_forecast"][0]["precipitation_probability"] == 0
 
-
 ###############################################################################
 def test_openmeteo_direct_service_marks_missing_measurements_as_partial() -> None:
     service = OpenMeteoService(weather_base_url="https://weather.example/forecast")
@@ -98,7 +96,6 @@ def test_openmeteo_direct_service_marks_missing_measurements_as_partial() -> Non
     assert result["partial"] is True
     assert result["hourly_forecast"][0]["relative_humidity_2m"] is None
 
-
 ###############################################################################
 def test_openmeteo_direct_service_distinguishes_valid_empty_response() -> None:
     service = OpenMeteoService(weather_base_url="https://weather.example/forecast")
@@ -113,7 +110,6 @@ def test_openmeteo_direct_service_distinguishes_valid_empty_response() -> None:
 
     assert result["result_status"] == "valid_empty"
     assert result["partial"] is False
-
 
 ###############################################################################
 def test_overpass_direct_service_marks_limited_results_as_partial() -> None:

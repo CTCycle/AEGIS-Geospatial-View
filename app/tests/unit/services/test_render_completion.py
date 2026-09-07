@@ -29,10 +29,14 @@ from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.render_completion import RenderCompletionService
 
 
+###############################################################################
 class _EventPublisher:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.events: list[tuple[str, dict[str, object]]] = []
 
+    # -------------------------------------------------------------------------
     async def publish(
         self,
         *,
@@ -43,7 +47,10 @@ class _EventPublisher:
         self.events.append((str(type), dict(payload)))
 
 
+###############################################################################
 class _InMemoryBackend:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.engine = sqlalchemy.create_engine(
             "sqlite://",
@@ -54,6 +61,7 @@ class _InMemoryBackend:
         self.session = sessionmaker(bind=self.engine, future=True)
 
 
+###############################################################################
 @pytest.fixture()
 def render_context() -> tuple[AgentRunRepository, _EventPublisher, str, str]:
     backend = _InMemoryBackend()
@@ -73,6 +81,7 @@ def render_context() -> tuple[AgentRunRepository, _EventPublisher, str, str]:
     return repository, publisher, conversation_id, run.run_id
 
 
+###############################################################################
 def _session(*instances: OverlayInstance, bounds: list[float] | None = None) -> MapSession:
     location = ResolvedLocation(
         label="Rome, Italy",
@@ -100,6 +109,7 @@ def _session(*instances: OverlayInstance, bounds: list[float] | None = None) -> 
     )
 
 
+###############################################################################
 def _canonical() -> CanonicalRequestInterpretation:
     return CanonicalRequestInterpretation(
         request_id="request-1",
@@ -109,6 +119,7 @@ def _canonical() -> CanonicalRequestInterpretation:
     )
 
 
+###############################################################################
 def test_metadata_only_overlay_cannot_satisfy_renderable_geometry() -> None:
     metadata = OverlayInstance(
         instance_id="weather-1",
@@ -128,10 +139,12 @@ def test_metadata_only_overlay_cannot_satisfy_renderable_geometry() -> None:
     assert RenderCompletionService.requires_browser_ack(_session(metadata)) is False
 
 
+###############################################################################
 def test_location_only_map_still_requires_browser_ack() -> None:
     assert RenderCompletionService.requires_browser_ack(_session()) is True
 
 
+###############################################################################
 def test_unavailable_provider_is_not_treated_as_metadata_only() -> None:
     unavailable = OverlayInstance(
         instance_id="fires-1",
@@ -163,6 +176,7 @@ def test_unavailable_provider_is_not_treated_as_metadata_only() -> None:
     ).status == "failed"
 
 
+###############################################################################
 def test_valid_empty_result_with_bounds_can_render_analysis_area() -> None:
     requirements = CompletionEvaluator.candidate_requirements(
         _canonical(), _session()
@@ -172,6 +186,7 @@ def test_valid_empty_result_with_bounds_can_render_analysis_area() -> None:
     assert renderable.status == "satisfied"
 
 
+###############################################################################
 def test_explicit_scope_and_time_require_descriptor_evidence() -> None:
     location = ResolvedLocation(
         label="Rome, Italy",
@@ -251,6 +266,7 @@ def test_explicit_scope_and_time_require_descriptor_evidence() -> None:
     assert next(item for item in requirements if item.name == "temporal_filter_applied").status == "failed"
 
 
+###############################################################################
 def test_acknowledgment_payload_is_bounded_and_requires_valid_viewport() -> None:
     payload = RealtimeRenderAckPayload(
         run_id="run-1",
@@ -292,6 +308,7 @@ def test_acknowledgment_payload_is_bounded_and_requires_valid_viewport() -> None
         )
 
 
+###############################################################################
 def test_matching_render_ack_promotes_once_and_replay_is_idempotent(
     render_context,
 ) -> None:
@@ -378,6 +395,7 @@ def test_matching_render_ack_promotes_once_and_replay_is_idempotent(
         )
 
 
+###############################################################################
 def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
     render_context,
 ) -> None:
@@ -447,6 +465,7 @@ def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
         )
 
 
+###############################################################################
 def test_render_ack_rejects_missing_required_data_even_with_analysis_bounds(
     render_context,
 ) -> None:
@@ -491,6 +510,7 @@ def test_render_ack_rejects_missing_required_data_even_with_analysis_bounds(
         )
 
 
+###############################################################################
 def test_production_render_ack_persists_terminal_events_atomically() -> None:
     backend = _InMemoryBackend()
     Base.metadata.create_all(backend.engine)

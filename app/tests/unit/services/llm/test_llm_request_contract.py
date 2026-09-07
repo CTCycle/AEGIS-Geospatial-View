@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
-
 ###############################################################################
 def test_llm_request_preserves_tools_and_schema_for_provider_validation() -> None:
     tool = LLMToolDefinition(

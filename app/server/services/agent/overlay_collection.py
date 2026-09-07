@@ -20,7 +20,6 @@ from server.contracts.geospatial import (
 )
 from server.domain.agent.decision import ResolvedLocation
 
-
 ###############################################################################
 class OverlayCollectionService:
     """Resolve and apply typed overlay commands without refetching the map.

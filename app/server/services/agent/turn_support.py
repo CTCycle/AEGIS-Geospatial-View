@@ -5,7 +5,6 @@ from typing import Any
 from server.common.typing import is_json_object, json_array, json_object
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
 
-
 ###############################################################################
 class AgentTurnSupport:
     _EXECUTABLE_ACTION_IDS = frozenset(

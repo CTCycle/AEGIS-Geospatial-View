@@ -16,9 +16,9 @@ from server.services.llm.opencode_provider import (
 )
 from server.services.llm.openai_provider import OpenAIProvider
 
-
 ###############################################################################
 class LLMFactory:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

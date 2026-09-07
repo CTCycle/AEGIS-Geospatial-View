@@ -40,7 +40,6 @@ SpecialistGroup = Literal[
     "visualization_update",
 ]
 
-
 ###############################################################################
 class TaskFailureDetail(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -73,7 +72,6 @@ class TaskFailureDetail(BaseModel):
         | None
     ) = None
 
-
 ###############################################################################
 class ToolRetryPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -88,7 +86,6 @@ class ToolRetryPolicy(BaseModel):
         ]
     )
 
-
 ###############################################################################
 class ToolInputBinding(BaseModel):
     """Bind a value produced by a predecessor into a later tool call."""
@@ -99,7 +96,6 @@ class ToolInputBinding(BaseModel):
     source_step_id: str = Field(min_length=1)
     source_path: str = "data"
     required: bool = True
-
 
 ###############################################################################
 class ToolPlanStep(BaseModel):
@@ -127,7 +123,6 @@ class ToolPlanStep(BaseModel):
     analysis_scope: str | None = None
     required_outputs: list[str] = Field(default_factory=list)
 
-
 ###############################################################################
 class ToolPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -142,7 +137,6 @@ class ToolPlan(BaseModel):
     frontend_derivation: str = "derive_from_validated_results"
     partial_failure_policy: str = "retain_successful_required_results"
     canonical_request_id: str | None = None
-
 
 ###############################################################################
 class ConversationTaskRecord(BaseModel):
@@ -173,7 +167,6 @@ class ConversationTaskRecord(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
-
 ###############################################################################
 class ToolResultProvenance(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -195,7 +188,6 @@ class ToolResultProvenance(BaseModel):
     partial: bool = False
     warnings: list[str] = Field(default_factory=lambda: list[str]())
 
-
 ###############################################################################
 class PlannedToolResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -207,7 +199,6 @@ class PlannedToolResult(BaseModel):
     error_message: str | None = None
     validation_error: str | None = None
     provenance: ToolResultProvenance
-
 
 ###############################################################################
 class VisualizationUpdate(BaseModel):
@@ -225,7 +216,6 @@ class VisualizationUpdate(BaseModel):
     unmatched_selectors: list[str] = Field(default_factory=lambda: list[str]())
     ambiguous_selectors: list[str] = Field(default_factory=lambda: list[str]())
     clarification: str | None = None
-
 
 ###############################################################################
 class ConversationTaskSnapshot(BaseModel):

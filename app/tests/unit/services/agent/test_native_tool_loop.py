@@ -29,14 +29,13 @@ from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
 from server.services.llm.errors import LLMProviderRequestError
 
-
 ###############################################################################
 class _Credentials:
+
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN001
         _ = provider, label
         return None
-
 
 ###############################################################################
 def _registry() -> ToolRegistry:
@@ -46,7 +45,6 @@ def _registry() -> ToolRegistry:
             credentials_repo=_Credentials(),  # type: ignore[arg-type]
         )
     )
-
 
 ###############################################################################
 def _tool(name: str = "lookup") -> LLMToolDefinition:
@@ -60,9 +58,9 @@ def _tool(name: str = "lookup") -> LLMToolDefinition:
         },
     )
 
-
 ###############################################################################
 class _Provider:
+
     # -------------------------------------------------------------------------
     def __init__(self, responses: list[LLMResult]) -> None:
         self.responses = responses
@@ -73,9 +71,9 @@ class _Provider:
         self.requests.append(request)
         return self.responses.pop(0)
 
-
 ###############################################################################
 class _Factory:
+
     # -------------------------------------------------------------------------
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
@@ -84,10 +82,13 @@ class _Factory:
     def get_provider(self, provider: str) -> _Provider:
         return self.provider
 
-
 ###############################################################################
 def test_native_tool_loop_keeps_usage_with_concurrent_invocations() -> None:
+
+    ###############################################################################
     class _InvocationProvider(_Provider):
+
+        # -------------------------------------------------------------------------
         def chat(self, request):  # noqa: ANN001
             return LLMResult(
                 content=request.model,
@@ -146,7 +147,6 @@ def test_native_tool_loop_keeps_usage_with_concurrent_invocations() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_native_tool_loop_executes_single_tool_call() -> None:
     async def _run() -> None:
@@ -187,7 +187,6 @@ def test_native_tool_loop_executes_single_tool_call() -> None:
         assert provider.requests[1].messages[-1]["role"] == "tool"
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_native_tool_loop_replaces_working_state_instead_of_appending_it() -> None:
@@ -250,7 +249,6 @@ def test_native_tool_loop_replaces_working_state_instead_of_appending_it() -> No
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
     async def _run() -> None:
@@ -287,7 +285,6 @@ def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
         assert result.tool_results[0].content["error"]["code"] == "invalid_arguments"
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_native_tool_loop_stops_at_max_iterations() -> None:
@@ -329,7 +326,6 @@ def test_native_tool_loop_stops_at_max_iterations() -> None:
         assert result.iterations == 2
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> None:
@@ -373,10 +369,13 @@ def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> No
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_expected_provider_failure_is_logged_without_traceback(caplog) -> None:  # noqa: ANN001
+
+    ###############################################################################
     class _FailingProvider:
+
+        # -------------------------------------------------------------------------
         def chat(self, request):  # noqa: ANN001
             _ = request
             raise LLMProviderRequestError(
@@ -413,7 +412,6 @@ def test_expected_provider_failure_is_logged_without_traceback(caplog) -> None: 
     assert len(records) == 1
     assert records[0].message == "tool_loop_failed category=provider_api provider=test model=model"
     assert records[0].exc_info is None
-
 
 ###############################################################################
 def test_native_tool_loop_uses_the_latest_map_session_result() -> None:
@@ -452,6 +450,7 @@ def test_native_tool_loop_uses_the_latest_map_session_result() -> None:
     assert result.session_id == "second"
 
 
+###############################################################################
 def test_native_geospatial_output_uses_the_canonical_scope_contract() -> None:
     location = ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5)
     canonical = CanonicalRequestInterpretation(

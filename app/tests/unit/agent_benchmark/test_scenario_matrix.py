@@ -7,7 +7,6 @@ from tests.agent_benchmark.scenario_matrix import (
     validate_scenario_matrix,
 )
 
-
 ###############################################################################
 def test_checked_in_scenario_matrix_is_complete_and_unique() -> None:
     matrix = load_scenario_matrix()
@@ -15,7 +14,6 @@ def test_checked_in_scenario_matrix_is_complete_and_unique() -> None:
     assert len(matrix["scenarios"]) >= 20
     assert len({item["id"] for item in matrix["scenarios"]}) == len(matrix["scenarios"])
     assert validate_scenario_matrix(matrix) == []
-
 
 ###############################################################################
 def test_matrix_covers_required_geographic_agent_dimensions() -> None:
@@ -46,7 +44,6 @@ def test_matrix_covers_required_geographic_agent_dimensions() -> None:
         "bounding_box",
     }
     assert all(item["expected"]["fabrication_forbidden"] for item in dimensions)
-
 
 ###############################################################################
 def test_held_out_matrix_validates_and_uses_generalized_invariants() -> None:

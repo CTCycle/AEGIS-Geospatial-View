@@ -21,9 +21,9 @@ from server.contracts.extraction import (
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.direct_turn_response import DirectTurnResponseService
 
-
 ###############################################################################
 class _History:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.messages: list[dict[str, Any]] = []
@@ -32,13 +32,12 @@ class _History:
     def append_message(self, **kwargs: Any) -> None:
         self.messages.append(kwargs)
 
-
 ###############################################################################
 class _Synthesizer:
+
     # -------------------------------------------------------------------------
     def synthesize(self, *, fallback_text: str, **_: Any) -> str:
         return f"synthesized: {fallback_text}"
-
 
 ###############################################################################
 def _turn(
@@ -63,13 +62,11 @@ def _turn(
         ambiguities=ambiguities or [],
     )
 
-
 ###############################################################################
 def _task(
     state: ConversationTaskStateService, turn: TurnParseResult
 ) -> ConversationTaskRecord:
     return state.start_task("conversation", turn, "direct_chat")
-
 
 ###############################################################################
 def _service() -> tuple[
@@ -86,7 +83,6 @@ def _service() -> tuple[
         state,
         history,
     )
-
 
 ###############################################################################
 def test_parser_authentication_failure_persists_stable_failure_response() -> None:
@@ -117,7 +113,6 @@ def test_parser_authentication_failure_persists_stable_failure_response() -> Non
         assert response.task_snapshot.tasks[-1].status == "failed"
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_provider_authentication_failure_persists_stable_failure_response() -> None:
@@ -151,7 +146,6 @@ def test_provider_authentication_failure_persists_stable_failure_response() -> N
         assert history.messages[-1]["content"] == response.assistant_message
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_failure_inquiry_explains_the_latest_structured_failure() -> None:
@@ -193,7 +187,6 @@ def test_failure_inquiry_explains_the_latest_structured_failure() -> None:
         assert "Try again later." in response.assistant_message
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_preflight_clarification_is_persisted_as_partial_response() -> None:
@@ -237,7 +230,6 @@ def test_preflight_clarification_is_persisted_as_partial_response() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_typed_context_query_uses_active_map_location_without_tool_call() -> None:
     async def _run() -> None:
@@ -263,7 +255,6 @@ def test_typed_context_query_uses_active_map_location_without_tool_call() -> Non
         assert "Lugano" in response.assistant_message
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_actionable_context_reference_reaches_tool_pipeline() -> None:
@@ -309,7 +300,6 @@ def test_actionable_context_reference_reaches_tool_pipeline() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_parser_failure_is_terminal_for_context_looking_map_request() -> None:
     async def _run() -> None:
@@ -340,7 +330,6 @@ def test_parser_failure_is_terminal_for_context_looking_map_request() -> None:
         assert response.failure_diagnostic is not None
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_parser_failure_is_terminal_for_context_looking_summary_request() -> None:
@@ -376,7 +365,6 @@ def test_parser_failure_is_terminal_for_context_looking_summary_request() -> Non
         assert response.failure_diagnostic is not None
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_provider_timeout_failure_persists_context_usage() -> None:

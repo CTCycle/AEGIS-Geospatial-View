@@ -38,7 +38,6 @@ VERIFIED_EVIDENCE_USER_TEMPLATE = (
     "Write the final response using only this verified evidence:\n{evidence_json}"
 )
 
-
 ###############################################################################
 def build_grounded_response_system_prompt() -> str:
     return "\n\n".join(
@@ -51,7 +50,6 @@ def build_grounded_response_system_prompt() -> str:
         ]
     )
 
-
 ###############################################################################
 def build_verified_evidence_prompt(evidence: Any) -> str:
     return VERIFIED_EVIDENCE_USER_TEMPLATE.format(
@@ -62,7 +60,6 @@ def build_verified_evidence_prompt(evidence: Any) -> str:
             default=str,
         )
     )
-
 
 ###############################################################################
 def build_response_prompt(evidence: Any) -> list[dict[str, str]]:

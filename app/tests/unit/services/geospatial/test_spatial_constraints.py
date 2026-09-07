@@ -12,6 +12,7 @@ from server.services.geospatial.spatial_constraints import (
 )
 
 
+###############################################################################
 def test_bbox_uses_west_south_east_north_and_preserves_antimeridian_wrap() -> None:
     assert normalize_bbox([8.0, 45.0, 9.0, 46.0]) == [8.0, 45.0, 9.0, 46.0]
     assert normalize_bbox([170.0, -10.0, -170.0, 10.0]) == [170.0, -10.0, -170.0, 10.0]
@@ -20,6 +21,7 @@ def test_bbox_uses_west_south_east_north_and_preserves_antimeridian_wrap() -> No
         normalize_bbox([8.0, 45.0, 8.0, 46.0])
 
 
+###############################################################################
 def test_invalid_coordinates_and_geometry_fail_closed() -> None:
     with pytest.raises(SpatialConstraintError):
         validate_point(91.0, 0.0)
@@ -31,11 +33,13 @@ def test_invalid_coordinates_and_geometry_fail_closed() -> None:
         validate_geojson_geometry({"type": "Polygon", "coordinates": []})
 
 
+###############################################################################
 def test_radius_uses_wgs84_geodesic_distance() -> None:
     distance = geodesic_distance_m(0.0, 0.0, 0.0, 1.0)
     assert 110_000 < distance < 112_000
 
 
+###############################################################################
 def test_containment_and_distance_are_applied_to_feature_geometry() -> None:
     polygon = {
         "type": "Polygon",
@@ -68,6 +72,7 @@ def test_containment_and_distance_are_applied_to_feature_geometry() -> None:
     ) is False
 
 
+###############################################################################
 def test_distance_uses_the_nearest_part_of_nonpoint_geometry() -> None:
     line = {
         "type": "Feature",

@@ -24,7 +24,6 @@ GeospatialProviderAutomationSupport = Literal[
 ]
 GeospatialProviderSignupFieldType = Literal["text", "email", "textarea", "select"]
 
-
 ###############################################################################
 class CapabilityKind(str, Enum):
     BASEMAP = "basemap"
@@ -35,7 +34,6 @@ class CapabilityKind(str, Enum):
     DATASET_INGESTION = "dataset-ingestion"
     ANALYSIS_TOOL = "analysis-tool"
     METADATA_ONLY = "metadata-only"
-
 
 ###############################################################################
 class CapabilityExecutionContract(BaseModel):
@@ -55,7 +53,6 @@ class CapabilityExecutionContract(BaseModel):
     limitations: list[str] = Field(default_factory=list)
     fallback_ids: list[str] = Field(default_factory=list)
 
-
 ###############################################################################
 class ProviderAuthType(str, Enum):
     NONE = "none"
@@ -64,7 +61,6 @@ class ProviderAuthType(str, Enum):
     TOKEN_HEADER = "token-header"
     PAID_OR_GATED = "paid-or-gated"
 
-
 ###############################################################################
 class LayerHealthStatus(str, Enum):
     FUNCTIONAL = "functional"
@@ -72,7 +68,6 @@ class LayerHealthStatus(str, Enum):
     BROKEN = "broken"
     DISABLED = "disabled"
     UNKNOWN = "unknown"
-
 
 ###############################################################################
 class RenderingMode(str, Enum):
@@ -87,13 +82,11 @@ class RenderingMode(str, Enum):
     CAMERA_POINTS = "camera-points"
     METADATA_ONLY = "metadata-only"
 
-
 ###############################################################################
 class CommercialUse(str, Enum):
     ALLOWED = "allowed"
     RESTRICTED = "restricted"
     UNKNOWN = "unknown"
-
 
 ###############################################################################
 class EmbeddingAllowed(str, Enum):
@@ -102,7 +95,6 @@ class EmbeddingAllowed(str, Enum):
     METADATA_ONLY = "metadata-only"
     UNKNOWN = "unknown"
 
-
 ###############################################################################
 class CacheMode(str, Enum):
     NONE = "none"
@@ -110,7 +102,6 @@ class CacheMode(str, Enum):
     DISK = "disk"
     DATABASE = "database"
     PREPROCESSED = "preprocessed"
-
 
 ###############################################################################
 class LicensePolicy(BaseModel):
@@ -122,7 +113,6 @@ class LicensePolicy(BaseModel):
     commercial_use: CommercialUse = Field(alias="commercialUse")
     embedding_allowed: EmbeddingAllowed = Field(alias="embeddingAllowed")
 
-
 ###############################################################################
 class ProviderAuthPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -133,7 +123,6 @@ class ProviderAuthPolicy(BaseModel):
     access_page_provider_id: str | None = Field(
         default=None, alias="accessPageProviderId"
     )
-
 
 ###############################################################################
 class GeospatialLayersResponse(BaseModel):
@@ -152,7 +141,6 @@ class GeospatialLayersResponse(BaseModel):
         default_factory=lambda: list[dict[str, Any]]()
     )
 
-
 ###############################################################################
 class GeospatialLayerHealthResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -161,7 +149,6 @@ class GeospatialLayerHealthResponse(BaseModel):
     provider: str | None = None
     reliability: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     runtime: Any = None
-
 
 ###############################################################################
 class GeospatialProviderPayloadResponse(BaseModel):
@@ -184,7 +171,6 @@ class GeospatialProviderPayloadResponse(BaseModel):
     source_url: str | None = None
     partial: bool = False
     error_code: str | None = None
-
 
 ###############################################################################
 class GeospatialLayerRenderDescriptor(BaseModel):
@@ -209,7 +195,6 @@ class GeospatialLayerRenderDescriptor(BaseModel):
     attribution_url: str | None = None
     warnings: list[str] = Field(default_factory=lambda: list[str]())
 
-
 ###############################################################################
 class GeospatialProviderLayerDescriptor(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -233,7 +218,6 @@ class GeospatialProviderLayerDescriptor(BaseModel):
     attribution: list[str] = Field(default_factory=lambda: list[str]())
     warnings: list[str] = Field(default_factory=lambda: list[str]())
 
-
 ###############################################################################
 class GeospatialProviderLayersResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -242,7 +226,6 @@ class GeospatialProviderLayersResponse(BaseModel):
     layers: list[GeospatialProviderLayerDescriptor]
     warnings: list[str] = Field(default_factory=lambda: list[str]())
 
-
 ###############################################################################
 class GeospatialProviderLayerResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -250,7 +233,6 @@ class GeospatialProviderLayerResponse(BaseModel):
     provider: str
     layer: GeospatialProviderLayerDescriptor
     warnings: list[str] = Field(default_factory=lambda: list[str]())
-
 
 ###############################################################################
 class GeospatialCameraDetailResponse(BaseModel):
@@ -265,7 +247,6 @@ class GeospatialCameraDetailResponse(BaseModel):
     warnings: list[str] = Field(default_factory=lambda: list[str]())
     stale: bool = False
 
-
 ###############################################################################
 class GeospatialCredentialStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -273,7 +254,6 @@ class GeospatialCredentialStatusResponse(BaseModel):
     provider: str
     required: bool
     configured: bool
-
 
 ###############################################################################
 class GeospatialProviderSignupField(BaseModel):
@@ -285,7 +265,6 @@ class GeospatialProviderSignupField(BaseModel):
     required: bool = True
     sensitive: bool = False
     help_text: str | None = None
-
 
 ###############################################################################
 class GeospatialProviderSignupAutomation(BaseModel):
@@ -302,7 +281,6 @@ class GeospatialProviderSignupAutomation(BaseModel):
     safety_notes: list[str] = Field(default_factory=lambda: list[str]())
     experimental: bool = True
     experimental_label: str = "Experimental guided setup"
-
 
 ###############################################################################
 class GeospatialProviderAccountSetupResponse(BaseModel):
@@ -321,7 +299,6 @@ class GeospatialProviderAccountSetupResponse(BaseModel):
     key_format_hint: str | None = None
     validation_supported: bool = False
 
-
 ###############################################################################
 class GeospatialProviderAccountSetupListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -329,7 +306,6 @@ class GeospatialProviderAccountSetupListResponse(BaseModel):
     providers: list[GeospatialProviderAccountSetupResponse] = Field(
         default_factory=lambda: list[GeospatialProviderAccountSetupResponse]()
     )
-
 
 ###############################################################################
 class ProviderCredentialValidationResult(BaseModel):
@@ -340,7 +316,6 @@ class ProviderCredentialValidationResult(BaseModel):
     status: Literal["valid", "invalid", "unsupported", "error"]
     message: str
 
-
 ###############################################################################
 class LayerAuditIssue(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -349,7 +324,6 @@ class LayerAuditIssue(BaseModel):
     manifest_id: str | None = None
     severity: str
     message: str
-
 
 ###############################################################################
 class CapabilityImplementationStatus(BaseModel):
@@ -367,7 +341,6 @@ class CapabilityImplementationStatus(BaseModel):
     unit_tested: bool
     visual_tested: bool
     placeholder_statuses: list[str] = Field(default_factory=lambda: list[str]())
-
 
 ###############################################################################
 class LayerAuditReport(BaseModel):
@@ -395,7 +368,6 @@ class LayerAuditReport(BaseModel):
     def ok(self) -> bool:
         return self.error_count == 0
 
-
 ###############################################################################
 class AgenticUsePolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -408,7 +380,6 @@ class AgenticUsePolicy(BaseModel):
     )
     avoid_when: list[str] = Field(default_factory=list, alias="avoidWhen")
 
-
 ###############################################################################
 class ReliabilityPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -416,7 +387,6 @@ class ReliabilityPolicy(BaseModel):
     status: LayerHealthStatus
     last_audited: str = Field(alias="lastAudited")
     known_limitations: list[str] = Field(default_factory=list, alias="knownLimitations")
-
 
 ###############################################################################
 class CachePolicy(BaseModel):
@@ -428,7 +398,6 @@ class CachePolicy(BaseModel):
         default=0, ge=0, alias="staleWhileRevalidateSeconds"
     )
 
-
 ###############################################################################
 class NormalizationPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -438,7 +407,6 @@ class NormalizationPolicy(BaseModel):
     timestamp_path: str | None = Field(default=None, alias="timestampPath")
     field_map: dict[str, str] = Field(default_factory=dict, alias="fieldMap")
     expected_geometry: str = Field(default="not-applicable", alias="expectedGeometry")
-
 
 ###############################################################################
 class CapabilityManifestV2(BaseModel):
@@ -473,7 +441,6 @@ class CapabilityManifestV2(BaseModel):
         alias="executionContract",
     )
 
-
 ###############################################################################
 class CameraFeature(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -492,7 +459,6 @@ class CameraFeature(BaseModel):
     stale: bool
     metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
-
 ###############################################################################
 class PoiFeature(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -509,7 +475,6 @@ class PoiFeature(BaseModel):
     phone: str | None = None
     metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
-
 ###############################################################################
 class ViewportPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -519,7 +484,6 @@ class ViewportPolicy(BaseModel):
     radius_m: float = Field(default=2500.0, gt=0)
     bbox: list[float] | None = None
 
-
 ###############################################################################
 class PresentationPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -527,7 +491,6 @@ class PresentationPolicy(BaseModel):
     emphasize_overlays: bool = False
     high_contrast: bool = False
     show_legend: bool = True
-
 
 ###############################################################################
 class ProviderLayerSelection(BaseModel):
@@ -539,7 +502,6 @@ class ProviderLayerSelection(BaseModel):
     style: str | None = None
     format: str | None = None
     render: dict[str, object] | None = None
-
 
 ###############################################################################
 class InspectionField(BaseModel):
@@ -554,7 +516,6 @@ class InspectionField(BaseModel):
     category: str = "general"
     source_url: str | None = None
     order: int = 0
-
 
 ###############################################################################
 class MapInspection(BaseModel):
@@ -573,7 +534,6 @@ class MapInspection(BaseModel):
     stale: bool = False
     warnings: list[str] = Field(default_factory=lambda: list[str]())
     geometry: dict[str, Any] | None = None
-
 
 ###############################################################################
 class OverlayInstance(BaseModel):
@@ -601,7 +561,6 @@ class OverlayInstance(BaseModel):
         default_factory=lambda: list[MapInspection]()
     )
 
-
 ###############################################################################
 class OverlayCollectionState(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -611,7 +570,6 @@ class OverlayCollectionState(BaseModel):
     instances: list[OverlayInstance] = Field(
         default_factory=lambda: list[OverlayInstance]()
     )
-
 
 ###############################################################################
 class OverlayMutationResult(BaseModel):
@@ -625,7 +583,6 @@ class OverlayMutationResult(BaseModel):
     unmatched_selectors: list[str] = Field(default_factory=lambda: list[str]())
     ambiguous_selectors: list[str] = Field(default_factory=lambda: list[str]())
     clarification: str | None = None
-
 
 ###############################################################################
 class LocationSearchRequest(BaseModel):
@@ -653,7 +610,6 @@ class LocationSearchRequest(BaseModel):
     viewport_intent: ViewportIntent | None = None
     poi_categories: list[str] = Field(default_factory=lambda: list[str]())
 
-
 ###############################################################################
 class MapSession(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -669,7 +625,6 @@ class MapSession(BaseModel):
     basemap: dict[str, object] | None = None
     compliance_warnings: list[str] = Field(default_factory=lambda: list[str]())
     overlay_collection: OverlayCollectionState
-
 
 ###############################################################################
 class GeospatialCatalogResponse(BaseModel):

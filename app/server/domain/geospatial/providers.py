@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ProviderRequest:
@@ -13,7 +12,6 @@ class ProviderRequest:
     zoom: int | None = None
     time: datetime | None = None
     params: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -33,7 +31,6 @@ class ProviderResponse:
     units: dict[str, str] = field(default_factory=lambda: dict[str, str]())
     source_url: str | None = None
     partial: bool = False
-
 
 ###############################################################################
 @dataclass(frozen=True)

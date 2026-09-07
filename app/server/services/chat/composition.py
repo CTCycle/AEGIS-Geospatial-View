@@ -33,7 +33,6 @@ from server.services.llm.context_profile_resolver import ModelContextProfileReso
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ChatRuntime:
@@ -44,7 +43,6 @@ class ChatRuntime:
     conversation_repository: ConversationRepository
     history_service: ChatHistoryService
     task_state_service: ConversationTaskStateService
-
 
 ###############################################################################
 def build_chat_runtime(

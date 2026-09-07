@@ -10,7 +10,6 @@ from server.configurations.environment import (
     reset_environment_bootstrap_for_tests,
 )
 
-
 ###############################################################################
 def test_runtime_env_is_loaded_from_dotenv(monkeypatch, tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
@@ -51,7 +50,6 @@ def test_runtime_env_is_loaded_from_dotenv(monkeypatch, tmp_path: Path) -> None:
     assert os.getenv("KERAS_BACKEND") == "tensorflow"
     assert os.getenv("MPLBACKEND") == "Agg"
 
-
 ###############################################################################
 def test_process_environment_values_are_not_overwritten(
     monkeypatch: pytest.MonkeyPatch,
@@ -68,7 +66,6 @@ def test_process_environment_values_are_not_overwritten(
     ensure_environment_loaded()
 
     assert os.getenv("AEGIS_DATA_DIR") == "from-process"
-
 
 ###############################################################################
 def test_missing_runtime_env_is_created_from_example(
@@ -95,7 +92,6 @@ def test_missing_runtime_env_is_created_from_example(
     assert env_file.read_bytes() == example_file.read_bytes()
     assert os.getenv("FASTAPI_PORT") == "6101"
     assert os.getenv("SQLITE_LOCK_TIMEOUT") == "9"
-
 
 ###############################################################################
 def test_existing_runtime_env_is_not_overwritten(

@@ -11,17 +11,14 @@ from server.configurations.environment import (
 from server.configurations.management import ConfigurationManager
 from server.configurations.settings import ServerSettings
 
-
 ###############################################################################
 def _resolve_config_path(config_path: str | Path | None = None) -> str:
     return str(Path(config_path or CONFIGURATIONS_FILE))
-
 
 ###############################################################################
 @lru_cache(maxsize=4)
 def _cached_configuration_manager(config_path: str) -> ConfigurationManager:
     return ConfigurationManager(config_path=config_path)
-
 
 ###############################################################################
 def get_configuration_manager(
@@ -35,11 +32,9 @@ def get_configuration_manager(
         manager.reload()
     return manager
 
-
 ###############################################################################
 def get_server_settings(config_path: str | Path | None = None) -> ServerSettings:
     return get_configuration_manager(config_path=config_path).server_settings
-
 
 ###############################################################################
 def reload_settings_for_tests(config_path: str | Path | None = None) -> ServerSettings:

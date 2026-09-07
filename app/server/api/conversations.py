@@ -19,18 +19,15 @@ from server.services.chat.conversation_snapshot import (
 
 router = APIRouter(prefix=CONVERSATIONS_ROUTER_PREFIX, tags=["conversations"])
 
-
 ###############################################################################
 def get_run_lifecycle_service(request: Request) -> RunLifecycleService:
     return request.app.state.run_lifecycle_service
-
 
 ###############################################################################
 def get_conversation_snapshot_service(
     request: Request,
 ) -> ConversationSnapshotService:
     return request.app.state.conversation_snapshot_service
-
 
 ###############################################################################
 @router.post(
@@ -43,7 +40,6 @@ def create_conversation(
     lifecycle_service: RunLifecycleService = Depends(get_run_lifecycle_service),
 ) -> ConversationCreateResponse:
     return lifecycle_service.create_conversation(title=payload.title)
-
 
 ###############################################################################
 @router.get(

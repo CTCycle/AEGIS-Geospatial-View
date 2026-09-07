@@ -20,26 +20,21 @@ from server.services.geospatial.providers.base import (
     ProviderRateLimitError,
 )
 
-
 ###############################################################################
 class OverpassServiceError(ProviderError):
     """Base exception for Overpass failures."""
-
 
 ###############################################################################
 class OverpassRequestError(OverpassServiceError):
     """Raised when an Overpass request or response cannot be completed."""
 
-
 ###############################################################################
 class OverpassInvalidQueryError(OverpassServiceError, ProviderInvalidQueryError):
     """Raised when a request is structurally valid but not executable."""
 
-
 ###############################################################################
 class OverpassRateLimitError(OverpassServiceError, ProviderRateLimitError):
     """Raised when Overpass rejects a request due to rate limits."""
-
 
 ###############################################################################
 class OverpassService:

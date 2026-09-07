@@ -10,7 +10,6 @@ from server.services.geospatial.providers.nasa_firms import NASAFIRMSProvider
 from server.services.geospatial.providers.noaa import NOAAProvider
 from server.services.geospatial.providers.usgs import USGSProvider
 
-
 ###############################################################################
 def test_usgs_provider_builds_earthquake_and_water_urls() -> None:
     earthquake = run_async_in_thread(
@@ -34,7 +33,6 @@ def test_usgs_provider_builds_earthquake_and_water_urls() -> None:
     )
     assert "bbox=-78.0%2C38.0%2C-77.0%2C39.0" in water.payload["featuresUrl"]
     assert water.payload["freshnessLabel"]
-
 
 ###############################################################################
 def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
@@ -67,6 +65,7 @@ def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
     assert response.payload["features"][0]["magnitude"] == 2.5
 
 
+###############################################################################
 def test_usgs_bbox_filter_preserves_antimeridian_scope() -> None:
     async def fetcher(url: str, headers=None):  # noqa: ANN001
         _ = url, headers
@@ -106,7 +105,6 @@ def test_usgs_bbox_filter_preserves_antimeridian_scope() -> None:
         "west-edge",
     ]
 
-
 ###############################################################################
 def test_usgs_provider_normalizes_live_water_gauges() -> None:
     async def fetcher(url: str, headers=None):  # noqa: ANN001
@@ -142,7 +140,6 @@ def test_usgs_provider_normalizes_live_water_gauges() -> None:
     assert response.payload["features"][0]["id"] == "01646500"
     assert response.payload["features"][0]["metadata"]["unit"] == "ft"
 
-
 ###############################################################################
 def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
     alerts = run_async_in_thread(
@@ -162,7 +159,6 @@ def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
     assert coops.payload["status"] == "server-side-only"
     assert "featuresUrl" not in coops.payload
     assert coops.payload["freshnessLabel"]
-
 
 ###############################################################################
 def test_noaa_provider_normalizes_live_alert_geojson() -> None:
@@ -206,7 +202,6 @@ def test_noaa_provider_normalizes_live_alert_geojson() -> None:
     assert response.payload["features"][0]["category"] == "weather_alert"
     assert response.payload["features"][0]["severity"] == "Severe"
 
-
 ###############################################################################
 def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
     response = run_async_in_thread(
@@ -216,7 +211,6 @@ def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
     assert response.payload["renderingMode"] == "raster-tile"
     assert "hazards.fema.gov" in response.payload["tileUrl"]
     assert response.payload["legend"]["type"]
-
 
 ###############################################################################
 def test_nasa_firms_requires_key_before_descriptor() -> None:
@@ -241,7 +235,6 @@ def test_nasa_firms_requires_key_before_descriptor() -> None:
     assert response.payload["status"] == "server-side-only"
     assert "test-key" not in str(response.payload)
     assert response.payload["freshnessLabel"]
-
 
 ###############################################################################
 def test_nasa_firms_normalizes_live_csv() -> None:

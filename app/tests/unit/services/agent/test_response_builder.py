@@ -9,7 +9,6 @@ from server.contracts.geospatial import (
 )
 from server.services.agent.response_builder import AgentResponseBuilder
 
-
 ###############################################################################
 def test_build_final_decision_maps_map_sessions_to_map_search_state() -> None:
     decision = AgentResponseBuilder.build_final_decision(
@@ -24,7 +23,6 @@ def test_build_final_decision_maps_map_sessions_to_map_search_state() -> None:
 
     assert decision.plan.state == "map_search"
     assert decision.plan.mode == "map"
-
 
 ###############################################################################
 def test_build_final_decision_maps_clarification_and_rejection_to_non_map_states() -> (
@@ -54,7 +52,6 @@ def test_build_final_decision_maps_clarification_and_rejection_to_non_map_states
     assert rejection.plan.state == "reject"
     assert rejection.plan.mode is None
 
-
 ###############################################################################
 def test_build_final_decision_maps_direct_answers_to_direct_text() -> None:
     decision = AgentResponseBuilder.build_final_decision(
@@ -70,7 +67,6 @@ def test_build_final_decision_maps_direct_answers_to_direct_text() -> None:
 
     assert decision.plan.state == "direct_tool"
     assert decision.plan.mode == "direct_text"
-
 
 ###############################################################################
 def test_map_response_preserves_and_renders_companion_direct_result() -> None:
@@ -117,7 +113,6 @@ def test_map_response_preserves_and_renders_companion_direct_result() -> None:
     assert operation.kind == "map_session"
     assert operation.direct_result == direct_result
 
-
 ###############################################################################
 def test_direct_weather_message_reports_requested_measurements_and_units() -> None:
     message = AgentResponseBuilder.compose_direct_tool_message(
@@ -149,7 +144,6 @@ def test_direct_weather_message_reports_requested_measurements_and_units() -> No
     assert "pressure 1013.3 hPa" in message
     assert "wind speed 0 km/h" in message
 
-
 ###############################################################################
 def test_infer_failure_category_classifies_provider_warnings_in_success_envelope() -> None:
     category = AgentResponseBuilder.infer_failure_category(
@@ -176,7 +170,6 @@ def test_infer_failure_category_classifies_provider_warnings_in_success_envelope
 
     assert category == "provider_api"
 
-
 ###############################################################################
 def test_infer_failure_category_ignores_non_failure_overlay_warnings() -> None:
     category = AgentResponseBuilder.infer_failure_category(
@@ -198,7 +191,6 @@ def test_infer_failure_category_ignores_non_failure_overlay_warnings() -> None:
     )
 
     assert category is None
-
 
 ###############################################################################
 def test_provider_warning_is_available_to_override_broader_capability_failure() -> None:

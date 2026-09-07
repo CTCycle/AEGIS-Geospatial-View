@@ -6,9 +6,9 @@ from typing import Any
 
 from server.repositories.chat_history import ChatHistoryRepository
 
-
 ###############################################################################
 class ChatHistoryService:
+
     # -------------------------------------------------------------------------
     def __init__(self, repo: ChatHistoryRepository) -> None:
         self.repo = repo

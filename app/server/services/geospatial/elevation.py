@@ -17,11 +17,9 @@ __all__ = [
     "OpenElevationError",
 ]
 
-
 ###############################################################################
 class OpenElevationError(Exception):
     """Exception for Open-Elevation service failures."""
-
 
 ###############################################################################
 class OpenElevationService:

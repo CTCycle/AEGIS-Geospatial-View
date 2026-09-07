@@ -16,7 +16,6 @@ from server.services.geospatial.providers.mobility_database import (
     MobilityDatabaseProvider,
 )
 
-
 ###############################################################################
 class _FeatureOnlyProvider:
     provider_id = "feature_only"
@@ -34,7 +33,6 @@ class _FeatureOnlyProvider:
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         raise AssertionError("fetch_features should be preferred")
 
-
 ###############################################################################
 def test_provider_registry_prefers_canonical_fetch_features_contract() -> None:
     registry = ProviderRegistry(providers=[_FeatureOnlyProvider()])
@@ -45,7 +43,6 @@ def test_provider_registry_prefers_canonical_fetch_features_contract() -> None:
 
     assert response.payload == {"api_key": "<redacted>", "value": 1}
     assert response.attribution == ["Example Attribution"]
-
 
 ###############################################################################
 def test_provider_cache_key_uses_safe_stable_request_parts() -> None:
@@ -63,7 +60,6 @@ def test_provider_cache_key_uses_safe_stable_request_parts() -> None:
     assert "secret" not in key_a
     assert key_a.startswith("provider:layer:")
 
-
 ###############################################################################
 def test_safe_request_params_redacts_credentials() -> None:
     params = safe_request_params(
@@ -75,7 +71,6 @@ def test_safe_request_params_redacts_credentials() -> None:
         "category": "parks",
         "token": "<redacted>",
     }
-
 
 ###############################################################################
 def test_nominatim_provider_geocodes_live_contract_payload() -> None:
@@ -103,7 +98,6 @@ def test_nominatim_provider_geocodes_live_contract_payload() -> None:
 
     assert response.payload["resultCount"] == 1
     assert response.payload["results"][0]["latitude"] == 41.8933
-
 
 ###############################################################################
 def test_mobility_database_provider_searches_local_snapshot(tmp_path) -> None:

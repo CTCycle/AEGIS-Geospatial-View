@@ -17,7 +17,6 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
-
 ###############################################################################
 class ESAProvider(GeospatialProvider):
     provider_id = "esa"
@@ -138,7 +137,6 @@ class ESAProvider(GeospatialProvider):
             warnings=warnings or [],
             stale=stale,
         )
-
 
 ###############################################################################
 def _metadata(request: ProviderRequest) -> dict[str, Any]:

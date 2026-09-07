@@ -26,6 +26,7 @@ from server.repositories.schemas.models import AgentRunRecord, ConversationRecor
 JsonObject = dict[str, Any]
 
 
+###############################################################################
 def _json_object(value: object) -> JsonObject:
     """Narrow a JSON value at a repository boundary."""
     if isinstance(value, dict):
@@ -33,13 +34,16 @@ def _json_object(value: object) -> JsonObject:
     return {}
 
 
+###############################################################################
 def _json_list(value: object) -> list[Any]:
     if isinstance(value, list):
         return cast(list[Any], value)
     return []
 
 
+###############################################################################
 class AgentRunRepository:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -621,6 +625,7 @@ class AgentRunRepository:
             session.refresh(run)
             return self._to_snapshot(run), False, pending_response
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _candidate_bounds(value: object) -> list[float] | None:
         if not isinstance(value, dict):
@@ -650,6 +655,7 @@ class AgentRunRepository:
             return None
         return normalized
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _candidate_overlay_instances(
         value: object,
@@ -665,6 +671,7 @@ class AgentRunRepository:
             if item.get("instance_id")
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _candidate_requires_visible_features(
         instance: dict[str, Any] | None,
@@ -684,6 +691,7 @@ class AgentRunRepository:
         features = data.get("features")
         return isinstance(features, list) and len(cast(list[Any], features)) > 0
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _bounds_intersect(left: list[float], right: object) -> bool:
         if not isinstance(right, list):

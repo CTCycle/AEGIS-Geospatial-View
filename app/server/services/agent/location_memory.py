@@ -8,9 +8,9 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 from server.domain.agent.decision import ResolvedLocation
 from server.contracts.extraction import LocationSignal, NormalizedAction
 
-
 ###############################################################################
 class LocationMemoryService:
+
     # -------------------------------------------------------------------------
     def build_memory_snapshot(
         self, last_assistant_payload: dict[str, Any] | None
@@ -96,6 +96,7 @@ class LocationMemoryService:
         }
 
 
+###############################################################################
 def _finite_number(
     value: object, *, minimum: float, maximum: float
 ) -> float | None:

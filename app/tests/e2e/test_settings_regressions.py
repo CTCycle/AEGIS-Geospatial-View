@@ -21,11 +21,9 @@ PNG_1X1_TRANSPARENT = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 
-
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
-
 
 ###############################################################################
 def _request_json(route: Route) -> dict[str, Any]:
@@ -44,7 +42,6 @@ def _request_json(route: Route) -> dict[str, Any]:
     except Exception:  # noqa: BLE001
         return {}
     return payload if isinstance(payload, dict) else {}
-
 
 ###############################################################################
 def _setup_stub_harness(
@@ -115,7 +112,6 @@ def _setup_stub_harness(
     )
     return captured_patch_payloads
 
-
 ###############################################################################
 def test_settings_layout_has_no_overlap_at_minimum_desktop_width(
     page: Page, base_url: str
@@ -159,7 +155,6 @@ def test_settings_layout_has_no_overlap_at_minimum_desktop_width(
         or left["bottom"] <= right["top"] + 1
         or right["bottom"] <= left["top"] + 1
     )
-
 
 ###############################################################################
 def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) -> None:
@@ -213,7 +208,6 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
     assert "credential_health" not in payload
     assert all("api_key" not in values for values in payload["credentials"].values())
 
-
 ###############################################################################
 def test_capabilities_tables_do_not_clip_desktop_columns(
     page: Page, base_url: str
@@ -246,7 +240,6 @@ def test_capabilities_tables_do_not_clip_desktop_columns(
     assert all(
         item["right"] <= item["pageRight"] + 1 for item in metrics["wrappedTables"]
     )
-
 
 ###############################################################################
 def test_chat_composer_does_not_cover_latest_assistant_message(
@@ -283,7 +276,6 @@ def test_chat_composer_does_not_cover_latest_assistant_message(
 
     assert metrics["assistantBottom"] <= metrics["composerTop"] + 1
 
-
 ###############################################################################
 def test_settings_query_params_do_not_leak_back_to_chat(
     page: Page, base_url: str
@@ -300,7 +292,6 @@ def test_settings_query_params_do_not_leak_back_to_chat(
     query = page.evaluate("() => window.location.search")
     assert path == "/"
     assert query == ""
-
 
 ###############################################################################
 def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(

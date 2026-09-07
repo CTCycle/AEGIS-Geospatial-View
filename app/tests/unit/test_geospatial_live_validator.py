@@ -9,7 +9,6 @@ from server.services.geospatial.live_validator import (
 )
 from server.services.geospatial.providers.base import ProviderRequest, ProviderResponse
 
-
 ###############################################################################
 class _LiveValidationRegistry:
     credential_resolver = type(
@@ -49,7 +48,6 @@ class _LiveValidationRegistry:
             payload=payload,
         )
 
-
 ###############################################################################
 def test_live_validator_runs_public_provider_checks_with_injected_registry() -> None:
     report = run_async_in_thread(
@@ -74,7 +72,6 @@ def test_live_validator_runs_public_provider_checks_with_injected_registry() -> 
         "pvgis",
     }
 
-
 ###############################################################################
 def test_live_validator_skips_missing_saved_credentials() -> None:
 
@@ -85,12 +82,12 @@ def test_live_validator_skips_missing_saved_credentials() -> None:
     assert result.status == "skipped"
     assert "saved credential" in (result.message or "")
 
-
 ###############################################################################
 def test_live_validator_rejects_error_payloads() -> None:
 
     ###############################################################################
     class _ErrorRegistry(_LiveValidationRegistry):
+
         # -------------------------------------------------------------------------
         async def fetch(
             self, provider_id: str, request: ProviderRequest

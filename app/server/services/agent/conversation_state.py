@@ -27,7 +27,6 @@ from server.domain.agent.runtime import (
 from server.contracts.extraction import TurnParseResult
 from server.contracts.geospatial import MapSession
 
-
 ###############################################################################
 @dataclass
 class _ConversationState:
@@ -38,9 +37,9 @@ class _ConversationState:
     runtime_state: AgentThreadState | None = None
     updated_at: datetime = field(default_factory=utc_now)
 
-
 ###############################################################################
 class ConversationTaskStateService:
+
     # -------------------------------------------------------------------------
     def __init__(self, *, ttl: timedelta = timedelta(hours=6)) -> None:
         self.ttl = ttl

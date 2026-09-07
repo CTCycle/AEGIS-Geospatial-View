@@ -7,14 +7,12 @@ from server.api.chat import get_chat_runtime, router
 from server.common.paths import CHAT_TURN_ROUTE
 from server.contracts.chat import ChatTurnRequest
 
-
 ###############################################################################
 def _app() -> FastAPI:
     application = FastAPI()
     application.include_router(router, prefix="/api")
     application.dependency_overrides[get_chat_runtime] = lambda: object()
     return application
-
 
 ###############################################################################
 def test_chat_turn_requires_conversation_id_over_http() -> None:
@@ -28,7 +26,6 @@ def test_chat_turn_requires_conversation_id_over_http() -> None:
         error["loc"][-1] == "conversation_id" for error in response.json()["detail"]
     )
 
-
 ###############################################################################
 def test_chat_turn_contract_openapi_marks_conversation_id_required() -> None:
     schema = _app().openapi()
@@ -39,14 +36,12 @@ def test_chat_turn_contract_openapi_marks_conversation_id_required() -> None:
     assert "/api/chat/jobs" in schema["paths"]
     assert "/api/chat/stream" in schema["paths"]
 
-
 ###############################################################################
 def test_chat_settings_update_uses_patch_semantics() -> None:
     settings_path = _app().openapi()["paths"]["/api/chat/settings"]
 
     assert "patch" in settings_path
     assert "put" not in settings_path
-
 
 ###############################################################################
 def test_chat_turn_request_rejects_missing_conversation_id() -> None:

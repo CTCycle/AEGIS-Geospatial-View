@@ -26,13 +26,11 @@ APPLICATION_SETTING_BLOCKS = (
     "gibs",
 )
 
-
 ###############################################################################
 def _ensure_mapping(value: Any) -> dict[str, Any]:
     if is_json_object(value):
         return dict(value)
     raise RuntimeError("Configuration setting blocks must be JSON objects.")
-
 
 ###############################################################################
 def _build_settings_payload(raw_payload: dict[str, Any]) -> dict[str, Any]:
@@ -52,9 +50,9 @@ def _build_settings_payload(raw_payload: dict[str, Any]) -> dict[str, Any]:
         for block in APPLICATION_SETTING_BLOCKS
     }
 
-
 ###############################################################################
 class ConfigurationManager:
+
     # -------------------------------------------------------------------------
     def __init__(self, config_path: str | Path = CONFIGURATIONS_FILE) -> None:
         self.config_path = Path(config_path)

@@ -11,9 +11,9 @@ from server.common.constants import (
 from server.contracts.chat import ChatStreamEvent, ChatTurnRequest
 from server.services.jobs import BackgroundJobService
 
-
 ###############################################################################
 class _ChatStreamingStub:
+
     # -------------------------------------------------------------------------
     async def stream_turn(self, payload: ChatTurnRequest):
         yield ChatStreamEvent(event="parsed", data={"request_id": payload.request_id})
@@ -55,7 +55,6 @@ class _ChatStreamingStub:
             },
         )
 
-
 ###############################################################################
 class _MapSessionStub:
     compliance_warnings: list[str] = []
@@ -65,15 +64,14 @@ class _MapSessionStub:
     def model_dump(self, mode: str = "json") -> dict[str, object]:
         return {"conversation_id": "conversation-test"}
 
-
 ###############################################################################
 async def _map_runner(payload):  # noqa: ANN001
     _ = payload
     return _MapSessionStub()
 
-
 ###############################################################################
 class _ChatStreamingFailureStub:
+
     # -------------------------------------------------------------------------
     async def stream_turn(self, payload: ChatTurnRequest):
         yield ChatStreamEvent(
@@ -114,9 +112,9 @@ class _ChatStreamingFailureStub:
             },
         )
 
-
 ###############################################################################
 class _UnexpectedFailureStub:
+
     # -------------------------------------------------------------------------
     async def stream_turn(self, payload: ChatTurnRequest):
         _ = payload
@@ -125,14 +123,12 @@ class _UnexpectedFailureStub:
         )
         yield  # pragma: no cover
 
-
 ###############################################################################
 def _build_service() -> BackgroundJobService:
     return BackgroundJobService(
         chat_streaming_service=_ChatStreamingStub(),
         polling_interval=1.0,
     )
-
 
 ###############################################################################
 def test_create_chat_job_is_idempotent() -> None:
@@ -144,7 +140,6 @@ def test_create_chat_job_is_idempotent() -> None:
     second = service.create_chat_job(request)
     assert first.job_id == second.job_id
     assert first.status == JOB_STATUS_QUEUED
-
 
 ###############################################################################
 def test_cancel_queued_job_marks_it_cancelled() -> None:
@@ -158,7 +153,6 @@ def test_cancel_queued_job_marks_it_cancelled() -> None:
     status = service.get_job(created.job_id)
     assert cancelled is not None and cancelled.success is True
     assert status is not None and status.status == JOB_STATUS_CANCELLED
-
 
 ###############################################################################
 def test_worker_completes_chat_job() -> None:
@@ -181,7 +175,6 @@ def test_worker_completes_chat_job() -> None:
     service.stop()
     assert status is not None
     assert status.status == JOB_STATUS_SUCCEEDED
-
 
 ###############################################################################
 def test_worker_fails_chat_job_when_final_operation_failed() -> None:
@@ -209,7 +202,6 @@ def test_worker_fails_chat_job_when_final_operation_failed() -> None:
     assert status.status == JOB_STATUS_FAILED
     assert status.error_json is not None
     assert status.error_json["operation"]["status"] == "failed"
-
 
 ###############################################################################
 def test_worker_sanitizes_unexpected_exception_details() -> None:

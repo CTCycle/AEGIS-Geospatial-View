@@ -25,7 +25,6 @@ from server.common.constants import (
 from server.common.logger import logger
 from server.configurations import get_server_settings
 
-
 ###############################################################################
 class NominatimService:
     GENERIC_QUERY_DESCRIPTORS = frozenset(

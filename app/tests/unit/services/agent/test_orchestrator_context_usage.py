@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from server.contracts.chat import ChatTurnResponse, ContextUsageResponse
 from server.services.agent.orchestrator import AgentOrchestrator
 
-
 ###############################################################################
 def _usage(
     *,
@@ -32,7 +31,6 @@ def _usage(
         expected_output_tokens=512,
         context_profile_source="provider_metadata",
     )
-
 
 ###############################################################################
 def test_phase_usage_reports_peak_request_and_preserves_all_phase_totals() -> None:
@@ -69,7 +67,6 @@ def test_phase_usage_reports_peak_request_and_preserves_all_phase_totals() -> No
     assert result.context_usage.phases["native_loop"]["reported_input_tokens"] == 1600
     assert result.context_usage.phases["native_loop"]["reported_output_tokens"] == 24
     assert result.context_usage.phases["native_loop"]["peak_request_tokens"] == 900
-
 
 ###############################################################################
 def test_phase_context_limit_is_used_when_initial_sample_is_unknown() -> None:

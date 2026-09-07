@@ -33,9 +33,9 @@ from server.services.llm.types import LLMToolDefinition
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
-
 ###############################################################################
 class AgentToolCatalogService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -929,6 +929,7 @@ class AgentToolCatalogService:
             )
         return resolved
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _has_location_argument(arguments: dict[str, Any]) -> bool:
         return any(
@@ -941,6 +942,7 @@ class AgentToolCatalogService:
             and isinstance(arguments.get("longitude"), (int, float))
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _match_canonical_argument_target(
         arguments: dict[str, Any],

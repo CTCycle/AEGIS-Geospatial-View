@@ -22,10 +22,12 @@ DEFAULT_STAGE_LIMITS: dict[str, float] = {
 }
 
 
+###############################################################################
 def _new_stage_metadata() -> dict[str, Any]:
     return {}
 
 
+###############################################################################
 @dataclass(frozen=True)
 class StageObservation:
     """A bounded stage record; it never contains prompts or provider bodies."""
@@ -38,6 +40,7 @@ class StageObservation:
     timeout_origin: str | None = None
     metadata: dict[str, Any] = field(default_factory=_new_stage_metadata)
 
+    # -------------------------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:
         return {
             "stage": self.stage,
@@ -50,10 +53,12 @@ class StageObservation:
         }
 
 
+###############################################################################
 def _new_stage_observations() -> list[StageObservation]:
     return []
 
 
+###############################################################################
 @dataclass
 class AgentExecutionBudget:
     """One absolute deadline and bounded counters for a complete run."""
@@ -71,6 +76,7 @@ class AgentExecutionBudget:
     retry_count: int = 0
     terminal_reason: str | None = None
 
+    # -------------------------------------------------------------------------
     def __post_init__(self) -> None:
         if self.total_seconds <= 0:
             raise ValueError("total_seconds must be positive")
@@ -78,9 +84,11 @@ class AgentExecutionBudget:
 
     deadline_monotonic: float = field(init=False)
 
+    # -------------------------------------------------------------------------
     def remaining_seconds(self) -> float:
         return max(0.0, self.deadline_monotonic - time.monotonic())
 
+    # -------------------------------------------------------------------------
     def stage_deadline(
         self, stage: str, *, requested_seconds: float | None = None
     ) -> float:
@@ -92,20 +100,25 @@ class AgentExecutionBudget:
             return time.monotonic() + remaining
         return time.monotonic() + min(max(0.0, limit), remaining)
 
+    # -------------------------------------------------------------------------
     def ensure_available(self, stage: str) -> None:
         if self.remaining_seconds() <= 0.0:
             self.terminal_reason = "run_deadline_exhausted"
             raise TimeoutError(f"The agent run deadline expired before {stage}.")
 
+    # -------------------------------------------------------------------------
     def record_model_call(self) -> None:
         self.model_calls += 1
 
+    # -------------------------------------------------------------------------
     def record_tool_call(self) -> None:
         self.tool_calls += 1
 
+    # -------------------------------------------------------------------------
     def record_retry(self) -> None:
         self.retry_count += 1
 
+    # -------------------------------------------------------------------------
     @contextmanager
     def observe(
         self,
@@ -164,6 +177,7 @@ class AgentExecutionBudget:
                 )
             )
 
+    # -------------------------------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
         return {
             "total_budget_ms": int(self.total_seconds * 1000),

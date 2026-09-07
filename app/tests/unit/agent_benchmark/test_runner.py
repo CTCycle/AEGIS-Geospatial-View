@@ -9,7 +9,6 @@ from tests.agent_benchmark.runner import (
     run_manifest,
 )
 
-
 ###############################################################################
 def test_model_lane_evaluates_structured_tool_and_map_evidence() -> None:
     scenario = {"assertions": ["air_quality_tool", "rendered_map", "valid_arguments"]}
@@ -45,7 +44,6 @@ def test_model_lane_evaluates_structured_tool_and_map_evidence() -> None:
     assert evaluation["passed"] is True
     assert evaluation["duplicate_tool_calls"] == 0
 
-
 ###############################################################################
 def test_model_lane_scores_ambiguous_location_clarification() -> None:
     evaluation = evaluate_model_scenario(
@@ -66,7 +64,6 @@ def test_model_lane_scores_ambiguous_location_clarification() -> None:
     )
 
     assert evaluation["passed"] is True
-
 
 ###############################################################################
 def test_model_lane_evaluates_matrix_properties_without_exact_answer_matching() -> None:
@@ -127,7 +124,6 @@ def test_model_lane_evaluates_matrix_properties_without_exact_answer_matching() 
     assert evaluation["passed"] is True
     assert all(item["passed"] for item in evaluation["assertions"])
 
-
 ###############################################################################
 def test_model_lane_accepts_first_class_location_provider_evidence() -> None:
     evaluation = evaluate_model_scenario(
@@ -181,7 +177,6 @@ def test_model_lane_accepts_first_class_location_provider_evidence() -> None:
     assert evaluation["tool_calls"] == 0
     assert evaluation["provider_events"] == 1
     assert evaluation["execution_evidence"] == 1
-
 
 ###############################################################################
 def test_model_lane_accepts_explicit_coordinate_grounding_without_provider_call() -> None:
@@ -241,7 +236,6 @@ def test_model_lane_accepts_explicit_coordinate_grounding_without_provider_call(
     assert evaluation["passed"] is True
     assert evaluation["provider_events"] == 0
     assert evaluation["execution_evidence"] == 1
-
 
 ###############################################################################
 def test_model_lane_does_not_count_model_invented_coordinates_as_grounding() -> None:
@@ -304,7 +298,6 @@ def test_model_lane_does_not_count_model_invented_coordinates_as_grounding() -> 
         for item in evaluation["assertions"]
     )
 
-
 ###############################################################################
 def test_model_lane_accepts_safe_clarification_for_allowed_location_outcome() -> None:
     evaluation = evaluate_model_scenario(
@@ -353,7 +346,6 @@ def test_model_lane_accepts_safe_clarification_for_allowed_location_outcome() ->
 
     assert evaluation["passed"] is True
 
-
 ###############################################################################
 def test_model_lane_rejects_unexplained_unbacked_answer() -> None:
     evaluation = evaluate_model_scenario(
@@ -390,7 +382,6 @@ def test_model_lane_rejects_unexplained_unbacked_answer() -> None:
     )
     assert grounding["passed"] is False
     assert evaluation["passed"] is False
-
 
 ###############################################################################
 def test_model_lane_checks_context_peak_and_phase_invariants() -> None:
@@ -433,7 +424,6 @@ def test_model_lane_checks_context_peak_and_phase_invariants() -> None:
 
     assert evaluation["passed"] is True
 
-
 ###############################################################################
 def test_model_lane_rejects_unknown_cap_determinate_percentage() -> None:
     evaluation = evaluate_model_scenario(
@@ -454,7 +444,6 @@ def test_model_lane_rejects_unknown_cap_determinate_percentage() -> None:
     )
 
     assert evaluation["passed"] is False
-
 
 ###############################################################################
 def test_model_lane_rejects_parent_downgrade_and_center_mismatch() -> None:
@@ -483,7 +472,6 @@ def test_model_lane_rejects_parent_downgrade_and_center_mismatch() -> None:
 
     assert evaluation["passed"] is False
 
-
 ###############################################################################
 def test_model_lane_requires_categorized_failures_and_no_false_success() -> None:
     evaluation = evaluate_model_scenario(
@@ -505,7 +493,6 @@ def test_model_lane_requires_categorized_failures_and_no_false_success() -> None
     )
 
     assert evaluation["passed"] is True
-
 
 ###############################################################################
 def test_model_lane_checks_ambiguous_clarification_and_deadline() -> None:
@@ -543,7 +530,6 @@ def test_model_lane_checks_ambiguous_clarification_and_deadline() -> None:
 
     assert evaluation["passed"] is True
 
-
 ###############################################################################
 def test_live_lane_blocks_provider_failure_without_blocking_verified_map_success() -> None:
     assert _live_provider_block_reason(
@@ -570,7 +556,6 @@ def test_live_lane_blocks_provider_failure_without_blocking_verified_map_success
             },
         }
     ) is None
-
 
 ###############################################################################
 def test_scripted_fault_lane_is_provider_independent(tmp_path: Path) -> None:

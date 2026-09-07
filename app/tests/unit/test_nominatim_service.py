@@ -6,7 +6,6 @@ from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.nominatim import NominatimService
 
-
 ###############################################################################
 def test_nominatim_rank_candidates_prefers_poi_when_expected() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -53,7 +52,6 @@ def test_nominatim_rank_candidates_prefers_poi_when_expected() -> None:
     assert ranked[0]["source_url"].endswith("/search")
     assert ranked[0]["fetched_at"] == "2026-09-01T10:00:00+00:00"
 
-
 ###############################################################################
 def test_nominatim_rank_candidates_preserves_named_river_semantics() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -88,7 +86,6 @@ def test_nominatim_rank_candidates_preserves_named_river_semantics() -> None:
     assert ranked
     assert ranked[0]["selected_result_type"] == "river"
     assert ranked[0]["selected_result_class"] == "waterway"
-
 
 ###############################################################################
 def test_nominatim_rank_candidates_prefers_city_boundary_over_parent_region() -> None:
@@ -133,7 +130,6 @@ def test_nominatim_rank_candidates_prefers_city_boundary_over_parent_region() ->
 
     assert ranked[0]["lat"] == 12.3
 
-
 ###############################################################################
 def test_nominatim_uses_localized_city_name_metadata_before_parent_result() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -174,7 +170,6 @@ def test_nominatim_uses_localized_city_name_metadata_before_parent_result() -> N
 
     assert ranked[0]["lat"] == 19.43
 
-
 ###############################################################################
 def test_nominatim_surfaces_unqualified_same_level_city_ambiguity() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -214,7 +209,6 @@ def test_nominatim_surfaces_unqualified_same_level_city_ambiguity() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_nominatim_accepts_a_dominant_unqualified_city_candidate() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -247,7 +241,6 @@ def test_nominatim_accepts_a_dominant_unqualified_city_candidate() -> None:
         query="Rome",
         has_parent_context=False,
     ) == []
-
 
 ###############################################################################
 def test_nominatim_deduplicates_city_boundary_and_centroid() -> None:
@@ -301,7 +294,6 @@ def test_nominatim_deduplicates_city_boundary_and_centroid() -> None:
     assert len(ranked) == 2
     assert "ambiguous_candidates" not in ranked[0]
 
-
 ###############################################################################
 def test_nominatim_prepares_language_and_name_metadata_for_validation() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -337,7 +329,6 @@ def test_nominatim_prepares_language_and_name_metadata_for_validation() -> None:
     run_async_in_thread(_run())
     assert captured["namedetails"] == "1"
     assert captured["accept-language"] == "en"
-
 
 ###############################################################################
 def test_nominatim_retries_generic_named_target_with_bounded_acronym_variant() -> None:
@@ -381,7 +372,6 @@ def test_nominatim_retries_generic_named_target_with_bounded_acronym_variant() -
         "ncrc, Noordwijk, Netherlands",
     ]
 
-
 ###############################################################################
 def test_nominatim_rejects_partial_acronym_child_for_named_target() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -408,7 +398,6 @@ def test_nominatim_rejects_partial_acronym_child_for_named_target() -> None:
     )
 
     assert ranked == []
-
 
 ###############################################################################
 def test_nominatim_district_ranking_rejects_nearby_child_features() -> None:

@@ -33,7 +33,6 @@ from server.services.llm.types import (
     ModelDescriptor,
 )
 
-
 ###############################################################################
 class OpenAIProvider(LLMProvider):
     provider_name = "openai"

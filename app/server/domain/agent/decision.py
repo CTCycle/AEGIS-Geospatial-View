@@ -11,7 +11,6 @@ from server.domain.agent.actions import AgentAction
 PlanState = Literal["clarify", "direct_response", "direct_tool", "map_search", "reject"]
 ExecutionMode = Literal["direct_text", "map"]
 
-
 ###############################################################################
 class ClarificationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -19,7 +18,6 @@ class ClarificationRequest(BaseModel):
     question: str
     reason: str
     missing_fields: list[str] = Field(default_factory=lambda: list[str]())
-
 
 ###############################################################################
 class LocationResolutionProvenance(BaseModel):
@@ -32,7 +30,6 @@ class LocationResolutionProvenance(BaseModel):
     fetched_at: datetime = Field(default_factory=utc_now)
     result_status: str = "ok"
     result_type: str = "location"
-
 
 ###############################################################################
 class LocationHierarchyEntry(BaseModel):
@@ -47,7 +44,6 @@ class LocationHierarchyEntry(BaseModel):
     source: str = "text"
     canonical_label: str | None = None
 
-
 ###############################################################################
 class LocationHierarchy(BaseModel):
     """The single target and its geographic parent context."""
@@ -59,7 +55,6 @@ class LocationHierarchy(BaseModel):
         default_factory=list[LocationHierarchyEntry]
     )
 
-
 ###############################################################################
 class CapabilityCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -70,7 +65,6 @@ class CapabilityCandidate(BaseModel):
     score: float = 0.0
     supports_map: bool = True
     supports_direct_text: bool = False
-
 
 ###############################################################################
 class ResolvedLocation(BaseModel):
@@ -91,7 +85,6 @@ class ResolvedLocation(BaseModel):
     provenance: LocationResolutionProvenance | None = None
     hierarchy: LocationHierarchy | None = None
 
-
 ###############################################################################
 class ExecutionPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -109,7 +102,6 @@ class ExecutionPlan(BaseModel):
     overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
     tool_id: str | None = None
 
-
 ###############################################################################
 class AgentToolCallPlanItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -117,7 +109,6 @@ class AgentToolCallPlanItem(BaseModel):
     tool_name: str
     reason: str
     required: bool = True
-
 
 ###############################################################################
 class AgentDecision(BaseModel):
@@ -132,13 +123,11 @@ class AgentDecision(BaseModel):
     requires_clarification: bool = False
     clarification_question: str | None = None
 
-
 ###############################################################################
 class DecisionTrace(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     steps: list[str] = Field(default_factory=lambda: list[str]())
-
 
 ###############################################################################
 class PolicyDecision(BaseModel):

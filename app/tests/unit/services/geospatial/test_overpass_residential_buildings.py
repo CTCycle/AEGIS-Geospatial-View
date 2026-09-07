@@ -6,7 +6,6 @@ from server.services.geospatial.overpass import OverpassService
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.overpass import OverpassProvider
 
-
 ###############################################################################
 class _BuildingService:
     default_radius_m = 1500.0
@@ -32,7 +31,6 @@ class _BuildingService:
             ],
         }
 
-
 ###############################################################################
 def test_overpass_provider_routes_residential_capability_separately() -> None:
     async def _run() -> None:
@@ -47,7 +45,6 @@ def test_overpass_provider_routes_residential_capability_separately() -> None:
         assert "OpenStreetMap" in response.attribution[0]
 
     run_async_in_thread(_run())
-
 
 ###############################################################################
 def test_residential_building_normalization_rejects_non_polygons() -> None:

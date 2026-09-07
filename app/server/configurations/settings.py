@@ -15,13 +15,11 @@ from server.common.constants import (
 )
 from server.common.paths import resolve_database_file_path
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class DatabaseSettings:
     database_path: str
     sqlite_lock_timeout_seconds: int = DEFAULT_SQLITE_LOCK_TIMEOUT_SECONDS
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -29,7 +27,6 @@ class NominatimSettings:
     base_url: str
     user_agent: str
     timeout: float
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -41,7 +38,6 @@ class GeospatialSettings:
     min_lon: float
     max_mercator_extent: float
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class MapSettings:
@@ -49,12 +45,10 @@ class MapSettings:
     render_delay_s: float
     tiles: str
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class JobsSettings:
     polling_interval: float
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -63,7 +57,6 @@ class ChatRuntimeSettings:
     parser_certainty_threshold: float
     parser_max_retries: int
     application_timezone: str = "UTC"
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -74,7 +67,6 @@ class OpenMeteoSettings:
     timeout: float
     cache_ttl_s: float
     min_call_interval_s: float
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -87,7 +79,6 @@ class OverpassSettings:
     default_radius_m: float
     default_limit: int
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class RainViewerSettings:
@@ -99,7 +90,6 @@ class RainViewerSettings:
     tile_color_scheme: int
     tile_smooth: int
     tile_snow: int
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -121,7 +111,6 @@ class GIBSSettings:
     layer_sync_user_agent: str
     layer_sync_timeout: float
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ServerSettings:
@@ -136,18 +125,15 @@ class ServerSettings:
     rainviewer: RainViewerSettings
     gibs: GIBSSettings
 
-
 ###############################################################################
 class StrictJsonSettings(BaseModel):
     model_config = SettingsConfigDict(extra="forbid")
-
 
 ###############################################################################
 class JsonNominatimSettings(StrictJsonSettings):
     base_url: str
     user_agent: str
     timeout: float = Field(ge=1.0)
-
 
 ###############################################################################
 class JsonGeospatialSettings(StrictJsonSettings):
@@ -158,18 +144,15 @@ class JsonGeospatialSettings(StrictJsonSettings):
     min_lon: float
     max_mercator_extent: float
 
-
 ###############################################################################
 class JsonMapSettings(StrictJsonSettings):
     default_size_m: float = Field(ge=1.0)
     render_delay_s: float = Field(ge=0.0)
     tiles: str
 
-
 ###############################################################################
 class JsonJobsSettings(StrictJsonSettings):
     polling_interval: float
-
 
 ###############################################################################
 class JsonChatRuntimeSettings(StrictJsonSettings):
@@ -177,7 +160,6 @@ class JsonChatRuntimeSettings(StrictJsonSettings):
     parser_certainty_threshold: float = Field(ge=0.0, le=1.0)
     parser_max_retries: int = Field(ge=0, le=5)
     application_timezone: str = "UTC"
-
 
 ###############################################################################
 class JsonOpenMeteoSettings(StrictJsonSettings):
@@ -187,7 +169,6 @@ class JsonOpenMeteoSettings(StrictJsonSettings):
     timeout: float = Field(ge=1.0)
     cache_ttl_s: float = Field(ge=30.0)
     min_call_interval_s: float = Field(ge=0.05)
-
 
 ###############################################################################
 class JsonOverpassSettings(StrictJsonSettings):
@@ -199,7 +180,6 @@ class JsonOverpassSettings(StrictJsonSettings):
     default_radius_m: float = Field(ge=100.0)
     default_limit: int = Field(ge=1, le=200)
 
-
 ###############################################################################
 class JsonRainViewerSettings(StrictJsonSettings):
     metadata_url: str
@@ -210,7 +190,6 @@ class JsonRainViewerSettings(StrictJsonSettings):
     tile_color_scheme: int = Field(ge=0, le=6)
     tile_smooth: int = Field(ge=0, le=1)
     tile_snow: int = Field(ge=0, le=1)
-
 
 ###############################################################################
 class JsonGIBSSettings(StrictJsonSettings):
@@ -238,7 +217,6 @@ class JsonGIBSSettings(StrictJsonSettings):
     layer_sync_user_agent: str
     layer_sync_timeout: float = Field(ge=1.0)
 
-
 ###############################################################################
 def _read_env_text(name: str) -> str | None:
     value = os.getenv(name)
@@ -246,7 +224,6 @@ def _read_env_text(name: str) -> str | None:
         return None
     text = value.strip()
     return text or None
-
 
 ###############################################################################
 def _read_env_int(name: str) -> int | None:
@@ -257,7 +234,6 @@ def _read_env_int(name: str) -> int | None:
         return int(value)
     except ValueError as exc:
         raise RuntimeError(f"Invalid integer value for {name}: {value}") from exc
-
 
 ###############################################################################
 def build_database_settings() -> DatabaseSettings:
@@ -270,7 +246,6 @@ def build_database_settings() -> DatabaseSettings:
         database_path=str(resolve_database_file_path()),
         sqlite_lock_timeout_seconds=timeout_seconds,
     )
-
 
 ###############################################################################
 class AppSettings(BaseSettings):
@@ -390,7 +365,6 @@ class AppSettings(BaseSettings):
             ),
         )
 
-
 ###############################################################################
 def _normalize_upper_key_mapping(
     mapping: dict[str, str],
@@ -402,7 +376,6 @@ def _normalize_upper_key_mapping(
         if k and v:
             normalized[k] = v
     return normalized
-
 
 ###############################################################################
 def _normalize_key_mapping(

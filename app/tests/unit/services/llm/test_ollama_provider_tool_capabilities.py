@@ -7,7 +7,6 @@ from server.prompts.providers import OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.types import LLMToolDefinition
 
-
 ###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
@@ -16,12 +15,12 @@ def _tool() -> LLMToolDefinition:
         parameters_json_schema={"type": "object", "properties": {}},
     )
 
-
 ###############################################################################
 def test_ollama_uses_show_capabilities_when_present() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
+
         # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             assert path == "/api/show"
@@ -34,12 +33,12 @@ def test_ollama_uses_show_capabilities_when_present() -> None:
     assert provider.supports_structured_output("llama") is True
     assert "structured_output" in provider.get_model_capabilities("llama")
 
-
 ###############################################################################
 def test_ollama_tag_capabilities_include_structured_output() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
+
         # -------------------------------------------------------------------------
         def _get_json(self, path: str):
             assert path == "/api/tags"
@@ -59,7 +58,6 @@ def test_ollama_tag_capabilities_include_structured_output() -> None:
     assert "structured_output" in model.capabilities
     assert "tools" in model.capabilities
 
-
 ###############################################################################
 def test_ollama_structured_requests_allow_the_longer_local_inference_window() -> None:
     provider = OllamaProvider(base_url="http://ollama.test")
@@ -67,12 +65,12 @@ def test_ollama_structured_requests_allow_the_longer_local_inference_window() ->
     assert provider._STRUCTURED_REQUEST_TIMEOUT_SECONDS == 90
     assert provider._DEFAULT_REQUEST_TIMEOUT_SECONDS == 30
 
-
 ###############################################################################
 def test_ollama_falls_back_to_probe_when_show_capabilities_absent() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
+
         # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             if path == "/api/show":
@@ -97,12 +95,12 @@ def test_ollama_falls_back_to_probe_when_show_capabilities_absent() -> None:
     assert provider.supports_tools("llama") is True
     assert provider._tool_support_source("llama") == "ollama_probe"
 
-
 ###############################################################################
 def test_ollama_accepts_successful_tool_request_without_tool_call() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
+
         # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             if path == "/api/show":
@@ -115,12 +113,12 @@ def test_ollama_accepts_successful_tool_request_without_tool_call() -> None:
     assert provider.supports_tools("llama") is True
     assert provider._tool_support_source("llama") == "ollama_tool_request_accepted"
 
-
 ###############################################################################
 def test_ollama_tool_probe_uses_canonical_prompt() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
+
         # -------------------------------------------------------------------------
         def __init__(self) -> None:
             super().__init__(base_url="http://ollama-canonical-probe.test")
@@ -142,12 +140,12 @@ def test_ollama_tool_probe_uses_canonical_prompt() -> None:
         == OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT
     )
 
-
 ###############################################################################
 def test_ollama_rejects_explicit_unsupported_tool_error() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
+
         # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             if path == "/api/show":
@@ -166,12 +164,12 @@ def test_ollama_rejects_explicit_unsupported_tool_error() -> None:
     assert provider.supports_tools("plain") is False
     assert provider._tool_support_source("plain") == "ollama_tool_request_rejected"
 
-
 ###############################################################################
 def test_ollama_keeps_transport_probe_failure_unknown() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
+
         # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             if path == "/api/show":
@@ -183,19 +181,18 @@ def test_ollama_keeps_transport_probe_failure_unknown() -> None:
     assert provider.supports_tools("plain") is None
     assert "tools" not in provider.get_model_capabilities("plain")
 
-
 ###############################################################################
 def test_ollama_emits_native_tool_result_message_format() -> None:
     schema = OllamaProvider.tool_to_ollama_schema(_tool())
     assert schema["type"] == "function"
     assert schema["function"]["name"] == "execute_geospatial_capability"
 
-
 ###############################################################################
 def test_ollama_reads_context_window_only_from_show_metadata() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
+
         # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             assert path == "/api/show"
@@ -214,12 +211,12 @@ def test_ollama_reads_context_window_only_from_show_metadata() -> None:
         "context_profile_source": "ollama_show_model_info",
     }
 
-
 ###############################################################################
 def test_ollama_does_not_infer_context_from_missing_or_malformed_metadata() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
+
         # -------------------------------------------------------------------------
         def __init__(self, payload: dict):
             super().__init__(base_url="http://ollama-context-empty.test")

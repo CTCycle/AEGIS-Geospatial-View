@@ -3,9 +3,10 @@ from server.services.agent.instruction_state import ConversationInstructionServi
 from server.services.llm.types import ModelContextProfile
 from server.services.llm.context_budget import estimate_json_tokens
 
-
 ###############################################################################
 class _ExplicitProfileResolver:
+
+    # -------------------------------------------------------------------------
     def resolve(self, provider: str, model: str) -> ModelContextProfile:  # noqa: ARG002
         if model == "4k-local":
             return ModelContextProfile(
@@ -25,7 +26,6 @@ class _ExplicitProfileResolver:
             metadata_source="provider_metadata",
         )
 
-
 ###############################################################################
 def _messages(count: int) -> list[dict]:
     return [
@@ -37,7 +37,6 @@ def _messages(count: int) -> list[dict]:
         }
         for i in range(1, count + 1)
     ]
-
 
 ###############################################################################
 def test_known_model_profiles_drive_compaction_without_unknown_fallback() -> None:
@@ -57,7 +56,6 @@ def test_known_model_profiles_drive_compaction_without_unknown_fallback() -> Non
     assert small.conversation_summary is not None
     assert small.omitted_message_ids
 
-
 ###############################################################################
 def test_durable_instruction_is_scoped_and_deduplicated() -> None:
     service = ConversationInstructionService()
@@ -71,7 +69,6 @@ def test_durable_instruction_is_scoped_and_deduplicated() -> None:
     assert len(service.active(repeated)) == 1
     assert service.active(repeated)[0].source_turn_index == 1
     assert service.active([]) == []
-
 
 ###############################################################################
 def test_later_conflicting_instruction_supersedes_prior_directive() -> None:
@@ -87,6 +84,7 @@ def test_later_conflicting_instruction_supersedes_prior_directive() -> None:
     assert any(item.status == "superseded" for item in directives)
 
 
+###############################################################################
 def test_oversized_newest_history_is_compacted_without_losing_location_state() -> None:
     location = {"active_location": {"name": "Rome", "lat": 41.9, "lon": 12.5}}
     package = AgentContextAssembler(_ExplicitProfileResolver()).assemble(
@@ -104,6 +102,7 @@ def test_oversized_newest_history_is_compacted_without_losing_location_state() -
     assert estimate_json_tokens(package.model_dump(mode="json")) < 3072
 
 
+###############################################################################
 def test_unknown_model_history_is_bounded_and_excludes_renderer_payloads() -> None:
     for turns in (10, 25, 50):
         messages = _messages(turns)

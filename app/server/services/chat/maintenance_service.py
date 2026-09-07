@@ -15,7 +15,6 @@ from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCach
 
 OllamaProviderFactory = Callable[[str, OllamaToolCapabilityCache], OllamaProvider]
 
-
 ###############################################################################
 def create_ollama_provider(
     base_url: str,
@@ -26,9 +25,9 @@ def create_ollama_provider(
         tool_capability_cache=tool_capability_cache,
     )
 
-
 ###############################################################################
 class ChatMaintenanceService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

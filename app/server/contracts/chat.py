@@ -21,7 +21,6 @@ from server.contracts.geospatial import MapSession
 ChatRole = Literal["user", "assistant", "system", "tool"]
 ModelProviderMode = Literal["local", "cloud"]
 
-
 ###############################################################################
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -29,7 +28,6 @@ class ChatMessage(BaseModel):
     role: ChatRole
     content: str
     created_at: datetime = Field(default_factory=utc_now)
-
 
 ###############################################################################
 class ChatTurnRequest(BaseModel):
@@ -45,7 +43,6 @@ class ChatTurnRequest(BaseModel):
     # browser acknowledges the exact rendered revision.  Direct API callers
     # retain the historical immediate-commit behavior by default.
     defer_map_commit: bool = False
-
 
 ###############################################################################
 class ContextUsageResponse(BaseModel):
@@ -78,7 +75,6 @@ class ContextUsageResponse(BaseModel):
     total_input_tokens: int | None = None
     total_output_tokens: int | None = None
 
-
 ###############################################################################
 class ChatOperationResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -108,7 +104,6 @@ class ChatOperationResult(BaseModel):
         | None
     ) = None
 
-
 ###############################################################################
 class ChatTurnResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -131,7 +126,6 @@ class ChatTurnResponse(BaseModel):
     execution_trace: dict[str, Any] | None = None
     canonical_request: CanonicalRequestInterpretation | None = None
 
-
 ###############################################################################
 class ChatStreamEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -149,7 +143,6 @@ class ChatStreamEvent(BaseModel):
         "error",
     ]
     data: dict[str, Any]
-
 
 ###############################################################################
 class ModelCardDescriptor(BaseModel):
@@ -170,7 +163,6 @@ class ModelCardDescriptor(BaseModel):
     context_profile_source: str = "unknown"
     metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
-
 ###############################################################################
 class ModelLibrarySourceStatus(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -179,7 +171,6 @@ class ModelLibrarySourceStatus(BaseModel):
     reachable: bool | None = None
     message: str | None = None
     model_count: int | None = None
-
 
 ###############################################################################
 class SelectedModelContextResponse(BaseModel):
@@ -190,7 +181,6 @@ class SelectedModelContextResponse(BaseModel):
     context_window_tokens: int | None = None
     maximum_output_tokens: int | None = None
     context_profile_source: str = "unknown"
-
 
 ###############################################################################
 class ModelSettingsResponse(BaseModel):
@@ -209,7 +199,6 @@ class ModelSettingsResponse(BaseModel):
     )
     selected_model_context: SelectedModelContextResponse
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ModelSettingsSnapshot:
@@ -223,7 +212,6 @@ class ModelSettingsSnapshot:
     openai_base_url: str | None
     google_base_url: str | None
     deepseek_base_url: str | None
-
 
 ###############################################################################
 class ModelSettingsUpdateRequest(BaseModel):
@@ -267,7 +255,6 @@ class ModelSettingsUpdateRequest(BaseModel):
             raise ValueError("Base URL must start with http:// or https://")
         return normalized
 
-
 ###############################################################################
 class ModelLibraryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -282,7 +269,6 @@ class ModelLibraryResponse(BaseModel):
         default_factory=lambda: dict[str, ModelLibrarySourceStatus]()
     )
 
-
 ###############################################################################
 class OllamaRefreshResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -294,18 +280,15 @@ class OllamaRefreshResponse(BaseModel):
         default_factory=lambda: list[ModelCardDescriptor]()
     )
 
-
 ###############################################################################
 class OllamaPullRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model: str
 
-
 ###############################################################################
 class OllamaPullResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
-
 
 ###############################################################################
 class OllamaHealthResponse(BaseModel):

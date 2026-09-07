@@ -32,6 +32,7 @@ SpatialRelationship = Literal[
 ]
 
 
+###############################################################################
 def normalize_target_key(value: str) -> str:
     """Return the stable key shared by interpretation and location resolution.
 
@@ -60,6 +61,7 @@ ResolutionStatus = Literal["resolved", "inherited", "ambiguous", "unresolved"]
 CompletionStatus = Literal["pending", "satisfied", "failed", "not_applicable"]
 
 
+###############################################################################
 class CanonicalTarget(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -73,6 +75,7 @@ class CanonicalTarget(BaseModel):
     peer: bool = False
 
 
+###############################################################################
 class CanonicalSpatialConstraint(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -84,6 +87,7 @@ class CanonicalSpatialConstraint(BaseModel):
     provenance: Literal["explicit", "parser", "inherited", "viewport"] = "parser"
 
 
+###############################################################################
 class CanonicalTemporalConstraints(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -99,6 +103,7 @@ class CanonicalTemporalConstraints(BaseModel):
     resolved_once: bool = False
 
 
+###############################################################################
 class CanonicalPresentation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -112,6 +117,7 @@ class CanonicalPresentation(BaseModel):
     show_legend: bool = True
 
 
+###############################################################################
 class CompletionRequirement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -123,6 +129,7 @@ class CompletionRequirement(BaseModel):
     failure_code: str | None = None
 
 
+###############################################################################
 class CanonicalRequestInterpretation(BaseModel):
     """The single request interpretation consumed after parsing."""
 
@@ -152,11 +159,13 @@ class CanonicalRequestInterpretation(BaseModel):
     )
     assumptions: list[str] = Field(default_factory=list)
 
+    # -------------------------------------------------------------------------
     @property
     def primary_target(self) -> CanonicalTarget | None:
         """Return the first non-peer target without maintaining a second copy."""
 
         return next((target for target in self.targets if not target.peer), None)
 
+    # -------------------------------------------------------------------------
     def target(self, target_id: str) -> CanonicalTarget | None:
         return next((item for item in self.targets if item.target_id == target_id), None)

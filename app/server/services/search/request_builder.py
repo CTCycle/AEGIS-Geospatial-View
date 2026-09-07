@@ -22,7 +22,6 @@ from server.contracts.geospatial import (
 )
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
-
 ###############################################################################
 class RequestBuilder:
     DEFAULT_RADIUS_M = 2500.0
@@ -235,6 +234,7 @@ class RequestBuilder:
         )
         return request
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _canonical_analysis_bbox(
         *,

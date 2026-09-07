@@ -23,6 +23,7 @@ from server.domain.agent.interpretation import (
 FLOOD_COMPARISON_AMBIGUITY = "flood_comparison_requires_comparable_semantics"
 
 
+###############################################################################
 class RequestInterpreter:
     """Compile once; downstream services must consume this value verbatim."""
 
@@ -59,6 +60,7 @@ class RequestInterpreter:
         "deictic": 0,
     }
 
+    # -------------------------------------------------------------------------
     def compile(
         self,
         *,
@@ -345,10 +347,12 @@ class RequestInterpreter:
             assumptions=assumptions,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _key(value: str) -> str:
         return normalize_target_key(value)
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _is_flood_comparison(
         cls,
@@ -366,6 +370,7 @@ class RequestInterpreter:
             for domain in data_domains
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _is_comparison_operation(cls, operation: str) -> bool:
         operation_key = cls._key(str(operation))
@@ -376,6 +381,7 @@ class RequestInterpreter:
             or "comparison" in operation_key
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _compile_temporal_constraints(
         cls,
@@ -441,6 +447,7 @@ class RequestInterpreter:
             resolved_once=resolved_once,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _select_timezone(
         client_timezone: str | None,
@@ -459,6 +466,7 @@ class RequestInterpreter:
                 continue
         return ZoneInfo("UTC"), "UTC", "utc"
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _coerce_request_datetime(value: str | datetime | None) -> datetime:
         if isinstance(value, datetime):
@@ -474,6 +482,7 @@ class RequestInterpreter:
             return result.replace(tzinfo=UTC)
         return result
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _relative_bounds(raw_text: str, base: datetime) -> tuple[str, str] | None:
         local_date = base.date()
@@ -505,6 +514,7 @@ class RequestInterpreter:
                 return (base - timedelta(days=days)).isoformat(), base.isoformat()
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _normalize_boundary(
         value: str | None,
@@ -527,6 +537,7 @@ class RequestInterpreter:
             parsed += timedelta(days=1)
         return parsed.isoformat()
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _dedupe(values: list[str]) -> list[str]:
         return list(dict.fromkeys(item.strip() for item in values if item and item.strip()))

@@ -18,7 +18,6 @@ from server.services.geospatial.providers.http import (
 )
 from server.services.geospatial.spatial_constraints import geodesic_distance_m
 
-
 ###############################################################################
 class USGSProvider(GeospatialProvider):
     provider_id = "usgs"
@@ -124,7 +123,6 @@ class USGSProvider(GeospatialProvider):
             result_type="metadata",
         )
 
-
 ###############################################################################
 def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
     if not is_json_object(payload):
@@ -166,7 +164,6 @@ def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
             }
         )
     return features
-
 
 ###############################################################################
 def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
@@ -218,7 +215,6 @@ def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
         )
     return features
 
-
 ###############################################################################
 def _float_or_none(value: object) -> float | None:
     if not isinstance(value, int | float | str):
@@ -228,7 +224,6 @@ def _float_or_none(value: object) -> float | None:
     except TypeError, ValueError:
         return None
     return number if math.isfinite(number) else None
-
 
 ###############################################################################
 def _valid_coordinates(latitude: object, longitude: object) -> bool:
@@ -242,7 +237,6 @@ def _valid_coordinates(latitude: object, longitude: object) -> bool:
         and -90.0 <= float(latitude) <= 90.0
         and -180.0 <= float(longitude) <= 180.0
     )
-
 
 ###############################################################################
 def _filter_features_to_bbox(
@@ -268,7 +262,6 @@ def _filter_features_to_bbox(
         ):
             filtered.append(feature)
     return filtered
-
 
 ###############################################################################
 def _filter_features_to_radius(

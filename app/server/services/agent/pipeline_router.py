@@ -3,9 +3,9 @@ from __future__ import annotations
 from server.domain.agent.pipeline import SpecialistGroup
 from server.contracts.extraction import TurnParseResult
 
-
 ###############################################################################
 class DeterministicAgentRouter:
+
     # -------------------------------------------------------------------------
     def select_specialist(self, turn: TurnParseResult) -> SpecialistGroup:
         if turn.relationship == "failure_inquiry":

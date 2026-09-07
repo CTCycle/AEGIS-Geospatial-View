@@ -4,9 +4,9 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 class _CredentialRepo:
+
     # -------------------------------------------------------------------------
     def __init__(self, present: bool) -> None:
         self.present = present
@@ -17,7 +17,6 @@ class _CredentialRepo:
             return object()
         return None
 
-
 ###############################################################################
 def test_runtime_registry_reads_profiles() -> None:
     registry = RuntimeRegistry(
@@ -27,7 +26,6 @@ def test_runtime_registry_reads_profiles() -> None:
     snapshot = registry.build_snapshot()
     assert "osm_default" in snapshot.profiles
     assert registry.is_enabled("osm_default")
-
 
 ###############################################################################
 def test_runtime_profiles_cover_all_capabilities() -> None:
@@ -53,7 +51,6 @@ def test_runtime_profiles_cover_all_capabilities() -> None:
     )
     assert not missing
 
-
 ###############################################################################
 def test_key_required_providers_are_unavailable_without_saved_credentials(
     monkeypatch,
@@ -68,7 +65,6 @@ def test_key_required_providers_are_unavailable_without_saved_credentials(
     assert not registry.credentials_present("tomtom_traffic_flow")
     assert registry.provider_health("tomtom_traffic_flow") == "missing_credentials"
 
-
 ###############################################################################
 def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
@@ -82,6 +78,7 @@ def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
     assert registry.provider_health("tomtom_traffic_flow") == "healthy"
 
 
+###############################################################################
 def test_restricted_capability_is_disabled_without_explicit_opt_in(monkeypatch) -> None:
     monkeypatch.delenv("AEGIS_ALLOW_RESTRICTED_SOURCES", raising=False)
     registry = RuntimeRegistry(
@@ -93,6 +90,7 @@ def test_restricted_capability_is_disabled_without_explicit_opt_in(monkeypatch) 
     assert registry.provider_health("openmeteo_elevation") == "disabled"
 
 
+###############################################################################
 def test_restricted_capability_requires_explicit_opt_in(monkeypatch) -> None:
     monkeypatch.setenv("AEGIS_ALLOW_RESTRICTED_SOURCES", "true")
     registry = RuntimeRegistry(

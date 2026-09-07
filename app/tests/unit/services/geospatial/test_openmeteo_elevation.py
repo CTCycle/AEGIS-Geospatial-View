@@ -11,9 +11,9 @@ from server.services.geospatial.openmeteo import (
 from server.services.geospatial.providers.base import ProviderRequest, ProviderUnavailableError
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
 
-
 ###############################################################################
 class StubOpenMeteoService(OpenMeteoService):
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.elevation_base_url = "https://api.open-meteo.com/v1/elevation"
@@ -54,7 +54,6 @@ class StubOpenMeteoService(OpenMeteoService):
             "attribution": "Data from Open-Meteo; Copernicus DEM GLO-90",
         }
 
-
 ###############################################################################
 def test_openmeteo_provider_routes_and_normalizes_elevation() -> None:
     provider = OpenMeteoProvider(service=StubOpenMeteoService())
@@ -81,6 +80,7 @@ def test_openmeteo_provider_routes_and_normalizes_elevation() -> None:
     assert feature["longitude"] == 8.5
 
 
+###############################################################################
 def _service_with_elevation_payload(
     monkeypatch: pytest.MonkeyPatch,
     payload: dict[str, object],
@@ -103,6 +103,7 @@ def _service_with_elevation_payload(
     return service, calls
 
 
+###############################################################################
 def test_openmeteo_service_parses_numeric_elevation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -123,6 +124,7 @@ def test_openmeteo_service_parses_numeric_elevation(
     ]
 
 
+###############################################################################
 @pytest.mark.parametrize("payload", [{}, {"elevation": []}, {"elevation": [None]}])
 def test_openmeteo_service_marks_missing_or_empty_elevation_as_valid_empty(
     monkeypatch: pytest.MonkeyPatch,
@@ -136,6 +138,7 @@ def test_openmeteo_service_marks_missing_or_empty_elevation_as_valid_empty(
     assert result["elevation"] is None
 
 
+###############################################################################
 @pytest.mark.parametrize(
     ("payload", "message"),
     [
@@ -154,6 +157,7 @@ def test_openmeteo_service_rejects_malformed_elevation_payload(
         asyncio.run(service.get_elevation(latitude=46.0, longitude=8.5))
 
 
+###############################################################################
 def test_openmeteo_service_preserves_negative_elevation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -167,6 +171,7 @@ def test_openmeteo_service_preserves_negative_elevation(
     assert result["elevation"] == -430.5
 
 
+###############################################################################
 def test_openmeteo_service_propagates_provider_request_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -184,6 +189,7 @@ def test_openmeteo_service_propagates_provider_request_errors(
         asyncio.run(service.get_elevation(latitude=46.0, longitude=8.5))
 
 
+###############################################################################
 def test_openmeteo_provider_translates_service_request_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

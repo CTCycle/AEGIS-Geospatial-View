@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-
 ###############################################################################
 class CredentialStore(Protocol):
+
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str) -> Any:
         """Return the active encrypted credential record, if present."""
@@ -13,19 +13,17 @@ class CredentialStore(Protocol):
     def mark_used(self, *, provider: str, label: str) -> None:
         """Record that a stored credential was used."""
 
-
 ###############################################################################
 class CredentialDecryptor(Protocol):
+
     # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:
         """Decrypt a stored credential value."""
         ...
 
-
 ###############################################################################
 class GeospatialCredentialResolutionError(RuntimeError):
     """Raised when a saved geospatial credential cannot be used."""
-
 
 ###############################################################################
 class GeospatialCredentialResolver:
