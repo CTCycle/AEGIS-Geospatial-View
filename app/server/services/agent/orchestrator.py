@@ -63,6 +63,7 @@ from server.services.agent.turn_support import AgentTurnSupport
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.tool_planner import DeterministicToolPlanner
+from server.services.agent.request_interpreter import RequestInterpreter
 from server.prompts.agent import build_native_agent_messages
 from server.services.llm.types import LLMToolDefinition
 from server.services.llm.context_budget import calculate_context_usage_percent
@@ -109,6 +110,7 @@ class AgentOrchestrator:
         response_synthesizer: GroundedResponseSynthesizer,
         direct_turn_response_service: DirectTurnResponseService,
         context_profile_resolver: ModelContextProfileResolver | None = None,
+        application_timezone: str = "UTC",
     ) -> None:
         self.search_orchestrator = search_orchestrator
         self.parser_service = parser_service
@@ -135,9 +137,11 @@ class AgentOrchestrator:
         self.capability_resolver = capability_resolver
         self.response_synthesizer = response_synthesizer
         self.direct_turn_response_service = direct_turn_response_service
+        self.application_timezone = application_timezone
         self.deterministic_intent_recovery_service = (
             DeterministicIntentRecoveryService()
         )
+        self.request_interpreter = RequestInterpreter()
         self.turn_history_service = AgentTurnHistoryService(
             history_service=self.history_service,
             location_memory_service=self.location_memory_service,
@@ -175,6 +179,34 @@ class AgentOrchestrator:
         )
         async with lock:
             return await self._run_turn_serialized(payload, progress_callback)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _task_snapshot_for_persistence(
+        candidate_snapshot: dict[str, Any],
+        persisted_snapshot: object,
+        *,
+        defer_map_commit: bool,
+        has_map_candidate: bool,
+    ) -> dict[str, Any]:
+        """Keep an unacknowledged map out of committed task state.
+
+        Map assembly intentionally updates the in-memory task state so the
+        candidate can be returned to the client.  Realtime runs persist the
+        task snapshot before the browser acknowledgment arrives, therefore
+        the two map-bearing fields must be restored from the last committed
+        snapshot at that boundary.
+        """
+
+        if not (defer_map_commit and has_map_candidate) or not isinstance(
+            persisted_snapshot, dict
+        ):
+            return candidate_snapshot
+        result = dict(candidate_snapshot)
+        for field in ("active_map_session", "geospatial_state"):
+            if field in persisted_snapshot:
+                result[field] = persisted_snapshot[field]
+        return result
 
     # -------------------------------------------------------------------------
     async def _run_turn_serialized(
@@ -222,6 +254,27 @@ class AgentOrchestrator:
             usage=synthesis_usage,
         )
         response = self._with_phase_usage(response)
+        task_snapshot_for_persistence = self._task_snapshot_for_persistence(
+            self.task_state_service.serialize(conversation_id),
+            persisted.get("task_snapshot"),
+            defer_map_commit=payload.defer_map_commit,
+            has_map_candidate=response.map_session is not None,
+        )
+        if payload.defer_map_commit and response.map_session is not None:
+            # Keep the candidate in the run response, but never make it the
+            # conversation's active visualization before browser validation.
+            # The map assembler updates the in-memory task state while it
+            # builds the candidate. Restore the committed map and geospatial
+            # working state in the snapshot written for this turn; the
+            # candidate remains in the pending run presentation and is
+            # promoted only by a matching render acknowledgment.
+            persisted_memory: object = persisted.get("memory_snapshot")
+            committed_memory: dict[str, Any] = (
+                dict(cast(dict[str, Any], persisted_memory))
+                if isinstance(persisted_memory, dict)
+                else {}
+            )
+            response = response.model_copy(update={"memory_snapshot": committed_memory})
         with self._stage_scope(
             execution_budget,
             "persistence",
@@ -233,7 +286,7 @@ class AgentOrchestrator:
                 conversation_id,
                 expected_revision=int(persisted["context_revision"]),
                 active_instructions=[item.model_dump(mode="json") for item in directives],
-                task_snapshot=self.task_state_service.serialize(conversation_id),
+                task_snapshot=task_snapshot_for_persistence,
                 memory_snapshot=response.memory_snapshot,
                 conversation_summary=(
                     self._context_packages[conversation_id].conversation_summary
@@ -769,7 +822,6 @@ class AgentOrchestrator:
             turn_contract=turn_contract,
             latest_memory=latest_memory,
         )
-        turn_contract = self.capability_resolver.resolve(turn_contract)
         LOGGER.debug(
             "chat_turn_parsed request_id=%s conversation_key=%s task=%s action=%s relationship=%s context_query=%s tools_needed=%s specialist_candidate=%s viewport_scope=%s basemap=%s layers=%s concepts=%s",
             request_id,
@@ -834,6 +886,7 @@ class AgentOrchestrator:
             )
         preflight_decision = self.policy_engine.evaluate_preflight(turn_contract)
         resolved_location: ResolvedLocation | None = None
+        resolved_locations: dict[str, ResolvedLocation] = {}
         if (
             preflight_decision is None
             and turn_contract.task_class in {"map_search", "direct_query"}
@@ -858,14 +911,61 @@ class AgentOrchestrator:
                     conversation_id=conversation_id,
                 ):
                     async with asyncio.timeout(resolution_timeout):
-                        location_result = (
-                            await self.policy_engine.location_resolver.resolve_location_signals(
+                        resolve_targets = getattr(
+                            self.policy_engine.location_resolver,
+                            "resolve_location_targets",
+                            None,
+                        )
+                        if callable(resolve_targets):
+                            location_result = await cast(
+                                Callable[..., Awaitable[Any]], resolve_targets
+                            )(
                                 list(turn_contract.location_signals),
                                 json_object(latest_memory),
                             )
+                        else:
+                            location_result = (
+                                await self.policy_engine.location_resolver.resolve_location_signals(
+                                    list(turn_contract.location_signals),
+                                    json_object(latest_memory),
+                                )
+                            )
+                if isinstance(location_result, dict):
+                    location_result_map = cast(dict[str, Any], location_result)
+                    resolved_locations = {
+                        str(key): value
+                        for key, value in location_result_map.items()
+                        if isinstance(value, ResolvedLocation)
+                    }
+                    resolved_location = next(
+                        iter(resolved_locations.values()),
+                        None,
+                    )
+                    if resolved_location is None:
+                        preflight_decision = PolicyDecision(
+                            plan=ExecutionPlan(
+                                state="clarify",
+                                action_id=turn_contract.normalized_action.action_id,
+                            ),
+                            clarification=ClarificationRequest(
+                                question="Which location should I use?",
+                                reason="The requested geographic targets could not be resolved.",
+                                missing_fields=["location"],
+                            ),
                         )
-                if isinstance(location_result, ResolvedLocation):
+                    else:
+                        LOGGER.info(
+                            "locations_resolved request_id=%s count=%d",
+                            request_id,
+                            len(resolved_locations),
+                        )
+                elif isinstance(location_result, ResolvedLocation):
                     resolved_location = location_result
+                    resolved_locations = {
+                        " ".join(
+                            (location_result.label or "").casefold().split()
+                        ): location_result
+                    }
                     LOGGER.info(
                         "location_resolved request_id=%s location_type=%s confidence=%.3f has_bbox=%s",
                         request_id,
@@ -873,13 +973,25 @@ class AgentOrchestrator:
                         location_result.confidence,
                         location_result.bbox is not None,
                     )
-                else:
+                elif isinstance(location_result, ClarificationRequest):
                     preflight_decision = PolicyDecision(
                         plan=ExecutionPlan(
                             state="clarify",
                             action_id=turn_contract.normalized_action.action_id,
                         ),
                         clarification=location_result,
+                    )
+                else:
+                    preflight_decision = PolicyDecision(
+                        plan=ExecutionPlan(
+                            state="clarify",
+                            action_id=turn_contract.normalized_action.action_id,
+                        ),
+                        clarification=ClarificationRequest(
+                            question="Which location should I use?",
+                            reason="The location resolver returned no usable result.",
+                            missing_fields=["location"],
+                        ),
                     )
             except TimeoutError:
                 execution_budget.terminal_reason = "location_resolution_deadline"
@@ -894,6 +1006,60 @@ class AgentOrchestrator:
                         missing_fields=["location"],
                     ),
                 )
+        canonical_request = self.request_interpreter.compile(
+            request_id=request_id,
+            turn=turn_contract,
+            resolved_location=resolved_location,
+            resolved_locations=resolved_locations,
+            memory_snapshot=json_object(latest_memory),
+            request_datetime=payload.datetime,
+            client_timezone=payload.timezone,
+            application_timezone=self.application_timezone,
+        )
+        deterministic_ambiguities = [
+            item
+            for item in canonical_request.ambiguities
+            if item
+            in {
+                "strongest_requires_threshold_or_top_n",
+                "spatial_distance_required",
+                "recent_requires_time_window",
+            }
+        ]
+        if preflight_decision is None and deterministic_ambiguities:
+            missing_fields: list[str] = []
+            questions: list[str] = []
+            reasons: list[str] = []
+            if "strongest_requires_threshold_or_top_n" in deterministic_ambiguities:
+                missing_fields.append("magnitude_threshold_or_top_n")
+                questions.append("a magnitude threshold or a top-N count for strongest results")
+                reasons.append("strength ordering has no cutoff")
+            if "spatial_distance_required" in deterministic_ambiguities:
+                missing_fields.append("analysis_radius")
+                questions.append("the distance to use for the geographic search")
+                reasons.append("the proximity relationship has no distance")
+            if "recent_requires_time_window" in deterministic_ambiguities:
+                missing_fields.append("time_window")
+                questions.append("the time window to use for recent data")
+                reasons.append("recent is not a defined provider time window")
+            question = "Please specify " + " and ".join(questions) + "."
+            preflight_decision = PolicyDecision(
+                plan=ExecutionPlan(
+                    state="clarify",
+                    action_id=turn_contract.normalized_action.action_id,
+                ),
+                clarification=ClarificationRequest(
+                    question=question,
+                    reason="The request is missing " + " and ".join(reasons) + ".",
+                    missing_fields=missing_fields,
+                ),
+            )
+        # Capability routing runs after location resolution and canonical
+        # compilation. Providers therefore validate the request's declared
+        # scope and geography instead of becoming an alternate interpreter.
+        turn_contract = self.capability_resolver.resolve(
+            turn_contract, canonical_request=canonical_request
+        )
         direct_response = await self.direct_turn_response_service.handle(
             request_id=request_id,
             conversation_id=conversation_id,
@@ -904,17 +1070,18 @@ class AgentOrchestrator:
             latest_contract=latest_contract,
             recent_messages=recent_messages,
             context_usage=context_usage,
+            canonical_request=canonical_request,
             preflight_decision=preflight_decision,
             execution_budget=execution_budget,
         )
         if direct_response is not None:
-            return direct_response
+            return direct_response.model_copy(update={"canonical_request": canonical_request})
 
         if (
             turn_contract.clarification_plan is not None
             and not turn_contract.requested_layers
         ):
-            return await self.turn_state_assembler.build_partial_clarification_response(
+            clarification_response = await self.turn_state_assembler.build_partial_clarification_response(
                 request_id=request_id,
                 conversation_id=conversation_id,
                 conversation_key=conversation_key,
@@ -923,7 +1090,9 @@ class AgentOrchestrator:
                 latest_memory=latest_memory,
                 context_usage=context_usage,
                 resolved_location=resolved_location,
+                canonical_request=canonical_request,
             )
+            return clarification_response.model_copy(update={"canonical_request": canonical_request})
 
         settings = self.settings_repo.get_required()
         with self._stage_scope(
@@ -936,24 +1105,21 @@ class AgentOrchestrator:
             planner_parameters = inspect.signature(
                 self.tool_planner.build_plan
             ).parameters
-            if "resolved_location" in planner_parameters or any(
+            accepts_keywords = any(
                 parameter.kind is inspect.Parameter.VAR_KEYWORD
                 for parameter in planner_parameters.values()
-            ):
-                tool_plan = self.tool_planner.build_plan(
-                    turn_contract,
-                    specialist,
-                    latest_memory,
-                    resolved_location=resolved_location,
-                )
-            else:
-                # Keep injected planners with the pre-resolution signature
-                # usable while the production planner owns the resolved value.
-                tool_plan = self.tool_planner.build_plan(
-                    turn_contract,
-                    specialist,
-                    latest_memory,
-                )
+            )
+            planner_kwargs: dict[str, Any] = {}
+            if accepts_keywords or "resolved_location" in planner_parameters:
+                planner_kwargs["resolved_location"] = resolved_location
+            if accepts_keywords or "canonical_request" in planner_parameters:
+                planner_kwargs["canonical_request"] = canonical_request
+            tool_plan = self.tool_planner.build_plan(
+                turn_contract,
+                specialist,
+                latest_memory,
+                **planner_kwargs,
+            )
         LOGGER.debug(
             "chat_turn_plan request_id=%s specialist=%s tools=%s steps=%d visualization_update=%s",
             request_id,
@@ -1008,6 +1174,7 @@ class AgentOrchestrator:
                     if step.capability_id is not None
                 ],
                 "specialist": specialist,
+                "defer_map_commit": payload.defer_map_commit,
                 "complexity": (
                     "simple"
                     if not turn_contract.atomic_tasks
@@ -1017,6 +1184,7 @@ class AgentOrchestrator:
                 ),
             },
             resolved_location=resolved_location,
+            canonical_request=canonical_request,
             execution_budget=execution_budget,
         )
         deterministic_tools_available = (
@@ -1026,7 +1194,7 @@ class AgentOrchestrator:
             for step in tool_plan.steps
         )
         if deterministic_tools_available:
-            return await self.planned_turn_execution_service.execute(
+            response = await self.planned_turn_execution_service.execute(
                 request_id=request_id,
                 conversation_id=conversation_id,
                 conversation_key=conversation_key,
@@ -1039,6 +1207,7 @@ class AgentOrchestrator:
                 tool_plan=tool_plan,
                 progress_callback=progress_callback,
             )
+            return response.model_copy(update={"canonical_request": canonical_request})
         build_native_tools = getattr(
             self.agent_tool_catalog_service, "build_native_tools", None
         )
@@ -1126,6 +1295,7 @@ class AgentOrchestrator:
                 turn_contract=turn_contract,
                 latest_memory=latest_memory,
                 resolved_location=resolved_location,
+                canonical_request=canonical_request,
             )
         if isinstance(map_result, ClarificationRequest) and (
             tool_loop_result.failure_category is None
@@ -1194,6 +1364,7 @@ class AgentOrchestrator:
                     turn_contract=turn_contract,
                     latest_memory=latest_memory,
                     resolved_location=resolved_location,
+                    canonical_request=canonical_request,
                 )
             if isinstance(map_result, ClarificationRequest) and (
                 tool_loop_result.failure_category is None
@@ -1235,6 +1406,7 @@ class AgentOrchestrator:
             direct_result=direct_result,
             tool_payload=tool_payload,
             resolved_location=resolved_location,
+            canonical_request=canonical_request,
         )
         assistant_message = AgentResponseBuilder.build_verified_assistant_message(
             tool_loop_result.final_text,
@@ -1291,9 +1463,10 @@ class AgentOrchestrator:
                 if is_json_object(item) and item.get("tool_call_id")
             ],
         )
-        self.task_state_service.set_active_visualization(
-            conversation_key, map_session, tool_payload=tool_payload
-        )
+        if not payload.defer_map_commit:
+            self.task_state_service.set_active_visualization(
+                conversation_key, map_session, tool_payload=tool_payload
+            )
         assistant_message = await synthesize_response_async(
             self.response_synthesizer,
             user_text=turn_contract.user_text,
@@ -1360,9 +1533,10 @@ class AgentOrchestrator:
                 if is_json_object(item) and item.get("tool_call_id")
             ],
         )
-        self.task_state_service.set_active_visualization(
-            conversation_key, map_session, tool_payload=tool_payload
-        )
+        if not payload.defer_map_commit:
+            self.task_state_service.set_active_visualization(
+                conversation_key, map_session, tool_payload=tool_payload
+            )
 
         mutation_added = [
             instance_id
@@ -1417,6 +1591,15 @@ class AgentOrchestrator:
         )
         tool_payload["execution_trace"] = execution_budget.snapshot()
 
+        # A deferred interactive run owns an uncommitted candidate. Keep the
+        # candidate in the run presentation payload, but persist only the
+        # previously committed memory snapshot in conversational history so a
+        # follow-up cannot inherit an unacknowledged map as authoritative.
+        history_memory_snapshot = (
+            latest_memory
+            if payload.defer_map_commit and map_session is not None
+            else memory_snapshot
+        )
         self.history_service.append_message(
             conversation_id=conversation_id,
             role="assistant",
@@ -1424,9 +1607,10 @@ class AgentOrchestrator:
             request_id=request_id,
             structured_payload={
                 "turn_contract": turn_contract.model_dump(mode="json"),
+                "canonical_request": canonical_request.model_dump(mode="json"),
                 "decision": decision.model_dump(mode="json"),
                 "operation": operation.model_dump(mode="json"),
-                "memory_snapshot": memory_snapshot,
+                "memory_snapshot": history_memory_snapshot,
                 "context_usage": context_usage.model_dump(mode="json")
                 if context_usage is not None
                 else None,
@@ -1435,9 +1619,15 @@ class AgentOrchestrator:
                 "execution_trace": execution_budget.snapshot(),
             },
             tool_payload=tool_payload,
-            map_session=map_session.model_dump(mode="json")
-            if map_session is not None
-            else None,
+            # A deferred run owns a candidate until the browser acknowledges
+            # its exact revision.  Do not let the assistant history expose
+            # that candidate as the conversation's committed map; the pending
+            # run presentation retains it for the render handshake.
+            map_session=(
+                map_session.model_dump(mode="json")
+                if map_session is not None and not payload.defer_map_commit
+                else None
+            ),
         )
 
         LOGGER.info(
@@ -1461,4 +1651,5 @@ class AgentOrchestrator:
             tool_plan=tool_plan,
             failure_diagnostic=failure,
             visualization_update=visualization_update,
+            canonical_request=canonical_request,
         )

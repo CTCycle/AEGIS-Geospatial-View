@@ -16,6 +16,7 @@ class AgentRunState(StrEnum):
     RUNNING = "running"
     UPDATING = "updating"
     WAITING_FOR_CLARIFICATION = "waiting_for_clarification"
+    AWAITING_RENDER = "awaiting_render"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -59,6 +60,8 @@ class ActiveConversationRunSnapshot(BaseModel):
     run_id: str
     run_version: int = Field(..., ge=1)
     state: AgentRunState
+    presentation_status: Literal["not_required", "pending", "ready", "failed"] = "not_required"
+    presentation: dict[str, Any] | None = None
 
 
 ###############################################################################
@@ -83,6 +86,7 @@ class AgentRunCreateRequest(BaseModel):
 
     message: str
     client_request_id: str | None = None
+    timezone: str | None = Field(default=None, max_length=64)
 
     # -------------------------------------------------------------------------
     @field_validator("message")
@@ -130,11 +134,14 @@ class AgentRunSnapshot(BaseModel):
     active_run_version: int
     state: AgentRunState
     created_at: datetime
+    request_timezone: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     cancel_requested_at: datetime | None = None
     error_code: str | None = None
     error_message: str | None = None
+    presentation_status: Literal["not_required", "pending", "ready", "failed"] = "not_required"
+    presentation: dict[str, Any] | None = None
 
 
 ###############################################################################

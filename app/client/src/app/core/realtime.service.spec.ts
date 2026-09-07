@@ -120,6 +120,32 @@ describe('RealtimeService', () => {
     ).length).toBe(1);
   });
 
+  it('discards queued map acknowledgments before a newer run starts', () => {
+    service.connect('conv-1');
+    service.sendMapRenderAck({
+      run_id: 'old-run',
+      run_version: 1,
+      map_session_id: 'old-map',
+      collection_revision: 2,
+      status: 'ready',
+      viewport_bounds: [0, 0, 1, 1],
+      checks: {},
+      overlay_results: [],
+    });
+
+    service.discardPendingMapRenderAcks();
+    service.sendRunStart('new request', 'request-2');
+    sockets[0].open();
+
+    const commands = sockets[0].sent.map((value) => JSON.parse(value) as {
+      type: string;
+      payload?: { run_id?: string; message?: string };
+    });
+    expect(commands.filter((command) => command.type === 'map.render_ack').length).toBe(0);
+    expect(commands.filter((command) => command.type === 'map.render_ack' && command.payload?.run_id === 'old-run').length).toBe(0);
+    expect(commands.filter((command) => command.type === 'run.start' && command.payload?.message === 'new request').length).toBe(1);
+  });
+
   it('does not replay a command rejected by the server', () => {
     jasmine.clock().install();
     clockInstalled = true;

@@ -21,6 +21,7 @@ from server.domain.realtime import (
     RealtimeCancelPayload,
     RealtimeClientMessage,
     RealtimeResumePayload,
+    RealtimeRenderAckPayload,
     RealtimeServerMessage,
     RealtimeStartPayload,
     RealtimeSteerPayload,
@@ -38,6 +39,10 @@ from server.services.agent_runs.exceptions import (
 )
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.metrics import RealtimeMetrics
+from server.services.agent_runs.render_completion import (
+    RenderAcknowledgementError,
+    RenderCompletionService,
+)
 from server.services.agent_runs.steering import RunSteeringService
 
 LOGGER = logging.getLogger(__name__)
@@ -109,6 +114,7 @@ class RealtimeConnection:
         event_publisher: RunEventPublisher,
         registry: RealtimeConnectionRegistry,
         metrics: RealtimeMetrics,
+        render_completion_service: RenderCompletionService | None = None,
     ) -> None:
         self.websocket = websocket
         self.conversation_id = conversation_id
@@ -119,6 +125,7 @@ class RealtimeConnection:
         self.event_publisher = event_publisher
         self.registry = registry
         self.metrics = metrics
+        self.render_completion_service = render_completion_service
         self._outbound: asyncio.Queue[RealtimeServerMessage] = asyncio.Queue(
             maxsize=OUTBOUND_QUEUE_SIZE
         )
@@ -274,6 +281,8 @@ class RealtimeConnection:
                 await self._steer_run(message)
             elif message.type == "run.cancel":
                 await self._cancel_run(message)
+            elif message.type == "map.render_ack":
+                await self._render_ack(message)
         except RunServiceError as exc:
             await self._protocol_error(
                 message.message_id,
@@ -285,6 +294,13 @@ class RealtimeConnection:
             await self._protocol_error(
                 message.message_id,
                 "invalid_payload",
+                fatal=False,
+                command=message.type,
+            )
+        except RenderAcknowledgementError:
+            await self._protocol_error(
+                message.message_id,
+                "render_ack_rejected",
                 fatal=False,
                 command=message.type,
             )
@@ -343,6 +359,7 @@ class RealtimeConnection:
             AgentRunCreateRequest(
                 message=payload.message,
                 client_request_id=payload.client_request_id,
+                timezone=payload.timezone,
             ),
         )
         await self._send(
@@ -404,6 +421,29 @@ class RealtimeConnection:
                 "duplicate": not transitioned,
                 "run_id": response.run_id,
                 "state": response.state.value,
+            },
+        )
+
+    # -------------------------------------------------------------------------
+    async def _render_ack(self, message: RealtimeClientMessage) -> None:
+        if self.render_completion_service is None:
+            raise RenderAcknowledgementError("Render acknowledgment is unavailable.")
+        payload = RealtimeRenderAckPayload.model_validate(message.payload)
+        result = await self.render_completion_service.acknowledge(
+            conversation_id=self.conversation_id,
+            payload=payload,
+        )
+        await self._send(
+            "run.ack",
+            correlation_id=message.message_id,
+            payload={
+                "command": "map.render_ack",
+                "accepted": True,
+                "duplicate": result.duplicate,
+                "run_id": result.run_id,
+                "run_version": result.run_version,
+                "state": result.state,
+                "presentation_status": result.presentation_status,
             },
         )
 

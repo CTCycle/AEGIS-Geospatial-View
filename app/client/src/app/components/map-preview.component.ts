@@ -40,13 +40,27 @@ import {
   recordNumberEqual,
   removeOverlayLayers,
 } from './map-preview-rendering';
+import { isFiniteNumber } from '../core/type-guards';
 
 export type MapRenderState = 'preparing' | 'ready' | 'failed';
+
+export interface MapRenderIdentity {
+  runId: string;
+  runVersion: number;
+  mapSessionId: string;
+  collectionRevision: number;
+}
 
 export interface MapRenderStateChange {
   sessionId: string;
   state: MapRenderState;
+  runId?: string;
+  runVersion?: number;
   message?: string;
+  collectionRevision?: number;
+  viewportBounds?: [number, number, number, number];
+  checks?: Record<string, boolean>;
+  overlayResults?: Array<Record<string, string | number | boolean | null>>;
 }
 
 @Component({
@@ -64,6 +78,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   @Input() initialOverlayVisibility: Record<string, boolean> = {};
   @Input() initialOverlayOpacity: Record<string, number> = {};
   @Input() availableBasemaps: CapabilityDescriptor[] = [];
+  @Input() renderIdentity?: MapRenderIdentity;
   @Output() overlayStateChange = new EventEmitter<OverlayStateChange>();
   @Output() renderStateChange = new EventEmitter<MapRenderStateChange>();
   @Output() basemapChange = new EventEmitter<string>();
@@ -95,18 +110,29 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   private activeMapContainer: HTMLDivElement | null = null;
   private activeBasemapId: string | null = null;
   private activeCenterKey: string | null = null;
+  private activeSessionKey: string | null = null;
   private mapContainerRef?: ElementRef<HTMLDivElement>;
   private resizeObserver?: ResizeObserver;
   private resizeFrame: number | null = null;
   private viewInitialized = false;
   private mapPreparing = false;
+  private awaitingBackendAcknowledgment = false;
+  private awaitingCandidateMap: Map | null = null;
   private destroyed = false;
   private candidateGeneration = 0;
+  private renderWatchdog?: number;
   private pendingCandidate?: {
     map: Map;
     container: HTMLDivElement;
     originalContainer: HTMLDivElement;
     generation: number;
+  };
+  private retainedPrevious?: {
+    map: Map;
+    container: HTMLDivElement | null;
+    basemapId: string | null;
+    centerKey: string | null;
+    sessionKey: string | null;
   };
   private inspectionListeners: Array<{
     map: Map;
@@ -130,6 +156,73 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   get complianceWarnings(): string[] {
     return this.mapSession?.compliance_warnings || [];
+  }
+
+  acceptRenderedCandidate(): void {
+    const retained = this.retainedPrevious;
+    this.retainedPrevious = undefined;
+    this.awaitingBackendAcknowledgment = false;
+    this.awaitingCandidateMap = null;
+    if (!retained) {
+      // An identical-session update may reuse the already committed map. Keep
+      // it available when the backend rejects a no-op acknowledgment.
+      if (this.mapRef) {
+        this.mapPreparing = false;
+        return;
+      }
+      return;
+    }
+    this.unbindInspectionListenersForMap(retained.map);
+    retained.map.remove();
+    if (retained.container && retained.container !== this.mapContainerRef?.nativeElement) {
+      retained.container.remove();
+    }
+  }
+
+  rejectRenderedCandidate(): void {
+    this.clearRenderWatchdog();
+    const pending = this.pendingCandidate;
+    if (pending) {
+      this.pendingCandidate = undefined;
+      this.candidateGeneration += 1;
+      this.unbindInspectionListenersForMap(pending.map);
+      pending.map.remove();
+      this.removeCandidateContainer(pending.container, pending.originalContainer);
+    }
+    const retained = this.retainedPrevious;
+    this.retainedPrevious = undefined;
+    if (retained) {
+      if (this.mapRef && this.mapRef !== retained.map) {
+        this.unbindInspectionListenersForMap(this.mapRef);
+        this.mapRef.remove();
+      }
+      if (this.activeMapContainer && this.activeMapContainer !== retained.container) {
+        this.activeMapContainer.remove();
+      }
+      this.mapRef = retained.map;
+      this.activeMapContainer = retained.container;
+      this.activeBasemapId = retained.basemapId;
+      this.activeCenterKey = retained.centerKey;
+      this.activeSessionKey = retained.sessionKey;
+      this.mapPreparing = false;
+      this.awaitingBackendAcknowledgment = false;
+      this.awaitingCandidateMap = null;
+      this.bindInspectionListeners(retained.map);
+      this.applyOverlayStateToMap();
+      return;
+    }
+    // An acknowledgment can be rejected for an unchanged session or before a
+    // candidate map was allocated. Keep the already committed map in the
+    // former case; only tear the map down when there is no committed instance.
+    if (this.mapRef) {
+      if (this.awaitingBackendAcknowledgment && this.mapRef === this.awaitingCandidateMap) {
+        this.destroyMap();
+        return;
+      }
+      this.mapPreparing = false;
+      return;
+    }
+    this.destroyMap();
   }
 
   get metadataOnlyOverlays(): OverlayEntry[] {
@@ -192,7 +285,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (this.destroyed) {
       return;
     }
-    if (changes['payload'] || changes['initialOverlayVisibility'] || changes['initialOverlayOpacity']) {
+    if (changes['payload'] || changes['renderIdentity'] || changes['initialOverlayVisibility'] || changes['initialOverlayOpacity']) {
       this.syncSessionFromPayload();
       this.rebuildOverlayStateFromSession();
       this.recreateMapIfPossible();
@@ -385,7 +478,18 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       return;
     }
     if (!Number.isFinite(center?.longitude) || !Number.isFinite(center?.latitude)) {
-      this.destroyMap();
+      this.mapPreparing = false;
+      this.awaitingBackendAcknowledgment = false;
+      this.awaitingCandidateMap = null;
+      if (this.renderIdentity) {
+        this.emitRenderState(
+          'failed',
+          'The prepared map has no valid center coordinates.',
+          { ...this.renderIdentity },
+        );
+      } else {
+        this.destroyMap();
+      }
       return;
     }
     const longitude = Number(center?.longitude);
@@ -399,7 +503,8 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
     const nextBasemapId = this.mapSession?.basemap_id || this.mapSession?.basemap?.id || null;
     const nextCenterKey = `${latitude.toFixed(5)}:${longitude.toFixed(5)}`;
-    if (this.mapRef && this.activeBasemapId === nextBasemapId && this.activeCenterKey === nextCenterKey) {
+    const nextSessionKey = this.mapSessionIdentityKey(this.mapSession);
+    if (this.mapRef && this.activeSessionKey === nextSessionKey) {
       // Overlay and metadata updates are applied to the known-good map in place.
       this.unbindInspectionListeners();
       removeOverlayLayers(this.mapRef, this.mapSession);
@@ -417,7 +522,16 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       : originalContainer;
     const previousMap = this.mapRef;
     const previousContainer = this.activeMapContainer;
-    this.emitRenderState('preparing');
+    const previousBasemapId = this.activeBasemapId;
+    const previousCenterKey = this.activeCenterKey;
+    const previousSessionKey = this.activeSessionKey;
+    if (this.retainedPrevious && previousMap && this.retainedPrevious.map !== previousMap) {
+      this.acceptRenderedCandidate();
+    }
+    const candidateIdentity = this.renderIdentity
+      ? { ...this.renderIdentity }
+      : undefined;
+    this.emitRenderState('preparing', undefined, candidateIdentity);
     this.mapPreparing = true;
     let candidate: Map;
     try {
@@ -429,9 +543,11 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       });
     } catch (error) {
       this.mapPreparing = false;
+      this.awaitingBackendAcknowledgment = false;
+      this.awaitingCandidateMap = null;
       this.removeCandidateContainer(candidateContainer, originalContainer);
       if (!this.destroyed) {
-        this.emitRenderState('failed', this.safeRenderError(error));
+        this.emitRenderState('failed', this.safeRenderError(error), candidateIdentity);
       }
       return;
     }
@@ -443,6 +559,8 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       originalContainer,
       generation,
     };
+    this.awaitingBackendAcknowledgment = Boolean(candidateIdentity);
+    this.awaitingCandidateMap = candidateIdentity ? candidate : null;
     let candidateSettled = false;
     const isCurrentCandidate = (): boolean => !this.destroyed
       && !candidateSettled
@@ -452,7 +570,25 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       if (this.pendingCandidate?.map === candidate) {
         this.pendingCandidate = undefined;
       }
+      this.clearRenderWatchdog();
     };
+
+    this.clearRenderWatchdog();
+    this.renderWatchdog = window.setTimeout(() => {
+      if (!isCurrentCandidate()) {
+        return;
+      }
+      candidateSettled = true;
+      this.mapPreparing = false;
+      clearCandidate();
+      this.unbindInspectionListenersForMap(candidate);
+      candidate.remove();
+      this.removeCandidateContainer(candidateContainer, originalContainer);
+      if (!this.destroyed) {
+        this.emitRenderState('failed', 'render_timeout', candidateIdentity);
+        this.changeDetector.detectChanges();
+      }
+    }, 30_000);
 
     candidate.on('error', (event: unknown) => {
       if (!isCurrentCandidate()) {
@@ -467,7 +603,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         candidate.remove();
         this.removeCandidateContainer(candidateContainer, originalContainer);
         if (!this.destroyed) {
-          this.emitRenderState('failed', this.safeRenderError(error));
+          this.emitRenderState('failed', this.safeRenderError(error), candidateIdentity);
         }
       }
     });
@@ -490,7 +626,11 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         candidate.remove();
         this.removeCandidateContainer(candidateContainer, originalContainer);
         if (!this.destroyed) {
-          this.emitRenderState('failed', 'The map source loaded but produced no renderable canvas.');
+        this.emitRenderState(
+          'failed',
+          'The map source loaded but produced no renderable canvas.',
+          candidateIdentity,
+        );
         }
         return;
       }
@@ -507,14 +647,20 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         this.activeMapContainer = candidateContainer;
         this.activeBasemapId = nextBasemapId;
         this.activeCenterKey = nextCenterKey;
+        this.activeSessionKey = nextSessionKey;
+        this.awaitingBackendAcknowledgment = Boolean(candidateIdentity);
+        this.awaitingCandidateMap = candidateIdentity ? candidate : null;
         this.applyOverlayStateToMap();
         if (previousMap && previousMap !== candidate) {
-          previousMap.remove();
-          if (previousContainer && previousContainer !== originalContainer) {
-            previousContainer.remove();
-          }
+          this.retainedPrevious = {
+            map: previousMap,
+            container: previousContainer,
+            basemapId: previousBasemapId,
+            centerKey: previousCenterKey,
+            sessionKey: previousSessionKey,
+          };
         }
-        this.emitRenderState('ready');
+        this.emitRenderState('ready', undefined, candidateIdentity);
         this.changeDetector.detectChanges();
         this.scheduleMapResize();
       });
@@ -589,11 +735,161 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     return canvas.width > 0 && canvas.height > 0;
   }
 
-  private emitRenderState(state: MapRenderState, message?: string): void {
+  private emitRenderState(
+    state: MapRenderState,
+    message?: string,
+    identity: MapRenderIdentity | undefined = this.renderIdentity,
+  ): void {
     const sessionId = this.mapSession?.session_id;
     if (sessionId) {
-      this.renderStateChange.emit({ sessionId, state, message });
+      const evidence = this.renderEvidence(state);
+      this.renderStateChange.emit({
+        sessionId,
+        state,
+        runId: identity?.runId,
+        runVersion: identity?.runVersion,
+        message,
+        collectionRevision: this.mapSession?.overlay_collection?.revision,
+        viewportBounds: evidence.viewportBounds,
+        checks: evidence.checks,
+        overlayResults: evidence.overlayResults,
+      });
     }
+  }
+
+  private renderEvidence(state: MapRenderState): {
+    viewportBounds?: [number, number, number, number];
+    checks: Record<string, boolean>;
+    overlayResults: Array<Record<string, string | number | boolean | null>>;
+  } {
+    const session = this.mapSession;
+    const map = this.mapRef;
+    const rawBounds = this.readMapBounds(map) ?? session?.bounds ?? session?.viewport?.bbox;
+    const viewportBounds: [number, number, number, number] | undefined = Array.isArray(rawBounds)
+      && rawBounds.length === 4
+      && rawBounds.every(isFiniteNumber)
+      && rawBounds[0] >= -180 && rawBounds[0] <= 180
+      && rawBounds[1] >= -90 && rawBounds[1] <= 90
+      && rawBounds[2] >= -180 && rawBounds[2] <= 180
+      && rawBounds[3] >= -90 && rawBounds[3] <= 90
+      && rawBounds[1] <= rawBounds[3]
+      ? [rawBounds[0], rawBounds[1], rawBounds[2], rawBounds[3]]
+      : undefined;
+    const overlayResults = this.overlays.map((overlay) => {
+      const layerIds = getOverlayLayerIds(overlay);
+      const metadataOnly = String(overlay.render?.rendering_mode || overlay.rendering_mode || overlay.type || '')
+        .toLowerCase() === 'metadata-only' || overlay.type === 'metadata-only';
+      const mapApi = map as unknown as {
+        getLayer?: (id: string) => unknown;
+        getSource?: (id: string) => unknown;
+        getLayoutProperty?: (id: string, property: string) => unknown;
+      } | null;
+      const layerRecords = metadataOnly
+        ? []
+        : layerIds
+          .map((id) => (mapApi?.getLayer ? mapApi.getLayer.call(map, id) : undefined))
+          .filter((layer): layer is Record<string, unknown> => (
+            Boolean(layer) && typeof layer === 'object'
+          ));
+      const present = metadataOnly || layerRecords.length > 0;
+      const styleValid = metadataOnly || layerRecords.length > 0 && layerRecords.every((layer) => {
+        const type = layer['type'];
+        return typeof type === 'string' && type.trim().length > 0;
+      });
+      const zoomRangeValid = metadataOnly || layerRecords.length > 0 && layerRecords.every((layer) => {
+        const minZoom = layer['minzoom'];
+        const maxZoom = layer['maxzoom'];
+        return (minZoom === undefined || isFiniteNumber(minZoom))
+          && (maxZoom === undefined || isFiniteNumber(maxZoom))
+          && (minZoom === undefined || maxZoom === undefined || Number(minZoom) <= Number(maxZoom));
+      });
+      const visible = metadataOnly || layerIds.some((id) => {
+        if (!mapApi?.getLayer) {
+          return false;
+        }
+        const layer = mapApi.getLayer.call(map, id) as Record<string, unknown> | undefined;
+        if (!layer) {
+          return false;
+        }
+        let visibility: unknown;
+        try {
+          visibility = mapApi.getLayoutProperty?.call(map, id, 'visibility');
+        } catch {
+          visibility = undefined;
+        }
+        if (visibility === undefined) {
+          const layout = layer['layout'];
+          visibility = layout && typeof layout === 'object'
+            ? (layout as Record<string, unknown>)['visibility']
+            : undefined;
+        }
+        return visibility !== 'none';
+      });
+      const status = this.overlayRenderStatuses.find((item) => item.overlayId === overlay.id)?.status;
+      let renderedFeatureCount: number | null = null;
+      if (!metadataOnly && map && present && typeof (map as unknown as {
+        queryRenderedFeatures?: (geometry?: unknown, options?: unknown) => unknown;
+      }).queryRenderedFeatures === 'function' && isGeoJsonOverlay(overlay)) {
+        try {
+          const features = (map as unknown as {
+            queryRenderedFeatures: (geometry?: unknown, options?: unknown) => unknown;
+          }).queryRenderedFeatures(undefined, { layers: layerIds });
+          renderedFeatureCount = Array.isArray(features) ? features.length : null;
+        } catch {
+          renderedFeatureCount = null;
+        }
+      }
+      return {
+        overlay_id: overlay.id,
+        source_present: metadataOnly || Boolean(
+          mapApi?.getSource?.call(map, `overlay-source-${overlay.id}`),
+        ),
+        layer_present: present && visible && styleValid && zoomRangeValid,
+        loaded: status === 'loaded' || metadataOnly,
+        metadata_only: metadataOnly,
+        style_valid: styleValid,
+        zoom_range_valid: zoomRangeValid,
+        rendered_feature_count: renderedFeatureCount,
+        failure_code: status === 'failed' ? 'overlay_render_failed' : null,
+      };
+    });
+    const required = overlayResults.filter((item) => item.metadata_only !== true);
+    const checks = {
+      required_sources_loaded: state === 'ready' && required.every((item) => item.loaded === true),
+      required_layers_present: state === 'ready' && required.every((item) => item.layer_present === true),
+      viewport_valid: state === 'ready' && Boolean(viewportBounds),
+    };
+    return { viewportBounds, checks, overlayResults };
+  }
+
+  private readMapBounds(map: Map | null): [number, number, number, number] | undefined {
+    const getBounds = (map as unknown as {
+      getBounds?: () => unknown;
+    } | null)?.getBounds;
+    if (typeof getBounds !== 'function' || !map) {
+      return undefined;
+    }
+    try {
+      const bounds = getBounds.call(map) as {
+        getWest?: () => unknown;
+        getSouth?: () => unknown;
+        getEast?: () => unknown;
+        getNorth?: () => unknown;
+      } | undefined;
+      const values = [
+        bounds?.getWest?.(),
+        bounds?.getSouth?.(),
+        bounds?.getEast?.(),
+        bounds?.getNorth?.(),
+      ];
+      if (values.every(isFiniteNumber)) {
+        return values as [number, number, number, number];
+      }
+    } catch {
+      // Fall back to the prepared session bounds when a test double or an
+      // older MapLibre adapter does not expose camera bounds.
+    }
+    return undefined;
   }
 
   private safeRenderError(error: unknown): string {
@@ -656,6 +952,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   private destroyMap(): void {
     this.mapPreparing = false;
+    this.clearRenderWatchdog();
     this.candidateGeneration += 1;
     const pendingCandidate = this.pendingCandidate;
     this.pendingCandidate = undefined;
@@ -663,6 +960,14 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.unbindInspectionListenersForMap(pendingCandidate.map);
       pendingCandidate.map.remove();
       this.removeCandidateContainer(pendingCandidate.container, pendingCandidate.originalContainer);
+    }
+    if (this.retainedPrevious) {
+      this.unbindInspectionListenersForMap(this.retainedPrevious.map);
+      this.retainedPrevious.map.remove();
+      if (this.retainedPrevious.container && this.retainedPrevious.container !== this.mapContainerRef?.nativeElement) {
+        this.retainedPrevious.container.remove();
+      }
+      this.retainedPrevious = undefined;
     }
     if (this.mapRef) {
       this.unbindInspectionListeners();
@@ -675,6 +980,30 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.activeMapContainer = null;
     this.activeBasemapId = null;
     this.activeCenterKey = null;
+    this.activeSessionKey = null;
+    this.awaitingBackendAcknowledgment = false;
+    this.awaitingCandidateMap = null;
+  }
+
+  private mapSessionIdentityKey(session?: MapSession): string | null {
+    if (!session) {
+      return null;
+    }
+    return JSON.stringify({
+      sessionId: session.session_id,
+      collectionRevision: session.overlay_collection?.revision ?? null,
+      basemapId: session.basemap_id,
+      center: session.center,
+      bounds: session.bounds,
+      viewport: session.viewport,
+    });
+  }
+
+  private clearRenderWatchdog(): void {
+    if (this.renderWatchdog !== undefined) {
+      window.clearTimeout(this.renderWatchdog);
+      this.renderWatchdog = undefined;
+    }
   }
 
   private bindInspectionListeners(map: Map): void {

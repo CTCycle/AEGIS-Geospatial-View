@@ -562,6 +562,10 @@ class RenderDescriptorService:
                 "latitude": request.viewport.center_latitude,
                 "longitude": request.viewport.center_longitude,
                 "live": True,
+                "radius_m": request.analysis_radius_m,
+                "temporal_mode": request.time_mode,
+                "start_time_iso": request.start_time_iso,
+                "end_time_iso": request.end_time_iso,
             },
         )
         try:
@@ -647,7 +651,7 @@ class RenderDescriptorService:
     def _provider_bbox(
         request: LocationSearchRequest,
     ) -> tuple[float, float, float, float] | None:
-        bounds = request.viewport.bbox or RenderDescriptorService._bounds_from_viewport(
+        bounds = request.analysis_bbox or request.viewport.bbox or RenderDescriptorService._bounds_from_viewport(
             request.viewport
         )
         if (
@@ -778,7 +782,10 @@ class RenderDescriptorService:
     # -------------------------------------------------------------------------
     def _bbox_query_value(self, request: LocationSearchRequest) -> str:
         bounds = (
-            request.viewport.bbox or self._bounds_from_viewport(request.viewport) or []
+            request.analysis_bbox
+            or request.viewport.bbox
+            or self._bounds_from_viewport(request.viewport)
+            or []
         )
         return ",".join(str(round(float(item), 6)) for item in bounds)
 

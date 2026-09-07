@@ -21,6 +21,7 @@ from server.contracts.extraction import (
     ConversationContextSnapshot,
     ContextQuery,
     DisallowedPattern,
+    GeographicRelationship,
     LocationSignal,
     NormalizedAction,
     OverlayCommand,
@@ -1090,6 +1091,14 @@ class ParserService:
                 granularity=extracted.temporal_signal.granularity,
                 aggregation=extracted.temporal_signal.aggregation,
             ),
+            geographic_relationships=[
+                GeographicRelationship.model_validate(item.model_dump(mode="json"))
+                for item in extracted.geographic_relationships
+                if item.target.strip()
+            ],
+            operations=list(extracted.operations),
+            filters=dict(extracted.filters),
+            presentation_requirements=dict(extracted.presentation_requirements),
             context_query=ContextQuery(kind=extracted.context_query.kind),
             ambiguities=ambiguities,
             parser_confidence=min(0.35, extracted.parser_confidence),
@@ -1350,6 +1359,11 @@ class ParserService:
             granularity=extracted.temporal_signal.granularity,
             aggregation=extracted.temporal_signal.aggregation,
         )
+        geographic_relationships = [
+            GeographicRelationship.model_validate(item.model_dump(mode="json"))
+            for item in extracted.geographic_relationships
+            if item.target.strip()
+        ]
         disallowed = [
             DisallowedPattern(
                 pattern_id=item.pattern_id,
@@ -1397,6 +1411,10 @@ class ParserService:
             location_signals=location_signals,
             normalized_action=normalized_action,
             temporal_signal=temporal_signal,
+            geographic_relationships=geographic_relationships,
+            operations=list(extracted.operations),
+            filters=dict(extracted.filters),
+            presentation_requirements=dict(extracted.presentation_requirements),
             context_query=ContextQuery(kind=extracted.context_query.kind),
             ambiguities=ambiguities,
             disallowed_patterns=disallowed,

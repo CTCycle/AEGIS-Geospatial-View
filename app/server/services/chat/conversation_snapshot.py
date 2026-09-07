@@ -81,6 +81,8 @@ class ConversationSnapshotService:
                     run_id=active_run.run_id,
                     run_version=active_run.active_run_version,
                     state=active_run.state,
+                    presentation_status=active_run.presentation_status,
+                    presentation=active_run.presentation,
                 )
                 if active_run is not None
                 else None

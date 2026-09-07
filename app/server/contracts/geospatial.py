@@ -38,6 +38,25 @@ class CapabilityKind(str, Enum):
 
 
 ###############################################################################
+class CapabilityExecutionContract(BaseModel):
+    """Provider-neutral execution facts used by deterministic planning."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    supported_operations: list[str] = Field(default_factory=list)
+    supported_scope_kinds: list[str] = Field(default_factory=list)
+    temporal_modes: list[str] = Field(default_factory=list)
+    temporal_windows: list[str] = Field(default_factory=list)
+    supported_aggregations: list[str] = Field(default_factory=list)
+    required_inputs: list[str] = Field(default_factory=list)
+    output_geometry_type: str | None = None
+    render_support: Literal["vector", "raster", "metadata_only", "none"] = "none"
+    coverage: str | None = None
+    limitations: list[str] = Field(default_factory=list)
+    fallback_ids: list[str] = Field(default_factory=list)
+
+
+###############################################################################
 class ProviderAuthType(str, Enum):
     NONE = "none"
     API_KEY = "api-key"
@@ -449,6 +468,10 @@ class CapabilityManifestV2(BaseModel):
     indexing: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     download: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     validation: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    execution_contract: CapabilityExecutionContract = Field(
+        default_factory=CapabilityExecutionContract,
+        alias="executionContract",
+    )
 
 
 ###############################################################################
@@ -611,6 +634,15 @@ class LocationSearchRequest(BaseModel):
     resolved_location: ResolvedLocation
     action_id: str
     time_mode: TimeMode = "current"
+    start_time_iso: str | None = None
+    end_time_iso: str | None = None
+    analysis_radius_m: float | None = Field(default=None, gt=0)
+    # Canonical execution evidence.  ``viewport`` remains the display extent;
+    # these fields identify the requested analysis scope and target so provider
+    # adapters and completion checks cannot infer them from a stale viewport.
+    analysis_scope: str | None = None
+    analysis_bbox: list[float] | None = None
+    target_id: str | None = None
     basemap_id: str
     overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
     provider_layer_selections: list[ProviderLayerSelection] = Field(

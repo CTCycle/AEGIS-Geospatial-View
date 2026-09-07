@@ -321,10 +321,23 @@ class ConversationTaskStateService:
     ) -> None:
         """Project the verified map result into the durable working state."""
         geospatial = runtime.geospatial_state
-        location = map_session.resolved_location.model_dump(mode="json")
-        geospatial.resolved_locations = [location]
+        locations = [map_session.resolved_location.model_dump(mode="json")]
+        for instance in map_session.overlay_collection.instances:
+            if instance.resolved_location is None:
+                continue
+            candidate = instance.resolved_location.model_dump(mode="json")
+            if not any(
+                abs(float(existing.get("latitude", 0)) - float(candidate.get("latitude", 0))) < 1e-6
+                and abs(float(existing.get("longitude", 0)) - float(candidate.get("longitude", 0))) < 1e-6
+                for existing in locations
+            ):
+                locations.append(candidate)
+        geospatial.resolved_locations = locations
+        # ``bounds`` is the aggregate analysis envelope for multi-target
+        # candidates.  The viewport bbox remains a fitting hint and can cover
+        # only the primary target.
         geospatial.geographic_scope.bbox = list(
-            map_session.viewport.bbox or map_session.bounds or []
+            map_session.bounds or map_session.viewport.bbox or []
         ) or None
         geospatial.geographic_scope.radius_m = map_session.viewport.radius_m
         geospatial.geographic_scope.crs = "EPSG:4326"

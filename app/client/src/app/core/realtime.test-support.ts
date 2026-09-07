@@ -44,7 +44,9 @@ export class FakeRealtimeService {
 
   setResumeCursor(_runId: string | undefined, _sequence: number): void {}
 
-  sendRunStart(message: string, _clientRequestId: string): string {
+  discardPendingMapRenderAcks(): void {}
+
+  sendRunStart(message: string, _clientRequestId: string, _timezone?: string): string {
     const conversationId = this.conversationId;
     if (!conversationId) {
       throw new Error('Conversation is not connected.');

@@ -186,6 +186,88 @@ describe('components/map-preview.component', () => {
     expect(states.at(-1)).toBe('failed');
   });
 
+  it('discards an initial candidate when its backend acknowledgment is rejected', () => {
+    component.renderIdentity = {
+      runId: 'run-1',
+      runVersion: 1,
+      mapSessionId: 'map-1',
+      collectionRevision: 1,
+    };
+    component.payload = {
+      map_session: makeMapSession({
+        overlay_collection: {
+          collection_id: 'active-map',
+          revision: 1,
+          instances: [],
+        },
+      }) as never,
+    };
+    fixture.detectChanges();
+
+    expect(fakeMap.remove).not.toHaveBeenCalled();
+    component.rejectRenderedCandidate();
+
+    expect(fakeMap.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the committed map when a replacement has invalid center coordinates', () => {
+    const states: string[] = [];
+    component.renderStateChange.subscribe((change) => states.push(change.state));
+    component.payload = { map_session: makeMapSession() as never };
+    fixture.detectChanges();
+    const mapCallCount = (maplibregl.Map as unknown as jasmine.Spy).calls.count();
+
+    component.renderIdentity = {
+      runId: 'run-2',
+      runVersion: 1,
+      mapSessionId: 'map-2',
+      collectionRevision: 2,
+    };
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({
+        session_id: 'map-2',
+        center: { latitude: Number.NaN, longitude: 12.5 },
+      }) as never,
+    });
+    fixture.detectChanges();
+
+    expect((maplibregl.Map as unknown as jasmine.Spy).calls.count()).toBe(mapCallCount);
+    expect(states.at(-1)).toBe('failed');
+    expect(fakeMap.remove).not.toHaveBeenCalled();
+  });
+
+  it('cancels a pre-idle candidate and ignores its late load callback on rollback', () => {
+    let candidateLoad: (() => void) | undefined;
+    const candidateMap = {
+      ...fakeMap,
+      on: jasmine.createSpy('candidateOn'),
+      remove: jasmine.createSpy('candidateRemove'),
+    };
+    candidateMap.on.and.callFake((event: string, callback: () => void) => {
+      if (event === 'load') {
+        candidateLoad = callback;
+      }
+    });
+    (maplibregl.Map as unknown as jasmine.Spy).and.returnValues(fakeMap as never, candidateMap as never);
+
+    const states: string[] = [];
+    component.renderStateChange.subscribe((change) => states.push(change.state));
+    component.payload = { map_session: makeMapSession() as never };
+    fixture.detectChanges();
+    expect(states).toContain('ready');
+
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({ session_id: 'map-2', center: { latitude: 42, longitude: 13 } }) as never,
+    });
+    fixture.detectChanges();
+    component.rejectRenderedCandidate();
+    candidateLoad?.();
+
+    expect(candidateMap.remove).toHaveBeenCalledTimes(1);
+    expect(fakeMap.remove).not.toHaveBeenCalled();
+    expect(states.at(-1)).toBe('preparing');
+  });
+
   it('preserves external satellite imagery tile URLs', () => {
     component.payload = {
       map_session: makeMapSession({

@@ -1,4 +1,4 @@
-# AEGIS custom agent runtime v2
+# AEGIS custom agent runtime v3
 
 AEGIS keeps one orchestrating agent.  Planning, scheduling, validation, and
 checkpointing are ordinary typed Python services; no LangGraph/LangChain agent
@@ -26,9 +26,9 @@ flowchart TD
 
 ## State boundary
 
-`server.domain.agent.runtime` owns the v2 contracts:
+`server.domain.agent.runtime` owns the v3 contracts:
 
-- `AgentThreadState` is durable conversation state (`schema_version=2`) and
+- `AgentThreadState` is durable conversation state (`schema_version=3`) and
   contains the goal, dependency-aware tasks, geospatial working state, evidence
   references, assumptions, unresolved questions, and active map session.
 - `AgentRunState` is per-execution state: budgets, counters, canonical call
@@ -37,9 +37,11 @@ flowchart TD
   candidates, selected places, data sources, layers, features, temporal limits,
   and renderable references first-class.
 
-The persisted conversation task snapshot is now v2 only.  There is no reader or
+The persisted conversation task snapshot is now v3 only. There is no reader or
 fallback for the former turn-ledger snapshot; local development data should be
-recreated when the schema changes.
+recreated when the schema changes. Run presentation is separate from committed
+conversation state: a valid candidate waits in `awaiting_render` until a
+matching browser acknowledgment promotes it.
 
 ## Scheduling and safety
 
@@ -55,10 +57,14 @@ application code and occurs before a handler is called.
 
 ## Context and evidence
 
-The model receives the current request, active directives, compact v2 task state,
+The model receives the current request, active directives, compact v3 task state,
 relevant geospatial evidence, unresolved failures, and a bounded recent-message
-window.  Raw payloads remain addressable through evidence references and are not
-re-injected on every iteration.
+window. Raw payloads remain addressable through evidence references and are not
+re-injected on every iteration. The canonical request interpretation is compiled
+once per turn after contextual merge and resolution. Every planned step carries
+the target and analysis-scope references from that contract. Follow-ups inherit
+only explicitly relevant committed targets and result references; a
+viewport-only follow-up changes the camera without refetching data.
 
 ## Observability
 

@@ -55,6 +55,42 @@ def test_nominatim_rank_candidates_prefers_poi_when_expected() -> None:
 
 
 ###############################################################################
+def test_nominatim_rank_candidates_preserves_named_river_semantics() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    ranked = service.rank_candidates(
+        [
+            {
+                "lat": "47.56",
+                "lon": "7.59",
+                "display_name": "Rhine, Basel, Switzerland",
+                "class": "waterway",
+                "type": "river",
+                "importance": 0.8,
+                "address": {"city": "Basel", "country": "Switzerland"},
+            },
+            {
+                "lat": "47.56",
+                "lon": "7.59",
+                "display_name": "Basel, Switzerland",
+                "class": "boundary",
+                "type": "administrative",
+                "importance": 0.95,
+                "address": {"city": "Basel", "country": "Switzerland"},
+            },
+        ],
+        address="Rhine river",
+        city="Basel",
+        country_name="Switzerland",
+        country_code="CH",
+        query="Rhine river, Basel, Switzerland",
+        expected_location_type="river",
+    )
+    assert ranked
+    assert ranked[0]["selected_result_type"] == "river"
+    assert ranked[0]["selected_result_class"] == "waterway"
+
+
+###############################################################################
 def test_nominatim_rank_candidates_prefers_city_boundary_over_parent_region() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
     candidates = [

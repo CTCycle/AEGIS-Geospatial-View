@@ -16,6 +16,7 @@ from server.domain.agent.decision import (
     LocationResolutionProvenance,
     ResolvedLocation,
 )
+from server.domain.agent.interpretation import normalize_target_key
 from server.contracts.extraction import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
 
@@ -25,8 +26,14 @@ class LocationResolver:
     SPECIFICITY_BY_SIGNAL_TYPE = {
         "coordinates": 6,
         "address": 5,
+        "airport": 5,
+        "feature": 5,
+        "landmark": 5,
         "poi": 5,
+        "river": 5,
+        "road": 5,
         "street": 5,
+        "station": 5,
         "neighborhood": 4,
         "district": 4,
         "municipality": 3,
@@ -222,6 +229,95 @@ class LocationResolver:
             ),
             missing_fields=["location"],
         )
+
+    async def resolve_location_targets(
+        self,
+        location_signals: list[LocationSignal],
+        memory_snapshot: dict[str, Any],
+    ) -> dict[str, ResolvedLocation] | ClarificationRequest:
+        """Resolve independent same-level targets without collapsing them.
+
+        The legacy single-location API intentionally returns a clarification for
+        two same-level places.  Comparisons and combined map requests need a
+        bounded multi-target form instead: the most specific level is treated
+        as the target level, each target is geocoded once, and lower-specificity
+        signals remain parent context.  A hierarchical request such as
+        ``EUR in Rome`` therefore still returns one target, while ``Paris and
+        London`` returns two resolved locations.
+        """
+
+        explicit = [
+            signal
+            for signal in location_signals
+            if signal.signal_type not in {"coordinates", *self.DEICTIC_SIGNAL_TYPES}
+            and signal.raw_value.strip()
+        ]
+        if not explicit:
+            result = await self.resolve_location_signals(
+                location_signals,
+                memory_snapshot,
+            )
+            if isinstance(result, ResolvedLocation):
+                return {self._normalize_text(result.label): result}
+            return result
+
+        context_signals = [
+            *explicit,
+            *self._memory_parent_signals(memory_snapshot, explicit),
+        ]
+        highest = max(
+            self.SPECIFICITY_BY_SIGNAL_TYPE.get(signal.signal_type, 0)
+            for signal in context_signals
+        )
+        target_signals = self._dedupe_signals(
+            [
+                signal
+                for signal in context_signals
+                if self.SPECIFICITY_BY_SIGNAL_TYPE.get(signal.signal_type, 0)
+                == highest
+            ]
+        )
+        if len(target_signals) <= 1:
+            result = await self.resolve_location_signals(
+                location_signals,
+                memory_snapshot,
+            )
+            if isinstance(result, ResolvedLocation):
+                key = self._normalize_text(
+                    (
+                        target_signals[0].normalized_value
+                        or target_signals[0].raw_value
+                    )
+                    if target_signals
+                    else result.label
+                )
+                return {key: result}
+            return result
+
+        resolved: dict[str, ResolvedLocation] = {}
+        parent_signals = [
+            signal
+            for signal in context_signals
+            if self.SPECIFICITY_BY_SIGNAL_TYPE.get(signal.signal_type, 0) < highest
+        ]
+        for target in target_signals:
+            candidate = await self._resolve_signal(
+                target,
+                context_signals=parent_signals,
+            )
+            if isinstance(candidate, ClarificationRequest):
+                return candidate
+            if candidate is None:
+                return ClarificationRequest(
+                    question=(
+                        f"Which {target.signal_type} do you mean by "
+                        f"{target.normalized_value or target.raw_value}?"
+                    ),
+                    reason="A requested peer target could not be resolved.",
+                    missing_fields=["location"],
+                )
+            resolved[self._normalize_text(target.normalized_value or target.raw_value)] = candidate
+        return resolved
 
     # -------------------------------------------------------------------------
     async def _resolve_same_level_relationship(
@@ -462,7 +558,19 @@ class LocationResolver:
             city=(
                 city
                 if signal.signal_type
-                in {"address", "poi", "street", "neighborhood", "district"}
+                in {
+                    "address",
+                    "airport",
+                    "feature",
+                    "landmark",
+                    "poi",
+                    "river",
+                    "road",
+                    "street",
+                    "station",
+                    "neighborhood",
+                    "district",
+                }
                 or (allow_related_type and city)
                 else None
             ),
@@ -666,7 +774,17 @@ class LocationResolver:
                 candidate_text=candidate_text,
             ):
                 return False
-        elif signal.signal_type in {"address", "poi", "street"}:
+        elif signal.signal_type in {
+            "address",
+            "airport",
+            "feature",
+            "landmark",
+            "poi",
+            "river",
+            "road",
+            "street",
+            "station",
+        }:
             if result_type in self.ADMINISTRATIVE_RESULT_TYPES:
                 return False
             if result_type in self.CITY_RESULT_TYPES:
@@ -792,8 +910,14 @@ class LocationResolver:
             signal_type
             not in {
                 "address",
+                "airport",
+                "feature",
+                "landmark",
                 "poi",
+                "river",
+                "road",
                 "street",
+                "station",
                 "neighborhood",
                 "district",
             }
@@ -892,8 +1016,11 @@ class LocationResolver:
     def _normalize_text(self, value: str) -> str:
         normalizer = getattr(self.nominatim_service, "normalize_component", None)
         if callable(normalizer):
+            # Keep the geocoder's configured normalizer when available, but
+            # fall back to the same shared canonical identity used by request
+            # compilation so lookup keys cannot diverge between services.
             return str(normalizer(value))
-        return " ".join(value.casefold().split())
+        return normalize_target_key(value)
 
     # -------------------------------------------------------------------------
     def _canonical_context_value(self, signal_type: str, value: str) -> str:

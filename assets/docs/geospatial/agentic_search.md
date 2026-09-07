@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-09-04
+Last updated: 2026-09-05
 
 ## Summary
 
@@ -232,3 +232,32 @@ allowlisted scalar fields and approved HTTP(S) source links cross into the UI.
 grounded with the verified operation, map summary, direct result, warnings,
 clarification requirements, and task state. It must not invent facts or expose
 internal identifiers.
+
+## Canonical interpretation and map completion
+
+`RequestInterpreter` compiles one `CanonicalRequestInterpretation` after
+parsing, contextual merge, and location resolution. It is the only executable
+interpretation for the turn. Targets retain hierarchy and peer identity;
+spatial relationships use explicit scope kinds (`point`, `bbox`, `radius`,
+`administrative_geometry`, `feature_geometry`, or `viewport`); temporal mode
+and normalized boundaries are carried independently of provider arguments.
+Tool planning consumes these fields and never reinterprets raw user text,
+viewport bounds, or stale location memory.
+
+Map requests have a two-step outcome. Backend execution creates a candidate map
+and emits `map_prepared`; this does not promote conversation map memory or claim
+visibility. The MapLibre client validates the candidate source/layer IDs,
+loading state, viewport, and relevant rendered feature evidence, then sends an
+idempotent `map.render_ack` containing the run version, map session, collection
+revision, and bounded checks. Only a matching successful acknowledgment promotes
+the candidate, commits geographic memory, and permits a final response to claim
+that required layers are visible. A failed or stale candidate leaves the last
+committed map in place.
+
+The deterministic completion contract tracks `location_resolved`,
+`required_data_retrieved`, `spatial_filter_applied`, `temporal_filter_applied`,
+`renderable_geometry_created`, `map_state_committed`,
+`viewport_contains_results`, and `final_response_ready`. Metadata-only weather
+or other sampled values remain inspectable but cannot satisfy a required visual
+layer. A valid empty result is data retrieval with an explicit no-results map
+state, not provider success with fabricated features.

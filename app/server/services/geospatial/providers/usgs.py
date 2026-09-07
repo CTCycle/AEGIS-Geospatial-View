@@ -16,6 +16,7 @@ from server.services.geospatial.providers.http import (
     call_json_fetcher,
     fetch_json_url,
 )
+from server.services.geospatial.spatial_constraints import geodesic_distance_m
 
 
 ###############################################################################
@@ -45,6 +46,7 @@ class USGSProvider(GeospatialProvider):
             payload = await call_json_fetcher(self.fetcher, features_url)
             features = _normalize_earthquake_features(payload)
             features = _filter_features_to_bbox(features, request.bbox)
+            features = _filter_features_to_radius(features, request.params)
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -89,6 +91,7 @@ class USGSProvider(GeospatialProvider):
             payload = await call_json_fetcher(self.fetcher, features_url)
             features = _normalize_water_gauge_features(payload)
             features = _filter_features_to_bbox(features, request.bbox)
+            features = _filter_features_to_radius(features, request.params)
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -257,7 +260,46 @@ def _filter_features_to_bbox(
             latitude is not None
             and longitude is not None
             and south <= latitude <= north
-            and west <= longitude <= east
+            and (
+                west <= longitude <= east
+                if west <= east
+                else longitude >= west or longitude <= east
+            )
         ):
             filtered.append(feature)
     return filtered
+
+
+###############################################################################
+def _filter_features_to_radius(
+    features: list[dict[str, object]],
+    params: dict[str, object],
+) -> list[dict[str, object]]:
+    """Apply the exact requested radius after the bbox prefilter."""
+
+    latitude = _float_or_none(params.get("latitude"))
+    longitude = _float_or_none(params.get("longitude"))
+    radius_m = _float_or_none(params.get("radius_m"))
+    if (
+        latitude is None
+        or longitude is None
+        or radius_m is None
+        or radius_m <= 0
+        or not _valid_coordinates(latitude, longitude)
+    ):
+        return features
+    return [
+        feature
+        for feature in features
+        if (
+            (feature_latitude := _float_or_none(feature.get("latitude"))) is not None
+            and (feature_longitude := _float_or_none(feature.get("longitude"))) is not None
+            and geodesic_distance_m(
+                latitude,
+                longitude,
+                feature_latitude,
+                feature_longitude,
+            )
+            <= radius_m
+        )
+    ]

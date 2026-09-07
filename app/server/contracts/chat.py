@@ -14,6 +14,7 @@ from server.domain.agent.pipeline import (
     ToolPlan,
     VisualizationUpdate,
 )
+from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.contracts.extraction import TurnParseResult
 from server.contracts.geospatial import MapSession
 
@@ -37,8 +38,13 @@ class ChatTurnRequest(BaseModel):
     title: str | None = None
     message: str
     datetime: str | None = None
+    timezone: str | None = Field(default=None, max_length=64)
     request_id: str | None = None
     conversation_id: str
+    # Interactive realtime runs defer promotion of a candidate map until the
+    # browser acknowledges the exact rendered revision.  Direct API callers
+    # retain the historical immediate-commit behavior by default.
+    defer_map_commit: bool = False
 
 
 ###############################################################################
@@ -86,7 +92,7 @@ class ChatOperationResult(BaseModel):
         "error",
         "failure_diagnostic",
     ]
-    status: Literal["success", "partial", "failed"]
+    status: Literal["success", "partial", "pending", "failed"]
     message: str
     warnings: list[str] = Field(default_factory=lambda: list[str]())
     direct_result: dict[str, Any] | None = None
@@ -123,6 +129,7 @@ class ChatTurnResponse(BaseModel):
     visualization_update: VisualizationUpdate | None = None
     context_revision: int | None = None
     execution_trace: dict[str, Any] | None = None
+    canonical_request: CanonicalRequestInterpretation | None = None
 
 
 ###############################################################################

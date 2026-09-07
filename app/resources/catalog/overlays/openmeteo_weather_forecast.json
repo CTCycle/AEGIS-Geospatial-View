@@ -125,5 +125,17 @@
     "timestampPath": null,
     "fieldMap": {},
     "expectedGeometry": "point"
+  },
+  "executionContract": {
+    "supported_operations": ["show", "inspect", "forecast"],
+    "supported_scope_kinds": ["point"],
+    "temporal_modes": ["current", "forecast"],
+    "temporal_windows": ["provider_forecast_window"],
+    "required_inputs": ["location", "temporal_mode"],
+    "output_geometry_type": "Point",
+    "render_support": "metadata_only",
+    "coverage": "global",
+    "limitations": ["Weather values are sampled at a point; no area raster is provided."],
+    "fallback_ids": []
   }
 }

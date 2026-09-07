@@ -31,6 +31,7 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "tenacity" },
     { name = "tqdm" },
+    { name = "tzdata" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -81,6 +82,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = "==2.0.50" },
     { name = "tenacity", specifier = ">=9.0.0" },
     { name = "tqdm", specifier = "==4.67.3" },
+    { name = "tzdata", specifier = ">=2024.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.40.0" },
 ]
 provides-extras = ["test", "geospatial-ingestion"]

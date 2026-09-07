@@ -15,8 +15,9 @@ def _map_session(
     location: str,
     basemap_id: str = "osm_default",
     basemap_label: str | None = None,
-    overlays: list[tuple[str, str, bool]] | None = None,
+    overlays: list[tuple[str, str, bool] | tuple[str, str, bool, str]] | None = None,
     warnings: list[str] | None = None,
+    descriptors: list[dict[str, object]] | None = None,
 ) -> MapSession:
     return MapSession(
         session_id="map-1",
@@ -40,14 +41,15 @@ def _map_session(
             instances=[
                 OverlayInstance(
                     instance_id=f"instance-{index}",
-                    capability_id=capability_id,
-                    label=label,
+                    capability_id=item[0],
+                    label=item[1],
                     provider="test",
                     overlay_type="overlay",
-                    rendering_mode="metadata-only",
-                    visible=visible,
+                    rendering_mode=item[3] if len(item) == 4 else "metadata-only",
+                    visible=item[2],
+                    descriptor=(descriptors or [])[index] if descriptors and index < len(descriptors) else {},
                 )
-                for index, (capability_id, label, visible) in enumerate(overlays or [])
+                for index, item in enumerate(overlays or [])
             ]
         ),
     )
@@ -65,7 +67,7 @@ def test_map_session_message_uses_human_readable_labels() -> None:
 
     assert message == (
         "Map ready for Times Square, New York using OpenStreetMap. "
-        "Visible overlays: the TomTom Traffic Flow overlay."
+        "Available as metadata only: the TomTom Traffic Flow overlay."
     )
     assert "osm_default" not in message
     assert "tomtom_traffic_flow" not in message
@@ -120,8 +122,8 @@ def test_map_session_message_reports_current_visibility_state() -> None:
             location="Zurich",
             basemap_label="OpenStreetMap",
             overlays=[
-                ("weather-zurich", "Weather Forecast", False),
-                ("traffic-zurich", "Traffic", True),
+                ("weather-zurich", "Weather Forecast", False, "geojson"),
+                ("traffic-zurich", "Traffic", True, "geojson"),
             ],
         )
     )
@@ -129,6 +131,22 @@ def test_map_session_message_reports_current_visibility_state() -> None:
     assert "Visible overlays: the Traffic overlay." in message
     assert "Hidden overlays: the Weather Forecast overlay." in message
     assert "I added" not in message
+
+
+###############################################################################
+def test_map_session_message_reports_render_status_failure_as_unavailable() -> None:
+    message = AgentOrchestrator._compose_map_session_message(
+        _map_session(
+            location="Zurich",
+            basemap_label="OpenStreetMap",
+            overlays=[("weather-zurich", "Weather Forecast", True, "geojson")],
+            descriptors=[{"render_status": "unavailable"}],
+        )
+    )
+
+    assert "Unavailable overlays: the Weather Forecast overlay." in message
+    assert "Visible overlays:" not in message
+    assert "Available as metadata only:" not in message
 
 
 ###############################################################################

@@ -630,7 +630,7 @@ class _Catalog:
 
     # -------------------------------------------------------------------------
     async def _handler(self, arguments: dict[str, Any], context: Any) -> dict[str, Any]:
-        _ = arguments, context
+        _ = arguments
         capability_id = str(arguments.get("capability_id") or "weather_overlay")
         capability_arguments = arguments.get("arguments") or {}
         latitude = float(capability_arguments.get("latitude") or 41.9028)
@@ -648,6 +648,32 @@ class _Catalog:
             "center_longitude": longitude,
             "radius_m": 2500.0,
         }
+        canonical_request = getattr(context, "canonical_request", None)
+        context_metadata = getattr(context, "metadata", {})
+        target_id = (
+            str(context_metadata.get("target_id") or "").strip()
+            or (
+                canonical_request.primary_target.target_id
+                if canonical_request is not None
+                and canonical_request.primary_target is not None
+                else None
+            )
+        )
+        analysis_scope = None
+        if canonical_request is not None and target_id:
+            analysis_scope = next(
+                (
+                    constraint.analysis_scope
+                    for constraint in canonical_request.spatial_constraints
+                    if constraint.target_id == target_id
+                ),
+                None,
+            )
+        temporal = (
+            canonical_request.temporal_constraints
+            if canonical_request is not None
+            else None
+        )
         return {
             "ok": True,
             "operation": "map_session_created",
@@ -671,6 +697,17 @@ class _Catalog:
                     longitude + 0.01,
                     latitude + 0.01,
                 ],
+                payload={
+                    "target_id": target_id,
+                    "analysis_scope": analysis_scope,
+                    "time_mode": temporal.mode if temporal is not None else None,
+                    "start_time_iso": (
+                        temporal.start_time_iso if temporal is not None else None
+                    ),
+                    "end_time_iso": (
+                        temporal.end_time_iso if temporal is not None else None
+                    ),
+                },
             ).model_dump(mode="json"),
             "direct_result": None,
             "capability_selection": None,

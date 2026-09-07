@@ -11,7 +11,7 @@ from typing import Any, Literal
 
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
 from server.contracts.chat import ChatOperationResult
-from server.contracts.geospatial import MapSession
+from server.contracts.geospatial import MapSession, OverlayInstance
 
 
 ###############################################################################
@@ -436,14 +436,48 @@ class AgentResponseBuilder:
             map_session.basemap_id
         )
         instances = map_session.overlay_collection.instances
+        metadata_labels: list[str] = []
+        unavailable_labels: list[str] = []
+        renderable_instances: list[OverlayInstance] = []
+        for instance in instances:
+            descriptor = instance.descriptor
+            rendering_mode = instance.rendering_mode.casefold()
+            result_type = str(
+                descriptor.get("result_type") or descriptor.get("resultType") or ""
+            ).casefold()
+            render_status = str(
+                descriptor.get("render_status") or descriptor.get("renderStatus") or ""
+            ).casefold()
+            result_status = str(
+                descriptor.get("result_status") or descriptor.get("resultStatus") or ""
+            ).casefold()
+            label = instance.label or cls.humanize_identifier(instance.capability_id)
+            if result_status in {"unavailable", "error", "failed", "invalid"} or render_status in {
+                "unavailable",
+                "error",
+                "failed",
+                "invalid",
+            }:
+                unavailable_labels.append(label)
+                continue
+            metadata_only = (
+                rendering_mode in {"metadata-only", "metadata_only"}
+                or result_type == "metadata"
+                or render_status in {"metadata-only", "metadata_only"}
+            )
+            if metadata_only:
+                if instance.visible:
+                    metadata_labels.append(label)
+                continue
+            renderable_instances.append(instance)
         visible_labels = [
             instance.label or cls.humanize_identifier(instance.capability_id)
-            for instance in instances
+            for instance in renderable_instances
             if instance.visible
         ]
         hidden_labels = [
             instance.label or cls.humanize_identifier(instance.capability_id)
-            for instance in instances
+            for instance in renderable_instances
             if not instance.visible
         ]
         warnings = [
@@ -457,7 +491,24 @@ class AgentResponseBuilder:
             parts.append(f"Visible overlays: {cls.format_label_list(visible_labels)}.")
         if hidden_labels:
             parts.append(f"Hidden overlays: {cls.format_label_list(hidden_labels)}.")
-        if not visible_labels and not hidden_labels:
+        if metadata_labels:
+            parts.append(
+                "Available as metadata only: "
+                + cls.format_label_list(metadata_labels)
+                + "."
+            )
+        if unavailable_labels:
+            parts.append(
+                "Unavailable overlays: "
+                + cls.format_label_list(unavailable_labels)
+                + "."
+            )
+        if (
+            not visible_labels
+            and not hidden_labels
+            and not metadata_labels
+            and not unavailable_labels
+        ):
             parts.append("No overlays are currently active.")
         if warnings:
             parts.append(

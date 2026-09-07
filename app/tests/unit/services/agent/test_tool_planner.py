@@ -7,6 +7,8 @@ from server.contracts.extraction import (
     OverlayCommand,
     TurnParseResult,
 )
+from server.domain.agent.decision import ResolvedLocation
+from server.services.agent.request_interpreter import RequestInterpreter
 from server.services.agent.tool_planner import DeterministicToolPlanner
 
 
@@ -179,3 +181,101 @@ def test_atomic_tasks_without_layer_refs_do_not_create_inferred_dependencies() -
     plan = DeterministicToolPlanner().build_plan(turn, "environmental_data")
 
     assert [step.depends_on for step in plan.steps] == [[], []]
+
+
+def test_peer_targets_create_independent_capability_steps() -> None:
+    turn = _turn(
+        "Compare earthquakes in Paris and London",
+        layers=["usgs_earthquakes"],
+    ).model_copy(
+        update={
+            "location_signals": [
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="Paris",
+                    normalized_value="Paris",
+                    confidence=0.99,
+                ),
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="London",
+                    normalized_value="London",
+                    confidence=0.99,
+                ),
+            ],
+            "operations": ["compare"],
+        }
+    )
+    canonical = RequestInterpreter().compile(
+        request_id="peer-plan-1",
+        turn=turn,
+        resolved_locations={
+            "paris": ResolvedLocation(
+                label="Paris, France", latitude=48.8566, longitude=2.3522
+            ),
+            "london": ResolvedLocation(
+                label="London, United Kingdom", latitude=51.5074, longitude=-0.1278
+            ),
+        },
+    )
+
+    plan = DeterministicToolPlanner().build_plan(
+        turn,
+        "environmental_data",
+        canonical_request=canonical,
+    )
+
+    assert len(plan.steps) == 2
+    assert [step.target_id for step in plan.steps] == ["target-1", "target-2"]
+    assert [
+        step.arguments["arguments"]["location"] for step in plan.steps
+    ] == ["Paris, France", "London, United Kingdom"]
+
+
+def test_peer_targets_create_independent_provider_layer_steps() -> None:
+    turn = _turn(
+        "Compare the selected layer in Paris and London",
+        layers=["gibs:MODIS_Terra_CorrectedReflectance_TrueColor"],
+    ).model_copy(
+        update={
+            "location_signals": [
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="Paris",
+                    normalized_value="Paris",
+                    confidence=0.99,
+                ),
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="London",
+                    normalized_value="London",
+                    confidence=0.99,
+                ),
+            ],
+            "operations": ["compare"],
+        }
+    )
+    canonical = RequestInterpreter().compile(
+        request_id="peer-provider-plan-1",
+        turn=turn,
+        resolved_locations={
+            "paris": ResolvedLocation(
+                label="Paris, France", latitude=48.8566, longitude=2.3522
+            ),
+            "london": ResolvedLocation(
+                label="London, United Kingdom", latitude=51.5074, longitude=-0.1278
+            ),
+        },
+    )
+
+    plan = DeterministicToolPlanner().build_plan(
+        turn,
+        "map_layers",
+        canonical_request=canonical,
+    )
+
+    assert len(plan.steps) == 2
+    assert [step.target_id for step in plan.steps] == ["target-1", "target-2"]
+    assert all(
+        step.tool_name == "render_geospatial_provider_layer" for step in plan.steps
+    )

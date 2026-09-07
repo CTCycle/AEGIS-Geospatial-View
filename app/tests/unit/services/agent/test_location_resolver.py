@@ -79,6 +79,48 @@ def test_location_resolver_uses_coordinates_without_geocoder() -> None:
 
 
 ###############################################################################
+def test_location_resolver_resolves_same_level_peer_targets_independently() -> None:
+    calls: list[str] = []
+
+    class _Peers:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            calls.append(kwargs["address"])
+            return {
+                "Paris": {
+                    "display_name": "Paris, France",
+                    "lat": 48.8566,
+                    "lon": 2.3522,
+                    "type": "city",
+                    "address": {"city": "Paris", "country": "France"},
+                },
+                "London": {
+                    "display_name": "London, United Kingdom",
+                    "lat": 51.5074,
+                    "lon": -0.1278,
+                    "type": "city",
+                    "address": {"city": "London", "country": "United Kingdom"},
+                },
+            }.get(kwargs["address"])
+
+    resolver = LocationResolver(nominatim_service=_Peers())
+
+    async def _run() -> None:
+        result = await resolver.resolve_location_targets(
+            [
+                LocationSignal(signal_type="city", raw_value="Paris", source="model"),
+                LocationSignal(signal_type="city", raw_value="London", source="model"),
+            ],
+            {},
+        )
+        assert isinstance(result, dict)
+        assert result["paris"].longitude == 2.3522
+        assert result["london"].longitude == -0.1278
+
+    run_async_in_thread(_run())
+    assert calls == ["Paris", "London"]
+
+
+###############################################################################
 def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
 
     calls: list[dict[str, object]] = []

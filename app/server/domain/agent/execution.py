@@ -7,6 +7,7 @@ from typing import Any, Literal
 from server.contracts.geospatial import MapSession
 from server.domain.llm.types import LLMToolCall, LLMToolDefinition, LLMToolResult
 from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.domain.agent.reliability import AgentExecutionBudget
 
 
@@ -20,6 +21,7 @@ class AgentExecutionContext:
     policy_constraints: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
     metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
     resolved_location: ResolvedLocation | None = None
+    canonical_request: CanonicalRequestInterpretation | None = None
     execution_budget: AgentExecutionBudget | None = None
 
 

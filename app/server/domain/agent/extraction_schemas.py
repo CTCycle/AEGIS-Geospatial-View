@@ -25,6 +25,17 @@ class LLMTemporalSignal(BaseModel):
 
 
 ###############################################################################
+class LLMGeographicRelationship(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    relationship: str = "in"
+    target: str = ""
+    reference: str | None = None
+    analysis_scope: str = "bbox"
+    distance_m: float | None = Field(default=None, gt=0.0)
+
+
+###############################################################################
 class LLMContextQuery(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -45,13 +56,19 @@ class LLMLocationSignal(BaseModel):
 
     signal_type: Literal[
         "address",
+        "airport",
         "city",
         "country",
         "coordinates",
         "deictic",
         "poi",
+        "feature",
+        "landmark",
         "region",
+        "river",
+        "road",
         "street",
+        "station",
         "neighborhood",
         "district",
         "municipality",
@@ -212,6 +229,14 @@ class LLMParserExtraction(BaseModel):
         default_factory=lambda: list[LLMLocationSignal]()
     )
     temporal_signal: LLMTemporalSignal = Field(default_factory=LLMTemporalSignal)
+    geographic_relationships: list[LLMGeographicRelationship] = Field(
+        default_factory=lambda: list[LLMGeographicRelationship]()
+    )
+    operations: list[str] = Field(default_factory=lambda: list[str]())
+    filters: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    presentation_requirements: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]()
+    )
     context_query: LLMContextQuery = Field(default_factory=LLMContextQuery)
     ambiguities: list[str] = Field(default_factory=lambda: list[str]())
     disallowed_patterns: list[LLMDisallowedPattern] = Field(

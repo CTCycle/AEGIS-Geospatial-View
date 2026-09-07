@@ -234,6 +234,7 @@ class PlannedTurnExecutionService:
                         turn_contract=turn_contract,
                         latest_memory=latest_memory,
                         resolved_location=native_context.resolved_location,
+                        canonical_request=native_context.canonical_request,
                     )
             else:
                 map_result = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
@@ -241,6 +242,7 @@ class PlannedTurnExecutionService:
                     turn_contract=turn_contract,
                     latest_memory=latest_memory,
                     resolved_location=native_context.resolved_location,
+                    canonical_request=native_context.canonical_request,
                 )
             if isinstance(map_result, ClarificationRequest):
                 return await self.turn_state_assembler.build_location_clarification_response(
@@ -269,12 +271,14 @@ class PlannedTurnExecutionService:
                             turn_contract,
                             latest_memory,
                             native_context.resolved_location,
+                            canonical_request=native_context.canonical_request,
                         )
                 else:
                     map_result = await self.turn_state_assembler.build_map_session_from_turn_contract(
                         turn_contract,
                         latest_memory,
                         native_context.resolved_location,
+                        canonical_request=native_context.canonical_request,
                     )
                 if isinstance(map_result, ClarificationRequest):
                     return await self.turn_state_assembler.build_location_clarification_response(
@@ -424,9 +428,10 @@ class PlannedTurnExecutionService:
                 tool_plan=tool_plan.model_dump(mode="json"),
                 tool_result_refs=[result.step_id for result in planned_results],
             )
-            self.task_state_service.set_active_visualization(
-                conversation_key, map_session, tool_payload=tool_payload
-            )
+            if not bool(native_context.metadata.get("defer_map_commit")):
+                self.task_state_service.set_active_visualization(
+                    conversation_key, map_session, tool_payload=tool_payload
+                )
             assistant_message = await synthesize_response_async(
                 self.response_synthesizer,
                 user_text=turn_contract.user_text,
@@ -510,6 +515,7 @@ class PlannedTurnExecutionService:
             direct_result=direct_result,
             tool_payload=tool_payload,
             resolved_location=native_context.resolved_location,
+            canonical_request=native_context.canonical_request,
         )
         failure = self.turn_state_assembler.failure_from_operation(
             operation, tool_payload
@@ -523,9 +529,10 @@ class PlannedTurnExecutionService:
             tool_plan=tool_plan.model_dump(mode="json"),
             tool_result_refs=[result.step_id for result in planned_results],
         )
-        self.task_state_service.set_active_visualization(
-            conversation_key, map_session, tool_payload=tool_payload
-        )
+        if not bool(native_context.metadata.get("defer_map_commit")):
+            self.task_state_service.set_active_visualization(
+                conversation_key, map_session, tool_payload=tool_payload
+            )
         added_instance_ids = [
             instance_id
             for result in overlay_mutation_results
@@ -601,6 +608,12 @@ class PlannedTurnExecutionService:
         )
         if execution_trace is not None:
             tool_payload["execution_trace"] = execution_trace
+        history_memory_snapshot = (
+            latest_memory
+            if bool(native_context.metadata.get("defer_map_commit"))
+            and map_session is not None
+            else memory_snapshot
+        )
         self.history_service.append_message(
             conversation_id=conversation_id,
             role="assistant",
@@ -608,9 +621,14 @@ class PlannedTurnExecutionService:
             request_id=request_id,
             structured_payload={
                 "turn_contract": turn_contract.model_dump(mode="json"),
+                "canonical_request": (
+                    native_context.canonical_request.model_dump(mode="json")
+                    if native_context.canonical_request is not None
+                    else None
+                ),
                 "decision": decision.model_dump(mode="json"),
                 "operation": operation.model_dump(mode="json"),
-                "memory_snapshot": memory_snapshot,
+                "memory_snapshot": history_memory_snapshot,
                 "context_usage": context_usage.model_dump(mode="json")
                 if context_usage is not None
                 else None,

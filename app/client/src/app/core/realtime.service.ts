@@ -7,7 +7,12 @@ import {
   REALTIME_SUBPROTOCOL,
 } from './constants';
 import { parseRealtimeServerMessage } from './realtime-parsers';
-import { JsonObject, RealtimeConnectionState, RealtimeServerMessage } from './types';
+import {
+  JsonObject,
+  MapRenderAcknowledgement,
+  RealtimeConnectionState,
+  RealtimeServerMessage,
+} from './types';
 
 type RealtimeMessageHandler = (message: RealtimeServerMessage) => void;
 type RealtimeStateHandler = (state: RealtimeConnectionState) => void;
@@ -100,10 +105,11 @@ export class RealtimeService {
     this.resumeSequence = Math.max(0, sequence);
   }
 
-  sendRunStart(message: string, clientRequestId: string): string {
+  sendRunStart(message: string, clientRequestId: string, timezone?: string): string {
     return this.queueCommand('run.start', {
       message,
       client_request_id: clientRequestId,
+      ...(timezone ? { timezone } : {}),
     });
   }
 
@@ -117,6 +123,25 @@ export class RealtimeService {
 
   sendRunCancel(runId: string, reason = 'user_cancelled'): string {
     return this.queueCommand('run.cancel', { run_id: runId, reason });
+  }
+
+  sendMapRenderAck(acknowledgement: MapRenderAcknowledgement): string {
+    return this.queueCommand(
+      'map.render_ack',
+      acknowledgement as unknown as JsonObject,
+    );
+  }
+
+  discardPendingMapRenderAcks(): void {
+    this.pendingCommands.forEach((command, messageId) => {
+      if (command.type !== 'map.render_ack') {
+        return;
+      }
+      if (command.ackTimer !== undefined) {
+        window.clearTimeout(command.ackTimer);
+      }
+      this.pendingCommands.delete(messageId);
+    });
   }
 
   get connectionState(): RealtimeConnectionState {

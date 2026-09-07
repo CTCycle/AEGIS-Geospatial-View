@@ -371,6 +371,30 @@ export interface MapSession {
   };
   compliance_warnings?: string[];
   overlay_collection: OverlayCollectionState;
+  presentation?: PresentationStatus | null;
+}
+
+export type PresentationStatus = 'not_required' | 'pending' | 'ready' | 'failed';
+
+export interface RenderRequirement {
+  name: string;
+  required: boolean;
+  status: 'pending' | 'satisfied' | 'failed' | 'not_applicable';
+  target_id?: string | null;
+  evidence_ref?: string | null;
+  failure_code?: string | null;
+}
+
+export interface MapRenderAcknowledgement {
+  run_id: string;
+  run_version: number;
+  map_session_id: string;
+  collection_revision: number;
+  status: 'ready' | 'failed';
+  viewport_bounds?: number[] | null;
+  checks: Record<string, boolean>;
+  overlay_results: Array<Record<string, JsonValue>>;
+  failure_code?: string | null;
 }
 
 export interface GeoJsonFeatureCollection {
@@ -424,6 +448,7 @@ export type AgentRunState =
   | 'running'
   | 'updating'
   | 'waiting_for_clarification'
+  | 'awaiting_render'
   | 'completed'
   | 'failed'
   | 'cancelled';
@@ -441,7 +466,8 @@ export type RunEventType =
   | 'cancelled'
   | 'clarification_needed'
   | 'trace'
-  | 'checkpoint';
+  | 'checkpoint'
+  | 'map_prepared';
 
 export type RunEventVisibility = 'user' | 'internal';
 
@@ -470,6 +496,8 @@ export interface ActiveConversationRunSnapshot {
   run_id: string;
   run_version: number;
   state: AgentRunState;
+  presentation_status?: PresentationStatus;
+  presentation?: Record<string, JsonValue> | null;
 }
 
 export interface ConversationSnapshotResponse {
@@ -488,6 +516,7 @@ export interface ChatTurnRequest {
   title?: string;
   message: string;
   datetime?: string;
+  timezone?: string;
   request_id?: string;
 }
 
@@ -561,7 +590,21 @@ export interface TemporalSignal {
 }
 
 export interface LocationSignal {
-  signal_type: 'address' | 'city' | 'country' | 'coordinates' | 'deictic' | 'poi' | 'region' | 'street';
+  signal_type:
+    | 'address'
+    | 'airport'
+    | 'city'
+    | 'country'
+    | 'coordinates'
+    | 'deictic'
+    | 'feature'
+    | 'landmark'
+    | 'poi'
+    | 'region'
+    | 'river'
+    | 'road'
+    | 'station'
+    | 'street';
   raw_value: string;
   normalized_value?: string | null;
   latitude?: number | null;
@@ -659,7 +702,7 @@ export interface ToolPayload {
 
 export interface ChatOperationResult {
   kind: 'map_session' | 'direct_answer' | 'capability_catalog' | 'clarification' | 'rejection' | 'error' | 'failure_diagnostic';
-  status: 'success' | 'partial' | 'failed';
+  status: 'success' | 'partial' | 'pending' | 'failed';
   message: string;
   warnings?: string[];
   direct_result?: Record<string, JsonValue> | null;
@@ -778,6 +821,7 @@ export interface ChatTurnResponse {
   failure_diagnostic?: TaskFailureDetail | null;
   visualization_update?: VisualizationUpdate | null;
   context_revision?: number | null;
+  canonical_request?: Record<string, JsonValue> | null;
 }
 
 export type ChatStreamEventType =

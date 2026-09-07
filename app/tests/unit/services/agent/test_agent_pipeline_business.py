@@ -8,6 +8,10 @@ from typing import Any
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.execution import AgentExecutionContext
 from server.domain.agent.extraction_schemas import LLMParserExtraction
+from server.domain.agent.interpretation import (
+    CanonicalRequestInterpretation,
+    CanonicalTarget,
+)
 from server.domain.agent.pipeline import (
     TaskFailureDetail,
     ToolInputBinding,
@@ -1124,5 +1128,55 @@ def test_map_state_assembler_reuses_single_verified_tool_map_session() -> None:
         assert result.compliance_warnings == [
             "Provider credentials are not configured."
         ]
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_memory_projection_uses_canonical_location_without_regeocoding() -> None:
+    async def _run() -> None:
+        canonical_location = ResolvedLocation(
+            label="Rome, Italy",
+            latitude=41.9028,
+            longitude=12.4964,
+            location_type="city",
+        )
+        stale_location = ResolvedLocation(
+            label="London, United Kingdom",
+            latitude=51.5074,
+            longitude=-0.1278,
+            location_type="city",
+        )
+        canonical = CanonicalRequestInterpretation(
+            request_id="canonical-memory-1",
+            primary_intent="geospatial_data_retrieval",
+            targets=[
+                CanonicalTarget(
+                    target_id="target-rome",
+                    original_text="Rome",
+                    entity_kind="city",
+                    resolved_location=canonical_location,
+                    resolution_status="resolved",
+                )
+            ],
+        )
+
+        class _Resolver:
+            async def resolve_location_signals(self, *_args: Any, **_kwargs: Any) -> Any:
+                raise AssertionError("canonical memory projection must not geocode again")
+
+        assembler = AgentTurnStateAssembler.__new__(AgentTurnStateAssembler)
+        assembler.policy_engine = SimpleNamespace(location_resolver=_Resolver())
+        result = await assembler.resolve_verified_location_for_memory(
+            turn_contract=SimpleNamespace(location_signals=[]),
+            latest_memory={},
+            map_session=None,
+            direct_result={"ok": True},
+            tool_payload={"tool_results": []},
+            resolved_location=stale_location,
+            canonical_request=canonical,
+        )
+
+        assert result == canonical_location
 
     run_async_in_thread(_run())

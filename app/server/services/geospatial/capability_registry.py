@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from server.domain.geospatial.registry import (
     CapabilityRegistrySnapshot,
@@ -95,3 +95,56 @@ class CapabilityRegistry:
                 if str(item.get("id") or "") == normalized:
                     return dict(item)
         return None
+
+    # -------------------------------------------------------------------------
+    def execution_contract(self, capability_id: str) -> dict[str, Any]:
+        """Return normalized provider-neutral facts for deterministic routing."""
+
+        capability = self.get_capability(capability_id) or {}
+        raw_value: object = capability.get("executionContract") or capability.get(
+            "execution_contract"
+        )
+        if not isinstance(raw_value, dict):
+            metadata_value: object = capability.get("metadata")
+            metadata = (
+                cast(dict[str, Any], metadata_value)
+                if isinstance(metadata_value, dict)
+                else {}
+            )
+            raw_value = metadata.get("execution_contract")
+        raw: dict[str, Any] = (
+            cast(dict[str, Any], raw_value)
+            if isinstance(raw_value, dict)
+            else {}
+        )
+        list_fields = (
+            "supported_operations",
+            "supported_scope_kinds",
+            "temporal_modes",
+            "temporal_windows",
+            "supported_aggregations",
+            "required_inputs",
+            "limitations",
+            "fallback_ids",
+        )
+        contract: dict[str, Any] = {
+            field: [str(item).strip() for item in raw.get(field, []) if str(item).strip()]
+            if isinstance(raw.get(field), list)
+            else []
+            for field in list_fields
+        }
+        contract["output_geometry_type"] = (
+            str(raw.get("output_geometry_type")).strip()
+            if raw.get("output_geometry_type") is not None
+            else None
+        )
+        render_support = str(raw.get("render_support") or "none").strip().casefold()
+        contract["render_support"] = (
+            render_support
+            if render_support in {"vector", "raster", "metadata_only", "none"}
+            else "none"
+        )
+        contract["coverage"] = (
+            str(raw.get("coverage")).strip() if raw.get("coverage") is not None else None
+        )
+        return contract

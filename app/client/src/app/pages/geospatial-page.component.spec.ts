@@ -267,6 +267,62 @@ describe('pages/geospatial-page.component', () => {
       .toEqual(['safe_overlay']);
   });
 
+  it('ignores a stale render callback before mutating presentation state', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component['pendingMapSession'] = {
+      session_id: 'map-current',
+      overlay_collection: { revision: 4, instances: [] },
+    } as never;
+    component['pendingRenderContext'] = {
+      runId: 'run-current',
+      runVersion: 2,
+      mapSessionId: 'map-current',
+      collectionRevision: 4,
+    };
+    component.mapRenderState = 'preparing';
+
+    component.onMapRenderStateChange({
+      sessionId: 'map-current',
+      runId: 'run-stale',
+      runVersion: 1,
+      state: 'ready',
+      collectionRevision: 4,
+    });
+
+    expect(component.mapRenderState).toBe('preparing');
+  });
+
+  it('restores the committed map when a pending candidate is cancelled after reconnect', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
+    component.mapSession = { session_id: 'committed-map' } as never;
+    component['committedMapSession'] = component.mapSession;
+    component['pendingMapSession'] = { session_id: 'candidate-map' } as never;
+    component['pendingRenderContext'] = {
+      runId: 'run-current',
+      runVersion: 1,
+      mapSessionId: 'candidate-map',
+      collectionRevision: 2,
+    };
+    component.isLoading = true;
+
+    component['handleRealtimeMessage']({
+      type: 'session.resumed',
+      conversation_id: 'conv-1',
+      payload: { state: 'cancelled' },
+    } as never);
+
+    const currentMap = component.mapSession as unknown as { session_id?: string } | undefined;
+    expect(currentMap?.session_id).toBe('committed-map');
+    expect(component['pendingMapSession']).toBeUndefined();
+    expect(component['pendingRenderContext']).toBeUndefined();
+    expect(component.isLoading).toBeFalse();
+  });
+
   it('operation-driven failures preserve the response and flag the agent model', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       assistant_message: 'Tool timed out.',

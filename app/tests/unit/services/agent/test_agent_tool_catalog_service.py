@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.interpretation import CanonicalRequestInterpretation, CanonicalTarget
 from server.contracts.extraction import (
     ConversationContextSnapshot,
     LocationSignal,
@@ -449,6 +450,36 @@ def test_catalog_reuses_run_scoped_location_without_resolving_tool_argument() ->
 
     assert result is resolved
     assert resolver.calls == 0
+
+
+def test_catalog_rejects_native_location_that_conflicts_with_canonical_target() -> None:
+    paris = ResolvedLocation(
+        label="Paris, France",
+        latitude=48.8566,
+        longitude=2.3522,
+        location_type="city",
+    )
+    context = AgentExecutionContext(
+        resolved_location=paris,
+        canonical_request=CanonicalRequestInterpretation(
+            request_id="native-target-1",
+            primary_intent="data_layer_query",
+            targets=[
+                CanonicalTarget(
+                    target_id="target-paris",
+                    original_text="Paris",
+                    entity_kind="city",
+                    resolved_location=paris,
+                )
+            ],
+        ),
+    )
+
+    result = run_async_in_thread(
+        _service()._resolve_location({"location": "London"}, context)
+    )
+
+    assert result["error"]["code"] == "canonical_location_mismatch"  # type: ignore[index]
 
 
 ###############################################################################

@@ -43,6 +43,7 @@ class AgentTurnHistoryService:
             "conversation_id": conversation_id,
             "assistant_message": existing.get("content") or "",
             "turn_contract": payload.get("turn_contract"),
+            "canonical_request": payload.get("canonical_request"),
             "decision": payload.get("decision"),
             "operation": payload.get("operation"),
             "tool_payload": existing.get("tool_payload"),

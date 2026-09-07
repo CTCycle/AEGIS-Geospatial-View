@@ -52,6 +52,7 @@ def build_chat_runtime(
     database: SQLiteRepository,
     *,
     geospatial_runtime: GeospatialRuntime,
+    application_timezone: str = "UTC",
 ) -> ChatRuntime:
     settings_repo = ModelSettingsRepository(database)
     credentials_repo = geospatial_runtime.credentials_repo
@@ -162,6 +163,7 @@ def build_chat_runtime(
             tool_plan_executor=tool_plan_executor,
             direct_turn_response_service=direct_turn_response_service,
             context_profile_resolver=context_profile_resolver,
+            application_timezone=application_timezone,
             capability_resolver=CapabilityResolver(
                 capability_registry=capability_registry,
                 runtime_registry=runtime_registry,

@@ -11,13 +11,19 @@ TaskClass = Literal["map_search", "direct_query", "general_question", "unclear"]
 PoiCategory = str
 LocationSignalType = Literal[
     "address",
+    "airport",
     "city",
     "country",
     "coordinates",
     "deictic",
     "poi",
+    "feature",
+    "landmark",
     "region",
+    "river",
+    "road",
     "street",
+    "station",
     "neighborhood",
     "district",
     "municipality",
@@ -80,6 +86,39 @@ class TemporalSignal(BaseModel):
     end_time_iso: str | None = None
     granularity: TemporalGranularity = "none"
     aggregation: TemporalAggregation = "none"
+
+
+###############################################################################
+class GeographicRelationship(BaseModel):
+    """Parser evidence for a target/reference spatial relationship."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    relationship: Literal[
+        "at",
+        "in",
+        "near",
+        "around",
+        "within_distance",
+        "along",
+        "north_of",
+        "south_of",
+        "east_of",
+        "west_of",
+        "visible_area",
+        "here",
+    ] = "in"
+    target: str
+    reference: str | None = None
+    analysis_scope: Literal[
+        "point",
+        "bbox",
+        "radius",
+        "administrative_geometry",
+        "feature_geometry",
+        "viewport",
+    ] = "bbox"
+    distance_m: float | None = Field(default=None, gt=0.0)
 
 
 ###############################################################################
@@ -206,6 +245,14 @@ class TurnParseResult(BaseModel):
     )
     normalized_action: NormalizedAction
     temporal_signal: TemporalSignal = Field(default_factory=TemporalSignal)
+    geographic_relationships: list[GeographicRelationship] = Field(
+        default_factory=lambda: list[GeographicRelationship]()
+    )
+    operations: list[str] = Field(default_factory=lambda: list[str]())
+    filters: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    presentation_requirements: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]()
+    )
     context_query: ContextQuery = Field(default_factory=ContextQuery)
     ambiguities: list[str] = Field(default_factory=lambda: list[str]())
     disallowed_patterns: list[DisallowedPattern] = Field(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from server.common.typing import is_json_object, json_array, json_object
 
 from typing import Any, Literal, cast
@@ -17,6 +19,7 @@ from server.domain.agent.pipeline import (
     TaskFailureDetail,
     VisualizationUpdate,
 )
+from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.contracts.chat import ChatOperationResult, ChatTurnResponse
 from server.contracts.extraction import OverlayCommand
 from server.contracts.geospatial import (
@@ -118,6 +121,7 @@ class AgentTurnStateAssembler:
         latest_memory: dict[str, Any],
         context_usage: Any,
         resolved_location: ResolvedLocation | None = None,
+        canonical_request: CanonicalRequestInterpretation | None = None,
     ) -> ChatTurnResponse:
         clarification = turn_contract.clarification_plan
         if not is_json_object(clarification):
@@ -165,6 +169,13 @@ class AgentTurnStateAssembler:
                         source_map.resolved_location,
                         turn_contract=turn_contract,
                         active_visualization=source_map.model_dump(mode="json"),
+                        canonical_request=canonical_request,
+                        target_id=(
+                            canonical_request.primary_target.target_id
+                            if canonical_request is not None
+                            and canonical_request.primary_target is not None
+                            else None
+                        ),
                     )
                     fetched_map = await self.search_orchestrator.execute(request)
                     map_session = OverlayCollectionService.merge_into_map_session(
@@ -623,8 +634,25 @@ class AgentTurnStateAssembler:
         turn_contract: Any,
         latest_memory: dict[str, Any] | None,
         resolved_location: ResolvedLocation | None = None,
+        canonical_request: CanonicalRequestInterpretation | None = None,
     ) -> MapSession | ClarificationRequest | None:
-        if resolved_location is None:
+        canonical_target = (
+            canonical_request.primary_target
+            if canonical_request is not None
+            else None
+        )
+        if canonical_request is not None:
+            if canonical_target is None or canonical_target.resolved_location is None:
+                return ClarificationRequest(
+                    question="Which location should I use?",
+                    reason="The canonical geographic target has not been resolved.",
+                    missing_fields=["location"],
+                )
+            # Once canonical interpretation exists, its resolved target is the
+            # only location authority.  A caller-provided location can be a
+            # stale pre-interpretation value and must not win here.
+            resolved_location = canonical_target.resolved_location
+        elif resolved_location is None:
             resolution = await self.policy_engine.location_resolver.resolve_location_signals(
                 turn_contract.location_signals,
                 latest_memory or {},
@@ -665,7 +693,11 @@ class AgentTurnStateAssembler:
             mode="map",
             action_id=turn_contract.normalized_action.action_id,
             basemap_id=(
-                turn_contract.requested_basemap
+                (
+                    canonical_request.presentation.basemap_id
+                    if canonical_request is not None
+                    else turn_contract.requested_basemap
+                )
                 or active_visualization_object.get("basemap_id")
                 or capability_selection.get("basemap_id")
             ),
@@ -676,6 +708,8 @@ class AgentTurnStateAssembler:
             resolved_location,
             turn_contract=turn_contract,
             active_visualization=active_visualization,
+            canonical_request=canonical_request,
+            target_id=(canonical_target.target_id if canonical_target is not None else None),
         )
         return await self.search_orchestrator.execute(request)
 
@@ -685,8 +719,23 @@ class AgentTurnStateAssembler:
         turn_contract: Any,
         latest_memory: dict[str, Any] | None,
         resolved_location: ResolvedLocation | None = None,
+        *,
+        canonical_request: CanonicalRequestInterpretation | None = None,
     ) -> MapSession | ClarificationRequest | None:
-        if resolved_location is None:
+        canonical_target = (
+            canonical_request.primary_target
+            if canonical_request is not None
+            else None
+        )
+        if canonical_request is not None:
+            if canonical_target is None or canonical_target.resolved_location is None:
+                return ClarificationRequest(
+                    question="Which location should I use?",
+                    reason="The canonical geographic target has not been resolved.",
+                    missing_fields=["location"],
+                )
+            resolved_location = canonical_target.resolved_location
+        elif resolved_location is None:
             resolution = await self.policy_engine.location_resolver.resolve_location_signals(
                 turn_contract.location_signals,
                 latest_memory or {},
@@ -710,7 +759,12 @@ class AgentTurnStateAssembler:
             state="map_search",
             mode="map",
             action_id=turn_contract.normalized_action.action_id,
-            basemap_id=self.infer_basemap_id(turn_contract),
+            basemap_id=(
+                canonical_request.presentation.basemap_id
+                if canonical_request is not None
+                and canonical_request.presentation.basemap_id
+                else self.infer_basemap_id(turn_contract)
+            ),
             overlay_ids=inferred_overlay_ids,
         )
         request = self.request_builder.build_location_search_request(
@@ -718,6 +772,8 @@ class AgentTurnStateAssembler:
             resolved_location,
             turn_contract=turn_contract,
             active_visualization=(active_visualization),
+            canonical_request=canonical_request,
+            target_id=(canonical_target.target_id if canonical_target is not None else None),
         )
         return await self.search_orchestrator.execute(request)
 
@@ -731,6 +787,7 @@ class AgentTurnStateAssembler:
         direct_result: dict[str, Any] | None,
         tool_payload: dict[str, Any] | None,
         resolved_location: ResolvedLocation | None = None,
+        canonical_request: CanonicalRequestInterpretation | None = None,
     ) -> dict[str, Any]:
         base_snapshot = json_object(latest_memory)
         resolved_location = await self.resolve_verified_location_for_memory(
@@ -740,6 +797,7 @@ class AgentTurnStateAssembler:
             direct_result=direct_result,
             tool_payload=tool_payload,
             resolved_location=resolved_location,
+            canonical_request=canonical_request,
         )
         if resolved_location is None:
             return base_snapshot
@@ -759,12 +817,23 @@ class AgentTurnStateAssembler:
         direct_result: dict[str, Any] | None,
         tool_payload: dict[str, Any] | None,
         resolved_location: ResolvedLocation | None = None,
+        canonical_request: CanonicalRequestInterpretation | None = None,
     ) -> Any:
+        if AgentResponseBuilder.tool_payload_has_error(tool_payload):
+            return None
+        if canonical_request is not None:
+            target = canonical_request.primary_target
+            if target is None or target.resolved_location is None:
+                return None
+            if map_session is None and direct_result is None:
+                return None
+            # Memory promotion must use the same resolved target that drove
+            # planning.  Map/tool payloads and the optional argument are
+            # observations, never a second location authority.
+            return target.resolved_location
         if map_session is not None:
             return map_session.resolved_location
         if direct_result is None:
-            return None
-        if AgentResponseBuilder.tool_payload_has_error(tool_payload):
             return None
         if resolved_location is not None:
             return resolved_location
@@ -784,6 +853,7 @@ class AgentTurnStateAssembler:
         turn_contract: Any,
         latest_memory: dict[str, Any] | None,
         resolved_location: ResolvedLocation | None = None,
+        canonical_request: CanonicalRequestInterpretation | None = None,
     ) -> MapSession | ClarificationRequest | None:
         if not is_json_object(tool_payload):
             return None
@@ -803,6 +873,22 @@ class AgentTurnStateAssembler:
             else None
         )
         candidate_map_sessions: list[MapSession] = []
+
+        canonical_target = (
+            canonical_request.primary_target
+            if canonical_request is not None
+            else None
+        )
+        if canonical_request is not None:
+            if canonical_target is None or canonical_target.resolved_location is None:
+                return ClarificationRequest(
+                    question="Which location should I use?",
+                    reason="The canonical geographic target has not been resolved.",
+                    missing_fields=["location"],
+                )
+            # Ignore the optional resolved_location argument once the request
+            # has been compiled.  It may belong to an earlier interpretation.
+            resolved_location = canonical_target.resolved_location
 
         for result in json_array(tool_payload.get("tool_results")):
             if not is_json_object(result):
@@ -874,7 +960,29 @@ class AgentTurnStateAssembler:
                 candidate_map_sessions,
                 active_map_session=active_map_session,
                 resolved_location=resolved_location,
-                requested_basemap_id=self.infer_basemap_id(turn_contract),
+                requested_basemap_id=(
+                    canonical_request.presentation.basemap_id
+                    if canonical_request is not None
+                    and canonical_request.presentation.basemap_id
+                    else self.infer_basemap_id(turn_contract)
+                ),
+                merge_active=(
+                    (
+                        canonical_request.relationship_to_previous_turn
+                        if canonical_request is not None
+                        else getattr(turn_contract, "relationship", None)
+                    )
+                    != "new_task"
+                    or bool(turn_contract.overlay_commands)
+                    or "compare" in {
+                        str(item).casefold()
+                        for item in (
+                            canonical_request.operations
+                            if canonical_request is not None
+                            else getattr(turn_contract, "operations", [])
+                        )
+                    }
+                ),
             )
 
         if not overlay_ids and basemap_id is None:
@@ -908,6 +1016,13 @@ class AgentTurnStateAssembler:
             resolved_location,
             turn_contract=turn_contract,
             active_visualization=(active_visualization),
+            canonical_request=canonical_request,
+            target_id=(
+                canonical_request.primary_target.target_id
+                if canonical_request is not None
+                and canonical_request.primary_target is not None
+                else None
+            ),
         )
         return await self.search_orchestrator.execute(request)
 
@@ -920,11 +1035,19 @@ class AgentTurnStateAssembler:
         active_map_session: MapSession | None,
         resolved_location: ResolvedLocation | None,
         requested_basemap_id: str | None = None,
+        merge_active: bool = True,
     ) -> MapSession:
         """Merge validated tool output without re-running the data search."""
         candidate = candidates[-1]
         canonical_location = resolved_location or candidate.resolved_location
-        candidate = cls._with_canonical_location(candidate, canonical_location)
+        # A MapSession has one convenient top-level location for labels and
+        # viewport defaults, while every overlay instance carries its own
+        # scoped location.  Keep those instance locations intact: a
+        # comparison such as Paris and London must never rewrite the London
+        # overlay to the first (Paris) target.
+        candidate = cls._with_canonical_location(
+            candidate, canonical_location, rewrite_instances=False
+        )
 
         # The basemap is map-session state, not a property of the fetched
         # overlay.  A layer-only follow-up must retain the active basemap;
@@ -943,25 +1066,47 @@ class AgentTurnStateAssembler:
             )
 
         # Multiple successful tool calls in one bounded loop can contribute
-        # different overlays. The last result owns the viewport and payload;
-        # earlier results contribute only their validated overlay instances.
+        # different overlays and geographic targets. Preserve each result's
+        # scope and derive one aggregate viewport from all result bounds.
         candidate_instances: list[OverlayInstance] = []
         for session in candidates:
-            normalized = cls._with_canonical_location(session, canonical_location)
-            candidate_instances.extend(normalized.overlay_collection.instances)
+            candidate_instances.extend(
+                instance.model_copy(deep=True)
+                for instance in session.overlay_collection.instances
+            )
         candidate_collection = cls._merge_overlay_instances(
             OverlayCollectionState(), candidate_instances
         )
         candidate = OverlayCollectionService.merge_into_map_session(
             candidate, candidate_collection
         )
+        active_for_bounds = (
+            active_map_session
+            if merge_active
+            and active_map_session is not None
+            and cls._same_resolved_location(
+                active_map_session.resolved_location, canonical_location
+            )
+            else None
+        )
+        aggregate_bounds = cls._aggregate_bounds([*candidates, active_for_bounds])
+        if aggregate_bounds is not None:
+            candidate = candidate.model_copy(
+                update={"bounds": aggregate_bounds}, deep=True
+            )
 
-        if active_map_session is None or not cls._same_resolved_location(
-            active_map_session.resolved_location, canonical_location
+        if (
+            not merge_active
+            or active_map_session is None
+            or not cls._same_resolved_location(
+                active_map_session.resolved_location, canonical_location
+            )
         ):
             return candidate
 
-        active = cls._with_canonical_location(active_map_session, canonical_location)
+        active = cls._with_canonical_location(
+            active_map_session, canonical_location, rewrite_instances=False
+        )
         merged_collection = cls._merge_overlay_instances(
             active.overlay_collection,
             [*active.overlay_collection.instances, *candidate_collection.instances],
@@ -974,6 +1119,7 @@ class AgentTurnStateAssembler:
         return candidate.model_copy(
             update={
                 "resolved_location": canonical_location,
+                "bounds": aggregate_bounds or candidate.bounds,
                 "compliance_warnings": warnings,
                 "overlay_collection": merged_collection,
             },
@@ -985,11 +1131,20 @@ class AgentTurnStateAssembler:
     def _with_canonical_location(
         session: MapSession,
         resolved_location: ResolvedLocation,
+        *,
+        rewrite_instances: bool = False,
     ) -> MapSession:
-        instances = [
-            instance.model_copy(update={"resolved_location": resolved_location})
-            for instance in session.overlay_collection.instances
-        ]
+        instances = (
+            [
+                instance.model_copy(update={"resolved_location": resolved_location})
+                for instance in session.overlay_collection.instances
+            ]
+            if rewrite_instances
+            else [
+                instance.model_copy(deep=True)
+                for instance in session.overlay_collection.instances
+            ]
+        )
         collection = session.overlay_collection.model_copy(
             update={"instances": instances},
             deep=True,
@@ -1001,6 +1156,49 @@ class AgentTurnStateAssembler:
             },
             deep=True,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _aggregate_bounds(sessions: list[MapSession | None]) -> list[float] | None:
+        """Return a safe west/south/east/north envelope for map candidates."""
+
+        boxes: list[list[float]] = []
+        for session in sessions:
+            if session is None:
+                continue
+            raw = session.bounds or session.viewport.bbox
+            if not isinstance(raw, list) or len(raw) != 4:
+                continue
+            try:
+                box = [float(value) for value in raw]
+            except (TypeError, ValueError):
+                continue
+            west, south, east, north = box
+            if not all(map(math.isfinite, box)):
+                continue
+            if not (-180 <= west <= 180 and -180 <= east <= 180):
+                continue
+            if not (-90 <= south <= 90 and -90 <= north <= 90):
+                continue
+            if south > north:
+                continue
+            # Ordinary envelopes can be unioned directly. Preserve an
+            # antimeridian box as-is when it is the only scope; combining it
+            # with other boxes is intentionally conservative and leaves the
+            # provider-specific limitation visible to the caller.
+            if west > east:
+                if not boxes:
+                    return box
+                continue
+            boxes.append(box)
+        if not boxes:
+            return None
+        return [
+            min(box[0] for box in boxes),
+            min(box[1] for box in boxes),
+            max(box[2] for box in boxes),
+            max(box[3] for box in boxes),
+        ]
 
     # -------------------------------------------------------------------------
     @staticmethod

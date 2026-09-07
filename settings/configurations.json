@@ -23,7 +23,8 @@
   "chat": {
     "max_history_messages": 12,
     "parser_certainty_threshold": 0.75,
-    "parser_max_retries": 2
+    "parser_max_retries": 2,
+    "application_timezone": "UTC"
   },
   "openmeteo": {
     "weather_base_url": "https://api.open-meteo.com/v1/forecast",

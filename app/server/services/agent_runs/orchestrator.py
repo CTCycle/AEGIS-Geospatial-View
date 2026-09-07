@@ -20,6 +20,10 @@ from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent_runs.events import RunEventPublisher
+from server.services.agent_runs.render_completion import (
+    RenderAcknowledgementError,
+    RenderCompletionService,
+)
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderError
 
 
@@ -34,12 +38,16 @@ class AgentRunOrchestrator:
         event_publisher: RunEventPublisher,
         conversation_repository: ConversationRepository,
         steering_repository: AgentSteeringRepository | None = None,
+        render_completion_service: RenderCompletionService | None = None,
+        defer_map_completion: bool = False,
     ) -> None:
         self.agent_orchestrator = agent_orchestrator
         self.run_repository = run_repository
         self.event_publisher = event_publisher
         self.conversation_repository = conversation_repository
         self.steering_repository = steering_repository
+        self.render_completion_service = render_completion_service
+        self.defer_map_completion = defer_map_completion
 
     # -------------------------------------------------------------------------
     async def execute_run(self, run_id: str) -> None:
@@ -115,9 +123,12 @@ class AgentRunOrchestrator:
             response = await self.agent_orchestrator.run_turn(
                 ChatTurnRequest(
                     message=self._request_message(snapshot),
+                    datetime=snapshot.created_at.isoformat(),
+                    timezone=snapshot.request_timezone,
                     request_id=run_id,
                     title=snapshot.original_request[:120],
                     conversation_id=snapshot.conversation_id,
+                    defer_map_commit=True,
                 ),
                 progress_callback=on_agent_progress,
             )
@@ -188,6 +199,170 @@ class AgentRunOrchestrator:
             )
             await self.execute_run(run_id)
             return
+
+        if (
+            self.defer_map_completion
+            and self.render_completion_service is not None
+            and response.map_session is not None
+            and response.operation is not None
+            and response.operation.kind == "map_session"
+            and response.operation.status in {"success", "partial"}
+        ):
+            if self.render_completion_service.has_blocking_data_failure(
+                response.map_session
+            ):
+                failed_operation = response.operation.model_copy(
+                    update={
+                        "status": "failed",
+                        "message": (
+                            "The requested map data was unavailable; the previous map "
+                            "remains available."
+                        ),
+                    }
+                )
+                response = response.model_copy(
+                    update={
+                        "map_session": None,
+                        "operation": failed_operation,
+                    }
+                )
+            elif not self.render_completion_service.requires_browser_ack(
+                response.map_session
+            ):
+                # Metadata-only products (for example point-sampled weather)
+                # are valid data responses but have no browser-visible layer to
+                # acknowledge. Keep their explanatory response and finalize it
+                # through the ordinary path instead of leaving the run pending
+                # forever with an impossible render requirement.
+                metadata_requirements = None
+                if response.canonical_request is not None:
+                    metadata_requirements = [
+                        item.model_copy(
+                            update=(
+                                {
+                                    "status": "failed",
+                                    "failure_code": "metadata_only",
+                                }
+                                if item.name == "renderable_geometry_created"
+                                else {
+                                    "status": "not_applicable"
+                                }
+                                if item.name
+                                in {
+                                    "map_state_committed",
+                                    "viewport_contains_results",
+                                }
+                                else {"status": "satisfied"}
+                                if item.name == "final_response_ready"
+                                else {}
+                            )
+                        )
+                        for item in response.canonical_request.completion_requirements
+                    ]
+                metadata_operation = response.operation.model_copy(
+                    update={
+                        "status": "partial",
+                        "message": (
+                            response.operation.message
+                            + " The requested product is metadata-only, so no area overlay was created."
+                        ),
+                    }
+                )
+                metadata_task_snapshot = (
+                    response.task_snapshot.model_copy(update={"active_map_session": None})
+                    if response.task_snapshot is not None
+                    else None
+                )
+                response = response.model_copy(
+                    update={
+                        "map_session": None,
+                        "operation": metadata_operation,
+                        "task_snapshot": metadata_task_snapshot,
+                        "canonical_request": (
+                            response.canonical_request.model_copy(
+                                update={"completion_requirements": metadata_requirements}
+                            )
+                            if response.canonical_request is not None
+                            and metadata_requirements is not None
+                            else response.canonical_request
+                        ),
+                    }
+                )
+
+        if (
+            self.defer_map_completion
+            and self.render_completion_service is not None
+            and response.map_session is not None
+            and response.operation is not None
+            and response.operation.kind == "map_session"
+            and response.operation.status in {"success", "partial"}
+        ):
+            final_response_payload = response.model_dump(mode="json")
+            if response.canonical_request is not None:
+                final_response_payload["render_requirements"] = [
+                    item.model_dump(mode="json")
+                    for item in response.canonical_request.completion_requirements
+                    if item.required
+                ]
+            try:
+                presentation, prepared = self.render_completion_service.prepare(
+                    run_id=run_id,
+                    run_version=snapshot.active_run_version,
+                    response_payload=final_response_payload,
+                )
+            except (RenderAcknowledgementError, ValueError) as exc:
+                failed, transitioned = self.run_repository.mark_failed_if_current(
+                    run_id,
+                    snapshot.active_run_version,
+                    "map_preparation_failed",
+                    str(exc),
+                )
+                if transitioned:
+                    await self._publish_progress(failed, RunProgressStage.FAILED)
+                    await self.event_publisher.publish(
+                        conversation_id=failed.conversation_id,
+                        run_id=failed.run_id,
+                        run_version=failed.active_run_version,
+                        type=RunEventType.ERROR,
+                        payload={
+                            "code": "map_preparation_failed",
+                            "message": "The requested map could not be prepared for rendering.",
+                        },
+                    )
+                return
+            if not prepared:
+                # A cancellation or version change won the compare-and-swap;
+                # never let the normal completion path promote this stale
+                # candidate.
+                return
+            if prepared:
+                loading_operation = response.operation.model_copy(
+                    update={
+                        "status": "pending",
+                        "message": "Data prepared; the map is loading.",
+                    }
+                )
+                loading_response = response.model_copy(
+                    update={
+                        "assistant_message": "Data prepared; the map is loading.",
+                        "operation": loading_operation,
+                    }
+                )
+                await self._publish_response(snapshot, loading_response)
+                awaiting = self.run_repository.get_run(run_id) or snapshot
+                await self._publish_progress(awaiting, RunProgressStage.AWAITING_RENDER)
+                await self.event_publisher.publish(
+                    conversation_id=awaiting.conversation_id,
+                    run_id=awaiting.run_id,
+                    run_version=awaiting.active_run_version,
+                    type=RunEventType.MAP_PREPARED,
+                    payload={
+                        "presentation": presentation,
+                        "map_session": response.map_session.model_dump(mode="json"),
+                        "operation": loading_operation.model_dump(mode="json"),
+                    },
+                )
+                return
         await self._publish_trace(
             latest,
             AgentTraceEvent(

@@ -8,7 +8,11 @@ import {
   CapabilityStatusTone,
 } from '../components/capability-status-list.component';
 import { ChatMessageComponent } from '../components/chat-message.component';
-import { MapPreviewComponent, MapRenderStateChange } from '../components/map-preview.component';
+import {
+  MapPreviewComponent,
+  MapRenderIdentity,
+  MapRenderStateChange,
+} from '../components/map-preview.component';
 import {
   AgentReadinessService,
   AgentReadinessState,
@@ -25,6 +29,7 @@ import { RealtimeService } from '../core/realtime.service';
 import {
   ChatOperationResult,
   MapSession,
+  MapRenderAcknowledgement,
   OverlayStateChange,
   SearchResponsePayload,
   ChatMessage,
@@ -102,11 +107,24 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   private steeringMutationCounter = 0;
   private isDestroyed = false;
   private pendingMapSession?: MapSession;
+  private committedMapSession?: MapSession;
+  private pendingRenderContext?: {
+    runId: string;
+    runVersion: number;
+    mapSessionId: string;
+    collectionRevision: number;
+  };
+  private renderAckQueued = false;
   private lastRunSequence = 0;
+  private lastHandledRunId?: string;
   private pendingRun?: { clientRequestId: string; message: string };
   private removeRealtimeMessageListener?: () => void;
   private removeRealtimeStateListener?: () => void;
   private cancelRequested = false;
+
+  get mapRenderIdentity(): MapRenderIdentity | undefined {
+    return this.pendingRenderContext;
+  }
 
   constructor(
     private readonly router: Router,
@@ -353,6 +371,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.taskSnapshot = undefined;
     this.activeRunId = undefined;
     this.activeRunVersion = undefined;
+    this.lastHandledRunId = undefined;
     this.pendingRun = undefined;
     this.lastRunSequence = 0;
     this.streamState = 'idle';
@@ -366,6 +385,10 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.memorySnapshot = {};
     this.contextUsage = undefined;
     this.mapSession = undefined;
+    this.pendingMapSession = undefined;
+    this.committedMapSession = undefined;
+    this.pendingRenderContext = undefined;
+    this.renderAckQueued = false;
     this.payload = undefined;
     this.status = 'Agent ready';
     this.isLoading = false;
@@ -465,18 +488,60 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.cancelRequested = false;
       this.seenEventIds.clear();
       this.activeRunId = snapshot.active_run?.run_id;
+      this.lastHandledRunId = this.activeRunId;
       this.activeRunVersion = snapshot.active_run?.run_version;
       this.isLoading = snapshot.active_run !== null
         && snapshot.active_run !== undefined
-        && ['pending', 'running', 'updating'].includes(snapshot.active_run.state);
+        && ['pending', 'running', 'updating', 'awaiting_render'].includes(snapshot.active_run.state);
       this.streamState = 'idle';
       this.mapSession = undefined;
       this.pendingMapSession = undefined;
+      this.committedMapSession = undefined;
+      this.pendingRenderContext = undefined;
+      this.renderAckQueued = false;
       this.payload = undefined;
       if (snapshot.map_session) {
-        this.handleMapSession(snapshot.map_session);
+        this.mapSession = snapshot.map_session;
+        this.committedMapSession = snapshot.map_session;
+        this.payload = {
+          map_session: snapshot.map_session,
+          compliance_warnings: snapshot.map_session.compliance_warnings,
+        };
       }
-      this.status = this.isLoading ? 'Reconnecting to active request' : 'Agent ready';
+      const pendingPresentation = snapshot.active_run?.presentation;
+      const restoringPendingPresentation = snapshot.active_run?.state === 'awaiting_render'
+        && snapshot.active_run.presentation_status === 'pending'
+        && pendingPresentation !== null
+        && pendingPresentation !== undefined;
+      const activeRun = snapshot.active_run;
+      if (restoringPendingPresentation && pendingPresentation && activeRun) {
+        const candidate = normalizeMapSession(pendingPresentation['pending_response']
+          && typeof pendingPresentation['pending_response'] === 'object'
+          ? (pendingPresentation['pending_response'] as Record<string, unknown>)['map_session']
+          : undefined);
+        const mapSessionId = this.readString(pendingPresentation['map_session_id']);
+        const revision = this.readNumber(pendingPresentation['collection_revision']);
+        if (candidate && mapSessionId && revision !== undefined
+          && candidate.session_id === mapSessionId
+          && candidate.overlay_collection.revision === revision) {
+          this.pendingRenderContext = {
+            runId: activeRun.run_id,
+            runVersion: activeRun.run_version,
+            mapSessionId,
+            collectionRevision: revision,
+          };
+          this.handleMapSession(candidate);
+          this.status = 'Map data ready; rendering';
+          this.progressStage = 'awaiting_render';
+          this.progressLabel = 'Map data ready; rendering';
+        }
+      }
+      // Keep the presentation watchdog state visible after hydration.  The
+      // candidate is still uncommitted until the matching render
+      // acknowledgment is accepted by the backend.
+      this.status = restoringPendingPresentation
+        ? 'Map data ready; rendering'
+        : this.isLoading ? 'Reconnecting to active request' : 'Agent ready';
       this.realtimeService.connect(conversationId, {
         runId: this.activeRunId,
         afterSequence: this.lastRunSequence,
@@ -522,6 +587,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.contextUsage = undefined;
     this.mapSession = undefined;
     this.pendingMapSession = undefined;
+    this.committedMapSession = undefined;
+    this.pendingRenderContext = undefined;
+    this.renderAckQueued = false;
     this.payload = undefined;
     this.assistantDraft = '';
     this.status = 'Agent ready';
@@ -584,7 +652,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return;
     }
     this.composerDraft = '';
-    if (this.isLoading && this.conversationId) {
+    if (this.isLoading && this.conversationId && this.progressStage !== 'awaiting_render') {
       if (this.activeRunId) {
         await this.sendSteeringMessage(message);
       } else {
@@ -597,6 +665,16 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private async startAgentRun(message: string, requestNonce: number): Promise<void> {
+    // A reconnect may still have an unacknowledged render command queued for
+    // the previous candidate. Remove it before enqueueing the new run so an
+    // old browser observation cannot commit stale geography first.
+    this.realtimeService.discardPendingMapRenderAcks();
+    if (this.pendingMapSession || this.pendingRenderContext) {
+      this.restoreCommittedMap();
+    }
+    this.pendingMapSession = undefined;
+    this.pendingRenderContext = undefined;
+    this.renderAckQueued = false;
     this.isLoading = true;
     this.status = 'Understanding the request';
     this.progressStage = 'understanding_request';
@@ -616,6 +694,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.conversationId = conversation.conversation_id;
       this.activeRunId = undefined;
       this.activeRunVersion = undefined;
+      this.lastHandledRunId = undefined;
       const pendingRun = {
         clientRequestId: this.newClientRequestId(),
         message,
@@ -628,6 +707,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.realtimeService.sendRunStart(
         message,
         pendingRun.clientRequestId,
+        Intl.DateTimeFormat().resolvedOptions().timeZone,
       );
     } catch (error: unknown) {
       const fallback = this.userFacingErrorService.toUserFacingError(
@@ -703,6 +783,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       const runId = this.readString(message.payload['run_id']);
       if (runId && message.payload['command'] === 'run.start') {
         this.activeRunId = runId;
+        this.lastHandledRunId = runId;
         this.activeRunVersion = this.readNumber(message.payload['run_version']);
         this.isLoading = true;
         this.realtimeService.setResumeCursor(runId, this.lastRunSequence);
@@ -725,13 +806,39 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.pendingRun = undefined;
         this.cancelRequested = false;
       }
+      if (message.payload['command'] === 'map.render_ack') {
+        const ackRunId = this.readString(message.payload['run_id']);
+        const presentationStatus = this.readString(message.payload['presentation_status']);
+        if (ackRunId === this.pendingRenderContext?.runId && presentationStatus === 'failed') {
+          this.restoreCommittedMap('Map update failed; previous map retained');
+          this.isLoading = false;
+          this.activeRunId = undefined;
+          this.pendingRun = undefined;
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+        }
+      }
       this.syncState();
       this.changeDetectorRef.detectChanges();
       return;
     }
     if (message.type === 'session.resumed') {
       const state = this.readString(message.payload['state']);
-      if (state === 'completed' || state === 'failed' || state === 'cancelled') {
+      if (state === 'awaiting_render') {
+        this.isLoading = true;
+        this.status = 'Map data ready; rendering';
+        this.progressStage = 'awaiting_render';
+        this.progressLabel = 'Map data ready; rendering';
+      } else if (state === 'completed' || state === 'failed' || state === 'cancelled') {
+        if (state !== 'completed' && (this.pendingMapSession || this.pendingRenderContext)) {
+          this.restoreCommittedMap(
+            state === 'cancelled'
+              ? 'Map update cancelled; previous map retained'
+              : 'Map update failed; previous map retained',
+          );
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+        }
         this.isLoading = false;
         this.activeRunId = undefined;
         this.status = 'Agent ready';
@@ -758,6 +865,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.activeRunId = undefined;
         this.pendingRun = undefined;
       }
+      if (command === 'map.render_ack' || code === 'render_ack_rejected') {
+        this.restoreCommittedMap('Map update failed; previous map retained');
+        this.pendingRenderContext = undefined;
+        this.renderAckQueued = false;
+        this.isLoading = false;
+        this.activeRunId = undefined;
+        this.pendingRun = undefined;
+      }
       this.status = 'Agent ready';
       this.progressLabel = undefined;
       const messageText = 'The real-time connection could not apply that request.';
@@ -771,7 +886,11 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   private handleRunEvent(event: RunEvent): void {
     if (event.conversation_id !== this.conversationId
-      || (this.activeRunId && event.run_id !== this.activeRunId)) {
+      || (this.activeRunId && event.run_id !== this.activeRunId)
+      || (!this.activeRunId && this.lastHandledRunId && event.run_id !== this.lastHandledRunId)
+      || (this.activeRunId === event.run_id
+        && this.activeRunVersion !== undefined
+        && event.run_version < this.activeRunVersion)) {
       return;
     }
     if (this.seenEventIds.has(event.event_id) || event.sequence <= this.lastRunSequence) {
@@ -788,6 +907,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.lastRunSequence = event.sequence;
     this.realtimeService.setResumeCursor(event.run_id, event.sequence);
     this.activeRunVersion = event.run_version;
+    this.lastHandledRunId = event.run_id;
     switch (event.type) {
       case 'context_usage': {
         const usage = parseContextUsage(event.payload['context_usage']);
@@ -808,7 +928,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         break;
       case 'assistant_text_completed':
         this.assistantDraft = '';
-        this.messages = [...this.messages, { role: 'assistant', content: String(event.payload['content'] ?? '') }];
+        this.appendAssistantEventMessage(String(event.payload['content'] ?? ''));
         break;
       case 'request_updated':
         this.progressStage = 'request_updated';
@@ -822,6 +942,16 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           const parsed = parseRunCompletionPayload(event.payload);
           this.applyContextUsage(parsed.contextUsage);
           const message = String(event.payload['message'] ?? 'Failed');
+          const errorCode = this.readString(event.payload['code']);
+          const presentationStatus = this.readString(event.payload['presentation_status']);
+          if (presentationStatus === 'failed' || errorCode === 'render_failed') {
+            // A durable render failure arrives as an ERROR event after the
+            // browser has already displayed the candidate. Restore the last
+            // acknowledged map before clearing the pending identity.
+            this.restoreCommittedMap('Map update failed; previous map retained');
+            this.pendingRenderContext = undefined;
+            this.renderAckQueued = false;
+          }
           this.agentReadiness = {
             status: 'needs_attention',
             label: 'Needs attention',
@@ -837,6 +967,33 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.cancelRequested = false;
         this.streamState = 'closed';
         break;
+      case 'map_prepared': {
+        const presentation = event.payload['presentation'];
+        const mapSession = normalizeMapSession(event.payload['map_session']);
+        if (mapSession && presentation && typeof presentation === 'object' && !Array.isArray(presentation)) {
+          const rawPresentation = presentation as Record<string, unknown>;
+          const sessionId = this.readString(rawPresentation['map_session_id']);
+          const revision = this.readNumber(rawPresentation['collection_revision']);
+          if (sessionId && revision !== undefined
+            && sessionId === mapSession.session_id
+            && revision === mapSession.overlay_collection.revision) {
+            this.pendingRenderContext = {
+              runId: event.run_id,
+              runVersion: event.run_version,
+              mapSessionId: sessionId,
+              collectionRevision: revision,
+            };
+            this.renderAckQueued = false;
+            this.handleMapSession(mapSession);
+            this.mapRenderState = 'preparing';
+            this.status = 'Map data ready; rendering';
+            this.progressStage = 'awaiting_render';
+            this.progressLabel = 'Map data ready; rendering';
+            this.isLoading = true;
+          }
+        }
+        break;
+      }
       case 'completed':
         this.isLoading = false;
         this.status = 'Agent ready';
@@ -854,6 +1011,11 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         };
         break;
       case 'cancelled':
+        if (this.pendingMapSession || this.pendingRenderContext) {
+          this.restoreCommittedMap('Map update cancelled; previous map retained');
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+        }
         this.isLoading = false;
         this.status = 'Agent ready';
         this.progressLabel = undefined;
@@ -898,7 +1060,22 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.lastDecision = parsed.decision;
     }
     if (parsed.mapSession) {
-      this.handleMapSession(parsed.mapSession);
+      if (this.pendingRenderContext) {
+        if (this.pendingRenderContext.mapSessionId === parsed.mapSession.session_id
+          && this.pendingRenderContext.collectionRevision === parsed.mapSession.overlay_collection.revision) {
+          this.commitMapSession(parsed.mapSession);
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+        } else {
+          // A completion payload for another candidate must not replace the
+          // map that is still awaiting acknowledgment for the current run.
+          this.restoreCommittedMap('Map update failed; previous map retained');
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+        }
+      } else {
+        this.handleMapSession(parsed.mapSession);
+      }
     }
     if (parsed.operation !== undefined) {
       this.lastOperation = parsed.operation;
@@ -979,12 +1156,77 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (!mapSession) {
       return;
     }
+    if (!this.pendingMapSession && this.mapSession && this.mapSession.session_id !== mapSession.session_id) {
+      this.committedMapSession = this.mapSession;
+    }
     this.pendingMapSession = mapSession;
     this.synchronizeOverlayState(mapSession);
     this.payload = {
       map_session: mapSession,
       compliance_warnings: mapSession.compliance_warnings,
     };
+  }
+
+  private commitMapSession(mapSession: MapSession): void {
+    this.mapPreview?.acceptRenderedCandidate();
+    this.mapSession = mapSession;
+    this.committedMapSession = mapSession;
+    this.pendingMapSession = undefined;
+    this.payload = {
+      map_session: mapSession,
+      compliance_warnings: mapSession.compliance_warnings,
+    };
+  }
+
+  private restoreCommittedMap(message?: string): void {
+    this.mapPreview?.rejectRenderedCandidate();
+    this.pendingMapSession = undefined;
+    if (this.committedMapSession) {
+      this.mapSession = this.committedMapSession;
+      this.payload = {
+        map_session: this.committedMapSession,
+        compliance_warnings: this.committedMapSession.compliance_warnings,
+      };
+    } else {
+      this.mapSession = undefined;
+      this.payload = undefined;
+    }
+    if (message) {
+      this.status = message;
+      this.progressLabel = undefined;
+      this.lastOperation = this.lastOperation
+        ? { ...this.lastOperation, status: 'partial', message }
+        : this.lastOperation;
+    }
+  }
+
+  private appendAssistantEventMessage(content: string): void {
+    const previous = this.messages.at(-1);
+    if (previous?.role === 'assistant' && previous.content === 'Data prepared; the map is loading.') {
+      this.messages = [...this.messages.slice(0, -1), { role: 'assistant', content }];
+      return;
+    }
+    // A reconnect can replay the preparation event after the durable history
+    // already contains the candidate's final text. Replace that last
+    // assistant entry with the pending presentation message instead of
+    // appending a duplicate assistant turn.
+    if (content === 'Data prepared; the map is loading.') {
+      let lastAssistantIndex = -1;
+      for (let index = this.messages.length - 1; index >= 0; index -= 1) {
+        if (this.messages[index].role === 'assistant') {
+          lastAssistantIndex = index;
+          break;
+        }
+      }
+      if (lastAssistantIndex >= 0 && lastAssistantIndex === this.messages.length - 1) {
+        this.messages = [
+          ...this.messages.slice(0, lastAssistantIndex),
+          { role: 'assistant', content },
+        ];
+        return;
+      }
+    }
+    this.messages = [...this.messages, { role: 'assistant', content }];
   }
 
   private synchronizeOverlayState(session: MapSession): void {
@@ -1008,27 +1250,95 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   onMapRenderStateChange(change: MapRenderStateChange): void {
-    this.mapRenderState = change.state;
     if (this.pendingMapSession?.session_id !== change.sessionId) {
       return;
     }
+    const pendingRenderContext = this.pendingRenderContext;
+    if (pendingRenderContext) {
+      if (
+        change.runId !== pendingRenderContext.runId
+        || change.runVersion !== pendingRenderContext.runVersion
+        || pendingRenderContext.mapSessionId !== change.sessionId
+      ) {
+        return;
+      }
+    }
+    const expectedRevision = this.pendingMapSession.overlay_collection?.revision
+      ?? change.collectionRevision;
+    if (expectedRevision === undefined) {
+      return;
+    }
+    if (change.collectionRevision !== undefined && change.collectionRevision !== expectedRevision) {
+      return;
+    }
+    if (pendingRenderContext) {
+      if (pendingRenderContext.collectionRevision !== expectedRevision) {
+        return;
+      }
+    }
+    // All candidate identity checks are complete before mutating presentation
+    // state; delayed callbacks from an older collection cannot alter status.
+    this.mapRenderState = change.state;
+    if (pendingRenderContext) {
+      if (change.state === 'ready' && !this.renderAckQueued) {
+        const acknowledgement: MapRenderAcknowledgement = {
+          run_id: pendingRenderContext.runId,
+          run_version: pendingRenderContext.runVersion,
+          map_session_id: change.sessionId,
+          collection_revision: expectedRevision,
+          status: 'ready',
+          viewport_bounds: change.viewportBounds ?? null,
+          checks: change.checks ?? {},
+          overlay_results: (change.overlayResults ?? []) as Array<Record<string, import('../core/types').JsonValue>>,
+          failure_code: null,
+        };
+        this.renderAckQueued = true;
+        this.status = 'Map data ready; rendering';
+        this.progressLabel = 'Map data ready; rendering';
+        try {
+          this.realtimeService.sendMapRenderAck(acknowledgement);
+        } catch {
+          this.renderAckQueued = false;
+          this.restoreCommittedMap('Map update failed; previous map retained');
+        }
+        this.syncState();
+        this.changeDetectorRef.detectChanges();
+        return;
+      }
+      if (change.state === 'failed' && !this.renderAckQueued) {
+        const acknowledgement: MapRenderAcknowledgement = {
+          run_id: pendingRenderContext.runId,
+          run_version: pendingRenderContext.runVersion,
+          map_session_id: change.sessionId,
+          collection_revision: expectedRevision,
+          status: 'failed',
+          viewport_bounds: change.viewportBounds ?? null,
+          checks: change.checks ?? {},
+          overlay_results: (change.overlayResults ?? []) as Array<Record<string, import('../core/types').JsonValue>>,
+          failure_code: 'render_failed',
+        };
+        this.renderAckQueued = true;
+        try {
+          this.realtimeService.sendMapRenderAck(acknowledgement);
+        } catch {
+          this.renderAckQueued = false;
+          this.restoreCommittedMap('Map update failed; previous map retained');
+        }
+        this.status = 'Map update failed';
+        this.progressLabel = undefined;
+        this.syncState();
+        this.changeDetectorRef.detectChanges();
+        return;
+      }
+    }
     if (change.state === 'ready') {
-      this.mapSession = this.pendingMapSession;
-      this.pendingMapSession = undefined;
+      this.commitMapSession(this.pendingMapSession);
       this.syncState();
       this.changeDetectorRef.detectChanges();
       return;
     }
     if (change.state === 'failed') {
-      this.pendingMapSession = undefined;
-      if (this.mapSession) {
-        this.payload = {
-          map_session: this.mapSession,
-          compliance_warnings: this.mapSession.compliance_warnings,
-        };
-      } else {
-        this.payload = undefined;
-      }
+      this.restoreCommittedMap();
       const message = change.message || 'The map update could not be rendered; the previous map remains available.';
       if (this.messages.at(-1)?.content !== message) {
         this.messages = [...this.messages, { role: 'assistant', content: message }];
@@ -1097,7 +1407,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       const currentSession = this.pendingMapSession || this.mapSession || this.payload?.map_session;
       if (currentSession) {
         const enrichedSession = this.enrichMapSessionBasemap(currentSession);
-        this.mapSession = enrichedSession;
+        if (this.pendingMapSession?.session_id === currentSession.session_id) {
+          this.pendingMapSession = enrichedSession;
+        } else {
+          this.mapSession = enrichedSession;
+          this.committedMapSession = enrichedSession;
+        }
         this.payload = {
           map_session: enrichedSession,
           compliance_warnings: enrichedSession.compliance_warnings,
