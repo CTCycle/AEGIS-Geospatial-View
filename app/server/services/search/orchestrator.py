@@ -99,6 +99,7 @@ class LocationSearchOrchestrator:
                     f"{descriptor.get('label', 'Requested layer')}: provider data is unavailable. "
                     "Check provider access and availability before retrying."
                 )
+            self._annotate_descriptor_with_request(descriptor, payload)
             descriptor = MapInspectionService.attach_to_descriptor(descriptor)
             overlays.append(descriptor)
             warnings.extend(overlay_warnings)
@@ -132,6 +133,7 @@ class LocationSearchOrchestrator:
                 render["format"] = selection.format
             if render:
                 descriptor["render"] = render
+            self._annotate_descriptor_with_request(descriptor, payload)
             descriptor = MapInspectionService.attach_to_descriptor(descriptor)
             overlays.append(descriptor)
             warnings.extend(overlay_warnings)
@@ -157,9 +159,33 @@ class LocationSearchOrchestrator:
             payload={
                 "action_id": payload.action_id,
                 "time_mode": payload.time_mode,
+                "start_time_iso": payload.start_time_iso,
+                "end_time_iso": payload.end_time_iso,
+                "analysis_radius_m": payload.analysis_radius_m,
+                "analysis_scope": payload.analysis_scope,
+                "analysis_bbox": payload.analysis_bbox,
+                "target_id": payload.target_id,
                 "presentation": payload.presentation.model_dump(mode="json"),
             },
         )
+
+    @staticmethod
+    def _annotate_descriptor_with_request(
+        descriptor: dict[str, object], payload: LocationSearchRequest
+    ) -> None:
+        """Carry canonical scope and temporal evidence into each overlay."""
+
+        if payload.analysis_scope is not None:
+            descriptor["analysis_scope"] = payload.analysis_scope
+        if payload.analysis_bbox is not None:
+            descriptor["analysis_bbox"] = list(payload.analysis_bbox)
+        if payload.target_id is not None:
+            descriptor["target_id"] = payload.target_id
+        descriptor["temporal_mode"] = payload.time_mode
+        if payload.start_time_iso is not None:
+            descriptor["start_time_iso"] = payload.start_time_iso
+        if payload.end_time_iso is not None:
+            descriptor["end_time_iso"] = payload.end_time_iso
 
     # -------------------------------------------------------------------------
     @staticmethod

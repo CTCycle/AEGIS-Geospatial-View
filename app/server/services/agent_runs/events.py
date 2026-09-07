@@ -63,6 +63,20 @@ class RunEventPublisher:
         return event
 
     # -------------------------------------------------------------------------
+    async def fanout_existing(self, event_id: str) -> RunEvent | None:
+        """Fan out an event that was committed with another repository transaction.
+
+        Render acknowledgment promotion persists its terminal events alongside
+        the run and conversation state. This method only reads those durable
+        rows and notifies live subscribers; it never creates a second event.
+        """
+
+        event = self.event_repository.get_event(event_id)
+        if event is not None and event.visibility == RunEventVisibility.USER:
+            await self._fanout(event)
+        return event
+
+    # -------------------------------------------------------------------------
     async def _fanout(self, event: RunEvent) -> None:
         async with self._lock:
             queues = list(self._subscribers.get(event.run_id, set()))

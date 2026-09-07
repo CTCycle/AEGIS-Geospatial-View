@@ -1,6 +1,6 @@
 # Testing And Quality
 
-Last updated: 2026-08-20
+Last updated: 2026-09-05
 
 ## Python Quality Gates
 
@@ -55,6 +55,22 @@ under `assets/QA`.
 - Update E2E coverage for user-visible workflow changes.
 - Browser smoke coverage lives in `app/client/src/app/e2e`; backend/API E2E
   coverage lives in `app/tests/e2e`.
+
+Map-oriented E2E tests must prove the complete controlled path, including
+canonical interpretation, location/scope validation, capability execution,
+candidate map assembly, persistence, realtime `map_prepared`, MapLibre
+settlement, and `map.render_ack`. HTTP 200, a successful provider call, a
+non-empty descriptor, or a visible canvas is not sufficient evidence. Each
+scenario records request/run/version IDs, expected and actual bounds, required
+source/layer IDs, feature or raster evidence, collection revisions,
+acknowledgment, screenshot, and sanitized console/failure data under
+`assets/QA/`.
+
+Keep controlled fixtures and live-provider runs separate. Controlled fixtures
+use meaningful visible vector/raster data and exercise the real frontend and
+acknowledgment handler. Live runs use the configured model and providers without
+silent substitution; absent credentials, unsupported coverage, or no usable
+browser are recorded as limitations or blocked evidence rather than passes.
 
 ## Scope Expectations
 

@@ -5,6 +5,7 @@ from server.common.typing import json_object
 from uuid import uuid4
 
 from sqlalchemy import func, select, update
+from sqlalchemy.orm import Session
 
 from server.contracts.events import (
     RunEvent,
@@ -25,32 +26,54 @@ class AgentRunEventRepository:
     # -------------------------------------------------------------------------
     def append_event(self, event: RunEventCreate) -> RunEvent:
         with self._session_factory() as session:
-            sequence = session.scalar(
-                update(AgentRunRecord)
-                .where(
-                    AgentRunRecord.id == event.run_id,
-                    AgentRunRecord.conversation_id == event.conversation_id,
-                )
-                .values(next_event_sequence=AgentRunRecord.next_event_sequence + 1)
-                .returning(AgentRunRecord.next_event_sequence)
-            )
-            if sequence is None:
-                raise ValueError("Run not found.")
-            record = AgentRunEventRecord(
-                id=f"evt_{uuid4().hex}",
-                run_id=event.run_id,
-                conversation_id=event.conversation_id,
-                sequence=sequence,
-                run_version=event.run_version,
-                type=event.type.value,
-                visibility=event.visibility.value,
-                payload_json=event.payload,
-                created_at=event.timestamp,
-            )
-            session.add(record)
+            domain_event = self.append_event_in_session(session, event)
             session.commit()
-            session.refresh(record)
-            return self._to_domain(record)
+            return domain_event
+
+    # -------------------------------------------------------------------------
+    def append_event_in_session(
+        self,
+        session: Session,
+        event: RunEventCreate,
+    ) -> RunEvent:
+        """Append an event without committing the caller's transaction.
+
+        Run acknowledgment needs the terminal event and the run/conversation
+        promotion to commit or roll back as one unit. Ordinary callers should
+        continue using :meth:`append_event`.
+        """
+
+        sequence = session.scalar(
+            update(AgentRunRecord)
+            .where(
+                AgentRunRecord.id == event.run_id,
+                AgentRunRecord.conversation_id == event.conversation_id,
+            )
+            .values(next_event_sequence=AgentRunRecord.next_event_sequence + 1)
+            .returning(AgentRunRecord.next_event_sequence)
+        )
+        if sequence is None:
+            raise ValueError("Run not found.")
+        record = AgentRunEventRecord(
+            id=f"evt_{uuid4().hex}",
+            run_id=event.run_id,
+            conversation_id=event.conversation_id,
+            sequence=sequence,
+            run_version=event.run_version,
+            type=event.type.value,
+            visibility=event.visibility.value,
+            payload_json=event.payload,
+            created_at=event.timestamp,
+        )
+        session.add(record)
+        session.flush()
+        return self._to_domain(record)
+
+    # -------------------------------------------------------------------------
+    def get_event(self, event_id: str) -> RunEvent | None:
+        with self._session_factory() as session:
+            record = session.get(AgentRunEventRecord, event_id)
+            return self._to_domain(record) if record is not None else None
 
     # -------------------------------------------------------------------------
     def list_events(

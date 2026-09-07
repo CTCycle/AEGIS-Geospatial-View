@@ -123,6 +123,9 @@ class ToolPlanStep(BaseModel):
     expected_output_schema: str = "tool_execution_envelope"
     merge_policy: str = "merge_verified_map_or_direct_result"
     required: bool = True
+    target_id: str | None = None
+    analysis_scope: str | None = None
+    required_outputs: list[str] = Field(default_factory=list)
 
 
 ###############################################################################
@@ -138,6 +141,7 @@ class ToolPlan(BaseModel):
     )
     frontend_derivation: str = "derive_from_validated_results"
     partial_failure_policy: str = "retain_successful_required_results"
+    canonical_request_id: str | None = None
 
 
 ###############################################################################

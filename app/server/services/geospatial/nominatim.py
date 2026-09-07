@@ -44,6 +44,11 @@ class NominatimService:
             "neighbourhood",
             "quarter",
             "borough",
+            "airport",
+            "landmark",
+            "river",
+            "road",
+            "station",
             "area",
             "zona",
             "quartiere",
@@ -247,7 +252,17 @@ class NominatimService:
                 and str(candidate.get("selected_result_type") or "").lower()
                 != "country"
             ]
-        elif expected in {"address", "poi", "street"}:
+        elif expected in {
+            "address",
+            "airport",
+            "feature",
+            "landmark",
+            "poi",
+            "river",
+            "road",
+            "street",
+            "station",
+        }:
             same_level_candidates = [
                 candidate
                 for candidate in ranked
@@ -665,6 +680,42 @@ class NominatimService:
             }:
                 return 0.0
             return 2.0
+        feature_scores = {
+            "airport": {
+                ("aeroway", "aerodrome"),
+                ("aeroway", "airport"),
+                ("aeroway", "heliport"),
+            },
+            "landmark": {
+                ("historic", "*"),
+                ("tourism", "*"),
+                ("man_made", "*"),
+            },
+            "river": {
+                ("waterway", "river"),
+            },
+            "road": {
+                ("highway", "*"),
+            },
+            "station": {
+                ("amenity", "bus_station"),
+                ("public_transport", "station"),
+                ("railway", "station"),
+                ("railway", "halt"),
+            },
+        }
+        if expected in feature_scores:
+            candidates_for_type = feature_scores[expected]
+            if (
+                (class_name, type_name) in candidates_for_type
+                or (class_name, "*") in candidates_for_type
+            ):
+                return 3.0
+            if class_name in {"administrative", "boundary"}:
+                return 0.0
+            return 0.5
+        if expected == "feature":
+            return 0.0 if class_name in {"administrative", "boundary"} else 1.0
         if expected == "city" and type_name in {
             "city",
             "town",
@@ -837,7 +888,17 @@ class NominatimService:
                 return False
             candidate_tokens = self.tokenize(self._candidate_text(candidate))
             return self.compute_token_overlap(target_tokens, candidate_tokens) >= 0.8
-        if expected not in {"address", "poi", "street"}:
+        if expected not in {
+            "address",
+            "airport",
+            "feature",
+            "landmark",
+            "poi",
+            "river",
+            "road",
+            "street",
+            "station",
+        }:
             return True
         target_tokens = self.tokenize(address)
         if not target_tokens:

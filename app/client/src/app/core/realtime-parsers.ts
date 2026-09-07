@@ -29,6 +29,7 @@ const RUN_EVENT_TYPES: readonly RunEventType[] = [
   'clarification_needed',
   'trace',
   'checkpoint',
+  'map_prepared',
 ];
 
 const RUN_EVENT_VISIBILITIES: readonly RunEventVisibility[] = ['user', 'internal'];
@@ -44,6 +45,7 @@ const OPERATION_KINDS: readonly ChatOperationResult['kind'][] = [
 const OPERATION_STATUSES: readonly ChatOperationResult['status'][] = [
   'success',
   'partial',
+  'pending',
   'failed',
 ];
 const POLICY_PLAN_STATES: readonly PolicyDecision['plan']['state'][] = [

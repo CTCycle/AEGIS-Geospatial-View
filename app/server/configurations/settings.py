@@ -62,6 +62,7 @@ class ChatRuntimeSettings:
     max_history_messages: int
     parser_certainty_threshold: float
     parser_max_retries: int
+    application_timezone: str = "UTC"
 
 
 ###############################################################################
@@ -175,6 +176,7 @@ class JsonChatRuntimeSettings(StrictJsonSettings):
     max_history_messages: int = Field(ge=1, le=100)
     parser_certainty_threshold: float = Field(ge=0.0, le=1.0)
     parser_max_retries: int = Field(ge=0, le=5)
+    application_timezone: str = "UTC"
 
 
 ###############################################################################
@@ -339,6 +341,7 @@ class AppSettings(BaseSettings):
                 max_history_messages=self.chat.max_history_messages,
                 parser_certainty_threshold=self.chat.parser_certainty_threshold,
                 parser_max_retries=self.chat.parser_max_retries,
+                application_timezone=self.chat.application_timezone,
             ),
             openmeteo=OpenMeteoSettings(
                 weather_base_url=self.openmeteo.weather_base_url,

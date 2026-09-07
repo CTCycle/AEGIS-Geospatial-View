@@ -5,6 +5,7 @@ from server.common.typing import is_json_object
 from typing import Any, Literal, cast
 
 from server.domain.agent.decision import PolicyDecision
+from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.domain.agent.pipeline import ConversationTaskRecord, TaskFailureDetail
 from server.domain.agent.reliability import AgentExecutionBudget
 from server.contracts.chat import ChatOperationResult, ChatTurnResponse
@@ -112,9 +113,15 @@ class DirectTurnResponseService:
         latest_contract: Any,
         recent_messages: list[dict[str, Any]],
         context_usage: Any,
+        canonical_request: CanonicalRequestInterpretation | None = None,
         preflight_decision: PolicyDecision | None = None,
         execution_budget: AgentExecutionBudget | None = None,
     ) -> ChatTurnResponse | None:
+        canonical_payload = (
+            canonical_request.model_dump(mode="json")
+            if canonical_request is not None
+            else None
+        )
         context_query_kind = getattr(
             getattr(turn_contract, "context_query", None),
             "kind",
@@ -143,6 +150,7 @@ class DirectTurnResponseService:
                 latest_memory=latest_memory,
                 latest_contract=latest_contract,
                 context_usage=context_usage,
+                canonical_request=canonical_request,
                 assistant_message=assistant_message,
                 failure=failure,
                 progress_summary="Intent extraction failed.",
@@ -200,6 +208,7 @@ class DirectTurnResponseService:
                 latest_memory=latest_memory,
                 latest_contract=latest_contract,
                 context_usage=context_usage,
+                canonical_request=canonical_request,
                 assistant_message=assistant_message,
                 failure=failure,
                 progress_summary="Intent extraction failed.",
@@ -242,6 +251,7 @@ class DirectTurnResponseService:
                 request_id=request_id,
                 structured_payload={
                     "turn_contract": turn_contract.model_dump(mode="json"),
+                    "canonical_request": canonical_payload,
                     "decision": decision.model_dump(mode="json"),
                     "operation": operation.model_dump(mode="json"),
                     "memory_snapshot": latest_memory,
@@ -301,6 +311,7 @@ class DirectTurnResponseService:
                 request_id=request_id,
                 structured_payload={
                     "turn_contract": turn_contract.model_dump(mode="json"),
+                    "canonical_request": canonical_payload,
                     "decision": None,
                     "operation": operation.model_dump(mode="json"),
                     "memory_snapshot": latest_memory,
@@ -392,6 +403,7 @@ class DirectTurnResponseService:
             request_id=request_id,
             structured_payload={
                 "turn_contract": turn_contract.model_dump(mode="json"),
+                "canonical_request": canonical_payload,
                 "decision": preflight_decision.model_dump(mode="json"),
                 "operation": operation.model_dump(mode="json"),
                 "memory_snapshot": latest_memory,
@@ -430,10 +442,16 @@ class DirectTurnResponseService:
         latest_memory: dict[str, Any],
         latest_contract: Any,
         context_usage: Any,
+        canonical_request: CanonicalRequestInterpretation | None,
         assistant_message: str,
         failure: TaskFailureDetail,
         progress_summary: str,
     ) -> ChatTurnResponse:
+        canonical_payload = (
+            canonical_request.model_dump(mode="json")
+            if canonical_request is not None
+            else None
+        )
         decision = AgentTurnSupport.build_direct_reject_decision(
             turn_contract.normalized_action.action_id
         )
@@ -458,6 +476,7 @@ class DirectTurnResponseService:
             request_id=request_id,
             structured_payload={
                 "turn_contract": turn_contract.model_dump(mode="json"),
+                "canonical_request": canonical_payload,
                 "decision": decision.model_dump(mode="json"),
                 "operation": operation.model_dump(mode="json"),
                 "memory_snapshot": latest_memory,

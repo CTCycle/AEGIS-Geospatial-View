@@ -15,6 +15,7 @@ dependencies = [
     "tqdm==4.67.3",
     "SQLAlchemy==2.0.50",
     "python-dotenv==1.2.2",
+    "tzdata>=2024.1",
     "pydantic-settings>=2.0.0,<3",
     "folium==0.17.0",
     "pillow==12.2.0",

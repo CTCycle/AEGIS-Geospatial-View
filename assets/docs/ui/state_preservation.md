@@ -1,6 +1,6 @@
 # State Preservation
 
-Last updated: 2026-08-27
+Last updated: 2026-09-05
 
 ## Overview
 
@@ -28,6 +28,8 @@ Persisted chat state includes:
 - `lastDecision`
 - `memorySnapshot`
 - `mapSession`
+- candidate presentation identity and status (`runVersion`, `mapSessionId`,
+  `collectionRevision`, and pending render requirements)
 - status and composer/transcript UI state
 - bounded run event duplicate-protection state
 
@@ -43,6 +45,13 @@ one-time migration retains conversation ID and messages, while old map/task
 state is discarded; messages are never removed solely because the map schema
 changed.
 
+Prepared map state is a candidate, not committed visualization memory. The
+client validates it locally and acknowledges the exact run/version/session/
+revision tuple. Until the server accepts that acknowledgment, the previous
+committed map remains authoritative. Reconnect hydrates a still-pending
+candidate; a duplicate matching acknowledgment updates neither transcript nor
+context revision, while a stale or conflicting acknowledgment is discarded.
+
 ## Restore Rules
 
 State is restored only when:
@@ -56,6 +65,12 @@ Otherwise the app falls back to `defaultAppState()`.
 
 Late completion payloads with older context revisions are discarded. Numeric
 backend chat-session identifiers are neither restored nor transmitted.
+
+The browser sends bounded render evidence only: source/layer presence, loaded
+state, viewport validity, and rendered feature counts where applicable. It does
+not send geometry, raw tile URLs, or browser error objects. A new run locally
+invalidates an older pending candidate, and the server atomically supersedes it
+when the new run is created.
 
 The active run also persists the last realtime event sequence and bounded seen-
 event IDs so WebSocket reconnects can replay without duplicating transcript

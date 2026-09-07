@@ -145,6 +145,8 @@ class AgentExecutionBudget:
             if timeout_origin_value:
                 status = "timeout"
                 timeout_origin = str(timeout_origin_value)
+            else:
+                status = "failed"
             error_code = str(getattr(exc, "code", "")) or type(exc).__name__
             raise
         finally:

@@ -1462,6 +1462,29 @@
           },
           "state": {
             "$ref": "#/components/schemas/AgentRunState"
+          },
+          "presentation_status": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "ready",
+              "failed"
+            ],
+            "title": "Presentation Status",
+            "default": "not_required"
+          },
+          "presentation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presentation"
           }
         },
         "additionalProperties": false,
@@ -1516,6 +1539,7 @@
           "running",
           "updating",
           "waiting_for_clarification",
+          "awaiting_render",
           "completed",
           "failed",
           "cancelled"
@@ -1889,6 +1913,415 @@
         ],
         "title": "BackgroundJobStatusResponse"
       },
+      "CanonicalPresentation": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "text",
+              "map",
+              "both"
+            ],
+            "title": "Mode",
+            "default": "map"
+          },
+          "geometry": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Geometry"
+          },
+          "basemap_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basemap Id"
+          },
+          "viewport_operation": {
+            "type": "string",
+            "title": "Viewport Operation",
+            "default": "auto"
+          },
+          "viewport_radius_m": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewport Radius M"
+          },
+          "viewport_tighten_relative_to_active": {
+            "type": "boolean",
+            "title": "Viewport Tighten Relative To Active",
+            "default": false
+          },
+          "viewport_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewport Reason"
+          },
+          "show_legend": {
+            "type": "boolean",
+            "title": "Show Legend",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CanonicalPresentation"
+      },
+      "CanonicalRequestInterpretation": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "interpretation_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Interpretation Revision",
+            "default": 1
+          },
+          "relationship_to_previous_turn": {
+            "type": "string",
+            "title": "Relationship To Previous Turn",
+            "default": "new_task"
+          },
+          "primary_intent": {
+            "type": "string",
+            "title": "Primary Intent"
+          },
+          "operations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Operations"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/CanonicalTarget"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "spatial_constraints": {
+            "items": {
+              "$ref": "#/components/schemas/CanonicalSpatialConstraint"
+            },
+            "type": "array",
+            "title": "Spatial Constraints"
+          },
+          "temporal_constraints": {
+            "$ref": "#/components/schemas/CanonicalTemporalConstraints"
+          },
+          "data_domains": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Data Domains"
+          },
+          "filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filters"
+          },
+          "presentation": {
+            "$ref": "#/components/schemas/CanonicalPresentation"
+          },
+          "map_required": {
+            "type": "boolean",
+            "title": "Map Required",
+            "default": false
+          },
+          "ambiguities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ambiguities"
+          },
+          "completion_requirements": {
+            "items": {
+              "$ref": "#/components/schemas/CompletionRequirement"
+            },
+            "type": "array",
+            "title": "Completion Requirements"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assumptions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "primary_intent"
+        ],
+        "title": "CanonicalRequestInterpretation",
+        "description": "The single request interpretation consumed after parsing."
+      },
+      "CanonicalSpatialConstraint": {
+        "properties": {
+          "relationship": {
+            "type": "string",
+            "enum": [
+              "at",
+              "in",
+              "near",
+              "around",
+              "within_distance",
+              "along",
+              "north_of",
+              "south_of",
+              "east_of",
+              "west_of",
+              "visible_area",
+              "here"
+            ],
+            "title": "Relationship"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "reference_target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Target Id"
+          },
+          "analysis_scope": {
+            "type": "string",
+            "enum": [
+              "point",
+              "bbox",
+              "radius",
+              "administrative_geometry",
+              "feature_geometry",
+              "viewport"
+            ],
+            "title": "Analysis Scope"
+          },
+          "distance_m": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance M"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "explicit",
+              "parser",
+              "inherited",
+              "viewport"
+            ],
+            "title": "Provenance",
+            "default": "parser"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "relationship",
+          "target_id",
+          "analysis_scope"
+        ],
+        "title": "CanonicalSpatialConstraint"
+      },
+      "CanonicalTarget": {
+        "properties": {
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "original_text": {
+            "type": "string",
+            "title": "Original Text"
+          },
+          "entity_kind": {
+            "type": "string",
+            "title": "Entity Kind"
+          },
+          "parent_target_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Parent Target Ids"
+          },
+          "resolved_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "geometry_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geometry Ref"
+          },
+          "resolution_status": {
+            "type": "string",
+            "enum": [
+              "resolved",
+              "inherited",
+              "ambiguous",
+              "unresolved"
+            ],
+            "title": "Resolution Status",
+            "default": "unresolved"
+          },
+          "peer": {
+            "type": "boolean",
+            "title": "Peer",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_id",
+          "original_text",
+          "entity_kind"
+        ],
+        "title": "CanonicalTarget"
+      },
+      "CanonicalTemporalConstraints": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "current",
+              "historical",
+              "forecast",
+              "none"
+            ],
+            "title": "Mode",
+            "default": "none"
+          },
+          "reference_time_iso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Time Iso"
+          },
+          "start_time_iso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time Iso"
+          },
+          "end_time_iso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time Iso"
+          },
+          "granularity": {
+            "type": "string",
+            "title": "Granularity",
+            "default": "none"
+          },
+          "aggregation": {
+            "type": "string",
+            "title": "Aggregation",
+            "default": "none"
+          },
+          "raw_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Text"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "UTC"
+          },
+          "timezone_source": {
+            "type": "string",
+            "enum": [
+              "client",
+              "application",
+              "utc"
+            ],
+            "title": "Timezone Source",
+            "default": "utc"
+          },
+          "resolved_once": {
+            "type": "boolean",
+            "title": "Resolved Once",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CanonicalTemporalConstraints"
+      },
       "CapabilityCandidate": {
         "properties": {
           "capability_id": {
@@ -2024,6 +2457,7 @@
             "enum": [
               "success",
               "partial",
+              "pending",
               "failed"
             ],
             "title": "Status"
@@ -2119,6 +2553,18 @@
             ],
             "title": "Datetime"
           },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
           "request_id": {
             "anyOf": [
               {
@@ -2133,6 +2579,11 @@
           "conversation_id": {
             "type": "string",
             "title": "Conversation Id"
+          },
+          "defer_map_commit": {
+            "type": "boolean",
+            "title": "Defer Map Commit",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -2272,6 +2723,16 @@
               }
             ],
             "title": "Execution Trace"
+          },
+          "canonical_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CanonicalRequestInterpretation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -2310,6 +2771,69 @@
           "reason"
         ],
         "title": "ClarificationRequest"
+      },
+      "CompletionRequirement": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "satisfied",
+              "failed",
+              "not_applicable"
+            ],
+            "title": "Status",
+            "default": "pending"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CompletionRequirement"
       },
       "ContextQuery": {
         "properties": {
@@ -2937,6 +3461,76 @@
           "action_id"
         ],
         "title": "ExecutionPlan"
+      },
+      "GeographicRelationship": {
+        "properties": {
+          "relationship": {
+            "type": "string",
+            "enum": [
+              "at",
+              "in",
+              "near",
+              "around",
+              "within_distance",
+              "along",
+              "north_of",
+              "south_of",
+              "east_of",
+              "west_of",
+              "visible_area",
+              "here"
+            ],
+            "title": "Relationship",
+            "default": "in"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "analysis_scope": {
+            "type": "string",
+            "enum": [
+              "point",
+              "bbox",
+              "radius",
+              "administrative_geometry",
+              "feature_geometry",
+              "viewport"
+            ],
+            "title": "Analysis Scope",
+            "default": "bbox"
+          },
+          "distance_m": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance M"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "title": "GeographicRelationship",
+        "description": "Parser evidence for a target/reference spatial relationship."
       },
       "GeographicScope": {
         "properties": {
@@ -4370,13 +4964,19 @@
             "type": "string",
             "enum": [
               "address",
+              "airport",
               "city",
               "country",
               "coordinates",
               "deictic",
               "poi",
+              "feature",
+              "landmark",
               "region",
+              "river",
+              "road",
               "street",
+              "station",
               "neighborhood",
               "district",
               "municipality",
@@ -6046,6 +6646,17 @@
             "type": "string",
             "title": "Partial Failure Policy",
             "default": "retain_successful_required_results"
+          },
+          "canonical_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Request Id"
           }
         },
         "additionalProperties": false,
@@ -6151,6 +6762,35 @@
             "type": "boolean",
             "title": "Required",
             "default": true
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          },
+          "analysis_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Scope"
+          },
+          "required_outputs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Outputs"
           }
         },
         "additionalProperties": false,
@@ -6214,6 +6854,30 @@
           },
           "temporal_signal": {
             "$ref": "#/components/schemas/TemporalSignal"
+          },
+          "geographic_relationships": {
+            "items": {
+              "$ref": "#/components/schemas/GeographicRelationship"
+            },
+            "type": "array",
+            "title": "Geographic Relationships"
+          },
+          "operations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Operations"
+          },
+          "filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filters"
+          },
+          "presentation_requirements": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Presentation Requirements"
           },
           "context_query": {
             "$ref": "#/components/schemas/ContextQuery"

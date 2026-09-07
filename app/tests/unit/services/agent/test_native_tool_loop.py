@@ -18,6 +18,11 @@ from server.contracts.geospatial import (
     ViewportPolicy,
 )
 from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.interpretation import (
+    CanonicalRequestInterpretation,
+    CanonicalSpatialConstraint,
+    CanonicalTarget,
+)
 from server.domain.llm.types import LLMToolResult
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
@@ -445,3 +450,68 @@ def test_native_tool_loop_uses_the_latest_map_session_result() -> None:
 
     assert result is not None
     assert result.session_id == "second"
+
+
+def test_native_geospatial_output_uses_the_canonical_scope_contract() -> None:
+    location = ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5)
+    canonical = CanonicalRequestInterpretation(
+        request_id="native-scope-1",
+        primary_intent="geospatial_data_retrieval",
+        targets=[
+            CanonicalTarget(
+                target_id="target-rome",
+                original_text="Rome",
+                entity_kind="city",
+                resolved_location=location,
+                resolution_status="resolved",
+            )
+        ],
+        spatial_constraints=[
+            CanonicalSpatialConstraint(
+                relationship="within_distance",
+                target_id="target-rome",
+                analysis_scope="radius",
+                distance_m=5_000,
+                provenance="explicit",
+            )
+        ],
+    )
+    context = AgentExecutionContext(
+        canonical_request=canonical,
+        metadata={"target_id": "target-rome"},
+    )
+    session = MapSession(
+        session_id="native-map",
+        resolved_location=location,
+        basemap_id="osm",
+        viewport=ViewportPolicy(center_latitude=41.9, center_longitude=12.5),
+        overlay_collection=OverlayCollectionState(),
+    )
+    call = LLMToolCall(
+        id="native-call-1",
+        name="execute_geospatial_capability",
+        arguments={"capability_id": "usgs_earthquakes", "arguments": {}},
+    )
+    envelope = {
+        "ok": True,
+        "capability_id": "usgs_earthquakes",
+        "data": {
+            "ok": True,
+            "operation": "map_session_created",
+            "capability_id": "usgs_earthquakes",
+            "map_session": session.model_dump(mode="json"),
+        },
+    }
+
+    assert (
+        NativeToolLoop._validate_geospatial_tool_output(call, context, envelope)
+        == "Tool output is missing the planned analysis scope evidence."
+    )
+
+    session.payload = {
+        "analysis_scope": "radius",
+        "target_id": "target-rome",
+        "time_mode": "current",
+    }
+    envelope["data"]["map_session"] = session.model_dump(mode="json")
+    assert NativeToolLoop._validate_geospatial_tool_output(call, context, envelope) is None

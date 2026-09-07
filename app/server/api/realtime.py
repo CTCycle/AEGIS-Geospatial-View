@@ -46,6 +46,11 @@ async def realtime_socket(
     lifecycle_service: RunLifecycleService = websocket.app.state.run_lifecycle_service
     steering_service: RunSteeringService = websocket.app.state.run_steering_service
     event_publisher: RunEventPublisher = websocket.app.state.run_event_publisher
+    render_completion_service = getattr(
+        websocket.app.state,
+        "render_completion_service",
+        None,
+    )
     registry: RealtimeConnectionRegistry = websocket.app.state.realtime_connections
     try:
         conversation_repository.verify_conversation_access(conversation_id, None)
@@ -63,6 +68,7 @@ async def realtime_socket(
         event_publisher=event_publisher,
         registry=registry,
         metrics=websocket.app.state.realtime_metrics,
+        render_completion_service=render_completion_service,
     )
     await connection.run()
 

@@ -15,6 +15,7 @@ from server.contracts.chat import (
 )
 from server.contracts.events import RunEventType
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
+from server.services.agent.orchestrator import AgentOrchestrator as ChatAgentOrchestrator
 
 
 ###############################################################################
@@ -299,5 +300,30 @@ def test_geospatial_auth_failure_points_to_access_without_exposing_provider_text
     assert "Access" in message
     assert "Model Settings" not in message
     assert "secret-token" not in message
+
+
+def test_unacknowledged_map_candidate_does_not_replace_committed_task_state():
+    candidate = {
+        "schema_version": 3,
+        "active_map_session": {"session_id": "candidate"},
+        "geospatial_state": {"geographic_scope": {"bbox": [10, 40, 11, 41]}},
+        "tasks": [{"id": "run_1"}],
+    }
+    committed = {
+        "schema_version": 3,
+        "active_map_session": {"session_id": "committed"},
+        "geospatial_state": {"geographic_scope": {"bbox": [12, 41, 13, 42]}},
+    }
+
+    persisted = ChatAgentOrchestrator._task_snapshot_for_persistence(
+        candidate,
+        committed,
+        defer_map_commit=True,
+        has_map_candidate=True,
+    )
+
+    assert persisted["active_map_session"] == committed["active_map_session"]
+    assert persisted["geospatial_state"] == committed["geospatial_state"]
+    assert persisted["tasks"] == candidate["tasks"]
 
 

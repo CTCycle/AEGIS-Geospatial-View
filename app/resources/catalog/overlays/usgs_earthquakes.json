@@ -94,5 +94,17 @@
     "timestampPath": "features[].properties.time",
     "fieldMap": {},
     "expectedGeometry": "Point"
+  },
+  "executionContract": {
+    "supported_operations": ["show", "search", "filter", "near", "around", "within_distance"],
+    "supported_scope_kinds": ["point", "bbox", "radius"],
+    "temporal_modes": ["current"],
+    "temporal_windows": ["recent_feed"],
+    "required_inputs": ["location", "analysis_scope"],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "global",
+    "limitations": ["Feed granularity depends on the selected USGS summary feed."],
+    "fallback_ids": []
   }
 }

@@ -10,6 +10,7 @@ from server.domain.agent.pipeline import (
     ToolPlanStep,
 )
 from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.contracts.extraction import TurnParseResult
 from server.services.agent.tool_argument_builder import ToolArgumentBuilder
 
@@ -27,42 +28,76 @@ class DeterministicToolPlanner:
         specialist: SpecialistGroup,
         memory_snapshot: dict[str, Any] | None = None,
         resolved_location: ResolvedLocation | None = None,
+        canonical_request: CanonicalRequestInterpretation | None = None,
     ) -> ToolPlan:
         steps: list[ToolPlanStep] = []
         visualization_update = self._build_visualization_update(turn)
         capability_ids = self._select_capabilities(turn)
-        for index, capability_id in enumerate(capability_ids, start=1):
-            steps.append(
-                ToolPlanStep(
-                    step_id=f"step-{index}",
-                    tool_name="execute_geospatial_capability",
-                    capability_id=capability_id,
-                    reason=f"Required layer for {turn.entity_target or turn.normalized_action.action_label}.",
-                    parallel_group="capability-fetch",
-                    arguments={
-                        "capability_id": capability_id,
-                        "arguments": self.argument_builder.build_capability_arguments(
-                            capability_id,
-                            turn,
-                            memory_snapshot,
-                            resolved_location,
+        target_specs = self._target_specs(canonical_request, resolved_location)
+        step_number = 1
+        for capability_id in capability_ids:
+            for target_id, target_location, analysis_scope in target_specs:
+                steps.append(
+                    ToolPlanStep(
+                        step_id=f"step-{step_number}",
+                        tool_name="execute_geospatial_capability",
+                        capability_id=capability_id,
+                        reason=f"Required layer for {turn.entity_target or turn.normalized_action.action_label}.",
+                        parallel_group="capability-fetch",
+                        arguments={
+                            "capability_id": capability_id,
+                            "arguments": self.argument_builder.build_capability_arguments(
+                                capability_id,
+                                turn,
+                                memory_snapshot,
+                                target_location,
+                                canonical_request=canonical_request,
+                                target_id=target_id,
+                            ),
+                        },
+                        target_id=target_id,
+                        analysis_scope=analysis_scope,
+                        required_outputs=(
+                            [
+                                item.name
+                                for item in canonical_request.completion_requirements
+                                if item.required
+                            ]
+                            if canonical_request is not None
+                            else []
                         ),
-                    },
+                    )
                 )
-            )
+                step_number += 1
         for provider_id, layer_id in self._select_provider_layers(turn):
-            steps.append(
-                ToolPlanStep(
-                    step_id=f"step-{len(steps) + 1}",
-                    tool_name="render_geospatial_provider_layer",
-                    reason="Provider-native layer was explicitly selected for rendering.",
-                    parallel_group="provider-layer-fetch",
-                    arguments={
-                        "provider_id": provider_id,
-                        "layer_id": layer_id,
-                    },
+            # Provider-native layers are capabilities too.  Keep one step per
+            # canonical target so a comparison cannot silently render every
+            # provider layer against the primary place.
+            for target_id, _target_location, analysis_scope in target_specs:
+                steps.append(
+                    ToolPlanStep(
+                        step_id=f"step-{step_number}",
+                        tool_name="render_geospatial_provider_layer",
+                        reason="Provider-native layer was explicitly selected for rendering.",
+                        parallel_group="provider-layer-fetch",
+                        arguments={
+                            "provider_id": provider_id,
+                            "layer_id": layer_id,
+                        },
+                        target_id=target_id,
+                        analysis_scope=analysis_scope,
+                        required_outputs=(
+                            [
+                                item.name
+                                for item in canonical_request.completion_requirements
+                                if item.required
+                            ]
+                            if canonical_request is not None
+                            else []
+                        ),
+                    )
                 )
-            )
+                step_number += 1
         if self._requires_provider_discovery(turn, specialist):
             provider_id = next(
                 (item for item in turn.required_data_sources if item.strip()),
@@ -92,7 +127,51 @@ class DeterministicToolPlanner:
             selected_tools=selected,
             steps=steps,
             visualization_update=visualization_update,
+            canonical_request_id=(
+                canonical_request.request_id
+                if canonical_request is not None
+                else None
+            ),
         )
+
+    @staticmethod
+    def _target_specs(
+        canonical_request: CanonicalRequestInterpretation | None,
+        resolved_location: ResolvedLocation | None,
+    ) -> list[tuple[str | None, ResolvedLocation | None, str | None]]:
+        if canonical_request is None:
+            return [(None, resolved_location, None)]
+        targets = [
+            item
+            for item in canonical_request.targets
+            if item is canonical_request.primary_target or item.peer
+        ]
+        if not targets:
+            return [(None, resolved_location, None)]
+        specs: list[tuple[str | None, ResolvedLocation | None, str | None]] = []
+        for target in targets:
+            # A peer target must never inherit the primary target's point.  The
+            # resolver either supplies its own location or leaves the step
+            # unresolved for an explicit clarification/error.
+            location = target.resolved_location
+            if location is None and target is canonical_request.primary_target:
+                location = resolved_location
+            constraint = next(
+                (
+                    item
+                    for item in canonical_request.spatial_constraints
+                    if item.target_id == target.target_id
+                ),
+                None,
+            )
+            specs.append(
+                (
+                    target.target_id,
+                    location,
+                    constraint.analysis_scope if constraint is not None else None,
+                )
+            )
+        return specs
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -173,6 +252,8 @@ class DeterministicToolPlanner:
                     "tool": step.tool_name,
                     "capability": step.capability_id,
                     "arguments": step.arguments,
+                    "target_id": step.target_id,
+                    "analysis_scope": step.analysis_scope,
                 },
                 sort_keys=True,
                 separators=(",", ":"),

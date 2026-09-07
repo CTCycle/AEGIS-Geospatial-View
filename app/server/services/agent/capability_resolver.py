@@ -6,6 +6,7 @@ from typing import Any, cast
 from server.common.typing import is_json_array, json_array, json_object
 
 from server.contracts.extraction import TurnParseResult
+from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
@@ -122,7 +123,11 @@ class CapabilityResolver:
         self.runtime_registry = runtime_registry
 
     # -------------------------------------------------------------------------
-    def resolve(self, turn: TurnParseResult) -> TurnParseResult:
+    def resolve(
+        self,
+        turn: TurnParseResult,
+        canonical_request: CanonicalRequestInterpretation | None = None,
+    ) -> TurnParseResult:
         capabilities = self._all_capabilities()
         atomic_layer_refs = {
             self._normalize_text(str(item))
@@ -191,6 +196,7 @@ class CapabilityResolver:
         overlay_commands = self._resolve_overlay_commands(
             turn.overlay_commands,
             turn,
+            canonical_request=canonical_request,
         )
         for command in overlay_commands:
             if command.action not in {"add", "show", "update"}:
@@ -202,9 +208,13 @@ class CapabilityResolver:
 
         resolved: list[str] = []
         unresolved: list[str] = []
-        poi_capability = self._resolve_one("poi", turn) if turn.poi_categories else None
+        poi_capability = (
+            self._resolve_one("poi", turn, canonical_request)
+            if turn.poi_categories
+            else None
+        )
         for layer in requested:
-            capability_id = self._resolve_one(layer, turn)
+            capability_id = self._resolve_one(layer, turn, canonical_request)
             if capability_id is None:
                 if poi_capability and self._is_poi_refinement(layer, turn):
                     if poi_capability not in resolved:
@@ -497,18 +507,19 @@ class CapabilityResolver:
         self,
         commands: list[Any],
         turn: TurnParseResult,
+        canonical_request: CanonicalRequestInterpretation | None = None,
     ) -> list[Any]:
         resolved_commands: list[Any] = []
         for command in commands:
             selector = command.selector
             capability_ids: list[str] = []
             for value in selector.capability_ids:
-                capability_id = self._resolve_one(value, turn)
+                capability_id = self._resolve_one(value, turn, canonical_request)
                 normalized = capability_id or str(value).strip()
                 if normalized and normalized not in capability_ids:
                     capability_ids.append(normalized)
             for value in [*selector.concepts, *selector.labels]:
-                capability_id = self._resolve_one(value, turn)
+                capability_id = self._resolve_one(value, turn, canonical_request)
                 if capability_id is not None and capability_id not in capability_ids:
                     capability_ids.append(capability_id)
             if capability_ids != selector.capability_ids:
@@ -523,7 +534,12 @@ class CapabilityResolver:
         return resolved_commands
 
     # -------------------------------------------------------------------------
-    def _resolve_one(self, layer: str, turn: TurnParseResult) -> str | None:
+    def _resolve_one(
+        self,
+        layer: str,
+        turn: TurnParseResult,
+        canonical_request: CanonicalRequestInterpretation | None = None,
+    ) -> str | None:
         query = str(layer).strip()
         if not query:
             return None
@@ -540,12 +556,16 @@ class CapabilityResolver:
         )
         if exact is not None:
             capability_id = str(exact.get("id") or "").strip()
-            return capability_id if self._is_usable(exact, turn) else None
+            return (
+                capability_id
+                if self._is_usable(exact, turn, canonical_request)
+                else None
+            )
 
         candidates = [
             item
             for item in capabilities
-            if self._is_usable(item, turn)
+            if self._is_usable(item, turn, canonical_request)
             and ("_" not in query or self._query_token_coverage(query, item) == 1.0)
         ]
         role_candidates = [
@@ -595,6 +615,7 @@ class CapabilityResolver:
         self,
         capability: dict[str, Any],
         turn: TurnParseResult,
+        canonical_request: CanonicalRequestInterpretation | None = None,
     ) -> bool:
         capability_id = str(capability.get("id") or "").strip()
         if not capability_id or not self.runtime_registry.is_enabled(capability_id):
@@ -609,7 +630,56 @@ class CapabilityResolver:
                 capability_id, required_mode
             ):
                 return False
-        return self._supports_temporal_request(capability, turn)
+        if not self._supports_temporal_request(
+            capability,
+            turn,
+            canonical_request=canonical_request,
+        ):
+            return False
+        if canonical_request is not None:
+            contract = self._execution_contract(capability)
+            explicit_scopes = {
+                constraint.analysis_scope
+                for constraint in canonical_request.spatial_constraints
+                if constraint.provenance == "explicit"
+            }
+            requested_scopes = {
+                constraint.analysis_scope
+                for constraint in canonical_request.spatial_constraints
+            }
+            declared_scopes = set(contract.get("supported_scope_kinds") or [])
+            # An explicitly requested radius, feature geometry, or viewport is
+            # a semantic requirement.  An empty declaration is unknown support,
+            # not an implicit wildcard, so do not route the request there.
+            scopes_to_check = requested_scopes if declared_scopes else explicit_scopes
+            if scopes_to_check and (
+                not declared_scopes or not scopes_to_check.issubset(declared_scopes)
+            ):
+                return False
+            coverage = str(contract.get("coverage") or capability.get("coverage") or "").casefold()
+            if coverage in {"united-states", "us", "usa"}:
+                # Every independent target must be inside the provider's
+                # declared coverage.  Checking only the primary target lets a
+                # Paris/London comparison silently route London through a US
+                # source when Paris happens to be the first target.
+                for target in canonical_request.targets:
+                    location = target.resolved_location
+                    if location is None:
+                        continue
+                    country = str(location.country or "").casefold()
+                    if country and country not in {"united states", "usa", "us"}:
+                        return False
+        return True
+
+    @staticmethod
+    def _execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
+        raw = capability.get("executionContract") or capability.get(
+            "execution_contract"
+        )
+        if not isinstance(raw, dict):
+            metadata = json_object(capability.get("metadata"))
+            raw = metadata.get("execution_contract")
+        return cast(dict[str, Any], raw) if isinstance(raw, dict) else {}
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -633,28 +703,54 @@ class CapabilityResolver:
     def _supports_temporal_request(
         capability: dict[str, Any],
         turn: TurnParseResult,
+        *,
+        canonical_request: CanonicalRequestInterpretation | None = None,
     ) -> bool:
-        temporal = turn.temporal_signal
+        temporal = (
+            canonical_request.temporal_constraints
+            if canonical_request is not None
+            else turn.temporal_signal
+        )
         if temporal.mode == "none" and temporal.aggregation == "none":
             return True
 
         metadata = json_object(capability.get("metadata"))
-        declared_modes = metadata.get("supported_temporal_modes")
+        execution_contract = json_object(
+            capability.get("executionContract") or capability.get("execution_contract")
+        )
+        declared_modes = execution_contract.get("temporal_modes")
+        if not is_json_array(declared_modes):
+            declared_modes = metadata.get("supported_temporal_modes")
         if not is_json_array(declared_modes):
             declared_modes = capability.get("supported_temporal_modes")
-        if is_json_array(declared_modes) and declared_modes:
+        if temporal.mode != "none":
+            if (
+                (not is_json_array(declared_modes) or not declared_modes)
+                and temporal.mode != "current"
+            ):
+                # ``current`` is the established provider default for legacy
+                # manifests. Forecast and historical products must declare
+                # their support explicitly because silently substituting one
+                # for another changes the meaning of the request.
+                return False
+            if not is_json_array(declared_modes) or not declared_modes:
+                return True
             allowed_modes = {
                 str(item).strip().casefold()
                 for item in declared_modes
                 if str(item).strip()
             }
-            if temporal.mode not in allowed_modes and temporal.mode != "none":
+            if temporal.mode not in allowed_modes:
                 return False
 
-        declared_aggregations = metadata.get("supported_aggregations")
+        declared_aggregations = execution_contract.get("supported_aggregations")
+        if not is_json_array(declared_aggregations):
+            declared_aggregations = metadata.get("supported_aggregations")
         if not is_json_array(declared_aggregations):
             declared_aggregations = capability.get("supported_aggregations")
-        if is_json_array(declared_aggregations) and declared_aggregations:
+        if temporal.aggregation != "none":
+            if not is_json_array(declared_aggregations) or not declared_aggregations:
+                return False
             allowed_aggregations = {
                 str(item).strip().casefold()
                 for item in declared_aggregations

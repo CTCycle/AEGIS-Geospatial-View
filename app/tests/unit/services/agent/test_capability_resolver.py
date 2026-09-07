@@ -13,6 +13,10 @@ from server.contracts.extraction import (
     TemporalSignal,
     TurnParseResult,
 )
+from server.domain.agent.interpretation import (
+    CanonicalRequestInterpretation,
+    CanonicalTemporalConstraints,
+)
 from server.services.agent.capability_resolver import CapabilityResolver
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
@@ -86,6 +90,23 @@ def test_preserves_enabled_exact_capability_id() -> None:
     assert resolved.clarification_plan is None
 
 
+def test_temporal_capability_check_uses_canonical_request_over_stale_turn() -> None:
+    turn = _turn("Show current weather", "openmeteo_weather_forecast", temporal_mode="current")
+    canonical = CanonicalRequestInterpretation(
+        request_id="canonical-temporal-1",
+        primary_intent="data_layer_query",
+        temporal_constraints=CanonicalTemporalConstraints(mode="historical"),
+    )
+    capability = {"metadata": {"supported_temporal_modes": ["current"]}}
+
+    assert (
+        CapabilityResolver._supports_temporal_request(
+            capability,
+            turn,
+            canonical_request=canonical,
+        )
+        is False
+    )
 ###############################################################################
 def test_resolves_precipitation_radar_semantics() -> None:
     resolved = _resolver().resolve(

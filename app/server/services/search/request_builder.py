@@ -3,10 +3,11 @@ from __future__ import annotations
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
 import math
-from typing import Any
+from typing import Any, cast
 
 from server.common.logger import logger as LOGGER
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
+from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.contracts.extraction import (
     NormalizedAction,
     TurnParseResult,
@@ -16,6 +17,7 @@ from server.contracts.geospatial import (
     LocationSearchRequest,
     PresentationPolicy,
     ProviderLayerSelection,
+    TimeMode,
     ViewportPolicy,
 )
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -50,7 +52,36 @@ class RequestBuilder:
         turn_contract: TurnParseResult | None = None,
         active_visualization: dict[str, Any] | None = None,
         provider_layer_selections: list[ProviderLayerSelection] | None = None,
+        canonical_request: CanonicalRequestInterpretation | None = None,
+        target_id: str | None = None,
+        canonical_arguments: dict[str, Any] | None = None,
     ) -> LocationSearchRequest:
+        canonical_target = (
+            canonical_request.target(target_id)
+            if canonical_request is not None and target_id
+            else canonical_request.primary_target
+            if canonical_request is not None
+            else None
+        )
+        canonical_constraint = (
+            next(
+                (
+                    item
+                    for item in canonical_request.spatial_constraints
+                    if canonical_target is not None
+                    and item.target_id == canonical_target.target_id
+                ),
+                None,
+            )
+            if canonical_request is not None
+            else None
+        )
+        effective_location = (
+            canonical_target.resolved_location
+            if canonical_target is not None
+            and canonical_target.resolved_location is not None
+            else location
+        )
         action = (
             turn_contract.normalized_action
             if turn_contract is not None
@@ -61,28 +92,133 @@ class RequestBuilder:
                 action_tags=[],
             )
         )
-        viewport_intent = (
-            turn_contract.viewport_intent if turn_contract is not None else None
+        if canonical_request is not None:
+            canonical_viewport_scope = canonical_request.presentation.viewport_operation
+            viewport_scope = (
+                canonical_viewport_scope
+                if canonical_viewport_scope
+                in {
+                    "preserve_current",
+                    "building",
+                    "street",
+                    "neighborhood",
+                    "district",
+                    "city",
+                    "region",
+                    "country",
+                    "auto",
+                }
+                else "auto"
+            )
+            viewport_intent = ViewportIntent(
+                scope=cast(Any, viewport_scope),
+                tighten_relative_to_active=(
+                    canonical_request.presentation.viewport_tighten_relative_to_active
+                ),
+                radius_hint_m=canonical_request.presentation.viewport_radius_m,
+                reason=canonical_request.presentation.viewport_reason,
+            )
+        else:
+            viewport_intent = (
+                turn_contract.viewport_intent if turn_contract is not None else None
+            )
+        temporal_signal = (
+            turn_contract.temporal_signal if turn_contract is not None else None
         )
+        canonical_temporal = (
+            canonical_request.temporal_constraints
+            if canonical_request is not None
+            else None
+        )
+        requested_time_mode = (
+            canonical_temporal.mode
+            if canonical_temporal is not None
+            else temporal_signal.mode
+            if temporal_signal is not None
+            else "current"
+        )
+        time_mode: TimeMode = (
+            cast(TimeMode, requested_time_mode)
+            if requested_time_mode in {"current", "historical", "forecast"}
+            else "current"
+        )
+        if (
+            canonical_constraint is not None
+            and canonical_constraint.analysis_scope == "radius"
+        ):
+            analysis_radius_m = canonical_constraint.distance_m
+        elif canonical_request is None and turn_contract is not None:
+            analysis_radius_m = turn_contract.radius_m
+        else:
+            analysis_radius_m = None
+        if canonical_request is None and canonical_arguments is not None:
+            argument_radius = canonical_arguments.get("radius_m")
+            if isinstance(argument_radius, (int, float)) and argument_radius > 0:
+                analysis_radius_m = float(argument_radius)
+        analysis_scope = (
+            canonical_constraint.analysis_scope
+            if canonical_constraint is not None
+            else None
+        )
+        analysis_bbox = self._canonical_analysis_bbox(
+            analysis_scope=analysis_scope,
+            canonical_target=canonical_target,
+        )
+        if canonical_request is not None and canonical_temporal is not None:
+            start_time_iso = canonical_temporal.start_time_iso
+            end_time_iso = canonical_temporal.end_time_iso
+        else:
+            start_time_iso = (
+                temporal_signal.start_time_iso if temporal_signal is not None else None
+            )
+            end_time_iso = (
+                temporal_signal.end_time_iso if temporal_signal is not None else None
+            )
         overlays = list(plan.overlay_ids)
+        canonical_categories = (
+            canonical_request.filters.get("poi_categories")
+            if canonical_request is not None
+            else None
+        )
+        if canonical_request is not None:
+            poi_categories = [
+                str(item).strip()
+                for item in cast(list[Any], canonical_categories)
+                if str(item).strip()
+            ] if isinstance(canonical_categories, list) else []
+        else:
+            poi_categories = (
+                list(turn_contract.poi_categories) if turn_contract is not None else []
+            )
+        basemap_id = (
+            canonical_request.presentation.basemap_id
+            if canonical_request is not None
+            and canonical_request.presentation.basemap_id
+            else self.choose_basemap(plan)
+        )
         request = LocationSearchRequest(
-            resolved_location=location,
+            resolved_location=effective_location,
             action_id=plan.action_id,
-            time_mode="current",
-            basemap_id=self.choose_basemap(plan),
+            time_mode=time_mode,
+            start_time_iso=start_time_iso,
+            end_time_iso=end_time_iso,
+            analysis_radius_m=analysis_radius_m,
+            analysis_scope=analysis_scope,
+            analysis_bbox=analysis_bbox,
+            target_id=(canonical_target.target_id if canonical_target is not None else target_id),
+            basemap_id=basemap_id,
             overlay_ids=overlays,
             provider_layer_selections=list(provider_layer_selections or []),
             viewport=self.build_viewport(
-                location,
+                effective_location,
                 action,
                 viewport_intent=viewport_intent,
                 active_visualization=active_visualization,
+                radius_m=analysis_radius_m,
             ),
             presentation=self.build_presentation(overlays),
             viewport_intent=viewport_intent,
-            poi_categories=list(turn_contract.poi_categories)
-            if turn_contract is not None
-            else [],
+            poi_categories=poi_categories,
         )
         LOGGER.debug(
             "map_request_built action=%s basemap=%s overlays=%d viewport_scope=%s tighten=%s radius_m=%.1f bbox=%s location_type=%s",
@@ -98,6 +234,37 @@ class RequestBuilder:
             location.location_type,
         )
         return request
+
+    @staticmethod
+    def _canonical_analysis_bbox(
+        *,
+        analysis_scope: str | None,
+        canonical_target: Any | None,
+    ) -> list[float] | None:
+        """Extract an explicit analysis bbox without treating a viewport as one.
+
+        The extent is owned by the resolved canonical target.  Native tool
+        arguments are model output and may contain a different bbox, so they
+        are deliberately ignored once canonical interpretation exists.
+        Viewport and point scopes return no analysis bbox; their display bounds
+        are built separately below.
+        """
+
+        if analysis_scope != "bbox" or canonical_target is None:
+            return None
+        location = getattr(canonical_target, "resolved_location", None)
+        raw = getattr(location, "bbox", None)
+        if not isinstance(raw, list):
+            return None
+        raw_items = cast(list[Any], raw)
+        if len(raw_items) != 4:
+            return None
+        if any(
+            not isinstance(item, (int, float)) or isinstance(item, bool)
+            for item in raw_items
+        ):
+            return None
+        return [float(item) for item in raw_items]
 
     # -------------------------------------------------------------------------
     def choose_basemap(self, plan: ExecutionPlan) -> str:
@@ -126,6 +293,7 @@ class RequestBuilder:
         *,
         viewport_intent: ViewportIntent | None = None,
         active_visualization: dict[str, Any] | None = None,
+        radius_m: float | None = None,
     ) -> ViewportPolicy:
         _ = action
         current_viewport = self._coerce_active_viewport(active_visualization)
@@ -159,24 +327,26 @@ class RequestBuilder:
                 return tightened
 
         scope = explicit_scope or self._scope_from_resolved_location(location) or "auto"
-        radius_m = (
+        viewport_radius_m = (
             viewport_intent.radius_hint_m
             if viewport_intent and viewport_intent.radius_hint_m
             else self.SCOPE_RADII_M.get(scope, self.DEFAULT_RADIUS_M)
         )
-        radius_m = self._clamp_radius(radius_m)
+        viewport_radius_m = self._clamp_radius(viewport_radius_m)
+        if radius_m is not None and radius_m > 0:
+            viewport_radius_m = max(viewport_radius_m, self._clamp_radius(radius_m))
         bbox = self._padded_bbox_for_scope(location.bbox, scope)
         if bbox is not None:
             return ViewportPolicy(
                 center_latitude=location.latitude,
                 center_longitude=location.longitude,
-                radius_m=max(radius_m, self._radius_from_bbox(bbox)),
+                radius_m=max(viewport_radius_m, self._radius_from_bbox(bbox)),
                 bbox=bbox,
             )
         return ViewportPolicy(
             center_latitude=location.latitude,
             center_longitude=location.longitude,
-            radius_m=radius_m,
+            radius_m=viewport_radius_m,
         )
 
     # -------------------------------------------------------------------------

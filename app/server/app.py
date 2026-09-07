@@ -39,6 +39,7 @@ from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
+from server.services.agent_runs.render_completion import RenderCompletionService
 from server.services.agent_runs.steering import RunSteeringService
 from server.services.agent_runs.realtime import RealtimeConnectionRegistry
 from server.services.agent_runs.metrics import RealtimeMetrics
@@ -129,10 +130,14 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         search_runtime.search_orchestrator,
         database,
         geospatial_runtime=geospatial_runtime,
+        application_timezone=getattr(
+            getattr(settings, "chat", None), "application_timezone", "UTC"
+        ),
     )
     chat_streaming_service = ChatStreamingService(chat_runtime.agent_orchestrator)
-    run_event_publisher = RunEventPublisher(AgentRunEventRepository(database))
-    run_repository = AgentRunRepository(database)
+    event_repository = AgentRunEventRepository(database)
+    run_event_publisher = RunEventPublisher(event_repository)
+    run_repository = AgentRunRepository(database, event_repository=event_repository)
     conversation_repository = chat_runtime.conversation_repository
     steering_repository = AgentSteeringRepository(database)
     conversation_snapshot_service = ConversationSnapshotService(
@@ -141,12 +146,18 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         run_repository=run_repository,
     )
     aggregation_service = AggregatedRequestService()
+    render_completion_service = RenderCompletionService(
+        run_repository=run_repository,
+        event_publisher=run_event_publisher,
+    )
     run_orchestrator = AgentRunOrchestrator(
         agent_orchestrator=chat_runtime.agent_orchestrator,
         run_repository=run_repository,
         event_publisher=run_event_publisher,
         conversation_repository=conversation_repository,
         steering_repository=steering_repository,
+        render_completion_service=render_completion_service,
+        defer_map_completion=True,
     )
     run_lifecycle_service = RunLifecycleService(
         conversation_repository=conversation_repository,
@@ -179,6 +190,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     application.state.conversation_snapshot_service = conversation_snapshot_service
     application.state.run_repository = run_repository
     application.state.run_event_publisher = run_event_publisher
+    application.state.render_completion_service = render_completion_service
     application.state.realtime_connections = realtime_connections
     application.state.realtime_metrics = realtime_metrics
     application.state.job_service = job_service

@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-09-04
+Last updated: 2026-09-05
 
 ## Layering
 
@@ -97,6 +97,19 @@ Geospatial API services are composed during application startup and accessed thr
     clarification. Clarification responses may carry a partial validated map
     update.
 13. Task status, failure details, and active visualization are updated before persistence.
+
+For a map request, the lifecycle continues after backend preparation. The
+orchestrator persists the candidate presentation as `awaiting_render` and
+publishes `map_prepared` with the exact run version, map session ID, collection
+revision, required source/layer checks, and pending response. The browser keeps
+the previous committed map until the candidate settles. After local MapLibre
+validation it sends `map.render_ack` through the existing idempotent realtime
+command queue. `RenderCompletionService` verifies conversation ownership and all
+candidate identities, checks the server-side render contract, and atomically
+promotes the map and relevant geographic memory in one repository transaction.
+Only then does it publish the final response and completed event. Duplicate
+matching acknowledgments return the stored result; stale, conflicting, or
+superseded acknowledgments cannot mutate state.
 
 Direct responses (parser failures, capability questions, failure inquiries, and
 preflight rejection/clarification) are handled by
@@ -195,6 +208,15 @@ second overlay array or constructing provider-specific WMS or WMTS defaults.
 `MapInspectionService` translates verified provider metadata into bounded
 feature/location/overlay/non-spatial inspection contracts attached to the
 owning collection instance.
+
+The completion evaluator distinguishes preparation from presentation. A
+successful provider call or a valid MapLibre canvas alone is insufficient: the
+required data and spatial/temporal contracts must be satisfied, renderable
+geometry must exist when requested, the acknowledged viewport must contain the
+candidate result, and the final response must be grounded in that committed
+revision. Candidate geometry is kept in persisted run presentation state until
+acknowledgment, cancellation, or supersession; raw geometry is referenced by
+the map/evidence stores rather than copied into the language-model context.
 
 ## Async And Threaded Behavior
 

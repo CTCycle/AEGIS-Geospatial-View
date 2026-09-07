@@ -17,7 +17,9 @@ from server.domain.agent.execution import (
     AgentToolLoopRequest,
     AgentToolLoopResult,
 )
+from server.domain.agent.pipeline import ToolPlanStep
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.domain.agent.runtime import canonical_call_fingerprint
 from server.prompts.agent import build_working_state_message
 from server.services.llm.factory import LLMFactory
@@ -312,7 +314,7 @@ class NativeToolLoop:
                 )
             results_list: list[LLMToolResult] = []
             for call in tool_calls:
-                fingerprint = canonical_call_fingerprint(call.name, call.arguments)
+                fingerprint = self._call_fingerprint(call, request.context)
                 if fingerprint in fingerprints:
                     duplicate_tool_calls += 1
                     results_list.append(
@@ -377,6 +379,34 @@ class NativeToolLoop:
             duplicate_tool_calls=duplicate_tool_calls,
             no_progress_steps=no_progress_steps,
             context_usages=list(context_usages),
+        )
+
+    @staticmethod
+    def _call_fingerprint(call: LLMToolCall, context: AgentExecutionContext) -> str:
+        """Include canonical scope in duplicate detection for native calls."""
+
+        canonical = context.canonical_request
+        target_id = None
+        analysis_scope = None
+        temporal: dict[str, Any] = {}
+        if canonical is not None:
+            target = canonical.primary_target
+            target_id = target.target_id if target is not None else None
+            if canonical.spatial_constraints:
+                analysis_scope = canonical.spatial_constraints[0].analysis_scope
+            temporal = {
+                "mode": canonical.temporal_constraints.mode,
+                "start_time_iso": canonical.temporal_constraints.start_time_iso,
+                "end_time_iso": canonical.temporal_constraints.end_time_iso,
+            }
+        return canonical_call_fingerprint(
+            call.name,
+            {
+                "arguments": call.arguments,
+                "target_id": target_id,
+                "analysis_scope": analysis_scope,
+                "temporal": temporal,
+            },
         )
 
     # -------------------------------------------------------------------------
@@ -465,6 +495,18 @@ class NativeToolLoop:
             }
         else:
             envelope_payload = envelope.to_dict()
+        validation_error = self._validate_geospatial_tool_output(
+            call, context, envelope_payload
+        )
+        if validation_error is not None:
+            envelope_payload = {
+                **envelope_payload,
+                "ok": False,
+                "error": {
+                    "code": "invalid_tool_output",
+                    "message": validation_error,
+                },
+            }
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         ok = bool(envelope_payload.get("ok"))
         LOGGER.debug(
@@ -484,6 +526,56 @@ class NativeToolLoop:
             error=str(error_payload.get("message"))
             if error_payload.get("message")
             else None,
+        )
+
+    @staticmethod
+    def _validate_geospatial_tool_output(
+        call: LLMToolCall,
+        context: AgentExecutionContext,
+        envelope: dict[str, Any],
+    ) -> str | None:
+        """Apply the planned output contract to native geospatial calls too."""
+
+        if call.name not in {
+            "execute_geospatial_capability",
+            "render_geospatial_provider_layer",
+        } or not bool(envelope.get("ok")):
+            return None
+        canonical = context.canonical_request
+        target_id = str(context.metadata.get("target_id") or "").strip() or None
+        analysis_scope: str | None = None
+        if canonical is not None:
+            target = canonical.target(target_id) if target_id else canonical.primary_target
+            if target is not None:
+                target_id = target.target_id
+                analysis_scope = next(
+                    (
+                        item.analysis_scope
+                        for item in canonical.spatial_constraints
+                        if item.target_id == target.target_id
+                    ),
+                    None,
+                )
+        capability_id = (
+            str(call.arguments.get("capability_id") or "").strip() or None
+        )
+        if call.name == "render_geospatial_provider_layer":
+            provider_id = str(call.arguments.get("provider_id") or "").strip()
+            layer_id = str(call.arguments.get("layer_id") or "").strip()
+            capability_id = f"{provider_id}:{layer_id}" if provider_id and layer_id else capability_id
+        step = ToolPlanStep(
+            step_id=f"native:{call.id}",
+            tool_name=call.name,
+            capability_id=capability_id,
+            reason="Native geospatial call validated against the canonical request.",
+            arguments=dict(call.arguments),
+            target_id=target_id,
+            analysis_scope=analysis_scope,
+        )
+        return ToolPlanExecutor.validate_result(
+            step,
+            envelope.get("data"),
+            canonical,
         )
 
     # -------------------------------------------------------------------------

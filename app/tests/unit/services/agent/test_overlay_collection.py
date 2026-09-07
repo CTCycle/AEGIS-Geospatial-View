@@ -730,3 +730,146 @@ def test_tool_map_session_is_merged_into_active_map_without_refetch() -> None:
         "census_tigerweb_hydrography",
     }
     assert merged.overlay_collection.revision == 1
+
+
+def test_multi_target_tool_sessions_preserve_scope_and_aggregate_bounds() -> None:
+    paris = ResolvedLocation(
+        label="Paris, France",
+        latitude=48.8566,
+        longitude=2.3522,
+        country="France",
+    )
+    london = ResolvedLocation(
+        label="London, United Kingdom",
+        latitude=51.5074,
+        longitude=-0.1278,
+        country="United Kingdom",
+    )
+    paris_overlay = _instance(
+        "earthquake-paris",
+        "usgs_earthquakes",
+        label="Earthquakes",
+        scope_key="Paris",
+        latitude=paris.latitude,
+        longitude=paris.longitude,
+    ).model_copy(update={"resolved_location": paris})
+    london_overlay = _instance(
+        "earthquake-london",
+        "usgs_earthquakes",
+        label="Earthquakes",
+        scope_key="London",
+        latitude=london.latitude,
+        longitude=london.longitude,
+    ).model_copy(update={"resolved_location": london})
+    paris_session = MapSession(
+        session_id="paris-session",
+        resolved_location=paris,
+        basemap_id="osm_default",
+        viewport=ViewportPolicy(
+            center_latitude=paris.latitude,
+            center_longitude=paris.longitude,
+            radius_m=20_000,
+        ),
+        bounds=[2.0, 48.5, 2.7, 49.1],
+        overlay_collection=OverlayCollectionState(instances=[paris_overlay]),
+    )
+    london_session = paris_session.model_copy(
+        update={
+            "session_id": "london-session",
+            "resolved_location": london,
+            "viewport": ViewportPolicy(
+                center_latitude=london.latitude,
+                center_longitude=london.longitude,
+                radius_m=20_000,
+            ),
+            "bounds": [-0.5, 51.2, 0.3, 51.8],
+            "overlay_collection": OverlayCollectionState(instances=[london_overlay]),
+        }
+    )
+    assembler = object.__new__(AgentTurnStateAssembler)
+    contract = SimpleNamespace(
+        location_signals=[],
+        requested_basemap=None,
+        overlay_commands=[],
+        relationship="new_task",
+        operations=["compare"],
+    )
+
+    merged = run_async_in_thread(
+        assembler.build_combined_map_session_from_tool_results(
+            tool_payload={
+                "tool_results": [
+                    {
+                        "content": {
+                            "ok": True,
+                            "data": {"map_session": paris_session.model_dump(mode="json")},
+                        }
+                    },
+                    {
+                        "content": {
+                            "ok": True,
+                            "data": {"map_session": london_session.model_dump(mode="json")},
+                        }
+                    },
+                ]
+            },
+            turn_contract=contract,
+            latest_memory={},
+            resolved_location=paris,
+        )
+    )
+
+    assert isinstance(merged, MapSession)
+    assert merged.bounds == [-0.5, 48.5, 2.7, 51.8]
+    scoped = {
+        instance.scope_key: instance.resolved_location.label
+        for instance in merged.overlay_collection.instances
+    }
+    assert scoped == {"Paris": "Paris, France", "London": "London, United Kingdom"}
+
+
+def test_new_task_replaces_same_location_search_layers() -> None:
+    location = ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5)
+    old = _instance(
+        "old", "old_search", label="Old search", scope_key="Rome", latitude=41.9, longitude=12.5
+    )
+    new = _instance(
+        "new", "new_search", label="New search", scope_key="Rome", latitude=41.9, longitude=12.5
+    )
+    active = MapSession(
+        session_id="active",
+        resolved_location=location,
+        basemap_id="osm_default",
+        viewport=ViewportPolicy(center_latitude=41.9, center_longitude=12.5),
+        overlay_collection=OverlayCollectionState(instances=[old]),
+    )
+    candidate = active.model_copy(
+        update={
+            "session_id": "candidate",
+            "overlay_collection": OverlayCollectionState(instances=[new]),
+        }
+    )
+    assembler = object.__new__(AgentTurnStateAssembler)
+    merged = run_async_in_thread(
+        assembler.build_combined_map_session_from_tool_results(
+            tool_payload={
+                "tool_results": [
+                    {"content": {"ok": True, "data": {"map_session": candidate.model_dump(mode="json")}}}
+                ]
+            },
+            turn_contract=SimpleNamespace(
+                location_signals=[],
+                requested_basemap=None,
+                overlay_commands=[],
+                relationship="new_task",
+                operations=[],
+            ),
+            latest_memory={"active_visualization": active.model_dump(mode="json")},
+            resolved_location=location,
+        )
+    )
+
+    assert isinstance(merged, MapSession)
+    assert [instance.capability_id for instance in merged.overlay_collection.instances] == [
+        "new_search"
+    ]

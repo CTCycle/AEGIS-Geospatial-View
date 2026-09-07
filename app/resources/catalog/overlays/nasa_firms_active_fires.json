@@ -101,6 +101,18 @@
     "fieldMap": {},
     "expectedGeometry": "Point"
   },
+  "executionContract": {
+    "supported_operations": ["show", "search", "filter", "near", "around", "within_distance"],
+    "supported_scope_kinds": ["point", "bbox", "radius"],
+    "temporal_modes": ["current"],
+    "temporal_windows": ["supported_provider_window"],
+    "required_inputs": ["location", "analysis_scope", "provider_credentials"],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "global",
+    "limitations": ["Requires NASA FIRMS credentials and its supported time window."],
+    "fallback_ids": []
+  },
   "account_setup": {
     "automation": {
       "support": "agent_assisted",

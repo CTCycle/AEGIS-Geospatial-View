@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -15,6 +16,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
     CheckConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -298,6 +300,7 @@ class AgentRunRecord(Base):
         String(80), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
     )
     client_request_id: Mapped[str | None] = mapped_column(String(160))
+    request_timezone: Mapped[str | None] = mapped_column(String(64))
     original_request: Mapped[str] = mapped_column(Text, nullable=False)
     aggregated_request: Mapped[str] = mapped_column(Text, nullable=False)
     active_run_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -315,6 +318,17 @@ class AgentRunRecord(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     error_code: Mapped[str | None] = mapped_column(String(120))
     error_message: Mapped[str | None] = mapped_column(Text)
+    presentation_status: Mapped[str] = mapped_column(
+        String(24),
+        nullable=False,
+        default="not_required",
+        server_default=text("'not_required'"),
+    )
+    # Presentation is a versioned object with a fixed top-level shape.  Keep
+    # the JSON column typed as an object so repository code can validate nested
+    # values at the boundary instead of propagating ``dict[Unknown, Unknown]``
+    # through the run lifecycle.
+    presentation_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     __table_args__ = (
         Index("ix_agent_runs_conversation_id", "conversation_id"),

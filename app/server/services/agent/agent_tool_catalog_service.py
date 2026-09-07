@@ -15,6 +15,7 @@ from server.domain.agent.decision import (
     ResolvedLocation,
 )
 from server.domain.agent.execution import AgentExecutionContext
+from server.domain.agent.interpretation import normalize_target_key
 from server.contracts.extraction import (
     LocationSignal,
     LocationSignalType,
@@ -348,6 +349,15 @@ class AgentToolCatalogService:
             plan,
             resolved_location,
             turn_contract=parsed_request,
+            canonical_request=(
+                context.canonical_request if context is not None else None
+            ),
+            target_id=(
+                str(context.metadata.get("target_id") or "").strip()
+                if context is not None
+                else None
+            ),
+            canonical_arguments=arguments,
             active_visualization=(
                 context.map_state.get("active_visualization")
                 if context is not None and is_json_object(context.map_state)
@@ -489,6 +499,16 @@ class AgentToolCatalogService:
                 message=validation_error,
             )
 
+        scope_error = self._canonical_scope_error(context)
+        if scope_error is not None:
+            return self._error_result(
+                capability_id=capability_id,
+                arguments=arguments,
+                operation="invalid_arguments",
+                code="missing_analysis_geometry",
+                message=scope_error,
+            )
+
         manifest = descriptor["manifest"]
         parsed_request = self._parsed_request_from_context(context)
         if self.policy_engine is not None and parsed_request is not None:
@@ -524,6 +544,15 @@ class AgentToolCatalogService:
                         plan,
                         resolved_location,
                         turn_contract=self._parsed_turn(context),
+                        canonical_request=(
+                            context.canonical_request if context is not None else None
+                        ),
+                        target_id=(
+                            str(context.metadata.get("target_id") or "").strip()
+                            if context is not None
+                            else None
+                        ),
+                        canonical_arguments=arguments,
                         active_visualization=(
                             context.map_state.get("active_visualization")
                             if context is not None and is_json_object(context.map_state)
@@ -573,6 +602,15 @@ class AgentToolCatalogService:
                 plan,
                 resolved_location,
                 turn_contract=self._parsed_turn(context),
+                canonical_request=(
+                    context.canonical_request if context is not None else None
+                ),
+                target_id=(
+                    str(context.metadata.get("target_id") or "").strip()
+                    if context is not None
+                    else None
+                ),
+                canonical_arguments=arguments,
                 active_visualization=(
                     context.map_state.get("active_visualization")
                     if context is not None and is_json_object(context.map_state)
@@ -599,6 +637,38 @@ class AgentToolCatalogService:
             "error": None,
             "metadata": {"manifest": self._compact_descriptor(manifest)},
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _canonical_scope_error(
+        context: AgentExecutionContext | None,
+    ) -> str | None:
+        if context is None or context.canonical_request is None:
+            return None
+        target_id = str(context.metadata.get("target_id") or "").strip()
+        target = (
+            context.canonical_request.target(target_id)
+            if target_id
+            else context.canonical_request.primary_target
+        )
+        constraint = next(
+            (
+                item
+                for item in context.canonical_request.spatial_constraints
+                if target is not None and item.target_id == target.target_id
+            ),
+            None,
+        )
+        if (
+            constraint is not None
+            and constraint.analysis_scope in {"administrative_geometry", "feature_geometry"}
+            and (target is None or not target.geometry_ref)
+        ):
+            return (
+                "The requested geographic scope requires a verified analysis "
+                "geometry; a geocoder point or viewport bbox is insufficient."
+            )
+        return None
 
     # -------------------------------------------------------------------------
     def _all_capabilities(self) -> list[dict[str, Any]]:
@@ -769,6 +839,69 @@ class AgentToolCatalogService:
         arguments: dict[str, Any],
         context: AgentExecutionContext | None,
     ) -> ResolvedLocation | GeospatialCapabilityExecutionResult:
+        if context is not None and context.canonical_request is not None:
+            target_id = str(context.metadata.get("target_id") or "").strip()
+            if target_id:
+                target = context.canonical_request.target(target_id)
+                if target is None:
+                    return self._error_result(
+                        capability_id="location_resolution",
+                        arguments=arguments,
+                        operation="invalid_arguments",
+                        code="unknown_target",
+                        message="The planned geographic target is not in the canonical request.",
+                    )
+                if target.resolved_location is None:
+                    return self._error_result(
+                        capability_id="location_resolution",
+                        arguments=arguments,
+                        operation="invalid_arguments",
+                        code="unresolved_target",
+                        message="The planned geographic target has not been resolved.",
+                    )
+                # Planned target identity is authoritative. The provider
+                # arguments remain a transport shape and cannot select a
+                # different place through a second geocoding pass.
+                return target.resolved_location
+            canonical_targets = [
+                target
+                for target in context.canonical_request.targets
+                if target.resolved_location is not None
+            ]
+            primary = context.canonical_request.primary_target
+            if primary is None or primary.resolved_location is None:
+                return self._error_result(
+                    capability_id="location_resolution",
+                    arguments=arguments,
+                    operation="invalid_arguments",
+                    code="unresolved_target",
+                    message="The canonical request has no resolved geographic target.",
+                )
+            argument_target = self._match_canonical_argument_target(
+                arguments, canonical_targets
+            )
+            has_location_argument = self._has_location_argument(arguments)
+            if argument_target is not None:
+                return argument_target.resolved_location  # type: ignore[return-value]
+            if has_location_argument:
+                code = (
+                    "canonical_target_required"
+                    if len(canonical_targets) > 1
+                    else "canonical_location_mismatch"
+                )
+                return self._error_result(
+                    capability_id="location_resolution",
+                    arguments=arguments,
+                    operation="invalid_arguments",
+                    code=code,
+                    message=(
+                        "The tool arguments do not identify one of the canonical "
+                        "geographic targets."
+                    ),
+                )
+            # A planned/native call with no location fields uses the canonical
+            # primary target. Provider arguments never trigger a second lookup.
+            return primary.resolved_location
         if context is not None and context.resolved_location is not None:
             # A run has one location owner.  Tool arguments are execution
             # parameters, not a second parser or geocoder input.
@@ -795,6 +928,60 @@ class AgentToolCatalogService:
                 message=resolved.question,
             )
         return resolved
+
+    @staticmethod
+    def _has_location_argument(arguments: dict[str, Any]) -> bool:
+        return any(
+            key in arguments
+            and arguments.get(key) is not None
+            and str(arguments.get(key)).strip()
+            for key in ("location", "address", "city", "country")
+        ) or (
+            isinstance(arguments.get("latitude"), (int, float))
+            and isinstance(arguments.get("longitude"), (int, float))
+        )
+
+    @staticmethod
+    def _match_canonical_argument_target(
+        arguments: dict[str, Any],
+        targets: list[Any],
+    ) -> Any | None:
+        latitude = arguments.get("latitude")
+        longitude = arguments.get("longitude")
+        if isinstance(latitude, (int, float)) and isinstance(longitude, (int, float)):
+            matches = [
+                target
+                for target in targets
+                if target.resolved_location is not None
+                and abs(float(target.resolved_location.latitude) - float(latitude)) <= 1e-3
+                and abs(float(target.resolved_location.longitude) - float(longitude)) <= 1e-3
+            ]
+            if len(matches) == 1:
+                return matches[0]
+            return None
+        raw = next(
+            (
+                str(arguments.get(key) or "").strip()
+                for key in ("location", "address", "city", "country")
+                if str(arguments.get(key) or "").strip()
+            ),
+        )
+        if not raw:
+            return None
+        normalized = normalize_target_key(raw)
+        matches: list[Any] = []
+        for target in targets:
+            location = target.resolved_location
+            labels = {
+                normalize_target_key(target.original_text),
+                normalize_target_key(location.label if location is not None else ""),
+            }
+            if normalized in labels or any(
+                value and (value in normalized or normalized in value)
+                for value in labels
+            ):
+                matches.append(target)
+        return matches[0] if len(matches) == 1 else None
 
     # -------------------------------------------------------------------------
     def _build_map_execution_plan(
@@ -891,11 +1078,17 @@ class AgentToolCatalogService:
             ).strip().lower()
             valid_types: set[LocationSignalType] = {
                 "address",
+                "airport",
                 "city",
                 "country",
                 "poi",
+                "feature",
+                "landmark",
                 "region",
+                "river",
+                "road",
                 "street",
+                "station",
                 "neighborhood",
                 "district",
                 "municipality",
@@ -966,6 +1159,7 @@ class AgentToolCatalogService:
         arguments: dict[str, Any],
         map_session: MapSession,
     ) -> GeospatialCapabilityExecutionResult:
+        map_payload = json_object(map_session.payload)
         return {
             "ok": True,
             "operation": "map_session_created",
@@ -977,7 +1171,12 @@ class AgentToolCatalogService:
             "observations": [],
             "warnings": list(map_session.compliance_warnings),
             "error": None,
-            "metadata": {},
+            "metadata": {
+                "target_id": map_payload.get("target_id"),
+                "analysis_scope": map_payload.get("analysis_scope"),
+                "start_time_iso": map_payload.get("start_time_iso"),
+                "end_time_iso": map_payload.get("end_time_iso"),
+            },
         }
 
     # -------------------------------------------------------------------------

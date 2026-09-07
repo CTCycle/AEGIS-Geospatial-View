@@ -500,8 +500,11 @@ const normalizeBoundsTuple = (
     || !isValidLatitude(south)
     || !isValidLongitude(east)
     || !isValidLatitude(north)
-    || west > east
     || south > north
+    // A west/east reversal is only a valid wrap when the interval reaches
+    // both sides of the antimeridian.  Ordinary reversed bounds are rejected
+    // so coordinate-order regressions cannot become a world-spanning map.
+    || (west > east && (west < 150 || east > -150))
   ) {
     return null;
   }
@@ -868,6 +871,7 @@ const RUN_STATES: readonly AgentRunState[] = [
   'running',
   'updating',
   'waiting_for_clarification',
+  'awaiting_render',
   'completed',
   'failed',
   'cancelled',
@@ -1298,6 +1302,9 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   const failureDiagnostic = optionalApiRecord(record, 'failure_diagnostic', endpoint);
   const visualizationUpdate = optionalApiRecord(record, 'visualization_update', endpoint);
   const contextRevision = optionalApiNumber(record, 'context_revision', endpoint);
+  const canonicalRequest = record.canonical_request === undefined || record.canonical_request === null
+    ? record.canonical_request ?? undefined
+    : optionalApiRecord(record, 'canonical_request', endpoint);
 
   return {
     conversation_id: requireString(record.conversation_id, 'conversation_id'),
@@ -1315,6 +1322,7 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     failure_diagnostic: failureDiagnostic as unknown as ChatTurnResponse['failure_diagnostic'],
     visualization_update: visualizationUpdate as unknown as ChatTurnResponse['visualization_update'],
     context_revision: contextRevision,
+    canonical_request: canonicalRequest as ChatTurnResponse['canonical_request'],
   };
 };
 
@@ -1352,6 +1360,15 @@ const normalizeActiveConversationRun = (
     run_id: value.run_id,
     run_version: value.run_version,
     state: value.state as AgentRunState,
+    presentation_status: value.presentation_status === 'pending'
+      || value.presentation_status === 'ready'
+      || value.presentation_status === 'failed'
+      || value.presentation_status === 'not_required'
+      ? value.presentation_status
+      : 'not_required',
+    presentation: value.presentation === null || value.presentation === undefined
+      ? null
+      : isJsonObject(value.presentation) ? value.presentation : null,
   };
 };
 

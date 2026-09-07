@@ -14,6 +14,7 @@ from server.services.geospatial.providers.base import (
     ProviderUnavailableError,
 )
 from server.services.geospatial.providers.http import fetch_text_url
+from server.services.geospatial.spatial_constraints import geodesic_distance_m
 
 TextFetcher = Callable[[str], Awaitable[str] | str]
 
@@ -41,6 +42,7 @@ class NASAFIRMSProvider(GeospatialProvider):
         if request.params.get("live"):
             csv_text = await _call_text_fetcher(self.fetcher, features_url)
             features = _normalize_firms_csv(csv_text)
+            features = _filter_features_to_radius(features, request.params)
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -138,3 +140,26 @@ def _float_or_none(value: str | None) -> float | None:
         return float(value)
     except ValueError:
         return None
+
+
+###############################################################################
+def _filter_features_to_radius(
+    features: list[dict[str, Any]],
+    params: dict[str, Any],
+) -> list[dict[str, Any]]:
+    latitude = _float_or_none(str(params.get("latitude")))
+    longitude = _float_or_none(str(params.get("longitude")))
+    radius_m = _float_or_none(str(params.get("radius_m")))
+    if latitude is None or longitude is None or radius_m is None or radius_m <= 0:
+        return features
+    return [
+        feature
+        for feature in features
+        if geodesic_distance_m(
+            latitude,
+            longitude,
+            float(feature["latitude"]),
+            float(feature["longitude"]),
+        )
+        <= radius_m
+    ]

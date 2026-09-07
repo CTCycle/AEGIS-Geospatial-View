@@ -67,6 +67,46 @@ def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
     assert response.payload["features"][0]["magnitude"] == 2.5
 
 
+def test_usgs_bbox_filter_preserves_antimeridian_scope() -> None:
+    async def fetcher(url: str, headers=None):  # noqa: ANN001
+        _ = url, headers
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "id": "east-edge",
+                    "properties": {"place": "east", "mag": 1.0},
+                    "geometry": {"type": "Point", "coordinates": [179.5, 0.0]},
+                },
+                {
+                    "id": "west-edge",
+                    "properties": {"place": "west", "mag": 1.0},
+                    "geometry": {"type": "Point", "coordinates": [-179.5, 0.0]},
+                },
+                {
+                    "id": "middle",
+                    "properties": {"place": "middle", "mag": 1.0},
+                    "geometry": {"type": "Point", "coordinates": [0.0, 0.0]},
+                },
+            ],
+        }
+
+    response = run_async_in_thread(
+        USGSProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="usgs_earthquakes",
+                bbox=(170.0, -10.0, -170.0, 10.0),
+                params={"live": True},
+            )
+        )
+    )
+
+    assert [item["id"] for item in response.payload["features"]] == [
+        "east-edge",
+        "west-edge",
+    ]
+
+
 ###############################################################################
 def test_usgs_provider_normalizes_live_water_gauges() -> None:
     async def fetcher(url: str, headers=None):  # noqa: ANN001

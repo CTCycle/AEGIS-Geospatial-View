@@ -422,3 +422,131 @@ def test_shutdown_cancels_in_flight_tasks_and_clears_task_registry(
         assert not lifecycle._tasks  # noqa: SLF001
 
     run_async_in_thread(_run())
+
+
+def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
+    run_repositories,
+) -> None:
+    lifecycle, _, _, _ = _services(run_repositories)
+    conversation = lifecycle.create_conversation(title="Render handshake")
+    run = run_async_in_thread(
+        lifecycle.create_run(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Show earthquakes in Rome"),
+        )
+    )
+    candidate_map = {
+        "session_id": "map-session-1",
+        "overlay_collection": {"collection_id": "active-map", "revision": 4, "instances": []},
+    }
+    presentation = {
+        "status": "pending",
+        "map_session_id": "map-session-1",
+        "collection_revision": 4,
+        "pending_response": {
+            "assistant_message": "Data prepared; the map is loading.",
+            "map_session": candidate_map,
+            "memory_snapshot": {"active_location": {"label": "Rome"}},
+            "task_snapshot": {"active_map_session": candidate_map},
+        },
+        "required_render_checks": {
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+        "completion_requirements": [
+            {
+                "name": "renderable_geometry_created",
+                "required": True,
+                "status": "satisfied",
+            }
+        ],
+    }
+    prepared, transitioned = run_repositories["runs"].prepare_render(
+        run.run_id,
+        run.run_version,
+        presentation,
+    )
+    assert transitioned is True
+    assert prepared.state.value == "awaiting_render"
+
+    acknowledgment = {
+        "run_id": run.run_id,
+        "run_version": run.run_version,
+        "map_session_id": "map-session-1",
+        "collection_revision": 4,
+        "status": "ready",
+        "viewport_bounds": [12.3, 41.7, 12.7, 42.1],
+        "checks": {
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+        "overlay_results": [],
+        "failure_code": None,
+    }
+    completed, duplicate, _ = run_repositories["runs"].acknowledge_render(
+        conversation_id=conversation.conversation_id,
+        run_id=run.run_id,
+        run_version=run.run_version,
+        map_session_id="map-session-1",
+        collection_revision=4,
+        status="ready",
+        acknowledgment=acknowledgment,
+    )
+    assert completed.state.value == "completed"
+    assert completed.presentation_status == "ready"
+    assert duplicate is False
+    revision_after_commit = run_repositories["conversations"].read_state(
+        conversation.conversation_id
+    )["context_revision"]
+
+    replay, duplicate, _ = run_repositories["runs"].acknowledge_render(
+        conversation_id=conversation.conversation_id,
+        run_id=run.run_id,
+        run_version=run.run_version,
+        map_session_id="map-session-1",
+        collection_revision=4,
+        status="ready",
+        acknowledgment=acknowledgment,
+    )
+    assert replay.state.value == "completed"
+    assert duplicate is True
+    assert run_repositories["conversations"].read_state(
+        conversation.conversation_id
+    )["context_revision"] == revision_after_commit
+
+
+def test_stale_render_ack_cannot_mutate_pending_candidate(run_repositories) -> None:
+    lifecycle, _, _, _ = _services(run_repositories)
+    conversation = lifecycle.create_conversation(title="Stale render")
+    run = run_async_in_thread(
+        lifecycle.create_run(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Show Rome"),
+        )
+    )
+    run_repositories["runs"].prepare_render(
+        run.run_id,
+        run.run_version,
+        {
+            "status": "pending",
+            "map_session_id": "map-session-2",
+            "collection_revision": 7,
+            "pending_response": {"map_session": {"session_id": "map-session-2"}},
+            "required_render_checks": {},
+            "completion_requirements": [],
+        },
+    )
+
+    with pytest.raises(ValueError, match="does not match"):
+        run_repositories["runs"].acknowledge_render(
+            conversation_id=conversation.conversation_id,
+            run_id=run.run_id,
+            run_version=run.run_version,
+            map_session_id="map-session-2",
+            collection_revision=8,
+            status="ready",
+            acknowledgment={"status": "ready"},
+        )
+    assert run_repositories["runs"].get_run(run.run_id).state.value == "awaiting_render"

@@ -7,12 +7,14 @@ import copy
 import logging
 import re
 import time
+from dataclasses import replace
 from contextlib import nullcontext as _nullcontext
 from datetime import datetime
 from collections.abc import Callable
 from typing import Any, cast
 
 from server.domain.agent.execution import AgentExecutionContext
+from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.domain.agent.pipeline import (
     PlannedToolResult,
     ToolPlan,
@@ -21,6 +23,12 @@ from server.domain.agent.pipeline import (
 )
 from server.domain.agent.runtime import canonical_call_fingerprint
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.geospatial.spatial_constraints import (
+    SpatialConstraintError,
+    normalize_bbox,
+    validate_geojson_geometry,
+    validate_point,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -134,7 +142,15 @@ class ToolPlanExecutor:
                 on_tool_completed(result)
             return result
         retryable = set(step.retry_policy.retryable_error_codes)
-        fingerprint = canonical_call_fingerprint(step.tool_name, arguments)
+        fingerprint = canonical_call_fingerprint(
+            step.tool_name,
+            {
+                "arguments": arguments,
+                "capability_id": step.capability_id,
+                "target_id": step.target_id,
+                "analysis_scope": step.analysis_scope,
+            },
+        )
         if fingerprint in fingerprints:
             result = PlannedToolResult(
                 step_id=step.step_id,
@@ -151,6 +167,7 @@ class ToolPlanExecutor:
                 on_tool_completed(result)
             return result
         fingerprints.add(fingerprint)
+        step_context = self._context_for_step(context, step)
         execution_budget = context.execution_budget
         for attempt in range(1, step.retry_policy.max_attempts + 1):
             started = time.perf_counter()
@@ -176,7 +193,7 @@ class ToolPlanExecutor:
                         self.tool_registry.execute_native_tool(
                             step.tool_name,
                             arguments,
-                            context,
+                            step_context,
                         ),
                         timeout=max(0.001, timeout),
                     )
@@ -195,7 +212,11 @@ class ToolPlanExecutor:
             error_code = str(error.get("code") or "") or None
             ok = bool(payload.get("ok"))
             data = payload.get("data")
-            validation_error = self._validate_result(step, data) if ok else None
+            validation_error = (
+                self._validate_result(step, data, context.canonical_request)
+                if ok
+                else None
+            )
             if ok and validation_error is None:
                 result = PlannedToolResult(
                     step_id=step.step_id,
@@ -292,9 +313,43 @@ class ToolPlanExecutor:
             )
         raise AssertionError("unreachable")
 
+    @staticmethod
+    def _context_for_step(
+        context: AgentExecutionContext,
+        step: ToolPlanStep,
+    ) -> AgentExecutionContext:
+        """Bind a planned target to the execution context for this step.
+
+        The outer native tool schema intentionally remains provider-neutral, so
+        target identity is carried in the plan rather than injected into
+        provider arguments. A multi-target plan must still resolve each
+        capability against its own canonical coordinates instead of reusing the
+        primary target from the shared run context.
+        """
+
+        canonical = context.canonical_request
+        if canonical is None or step.target_id is None:
+            return context
+        target = canonical.target(step.target_id)
+        if target is None:
+            return replace(
+                context,
+                resolved_location=None,
+                metadata={**context.metadata, "target_id": step.target_id},
+            )
+        return replace(
+            context,
+            resolved_location=target.resolved_location,
+            metadata={**context.metadata, "target_id": step.target_id},
+        )
+
     # -------------------------------------------------------------------------
     @staticmethod
-    def _validate_result(step: ToolPlanStep, data: Any) -> str | None:
+    def _validate_result(
+        step: ToolPlanStep,
+        data: Any,
+        canonical_request: CanonicalRequestInterpretation | None = None,
+    ) -> str | None:
         if not is_json_object(data):
             return "Tool output must be an object."
         if step.tool_name == "execute_geospatial_capability":
@@ -308,6 +363,179 @@ class ToolPlanExecutor:
         status = ToolPlanExecutor._result_field(data, "result_status")
         if status in {"unavailable", "invalid", "error", "failed"}:
             return f"Tool output reported an unusable result status: {status}."
+        geometry_error = ToolPlanExecutor._validate_map_geometry(data)
+        if geometry_error is not None:
+            return geometry_error
+        metadata = json_object(data.get("metadata"))
+        map_session = data.get("map_session")
+        map_payload = (
+            json_object(map_session.get("payload"))
+            if is_json_object(map_session)
+            else {}
+        )
+        output_target = (
+            data.get("target_id")
+            or metadata.get("target_id")
+            or map_payload.get("target_id")
+        )
+        if step.target_id and output_target is not None and str(output_target) != step.target_id:
+            return "Tool output target does not match the planned geographic target."
+        output_scope = (
+            data.get("analysis_scope")
+            or data.get("scope_kind")
+            or metadata.get("analysis_scope")
+            or map_payload.get("analysis_scope")
+        )
+        if step.analysis_scope and output_scope is not None and str(output_scope) != step.analysis_scope:
+            return "Tool output analysis scope does not match the planned scope."
+        if (
+            step.analysis_scope
+            and canonical_request is not None
+            and is_json_object(data.get("map_session"))
+            and output_scope is None
+            and any(
+                constraint.analysis_scope == step.analysis_scope
+                and (
+                    constraint.provenance in {"explicit", "viewport"}
+                    or constraint.analysis_scope != "bbox"
+                )
+                for constraint in canonical_request.spatial_constraints
+            )
+        ):
+            return "Tool output is missing the planned analysis scope evidence."
+        if canonical_request is not None and step.target_id:
+            target = canonical_request.target(step.target_id)
+            map_session = data.get("map_session")
+            if target is not None and target.resolved_location is not None and is_json_object(map_session):
+                location = map_session.get("resolved_location")
+                if is_json_object(location):
+                    raw_latitude: object = location.get("latitude")
+                    raw_longitude: object = location.get("longitude")
+                    if not isinstance(raw_latitude, (int, float)) or not isinstance(
+                        raw_longitude, (int, float)
+                    ):
+                        return "Tool output contains invalid geographic coordinates."
+                    try:
+                        lat_delta = abs(float(raw_latitude) - target.resolved_location.latitude)
+                        lon_delta = abs(float(raw_longitude) - target.resolved_location.longitude)
+                    except (TypeError, ValueError):
+                        return "Tool output contains invalid geographic coordinates."
+                    if lat_delta > 1e-3 or lon_delta > 1e-3:
+                        return "Tool output map location does not match the planned target."
+            temporal = canonical_request.temporal_constraints
+            if temporal.mode != "none" and is_json_object(map_session):
+                actual_mode = (
+                    data.get("temporal_mode")
+                    or metadata.get("temporal_mode")
+                    or map_payload.get("time_mode")
+                )
+                if actual_mode is None or str(actual_mode) != temporal.mode:
+                    return "Tool output temporal mode does not match the canonical request."
+            for field, expected in (
+                ("start_time_iso", temporal.start_time_iso),
+                ("end_time_iso", temporal.end_time_iso),
+            ):
+                actual = data.get(field) or metadata.get(field) or map_payload.get(field)
+                if expected is not None and (
+                    actual is None or str(actual) != expected
+                ):
+                    return f"Tool output temporal boundary does not match {field}."
+        if "renderable_geometry_created" in step.required_outputs:
+            map_session = data.get("map_session")
+            if is_json_object(map_session):
+                collection = map_session.get("overlay_collection")
+                instances_value: object = (
+                    collection.get("instances") if is_json_object(collection) else None
+                )
+                if is_json_array(instances_value):
+                    instances = instances_value
+                    renderable = any(
+                        is_json_object(item)
+                        and str(item.get("rendering_mode") or "").casefold()
+                        not in {"metadata-only", "metadata_only"}
+                        and str(is_json_object(item.get("descriptor")) and item.get("descriptor", {}).get("result_type") or "").casefold()
+                        != "metadata"
+                        for item in instances
+                    )
+                    if not renderable and not map_session.get("bounds"):
+                        return "Required map output has no renderable geometry or valid empty-result bounds."
+        return None
+
+    @staticmethod
+    def validate_result(
+        step: ToolPlanStep,
+        data: Any,
+        canonical_request: CanonicalRequestInterpretation | None = None,
+    ) -> str | None:
+        """Public shared validator for the native and planned execution paths."""
+
+        return ToolPlanExecutor._validate_result(step, data, canonical_request)
+
+    @staticmethod
+    def _validate_map_geometry(data: dict[str, Any]) -> str | None:
+        """Reject invalid WGS84 coordinates before map state is assembled."""
+
+        map_session = data.get("map_session")
+        if not is_json_object(map_session):
+            return None
+        location = map_session.get("resolved_location")
+        if is_json_object(location):
+            latitude: object = location.get("latitude")
+            longitude: object = location.get("longitude")
+            if latitude is not None or longitude is not None:
+                if not isinstance(latitude, (int, float)) or not isinstance(
+                    longitude, (int, float)
+                ):
+                    return "Tool output contains invalid EPSG:4326 coordinates."
+                try:
+                    validate_point(float(latitude), float(longitude))
+                except (TypeError, ValueError, SpatialConstraintError):
+                    return "Tool output contains invalid EPSG:4326 coordinates."
+        bounds: object = map_session.get("bounds")
+        if bounds is None:
+            viewport = map_session.get("viewport")
+            bounds = viewport.get("bbox") if is_json_object(viewport) else None
+        if bounds is not None:
+            if not is_json_array(bounds):
+                return "Tool output contains an invalid [west, south, east, north] bbox."
+            try:
+                normalize_bbox(cast(list[float], bounds))
+            except (TypeError, ValueError, SpatialConstraintError):
+                return "Tool output contains an invalid [west, south, east, north] bbox."
+
+        collection = map_session.get("overlay_collection")
+        instances_value: object = (
+            collection.get("instances") if is_json_object(collection) else None
+        )
+        if not is_json_array(instances_value):
+            return None
+        instances = instances_value
+        for raw_instance in instances[:512]:
+            instance = raw_instance
+            if not is_json_object(instance):
+                continue
+            descriptor = instance.get("descriptor")
+            if not is_json_object(descriptor):
+                continue
+            geometry = descriptor.get("geometry")
+            if is_json_object(geometry):
+                try:
+                    validate_geojson_geometry(geometry)
+                except SpatialConstraintError:
+                    return "Tool output contains invalid GeoJSON geometry."
+            features = descriptor.get("features")
+            if is_json_array(features):
+                for raw_feature in features[:512]:
+                    feature = raw_feature
+                    if not is_json_object(feature):
+                        continue
+                    feature_geometry = feature.get("geometry")
+                    if not is_json_object(feature_geometry):
+                        continue
+                    try:
+                        validate_geojson_geometry(feature_geometry)
+                    except SpatialConstraintError:
+                        return "Tool output contains invalid GeoJSON feature geometry."
         return None
 
     # -------------------------------------------------------------------------

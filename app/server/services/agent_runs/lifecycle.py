@@ -83,6 +83,7 @@ class RunLifecycleService:
                 payload.message,
                 aggregate,
                 client_request_id=payload.client_request_id,
+                request_timezone=payload.timezone,
             )
         except ValueError as exc:
             message = str(exc)

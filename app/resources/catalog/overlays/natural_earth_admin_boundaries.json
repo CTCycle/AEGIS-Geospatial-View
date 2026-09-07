@@ -97,6 +97,18 @@
     },
     "expectedGeometry": "Polygon"
   },
+  "executionContract": {
+    "supported_operations": ["show", "search", "in"],
+    "supported_scope_kinds": ["administrative_geometry", "bbox"],
+    "temporal_modes": ["historical"],
+    "temporal_windows": ["static"],
+    "required_inputs": ["location", "analysis_scope"],
+    "output_geometry_type": "Polygon",
+    "render_support": "vector",
+    "coverage": "global",
+    "limitations": ["Generalized boundaries are for geographic context, not parcel precision."],
+    "fallback_ids": []
+  },
   "download": {
     "sourceUrl": "https://naturalearth.s3.amazonaws.com/50m_cultural/ne_50m_admin_0_countries.zip",
     "license": "https://www.naturalearthdata.com/about/terms-of-use/",

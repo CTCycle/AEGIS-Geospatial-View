@@ -22,6 +22,7 @@ class RunEventType(StrEnum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
     CLARIFICATION_NEEDED = "clarification_needed"
+    MAP_PREPARED = "map_prepared"
     TRACE = "trace"
     CHECKPOINT = "checkpoint"
 
@@ -41,6 +42,7 @@ class RunProgressStage(StrEnum):
     DRAFTING_ANSWER = "drafting_answer"
     REQUEST_UPDATED = "request_updated"
     WAITING_FOR_CLARIFICATION = "waiting_for_clarification"
+    AWAITING_RENDER = "awaiting_render"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -54,6 +56,7 @@ RUN_PROGRESS_LABELS: dict[RunProgressStage, str] = {
     RunProgressStage.DRAFTING_ANSWER: "Drafting the answer",
     RunProgressStage.REQUEST_UPDATED: "Request updated because of user steering",
     RunProgressStage.WAITING_FOR_CLARIFICATION: "Waiting for clarification",
+    RunProgressStage.AWAITING_RENDER: "Waiting for the map to finish rendering",
     RunProgressStage.COMPLETED: "Completed",
     RunProgressStage.FAILED: "Failed",
     RunProgressStage.CANCELLED: "Cancelled",

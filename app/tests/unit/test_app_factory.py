@@ -169,7 +169,9 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     monkeypatch.setattr(
         app_module, "AgentRunEventRepository", lambda database: object()
     )
-    monkeypatch.setattr(app_module, "AgentRunRepository", lambda database: object())
+    monkeypatch.setattr(
+        app_module, "AgentRunRepository", lambda database, **_kwargs: object()
+    )
     monkeypatch.setattr(
         app_module, "AgentSteeringRepository", lambda database: object()
     )
@@ -238,7 +240,9 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
     monkeypatch.setattr(
         app_module, "AgentRunEventRepository", lambda database: object()
     )
-    monkeypatch.setattr(app_module, "AgentRunRepository", lambda database: object())
+    monkeypatch.setattr(
+        app_module, "AgentRunRepository", lambda database, **_kwargs: object()
+    )
     monkeypatch.setattr(
         app_module, "AgentSteeringRepository", lambda database: object()
     )
