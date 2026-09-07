@@ -20,8 +20,21 @@ from server.domain.agent.interpretation import (
 )
 
 
+FLOOD_COMPARISON_AMBIGUITY = "flood_comparison_requires_comparable_semantics"
+
+
 class RequestInterpreter:
     """Compile once; downstream services must consume this value verbatim."""
+
+    _COMPARISON_OPERATIONS = frozenset({"compare", "comparison"})
+    _FLOOD_COMPARISON_DOMAIN_TERMS = (
+        "flood",
+        "gauge",
+        "tide",
+        "water level",
+        "water levels",
+        "waterlevel",
+    )
 
     _SPECIFICITY = {
         "coordinates": 6,
@@ -240,6 +253,8 @@ class RequestInterpreter:
             and turn.temporal_signal.end_time_iso is None
         ):
             ambiguities.append("recent_requires_time_window")
+        if self._is_flood_comparison(turn.operations, data_domains):
+            ambiguities.append(FLOOD_COMPARISON_AMBIGUITY)
 
         temporal_constraints = self._compile_temporal_constraints(
             turn,
@@ -333,6 +348,33 @@ class RequestInterpreter:
     @staticmethod
     def _key(value: str) -> str:
         return normalize_target_key(value)
+
+    @classmethod
+    def _is_flood_comparison(
+        cls,
+        operations: list[str],
+        data_domains: list[str],
+    ) -> bool:
+        comparison_requested = any(cls._is_comparison_operation(operation) for operation in operations)
+        if not comparison_requested:
+            return False
+        return any(
+            any(
+                term in cls._key(str(domain))
+                for term in cls._FLOOD_COMPARISON_DOMAIN_TERMS
+            )
+            for domain in data_domains
+        )
+
+    @classmethod
+    def _is_comparison_operation(cls, operation: str) -> bool:
+        operation_key = cls._key(str(operation))
+        return (
+            operation_key in cls._COMPARISON_OPERATIONS
+            or operation_key.startswith("compare ")
+            or operation_key.endswith(" compare")
+            or "comparison" in operation_key
+        )
 
     @classmethod
     def _compile_temporal_constraints(

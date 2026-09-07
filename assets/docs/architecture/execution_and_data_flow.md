@@ -116,6 +116,11 @@ preflight rejection/clarification) are handled by
 `DirectTurnResponseService`. The orchestrator delegates these branches while
 retaining the normal tool execution path.
 
+The direct `POST /api/chat/turn` route keeps its immediate response behavior;
+it does not introduce a second headless render-ack transport. For realtime map
+runs, browser acknowledgment remains client-reported rendering evidence and
+the backend render/completion checks remain authoritative.
+
 Location resolution ranks coordinates first, then address/POI/street, district or
 neighborhood, city or municipality, region/state, and country. Deictic words are
 context references rather than competing targets. A more-specific entity becomes

@@ -273,6 +273,38 @@ describe('map-preview-rendering', () => {
     expect(layers[0].type).toBe('circle');
   });
 
+  it('classifies a valid-empty overlay as no-results after successful layer setup', () => {
+    const sources: Array<Record<string, unknown>> = [];
+    const layers: Array<Record<string, unknown>> = [];
+    const map = {
+      addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
+      addLayer: (layer: Record<string, unknown>) => layers.push(layer),
+    };
+    const session = makeMapSession([{
+      id: 'empty-flood-zones',
+      label: 'Flood Zones',
+      provider: 'fixture',
+      type: 'geojson',
+      rendering_mode: 'choropleth',
+      data_format: 'GeoJSON',
+      geometry_type: 'Polygon',
+      result_status: 'valid_empty',
+      data: { type: 'FeatureCollection', features: [] },
+    } as MapOverlayEntry]);
+
+    const result = addOverlayLayers(map as never, session);
+
+    expect(result).toEqual([
+      jasmine.objectContaining({
+        overlayId: 'empty-flood-zones',
+        status: 'no-results',
+        message: 'No results in the requested area or time window.',
+      }),
+    ]);
+    expect(sources[0]).toEqual(jasmine.objectContaining({ type: 'geojson' }));
+    expect(layers[0]).toEqual(jasmine.objectContaining({ type: 'fill' }));
+  });
+
   it('clusters point overlays and creates expansion/count layers', () => {
     const sources: Array<Record<string, unknown>> = [];
     const layers: Array<Record<string, unknown>> = [];

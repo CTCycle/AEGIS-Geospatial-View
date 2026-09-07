@@ -149,6 +149,32 @@ class _Parser:
 
 
 ###############################################################################
+class _FloodComparisonParser(_Parser):
+    # -------------------------------------------------------------------------
+    def parse_turn(
+        self,
+        user_message: str,
+        memory_snapshot: dict,
+        conversation_messages: list[dict],
+        **_kwargs: Any,
+    ) -> TurnParseResult:
+        parsed = super().parse_turn(
+            user_message,
+            memory_snapshot,
+            conversation_messages,
+            **_kwargs,
+        )
+        return parsed.model_copy(
+            update={
+                "requested_concepts": ["flooding"],
+                "requested_layers": ["fema_nfhl_flood_zones"],
+                "operations": ["compare"],
+                "tools_needed": True,
+            }
+        )
+
+
+###############################################################################
 class _TimedOutStructuredParser:
     PARSER_TIMEOUT_SECONDS = 1.0
     last_context_usage = None
@@ -1055,6 +1081,55 @@ def test_orchestrator_uses_verified_tool_map_session() -> None:
             == "execute_geospatial_capability"
         )
         assert policy.preflight_calls == 1
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_orchestrator_clarifies_flood_comparison_before_provider_or_tool_execution() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        search_orchestrator = _NoResultSearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="must not execute",
+                tool_calls=[],
+                tool_results=[],
+                iterations=0,
+                stopped_reason="not_needed",
+            )
+        )
+        tool_registry = _test_tool_registry()
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_FloodComparisonParser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=tool_registry,
+            request_builder=RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_NoOpCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_service=history,
+            conversation_repository=history,  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(
+                conversation_id="test-conversation",
+                message="Compare flood zones in Rome.",
+            )
+        )
+
+        assert response.operation is not None
+        assert response.operation.kind == "clarification"
+        assert response.operation.status == "partial"
+        assert "same measure" in response.assistant_message
+        assert "unit" in response.assistant_message
+        assert "time window" in response.assistant_message
+        assert search_orchestrator.requests == []
+        assert native_loop.requests == []
 
     run_async_in_thread(_run())
 

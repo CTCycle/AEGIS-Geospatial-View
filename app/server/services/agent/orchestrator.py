@@ -63,7 +63,10 @@ from server.services.agent.turn_support import AgentTurnSupport
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.tool_planner import DeterministicToolPlanner
-from server.services.agent.request_interpreter import RequestInterpreter
+from server.services.agent.request_interpreter import (
+    FLOOD_COMPARISON_AMBIGUITY,
+    RequestInterpreter,
+)
 from server.prompts.agent import build_native_agent_messages
 from server.services.llm.types import LLMToolDefinition
 from server.services.llm.context_budget import calculate_context_usage_percent
@@ -1024,9 +1027,34 @@ class AgentOrchestrator:
                 "strongest_requires_threshold_or_top_n",
                 "spatial_distance_required",
                 "recent_requires_time_window",
+                FLOOD_COMPARISON_AMBIGUITY,
             }
         ]
-        if preflight_decision is None and deterministic_ambiguities:
+        if (
+            preflight_decision is None
+            and FLOOD_COMPARISON_AMBIGUITY in deterministic_ambiguities
+        ):
+            preflight_decision = PolicyDecision(
+                plan=ExecutionPlan(
+                    state="clarify",
+                    action_id=turn_contract.normalized_action.action_id,
+                ),
+                clarification=ClarificationRequest(
+                    question=(
+                        "AEGIS can show flood-related layers separately, but it cannot "
+                        "claim a flood comparison unless the results use the same measure, "
+                        "unit, and time window. Please request the layers separately or "
+                        "provide a clearly comparable data contract."
+                    ),
+                    reason="Flood comparison semantics are not verified by the current app.",
+                    missing_fields=[
+                        "comparable_measure",
+                        "comparable_unit",
+                        "comparable_time_window",
+                    ],
+                ),
+            )
+        elif preflight_decision is None and deterministic_ambiguities:
             missing_fields: list[str] = []
             questions: list[str] = []
             reasons: list[str] = []

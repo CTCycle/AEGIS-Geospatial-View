@@ -429,6 +429,65 @@ describe('e2e/geospatial browser smoke', () => {
     expect(mapRequestInputs).not.toContain('x-windy-api-key');
   });
 
+  it('renders a bounded valid-empty layer as an explicit no-results state', async () => {
+    const emptyOverlayId = 'empty_flood_zones';
+    const emptyMapSession: MapSession = {
+      ...canonicalMockedMapResponse.map_session!,
+      session_id: 'empty-map-session',
+      bounds: [12.45, 41.86, 12.55, 41.94],
+      overlay_collection: {
+        collection_id: 'active-map',
+        revision: 1,
+        instances: [{
+          instance_id: emptyOverlayId,
+          capability_id: 'fema_nfhl_flood_zones',
+          label: 'Flood Zones',
+          provider: 'fixture',
+          overlay_type: 'geojson',
+          rendering_mode: 'choropleth',
+          scope_key: 'global',
+          scope: { kind: 'global' },
+          visible: true,
+          opacity: 1,
+          render_variant: {},
+          descriptor: {
+            id: emptyOverlayId,
+            label: 'Flood Zones',
+            provider: 'fixture',
+            type: 'geojson',
+            rendering_mode: 'choropleth',
+            data_format: 'GeoJSON',
+            geometry_type: 'Polygon',
+            result_status: 'valid_empty',
+            data: { type: 'FeatureCollection', features: [] },
+          },
+          inspections: [],
+        }],
+      },
+    };
+    apiClient.sendChatTurn.and.resolveTo({
+      ...canonicalMockedMapResponse,
+      assistant_message: 'Map ready. No results for the Flood Zones overlay.',
+      map_session: emptyMapSession,
+    });
+
+    const component = fixture.componentInstance;
+    component.composerDraft = 'show flood zones';
+
+    await component.sendMessage();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Flood Zones');
+    expect(fixture.nativeElement.textContent).toContain('no results in the requested area or time window');
+    expect(fixture.nativeElement.querySelector('[aria-label="No results"]')?.getAttribute('role')).toBe('status');
+    expect(fixture.nativeElement.textContent).not.toContain('Unavailable overlays:');
+    const descriptor = fixture.componentInstance.payload?.map_session?.overlay_collection.instances[0]
+      ?.descriptor as Record<string, unknown> | undefined;
+    expect(descriptor?.['result_status']).toBe('valid_empty');
+  });
+
   it('renders mocked provider families with attribution, stale state, and backend-only URLs', async () => {
     const component = fixture.componentInstance;
     component.composerDraft = 'show mocked map';

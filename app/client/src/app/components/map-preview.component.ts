@@ -234,6 +234,15 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     return this.overlays.filter((overlay) => metadataOnlyIds.has(overlay.id));
   }
 
+  get noResultsOverlays(): OverlayEntry[] {
+    const noResultsIds = new Set(
+      this.overlayRenderStatuses
+        .filter((status) => status.status === 'no-results')
+        .map((status) => status.overlayId),
+    );
+    return this.overlays.filter((overlay) => noResultsIds.has(overlay.id));
+  }
+
   get attributionEntries(): Array<{ label: string; url?: string }> {
     const entries = this.overlays
       .map((overlay) => ({
@@ -845,7 +854,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
           mapApi?.getSource?.call(map, `overlay-source-${overlay.id}`),
         ),
         layer_present: present && visible && styleValid && zoomRangeValid,
-        loaded: status === 'loaded' || metadataOnly,
+        loaded: status === 'loaded' || status === 'no-results' || metadataOnly,
         metadata_only: metadataOnly,
         style_valid: styleValid,
         zoom_range_valid: zoomRangeValid,

@@ -419,7 +419,7 @@ export interface OverlayStateChange {
 
 export interface OverlayRenderStatus {
   overlayId: string;
-  status: 'pending' | 'loaded' | 'failed' | 'metadata-only';
+  status: 'pending' | 'loaded' | 'failed' | 'metadata-only' | 'no-results';
   message?: string;
 }
 
