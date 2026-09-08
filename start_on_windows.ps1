@@ -48,6 +48,13 @@ $LegacyCachePaths = @(
     (Join-Path $RootDir '.tmp_pytest'),
     (Join-Path $ClientDir '.angular')
 )
+$LegacyUvCachePaths = @(
+    (Join-Path $RootDir '.uv-cache'),
+    (Join-Path $AppDir '.uv-cache'),
+    (Join-Path $ServerDir '.uv-cache'),
+    (Join-Path $ClientDir '.uv-cache'),
+    (Join-Path $TestsDir '.uv-cache')
+)
 $InitializeDatabaseScript = Join-Path $AppDir 'scripts\initialize_database.py'
 $PythonVersion = '3.14.2'
 $PythonArchiveName = "python-$PythonVersion-embed-amd64.zip"
@@ -1032,7 +1039,7 @@ function Remove-PythonCaches {
 function Clear-ApplicationCache {
     if (-not (Confirm-DestructiveAction 'clear runtime and test caches')) { return }
     Remove-PythonCaches
-    $cacheRoots = @($RuntimeCacheDir, $ToolCacheDir) + $LegacyCachePaths
+    $cacheRoots = @($RuntimeCacheDir, $ToolCacheDir) + $LegacyCachePaths + $LegacyUvCachePaths
     $skipped = 0
     $uniqueCacheRoots = @($cacheRoots | Select-Object -Unique)
     $progressId = Start-LauncherProgress -Activity 'AEGIS: clear caches' -Status "0 of $($uniqueCacheRoots.Count) roots"
@@ -1082,12 +1089,14 @@ function Uninstall-Application {
     $targets = @(
         $RuntimesDir,
         $LegacyCacheDir,
+        $LegacyCachePaths,
+        $LegacyUvCachePaths,
         $VenvDir,
         (Join-Path $RootDir '.venv'),
         (Join-Path $ClientDir 'node_modules'),
         (Join-Path $ClientDir '.angular'),
         (Join-Path $ClientDir 'dist')
-    )
+    ) | Select-Object -Unique
     $skipped = 0
     $progressId = Start-LauncherProgress -Activity 'AEGIS: uninstall application' -Status "0 of $($targets.Count) paths"
     try {
