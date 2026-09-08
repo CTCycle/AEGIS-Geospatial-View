@@ -34,10 +34,13 @@
   </div>
 
   <footer class="model-card__selection-status" aria-live="polite">
-    @if (isSelected) {
-      Selected agent model
-    } @else if (disabledReason) {
+    @if (disabledReason) {
+      @if (isSelected) {
+        Selected agent model —
+      }
       {{ disabledReason }}
+    } @else if (isSelected) {
+      Selected agent model
     } @else {
       Select as agent model
     }

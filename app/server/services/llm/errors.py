@@ -191,6 +191,13 @@ class LLMProviderRequestError(RuntimeError):
             code, retryable = "context_limit_exceeded", False
             category: FailureCategory = "context_limit"
         elif status == 400:
+            opencode_contract_markers = (
+                "x-opencode-session",
+                "opencode-session",
+                "session id",
+                "model unavailable",
+                "model is unavailable",
+            )
             capability_markers = (
                 "does not support",
                 "unsupported model",
@@ -205,7 +212,12 @@ class LLMProviderRequestError(RuntimeError):
                 "tool definition",
                 "json schema",
             )
-            if any(marker in text for marker in capability_markers):
+            if provider in {"opencode", "opencode-go"} and any(
+                marker in text for marker in opencode_contract_markers
+            ):
+                code, retryable = "provider_contract_rejected", False
+                category = "provider_api"
+            elif any(marker in text for marker in capability_markers):
                 code, retryable = "provider_model_incompatible", False
                 category = "model_capability"
             elif any(marker in text for marker in schema_markers):

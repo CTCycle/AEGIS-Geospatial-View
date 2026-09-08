@@ -1112,6 +1112,8 @@ export const normalizeModelCards = (
     supports_vision: optionalApiNullableBoolean(item, 'supports_vision', endpoint),
     supports_embeddings: optionalApiNullableBoolean(item, 'supports_embeddings', endpoint),
     tool_support_source: requireApiString(item, 'tool_support_source', endpoint),
+    protocol: optionalApiString(item, 'protocol', endpoint) ?? null,
+    agent_selection_disabled_reason: optionalApiString(item, 'agent_selection_disabled_reason', endpoint) ?? null,
     context_window_tokens: optionalApiNumber(item, 'context_window_tokens', endpoint) ?? null,
     maximum_output_tokens: optionalApiNumber(item, 'maximum_output_tokens', endpoint) ?? null,
     context_profile_source: requireApiString(item, 'context_profile_source', endpoint),

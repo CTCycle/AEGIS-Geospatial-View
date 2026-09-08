@@ -725,6 +725,19 @@ function Invoke-CheckForUpdates {
 # -----------------------------------------------------------------------------
 # DATABASE, DATA, AND MAINTENANCE ACTIONS
 # -----------------------------------------------------------------------------
+function Confirm-DestructiveAction([string]$Description) {
+    if (-not $script:LauncherInteractive) {
+        throw "The destructive action '$Description' requires an interactive console; no files were changed."
+    }
+    Clear-LauncherProgress
+    $confirmation = ([string](Read-Host "Continue to $($Description)? [y/N]")).Trim()
+    if ($confirmation -notmatch '^(?i:y|yes)$') {
+        Write-Status INFO 'Operation cancelled. No changes were made.'
+        return $false
+    }
+    return $true
+}
+
 function Get-ConfiguredDataDirectory {
     $configuredDataDir = if ($null -eq $env:AEGIS_DATA_DIR) { '' } else { $env:AEGIS_DATA_DIR.Trim() }
     if (-not $configuredDataDir) {
@@ -800,24 +813,16 @@ function Invoke-RemoveAllData {
     $configuredDataDir = Get-ConfiguredDataDirectory
     Test-SafeDataDirectory -Path $configuredDataDir
 
+    if (-not (Confirm-DestructiveAction 'remove all user-generated application data')) {
+        return
+    }
+
     $targets = @(
         $configuredDataDir,
         $IngestionDataDir,
         $VectorsDir,
         $LogsDir
     ) | ForEach-Object { Get-NormalizedPath -Path $_ } | Select-Object -Unique
-
-    Write-Host ''
-    Write-Host '  Remove all user-generated application data?' -ForegroundColor Yellow
-    Write-Host '  This permanently deletes the SQLite database, runtime data, ingested files, generated vectors, and logs.' -ForegroundColor Yellow
-    Write-Host '  Application source files, catalogs, settings templates, dependencies, and lockfiles are preserved.' -ForegroundColor DarkGray
-    Write-Host "  Runtime data path: $configuredDataDir" -ForegroundColor DarkGray
-    Clear-LauncherProgress
-    $confirmation = ([string](Read-Host '  Continue removing all user-generated application data? [y/N]')).Trim()
-    if ($confirmation -notmatch '^(?i:y|yes)$') {
-        Write-Status INFO 'Remove all data cancelled.'
-        return
-    }
 
     Write-Status INFO 'Stopping configured local application services before removing data.'
     $applicationPorts = @([int]$env:FASTAPI_PORT, [int]$env:UI_PORT) | Select-Object -Unique
@@ -849,6 +854,7 @@ function Invoke-TestSuite {
 }
 
 function Remove-ApplicationLogs {
+    if (-not (Confirm-DestructiveAction 'remove application log files')) { return }
     if (-not (Test-Path -LiteralPath $LogsDir)) {
         Write-Status INFO "Log directory does not exist: $LogsDir"
         return
@@ -1024,6 +1030,7 @@ function Remove-PythonCaches {
 }
 
 function Clear-ApplicationCache {
+    if (-not (Confirm-DestructiveAction 'clear runtime and test caches')) { return }
     Remove-PythonCaches
     $cacheRoots = @($RuntimeCacheDir, $ToolCacheDir) + $LegacyCachePaths
     $skipped = 0
@@ -1071,6 +1078,7 @@ function Clear-ApplicationCache {
 }
 
 function Uninstall-Application {
+    if (-not (Confirm-DestructiveAction 'remove local runtimes, dependencies, caches, and build outputs')) { return }
     $targets = @(
         $RuntimesDir,
         $LegacyCacheDir,

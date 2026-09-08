@@ -23,6 +23,7 @@ import {
   agentSelectionDisabledReason,
   buildAgentModelSelectionPayload,
   buildSelectedAgentModelSummary,
+  ensureSelectedModelVisible,
   enrichInstalledOllamaModel,
   isSelectedAgentModel,
   mergeModelCards,
@@ -160,9 +161,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       return this.cloudModels.filter((model) => model.provider === this.providerFilter);
     })();
+    const visibleSource = this.providerFilter === 'all'
+      || this.providerFilter === this.settings.agent_model_provider
+      ? ensureSelectedModelVisible(this.settings, source)
+      : source;
 
     const query = this.searchText.trim().toLowerCase();
-    return source.filter((model) => {
+    return visibleSource.filter((model) => {
       if (!query) {
         return true;
       }
@@ -209,7 +214,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return buildSelectedAgentModelSummary(
       this.settings,
       this.localModelIds,
-      mergeModelCards(this.localModels, this.cloudModels),
+      ensureSelectedModelVisible(
+        this.settings,
+        mergeModelCards(this.localModels, this.cloudModels),
+      ),
     );
   }
 

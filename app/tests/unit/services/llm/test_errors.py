@@ -130,6 +130,26 @@ def test_provider_bad_request_without_capability_evidence_stays_provider_api() -
     assert error.code == "provider_bad_request"
 
 ###############################################################################
+def test_opencode_session_contract_rejection_is_sanitized() -> None:
+
+    ###############################################################################
+    class _OpenCodeContractError(Exception):
+        response = SimpleNamespace(status_code=400)
+
+    error = LLMProviderRequestError.from_exception(
+        _OpenCodeContractError(
+            "x-opencode-session is required; bearer=super-secret-token"
+        ),
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+        stage="structured_output",
+    )
+
+    assert error.code == "provider_contract_rejected"
+    assert error.retryable is False
+    assert "super-secret-token" not in str(error)
+
+###############################################################################
 def test_explicit_provider_capability_rejection_is_classified_as_model_capability() -> (
     None
 ):

@@ -32,6 +32,7 @@ class AgentToolLoopRequest:
     tools: list[LLMToolDefinition]
     temperature: float
     max_tokens: int | None = None
+    provider_session_id: str | None = None
     context: AgentExecutionContext = field(default_factory=AgentExecutionContext)
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
 

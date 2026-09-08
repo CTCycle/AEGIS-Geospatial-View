@@ -109,6 +109,7 @@ class GroundedResponseSynthesizer:
         self,
         *,
         user_text: str,
+        provider_session_id: str | None = None,
         fallback_text: str,
         operation: ChatOperationResult,
         map_session: MapSession | None = None,
@@ -148,6 +149,7 @@ class GroundedResponseSynthesizer:
             request = LLMRequest(
                 model=settings.agent_model_name,
                 temperature=0.35,
+                provider_session_id=provider_session_id,
                 messages=build_response_prompt(evidence),
                 metadata={
                     **(
@@ -221,6 +223,7 @@ class GroundedResponseSynthesizer:
         self,
         *,
         user_text: str,
+        provider_session_id: str | None = None,
         fallback_text: str,
         operation: ChatOperationResult,
         map_session: MapSession | None = None,
@@ -288,6 +291,7 @@ class GroundedResponseSynthesizer:
             request = LLMRequest(
                 model=settings.agent_model_name,
                 temperature=0.35,
+                provider_session_id=provider_session_id,
                 messages=build_response_prompt(evidence),
                 metadata={
                     **(

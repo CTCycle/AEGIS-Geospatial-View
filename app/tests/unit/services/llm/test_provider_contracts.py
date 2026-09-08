@@ -89,7 +89,7 @@ def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(
     for provider, model in (
         (
             DeepSeekProvider(api_key="test", base_url="https://deepseek.test"),
-            "deepseek-chat",
+            "deepseek-v4-flash",
         ),
         (
             OpenCodeProvider(api_key="test", provider_name=OPENCODE_GO_PROVIDER),
@@ -97,7 +97,11 @@ def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(
         ),
     ):
         client = _OpenAICompatibleClient()
-        monkeypatch.setattr(provider, "_client", lambda client=client: client)
+        monkeypatch.setattr(
+            provider,
+            "_client",
+            lambda _request=None, client=client: client,
+        )
         result = provider.chat(_request(provider.provider_name, model))
         call = client.completions.calls[0]
         assert call["tools"][0]["type"] == "function"

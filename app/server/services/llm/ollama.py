@@ -382,6 +382,35 @@ class OllamaProvider(LLMProvider):
         return {str(item).strip().lower() for item in raw if str(item).strip()}
 
     # -------------------------------------------------------------------------
+    def _thinking_option(self, model: str) -> str | bool | None:
+        """Return only a provider-declared thinking control.
+
+        Ollama's GPT-OSS family requires a level such as ``low`` while other
+        thinking-capable families accept the boolean disable form.  Unknown
+        metadata deliberately leaves the field out so the request cannot send
+        a value that the model contract did not declare.
+        """
+
+        payload = self._show_payload(model)
+        if payload is None:
+            return None
+        details = json_object(payload.get("details"))
+        family = str(details.get("family") or "").strip().lower()
+        if not family:
+            model_info = json_object(payload.get("model_info"))
+            family = str(
+                model_info.get("general.architecture")
+                or model_info.get("general.family")
+                or ""
+            ).strip().lower()
+        if family in {"gpt-oss", "gptoss"}:
+            return "low"
+        capabilities = self._show_capabilities(model)
+        if capabilities is not None and "thinking" in capabilities:
+            return False
+        return None
+
+    # -------------------------------------------------------------------------
     def _probe_tool_support(self, model: str) -> bool | None:
         cached = self.tool_capability_cache.get(self.base_url, model)
         if cached is not None:
@@ -641,9 +670,11 @@ class OllamaProvider(LLMProvider):
             "messages": effective_request.messages,
             "stream": False,
             "format": schema_json,
-            "think": False,
             "options": {"temperature": effective_request.temperature},
         }
+        thinking_option = self._thinking_option(effective_request.model)
+        if thinking_option is not None:
+            payload["think"] = thinking_option
         if usage.selected_context_window is not None:
             payload["options"]["num_ctx"] = usage.selected_context_window
         try:

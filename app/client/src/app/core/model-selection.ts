@@ -70,6 +70,9 @@ export const isSelectedAgentModel = (
 };
 
 export const agentSelectionDisabledReason = (model: ModelCardDescriptor): string | null => {
+  if (model.agent_selection_disabled_reason) {
+    return model.agent_selection_disabled_reason;
+  }
   if (model.supports_tools === false) {
     return 'Agent model requires native tool calling.';
   }
@@ -120,6 +123,39 @@ export const mergeModelCards = (...groups: ModelCardDescriptor[][]): ModelCardDe
     models.set(key, current ? mergeModelCard(current, model) : model);
   });
   return [...models.values()];
+};
+
+export const ensureSelectedModelVisible = (
+  settings: ModelSettingsResponse,
+  models: readonly ModelCardDescriptor[],
+): ModelCardDescriptor[] => {
+  const provider = normalizeSettingField(settings.agent_model_provider);
+  const name = normalizeSettingField(settings.agent_model_name);
+  if (!provider || !name || models.some((model) => model.provider === provider && model.name === name)) {
+    return [...models];
+  }
+  return [
+    ...models,
+    {
+      id: name,
+      name,
+      provider,
+      description: 'This saved model is not present in the current provider catalog.',
+      capabilities: [],
+      supports_tools: false,
+      supports_structured_output: false,
+      supports_vision: null,
+      supports_embeddings: null,
+      tool_support_source: 'saved_selection',
+      protocol: null,
+      agent_selection_disabled_reason:
+        'This saved model is not present in the live provider catalog. Choose another model deliberately.',
+      metadata: {
+        invalid_configuration: true,
+        invalid_configuration_reason: 'model_absent_from_live_catalog',
+      },
+    },
+  ];
 };
 
 export const baseModelName = (value: string): string =>

@@ -16,13 +16,20 @@ The Access page is for optional geospatial provider keys such as TomTom and Open
 6. For local mode, manage Ollama URL, check connection, refresh models, or pull a model.
 7. Save credentials or Ollama settings if needed, then return to chat.
 8. When `DeepSeek`, `OpenCode Zen`, or `OpenCode Go` is selected in model filters or as the agent model, AEGIS loads the compatible models from the configured provider account.
-9. OpenCode catalogs expose only models backed by the provider's OpenAI-compatible chat-completions endpoint, which is the protocol used for AEGIS tools, streaming, and structured output.
+9. OpenCode catalogs expose the live intersection of the published model table and the provider account. AEGIS supports OpenAI-compatible Chat Completions and Responses models; Anthropic Messages, provider-specific Gemini transports, and unknown protocols remain visible as disabled selections with an explanation.
 10. If a dynamic cloud catalog cannot be loaded, Settings keeps its provider filter active and shows the provider-specific error instead of a generic empty-state message.
 
 An unavailable dynamic catalog does not erase a previously configured model.
 Re-enter a provider key only when Settings reports missing or undecryptable
 credentials; a valid key is not proof that the upstream catalog or inference
 endpoint is currently healthy.
+
+OpenCode requests identify AEGIS with a versioned `User-Agent` and carry a
+stable `x-opencode-session` value for the conversation. The session is reused
+for retries and later turns, while catalog discovery sends only the
+`User-Agent`. AEGIS never silently substitutes a model or provider when a
+saved selection is retired, absent from the live catalog, or uses an
+unsupported transport; select a replacement deliberately.
 
 ## User-Facing Controls
 

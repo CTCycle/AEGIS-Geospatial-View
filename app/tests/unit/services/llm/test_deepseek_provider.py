@@ -4,11 +4,13 @@ import asyncio
 import json
 from types import SimpleNamespace
 
+import pytest
 from pydantic import BaseModel
 from tests.conftest import run_async_in_thread
 
 from server.prompts.providers import build_deepseek_json_schema_instruction
 from server.services.llm.deepseek_provider import DeepSeekProvider
+from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.types import LLMRequest
 
 ###############################################################################
@@ -94,7 +96,7 @@ def test_structured_output_uses_deepseek_json_object_mode(monkeypatch) -> None:
     provider = DeepSeekProvider(api_key="test")
     monkeypatch.setattr(provider, "_client", lambda: client)
     request = LLMRequest(
-        model="deepseek-chat",
+        model="deepseek-v4-flash",
         messages=[
             {"role": "system", "content": "Extract the answer."},
             {"role": "user", "content": "Hello"},
@@ -112,6 +114,15 @@ def test_structured_output_uses_deepseek_json_object_mode(monkeypatch) -> None:
     assert call["messages"][-1]["content"] == build_deepseek_json_schema_instruction(
         _StructuredPayload.model_json_schema()
     )
+
+###############################################################################
+def test_retired_deepseek_models_are_rejected_without_aliasing() -> None:
+    provider = DeepSeekProvider(api_key="test")
+
+    with pytest.raises(LLMProviderRequestError) as error:
+        provider.chat(LLMRequest(model="deepseek-chat", messages=[]))
+
+    assert error.value.code == "provider_model_retired"
 
 ###############################################################################
 def test_async_chat_uses_native_transport_and_closes_client(monkeypatch) -> None:

@@ -684,6 +684,7 @@ class AgentOrchestrator:
             "user_message": payload.message,
             "memory_snapshot": latest_memory,
             "conversation_messages": recent_messages,
+            "provider_session_id": conversation_id,
         }
         parser_kwargs["active_instructions"] = [
             item.model_dump(mode="json")
@@ -1265,6 +1266,7 @@ class AgentOrchestrator:
                 tools=native_tools,
                 temperature=0.2,
                 max_tokens=1536,
+                provider_session_id=conversation_id,
                 context=native_context,
                 context_usage_callback=(
                     lambda usage: self._emit_context_usage(
@@ -1497,6 +1499,7 @@ class AgentOrchestrator:
         assistant_message = await synthesize_response_async(
             self.response_synthesizer,
             user_text=turn_contract.user_text,
+            provider_session_id=conversation_id,
             fallback_text=assistant_message,
             operation=operation,
             map_session=map_session,

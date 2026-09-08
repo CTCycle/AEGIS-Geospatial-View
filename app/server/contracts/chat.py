@@ -158,6 +158,8 @@ class ModelCardDescriptor(BaseModel):
     supports_vision: bool | None = None
     supports_embeddings: bool | None = None
     tool_support_source: str = "unknown"
+    protocol: str | None = None
+    agent_selection_disabled_reason: str | None = None
     context_window_tokens: int | None = None
     maximum_output_tokens: int | None = None
     context_profile_source: str = "unknown"

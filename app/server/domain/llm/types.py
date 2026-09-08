@@ -48,6 +48,10 @@ class LLMRequest:
     messages: list[dict[str, Any]]
     temperature: float = 0.2
     provider: str | None = None
+    # Opaque conversation-scoped value used by providers that require a
+    # stable session header.  It is deliberately not persisted by the LLM
+    # boundary or interpreted by provider-neutral code.
+    provider_session_id: str | None = None
     tools: list["LLMToolDefinition"] | None = None
     tool_choice: Literal["auto", "none", "required"] | str | None = "auto"
     response_json_schema: dict[str, Any] | None = None

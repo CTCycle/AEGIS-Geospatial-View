@@ -5327,6 +5327,28 @@
             "title": "Tool Support Source",
             "default": "unknown"
           },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "agent_selection_disabled_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Selection Disabled Reason"
+          },
           "context_window_tokens": {
             "anyOf": [
               {

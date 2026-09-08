@@ -298,6 +298,7 @@ class DirectTurnResponseService:
             assistant_message = await synthesize_response_async(
                 self.response_synthesizer,
                 user_text=turn_contract.user_text,
+                provider_session_id=conversation_id,
                 fallback_text=fallback_message,
                 operation=operation,
                 task_status="completed",
@@ -362,6 +363,7 @@ class DirectTurnResponseService:
             assistant_message = await synthesize_response_async(
                 self.response_synthesizer,
                 user_text=turn_contract.user_text,
+                provider_session_id=conversation_id,
                 fallback_text=assistant_message,
                 operation=operation,
                 clarification_plan={
