@@ -33,6 +33,7 @@ class _ProviderStub:
 
     # -------------------------------------------------------------------------
     def __init__(self, payload: dict[str, object] | None = None) -> None:
+        self.requests = []
         self.payload = payload or {
             "task_class": "general_question",
             "action_id": "chat_response",
@@ -49,7 +50,8 @@ class _ProviderStub:
 
     # -------------------------------------------------------------------------
     def structured_output(self, request, schema):  # noqa: ANN001
-        _ = request, schema
+        self.requests.append(request)
+        _ = schema
         return dict(self.payload)
 
 ###############################################################################
@@ -84,6 +86,7 @@ class _RetryProviderStub(_ProviderStub):
     def structured_output(self, request, schema):  # noqa: ANN001
         self.calls += 1
         if self.calls == 1:
+            self.requests.append(request)
             raise LLMProviderRequestError(
                 provider="opencode-go",
                 model="mimo-v2.5",
@@ -116,6 +119,7 @@ class _SchemaCorrectionProviderStub(_ProviderStub):
     def structured_output(self, request, schema):  # noqa: ANN001
         self.calls += 1
         if self.calls == 1:
+            self.requests.append(request)
             raise LLMResponseParsingError(
                 provider="opencode-go",
                 model="deepseek-v4-flash",
@@ -209,6 +213,27 @@ def test_parser_service_retries_schema_correction_on_the_same_model() -> None:
 
     assert result.failure_category is None
     assert factory.provider.calls == 2
+
+###############################################################################
+def test_parser_reuses_provider_session_id_across_structured_retries() -> None:
+    factory = _SchemaCorrectionFactoryStub()
+    parser = ParserService(
+        llm_factory=factory,
+        settings_repo=object(),
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+    )
+
+    parser.parse_turn(
+        user_message="Switch to satellite imagery",
+        memory_snapshot={},
+        conversation_messages=[],
+        provider_session_id="conversation-session",
+    )
+
+    assert [
+        request.provider_session_id for request in factory.provider.requests
+    ] == ["conversation-session", "conversation-session"]
 
 ###############################################################################
 def test_parser_schema_accepts_poi_region_and_street_location_signals() -> None:

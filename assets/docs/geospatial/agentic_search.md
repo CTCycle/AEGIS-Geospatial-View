@@ -68,9 +68,13 @@ raw tool payloads; explicit locations suppress stale location history, while onl
 explicit follow-ups receive minimal recent context.
 
 Every request also has a run-scoped absolute deadline, bounded stage budgets, and
-safe stage telemetry. Provider calls use the async OpenAI-compatible transport for
-OpenCode Go and DeepSeek Flash, with cancellation cleanup. Retries are limited to
-the failed operation and remaining deadline; the full pipeline is not restarted.
+safe stage telemetry. Provider calls use their native async transports; OpenCode
+Go routes published Chat Completions and Responses models through the shared
+OpenAI-compatible serializers, while Messages and Gemini-specific transports are
+explicitly disabled. Retries are limited to the failed operation and remaining
+deadline; the full pipeline is not restarted. OpenCode inference requests carry
+the conversation-scoped `x-opencode-session` header and a versioned AEGIS
+`User-Agent`; no model or provider fallback is performed.
 
 ## Parser Contract
 
@@ -150,7 +154,7 @@ Provider-neutral LLM tool contracts are translated by adapters for:
 - Google Gemini function declarations
 - Ollama chat tools
 - DeepSeek function tools
-- OpenCode Zen/OpenCode Go OpenAI-compatible tools
+- OpenCode Zen/OpenCode Go OpenAI-compatible Chat Completions and Responses tools
 
 Provider-specific schemas do not leak into parser, policy, or executor models.
 Native tools and structured response JSON are separate request modes; provider

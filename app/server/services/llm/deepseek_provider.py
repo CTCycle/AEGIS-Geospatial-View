@@ -38,6 +38,7 @@ from server.services.llm.types import (
 )
 
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+RETIRED_DEEPSEEK_MODELS = frozenset({"deepseek-chat", "deepseek-reasoner"})
 
 ###############################################################################
 class DeepSeekProvider(LLMProvider):
@@ -50,26 +51,44 @@ class DeepSeekProvider(LLMProvider):
         self._declared_model_capabilities: dict[str, dict[str, bool]] = {}
 
     # -------------------------------------------------------------------------
-    def _client(self) -> Any:
-        return OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url,
-            timeout=30.0,
-            max_retries=0,
-        )
+    def _request_headers(self, request: LLMRequest | None = None) -> dict[str, str]:
+        _ = request
+        return {}
 
     # -------------------------------------------------------------------------
-    def _async_client(self) -> Any:
-        return AsyncOpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url,
-            timeout=30.0,
-            max_retries=0,
-        )
+    def _client(self, request: LLMRequest | None = None) -> Any:
+        kwargs: dict[str, Any] = {
+            "api_key": self.api_key,
+            "base_url": self.base_url,
+            "timeout": 30.0,
+            "max_retries": 0,
+        }
+        headers = self._request_headers(request)
+        if headers:
+            kwargs["default_headers"] = headers
+        return OpenAI(**kwargs)
+
+    # -------------------------------------------------------------------------
+    def _async_client(self, request: LLMRequest | None = None) -> Any:
+        kwargs: dict[str, Any] = {
+            "api_key": self.api_key,
+            "base_url": self.base_url,
+            "timeout": 30.0,
+            "max_retries": 0,
+        }
+        headers = self._request_headers(request)
+        if headers:
+            kwargs["default_headers"] = headers
+        return AsyncOpenAI(**kwargs)
 
     # -------------------------------------------------------------------------
     def _client_for_request(self, request: LLMRequest) -> Any:
-        client = self._client()
+        try:
+            client = self._client(request)
+        except TypeError:
+            # Keep small injected test clients and third-party adapters that
+            # still expose the pre-request argument constructor usable.
+            client = self._client()
         remaining = remaining_request_seconds(request)
         if remaining is None:
             return client
@@ -104,6 +123,17 @@ class DeepSeekProvider(LLMProvider):
         return min(configured, maximum) if maximum is not None else configured
 
     # -------------------------------------------------------------------------
+    def _validate_model_selection(self, request: LLMRequest) -> None:
+        if request.model.strip().lower() in RETIRED_DEEPSEEK_MODELS:
+            raise LLMProviderRequestError(
+                provider=self.provider_name,
+                model=request.model,
+                stage="request_validation",
+                code="provider_model_retired",
+                retryable=False,
+            )
+
+    # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
         response = httpx.get(
             f"{self.base_url}/models",
@@ -129,12 +159,14 @@ class DeepSeekProvider(LLMProvider):
                 and isinstance(value, bool)
             }
             if declared:
-                self._declared_model_capabilities[model.name] = declared
+                self._declared_model_capabilities[model.name.lower()] = declared
         return models
 
     # -------------------------------------------------------------------------
     def supports_tools(self, model: str) -> bool | None:
-        declared = self._declared_model_capabilities.get(model, {}).get(
+        if model.strip().lower() in RETIRED_DEEPSEEK_MODELS:
+            return False
+        declared = self._declared_model_capabilities.get(model.strip().lower(), {}).get(
             "supports_tools"
         )
         if isinstance(declared, bool):
@@ -143,7 +175,9 @@ class DeepSeekProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def supports_structured_output(self, model: str) -> bool | None:
-        declared = self._declared_model_capabilities.get(model, {}).get(
+        if model.strip().lower() in RETIRED_DEEPSEEK_MODELS:
+            return False
+        declared = self._declared_model_capabilities.get(model.strip().lower(), {}).get(
             "supports_structured_output"
         )
         if isinstance(declared, bool):
@@ -153,6 +187,8 @@ class DeepSeekProvider(LLMProvider):
     # -------------------------------------------------------------------------
     def _capabilities_for_model(self, model: str) -> set[str]:
         normalized = model.strip().lower()
+        if normalized in RETIRED_DEEPSEEK_MODELS:
+            return {"chat", "stream"}
         if normalized.startswith("deepseek-"):
             return {"chat", "stream", "structured", "structured_output", "tools"}
         return {"chat", "stream"}
@@ -178,6 +214,7 @@ class DeepSeekProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
+        self._validate_model_selection(request)
         native_tools = list(tools or request.tools or [])
         schema = response_json_schema or request.response_json_schema
         metadata = dict(request.metadata)
@@ -224,6 +261,8 @@ class DeepSeekProvider(LLMProvider):
                 stream=False,
                 **kwargs,
             )
+        except LLMProviderRequestError:
+            raise
         except Exception as exc:
             raise LLMProviderRequestError.from_exception(
                 exc,
@@ -252,6 +291,7 @@ class DeepSeekProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
+        self._validate_model_selection(request)
         native_tools = list(tools or request.tools or [])
         schema = response_json_schema or request.response_json_schema
         metadata = dict(request.metadata)
@@ -290,7 +330,10 @@ class DeepSeekProvider(LLMProvider):
             kwargs["tool_choice"] = tool_choice or request.tool_choice or "auto"
         if schema and not native_tools:
             kwargs["response_format"] = {"type": "json_object"}
-        client = self._async_client()
+        try:
+            client = self._async_client(effective_request)
+        except TypeError:
+            client = self._async_client()
         started = time.perf_counter()
         try:
             request_client: Any = client
@@ -309,6 +352,8 @@ class DeepSeekProvider(LLMProvider):
                 **kwargs,
             )
         except asyncio.CancelledError:
+            raise
+        except LLMProviderRequestError:
             raise
         except Exception as exc:
             raise LLMProviderRequestError.from_exception(
@@ -337,6 +382,7 @@ class DeepSeekProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
+        self._validate_model_selection(request)
         request = prepare_request(request, provider=self.provider_name)
         usage = compute_context_usage(request, provider=self.provider_name)
         stream: LLMTextStream
@@ -392,6 +438,7 @@ class DeepSeekProvider(LLMProvider):
     def structured_output(
         self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
+        self._validate_model_selection(request)
         model_json_schema = getattr(schema, "model_json_schema", None)
         json_schema = (
             json_object(model_json_schema()) if callable(model_json_schema) else {}
@@ -425,6 +472,8 @@ class DeepSeekProvider(LLMProvider):
                 stream=False,
                 **({"max_tokens": max_tokens} if max_tokens is not None else {}),
             )
+        except LLMProviderRequestError:
+            raise
         except Exception as exc:
             raise LLMProviderRequestError.from_exception(
                 exc,
@@ -475,6 +524,7 @@ class DeepSeekProvider(LLMProvider):
     async def astructured_output(
         self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
+        self._validate_model_selection(request)
         model_json_schema = getattr(schema, "model_json_schema", None)
         json_schema = (
             json_object(model_json_schema()) if callable(model_json_schema) else {}
@@ -499,7 +549,10 @@ class DeepSeekProvider(LLMProvider):
             exc.context_usage = usage.to_dict()
             raise
         max_tokens = self._request_max_tokens(request)
-        client = self._async_client()
+        try:
+            client = self._async_client(request)
+        except TypeError:
+            client = self._async_client()
         started = time.perf_counter()
         try:
             request_client: Any = client
@@ -519,6 +572,8 @@ class DeepSeekProvider(LLMProvider):
                 **({"max_tokens": max_tokens} if max_tokens is not None else {}),
             )
         except asyncio.CancelledError:
+            raise
+        except LLMProviderRequestError:
             raise
         except Exception as exc:
             raise LLMProviderRequestError.from_exception(
@@ -642,6 +697,12 @@ class DeepSeekProvider(LLMProvider):
             "owned_by": str(item.get("owned_by") or "deepseek"),
             "tool_support_source": "provider",
         }
+        if model_id.lower() in RETIRED_DEEPSEEK_MODELS:
+            metadata["supports_tools"] = False
+            metadata["supports_structured_output"] = False
+            metadata["agent_selection_disabled_reason"] = (
+                "DeepSeek retired this model. Select a model from the live catalog."
+            )
         for key in (
             "context_window_tokens",
             "context_length",

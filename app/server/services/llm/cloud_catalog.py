@@ -15,6 +15,7 @@ def _catalog_model(
     default_output_reserve: int,
     supports_context_caching: bool = False,
     context_profile_source: str,
+    supports_temperature: bool = True,
 ) -> ModelDescriptor:
     return ModelDescriptor(
         name=name,
@@ -29,6 +30,10 @@ def _catalog_model(
             "tokenizer_strategy": "chars_per_token_4",
             "supports_context_caching": supports_context_caching,
             "supports_server_compaction": False,
+            "supports_temperature": supports_temperature,
+            "protocol": (
+                "openai-responses" if provider == "openai" else "google-model"
+            ),
             "context_profile_source": context_profile_source,
         },
     )
@@ -48,6 +53,7 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         maximum_output_tokens=128_000,
         default_output_reserve=8_192,
         supports_context_caching=True,
+        supports_temperature=False,
         context_profile_source="openai_model_catalog",
     ),
     _catalog_model(
@@ -60,6 +66,7 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         maximum_output_tokens=128_000,
         default_output_reserve=8_192,
         supports_context_caching=True,
+        supports_temperature=False,
         context_profile_source="openai_model_catalog",
     ),
     _catalog_model(
@@ -72,6 +79,7 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         maximum_output_tokens=128_000,
         default_output_reserve=16_384,
         supports_context_caching=True,
+        supports_temperature=False,
         context_profile_source="openai_model_catalog",
     ),
     _catalog_model(
@@ -132,17 +140,6 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         maximum_output_tokens=65_536,
         default_output_reserve=8_192,
         supports_context_caching=True,
-        context_profile_source="google_models_api",
-    ),
-    _catalog_model(
-        name="gemini-2.0-flash",
-        description="Low-latency Google model for quick conversational and extraction tasks.",
-        provider="google",
-        family="gemini-2.0",
-        capabilities=["chat", "stream", "structured", "structured_output", "tools"],
-        context_window_tokens=1_048_576,
-        maximum_output_tokens=8_192,
-        default_output_reserve=4_096,
         context_profile_source="google_models_api",
     ),
 )

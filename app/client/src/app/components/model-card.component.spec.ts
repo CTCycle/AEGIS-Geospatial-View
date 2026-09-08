@@ -89,4 +89,14 @@ describe('ModelCardComponent', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Selected agent model');
   });
+
+  it('explains why a selected model is disabled', () => {
+    component.isSelected = true;
+    component.disabledReason = 'This saved model is not present in the live provider catalog.';
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Selected agent model');
+    expect(text).toContain('not present in the live provider catalog');
+  });
 });

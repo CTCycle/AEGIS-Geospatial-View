@@ -16,9 +16,16 @@ def dump_response_payload(response: object) -> dict[str, Any]:
     model_dump = getattr(response, "model_dump", None)
     if callable(model_dump):
         try:
-            dumped = model_dump(mode="json")
+            # OpenAI Responses objects can contain SDK-only values in nested
+            # output items.  Pydantic's warning is expected at this boundary;
+            # suppress it while retaining the JSON-mode conversion, and keep
+            # fallbacks for lightweight test doubles and older SDKs.
+            dumped = model_dump(mode="json", warnings=False)
         except TypeError:
-            dumped = model_dump()
+            try:
+                dumped = model_dump(mode="json")
+            except TypeError:
+                dumped = model_dump()
         payload = _object_mapping(dumped)
     else:
         payload = _object_mapping(response)

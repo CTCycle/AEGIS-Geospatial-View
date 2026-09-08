@@ -853,6 +853,8 @@ export interface ModelCardDescriptor {
   supports_vision?: boolean | null;
   supports_embeddings?: boolean | null;
   tool_support_source?: string;
+  protocol?: string | null;
+  agent_selection_disabled_reason?: string | null;
   context_window_tokens?: number | null;
   maximum_output_tokens?: number | null;
   context_profile_source?: string;

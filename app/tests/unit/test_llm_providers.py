@@ -239,6 +239,31 @@ def test_openai_provider_uses_responses_api(monkeypatch) -> None:
     }
 
 ###############################################################################
+def test_openai_reasoning_catalog_policy_omits_temperature_and_caps_output(
+    monkeypatch,
+) -> None:
+    _FakeOpenAIClient.instances = []
+    monkeypatch.setattr("server.services.llm.openai_provider.OpenAI", _FakeOpenAIClient)
+    provider = OpenAIProvider(api_key="k")
+    request = LLMRequest(
+        model="gpt-5.2",
+        messages=[{"role": "user", "content": "Extract"}],
+        temperature=0.9,
+        metadata={"max_tokens": 200_000},
+    )
+
+    provider.chat(request)
+    provider.structured_output(request, schema=_StructuredPayload)
+
+    client = _FakeOpenAIClient.instances[0]
+    chat_call = client.responses.create_calls[0]
+    parse_call = _FakeOpenAIClient.instances[1].responses.parse_calls[0]
+    assert "temperature" not in chat_call
+    assert chat_call["max_output_tokens"] == 128_000
+    assert "temperature" not in parse_call
+    assert parse_call["max_output_tokens"] == 128_000
+
+###############################################################################
 def test_openai_structured_output_rejects_unsupported_model_before_api_call(
     monkeypatch,
 ) -> None:
@@ -365,6 +390,34 @@ def test_ollama_provider_http_paths(monkeypatch) -> None:
     structured_payload = next(
         payload for _, payload in post_calls if payload.get("format")
     )
-    assert structured_payload["think"] is False
+    assert "think" not in structured_payload
     assert response.context_usage is not None
     assert response.context_usage["provider"] == "ollama"
+
+###############################################################################
+def test_ollama_thinking_control_uses_exact_show_metadata(monkeypatch) -> None:
+    payloads: list[dict[str, object]] = []
+
+    def fake_post(self, path, payload):  # noqa: ANN001
+        if path == "/api/show":
+            if payload["name"] == "gpt-oss-local":
+                return {"details": {"family": "gpt-oss"}}
+            return {"details": {"family": "qwen3"}, "capabilities": ["thinking"]}
+        payloads.append(payload)
+        return {"message": {"content": json.dumps({"answer": "ok"})}}
+
+    monkeypatch.setattr(OllamaProvider, "_post_json", fake_post)
+    provider = OllamaProvider(base_url="http://localhost:11434")
+
+    provider.structured_output(
+        LLMRequest(model="gpt-oss-local", messages=[{"role": "user", "content": "x"}]),
+        schema=_StructuredPayload,
+    )
+    provider.structured_output(
+        LLMRequest(model="qwen-local", messages=[{"role": "user", "content": "x"}]),
+        schema=_StructuredPayload,
+    )
+
+    structured_payloads = [payload for payload in payloads if payload.get("format")]
+    assert structured_payloads[0]["think"] == "low"
+    assert structured_payloads[1]["think"] is False

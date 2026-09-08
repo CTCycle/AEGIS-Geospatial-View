@@ -20,6 +20,7 @@ from server.services.chat.model_library import (
 from server.services.cryptography import CredentialEncryptionService
 from server.services.llm.context_budget import resolve_model_context_profile
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
+from server.services.llm.deepseek_provider import RETIRED_DEEPSEEK_MODELS
 
 ###############################################################################
 class ChatSettingsValidationError(ValueError):
@@ -256,20 +257,33 @@ class ChatSettingsService:
             return
         if agent_model is not None and agent_model.get("supports_tools") is False:
             raise ChatSettingsValidationError(
-                "Selected agent model does not support native tool calling."
+                str(
+                    agent_model.get("agent_selection_disabled_reason")
+                    or "Selected agent model does not support native tool calling."
+                )
             )
         if (
             agent_model is not None
             and agent_model.get("supports_structured_output") is False
         ):
             raise ChatSettingsValidationError(
-                "Selected agent model does not support structured output."
+                str(
+                    agent_model.get("agent_selection_disabled_reason")
+                    or "Selected agent model does not support structured output."
+                )
             )
         if (
             agent_model is None
             and agent_model_provider in DYNAMIC_CLOUD_PROVIDERS
             and agent_model_name
         ):
+            if (
+                agent_model_provider == "deepseek"
+                and agent_model_name.strip().lower() in RETIRED_DEEPSEEK_MODELS
+            ):
+                raise ChatSettingsValidationError(
+                    "DeepSeek retired this model; choose a model from the live catalog."
+                )
             raise ChatSettingsValidationError(
                 f"Selected {agent_model_provider} agent model could not be found in the live provider catalog."
             )

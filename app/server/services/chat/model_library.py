@@ -117,6 +117,16 @@ class ChatModelLibraryService:
             "supports_vision": supports_vision,
             "supports_embeddings": supports_embeddings,
             "tool_support_source": tool_support_source,
+            "protocol": (
+                str(metadata["protocol"])
+                if isinstance(metadata.get("protocol"), str)
+                else None
+            ),
+            "agent_selection_disabled_reason": (
+                str(metadata["agent_selection_disabled_reason"])
+                if isinstance(metadata.get("agent_selection_disabled_reason"), str)
+                else None
+            ),
             "context_window_tokens": context_window_tokens,
             "maximum_output_tokens": maximum_output_tokens,
             "context_profile_source": context_profile_source,

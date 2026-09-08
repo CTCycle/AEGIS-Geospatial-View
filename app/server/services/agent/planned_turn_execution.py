@@ -435,6 +435,7 @@ class PlannedTurnExecutionService:
             assistant_message = await synthesize_response_async(
                 self.response_synthesizer,
                 user_text=turn_contract.user_text,
+                provider_session_id=conversation_id,
                 fallback_text=assistant_message,
                 operation=operation,
                 map_session=map_session,

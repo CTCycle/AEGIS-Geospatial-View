@@ -43,17 +43,29 @@ class OpenAIProvider(LLMProvider):
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
 
     # -------------------------------------------------------------------------
-    def _client(self) -> Any:
-        return OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url,
-            timeout=30.0,
-            max_retries=0,
-        )
+    def _request_headers(self, request: LLMRequest | None = None) -> dict[str, str]:
+        _ = request
+        return {}
+
+    # -------------------------------------------------------------------------
+    def _client(self, request: LLMRequest | None = None) -> Any:
+        kwargs: dict[str, Any] = {
+            "api_key": self.api_key,
+            "base_url": self.base_url,
+            "timeout": 30.0,
+            "max_retries": 0,
+        }
+        headers = self._request_headers(request)
+        if headers:
+            kwargs["default_headers"] = headers
+        return OpenAI(**kwargs)
 
     # -------------------------------------------------------------------------
     def _client_for_request(self, request: LLMRequest) -> Any:
-        client = self._client()
+        try:
+            client = self._client(request)
+        except TypeError:
+            client = self._client()
         remaining = remaining_request_seconds(request)
         if remaining is None:
             return client
@@ -92,6 +104,52 @@ class OpenAIProvider(LLMProvider):
             if entry.name == model:
                 return set(entry.capabilities)
         return {"chat", "stream"}
+
+    # -------------------------------------------------------------------------
+    def _catalog_metadata_for_model(self, model: str) -> dict[str, Any]:
+        for entry in get_cloud_model_catalog():
+            if entry.provider == self.provider_name and entry.name == model:
+                return dict(entry.metadata)
+        return {}
+
+    # -------------------------------------------------------------------------
+    def _temperature_kwargs(self, request: LLMRequest) -> dict[str, Any]:
+        supports_temperature = request.metadata.get("supports_temperature")
+        if not isinstance(supports_temperature, bool):
+            supports_temperature = self._catalog_metadata_for_model(
+                request.model
+            ).get("supports_temperature")
+        return (
+            {"temperature": request.temperature}
+            if supports_temperature is not False
+            else {}
+        )
+
+    # -------------------------------------------------------------------------
+    def _request_max_output_tokens(self, request: LLMRequest) -> int | None:
+        def positive_int(value: object) -> int | None:
+            if isinstance(value, bool):
+                return None
+            try:
+                parsed = int(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return None
+            return parsed if parsed > 0 else None
+
+        metadata = request.metadata
+        configured = positive_int(
+            metadata.get("max_output_tokens")
+            or metadata.get("max_tokens")
+            or metadata.get("max_completion_tokens")
+        )
+        catalog_metadata = self._catalog_metadata_for_model(request.model)
+        maximum = positive_int(
+            metadata.get("maximum_output_tokens")
+            or catalog_metadata.get("maximum_output_tokens")
+        )
+        if configured is None:
+            return None
+        return min(configured, maximum) if maximum is not None else configured
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -243,6 +301,9 @@ class OpenAIProvider(LLMProvider):
             exc.context_usage = usage.to_dict()
             raise
         kwargs: dict[str, Any] = {}
+        max_output_tokens = self._request_max_output_tokens(effective_request)
+        if max_output_tokens is not None:
+            kwargs["max_output_tokens"] = max_output_tokens
         if native_tools:
             kwargs["tools"] = [
                 self.tool_to_openai_schema(tool) for tool in native_tools
@@ -261,7 +322,7 @@ class OpenAIProvider(LLMProvider):
             response = self._client_for_request(effective_request).responses.create(
                 model=effective_request.model,
                 input=self.normalize_tool_messages(effective_request.messages),
-                temperature=effective_request.temperature,
+                **self._temperature_kwargs(effective_request),
                 **kwargs,
             )
         except LLMStructuredOutputError:
@@ -296,8 +357,14 @@ class OpenAIProvider(LLMProvider):
                 response_stream = self._client_for_request(request).responses.create(
                     model=request.model,
                     input=request.messages,
-                    temperature=request.temperature,
                     stream=True,
+                    **self._temperature_kwargs(request),
+                    **(
+                        {"max_output_tokens": max_output_tokens}
+                        if (max_output_tokens := self._request_max_output_tokens(request))
+                        is not None
+                        else {}
+                    ),
                 )
                 for event in response_stream:
                     remaining = remaining_request_seconds(request)
@@ -351,8 +418,14 @@ class OpenAIProvider(LLMProvider):
             response = self._client_for_request(request).responses.parse(
                 model=request.model,
                 input=request.messages,
-                temperature=request.temperature,
                 text_format=schema,
+                **self._temperature_kwargs(request),
+                **(
+                    {"max_output_tokens": max_output_tokens}
+                    if (max_output_tokens := self._request_max_output_tokens(request))
+                    is not None
+                    else {}
+                ),
             )
         except LLMStructuredOutputError:
             raise

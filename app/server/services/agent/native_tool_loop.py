@@ -162,6 +162,10 @@ class NativeToolLoop:
                         tools=request.tools,
                         tool_choice="auto",
                         temperature=request.temperature,
+                        provider_session_id=(
+                            request.provider_session_id
+                            or request.context.conversation_id
+                        ),
                         metadata={
                             **(
                                 self.context_profile_resolver.request_metadata(

@@ -765,6 +765,7 @@ class ParserService:
         task_snapshot: dict[str, Any] | None,
         schema_correction: bool,
         deadline_monotonic: float | None,
+        provider_session_id: str | None = None,
     ) -> tuple[str, str, Any, LLMRequest]:
         settings = None
         if self.provider is None or self.model is None:
@@ -799,6 +800,7 @@ class ParserService:
             model=model_name,
             temperature=0.0,
             provider=provider_name,
+            provider_session_id=provider_session_id,
             tools=[],
             tool_choice="none",
             metadata={
@@ -847,6 +849,7 @@ class ParserService:
         task_snapshot: dict[str, Any] | None = None,
         schema_correction: bool = False,
         deadline_monotonic: float | None = None,
+        provider_session_id: str | None = None,
     ) -> LLMParserExtraction:
         provider_name, model_name, parser_provider, request = (
             self._build_extraction_request(
@@ -857,6 +860,7 @@ class ParserService:
                 task_snapshot=task_snapshot,
                 schema_correction=schema_correction,
                 deadline_monotonic=deadline_monotonic,
+                provider_session_id=provider_session_id,
             )
         )
         self.last_context_usage = None
@@ -911,6 +915,7 @@ class ParserService:
         task_snapshot: dict[str, Any] | None = None,
         schema_correction: bool = False,
         deadline_monotonic: float | None = None,
+        provider_session_id: str | None = None,
     ) -> LLMParserExtraction:
         provider_name, model_name, parser_provider, request = (
             self._build_extraction_request(
@@ -921,6 +926,7 @@ class ParserService:
                 task_snapshot=task_snapshot,
                 schema_correction=schema_correction,
                 deadline_monotonic=deadline_monotonic,
+                provider_session_id=provider_session_id,
             )
         )
         self.last_context_usage = None
@@ -1154,6 +1160,7 @@ class ParserService:
         active_instructions: list[dict[str, Any]] | None = None,
         task_snapshot: dict[str, Any] | None = None,
         deadline_monotonic: float | None = None,
+        provider_session_id: str | None = None,
     ) -> TurnParseResult:
         return self.parse_turn_with_usage(
             user_message=user_message,
@@ -1162,6 +1169,7 @@ class ParserService:
             active_instructions=active_instructions,
             task_snapshot=task_snapshot,
             deadline_monotonic=deadline_monotonic,
+            provider_session_id=provider_session_id,
         ).turn_contract
 
     # -------------------------------------------------------------------------
@@ -1173,6 +1181,7 @@ class ParserService:
         active_instructions: list[dict[str, Any]] | None = None,
         task_snapshot: dict[str, Any] | None = None,
         deadline_monotonic: float | None = None,
+        provider_session_id: str | None = None,
     ) -> ParserRunResult:
         self.last_context_usage = None
         self._last_model_calls.set(0)
@@ -1188,6 +1197,7 @@ class ParserService:
                 active_instructions=active_instructions,
                 task_snapshot=task_snapshot,
                 deadline_monotonic=deadline_monotonic,
+                provider_session_id=provider_session_id,
             )
         except LLMConfigurationError:
             raise
@@ -1533,6 +1543,7 @@ class ParserService:
         active_instructions: list[dict[str, Any]] | None = None,
         task_snapshot: dict[str, Any] | None = None,
         deadline_monotonic: float | None = None,
+        provider_session_id: str | None = None,
     ) -> ParserRunResult:
         """Parse a turn without running the blocking provider on the event loop."""
 
@@ -1549,6 +1560,7 @@ class ParserService:
                 active_instructions=active_instructions,
                 task_snapshot=task_snapshot,
                 deadline_monotonic=deadline_monotonic,
+                provider_session_id=provider_session_id,
             )
             current_usage = self.last_context_usage
             usage = dict(current_usage) if is_json_object(current_usage) else None
@@ -1568,6 +1580,7 @@ class ParserService:
                 active_instructions=active_instructions,
                 task_snapshot=task_snapshot,
                 deadline_monotonic=deadline_monotonic,
+                provider_session_id=provider_session_id,
             )
         finally:
             self._extraction_override.reset(extraction_token)

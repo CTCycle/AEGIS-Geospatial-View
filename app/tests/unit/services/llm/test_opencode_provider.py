@@ -105,8 +105,13 @@ def test_zen_catalog_keeps_live_models_even_when_static_capabilities_are_unknown
     assert models[0].provider == OPENCODE_PROVIDER
     assert models[0].metadata["protocol"] == "openai-chat-completions"
     assert models[1].capabilities == ["chat", "stream"]
+    assert models[1].metadata["protocol"] == "anthropic-messages"
+    assert "unsupported transport" in models[1].metadata[
+        "agent_selection_disabled_reason"
+    ]
     assert captured["url"] == "https://opencode.ai/zen/v1/models"
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer test-key"
+    assert captured["kwargs"]["headers"]["User-Agent"] == "AEGIS-Geospatial-View/1.0.0"
 
 ###############################################################################
 def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
@@ -115,7 +120,7 @@ def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     assert provider.base_url == "https://opencode.ai/zen/go/v1"
     assert provider.supports_tools("deepseek-v4-flash") is True
     assert provider.supports_structured_output("deepseek-v4-flash") is True
-    assert provider.supports_tools("claude-opus-5") is None
+    assert provider.supports_tools("claude-opus-5") is False
 
 ###############################################################################
 def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -> None:
@@ -124,6 +129,7 @@ def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -
     monkeypatch.setattr(provider, "_client", lambda: client)
     request = LLMRequest(
         model="deepseek-v4-flash",
+        provider_session_id="conversation-1",
         messages=[
             {"role": "system", "content": "Extract the answer."},
             {"role": "user", "content": "Hello"},
@@ -147,6 +153,7 @@ def test_chat_forwards_bounded_output_tokens(monkeypatch) -> None:
     monkeypatch.setattr(provider, "_client", lambda: client)
     request = LLMRequest(
         model="deepseek-v4-flash",
+        provider_session_id="conversation-1",
         messages=[{"role": "user", "content": "Hello"}],
         metadata={"max_tokens": 77},
     )
@@ -162,6 +169,7 @@ def test_stream_forwards_bounded_output_tokens(monkeypatch) -> None:
     monkeypatch.setattr(provider, "_client", lambda: client)
     request = LLMRequest(
         model="deepseek-v4-flash",
+        provider_session_id="conversation-1",
         messages=[{"role": "user", "content": "Hello"}],
         metadata={"max_tokens": 88},
     )
@@ -184,6 +192,7 @@ def test_bounded_deadline_is_forwarded_without_the_old_thirty_second_cap(
     provider._client_for_request(
         LLMRequest(
             model="deepseek-v4-flash",
+            provider_session_id="conversation-1",
             messages=[{"role": "user", "content": "Hello"}],
         )
     )
@@ -197,6 +206,7 @@ def test_timeout_failure_keeps_preflight_context_usage(monkeypatch) -> None:
     monkeypatch.setattr(provider, "_client", lambda: client)
     request = LLMRequest(
         model="deepseek-v4-flash",
+        provider_session_id="conversation-1",
         messages=[{"role": "user", "content": "Hello"}],
         metadata={"max_tokens": 123},
     )
@@ -209,3 +219,88 @@ def test_timeout_failure_keeps_preflight_context_usage(monkeypatch) -> None:
     assert error.value.context_usage is not None
     assert error.value.context_usage["estimated_input_tokens"] > 0
     assert error.value.context_usage["response_schema_tokens"] == 0
+
+###############################################################################
+def test_opencode_session_headers_are_stable_per_conversation_and_not_shared() -> None:
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+
+    first = provider._request_headers(
+        LLMRequest(
+            model="deepseek-v4-flash",
+            messages=[],
+            provider_session_id="conversation-a",
+        )
+    )
+    retry = provider._request_headers(
+        LLMRequest(
+            model="deepseek-v4-flash",
+            messages=[],
+            provider_session_id="conversation-a",
+        )
+    )
+    second = provider._request_headers(
+        LLMRequest(
+            model="deepseek-v4-flash",
+            messages=[],
+            provider_session_id="conversation-b",
+        )
+    )
+
+    assert first == retry
+    assert first["x-opencode-session"] == "conversation-a"
+    assert second["x-opencode-session"] == "conversation-b"
+    assert first["User-Agent"] == "AEGIS-Geospatial-View/1.0.0"
+    assert "Authorization" not in first
+
+###############################################################################
+def test_opencode_requires_session_context_for_inference() -> None:
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+
+    with pytest.raises(LLMProviderRequestError) as error:
+        provider._request_headers(
+            LLMRequest(model="deepseek-v4-flash", messages=[])
+        )
+
+    assert error.value.code == "provider_session_required"
+    assert "test-key" not in str(error.value)
+
+###############################################################################
+def test_opencode_routes_responses_models_to_responses_transport(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _Responses:
+        def structured_output(self, request, schema):  # noqa: ANN001
+            captured["request"] = request
+            captured["schema"] = schema
+            return {"answer": "responses"}
+
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+    monkeypatch.setattr(provider, "_responses", lambda: _Responses())
+    request = LLMRequest(
+        model="gpt-5.6-luna",
+        messages=[{"role": "user", "content": "Hello"}],
+        provider_session_id="conversation-responses",
+    )
+
+    assert provider.structured_output(request, schema=_StructuredPayload) == {
+        "answer": "responses"
+    }
+    routed = captured["request"]
+    assert routed.provider == OPENCODE_GO_PROVIDER
+    assert routed.provider_session_id == "conversation-responses"
+    assert routed.metadata["protocol"] == "openai-responses"
+    assert routed.metadata["supports_temperature"] is False
+
+###############################################################################
+def test_opencode_rejects_messages_transport_without_guessing() -> None:
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+    request = LLMRequest(
+        model="minimax-m3",
+        messages=[{"role": "user", "content": "Hello"}],
+        provider_session_id="conversation-messages",
+    )
+
+    with pytest.raises(LLMProviderRequestError) as error:
+        provider.structured_output(request, schema=_StructuredPayload)
+
+    assert error.value.code == "provider_transport_unsupported"
