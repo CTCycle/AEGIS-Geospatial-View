@@ -33,7 +33,6 @@ from server.services.geospatial.providers.gbif import GBIFProvider
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
-from server.services.geospatial.providers.mapillary import MapillaryProvider
 from server.services.geospatial.providers.nasa_firms import NASAFIRMSProvider
 from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
 from server.services.geospatial.providers.natural_earth import NaturalEarthProvider
@@ -91,7 +90,6 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "local_open_data": lambda _credential: LocalOpenDataProvider(),
     "mobility_database": lambda _credential: MobilityDatabaseProvider(),
     "nominatim": lambda _credential: NominatimProvider(),
-    "mapillary": lambda credential: MapillaryProvider(access_token=credential),
 }
 
 LOGGER = logging.getLogger(__name__)

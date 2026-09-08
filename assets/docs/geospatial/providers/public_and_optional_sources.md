@@ -1,6 +1,6 @@
 # Public And Optional Sources
 
-Last updated: 2026-09-04
+Last updated: 2026-09-08
 
 ## Canonical POI path
 
@@ -109,7 +109,7 @@ Use `gbif_species_occurrences` for bounded biodiversity occurrence context.
 
 Use for optional traffic flow and incident layers; it is no longer a basic basemap source.
 
-- Configure `TOMTOM_API_KEY` or Access credentials.
+- Configure the key through encrypted AEGIS Access storage.
 - Coverage and refresh cadence vary by region.
 - Confirm evaluation and production licensing.
 
@@ -117,7 +117,7 @@ Use for optional traffic flow and incident layers; it is no longer a basic basem
 
 Use for air-quality station observations and measurements.
 
-- Configure `OPENAQ_API_KEY` or Access credentials.
+- Configure the key through encrypted AEGIS Access storage.
 - Send the key with `X-API-Key`.
 - Respect rate-limit headers.
 
@@ -125,7 +125,7 @@ Use for air-quality station observations and measurements.
 
 Use for tourism-oriented points of interest.
 
-- Configure `OPENTRIPMAP_API_KEY` or Access credentials.
+- Configure the key through encrypted AEGIS Access storage.
 - Keep requests bounded by location and radius.
 - If the key is missing, the source should remain unavailable and public alternatives should be preferred.
 
@@ -133,8 +133,12 @@ Use for tourism-oriented points of interest.
 
 Use for EV charging station discovery.
 
-- Hosted requests require `OPENCHARGEMAP_API_KEY`; anonymous hosted access is not treated as reliable.
+- Hosted requests require an API key resolved from encrypted AEGIS Access storage;
+  raw secret environment variables are not used.
 - Prototype local snapshots with `AEGIS_OCM_SNAPSHOT_PATH` for bounded, keyless reads.
+- The runtime availability mode is `credential_or_local_source`: without either
+  the saved key or an existing snapshot, catalog and planner availability are
+  false with an actionable configuration reason.
 - Bound requests by viewport, radius, and result count.
 - Cache station metadata and degrade gracefully on stale or empty results.
 
@@ -142,7 +146,8 @@ Use for EV charging station discovery.
 
 Use for NASA API-backed capabilities that are distinct from public GIBS tiles.
 
-- Configure `NASA_API_KEY` only when a capability explicitly requires it.
+- Configure the key through encrypted AEGIS Access storage when a capability
+  explicitly requires it.
 - Public GIBS manifests should keep `auth.type` as `none`.
 
 ### Google Maps Platform

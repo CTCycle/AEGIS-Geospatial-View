@@ -413,7 +413,7 @@ def _float_or_none(value: object) -> float | None:
         if value == "" or value == "-":
             return None
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 ###############################################################################

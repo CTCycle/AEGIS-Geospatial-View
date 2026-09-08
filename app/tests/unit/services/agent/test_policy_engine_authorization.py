@@ -29,6 +29,10 @@ class _CapabilityRegistry:
                 "id": "tomtom_traffic_flow",
                 "metadata": {"geometry_type": "raster-grid"},
             },
+            "openchargemap_ev_charging": {
+                "id": "openchargemap_ev_charging",
+                "metadata": {"geometry_type": "Point"},
+            },
         }
 
     # -------------------------------------------------------------------------
@@ -42,6 +46,8 @@ class _RuntimeRegistry:
     def provider_health(self, capability_id: str) -> str:
         if capability_id == "tomtom_traffic_flow":
             return "missing_credentials"
+        if capability_id == "openchargemap_ev_charging":
+            return "missing_access"
         if capability_id == "disabled_overlay":
             return "disabled"
         return "healthy"
@@ -54,6 +60,12 @@ class _RuntimeRegistry:
             "tomtom_traffic_flow": {"map"},
         }
         return mode in supported.get(capability_id, set())
+
+    # -------------------------------------------------------------------------
+    def access_reason(self, capability_id: str) -> str | None:
+        if capability_id == "openchargemap_ev_charging":
+            return "Configure an Open Charge Map API key or local snapshot."
+        return None
 
 ###############################################################################
 def _engine() -> PolicyEngine:
@@ -233,6 +245,38 @@ def test_authorize_capability_execution_rejects_missing_credentials() -> None:
 
     assert result.allowed is False
     assert result.metadata["code"] == "missing_credentials"
+
+
+###############################################################################
+def test_authorize_capability_execution_rejects_missing_openchargemap_access() -> None:
+    turn = TurnParseResult(
+        user_text="show chargers in Rome",
+        conversation_context=ConversationContextSnapshot(
+            memory_snapshot={"active_location": {"label": "Rome"}}
+        ),
+        task_class="map_search",
+        normalized_action=NormalizedAction(
+            action_id="map_search",
+            action_label="Map Search",
+            requires_location=True,
+        ),
+        location_signals=[
+            LocationSignal(
+                signal_type="city", raw_value="Rome", normalized_value="Rome"
+            )
+        ],
+    )
+
+    result = _engine().authorize_capability_execution(
+        "openchargemap_ev_charging",
+        {},
+        turn,
+        AgentExecutionContext(),
+    )
+
+    assert result.allowed is False
+    assert result.metadata["code"] == "missing_access"
+    assert "local snapshot" in result.reason
 
 ###############################################################################
 def test_authorize_capability_execution_rejects_mode_mismatch() -> None:

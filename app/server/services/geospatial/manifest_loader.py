@@ -4,7 +4,7 @@ from server.common.typing import is_json_object
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
@@ -12,6 +12,12 @@ from server.common.paths import PROJECT_DIR, ROOT_DIR
 from server.contracts.geospatial import CapabilityManifestV2
 
 type JsonDict = dict[str, Any]
+RuntimeAccessMode = Literal[
+    "public",
+    "credential",
+    "credential_or_local_source",
+    "configured_source",
+]
 
 ###############################################################################
 class CatalogIndex(BaseModel):
@@ -48,6 +54,8 @@ class RuntimeProfile(BaseModel):
     planner_hints: list[str]
     manual_toggle: bool
     auth_required: bool
+    availability_mode: RuntimeAccessMode | None = None
+    local_source_env: str | None = None
 
 ###############################################################################
 class RuntimeProfilesDocument(BaseModel):

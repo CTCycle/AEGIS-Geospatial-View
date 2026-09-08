@@ -14,7 +14,7 @@ def test_ecosystem_inventory_covers_catalog_runtime_and_native_tools() -> None:
 
     assert report["counts"] == {
         "manifests": 86,
-        "providers": 39,
+        "providers": 38,
         "direct_tools": 4,
         "llm_native_tools": 5,
         "runtime_profiles": 68,

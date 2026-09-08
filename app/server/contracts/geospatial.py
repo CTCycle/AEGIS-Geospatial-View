@@ -149,6 +149,8 @@ class GeospatialLayerHealthResponse(BaseModel):
     provider: str | None = None
     reliability: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     runtime: Any = None
+    available: bool = False
+    availability_reason: str | None = None
 
 ###############################################################################
 class GeospatialProviderPayloadResponse(BaseModel):

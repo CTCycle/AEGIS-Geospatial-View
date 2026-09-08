@@ -138,5 +138,5 @@ class NominatimProvider(GeospatialProvider):
     def _float_or_none(self, value: object) -> float | None:
         try:
             return float(str(value))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None

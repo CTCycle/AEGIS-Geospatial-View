@@ -18,7 +18,7 @@ def test_openchargemap_requires_key_for_hosted_access() -> None:
             )
         )
     except ProviderAuthError as exc:
-        assert "OPENCHARGEMAP_API_KEY" in str(exc)
+        assert "AEGIS Access" in str(exc)
     else:
         raise AssertionError("Hosted Open Charge Map access must not be anonymous.")
 

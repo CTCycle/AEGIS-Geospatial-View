@@ -130,6 +130,7 @@ def test_provider_registry_builds_manifest_backed_providers() -> None:
     registry.build_from_manifests()
 
     assert "gibs" in registry.list_provider_ids()
+    assert "mapillary" not in registry.list_provider_ids()
     assert "rainviewer" in registry.list_provider_ids()
     assert "fallback" not in registry.list_provider_ids()
     assert "osm" not in registry.list_provider_ids()

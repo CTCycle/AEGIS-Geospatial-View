@@ -97,7 +97,7 @@ class OpenChargeMapProvider(GeospatialProvider):
             )
         if not api_key:
             raise ProviderAuthError(
-                "Open Charge Map hosted API access requires OPENCHARGEMAP_API_KEY; configure a local snapshot for anonymous operation."
+                "Open Charge Map hosted API access requires a saved API key in encrypted AEGIS Access storage; configure a local snapshot for anonymous operation."
             )
         params["key"] = api_key
         url = f"https://api.openchargemap.io/v3/poi/?{urlencode(params)}"

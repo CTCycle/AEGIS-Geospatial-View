@@ -675,7 +675,7 @@ class LocationResolver:
                 provenance=self._provenance_from_geocoded(geocoded),
                 hierarchy=hierarchy,
             )
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     # -------------------------------------------------------------------------
@@ -1310,7 +1310,7 @@ class LocationResolver:
                     else None
                 ),
             )
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     # -------------------------------------------------------------------------
@@ -1320,7 +1320,7 @@ class LocationResolver:
             return None
         try:
             number = float(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         return number if math.isfinite(number) else None
 
@@ -1385,7 +1385,7 @@ class LocationResolver:
                     "result_type": value.get("result_type") or "location",
                 }
             )
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     # -------------------------------------------------------------------------
@@ -1398,7 +1398,7 @@ class LocationResolver:
             return None
         try:
             return LocationResolutionProvenance.model_validate(raw)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     # -------------------------------------------------------------------------

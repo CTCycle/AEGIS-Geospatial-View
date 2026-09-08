@@ -39,6 +39,7 @@ export interface CapabilityDescriptor {
   provider: string;
   requires_credentials: boolean;
   is_available: boolean;
+  availability_reason?: string | null;
   supports_map: boolean;
   supports_direct_text: boolean;
   coverage: string;

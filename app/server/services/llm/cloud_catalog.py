@@ -148,7 +148,7 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
 def _positive_int(value: object) -> int | None:
     try:
         number = int(value)  # type: ignore[arg-type]
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     return number if number > 0 else None
 

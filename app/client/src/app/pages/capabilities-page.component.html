@@ -64,7 +64,7 @@
                     </td>
                     <td>{{ updateFrequency(item) }}</td>
                     <td>
-                      <span class="access-status" [class.access-status--locked]="item.requires_credentials && !item.is_available">
+                      <span class="access-status" [class.access-status--locked]="!item.is_available">
                         {{ accessConstraints(item) }}
                       </span>
                     </td>
