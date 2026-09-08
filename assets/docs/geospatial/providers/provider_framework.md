@@ -1,6 +1,6 @@
 # Provider Framework
 
-Last updated: 2026-08-27
+Last updated: 2026-09-08
 
 ## Provider Adapter Location
 
@@ -17,7 +17,6 @@ Provider adapters live under `app/server/services/geospatial/providers`.
 - `gtfs_static.py`
 - `fema.py`
 - `local_open_data.py`
-- `mapillary.py`
 - `mobility_database.py`
 - `nasa_gibs.py`
 - `nasa_firms.py`
@@ -79,6 +78,9 @@ These methods return normalized provider layer descriptors. NASA GIBS parses WMS
 - Local open-data camera and dataset sources are selected by configured source IDs in `LOCAL_OPEN_DATA_SOURCES`; callers cannot supply arbitrary URLs, and private-network targets are rejected.
 - Mobility Database discovery reads a local CSV snapshot and refreshes it from the public catalog only when the snapshot is missing or explicitly requested; each feed's authentication and license metadata is preserved.
 - Provider adapters must not return credentials, credential-bearing URLs, or raw capability XML to frontend API responses.
+- The provider registry and the live smoke matrix must remain one-to-one. A
+  provider is not exposed as an adapter until it has a real normalized fetch
+  path; metadata-only placeholders are not registered.
 
 ## Dataset Processing Boundary
 

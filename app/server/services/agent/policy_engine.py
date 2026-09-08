@@ -218,12 +218,22 @@ class PolicyEngine:
                     "provider_health": provider_health,
                 },
             )
-        if provider_health == "missing_credentials":
+        if provider_health in {"missing_credentials", "missing_access"}:
+            reason = (
+                runtime_registry.access_reason(capability_id)
+                if callable(getattr(runtime_registry, "access_reason", None))
+                else None
+            )
             return ToolAuthorizationResult(
                 allowed=False,
-                reason=f"Capability '{capability_id}' requires provider credentials.",
+                reason=reason
+                or (
+                    f"Capability '{capability_id}' requires provider credentials."
+                    if provider_health == "missing_credentials"
+                    else f"Capability '{capability_id}' is not configured for use."
+                ),
                 metadata={
-                    "code": "missing_credentials",
+                    "code": provider_health,
                     "provider_health": provider_health,
                 },
             )

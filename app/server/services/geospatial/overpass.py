@@ -220,7 +220,7 @@ class OverpassService:
             try:
                 lat_value = float(str(lat))
                 lon_value = float(str(lon))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
             distance_m = self._haversine_distance_m(
                 latitude, longitude, lat_value, lon_value

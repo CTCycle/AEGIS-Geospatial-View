@@ -37,6 +37,7 @@
     "vectorizable": true,
     "endpoint_health": "partial",
     "auth_mode": "optional_api_key",
+    "constraints": "Configure an Open Charge Map API key in AEGIS Access or a local snapshot via AEGIS_OCM_SNAPSHOT_PATH.",
     "official_docs_url": "https://openchargemap.org/site/develop/api",
     "last_validated": "2026-05-11",
     "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."

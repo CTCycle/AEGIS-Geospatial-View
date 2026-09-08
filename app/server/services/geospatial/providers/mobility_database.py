@@ -222,7 +222,7 @@ def _first(row: dict[str, str], *names: str) -> str | None:
 def _float(value: str | None) -> float | None:
     try:
         return float(value) if value is not None else None
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 ###############################################################################
@@ -235,7 +235,7 @@ def _bool(value: str | None) -> bool | None:
 def _bounded_limit(value: object) -> int:
     try:
         return max(1, min(200, int(str(value or 50))))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 50
 
 ###############################################################################

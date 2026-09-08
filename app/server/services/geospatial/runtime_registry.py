@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.common.typing import is_json_object, json_object
 
 import os
+from pathlib import Path
 from typing import Any
 
 from server.domain.geospatial.registry import (
@@ -130,22 +131,99 @@ class RuntimeRegistry:
 
     # -------------------------------------------------------------------------
     def credentials_present(self, capability_id: str) -> bool:
+        return self.access_available(capability_id)
+
+    # -------------------------------------------------------------------------
+    def access_available(self, capability_id: str) -> bool:
         profile = self._profile(capability_id)
         if not is_json_object(profile):
             return False
-        manifest = self._ensure().manifests.get(str(capability_id), {})
-        auth = manifest.get("auth") if is_json_object(manifest) else None
-        auth_payload = json_object(auth)
-        if not bool(auth_payload.get("required", False)):
-            return True
-        provider = str(auth_payload.get("providerKey") or "").strip().lower()
-        if not provider:
-            return False
-        return self._credential_resolver.is_configured(provider)
+        mode = self._availability_mode(capability_id, profile)
+        if mode == "public":
+            return not self._auth_required(capability_id)
+        if mode == "credential":
+            return self._credentials_configured(capability_id, profile)
+        if mode == "configured_source":
+            return self._local_source_configured(profile)
+        if mode == "credential_or_local_source":
+            return self._credentials_configured(capability_id, profile) or (
+                self._local_source_configured(profile)
+            )
+        return False
+
+    # -------------------------------------------------------------------------
+    def access_reason(self, capability_id: str) -> str | None:
+        profile = self._profile(capability_id)
+        if not is_json_object(profile) or self.access_available(capability_id):
+            return None
+        mode = self._availability_mode(capability_id, profile)
+        if mode == "credential_or_local_source":
+            provider = self._credential_provider(capability_id, profile)
+            if provider == "openchargemap":
+                return (
+                    "Configure an Open Charge Map API key in AEGIS Access or "
+                    "a local snapshot via AEGIS_OCM_SNAPSHOT_PATH."
+                )
+            return "Configure provider credentials in AEGIS Access or a local source."
+        if mode == "credential":
+            return "Configure provider credentials in AEGIS Access."
+        if mode in {"configured_source", "configuration-dependent"}:
+            return "Configure the required local or trusted source before use."
+        if self._auth_required(capability_id):
+            return "Configure provider credentials in AEGIS Access."
+        return "Capability access is not configured."
+
+    # -------------------------------------------------------------------------
+    def availability_reason(self, capability_id: str) -> str | None:
+        if not self.is_enabled(capability_id):
+            return "Capability is disabled."
+        return self.access_reason(capability_id)
 
     # -------------------------------------------------------------------------
     def provider_credentials_present(self, provider_id: str) -> bool:
         return self._credential_resolver.is_configured(provider_id)
+
+    # -------------------------------------------------------------------------
+    def _availability_mode(
+        self, capability_id: str, profile: dict[str, Any]
+    ) -> str:
+        configured = str(profile.get("availability_mode") or "").strip().lower()
+        if configured and not (configured == "public" and self._auth_required(capability_id)):
+            return configured
+        return "credential" if self._auth_required(capability_id) else "public"
+
+    # -------------------------------------------------------------------------
+    def _auth_required(self, capability_id: str) -> bool:
+        manifest = self._ensure().manifests.get(str(capability_id), {})
+        auth = manifest.get("auth") if is_json_object(manifest) else None
+        return bool(json_object(auth).get("required", False))
+
+    # -------------------------------------------------------------------------
+    def _credential_provider(
+        self, capability_id: str, profile: dict[str, Any]
+    ) -> str:
+        profile_provider = str(profile.get("credential_provider") or "").strip().lower()
+        if profile_provider:
+            return profile_provider
+        manifest = self._ensure().manifests.get(str(capability_id), {})
+        auth = manifest.get("auth") if is_json_object(manifest) else None
+        return str(json_object(auth).get("providerKey") or "").strip().lower()
+
+    # -------------------------------------------------------------------------
+    def _credentials_configured(
+        self, capability_id: str, profile: dict[str, Any]
+    ) -> bool:
+        provider = self._credential_provider(capability_id, profile)
+        return bool(provider) and self._credential_resolver.is_configured(provider)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _local_source_configured(profile: dict[str, Any]) -> bool:
+        env_name = str(profile.get("local_source_env") or "").strip()
+        if not env_name:
+            return False
+        value = os.getenv(env_name, "").strip()
+        return bool(value) and Path(value).expanduser().is_file()
 
     # -------------------------------------------------------------------------
     def supports_mode(self, capability_id: str, mode: str) -> bool:
@@ -166,8 +244,14 @@ class RuntimeRegistry:
             return "unknown"
         if not self.is_enabled(capability_id):
             return "disabled"
-        if not self.credentials_present(capability_id):
-            return "missing_credentials"
+        if not self.access_available(capability_id):
+            profile = self._profile(capability_id) or {}
+            mode = self._availability_mode(capability_id, profile)
+            return (
+                "missing_credentials"
+                if mode == "credential"
+                else "missing_access"
+            )
         return "healthy"
 
     # -------------------------------------------------------------------------

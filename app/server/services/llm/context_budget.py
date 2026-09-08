@@ -20,7 +20,7 @@ RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY = "_response_schema_embedded_in_messages"
 def _positive_int(value: object) -> int | None:
     try:
         number = int(value)  # type: ignore[arg-type]
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     return number if number > 0 else None
 
@@ -259,7 +259,7 @@ def apply_reported_usage(
         for value in values:
             try:
                 parsed = int(value)  # type: ignore[arg-type]
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
             if parsed >= 0:
                 return parsed

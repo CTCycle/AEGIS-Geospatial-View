@@ -124,6 +124,12 @@ export class CapabilitiesPageComponent implements OnInit {
   }
 
   accessConstraints(item: CapabilityDescriptor): string {
+    if (!item.is_available) {
+      const reason = item.availability_reason?.trim();
+      if (reason) {
+        return reason;
+      }
+    }
     if (item.requires_credentials) {
       return item.is_available ? 'Optional provider key configured.' : 'Optional provider key required before use.';
     }

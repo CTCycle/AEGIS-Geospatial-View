@@ -13,7 +13,11 @@ class _CredentialRepo:
 
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN201
-        if self.present and provider == "tomtom" and label == "api_key":
+        if (
+            self.present
+            and provider in {"tomtom", "openchargemap"}
+            and label == "api_key"
+        ):
             return object()
         return None
 
@@ -76,6 +80,44 @@ def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
 
     assert registry.credentials_present("tomtom_traffic_flow")
     assert registry.provider_health("tomtom_traffic_flow") == "healthy"
+
+
+###############################################################################
+def test_openchargemap_requires_saved_key_or_local_snapshot(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("AEGIS_OCM_SNAPSHOT_PATH", raising=False)
+    unavailable = RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_CredentialRepo(False),
+    )  # type: ignore[arg-type]
+
+    assert not unavailable.access_available("openchargemap_ev_charging")
+    assert unavailable.provider_health("openchargemap_ev_charging") == "missing_access"
+    assert "Open Charge Map" in (
+        unavailable.access_reason("openchargemap_ev_charging") or ""
+    )
+
+    snapshot = tmp_path / "openchargemap.json"
+    snapshot.write_text("[]", encoding="utf-8")
+    monkeypatch.setenv("AEGIS_OCM_SNAPSHOT_PATH", str(snapshot))
+    local = RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_CredentialRepo(False),
+    )  # type: ignore[arg-type]
+
+    assert local.access_available("openchargemap_ev_charging")
+    assert local.provider_health("openchargemap_ev_charging") == "healthy"
+
+
+###############################################################################
+def test_openchargemap_is_available_with_saved_access_credential(monkeypatch) -> None:
+    monkeypatch.delenv("AEGIS_OCM_SNAPSHOT_PATH", raising=False)
+    registry = RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_CredentialRepo(True),
+    )  # type: ignore[arg-type]
+
+    assert registry.access_available("openchargemap_ev_charging")
+    assert registry.provider_health("openchargemap_ev_charging") == "healthy"
 
 
 ###############################################################################

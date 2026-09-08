@@ -1,6 +1,6 @@
 # Validation
 
-Last updated: 2026-08-02
+Last updated: 2026-09-08
 
 ## Static Validation
 
@@ -63,6 +63,13 @@ cd app
 .\server\.venv\Scripts\python.exe -m server.services.geospatial.live_validator --strict
 .\server\.venv\Scripts\python.exe -m server.services.geospatial.live_validator --strict --include-credentialed
 ```
+
+The validator is the canonical provider smoke matrix. It contains exactly one
+declarative case for every provider factory entry and classifies each case as
+public, credentialed, configured-source, or configuration-dependent. Missing
+credentials or sources are `SKIP`; transport failures, provider error payloads,
+and malformed semantic payloads are `FAIL`. Reports should be written to
+`assets/QA/` and retained by the scheduled workflow without including secrets.
 
 Live validation classifies upstream timeouts, rate limits, malformed responses,
 and missing credentials as provider availability failures. A failed provider

@@ -3766,6 +3766,22 @@
           },
           "runtime": {
             "title": "Runtime"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "default": false
+          },
+          "availability_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Availability Reason"
           }
         },
         "additionalProperties": false,

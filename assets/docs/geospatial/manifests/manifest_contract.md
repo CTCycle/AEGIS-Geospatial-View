@@ -1,13 +1,16 @@
 # Manifest Contract
 
-Last updated: 2026-09-05
+Last updated: 2026-09-08
 
 ## Loader Contract
 
 - Providers, basemaps, overlays, and direct tools are loaded through `GeospatialManifestLoader`, `CapabilityRegistry`, and `RuntimeRegistry`.
 - Capability manifests are the source of truth for agent catalog, describe, and execute operations.
 - Capability IDs must remain stable because the agent executes by `capability_id`.
-- Runtime availability is controlled by `runtime_profiles.json` plus credential presence.
+- Runtime availability is controlled by `runtime_profiles.json` plus the typed
+  `availability_mode`. Supported modes are `public`, `credential`,
+  `credential_or_local_source`, and `configured_source`; local source modes
+  name a non-secret environment variable such as `AEGIS_OCM_SNAPSHOT_PATH`.
 
 ## Metadata Expectations
 
@@ -47,6 +50,9 @@ the existence of an upstream endpoint cannot expand the declared semantics.
 
 - Schema v2 is the only accepted manifest contract.
 - Credential-backed providers use encrypted credential storage without environment fallback.
+- API keys are resolved only through encrypted AEGIS Access storage. Source
+  paths and feed URLs may use explicit non-secret configuration variables, but
+  they must not be treated as API-key fallbacks.
 - Queryable claims are reserved for structured machine-readable sources.
 - `metadata-only` capabilities must not claim renderable geometry.
 - A metadata-only or unavailable result cannot satisfy a required visual map

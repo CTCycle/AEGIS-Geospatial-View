@@ -757,6 +757,7 @@ class AgentToolCatalogService:
         code = str(metadata.get("code") or "unsupported_capability")
         operation_by_code = {
             "missing_credentials": "missing_credentials",
+            "missing_access": "missing_access",
             "invalid_arguments": "invalid_arguments",
             "tool_rejected": "provider_error",
             "unsupported_capability": "unsupported_capability",
@@ -764,7 +765,8 @@ class AgentToolCatalogService:
         operation = operation_by_code.get(code, "unsupported_capability")
         warnings = (
             [authorization.reason]
-            if code == "missing_credentials" and authorization.reason
+            if code in {"missing_credentials", "missing_access"}
+            and authorization.reason
             else []
         )
         return {

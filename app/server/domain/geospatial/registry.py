@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Mapping, cast
+from typing import Any, Literal, Mapping, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 from server.domain.geospatial.providers import ProviderRequest
@@ -75,6 +75,7 @@ class LiveValidationCheckResult(BaseModel):
 
     provider_id: str
     capability_id: str
+    access_mode: str = "public"
     status: str
     message: str | None = None
     feature_count: int | None = None
@@ -100,6 +101,27 @@ class LiveValidationReport(BaseModel):
 @dataclass(frozen=True)
 class LiveCheck:
     provider_id: str
-    request: ProviderRequest
+    request: ProviderRequest | None = None
+    access_mode: Literal[
+        "public",
+        "credentialed",
+        "credential_or_local_source",
+        "configured_source",
+        "configuration_dependent",
+    ] = "public"
+    response_contract: Literal[
+        "feature_collection",
+        "result_list",
+        "json_object",
+        "raster_metadata",
+        "dataset",
+        "metadata",
+    ] = "json_object"
     requires_credentials: bool = False
     required_feature_count: int | None = None
+    required_payload_keys: tuple[str, ...] = ()
+    numeric_payload_keys: tuple[str, ...] = ()
+    source_env: str | None = None
+    request_env: tuple[tuple[str, str], ...] = ()
+    source_path_only: bool = False
+    skip_message: str | None = None

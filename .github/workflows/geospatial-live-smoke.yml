@@ -19,13 +19,6 @@ jobs:
   optional-live-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    env:
-      NASA_API_KEY: ${{ secrets.NASA_API_KEY }}
-      OPENAQ_API_KEY: ${{ secrets.OPENAQ_API_KEY }}
-      OPENCHARGEMAP_API_KEY: ${{ secrets.OPENCHARGEMAP_API_KEY }}
-      OPENTRIPMAP_API_KEY: ${{ secrets.OPENTRIPMAP_API_KEY }}
-      TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
-      WINDY_WEBCAMS_API_KEY: ${{ secrets.WINDY_WEBCAMS_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,3 +55,18 @@ jobs:
             app/tests/unit/test_geospatial_ingestion.py \
             app/tests/unit/test_geospatial_plan_completion_surface.py \
             app/tests/unit/test_geospatial_api_contracts.py
+
+      - name: Run canonical provider smoke matrix
+        run: |
+          uv run --project app/server python -m server.services.geospatial.live_validator \
+            --include-credentialed \
+            --strict \
+            --output assets/QA/geospatial-live-smoke.json
+
+      - name: Upload sanitized provider smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: geospatial-live-smoke-report
+          path: assets/QA/geospatial-live-smoke.json
+          if-no-files-found: error

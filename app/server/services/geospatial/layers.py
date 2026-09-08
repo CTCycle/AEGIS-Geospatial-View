@@ -110,7 +110,7 @@ class LayerProviderService:
         for value in values:
             try:
                 numeric = float(value)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
             if numeric > 0:
                 normalized.append(numeric)

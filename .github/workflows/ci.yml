@@ -46,6 +46,10 @@ jobs:
           uv run --project app/server ruff check --config app/server/pyproject.toml app/server app/tests
           uv run --project app/server pyright --project app/server/pyproject.toml
 
+      - name: Compile backend and test Python sources
+        run: |
+          uv run --project app/server python -c "from pathlib import Path; excluded={'.venv','__pycache__','.pytest_cache','cache','dist','build'}; files=[p for root in ('app/server','app/tests') for p in Path(root).rglob('*.py') if not any(part in excluded for part in p.parts)]; [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]"
+
       - name: Verify Alembic migration metadata
         env:
           PYTHONPATH: app

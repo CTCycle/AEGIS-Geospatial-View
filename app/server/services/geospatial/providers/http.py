@@ -114,7 +114,7 @@ def _retry_after_seconds(headers: httpx.Headers) -> float | None:
         if retry_at.tzinfo is None:
             retry_at = retry_at.replace(tzinfo=UTC)
         return max(0.0, (retry_at.astimezone(UTC) - datetime.now(UTC)).total_seconds())
-    except TypeError, ValueError, OverflowError:
+    except (TypeError, ValueError, OverflowError):
         return None
 
 ###############################################################################

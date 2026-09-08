@@ -241,6 +241,7 @@ export const normalizeCapabilities = (
     provider: requireApiString(item, 'provider', endpoint),
     requires_credentials: requireApiBoolean(item, 'requires_credentials', endpoint),
     is_available: requireApiBoolean(item, 'is_available', endpoint),
+    availability_reason: optionalApiString(item, 'availability_reason', endpoint) ?? null,
     supports_map: requireApiBoolean(item, 'supports_map', endpoint),
     supports_direct_text: requireApiBoolean(item, 'supports_direct_text', endpoint),
     coverage: requireApiString(item, 'coverage', endpoint),

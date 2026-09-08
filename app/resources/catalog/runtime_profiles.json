@@ -372,7 +372,9 @@
         "electric vehicle"
       ],
       "manual_toggle": true,
-      "auth_required": false
+      "auth_required": false,
+      "availability_mode": "credential_or_local_source",
+      "local_source_env": "AEGIS_OCM_SNAPSHOT_PATH"
     },
     {
       "capability_id": "ourairports_airports",

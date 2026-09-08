@@ -67,6 +67,20 @@ def test_catalog_marks_key_required_capabilities_unavailable_without_credentials
     assert lookup["tomtom_traffic_flow"]["is_available"] is False
     assert providers["tomtom"]["is_available"] is False
 
+
+###############################################################################
+def test_catalog_exposes_openchargemap_local_or_access_reason(monkeypatch) -> None:
+    monkeypatch.delenv("AEGIS_OCM_SNAPSHOT_PATH", raising=False)
+
+    catalog = _service_with_credentials(False).list_catalog()
+    lookup = {item["id"]: item for item in catalog["capabilities"]}
+    openchargemap = lookup["openchargemap_ev_charging"]
+
+    assert openchargemap["requires_credentials"] is False
+    assert openchargemap["is_available"] is False
+    assert "Open Charge Map" in openchargemap["availability_reason"]
+    assert "local snapshot" in openchargemap["availability_reason"]
+
 ###############################################################################
 def test_catalog_marks_key_required_capabilities_available_with_saved_credentials(
     monkeypatch,

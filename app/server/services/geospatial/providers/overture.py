@@ -174,7 +174,7 @@ class OvertureProvider(GeospatialProvider):
                     float(str(coordinates[0])),
                     float(str(coordinates[1])),
                 )
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
             if request.bbox and not _in_bbox(longitude, latitude, request.bbox):
                 continue
@@ -239,7 +239,7 @@ def _amenity_tags(request: ProviderRequest) -> list[str] | None:
 def _optional_int(value: object) -> int | None:
     try:
         return int(str(value)) if value is not None else None
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 ###############################################################################

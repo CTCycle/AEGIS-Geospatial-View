@@ -66,7 +66,7 @@ class GeospatialCatalogService:
         capability_kind = str(item.get("capabilityKind") or kind)
         is_available = self.runtime_registry.is_enabled(
             capability_id
-        ) and self.runtime_registry.credentials_present(capability_id)
+        ) and self.runtime_registry.access_available(capability_id)
         descriptor = {
             "id": capability_id,
             "name": str(item.get("name") or capability_id),
@@ -76,6 +76,9 @@ class GeospatialCatalogService:
             "provider": str(item.get("provider") or "unknown"),
             "requires_credentials": requires_credentials,
             "is_available": is_available,
+            "availability_reason": self.runtime_registry.availability_reason(
+                capability_id
+            ),
             "supports_map": self.runtime_registry.supports_mode(capability_id, "map"),
             "supports_direct_text": self.runtime_registry.supports_mode(
                 capability_id, "direct_text"
@@ -163,6 +166,11 @@ class GeospatialCatalogService:
             is_available = self.runtime_registry.provider_credentials_present(
                 provider_id
             )
+        availability_reason = (
+            None
+            if is_available
+            else "Configure provider credentials in AEGIS Access."
+        )
         return {
             "id": provider_id,
             "name": str(item.get("name") or provider_id),
@@ -172,6 +180,7 @@ class GeospatialCatalogService:
             "provider": provider_id,
             "requires_credentials": requires_credentials,
             "is_available": is_available,
+            "availability_reason": availability_reason,
             "supports_map": "tile" in json_array(item.get("capabilities"))
             or "wms" in json_array(item.get("capabilities"))
             or "wmts" in json_array(item.get("capabilities"))

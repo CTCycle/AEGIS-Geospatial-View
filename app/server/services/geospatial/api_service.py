@@ -260,11 +260,16 @@ class GeospatialApiService:
     def get_layer_health(self, layer_id: str) -> dict[str, Any]:
         manifest = self._manifest_by_id(layer_id)
         reliability = manifest.get("reliability")
+        available = self.runtime_registry.is_enabled(
+            layer_id
+        ) and self.runtime_registry.access_available(layer_id)
         return {
             "id": layer_id,
             "provider": manifest.get("provider"),
             "reliability": json_object(reliability),
             "runtime": self.runtime_registry.provider_health(layer_id),
+            "available": available,
+            "availability_reason": self.runtime_registry.availability_reason(layer_id),
         }
 
     # -------------------------------------------------------------------------
