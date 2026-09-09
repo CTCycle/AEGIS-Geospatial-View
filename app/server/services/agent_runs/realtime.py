@@ -290,13 +290,24 @@ class RealtimeConnection:
                 command=message.type,
             )
         except ValidationError:
+            LOGGER.warning(
+                "realtime_command_payload_rejected conversation_id=%s type=%s",
+                self.conversation_id,
+                message.type,
+            )
             await self._protocol_error(
                 message.message_id,
                 "invalid_payload",
                 fatal=False,
                 command=message.type,
             )
-        except RenderAcknowledgementError:
+        except RenderAcknowledgementError as exc:
+            LOGGER.warning(
+                "realtime_render_ack_rejected conversation_id=%s run_id=%s reason=%s",
+                self.conversation_id,
+                self._active_run_id,
+                str(exc),
+            )
             await self._protocol_error(
                 message.message_id,
                 "render_ack_rejected",

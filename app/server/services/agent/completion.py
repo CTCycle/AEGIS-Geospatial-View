@@ -177,6 +177,11 @@ class CompletionEvaluator:
 
         if canonical_request is None:
             return True
+        # ``geospatial_data_retrieval`` is also the normalized action used for
+        # a location-only viewport request.  It is not, by itself, evidence
+        # that an overlay/provider dataset was requested; the basemap and
+        # resolved viewport are sufficient for that presentation.  Explicit
+        # domains or data-layer operations still require a validated result.
         data_requested = bool(canonical_request.data_domains) or any(
             operation
             in {
@@ -185,7 +190,6 @@ class CompletionEvaluator:
                 "overlay",
                 "inspect",
                 "calculate",
-                "geospatial_data_retrieval",
                 "data_layer_query",
                 "dataset_display",
             }

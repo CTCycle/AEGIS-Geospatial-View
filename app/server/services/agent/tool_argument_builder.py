@@ -17,6 +17,29 @@ class ToolArgumentBuilder:
         self.capability_registry = capability_registry
 
     # -------------------------------------------------------------------------
+    def default_basemap_id(self) -> str:
+        """Return the catalog-owned default basemap for a location map."""
+
+        if self.capability_registry is not None:
+            candidates: list[tuple[bool, str]] = []
+            for basemap in self.capability_registry.list_basemaps():
+                capability_id = str(basemap.get("id") or "").strip()
+                if not capability_id:
+                    continue
+                agentic_use = json_object(basemap.get("agenticUse"))
+                candidates.append(
+                    (
+                        not bool(agentic_use.get("defaultEnabled")),
+                        capability_id,
+                    )
+                )
+            if candidates:
+                return min(candidates)[1]
+        # Isolated planner tests have no catalog.  This is the same canonical
+        # fallback used by RequestBuilder, not a provider-specific selection.
+        return "osm_default"
+
+    # -------------------------------------------------------------------------
     def build_location_arguments(
         self,
         turn: TurnParseResult,

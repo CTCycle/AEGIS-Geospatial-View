@@ -52,6 +52,28 @@ def test_location_only_map_does_not_invent_a_basemap_in_the_planner() -> None:
     assert plan.steps == []
     assert plan.visualization_update == {}
 
+
+def test_native_location_only_map_has_catalog_owned_basemap_step() -> None:
+    planner = DeterministicToolPlanner()
+    turn = _turn("Show Rome")
+    plan = planner.build_plan(
+        turn,
+        "place_resolution",
+        resolved_location=ResolvedLocation(
+            label="Rome, Italy", latitude=41.9028, longitude=12.4964
+        ),
+    )
+    plan = planner.add_native_basemap_step(
+        plan,
+        turn,
+        resolved_location=ResolvedLocation(
+            label="Rome, Italy", latitude=41.9028, longitude=12.4964
+        ),
+    )
+    assert len(plan.steps) == 1
+    assert plan.steps[0].capability_id == "osm_default"
+    assert plan.steps[0].arguments["arguments"]["location"] == "Rome, Italy"
+
 ###############################################################################
 def test_layer_plan_contains_location_arguments() -> None:
     plan = DeterministicToolPlanner().build_plan(

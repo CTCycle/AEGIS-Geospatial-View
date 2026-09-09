@@ -35,6 +35,7 @@ class DeterministicToolPlanner:
         capability_ids = self._select_capabilities(turn)
         target_specs = self._target_specs(canonical_request, resolved_location)
         step_number = 1
+        provider_layers = self._select_provider_layers(turn)
         for capability_id in capability_ids:
             for target_id, target_location, analysis_scope in target_specs:
                 steps.append(
@@ -69,7 +70,7 @@ class DeterministicToolPlanner:
                     )
                 )
                 step_number += 1
-        for provider_id, layer_id in self._select_provider_layers(turn):
+        for provider_id, layer_id in provider_layers:
             # Provider-native layers are capabilities too.  Keep one step per
             # canonical target so a comparison cannot silently render every
             # provider layer against the primary place.
@@ -163,6 +164,88 @@ class DeterministicToolPlanner:
                 "Deterministic interpretation supplied safety and capability candidates.",
                 "Native tool ordering remains model-owned when supported.",
             ],
+        )
+
+    # -------------------------------------------------------------------------
+    def add_native_basemap_step(
+        self,
+        plan: ToolPlan,
+        turn: TurnParseResult,
+        *,
+        resolved_location: ResolvedLocation | None = None,
+        canonical_request: CanonicalRequestInterpretation | None = None,
+    ) -> ToolPlan:
+        """Add the application-owned basemap step only for native execution.
+
+        Deterministic execution already owns map preparation and must not be
+        turned into a synthetic provider fetch merely because a location-only
+        request is renderable.  The native binder, however, needs an explicit
+        planned capability so a model-selected basemap can be bound to the
+        canonical target without asking the model for internal identifiers.
+        """
+        if plan.steps:
+            return plan
+        if (
+            turn.presentation_mode not in {"map", "both"}
+            or turn.overlay_commands
+            or self._select_capabilities(turn)
+            or self._select_provider_layers(turn)
+        ):
+            return plan
+        target_specs = self._target_specs(canonical_request, resolved_location)
+        if not any(location is not None for _target, location, _scope in target_specs):
+            return plan
+        capability_id = turn.requested_basemap or self.argument_builder.default_basemap_id()
+        target_id, target_location, analysis_scope = next(
+            (
+                (target_id, location, scope)
+                for target_id, location, scope in target_specs
+                if location is not None
+            ),
+            (None, None, None),
+        )
+        if target_location is None:
+            return plan
+        step = ToolPlanStep(
+            step_id="step-1",
+            tool_name="execute_geospatial_capability",
+            capability_id=capability_id,
+            reason="Required basemap for the resolved location.",
+            parallel_group="capability-fetch",
+            arguments={
+                "capability_id": capability_id,
+                "arguments": self.argument_builder.build_capability_arguments(
+                    capability_id,
+                    turn,
+                    None,
+                    target_location,
+                    canonical_request=canonical_request,
+                    target_id=target_id,
+                ),
+            },
+            target_id=target_id,
+            analysis_scope=analysis_scope,
+            required_outputs=(
+                [
+                    item.name
+                    for item in canonical_request.completion_requirements
+                    if item.required
+                ]
+                if canonical_request is not None
+                else []
+            ),
+        )
+        return plan.model_copy(
+            update={
+                "candidate_tools": ["execute_geospatial_capability"],
+                "selected_tools": ["execute_geospatial_capability"],
+                "steps": [step],
+                "capability_domains": list(
+                    dict.fromkeys([*plan.capability_domains, "execution"])
+                ),
+                "candidate_capability_ids": [capability_id],
+            },
+            deep=True,
         )
 
     # -------------------------------------------------------------------------

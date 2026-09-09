@@ -128,7 +128,7 @@
   },
   "executionContract": {
     "supported_operations": ["show", "inspect", "forecast"],
-    "supported_scope_kinds": ["point"],
+    "supported_scope_kinds": ["point", "bbox"],
     "temporal_modes": ["current", "forecast"],
     "temporal_windows": ["provider_forecast_window"],
     "required_inputs": ["location", "temporal_mode"],

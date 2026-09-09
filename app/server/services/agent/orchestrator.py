@@ -1357,6 +1357,13 @@ class AgentOrchestrator:
                 # the native attempt remains authoritative and will surface its
                 # own configuration/provider error.
                 native_supports_tools = True
+        if native_supports_tools:
+            tool_plan = self.tool_planner.add_native_basemap_step(
+                tool_plan,
+                turn_contract,
+                resolved_location=resolved_location,
+                canonical_request=canonical_request,
+            )
         execution_mode = "native" if native_supports_tools else "deterministic"
         route_reasons = [
             "Canonical interpretation and policy validation completed.",
@@ -1417,6 +1424,9 @@ class AgentOrchestrator:
                 "execution_mode": execution_mode,
                 "capability_domains": tool_plan.capability_domains,
                 "candidate_capability_ids": tool_plan.candidate_capability_ids,
+                "tool_plan_steps": [
+                    step.model_dump(mode="json") for step in tool_plan.steps
+                ],
                 "allowed_provider_ids": tool_plan.allowed_provider_ids,
                 "presentation_required": presentation_required,
                 "completion_requirements": completion_requirements,
@@ -1585,6 +1595,14 @@ class AgentOrchestrator:
                 for item in json_array(tool_payload.get("tool_results"))
                 if is_json_object(item)
             )
+            # A native map-session hint is not, by itself, proof that the
+            # presentation inputs were validated and prepared.  The map
+            # assembler must only run for a presentation turn after the
+            # native prepare operation has completed (or for a non-map turn).
+            # This keeps provider/tool failures from being reinterpreted as a
+            # successful map merely because a loop result carried a partial
+            # session object.
+            map_input_ready = not presentation_required or prepared_by_native
             map_result = (
                 await self.turn_state_assembler.build_combined_map_session_from_tool_results(
                     tool_payload=tool_payload,
@@ -1593,7 +1611,7 @@ class AgentOrchestrator:
                     resolved_location=resolved_location,
                     canonical_request=canonical_request,
                 )
-                if (not presentation_required or prepared_by_native)
+                if map_input_ready
                 else None
             )
         if isinstance(map_result, ClarificationRequest) and (
@@ -1611,7 +1629,7 @@ class AgentOrchestrator:
                 tool_payload=tool_payload,
             )
         map_session = map_result if isinstance(map_result, MapSession) else None
-        if map_session is None and (not presentation_required or prepared_by_native):
+        if map_session is None and map_input_ready:
             map_session = tool_loop_result.map_session
         LOGGER.info(
             "map_assembly_result request_id=%s overlays=%d source=%s",
@@ -1653,7 +1671,7 @@ class AgentOrchestrator:
         if (
             map_session is None
             and capability_selection is not None
-            and (not presentation_required or prepared_by_native)
+            and map_input_ready
         ):
             with self._stage_scope(
                 execution_budget,

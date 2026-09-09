@@ -516,3 +516,30 @@ def test_district_concept_remains_location_navigation() -> None:
     })
     turn.normalized_action.action_id = "geospatial_data_retrieval"
     assert CapabilityResolver.is_location_focus_only(turn, [])
+
+
+def test_basemap_category_remains_location_navigation() -> None:
+    turn = _turn("Show a street map of Bologna, Italy", "").model_copy(
+        update={
+            "requested_layers": [],
+            "requested_concepts": [],
+            "requested_basemap": "openfreemap_liberty",
+            "required_tool_category": "basemap",
+            "location_signals": [
+                LocationSignal(signal_type="city", raw_value="Bologna")
+            ],
+            "map_target": "Bologna, Italy",
+            "normalized_action": NormalizedAction(
+                action_id="geospatial_data_retrieval",
+                action_label="Show a street map",
+                task_tags=["basemap"],
+                action_tags=["basemap_change", "navigate_to"],
+                requires_location=True,
+            ),
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.requested_layers == []
+    assert resolved.clarification_plan is None

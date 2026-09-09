@@ -175,10 +175,10 @@ class AgentToolCatalogService:
             LLMToolDefinition(
                 name="execute_geospatial_capability",
                 description=(
-                    "Execute one already-selected, policy-allowlisted manifest capability "
-                    "by exact capability_id after its arguments are known. Use for the "
-                    "catalog's basemap, overlay, or direct-tool path; do not use for "
-                    "discovery or provider-native layer selection."
+                    "Request execution of one already-selected, policy-allowlisted "
+                    "manifest capability by exact capability_id. AEGIS supplies the "
+                    "canonical target and validated arguments from the deterministic "
+                    "plan; do not invent target IDs, coordinates, or provider arguments."
                 ),
                 parameters_json_schema={
                     "type": "object",
@@ -190,7 +190,7 @@ class AgentToolCatalogService:
                         },
                         "arguments": {
                             "type": "object",
-                            "description": "Arguments matching the capability's executable argument schema.",
+                            "description": "Optional model hints; the application-owned plan is authoritative.",
                         },
                         "location_ref": {
                             "type": ["string", "null"],
@@ -202,7 +202,7 @@ class AgentToolCatalogService:
                             "maxItems": 16,
                         },
                     },
-                    "required": ["capability_id", "arguments"],
+                    "required": ["capability_id"],
                 },
             ),
             LLMToolDefinition(
@@ -326,9 +326,28 @@ class AgentToolCatalogService:
             }
             if allowed_tool_names:
                 definitions = [item for item in definitions if item.name in allowed_tool_names]
+            # Once deterministic planning has produced an exact capability
+            # allowlist, discovery is no longer part of this native turn.  A
+            # model may choose that planned capability and the server binds
+            # its canonical target/arguments; exposing another catalog loop
+            # only creates an unbounded provider round-trip and can cause the
+            # model to re-list the same page instead of executing the plan.
+            if allowed_capability_ids and not metadata.get("allow_capability_discovery"):
+                definitions = [
+                    item
+                    for item in definitions
+                    if item.name
+                    not in {"list_geospatial_capabilities", "describe_geospatial_capability"}
+                ]
             if not allowed_capability_ids and not metadata.get("register_all"):
                 definitions = [item for item in definitions if item.name != "execute_geospatial_capability"]
-            if not unresolved_targets:
+            # Location resolution is an application-owned transition.  The
+            # model must never be asked to invent or choose an internal
+            # target_id; registration retains the handler for deterministic
+            # compatibility tests, but real runs do not expose the tool.
+            if not metadata.get("register_all"):
+                definitions = [item for item in definitions if item.name != "resolve_geospatial_location"]
+            elif not unresolved_targets:
                 definitions = [item for item in definitions if item.name != "resolve_geospatial_location"]
             if not evidence_refs:
                 definitions = [
@@ -336,7 +355,17 @@ class AgentToolCatalogService:
                     for item in definitions
                     if item.name not in {"inspect_geospatial_evidence", "transform_geospatial_evidence"}
                 ]
-            if not presentation_required or (not evidence_refs and not metadata.get("resolved_location")):
+            # Map preparation is a post-evidence transition.  A resolved
+            # location alone is not a renderable input for the native loop:
+            # the deterministic plan must execute its canonical basemap or
+            # provider step first.  Exposing preparation earlier lets a model
+            # select it before the planned execution and creates a recoverable
+            # but unnecessary provider round-trip.  A server-side prepared
+            # candidate is also sufficient when the evidence reference is
+            # intentionally kept out of the model envelope.
+            if not presentation_required or (
+                not evidence_refs and not metadata.get("prepared_map_session")
+            ):
                 definitions = [item for item in definitions if item.name != "prepare_geospatial_map"]
         return definitions
 
@@ -529,6 +558,11 @@ class AgentToolCatalogService:
             if isinstance(map_session, MapSession)
             else map_session
         )
+        if is_json_object(map_session_payload):
+            # Keep the full validated candidate on the server side.  The
+            # model-facing evidence envelope below contains only a bounded
+            # identity summary and never re-serializes provider geometry.
+            context.metadata["prepared_map_session"] = dict(map_session_payload)
         status = "available" if ok else "failed"
         if ok and payload.get("direct_result") in (None, [], {}, "") and map_session is None:
             status = "valid_empty"
@@ -544,7 +578,7 @@ class AgentToolCatalogService:
                 "capability_id": arguments.get("capability_id"),
                 "map_eligibility": "renderable" if map_session is not None else "unknown",
                 **(
-                    {"map_session": map_session_payload}
+                    {"map_session": self._map_session_summary(map_session_payload)}
                     if is_json_object(map_session_payload)
                     else {}
                 ),
@@ -557,14 +591,16 @@ class AgentToolCatalogService:
         if str(context.metadata.get("execution_mode") or "native") == "deterministic":
             payload["evidence_ref"] = evidence_ref
             return payload
-        return AgentEvidenceEnvelope(
+        envelope = AgentEvidenceEnvelope(
             ok=ok,
             status=status,
             evidence_ref=evidence_ref,
             summary={
                 "operation": payload.get("operation"),
                 "capability_id": arguments.get("capability_id"),
-                "map_session": map_session_payload,
+                "map_session": self._map_session_summary(map_session_payload)
+                if is_json_object(map_session_payload)
+                else None,
             },
             provenance={"capability_id": arguments.get("capability_id")},
             map_eligibility="renderable" if map_session is not None else "unknown",
@@ -579,6 +615,18 @@ class AgentToolCatalogService:
                 else {}
             ],
         ).model_dump(mode="json")
+        # Native planned-result validation needs the application-owned
+        # capability/target identity and the validated map candidate at the
+        # envelope boundary.  Keep the evidence envelope shape intact while
+        # carrying these typed execution fields alongside its compact summary.
+        envelope.update(
+            {
+                "capability_id": arguments.get("capability_id"),
+                "target_id": context.metadata.get("target_id"),
+                "result_status": status,
+            }
+        )
+        return envelope
 
     # -------------------------------------------------------------------------
     async def _provider_layers_tool_handler(
@@ -830,6 +878,7 @@ class AgentToolCatalogService:
             },
             parent_evidence_ids=evidence_refs,
         )
+        context.metadata["prepared_map_session"] = map_session.model_dump(mode="json")
         all_evidence_refs = list(
             dict.fromkeys([*evidence_refs, *( [map_evidence_ref] if map_evidence_ref else [] )])
         )
@@ -843,7 +892,7 @@ class AgentToolCatalogService:
                     instance.instance_id
                     for instance in map_session.overlay_collection.instances
                 ],
-                "map_session": map_session.model_dump(mode="json"),
+                "map_session": self._map_session_summary(map_session),
                 "evidence_refs": all_evidence_refs,
                 "location_refs": location_refs,
                 "map_eligibility": "renderable",
@@ -880,6 +929,49 @@ class AgentToolCatalogService:
             parent_evidence_ids=parent_evidence_ids,
         )
         return record.evidence_id
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _map_session_summary(
+        map_session: MapSession | dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Return a bounded identity summary without provider feature payloads."""
+
+        if isinstance(map_session, MapSession):
+            session = map_session
+        elif is_json_object(map_session):
+            try:
+                session = MapSession.model_validate(map_session)
+            except Exception:  # noqa: BLE001
+                return {"map_session_available": False}
+        else:
+            return {"map_session_available": False}
+        instances = session.overlay_collection.instances
+        return {
+            "session_id": session.session_id,
+            "basemap_id": session.basemap_id,
+            "bounds": session.bounds,
+            "viewport": session.viewport.model_dump(mode="json"),
+            "overlay_collection": {
+                "collection_id": session.overlay_collection.collection_id,
+                "revision": session.overlay_collection.revision,
+                "instance_ids": [item.instance_id for item in instances],
+                "instances": [
+                    {
+                        "instance_id": item.instance_id,
+                        "capability_id": item.capability_id,
+                        "label": item.label,
+                        "provider": item.provider,
+                        "overlay_type": item.overlay_type,
+                        "rendering_mode": item.rendering_mode,
+                        "visible": item.visible,
+                        "render_variant": item.render_variant,
+                    }
+                    for item in instances
+                ],
+            },
+            "compliance_warning_count": len(session.compliance_warnings),
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1530,6 +1622,7 @@ class AgentToolCatalogService:
         operation_by_code = {
             "missing_credentials": "missing_credentials",
             "missing_access": "missing_access",
+            "unavailable_coverage": "unavailable",
             "invalid_arguments": "invalid_arguments",
             "tool_rejected": "provider_error",
             "unsupported_capability": "unsupported_capability",

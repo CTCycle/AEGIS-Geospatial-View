@@ -141,6 +141,39 @@ def test_location_scoped_remove_does_not_remove_other_scope() -> None:
     assert [item.instance_id for item in updated.instances] == ["weather-switzerland"]
     assert result.removed_instance_ids == ["weather-zurich"]
 
+
+def test_location_scope_matches_canonical_place_alias_without_coordinates() -> None:
+    bologna = _instance(
+        "species-bologna",
+        "gbif_species_occurrences",
+        label="Species records",
+        scope_key="Bologna, Emilia-Romagna, Italy",
+        latitude=44.4938,
+        longitude=11.3426,
+    )
+    command = OverlayCommand(
+        action="add",
+        selector=OverlaySelector(capability_ids=["gbif_species_occurrences"]),
+        scope=OverlayScope(
+            kind="location",
+            location={
+                "place": "Bologna",
+                "normalized_value": "Bologna, Italy",
+                "radius_m": 20_000,
+            },
+            label="Species records within 20 km of Bologna",
+        ),
+        state_reference=OverlayStateReference(revision=0),
+    )
+
+    updated, result = OverlayCollectionService.apply(
+        OverlayCollectionState(instances=[bologna]), command
+    )
+
+    assert [item.instance_id for item in updated.instances] == ["species-bologna"]
+    assert result.added_instance_ids == []
+
+
 ###############################################################################
 def test_current_view_remove_removes_only_visible_overlays_inside_view() -> None:
     collection = OverlayCollectionState(
