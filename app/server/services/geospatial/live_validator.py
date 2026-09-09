@@ -185,7 +185,7 @@ PROVIDER_SMOKE_CHECKS = (
         provider_id="noaa",
         request=ProviderRequest(
             capability_id="noaa_weather_alerts",
-            bbox=ROME_BBOX,
+            bbox=NYC_BBOX,
             params={"live": True},
         ),
         response_contract="feature_collection",
