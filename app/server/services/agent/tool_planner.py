@@ -77,12 +77,17 @@ class DeterministicToolPlanner:
                 steps.append(
                     ToolPlanStep(
                         step_id=f"step-{step_number}",
-                        tool_name="render_geospatial_provider_layer",
-                        reason="Provider-native layer was explicitly selected for rendering.",
+                        tool_name="prepare_geospatial_map",
+                        reason="Provider-native layer was explicitly selected for map preparation.",
                         parallel_group="provider-layer-fetch",
                         arguments={
-                            "provider_id": provider_id,
-                            "layer_id": layer_id,
+                            "evidence_refs": [],
+                            "location_refs": [target_id] if target_id else [],
+                            "layer_options": {
+                                "provider_id": provider_id,
+                                "layer_id": layer_id,
+                            },
+                            "viewport_strategy": "fit_results",
                         },
                         target_id=target_id,
                         analysis_scope=analysis_scope,
@@ -132,6 +137,32 @@ class DeterministicToolPlanner:
                 if canonical_request is not None
                 else None
             ),
+            execution_mode="native",
+            capability_domains=[
+                item
+                for item in (
+                    "catalog",
+                    "execution" if capability_ids else "",
+                    "presentation" if visualization_update else "",
+                )
+                if item
+            ],
+            candidate_capability_ids=sorted(set(capability_ids)),
+            allowed_provider_ids=[
+                item.strip().lower() for item in turn.required_data_sources if item.strip()
+            ],
+            presentation_required=turn.presentation_mode in {"map", "both"}
+            or bool(turn.presentation_requirements)
+            or bool(visualization_update),
+            completion_requirements=(
+                [item.name for item in canonical_request.completion_requirements if item.required]
+                if canonical_request is not None
+                else []
+            ),
+            routing_reasons=[
+                "Deterministic interpretation supplied safety and capability candidates.",
+                "Native tool ordering remains model-owned when supported.",
+            ],
         )
 
     # -------------------------------------------------------------------------

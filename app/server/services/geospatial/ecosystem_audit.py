@@ -366,7 +366,7 @@ def build_inventory(
                     + (
                         [
                             "fetch_geospatial_provider_layers",
-                            "render_geospatial_provider_layer",
+                            "prepare_geospatial_map",
                         ]
                         if provider_id
                         in {

@@ -40,7 +40,11 @@ class AgentEvidenceRepository:
         provenance: dict[str, Any] | None = None,
         parent_evidence_ids: list[str] | None = None,
     ) -> AgentEvidenceSummary:
-        raw = payload if isinstance(payload, bytes) else self._json_bytes(payload)
+        raw = (
+            payload
+            if isinstance(payload, bytes)
+            else self._json_bytes(self._sanitize_payload(payload))
+        )
         if len(raw) > self.MAX_PAYLOAD_BYTES:
             raise ValueError("Evidence payload exceeds the provider-size ceiling.")
         bounded_summary = self._sanitize_object(summary or {})
@@ -68,6 +72,19 @@ class AgentEvidenceRepository:
         with self._session_factory() as session:
             if session.get(ConversationRecord, conversation_id) is None:
                 raise ValueError("Conversation not found.")
+            if parents:
+                owned_parent_ids = set(
+                    session.scalars(
+                        select(AgentEvidenceRecord.id).where(
+                            AgentEvidenceRecord.conversation_id == conversation_id,
+                            AgentEvidenceRecord.id.in_(parents),
+                        )
+                    ).all()
+                )
+                if owned_parent_ids != set(parents):
+                    raise ValueError(
+                        "Parent evidence references must belong to the conversation."
+                    )
             session.add(record)
             session.commit()
         return self._summary(record)
@@ -124,26 +141,67 @@ class AgentEvidenceRepository:
         return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
 
     @classmethod
+    def _sanitize_payload(cls, value: Any, *, depth: int = 0) -> Any:
+        """Remove credential-shaped fields without truncating data records."""
+
+        if depth > 16:
+            return "[depth-limited]"
+        secret_keys = {
+            "authorization",
+            "cookie",
+            "set-cookie",
+            "api_key",
+            "apikey",
+            "token",
+            "password",
+            "secret",
+        }
+        if isinstance(value, dict):
+            mapping = cast(dict[Any, Any], value)
+            return {
+                str(key): cls._sanitize_payload(child, depth=depth + 1)
+                for key, child in mapping.items()
+                if not cls._is_secret_key(str(key), secret_keys)
+            }
+        if isinstance(value, list):
+            items = cast(list[Any], value)
+            return [cls._sanitize_payload(child, depth=depth + 1) for child in items]
+        if isinstance(value, tuple):
+            items = cast(tuple[Any, ...], value)
+            return [cls._sanitize_payload(child, depth=depth + 1) for child in items]
+        return value
+
+    @classmethod
     def _sanitize_object(cls, value: Any, *, depth: int = 0) -> Any:
         if depth > 8:
             return "[depth-limited]"
         secret_keys = {"authorization", "cookie", "set-cookie", "api_key", "apikey", "token", "password", "secret"}
         if isinstance(value, dict):
+            mapping = cast(dict[Any, Any], value)
             return {
                 str(key): cls._sanitize_object(child, depth=depth + 1)
-                for key, child in value.items()
-                if str(key).casefold().replace("-", "_") not in secret_keys
+                for key, child in mapping.items()
+                if not cls._is_secret_key(str(key), secret_keys)
             }
         if isinstance(value, list):
-            return [cls._sanitize_object(child, depth=depth + 1) for child in value[:1000]]
+            items = cast(list[Any], value)
+            return [cls._sanitize_object(child, depth=depth + 1) for child in items[:1000]]
         if isinstance(value, str):
             return value[:4096]
         return value
 
     @staticmethod
+    def _is_secret_key(key: str, secret_keys: set[str]) -> bool:
+        normalized = key.casefold().replace("-", "_")
+        return normalized in secret_keys or any(
+            marker in normalized
+            for marker in ("authorization", "access_token", "api_key", "password", "secret", "cookie")
+        ) or normalized.endswith("_token")
+
+    @staticmethod
     def _summary(record: AgentEvidenceRecord) -> AgentEvidenceSummary:
-        raw_summary = cast(dict[str, Any], record.summary_json or {})
-        raw_provenance = cast(dict[str, Any], record.provenance_json or {})
+        raw_summary = record.summary_json or {}
+        raw_provenance = record.provenance_json or {}
         map_eligibility = str(raw_summary.get("map_eligibility") or "unknown")
         if map_eligibility not in {"renderable", "not_renderable", "unknown"}:
             map_eligibility = "unknown"

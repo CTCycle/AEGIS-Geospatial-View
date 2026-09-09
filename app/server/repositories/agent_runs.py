@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 from uuid import uuid4
 
@@ -666,6 +666,54 @@ class AgentRunRepository:
             session.commit()
             session.refresh(run)
             return self._to_snapshot(run), False, pending_response
+
+    # -------------------------------------------------------------------------
+    def expire_pending_render(
+        self,
+        *,
+        conversation_id: str,
+        run_id: str,
+        run_version: int,
+        timeout_seconds: float = 90.0,
+    ) -> AgentRunSnapshot | None:
+        """Fail a stale candidate while preserving the last committed map."""
+
+        cutoff = datetime.now(UTC) - timedelta(seconds=max(0.1, timeout_seconds))
+        with self._session_factory() as session:
+            session.execute(text("BEGIN IMMEDIATE"))
+            run = session.scalar(
+                select(AgentRunRecord).where(
+                    AgentRunRecord.id == run_id,
+                    AgentRunRecord.conversation_id == conversation_id,
+                    AgentRunRecord.active_run_version == run_version,
+                    AgentRunRecord.state == AgentRunState.AWAITING_RENDER.value,
+                    AgentRunRecord.presentation_status == "pending",
+                )
+            )
+            if run is None:
+                return None
+            created_at = (
+                run.created_at.replace(tzinfo=UTC)
+                if run.created_at.tzinfo is None
+                else run.created_at
+            )
+            if created_at > cutoff:
+                return None
+            run.state = AgentRunState.FAILED.value
+            run.active_slot = None
+            run.completed_at = datetime.now(UTC)
+            run.error_code = "render_timeout"
+            run.error_message = "The browser did not acknowledge the prepared map before the render deadline."
+            run.presentation_status = "render_timeout"
+            presentation = _json_object(run.presentation_json)
+            run.presentation_json = {
+                **presentation,
+                "status": "render_timeout",
+                "error_code": "render_timeout",
+            }
+            session.commit()
+            session.refresh(run)
+            return self._to_snapshot(run)
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -58,6 +58,23 @@ class ChatRuntimeSettings:
     parser_max_retries: int
     application_timezone: str = "UTC"
 
+
+@dataclass(frozen=True)
+class AgentExecutionSettings:
+    interpretation_seconds: float = 90.0
+    simple_seconds: float = 150.0
+    complex_seconds: float = 300.0
+    context_assembly_seconds: float = 5.0
+    structured_extraction_seconds: float = 60.0
+    location_resolution_seconds: float = 30.0
+    native_model_call_seconds: float = 60.0
+    tool_idle_seconds: float = 45.0
+    tool_absolute_seconds: float = 90.0
+    map_assembly_seconds: float = 20.0
+    synthesis_seconds: float = 30.0
+    persistence_seconds: float = 5.0
+    render_ack_seconds: float = 90.0
+
 ###############################################################################
 @dataclass(frozen=True)
 class OpenMeteoSettings:
@@ -124,6 +141,7 @@ class ServerSettings:
     overpass: OverpassSettings
     rainviewer: RainViewerSettings
     gibs: GIBSSettings
+    agent_execution: AgentExecutionSettings = AgentExecutionSettings()
 
 ###############################################################################
 class StrictJsonSettings(BaseModel):
@@ -160,6 +178,22 @@ class JsonChatRuntimeSettings(StrictJsonSettings):
     parser_certainty_threshold: float = Field(ge=0.0, le=1.0)
     parser_max_retries: int = Field(ge=0, le=5)
     application_timezone: str = "UTC"
+
+
+class JsonAgentExecutionSettings(StrictJsonSettings):
+    interpretation_seconds: float = Field(default=90.0, ge=1.0, le=300.0)
+    simple_seconds: float = Field(default=150.0, ge=1.0, le=300.0)
+    complex_seconds: float = Field(default=300.0, ge=1.0, le=300.0)
+    context_assembly_seconds: float = Field(default=5.0, ge=0.1)
+    structured_extraction_seconds: float = Field(default=60.0, ge=0.1)
+    location_resolution_seconds: float = Field(default=30.0, ge=0.1)
+    native_model_call_seconds: float = Field(default=60.0, ge=0.1)
+    tool_idle_seconds: float = Field(default=45.0, ge=0.1, le=45.0)
+    tool_absolute_seconds: float = Field(default=90.0, ge=0.1, le=90.0)
+    map_assembly_seconds: float = Field(default=20.0, ge=0.1)
+    synthesis_seconds: float = Field(default=30.0, ge=0.1)
+    persistence_seconds: float = Field(default=5.0, ge=0.1)
+    render_ack_seconds: float = Field(default=90.0, ge=0.1, le=90.0)
 
 ###############################################################################
 class JsonOpenMeteoSettings(StrictJsonSettings):
@@ -264,6 +298,9 @@ class AppSettings(BaseSettings):
     overpass: JsonOverpassSettings
     rainviewer: JsonRainViewerSettings
     gibs: JsonGIBSSettings
+    agent_execution: JsonAgentExecutionSettings = Field(
+        default_factory=JsonAgentExecutionSettings
+    )
 
     fastapi_host: str = "127.0.0.1"
     fastapi_port: int = Field(default=8000, ge=1, le=65535)
@@ -317,6 +354,21 @@ class AppSettings(BaseSettings):
                 parser_certainty_threshold=self.chat.parser_certainty_threshold,
                 parser_max_retries=self.chat.parser_max_retries,
                 application_timezone=self.chat.application_timezone,
+            ),
+            agent_execution=AgentExecutionSettings(
+                interpretation_seconds=self.agent_execution.interpretation_seconds,
+                simple_seconds=self.agent_execution.simple_seconds,
+                complex_seconds=self.agent_execution.complex_seconds,
+                context_assembly_seconds=self.agent_execution.context_assembly_seconds,
+                structured_extraction_seconds=self.agent_execution.structured_extraction_seconds,
+                location_resolution_seconds=self.agent_execution.location_resolution_seconds,
+                native_model_call_seconds=self.agent_execution.native_model_call_seconds,
+                tool_idle_seconds=self.agent_execution.tool_idle_seconds,
+                tool_absolute_seconds=self.agent_execution.tool_absolute_seconds,
+                map_assembly_seconds=self.agent_execution.map_assembly_seconds,
+                synthesis_seconds=self.agent_execution.synthesis_seconds,
+                persistence_seconds=self.agent_execution.persistence_seconds,
+                render_ack_seconds=self.agent_execution.render_ack_seconds,
             ),
             openmeteo=OpenMeteoSettings(
                 weather_base_url=self.openmeteo.weather_base_url,

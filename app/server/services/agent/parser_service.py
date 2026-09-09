@@ -42,6 +42,7 @@ from server.services.llm.factory import LLMFactory
 from server.prompts.parser import build_parser_prompt
 from server.services.llm.types import LLMRequest
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
+from server.services.llm.context_budget import prepare_request
 from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
@@ -57,11 +58,10 @@ class ParserRunResult:
 
 ###############################################################################
 class ParserService:
-    PARSER_TIMEOUT_SECONDS = 30.0
-    RETRY_MIN_REMAINING_SECONDS = 18.0
+    PARSER_TIMEOUT_SECONDS = 60.0
+    RETRY_MIN_REMAINING_SECONDS = 24.0
     PARSER_MAX_OUTPUT_TOKENS = 2048
-    MAX_HISTORY_MESSAGES = 4
-    MAX_HISTORY_CONTENT_CHARS = 640
+    PARSER_INPUT_TOKEN_CEILING = 24_000
     MAX_CATALOG_IDENTITIES = 24
     _FAILURE_CATEGORIES = frozenset(
         {
@@ -151,7 +151,7 @@ class ParserService:
         conversation_messages: list[dict[str, Any]],
     ) -> list[dict[str, str]]:
         normalized: list[dict[str, str]] = []
-        for item in conversation_messages[-8:]:
+        for item in conversation_messages:
             if not is_json_object(item):
                 normalized.append({"role": "unknown", "content": str(item)})
                 continue
@@ -173,44 +173,11 @@ class ParserService:
     @classmethod
     def _compact_history_content(cls, role: str, content: object) -> str:
         text = cls._to_text(content).strip()
-        if len(text) <= cls.MAX_HISTORY_CONTENT_CHARS:
-            return text
-        if role == "assistant":
-            try:
-                payload = json.loads(text)
-            except (TypeError, json.JSONDecodeError):
-                payload = None
-            if is_json_object(payload):
-                operation = json_object(payload.get("operation"))
-                map_session = json_object(payload.get("map_session"))
-                resolved = json_object(map_session.get("resolved_location"))
-                turn_contract = json_object(payload.get("turn_contract"))
-                normalized_action = json_object(
-                    turn_contract.get("normalized_action")
-                )
-                summary = {
-                    "assistant_message": str(
-                        payload.get("assistant_message") or ""
-                    )[:240],
-                    "task_class": turn_contract.get("task_class"),
-                    "action_id": normalized_action.get("action_id"),
-                    "operation": {
-                        "kind": operation.get("kind"),
-                        "status": operation.get("status"),
-                    },
-                    "location": {
-                        key: resolved.get(key)
-                        for key in (
-                            "label",
-                            "city",
-                            "country",
-                            "location_type",
-                        )
-                        if resolved.get(key) is not None
-                    },
-                }
-                return json.dumps(summary, ensure_ascii=True, separators=(",", ":"))
-        return text[: cls.MAX_HISTORY_CONTENT_CHARS]
+        # The parser request is token-budgeted at the provider boundary.  A
+        # fixed character prefix can discard IDs, coordinates, errors, and
+        # provenance, so preserve the normalized message here.
+        _ = role
+        return text
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -220,7 +187,7 @@ class ParserService:
         if not include_history:
             return []
         compacted: list[dict[str, str]] = []
-        for message in messages[-cls.MAX_HISTORY_MESSAGES :]:
+        for message in messages:
             compacted.append(
                 {
                     "id": str(message.get("id") or ""),
@@ -830,6 +797,8 @@ class ParserService:
                     else {}
                 ),
                 "max_tokens": self.PARSER_MAX_OUTPUT_TOKENS,
+                "application_input_token_ceiling": self.PARSER_INPUT_TOKEN_CEILING,
+                "context_phase": "parser",
                 "purpose": "structured_intent_extraction",
                 **(
                     {REQUEST_DEADLINE_METADATA_KEY: deadline_monotonic}
@@ -848,6 +817,7 @@ class ParserService:
                 },
             ],
         )
+        request = prepare_request(request, provider=provider_name)
         return (
             provider_name,
             model_name,

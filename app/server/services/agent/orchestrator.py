@@ -39,7 +39,9 @@ from server.services.agent.context_assembler import AgentContextAssembler
 from server.domain.agent.context import ConversationDirective
 from server.domain.agent.pipeline import VisualizationUpdate
 from server.domain.agent.reliability import (
-    DEFAULT_RUN_SECONDS,
+    DEFAULT_STAGE_LIMITS,
+    COMPLEX_RUN_SECONDS,
+    INTERPRETATION_RUN_SECONDS,
     AgentExecutionBudget,
     StageObservation,
 )
@@ -78,7 +80,7 @@ from server.contracts.geospatial import MapSession
 
 ###############################################################################
 class AgentOrchestrator:
-    RUN_TIMEOUT_SECONDS = DEFAULT_RUN_SECONDS
+    RUN_TIMEOUT_SECONDS = INTERPRETATION_RUN_SECONDS
     _compose_map_session_message = staticmethod(
         AgentResponseBuilder.compose_map_session_message
     )
@@ -113,6 +115,7 @@ class AgentOrchestrator:
         direct_turn_response_service: DirectTurnResponseService,
         context_profile_resolver: ModelContextProfileResolver | None = None,
         application_timezone: str = "UTC",
+        execution_settings: Any | None = None,
     ) -> None:
         self.search_orchestrator = search_orchestrator
         self.parser_service = parser_service
@@ -122,6 +125,9 @@ class AgentOrchestrator:
         self.request_builder = request_builder
         self.settings_repo = settings_repo
         self.agent_tool_catalog_service = agent_tool_catalog_service
+        self.evidence_repository = getattr(
+            agent_tool_catalog_service, "evidence_repository", None
+        )
         self.agent_tool_catalog_service.register_with(self.tool_registry)
         self.native_tool_loop = native_tool_loop
         self.history_service = history_service
@@ -140,6 +146,7 @@ class AgentOrchestrator:
         self.response_synthesizer = response_synthesizer
         self.direct_turn_response_service = direct_turn_response_service
         self.application_timezone = application_timezone
+        self.execution_settings = execution_settings
         self.deterministic_intent_recovery_service = (
             DeterministicIntentRecoveryService()
         )
@@ -211,12 +218,61 @@ class AgentOrchestrator:
         return result
 
     # -------------------------------------------------------------------------
+    def _new_execution_budget(self) -> AgentExecutionBudget:
+        configured = self.execution_settings
+        stage_limits = dict(DEFAULT_STAGE_LIMITS)
+        if configured is not None:
+            stage_limits.update(
+                {
+                    "context_assembly": float(
+                        getattr(configured, "context_assembly_seconds", 5.0)
+                    ),
+                    "structured_intent_extraction": float(
+                        getattr(configured, "structured_extraction_seconds", 60.0)
+                    ),
+                    "location_resolution": float(
+                        getattr(configured, "location_resolution_seconds", 30.0)
+                    ),
+                    "tool_execution": float(
+                        getattr(configured, "tool_absolute_seconds", 90.0)
+                    ),
+                    "map_assembly": float(
+                        getattr(configured, "map_assembly_seconds", 20.0)
+                    ),
+                    "response_synthesis": float(
+                        getattr(configured, "synthesis_seconds", 30.0)
+                    ),
+                    "persistence": float(
+                        getattr(configured, "persistence_seconds", 5.0)
+                    ),
+                }
+            )
+        return AgentExecutionBudget(
+            total_seconds=float(
+                getattr(configured, "interpretation_seconds", self.RUN_TIMEOUT_SECONDS)
+                if configured is not None
+                else self.RUN_TIMEOUT_SECONDS
+            ),
+            hard_max_seconds=float(
+                getattr(configured, "complex_seconds", COMPLEX_RUN_SECONDS)
+                if configured is not None
+                else COMPLEX_RUN_SECONDS
+            ),
+            simple_run_seconds=float(
+                getattr(configured, "simple_seconds", 150.0)
+                if configured is not None
+                else 150.0
+            ),
+            stage_limits=stage_limits,
+        )
+
+    # -------------------------------------------------------------------------
     async def _run_turn_serialized(
         self,
         payload: ChatTurnRequest,
         progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> ChatTurnResponse:
-        execution_budget = AgentExecutionBudget(total_seconds=self.RUN_TIMEOUT_SECONDS)
+        execution_budget = self._new_execution_budget()
         conversation_id = payload.conversation_id
         if hasattr(self.response_synthesizer, "last_context_usage"):
             try:
@@ -305,6 +361,13 @@ class AgentOrchestrator:
         if execution_budget.terminal_reason is None:
             if response.operation is not None and response.operation.kind == "clarification":
                 execution_budget.terminal_reason = "clarification_required"
+            elif (
+                payload.defer_map_commit
+                and response.map_session is not None
+                and response.operation is not None
+                and response.operation.kind == "map_session"
+            ):
+                execution_budget.terminal_reason = "awaiting_render"
             elif (
                 response.operation is not None
                 and (
@@ -605,9 +668,7 @@ class AgentOrchestrator:
         *,
         execution_budget: AgentExecutionBudget | None = None,
     ) -> ChatTurnResponse:
-        execution_budget = execution_budget or AgentExecutionBudget(
-            total_seconds=self.RUN_TIMEOUT_SECONDS
-        )
+        execution_budget = execution_budget or self._new_execution_budget()
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
         LOGGER.info(
             "chat_turn_start request_id=%s conversation_id=%s message_length=%s",
@@ -679,8 +740,20 @@ class AgentOrchestrator:
                         "conversation_summary"
                     )
                 ),
+                relevant_tool_outcomes=(
+                    [
+                        item.model_dump(mode="json")
+                        for item in self.evidence_repository.list_summaries(
+                            conversation_id,
+                            limit=100,
+                        )
+                    ]
+                    if self.evidence_repository is not None
+                    else []
+                ),
             )
         self._context_packages[conversation_key] = context_package
+        execution_budget.record_context_allocation(context_package.context_allocation)
         recent_messages = context_package.recent_messages
 
         parser_kwargs: dict[str, Any] = {
@@ -1196,6 +1269,14 @@ class AgentOrchestrator:
                 latest_memory,
                 **planner_kwargs,
             )
+        complexity = (
+            "simple"
+            if not turn_contract.atomic_tasks
+            and len(tool_plan.steps) <= 1
+            and not turn_contract.required_data_sources
+            else "complex"
+        )
+        execution_budget.promote(complexity)
         LOGGER.debug(
             "chat_turn_plan request_id=%s specialist=%s tools=%s steps=%d visualization_update=%s",
             request_id,
@@ -1225,6 +1306,81 @@ class AgentOrchestrator:
             turn_contract,
             latest_memory,
         )
+        presentation_required = bool(
+            turn_contract.presentation_mode in {"map", "both"}
+            or turn_contract.presentation_requirements
+            or turn_contract.requested_layers
+            or turn_contract.overlay_commands
+            or canonical_request.map_required
+            or canonical_request.presentation.mode in {"map", "both"}
+            or any(
+                phrase in turn_contract.user_text.casefold()
+                for phrase in (
+                    "show",
+                    "display",
+                    "visualize",
+                    "visualise",
+                    "plot",
+                    "map",
+                    "where are",
+                    "distribution",
+                    "see them",
+                )
+            )
+        )
+        completion_requirements = [
+            item.name
+            for item in canonical_request.completion_requirements
+            if item.required
+        ]
+        unresolved_targets = bool(
+            any(item.resolved_location is None for item in canonical_request.targets)
+        )
+        # Native execution is opt-in at the provider boundary.  The concrete
+        # ``NativeToolLoop`` exposes a probe that treats an unknown provider
+        # result as usable, but test doubles and custom adapters without that
+        # probe cannot claim native support.  Route those adapters through the
+        # deterministic mode when a validated plan is available.
+        native_supports_tools = False
+        supports_native = getattr(self.native_tool_loop, "supports_native_tools", None)
+        if callable(supports_native):
+            try:
+                native_supports_tools = (
+                    supports_native(
+                        settings.agent_model_provider,
+                        settings.agent_model_name,
+                    )
+                    is not False
+                )
+            except Exception:
+                # Capability probing must not silently choose another provider;
+                # the native attempt remains authoritative and will surface its
+                # own configuration/provider error.
+                native_supports_tools = True
+        execution_mode = "native" if native_supports_tools else "deterministic"
+        route_reasons = [
+            "Canonical interpretation and policy validation completed.",
+            (
+                "Configured model explicitly supports native tools."
+                if native_supports_tools
+                else "Configured model explicitly does not support native tools."
+            ),
+        ]
+        tool_plan = tool_plan.model_copy(
+            update={
+                "execution_mode": execution_mode,
+                "presentation_required": presentation_required,
+                "completion_requirements": completion_requirements,
+                "allowed_provider_ids": [
+                    str(item).strip().lower()
+                    for item in constraints.metadata.get("allowed_provider_ids", [])
+                    if str(item).strip()
+                ],
+                "routing_reasons": route_reasons,
+            }
+        )
+        execution_budget.execution_mode = execution_mode
+        execution_budget.completion_requirements = list(completion_requirements)
         native_context = AgentExecutionContext(
             request_id=request_id,
             conversation_id=conversation_id,
@@ -1240,10 +1396,17 @@ class AgentOrchestrator:
                     if step.capability_id is not None
                 ],
                 **constraints.metadata,
+                "execution_mode": execution_mode,
+                "presentation_required": presentation_required,
+                "completion_requirements": completion_requirements,
+                "unresolved_targets": unresolved_targets,
+                "canonical_request": canonical_request.model_dump(mode="json"),
+                "task_ledger": self.task_state_service.serialize(conversation_key),
+                "context_allocation": context_package.context_allocation,
             },
             metadata={
                 "previous_turn_contract": latest_contract,
-                "allowed_native_tools": tool_plan.selected_tools,
+                "allowed_native_tools": constraints.allowed_tool_names,
                 "allowed_capability_ids": [
                     step.capability_id
                     for step in tool_plan.steps
@@ -1251,12 +1414,46 @@ class AgentOrchestrator:
                 ],
                 "specialist": specialist,
                 "defer_map_commit": payload.defer_map_commit,
-                "complexity": (
-                    "simple"
-                    if not turn_contract.atomic_tasks
-                    and len(tool_plan.steps) <= 1
-                    and not turn_contract.required_data_sources
-                    else "complex"
+                "execution_mode": execution_mode,
+                "capability_domains": tool_plan.capability_domains,
+                "candidate_capability_ids": tool_plan.candidate_capability_ids,
+                "allowed_provider_ids": tool_plan.allowed_provider_ids,
+                "presentation_required": presentation_required,
+                "completion_requirements": completion_requirements,
+                "routing_reasons": route_reasons,
+                "unresolved_targets": unresolved_targets,
+                "resolved_location": (
+                    resolved_location.model_dump(mode="json")
+                    if resolved_location is not None
+                    else None
+                ),
+                "evidence_refs": [],
+                "complexity": complexity,
+                "prior_evidence_summaries": (
+                    [
+                        item.model_dump(mode="json")
+                        for item in self.evidence_repository.list_summaries(
+                            conversation_id,
+                            limit=100,
+                        )
+                    ]
+                    if self.evidence_repository is not None
+                    else []
+                ),
+                "native_model_call_seconds": float(
+                    getattr(self.execution_settings, "native_model_call_seconds", 60.0)
+                    if self.execution_settings is not None
+                    else 60.0
+                ),
+                "tool_idle_seconds": float(
+                    getattr(self.execution_settings, "tool_idle_seconds", 45.0)
+                    if self.execution_settings is not None
+                    else 45.0
+                ),
+                "tool_absolute_seconds": float(
+                    getattr(self.execution_settings, "tool_absolute_seconds", 90.0)
+                    if self.execution_settings is not None
+                    else 90.0
                 ),
             },
             resolved_location=resolved_location,
@@ -1269,7 +1466,8 @@ class AgentOrchestrator:
             self.tool_registry.has_native_tool(step.tool_name)
             for step in tool_plan.steps
         )
-        if deterministic_tools_available:
+        if not native_supports_tools and deterministic_tools_available:
+            tool_plan = tool_plan.model_copy(update={"execution_mode": "deterministic"})
             execution_budget.pipeline_reach["tool_execution"] = "pending"
             response = await self.planned_turn_execution_service.execute(
                 request_id=request_id,
@@ -1333,9 +1531,15 @@ class AgentOrchestrator:
                         usage=usage,
                     )
                 ),
+                tool_resolver=(
+                    lambda loop_context, loop_results: self.agent_tool_catalog_service.build_native_tools(
+                        loop_context
+                    )
+                ),
             )
         )
         execution_budget.pipeline_reach["tool_execution"] = "success"
+        execution_budget.stopping_reason = tool_loop_result.stopped_reason
         decision_trace_steps = [
             "1.parse_structured_request",
             "2.build_policy_constraints",
@@ -1376,12 +1580,21 @@ class AgentOrchestrator:
             request_id=request_id,
             conversation_id=conversation_id,
         ):
-            map_result = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
-                tool_payload=tool_payload,
-                turn_contract=turn_contract,
-                latest_memory=latest_memory,
-                resolved_location=resolved_location,
-                canonical_request=canonical_request,
+            prepared_by_native = any(
+                str(item.get("name") or "") == "prepare_geospatial_map"
+                for item in json_array(tool_payload.get("tool_results"))
+                if is_json_object(item)
+            )
+            map_result = (
+                await self.turn_state_assembler.build_combined_map_session_from_tool_results(
+                    tool_payload=tool_payload,
+                    turn_contract=turn_contract,
+                    latest_memory=latest_memory,
+                    resolved_location=resolved_location,
+                    canonical_request=canonical_request,
+                )
+                if (not presentation_required or prepared_by_native)
+                else None
             )
         if isinstance(map_result, ClarificationRequest) and (
             tool_loop_result.failure_category is None
@@ -1398,7 +1611,7 @@ class AgentOrchestrator:
                 tool_payload=tool_payload,
             )
         map_session = map_result if isinstance(map_result, MapSession) else None
-        if map_session is None:
+        if map_session is None and (not presentation_required or prepared_by_native):
             map_session = tool_loop_result.map_session
         LOGGER.info(
             "map_assembly_result request_id=%s overlays=%d source=%s",
@@ -1437,7 +1650,11 @@ class AgentOrchestrator:
                 tool_payload
             )
         )
-        if map_session is None and capability_selection is not None:
+        if (
+            map_session is None
+            and capability_selection is not None
+            and (not presentation_required or prepared_by_native)
+        ):
             with self._stage_scope(
                 execution_budget,
                 "map_assembly",

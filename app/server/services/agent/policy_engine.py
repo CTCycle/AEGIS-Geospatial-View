@@ -109,9 +109,20 @@ class PolicyEngine:
             and provider_ids
         ):
             allowed_tools.append("fetch_geospatial_provider_layers")
-            allowed_tools.append("render_geospatial_provider_layer")
+            allowed_tools.append("prepare_geospatial_map")
         if any(":" in layer for layer in parsed_request.requested_layers):
-            allowed_tools.append("render_geospatial_provider_layer")
+            allowed_tools.append("prepare_geospatial_map")
+        if parsed_request.normalized_action.requires_location:
+            allowed_tools.append("resolve_geospatial_location")
+        if parsed_request.requested_layers or parsed_request.required_data_sources:
+            allowed_tools.extend(
+                ["inspect_geospatial_evidence", "transform_geospatial_evidence"]
+            )
+        if any(
+            phrase in parsed_request.user_text.casefold()
+            for phrase in ("show", "display", "visualize", "plot", "where are", "map")
+        ):
+            allowed_tools.append("prepare_geospatial_map")
         return AgentPolicyConstraints(
             requires_location=parsed_request.normalized_action.requires_location,
             blocked_patterns=[item.pattern_id for item in actionable_patterns],

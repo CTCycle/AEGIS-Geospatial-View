@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from server.configurations.settings import AgentExecutionSettings
 from server.repositories.chat_history import ChatHistoryRepository
 from server.repositories.conversations import ConversationRepository
 from server.repositories.agent_evidence import AgentEvidenceRepository
@@ -54,6 +55,7 @@ def build_chat_runtime(
     *,
     geospatial_runtime: GeospatialRuntime,
     application_timezone: str = "UTC",
+    execution_settings: AgentExecutionSettings | None = None,
 ) -> ChatRuntime:
     settings_repo = ModelSettingsRepository(database)
     credentials_repo = geospatial_runtime.credentials_repo
@@ -173,6 +175,7 @@ def build_chat_runtime(
             direct_turn_response_service=direct_turn_response_service,
             context_profile_resolver=context_profile_resolver,
             application_timezone=application_timezone,
+            execution_settings=execution_settings,
             capability_resolver=CapabilityResolver(
                 capability_registry=capability_registry,
                 runtime_registry=runtime_registry,

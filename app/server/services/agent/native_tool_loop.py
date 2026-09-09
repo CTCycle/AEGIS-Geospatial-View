@@ -6,9 +6,10 @@ import asyncio
 import json
 import logging
 import time
+from datetime import UTC, datetime
 from contextlib import nullcontext as _nullcontext
 from collections.abc import Awaitable, Callable
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from server.contracts.geospatial import MapSession
 
@@ -19,6 +20,7 @@ from server.domain.agent.execution import (
 )
 from server.domain.agent.pipeline import ToolPlanStep
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.agent.completion import CompletionEvaluator
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.domain.agent.runtime import canonical_call_fingerprint
 from server.prompts.agent import build_working_state_message
@@ -39,21 +41,34 @@ LOGGER = logging.getLogger(__name__)
 class NativeToolLoop:
 
     # -------------------------------------------------------------------------
+    def supports_native_tools(self, provider_name: str, model: str) -> bool:
+        """Return the provider's explicit native-tool capability decision.
+
+        ``None`` is treated as usable because several provider adapters only
+        learn capabilities during a live probe.  A provider that explicitly
+        reports ``False`` is routed to deterministic execution instead.
+        """
+
+        provider = self.provider_factory.get_provider(provider_name)
+        supports = provider.supports_tools(model)
+        return supports is not False
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
         provider_factory: LLMFactory,
         tool_registry: ToolRegistry,
         context_profile_resolver: ModelContextProfileResolver | None = None,
-        max_iterations: int = 8,
         max_parallel_tool_calls: int = 8,
-        max_tool_result_chars: int = 12000,
-        tool_timeout_seconds: int = 30,
-        max_model_calls: int = 6,
-        max_tool_calls: int = 12,
-        max_state_transitions: int = 16,
-        max_run_seconds: float = 180.0,
-        max_no_progress_steps: int = 2,
+        max_tool_result_chars: int = 4096,
+        tool_timeout_seconds: int = 45,
+        max_iterations: int = 12,
+        max_model_calls: int = 10,
+        max_tool_calls: int = 20,
+        max_state_transitions: int = 32,
+        max_run_seconds: float = 300.0,
+        max_no_progress_steps: int = 3,
     ) -> None:
         self.provider_factory = provider_factory
         self.tool_registry = tool_registry
@@ -70,13 +85,18 @@ class NativeToolLoop:
 
     # -------------------------------------------------------------------------
     async def run(self, request: AgentToolLoopRequest) -> AgentToolLoopResult:
+        context = request.context
         provider = self.provider_factory.get_provider(request.provider)
         messages = list(request.messages)
+        current_tools = list(request.tools)
         working_state = build_working_state_message(
-            parsed_request=request.context.parsed_request,
-            map_state=request.context.map_state,
-            policy_constraints=request.context.policy_constraints,
+            parsed_request=context.parsed_request,
+            map_state=context.map_state,
+            policy_constraints=context.policy_constraints,
             completed_tool_results=[],
+            evidence_summaries=list(
+                context.metadata.get("prior_evidence_summaries") or []
+            ),
         )
         messages.insert(1, working_state)
         all_calls: list[LLMToolCall] = []
@@ -84,15 +104,15 @@ class NativeToolLoop:
         fingerprints: set[str] = set()
         duplicate_tool_calls = 0
         no_progress_steps = 0
-        started_run = time.perf_counter()
         simple_run = (
-            str(request.context.metadata.get("complexity") or "").lower() == "simple"
+            str(context.metadata.get("complexity") or "").lower() == "simple"
         )
-        model_budget = 2 if simple_run else self.max_model_calls
-        tool_budget = 2 if simple_run else self.max_tool_calls
-        transition_budget = 6 if simple_run else self.max_state_transitions
+        model_budget = min(self.max_model_calls, 10 if not simple_run else 4)
+        tool_budget = min(self.max_tool_calls, 20 if not simple_run else 6)
+        transition_budget = min(self.max_state_transitions, 32 if not simple_run else 10)
+        premature_stop_proposals = 0
         context_usages: list[dict[str, Any]] = []
-        execution_budget = request.context.execution_budget
+        execution_budget = context.execution_budget
         run_deadline = (
             execution_budget.deadline_monotonic
             if execution_budget is not None
@@ -104,16 +124,24 @@ class NativeToolLoop:
                 return
             usage = dict(raw_usage)
             context_usages.append(usage)
+            if context.execution_budget is not None:
+                context.execution_budget.record_context_allocation(
+                    {
+                        "phase": "native_loop",
+                        "model": request.model,
+                        **usage,
+                    }
+                )
             if request.context_usage_callback is not None:
                 request.context_usage_callback(usage)
 
         for iteration in range(1, self.max_iterations + 1):
+            iteration_started = time.perf_counter()
             if (
                 iteration > model_budget
                 or len(all_calls) >= tool_budget
                 or iteration + len(all_results) > transition_budget
-                or time.perf_counter() - started_run
-                > (45.0 if simple_run else self.max_run_seconds)
+                or time.monotonic() > run_deadline
                 or (
                     execution_budget is not None
                     and execution_budget.remaining_seconds() <= 0.0
@@ -126,7 +154,11 @@ class NativeToolLoop:
                     tool_calls=all_calls,
                     tool_results=all_results,
                     iterations=iteration - 1,
-                    stopped_reason="budget_exhausted",
+                    stopped_reason=(
+                        "run_deadline_exhausted"
+                        if time.monotonic() > run_deadline
+                        else "tool_budget_exhausted"
+                    ),
                     map_session=self._extract_map_session(all_results),
                     model_calls=iteration - 1,
                     duplicate_tool_calls=duplicate_tool_calls,
@@ -134,19 +166,31 @@ class NativeToolLoop:
                     context_usages=list(context_usages),
                 )
             working_state = build_working_state_message(
-                parsed_request=request.context.parsed_request,
-                map_state=request.context.map_state,
-                policy_constraints=request.context.policy_constraints,
+                parsed_request=context.parsed_request,
+                map_state=context.map_state,
+                policy_constraints=context.policy_constraints,
                 completed_tool_results=[
-                    {
-                        "tool": result.name,
-                        "ok": not result.is_error,
-                        "error": result.error,
-                    }
+                    self._result_observation(result)
                     for result in all_results
+                ],
+                evidence_summaries=list(
+                    context.metadata.get("prior_evidence_summaries") or []
+                )
+                + [
+                    self._result_observation(result)
+                    for result in all_results
+                    if self._result_observation(result).get("evidence_ref")
                 ],
             )
             messages[1] = working_state
+            if request.tool_resolver is not None:
+                current_tools = request.tool_resolver(context, all_results)
+                context.policy_constraints["available_tools"] = [
+                item.name for item in current_tools
+            ]
+                context.policy_constraints["tool_exposure_reasons"] = dict(
+                    context.metadata.get("tool_exposure_reasons") or {}
+            )
             LOGGER.debug(
                 "tool_loop_started provider=%s model=%s iteration=%s",
                 request.provider,
@@ -159,12 +203,12 @@ class NativeToolLoop:
                         model=request.model,
                         provider=request.provider,
                         messages=list(messages),
-                        tools=request.tools,
+                        tools=current_tools,
                         tool_choice="auto",
                         temperature=request.temperature,
                         provider_session_id=(
                             request.provider_session_id
-                            or request.context.conversation_id
+                            or context.conversation_id
                         ),
                         metadata={
                             **(
@@ -180,6 +224,8 @@ class NativeToolLoop:
                                 if request.max_tokens is not None
                                 else {}
                             ),
+                            "application_input_token_ceiling": 64_000,
+                            "context_phase": "native_loop",
                             REQUEST_DEADLINE_METADATA_KEY: run_deadline,
                         },
                     ),
@@ -189,6 +235,14 @@ class NativeToolLoop:
                 working_state = messages[1]
                 if execution_budget is not None:
                     execution_budget.record_model_call()
+                model_timeout = float(
+                    context.metadata.get("native_model_call_seconds", 60.0)
+                    or 60.0
+                )
+                if execution_budget is not None:
+                    model_timeout = min(
+                        model_timeout, execution_budget.remaining_seconds()
+                    )
                 with (
                     execution_budget.observe(
                         "agent_model_call",
@@ -203,15 +257,56 @@ class NativeToolLoop:
                 ):
                     async_chat = getattr(provider, "achat", None)
                     if callable(async_chat):
-                        response = await cast(
-                            Callable[[LLMRequest], Awaitable[LLMResult]], async_chat
-                        )(llm_request)
+                        response = await asyncio.wait_for(
+                            cast(
+                                Callable[[LLMRequest], Awaitable[LLMResult]], async_chat
+                            )(llm_request),
+                            timeout=max(0.001, model_timeout),
+                        )
                     else:
                         # Only detached/test adapters should reach this
                         # compatibility branch. Production OpenCode/DeepSeek
                         # providers implement achat with a cancellable client.
-                        response = await asyncio.to_thread(provider.chat, llm_request)
+                        response = await asyncio.wait_for(
+                            asyncio.to_thread(provider.chat, llm_request),
+                            timeout=max(0.001, model_timeout),
+                        )
                 record_context_usage(getattr(response, "context_usage", None))
+            except TimeoutError as exc:
+                timeout_origin = (
+                    "application_deadline"
+                    if execution_budget is not None
+                    and execution_budget.remaining_seconds() <= 0.0
+                    else "provider_transport"
+                )
+                if execution_budget is not None:
+                    execution_budget.terminal_reason = (
+                        "run_deadline_exhausted"
+                        if timeout_origin == "application_deadline"
+                        else "provider_error"
+                    )
+                return AgentToolLoopResult(
+                    final_text=(
+                        "The agent provider did not return a native decision before "
+                        "the bounded model-call deadline."
+                    ),
+                    tool_calls=all_calls,
+                    tool_results=all_results,
+                    iterations=iteration,
+                    stopped_reason=(
+                        "run_deadline_exhausted"
+                        if timeout_origin == "application_deadline"
+                        else "provider_error"
+                    ),
+                    map_session=self._extract_map_session(all_results),
+                    model_calls=iteration,
+                    duplicate_tool_calls=duplicate_tool_calls,
+                    no_progress_steps=no_progress_steps,
+                    failure_category="provider_api",
+                    failure_detail=str(exc) or "Native model decision timed out.",
+                    timeout_origin=timeout_origin,
+                    context_usages=list(context_usages),
+                )
             except Exception as exc:
                 category = getattr(exc, "category", None)
                 if category in {
@@ -275,18 +370,67 @@ class NativeToolLoop:
                 )
 
             if not response.tool_calls:
-                return AgentToolLoopResult(
-                    final_text=response.content,
-                    tool_calls=all_calls,
-                    tool_results=all_results,
-                    iterations=iteration,
-                    stopped_reason="final",
-                    map_session=self._extract_map_session(all_results),
-                    model_calls=iteration,
-                    duplicate_tool_calls=duplicate_tool_calls,
-                    no_progress_steps=no_progress_steps,
-                    context_usages=list(context_usages),
+                stop_reason = self._evaluate_textual_stop(
+                    response.content,
+                    context,
+                    all_results,
+                    current_tools,
                 )
+                if stop_reason in {"goal_satisfied", "awaiting_render", "clarification_required", "insufficient_evidence"}:
+                    self._record_iteration_trace(
+                        context,
+                        iteration=iteration,
+                        available_tools=current_tools,
+                        selected_tool=None,
+                        result_status="textual_stop",
+                        results=all_results,
+                        started=iteration_started,
+                        stopping_evaluation={"reason": stop_reason},
+                    )
+                    return AgentToolLoopResult(
+                        final_text=response.content,
+                        tool_calls=all_calls,
+                        tool_results=all_results,
+                        iterations=iteration,
+                        stopped_reason=stop_reason,
+                        map_session=self._extract_map_session(all_results),
+                        model_calls=iteration,
+                        duplicate_tool_calls=duplicate_tool_calls,
+                        no_progress_steps=no_progress_steps,
+                        context_usages=list(context_usages),
+                    )
+                premature_stop_proposals += 1
+                if premature_stop_proposals >= 2:
+                    self._record_iteration_trace(
+                        context,
+                        iteration=iteration,
+                        available_tools=current_tools,
+                        selected_tool=None,
+                        result_status="no_progress",
+                        results=all_results,
+                        started=iteration_started,
+                        stopping_evaluation={"reason": "no_progress"},
+                    )
+                    return AgentToolLoopResult(
+                        final_text="The agent stopped before satisfying the request requirements.",
+                        tool_calls=all_calls,
+                        tool_results=all_results,
+                        iterations=iteration,
+                        stopped_reason="no_progress",
+                        map_session=self._extract_map_session(all_results),
+                        model_calls=iteration,
+                        duplicate_tool_calls=duplicate_tool_calls,
+                        no_progress_steps=no_progress_steps + 1,
+                        context_usages=list(context_usages),
+                    )
+                messages.append({"role": "assistant", "content": response.content or ""})
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": "The response proposed a stop, but required tasks remain pending. Continue with one allowed native tool or state a typed clarification/error.",
+                    }
+                )
+                continue
 
             tool_calls = response.tool_calls[
                 : min(self.max_parallel_tool_calls, tool_budget - len(all_calls))
@@ -318,7 +462,7 @@ class NativeToolLoop:
                 )
             results_list: list[LLMToolResult] = []
             for call in tool_calls:
-                fingerprint = self._call_fingerprint(call, request.context)
+                fingerprint = self._call_fingerprint(call, context)
                 if fingerprint in fingerprints:
                     duplicate_tool_calls += 1
                     results_list.append(
@@ -341,10 +485,20 @@ class NativeToolLoop:
                     continue
                 fingerprints.add(fingerprint)
                 results_list.append(
-                    await self._execute_tool_call(call, request.context, iteration)
+                    await self._execute_tool_call(call, context, iteration)
                 )
             results = results_list
             all_results.extend(results)
+            self._record_iteration_trace(
+                context,
+                iteration=iteration,
+                available_tools=current_tools,
+                selected_tool=tool_calls[0].name if tool_calls else None,
+                result_status="failed" if results and all(item.is_error for item in results) else "available",
+                results=results,
+                started=iteration_started,
+                stopping_evaluation=None,
+            )
             if results and all(result.is_error for result in results):
                 no_progress_steps += 1
             else:
@@ -377,12 +531,99 @@ class NativeToolLoop:
             tool_calls=all_calls,
             tool_results=all_results,
             iterations=self.max_iterations,
-            stopped_reason="max_iterations",
+            stopped_reason="tool_budget_exhausted",
             map_session=self._extract_map_session(all_results),
             model_calls=self.max_iterations,
             duplicate_tool_calls=duplicate_tool_calls,
             no_progress_steps=no_progress_steps,
             context_usages=list(context_usages),
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _result_observation(result: LLMToolResult) -> dict[str, Any]:
+        content = result.content if is_json_object(result.content) else {}
+        data = content.get("data") if is_json_object(content) else None
+        observation: dict[str, Any] = {
+            "tool": result.name,
+            "ok": not result.is_error,
+            "error": result.error,
+        }
+        if is_json_object(data):
+            for key in (
+                "evidence_ref",
+                "evidence_refs",
+                "status",
+                "summary",
+                "provenance",
+                "map_eligibility",
+                "state_changes",
+                "pagination",
+            ):
+                if key in data:
+                    observation[key] = data[key]
+        return observation
+
+    @staticmethod
+    def _record_iteration_trace(
+        context: AgentExecutionContext,
+        *,
+        iteration: int,
+        available_tools: list[Any],
+        selected_tool: str | None,
+        result_status: str,
+        results: list[LLMToolResult],
+        started: float,
+        stopping_evaluation: dict[str, Any] | None,
+    ) -> None:
+        budget = context.execution_budget
+        if budget is None:
+            return
+        evidence_refs: list[str] = []
+        state_changes: list[dict[str, Any]] = []
+        capability_id: str | None = None
+        for result in results:
+            content = result.content if is_json_object(result.content) else {}
+            data = content.get("data") if is_json_object(content) else None
+            if not is_json_object(data):
+                continue
+            ref = data.get("evidence_ref")
+            if isinstance(ref, str) and ref:
+                evidence_refs.append(ref)
+            refs = data.get("evidence_refs")
+            if is_json_array(refs):
+                evidence_refs.extend(str(item) for item in refs if str(item))
+            state = data.get("state_changes")
+            if is_json_array(state):
+                state_changes.extend(
+                    item for item in state if is_json_object(item)
+                )
+            summary = data.get("summary")
+            if is_json_object(summary) and summary.get("capability_id"):
+                capability_id = str(summary["capability_id"])
+        budget.record_iteration(
+            {
+                "iteration": iteration,
+                "execution_mode": str(context.metadata.get("execution_mode") or "native"),
+                "available_tools": [str(getattr(item, "name", "")) for item in available_tools],
+                "tool_exposure_reasons": dict(context.metadata.get("tool_exposure_reasons") or {}),
+                "selected_tool": selected_tool,
+                "capability_id": capability_id,
+                "started_at": datetime.now(UTC).isoformat(),
+                "duration_ms": max(0, int((time.perf_counter() - started) * 1000)),
+                "result_status": result_status,
+                "evidence_refs": list(dict.fromkeys(evidence_refs)),
+                "state_changes": state_changes,
+                "pending_requirements": [
+                    str(item)
+                    for item in cast(
+                        list[Any], context.metadata.get("completion_requirements") or []
+                    )
+                ],
+                "retry_number": int(context.metadata.get("last_retry_number") or 0),
+                "context_usage": {},
+                "stopping_evaluation": stopping_evaluation,
+            }
         )
 
     # -------------------------------------------------------------------------
@@ -427,9 +668,14 @@ class NativeToolLoop:
             if not is_json_object(data):
                 continue
             operation = data.get("operation")
+            summary = data.get("summary")
+            if operation is None and is_json_object(summary):
+                operation = summary.get("operation")
             if operation != "map_session_created":
                 continue
             ms_raw = data.get("map_session")
+            if ms_raw is None and is_json_object(summary):
+                ms_raw = summary.get("map_session")
             if is_json_object(ms_raw):
                 try:
                     return MapSession.model_validate(ms_raw)
@@ -437,6 +683,55 @@ class NativeToolLoop:
                     LOGGER.warning(
                         "Failed to validate MapSession from tool result", exc_info=True
                     )
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _evaluate_textual_stop(
+        content: str,
+        context: AgentExecutionContext,
+        results: list[LLMToolResult],
+        available_tools: list[Any],
+    ) -> Literal[
+        "goal_satisfied",
+        "awaiting_render",
+        "clarification_required",
+        "insufficient_evidence",
+    ] | None:
+        """Treat text as a proposal and compare it with durable requirements."""
+
+        _ = content
+        metadata = context.metadata or {}
+        missing_fields = metadata.get("clarification_required")
+        map_session = NativeToolLoop._extract_map_session(results)
+        evidence_refs = [
+            str(item)
+            for item in cast(list[Any], metadata.get("evidence_refs") or [])
+        ]
+        missing_fields_list = (
+            cast(list[Any], missing_fields) if isinstance(missing_fields, list) else []
+        )
+        available_names = [
+            str(getattr(item, "name", ""))
+            for item in available_tools
+        ]
+        evaluation = CompletionEvaluator.evaluate_proposed_stop(
+            canonical_request=context.canonical_request,
+            presentation_required=bool(metadata.get("presentation_required")),
+            map_prepared=map_session is not None,
+            evidence_refs=evidence_refs,
+            available_tools=available_names,
+            clarification_required=bool(missing_fields_list),
+            provider_error=False,
+        )
+        if evaluation.satisfied:
+            return "goal_satisfied"
+        if evaluation.reason == "clarification_required":
+            return "clarification_required"
+        if evaluation.reason == "awaiting_render":
+            return "awaiting_render"
+        if evaluation.reason == "insufficient_evidence":
+            return "insufficient_evidence"
         return None
 
     # -------------------------------------------------------------------------
@@ -468,38 +763,83 @@ class NativeToolLoop:
                 error=rejection,
             )
         execution_budget = context.execution_budget
-        if execution_budget is not None:
-            execution_budget.record_tool_call()
-        timeout = self.tool_timeout_seconds
+        idle_timeout = float(
+            context.metadata.get("tool_idle_seconds", self.tool_timeout_seconds)
+            or self.tool_timeout_seconds
+        )
+        absolute_timeout = float(
+            context.metadata.get("tool_absolute_seconds", 90.0) or 90.0
+        )
+        timeout = min(idle_timeout, absolute_timeout)
         if execution_budget is not None:
             timeout = min(timeout, execution_budget.remaining_seconds())
-        try:
-            with (
-                execution_budget.observe(
-                    "tool_execution",
-                    metadata={"tool": call.name, "iteration": iteration},
+        retry_number = 0
+        retryable_codes = {
+            "tool_timeout",
+            "provider_timeout",
+            "rate_limited",
+            "provider_unavailable",
+        }
+        while True:
+            if execution_budget is not None:
+                execution_budget.record_tool_call()
+            try:
+                with (
+                    execution_budget.observe(
+                        "tool_execution",
+                        metadata={
+                            "tool": call.name,
+                            "iteration": iteration,
+                            "retry_number": retry_number,
+                            "idle_deadline_seconds": idle_timeout,
+                            "absolute_deadline_seconds": absolute_timeout,
+                        },
+                    )
+                    if execution_budget is not None
+                    else _nullcontext()
+                ):
+                    envelope = await asyncio.wait_for(
+                        self.tool_registry.execute_native_tool(
+                            call.name, call.arguments, context
+                        ),
+                        timeout=max(0.001, timeout),
+                    )
+            except TimeoutError:
+                envelope_payload = {
+                    "ok": False,
+                    "data": None,
+                    "error": {
+                        "code": "tool_timeout",
+                        "message": f"Tool '{call.name}' timed out.",
+                    },
+                    "metadata": {},
+                }
+            else:
+                envelope_payload = envelope.to_dict()
+            error = json_object(envelope_payload.get("error"))
+            error_code = str(error.get("code") or "")
+            if (
+                envelope_payload.get("ok") is False
+                and error_code in retryable_codes
+                and retry_number == 0
+                and (
+                    execution_budget is None
+                    or execution_budget.remaining_seconds() > timeout
                 )
-                if execution_budget is not None
-                else _nullcontext()
             ):
-                envelope = await asyncio.wait_for(
-                    self.tool_registry.execute_native_tool(
-                        call.name, call.arguments, context
-                    ),
-                    timeout=max(0.001, timeout),
-                )
-        except TimeoutError:
-            envelope_payload = {
-                "ok": False,
-                "data": None,
-                "error": {
-                    "code": "tool_timeout",
-                    "message": f"Tool '{call.name}' timed out.",
-                },
-                "metadata": {},
-            }
-        else:
-            envelope_payload = envelope.to_dict()
+                retry_number = 1
+                if execution_budget is not None:
+                    execution_budget.record_retry()
+                continue
+            break
+        context.metadata["last_retry_number"] = retry_number
+        if (
+            retry_number
+            and execution_budget is not None
+            and execution_budget.terminal_reason == "provider_timeout"
+        ):
+            execution_budget.terminal_reason = None
+        self._record_evidence_refs(context, envelope_payload)
         validation_error = self._validate_geospatial_tool_output(
             call, context, envelope_payload
         )
@@ -535,6 +875,31 @@ class NativeToolLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _record_evidence_refs(
+        context: AgentExecutionContext,
+        envelope: dict[str, Any],
+    ) -> None:
+        data = envelope.get("data")
+        raw_refs = context.metadata.get("evidence_refs")
+        refs: list[Any] = raw_refs if is_json_array(raw_refs) else []
+        if "evidence_refs" not in context.metadata or not is_json_array(raw_refs):
+            context.metadata["evidence_refs"] = refs
+        candidates: list[Any] = []
+        if is_json_object(data):
+            candidates.extend([data.get("evidence_ref"), data.get("evidence_refs")])
+            summary = data.get("summary")
+            if is_json_object(summary):
+                candidates.extend([summary.get("evidence_ref"), summary.get("evidence_refs")])
+        for candidate in candidates:
+            if isinstance(candidate, str) and candidate and candidate not in refs:
+                refs.append(candidate)
+            elif is_json_array(candidate):
+                for value in candidate:
+                    if isinstance(value, str) and value and value not in refs:
+                        refs.append(value)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _validate_geospatial_tool_output(
         call: LLMToolCall,
         context: AgentExecutionContext,
@@ -542,10 +907,7 @@ class NativeToolLoop:
     ) -> str | None:
         """Apply the planned output contract to native geospatial calls too."""
 
-        if call.name not in {
-            "execute_geospatial_capability",
-            "render_geospatial_provider_layer",
-        } or not bool(envelope.get("ok")):
+        if call.name != "execute_geospatial_capability" or not bool(envelope.get("ok")):
             return None
         canonical = context.canonical_request
         target_id = str(context.metadata.get("target_id") or "").strip() or None
@@ -565,10 +927,6 @@ class NativeToolLoop:
         capability_id = (
             str(call.arguments.get("capability_id") or "").strip() or None
         )
-        if call.name == "render_geospatial_provider_layer":
-            provider_id = str(call.arguments.get("provider_id") or "").strip()
-            layer_id = str(call.arguments.get("layer_id") or "").strip()
-            capability_id = f"{provider_id}:{layer_id}" if provider_id and layer_id else capability_id
         step = ToolPlanStep(
             step_id=f"native:{call.id}",
             tool_name=call.name,
@@ -589,14 +947,21 @@ class NativeToolLoop:
         serialized = json.dumps(payload, ensure_ascii=True, default=str)
         if len(serialized) <= self.max_tool_result_chars:
             return payload
+        data = payload.get("data")
+        summary: dict[str, Any] = {
+            "externalized": True,
+            "original_size": len(serialized),
+            "keys": sorted(str(key) for key in data) if is_json_object(data) else [],
+        }
+        if is_json_object(data):
+            for key in ("evidence_ref", "evidence_refs", "next_cursor", "status", "operation", "capability_id"):
+                if key in data:
+                    summary[key] = data[key]
+        if "evidence_ref" in payload:
+            summary["evidence_ref"] = payload["evidence_ref"]
         return {
             "ok": payload.get("ok", False),
-            "data": {
-                "truncated": True,
-                "original_size": len(serialized),
-                "content_preview": serialized[: self.max_tool_result_chars],
-                "next_cursor": self._extract_next_cursor(payload),
-            },
+            "data": summary,
             "error": payload.get("error"),
             "metadata": payload.get("metadata", {}),
         }

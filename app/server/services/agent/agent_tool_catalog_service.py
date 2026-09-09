@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_object, json_object
+from server.common.typing import is_json_array, is_json_object, json_object
 
+import json
+import math
 from typing import Any, cast
 
 from server.domain.agent.catalog import (
@@ -15,6 +17,8 @@ from server.domain.agent.decision import (
     ResolvedLocation,
 )
 from server.domain.agent.execution import AgentExecutionContext
+from server.domain.agent.evidence import AgentEvidenceEnvelope
+from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.domain.agent.interpretation import normalize_target_key
 from server.contracts.extraction import (
     LocationSignal,
@@ -48,6 +52,7 @@ class AgentToolCatalogService:
         tool_registry: ToolRegistry | None = None,
         policy_engine: PolicyEngine | None = None,
         geospatial_api_service: GeospatialApiService,
+        evidence_repository: AgentEvidenceRepository | None = None,
     ) -> None:
         self.capability_registry = capability_registry
         self.runtime_registry = runtime_registry
@@ -57,18 +62,43 @@ class AgentToolCatalogService:
         self.tool_registry = tool_registry
         self.policy_engine = policy_engine
         self.geospatial_api_service = geospatial_api_service
+        self.evidence_repository = evidence_repository
 
     # -------------------------------------------------------------------------
     def build_native_tools(
         self,
         context: AgentExecutionContext | None = None,
     ) -> list[LLMToolDefinition]:
-        metadata = context.metadata if context is not None else {}
+        metadata: dict[str, Any] = context.metadata if context is not None else {}
         allowed_tool_names = set(map(str, metadata.get("allowed_native_tools") or []))
         allowed_capability_ids = sorted(
             set(map(str, metadata.get("allowed_capability_ids") or []))
         )
+        evidence_refs = [
+            str(item)
+            for item in cast(list[Any], metadata.get("evidence_refs") or [])
+        ]
+        presentation_required = bool(metadata.get("presentation_required"))
+        unresolved_targets = bool(metadata.get("unresolved_targets"))
         definitions = [
+            LLMToolDefinition(
+                name="resolve_geospatial_location",
+                description=(
+                    "Resolve one unresolved canonical geographic target. Use only a target_id "
+                    "from the canonical request or a candidate ID returned by this tool; "
+                    "never geocode arbitrary replacement text."
+                ),
+                parameters_json_schema={
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "target_id": {"type": "string"},
+                        "expected_location_type": {"type": ["string", "null"]},
+                        "candidate_id": {"type": ["string", "null"]},
+                    },
+                    "required": ["target_id"],
+                },
+            ),
             LLMToolDefinition(
                 name="list_geospatial_capabilities",
                 description=(
@@ -91,6 +121,22 @@ class AgentToolCatalogService:
                         "geometry_type": {
                             "type": ["string", "null"],
                             "description": "Optional geometry filter when the requested data shape is known.",
+                        },
+                        "capability_domain": {
+                            "type": ["string", "null"],
+                            "description": "Optional capability domain such as discovery, analysis, or presentation.",
+                        },
+                        "temporal_support": {
+                            "type": ["string", "null"],
+                            "description": "Optional temporal support filter such as static, current, or historical.",
+                        },
+                        "analysis_operation": {
+                            "type": ["string", "null"],
+                            "description": "Optional operation filter such as point-query, proximity, or aggregate.",
+                        },
+                        "renderable": {
+                            "type": ["boolean", "null"],
+                            "description": "Optional renderability filter.",
                         },
                         "bbox": {
                             "type": ["array", "null"],
@@ -146,6 +192,15 @@ class AgentToolCatalogService:
                             "type": "object",
                             "description": "Arguments matching the capability's executable argument schema.",
                         },
+                        "location_ref": {
+                            "type": ["string", "null"],
+                            "description": "Optional canonical location reference returned by location resolution.",
+                        },
+                        "input_evidence_refs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "maxItems": 16,
+                        },
                     },
                     "required": ["capability_id", "arguments"],
                 },
@@ -185,38 +240,67 @@ class AgentToolCatalogService:
                 },
             ),
             LLMToolDefinition(
-                name="render_geospatial_provider_layer",
+                name="inspect_geospatial_evidence",
                 description=(
-                    "Render one explicitly selected normalized provider-native layer "
-                    "after discovery returned its exact provider_id and layer_id. "
-                    "Do not guess layer IDs or use this for generic catalog capabilities."
+                    "Inspect bounded metadata, schema, samples, statistics, or a page from "
+                    "stored evidence. Full provider payloads are never returned by default."
                 ),
                 parameters_json_schema={
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "provider_id": {
+                        "evidence_ref": {"type": "string"},
+                        "view": {
                             "type": "string",
-                            "description": "Exact provider ID returned by the routed discovery call.",
+                            "enum": ["metadata", "schema", "sample", "statistics", "page"],
                         },
-                        "layer_id": {
-                            "type": "string",
-                            "description": "Exact normalized layer ID returned by provider discovery.",
-                        },
-                        "time": {
-                            "type": ["string", "null"],
-                            "description": "Optional time parameter supported by the selected layer.",
-                        },
-                        "style": {
-                            "type": ["string", "null"],
-                            "description": "Optional style parameter supported by the selected layer.",
-                        },
-                        "format": {
-                            "type": ["string", "null"],
-                            "description": "Optional format parameter supported by the selected layer.",
-                        },
+                        "fields": {"type": "array", "items": {"type": "string"}, "maxItems": 32},
+                        "cursor": {"type": ["string", "null"]},
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 100},
                     },
-                    "required": ["provider_id", "layer_id"],
+                    "required": ["evidence_ref", "view"],
+                },
+            ),
+            LLMToolDefinition(
+                name="transform_geospatial_evidence",
+                description=(
+                    "Transform normalized vector or tabular evidence using up to eight "
+                    "declarative filters, sorts, projections, limits, or aggregates. "
+                    "Arbitrary expressions and raster transformation are not supported."
+                ),
+                parameters_json_schema={
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "evidence_refs": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 8},
+                        "operations": {"type": "array", "items": {"type": "object"}, "minItems": 1, "maxItems": 8},
+                    },
+                    "required": ["evidence_refs", "operations"],
+                },
+            ),
+            LLMToolDefinition(
+                name="prepare_geospatial_map",
+                description=(
+                    "Prepare a candidate map from validated locations, provider descriptors, "
+                    "or renderable evidence. Preparation does not make the map visible; the "
+                    "browser render acknowledgement is authoritative."
+                ),
+                parameters_json_schema={
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "evidence_refs": {"type": "array", "items": {"type": "string"}, "maxItems": 16},
+                        "location_refs": {"type": "array", "items": {"type": "string"}, "maxItems": 16},
+                        "basemap_id": {"type": ["string", "null"]},
+                        "layer_options": {"type": "object"},
+                        "viewport_strategy": {"type": "string", "enum": ["fit_results", "fit_location", "preserve_current"]},
+                    },
+                    # At least one of these collections is required by the
+                    # handler, but JSON Schema cannot express that union
+                    # without making the model provide an unnecessary empty
+                    # value.  Keep both optional and enforce the invariant in
+                    # the deterministic boundary below.
+                    "required": [],
                 },
             ),
         ]
@@ -229,14 +313,50 @@ class AgentToolCatalogService:
             execute.parameters_json_schema["properties"]["capability_id"]["enum"] = (
                 allowed_capability_ids
             )
-        if allowed_tool_names:
-            return [item for item in definitions if item.name in allowed_tool_names]
+        if context is not None:
+            context.metadata["tool_exposure_reasons"] = {
+                "resolve_geospatial_location": "Canonical target remains unresolved.",
+                "list_geospatial_capabilities": "No exact capability is trusted or discovery is still useful.",
+                "describe_geospatial_capability": "Exact capability metadata or argument schema is needed.",
+                "execute_geospatial_capability": "Policy produced an exact allowlisted capability ID.",
+                "fetch_geospatial_provider_layers": "Provider-native discovery is explicitly routed and allowed.",
+                "inspect_geospatial_evidence": "Usable stored evidence is available for bounded inspection.",
+                "transform_geospatial_evidence": "Usable normalized evidence can satisfy a pending transformation.",
+                "prepare_geospatial_map": "Geographic presentation is required and a renderable input exists.",
+            }
+            if allowed_tool_names:
+                definitions = [item for item in definitions if item.name in allowed_tool_names]
+            if not allowed_capability_ids and not metadata.get("register_all"):
+                definitions = [item for item in definitions if item.name != "execute_geospatial_capability"]
+            if not unresolved_targets:
+                definitions = [item for item in definitions if item.name != "resolve_geospatial_location"]
+            if not evidence_refs:
+                definitions = [
+                    item
+                    for item in definitions
+                    if item.name not in {"inspect_geospatial_evidence", "transform_geospatial_evidence"}
+                ]
+            if not presentation_required or (not evidence_refs and not metadata.get("resolved_location")):
+                definitions = [item for item in definitions if item.name != "prepare_geospatial_map"]
         return definitions
 
     # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
-        for definition in self.build_native_tools():
-            if definition.name == "list_geospatial_capabilities":
+        # Registration owns the complete canonical surface; exposure is
+        # recalculated per run by ``build_native_tools(context)``.
+        registration_context = AgentExecutionContext(
+            metadata={
+                "unresolved_targets": True,
+                "evidence_refs": ["registration"],
+                "register_all": True,
+                "presentation_required": True,
+                "resolved_location": True,
+            }
+        )
+        for definition in self.build_native_tools(registration_context):
+            if definition.name == "resolve_geospatial_location":
+                registry.register_native_tool(definition, self._resolve_location_tool_handler)
+            elif definition.name == "list_geospatial_capabilities":
                 registry.register_native_tool(definition, self._list_tool_handler)
             elif definition.name == "describe_geospatial_capability":
                 registry.register_native_tool(definition, self._describe_tool_handler)
@@ -246,10 +366,12 @@ class AgentToolCatalogService:
                 registry.register_native_tool(
                     definition, self._provider_layers_tool_handler
                 )
-            elif definition.name == "render_geospatial_provider_layer":
-                registry.register_native_tool(
-                    definition, self._render_provider_layer_tool_handler
-                )
+            elif definition.name == "inspect_geospatial_evidence":
+                registry.register_native_tool(definition, self._inspect_evidence_tool_handler)
+            elif definition.name == "transform_geospatial_evidence":
+                registry.register_native_tool(definition, self._transform_evidence_tool_handler)
+            elif definition.name == "prepare_geospatial_map":
+                registry.register_native_tool(definition, self._prepare_map_tool_handler)
 
     # -------------------------------------------------------------------------
     async def _list_tool_handler(
@@ -257,8 +379,25 @@ class AgentToolCatalogService:
         arguments: dict[str, Any],
         context: AgentExecutionContext,
     ) -> dict[str, Any]:
-        _ = context
-        return self.list_geospatial_capabilities(CapabilityCatalogFilter(**arguments))
+        result = self.list_geospatial_capabilities(CapabilityCatalogFilter(**arguments))
+        discovered = {
+            str(item.get("id"))
+            for item in result.get("items", [])
+            if is_json_object(item) and item.get("id")
+        }
+        if discovered:
+            already_discovered = set(
+                map(str, context.metadata.get("discovered_capability_ids") or [])
+            )
+            already_discovered.update(discovered)
+            context.metadata["discovered_capability_ids"] = sorted(already_discovered)
+            current = set(
+                map(str, context.metadata.get("allowed_capability_ids") or [])
+            )
+            current.update(discovered)
+            context.metadata["allowed_capability_ids"] = sorted(current)
+            context.policy_constraints["allowed_capability_ids"] = sorted(current)
+        return result
 
     # -------------------------------------------------------------------------
     async def _describe_tool_handler(
@@ -266,8 +405,109 @@ class AgentToolCatalogService:
         arguments: dict[str, Any],
         context: AgentExecutionContext,
     ) -> dict[str, Any]:
-        _ = context
-        return self.describe_geospatial_capability(str(arguments["capability_id"]))
+        capability_id = str(arguments["capability_id"])
+        discovered = set(
+            map(str, context.metadata.get("discovered_capability_ids") or [])
+        )
+        allowlisted = set(
+            map(str, context.metadata.get("allowed_capability_ids") or [])
+        )
+        if capability_id not in discovered and capability_id not in allowlisted:
+            raise ValueError(
+                f"Capability '{capability_id}' was not returned by an allowed discovery call."
+            )
+        return self.describe_geospatial_capability(capability_id)
+
+    # -------------------------------------------------------------------------
+    async def _resolve_location_tool_handler(
+        self,
+        arguments: dict[str, Any],
+        context: AgentExecutionContext,
+    ) -> dict[str, Any]:
+        target_id = str(arguments.get("target_id") or "").strip()
+        canonical = context.canonical_request
+        target = canonical.target(target_id) if canonical is not None and target_id else None
+        if target is None:
+            return AgentEvidenceEnvelope(
+                ok=False,
+                status="error",
+                error={"code": "unknown_target", "message": "Only a canonical target may be resolved."},
+            ).model_dump(mode="json")
+        if target.resolved_location is not None:
+            location = target.resolved_location
+            return self._location_envelope(location, context, target_id)
+        parsed_request = self._parsed_request_from_context(context)
+        signals = [
+            signal
+            for signal in (
+                parsed_request.location_signals if parsed_request is not None else []
+            )
+            if getattr(signal, "target_id", None) in {None, target_id}
+        ]
+        if not signals:
+            raw = str(getattr(target, "original_text", "") or "").strip()
+            if raw:
+                signals = self._build_argument_location_signals({"location": raw})
+        result = await self.location_resolver.resolve_location_signals(
+            signals, json_object(context.map_state)
+        )
+        if isinstance(result, ClarificationRequest):
+            return AgentEvidenceEnvelope(
+                ok=False,
+                status="error",
+                error={"code": "ambiguous", "message": result.question},
+                summary={"candidates": result.model_dump(mode="json")},
+            ).model_dump(mode="json")
+        return self._location_envelope(result, context, target_id)
+
+    # -------------------------------------------------------------------------
+    def _location_envelope(
+        self,
+        location: ResolvedLocation,
+        context: AgentExecutionContext,
+        target_id: str,
+    ) -> dict[str, Any]:
+        canonical = context.canonical_request
+        if canonical is not None:
+            target = canonical.target(target_id)
+            if target is not None:
+                target.resolved_location = location
+                target.resolution_status = "resolved"
+            context.metadata["unresolved_targets"] = any(
+                item.resolved_location is None for item in canonical.targets
+            )
+        context.metadata["resolved_location"] = location.model_dump(mode="json")
+        payload = location.model_dump(mode="json")
+        evidence_ref = self._persist_evidence(
+            context=context,
+            kind="location",
+            media_type="application/json",
+            status="available",
+            payload=payload,
+            summary={
+                "label": location.label,
+                "target_id": target_id,
+                "coordinates": [location.longitude, location.latitude],
+                "map_eligibility": "renderable",
+            },
+            provenance=location.provenance.model_dump(mode="json") if location.provenance else {},
+        )
+        return AgentEvidenceEnvelope(
+            ok=True,
+            status="available",
+            evidence_ref=evidence_ref,
+            summary={
+                "target_id": target_id,
+                "label": location.label,
+                "type": location.location_type,
+                "coordinates": [location.longitude, location.latitude],
+                "bounds": location.bbox,
+                "confidence": location.confidence,
+            },
+            provenance=location.provenance.model_dump(mode="json") if location.provenance else {},
+            map_eligibility="renderable",
+            state_changes=[{"type": "location_resolved", "target_id": target_id}],
+        ).model_dump(mode="json")
 
     # -------------------------------------------------------------------------
     async def _execute_tool_handler(
@@ -275,13 +515,70 @@ class AgentToolCatalogService:
         arguments: dict[str, Any],
         context: AgentExecutionContext,
     ) -> dict[str, Any]:
-        return dict(
+        payload = dict(
             await self.execute_geospatial_capability(
                 str(arguments["capability_id"]),
                 dict(arguments.get("arguments") or {}),
                 context=context,
             )
         )
+        ok = bool(payload.get("ok"))
+        map_session = payload.get("map_session")
+        map_session_payload = (
+            map_session.model_dump(mode="json")
+            if isinstance(map_session, MapSession)
+            else map_session
+        )
+        status = "available" if ok else "failed"
+        if ok and payload.get("direct_result") in (None, [], {}, "") and map_session is None:
+            status = "valid_empty"
+        evidence_payload = {**payload, "map_session": map_session_payload}
+        evidence_ref = self._persist_evidence(
+            context=context,
+            kind="capability_result",
+            media_type="application/json",
+            status=status,
+            payload=evidence_payload,
+            summary={
+                "operation": payload.get("operation"),
+                "capability_id": arguments.get("capability_id"),
+                "map_eligibility": "renderable" if map_session is not None else "unknown",
+                **(
+                    {"map_session": map_session_payload}
+                    if is_json_object(map_session_payload)
+                    else {}
+                ),
+            },
+            provenance={
+                "capability_id": arguments.get("capability_id"),
+                "target_id": context.metadata.get("target_id"),
+            },
+        )
+        if str(context.metadata.get("execution_mode") or "native") == "deterministic":
+            payload["evidence_ref"] = evidence_ref
+            return payload
+        return AgentEvidenceEnvelope(
+            ok=ok,
+            status=status,
+            evidence_ref=evidence_ref,
+            summary={
+                "operation": payload.get("operation"),
+                "capability_id": arguments.get("capability_id"),
+                "map_session": map_session_payload,
+            },
+            provenance={"capability_id": arguments.get("capability_id")},
+            map_eligibility="renderable" if map_session is not None else "unknown",
+            error=(
+                cast(dict[str, Any], payload.get("error"))
+                if is_json_object(payload.get("error"))
+                else None
+            ),
+            state_changes=[
+                {"type": "evidence_available", "evidence_ref": evidence_ref}
+                if evidence_ref
+                else {}
+            ],
+        ).model_dump(mode="json")
 
     # -------------------------------------------------------------------------
     async def _provider_layers_tool_handler(
@@ -289,7 +586,6 @@ class AgentToolCatalogService:
         arguments: dict[str, Any],
         context: AgentExecutionContext,
     ) -> dict[str, Any]:
-        _ = context
         response = await self.geospatial_api_service.list_provider_layers(
             str(arguments["provider_id"]),
             query=arguments.get("query")
@@ -299,18 +595,431 @@ class AgentToolCatalogService:
             refresh=bool(arguments.get("refresh", False)),
         )
         payload = response.model_dump(mode="json")
-        return payload
+        evidence_ref = self._persist_evidence(
+            context=context,
+            kind="provider_layer_descriptor",
+            media_type="application/json",
+            status="valid_empty" if not payload.get("layers") else "available",
+            payload=payload,
+            summary={
+                "provider_id": arguments.get("provider_id"),
+                "layer_count": len(payload.get("layers") or []),
+                "map_eligibility": "renderable" if payload.get("layers") else "not_renderable",
+            },
+            provenance={"provider_id": arguments.get("provider_id")},
+        )
+        if str(context.metadata.get("execution_mode") or "native") == "deterministic":
+            payload["evidence_ref"] = evidence_ref
+            return payload
+        return AgentEvidenceEnvelope(
+            ok=True,
+            status="valid_empty" if not payload.get("layers") else "available",
+            evidence_ref=evidence_ref,
+            summary={
+                "provider_id": arguments.get("provider_id"),
+                "layer_count": len(payload.get("layers") or []),
+            },
+            provenance={"provider_id": arguments.get("provider_id")},
+            map_eligibility="renderable" if payload.get("layers") else "not_renderable",
+            pagination={"next_cursor": payload.get("next_cursor")},
+        ).model_dump(mode="json")
 
     # -------------------------------------------------------------------------
-    async def _render_provider_layer_tool_handler(
+    async def _inspect_evidence_tool_handler(
         self,
         arguments: dict[str, Any],
         context: AgentExecutionContext,
     ) -> dict[str, Any]:
-        return dict(await self._render_provider_layer(arguments, context))
+        if self.evidence_repository is None:
+            return AgentEvidenceEnvelope(
+                ok=False,
+                status="error",
+                error={"code": "evidence_unavailable", "message": "Evidence storage is not configured."},
+            ).model_dump(mode="json")
+        evidence_id = str(arguments.get("evidence_ref") or "")
+        item = self.evidence_repository.get_payload(
+            evidence_id,
+            conversation_id=context.conversation_id,
+        )
+        if item is None or context.conversation_id is None:
+            return AgentEvidenceEnvelope(
+                ok=False,
+                status="error",
+                error={"code": "unknown_evidence", "message": "Evidence reference is unavailable."},
+            ).model_dump(mode="json")
+        summary, raw = item
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            payload = {"byte_size": len(raw), "media_type": summary.media_type}
+        view = str(arguments.get("view") or "metadata")
+        result = self._inspect_payload(
+            payload,
+            view=view,
+            fields=[
+                str(value)
+                for value in cast(list[Any], arguments.get("fields") or [])
+            ],
+            cursor=arguments.get("cursor"),
+            limit=int(arguments.get("limit") or 100),
+        )
+        return AgentEvidenceEnvelope(
+            ok=True,
+            status=summary.status,
+            evidence_ref=evidence_id,
+            summary={"view": view, "result": result, "source": summary.summary},
+            provenance=summary.provenance,
+            map_eligibility=summary.map_eligibility,
+            pagination=result.get("pagination") if is_json_object(result) else None,
+        ).model_dump(mode="json")
 
     # -------------------------------------------------------------------------
-    async def _render_provider_layer(
+    async def _transform_evidence_tool_handler(
+        self,
+        arguments: dict[str, Any],
+        context: AgentExecutionContext,
+    ) -> dict[str, Any]:
+        if self.evidence_repository is None or context.conversation_id is None:
+            return AgentEvidenceEnvelope(
+                ok=False,
+                status="error",
+                error={"code": "evidence_unavailable", "message": "Evidence storage is not configured."},
+            ).model_dump(mode="json")
+        refs = [
+            str(value)
+            for value in cast(list[Any], arguments.get("evidence_refs") or [])
+        ]
+        raw_operations = arguments.get("operations")
+        operations: list[Any] = (
+            raw_operations if is_json_array(raw_operations) else []
+        )
+        if len(operations) > 8 or not refs:
+            return AgentEvidenceEnvelope(
+                ok=False,
+                status="error",
+                error={"code": "invalid_transform", "message": "At least one evidence reference and at most eight operations are required."},
+            ).model_dump(mode="json")
+        records: list[Any] = []
+        parents: list[str] = []
+        for ref in refs:
+            item = self.evidence_repository.get_payload(
+                ref,
+                conversation_id=context.conversation_id,
+            )
+            if item is None:
+                return AgentEvidenceEnvelope(
+                    ok=False,
+                    status="error",
+                    error={"code": "unknown_evidence", "message": f"Evidence '{ref}' is unavailable."},
+                ).model_dump(mode="json")
+            summary, raw = item
+            parents.append(summary.evidence_id)
+            try:
+                value = json.loads(raw.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return AgentEvidenceEnvelope(
+                    ok=False,
+                    status="error",
+                    error={"code": "unsupported_transform", "message": "Only normalized JSON vector or tabular evidence can be transformed."},
+                ).model_dump(mode="json")
+            records.extend(self._records_from_payload(value))
+        transformed, error = self._apply_transform_operations(records, operations)
+        if error:
+            return AgentEvidenceEnvelope(ok=False, status="error", error={"code": "invalid_transform", "message": error}).model_dump(mode="json")
+        evidence_ref = self._persist_evidence(
+            context=context,
+            kind="derived",
+            media_type="application/json",
+            status="valid_empty" if not transformed else "available",
+            payload={"records": transformed},
+            summary={"record_count": len(transformed), "parent_count": len(parents), "map_eligibility": "renderable" if transformed else "not_renderable"},
+            provenance={"operation_count": len(operations), "operations": [str(item.get("op") or "") for item in operations if is_json_object(item)]},
+            parent_evidence_ids=parents,
+        )
+        return AgentEvidenceEnvelope(
+            ok=True,
+            status="valid_empty" if not transformed else "available",
+            evidence_ref=evidence_ref,
+            summary={"record_count": len(transformed), "parents": parents},
+            provenance={"operation_count": len(operations)},
+            map_eligibility="renderable" if transformed else "not_renderable",
+        ).model_dump(mode="json")
+
+    # -------------------------------------------------------------------------
+    async def _prepare_map_tool_handler(
+        self,
+        arguments: dict[str, Any],
+        context: AgentExecutionContext,
+    ) -> dict[str, Any]:
+        evidence_refs = [
+            str(value)
+            for value in cast(list[Any], arguments.get("evidence_refs") or [])
+        ]
+        location_refs = [
+            str(value)
+            for value in cast(list[Any], arguments.get("location_refs") or [])
+        ]
+        if not evidence_refs and not location_refs:
+            return AgentEvidenceEnvelope(ok=False, status="error", error={"code": "missing_map_input", "message": "Map preparation requires evidence or location references."}).model_dump(mode="json")
+        map_session: MapSession | None = None
+        if self.evidence_repository is not None:
+            for ref in evidence_refs:
+                item = self.evidence_repository.get_payload(
+                    ref,
+                    conversation_id=context.conversation_id,
+                )
+                if item is None:
+                    continue
+                _summary, raw = item
+                try:
+                    payload = json.loads(raw.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    continue
+                candidate = payload.get("map_session") if is_json_object(payload) else None
+                if is_json_object(candidate):
+                    try:
+                        map_session = MapSession.model_validate(candidate)
+                        break
+                    except Exception:
+                        continue
+        layer_options = arguments.get("layer_options")
+        if map_session is None and is_json_object(layer_options):
+            provider_id = str(layer_options.get("provider_id") or "").strip()
+            layer_id = str(layer_options.get("layer_id") or "").strip()
+            if provider_id and layer_id:
+                rendered = await self._prepare_provider_layer(
+                    {
+                        "provider_id": provider_id,
+                        "layer_id": layer_id,
+                        "target_id": location_refs[0] if len(location_refs) == 1 else None,
+                        "time": layer_options.get("time"),
+                        "style": layer_options.get("style"),
+                        "format": layer_options.get("format"),
+                    },
+                    context,
+                )
+                rendered_map = rendered.get("map_session")
+                if rendered.get("ok") and is_json_object(rendered_map):
+                    try:
+                        map_session = MapSession.model_validate(rendered_map)
+                    except Exception:
+                        map_session = None
+        if map_session is None:
+            return AgentEvidenceEnvelope(
+                ok=False,
+                status="error",
+                error={"code": "map_not_preparable", "message": "No renderable map session or provider layer descriptor is available from the supplied evidence."},
+                state_changes=[{"type": "map_preparation_failed"}],
+            ).model_dump(mode="json")
+        map_evidence_ref = self._persist_evidence(
+            context=context,
+            kind="provider_layer_descriptor",
+            media_type="application/vnd.aegis.map-session+json",
+            status="available",
+            payload={"map_session": map_session.model_dump(mode="json")},
+            summary={
+                "operation": "map_session_created",
+                "overlay_count": len(map_session.overlay_collection.instances),
+                "map_eligibility": "renderable",
+            },
+            provenance={
+                "source_evidence_refs": evidence_refs,
+                "location_refs": location_refs,
+                "viewport_strategy": arguments.get("viewport_strategy")
+                or "fit_results",
+            },
+            parent_evidence_ids=evidence_refs,
+        )
+        all_evidence_refs = list(
+            dict.fromkeys([*evidence_refs, *( [map_evidence_ref] if map_evidence_ref else [] )])
+        )
+        return {
+            "ok": True,
+            "status": "available",
+            "evidence_ref": map_evidence_ref or (evidence_refs[0] if evidence_refs else None),
+            "summary": {
+                "operation": "map_session_created",
+                "required_overlay_ids": [
+                    instance.instance_id
+                    for instance in map_session.overlay_collection.instances
+                ],
+                "map_session": map_session.model_dump(mode="json"),
+                "evidence_refs": all_evidence_refs,
+                "location_refs": location_refs,
+                "map_eligibility": "renderable",
+            },
+            "provenance": {"viewport_strategy": arguments.get("viewport_strategy") or "fit_results"},
+            "map_eligibility": "renderable",
+            "state_changes": [{"type": "map_prepared", "render_status": "awaiting_render"}],
+        }
+
+    # -------------------------------------------------------------------------
+    def _persist_evidence(
+        self,
+        *,
+        context: AgentExecutionContext,
+        kind: str,
+        media_type: str,
+        status: Any,
+        payload: Any,
+        summary: dict[str, Any],
+        provenance: dict[str, Any],
+        parent_evidence_ids: list[str] | None = None,
+    ) -> str | None:
+        if self.evidence_repository is None or context.conversation_id is None:
+            return None
+        record = self.evidence_repository.create(
+            conversation_id=context.conversation_id,
+            run_id=context.request_id,
+            kind=kind,
+            media_type=media_type,
+            status=status,
+            payload=payload,
+            summary=summary,
+            provenance=provenance,
+            parent_evidence_ids=parent_evidence_ids,
+        )
+        return record.evidence_id
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _records_from_payload(payload: Any) -> list[dict[str, Any]]:
+        if is_json_object(payload):
+            for key in ("records", "features", "items", "data"):
+                value = payload.get(key)
+                if is_json_array(value):
+                    return [item for item in value if is_json_object(item)]
+            return [payload]
+        return [item for item in payload if is_json_object(item)] if is_json_array(payload) else []
+
+    @staticmethod
+    def _inspect_payload(payload: Any, *, view: str, fields: list[str], cursor: Any, limit: int) -> dict[str, Any]:
+        if view == "metadata":
+            return {"type": type(payload).__name__, "keys": list(payload)[:100] if is_json_object(payload) else [], "record_count": len(AgentToolCatalogService._records_from_payload(payload))}
+        records = AgentToolCatalogService._records_from_payload(payload)
+        if fields:
+            records = [{key: item.get(key) for key in fields if key in item} for item in records]
+        if view == "schema":
+            keys = sorted({key for item in records for key in item})
+            return {"fields": keys, "record_count": len(records)}
+        if view == "statistics":
+            stats: dict[str, Any] = {}
+            for key in sorted({key for item in records for key in item}):
+                values: list[float] = []
+                for item in records:
+                    value = item.get(key)
+                    if isinstance(value, (int, float)) and not isinstance(value, bool):
+                        values.append(float(value))
+                if values:
+                    stats[key] = {"min": min(values), "max": max(values), "count": len(values)}
+            return {"statistics": stats, "record_count": len(records)}
+        start = int(cursor or 0) if str(cursor or "0").isdigit() else 0
+        page = records[start : start + max(1, min(limit, 100))]
+        return {"records": page, "pagination": {"cursor": str(start + len(page)) if start + len(page) < len(records) else None, "total": len(records)}}
+
+    @staticmethod
+    def _apply_transform_operations(records: list[dict[str, Any]], operations: list[Any]) -> tuple[list[dict[str, Any]], str | None]:
+        allowed = {"attribute_filter", "temporal_filter", "spatial_filter", "sort", "limit", "field_projection", "aggregate"}
+        result = list(records)
+        for operation in operations:
+            if not is_json_object(operation) or str(operation.get("op") or "") not in allowed:
+                return result, "Only the supported declarative geospatial operations are allowed."
+            op = str(operation.get("op"))
+            if op == "attribute_filter":
+                field = str(operation.get("field") or "")
+                if not field:
+                    return result, f"{op} requires a field."
+                expected = operation.get("value")
+                operator = str(operation.get("operator") or "eq")
+                if operator not in {"eq", "neq", "in", "contains", "gte", "lte"}:
+                    return result, "attribute_filter uses an unsupported operator."
+                def matches(item: dict[str, Any]) -> bool:
+                    actual = item.get(field)
+                    if operator == "eq":
+                        return actual == expected
+                    if operator == "neq":
+                        return actual != expected
+                    if operator == "in":
+                        return is_json_array(expected) and actual in expected
+                    if operator == "contains":
+                        if isinstance(actual, str) and isinstance(expected, str):
+                            return expected in actual
+                        return is_json_array(actual) and expected in actual
+                    if operator == "gte":
+                        return isinstance(actual, (int, float)) and isinstance(expected, (int, float)) and actual >= expected
+                    return isinstance(actual, (int, float)) and isinstance(expected, (int, float)) and actual <= expected
+                result = [item for item in result if matches(item)]
+            elif op == "temporal_filter":
+                field = str(operation.get("field") or "timestamp")
+                start = str(operation.get("start") or "")
+                end = str(operation.get("end") or "")
+                if not start and not end:
+                    return result, "temporal_filter requires a start or end bound."
+                def in_time_window(item: dict[str, Any]) -> bool:
+                    actual = item.get(field)
+                    return (
+                        isinstance(actual, str)
+                        and (not start or actual >= start)
+                        and (not end or actual <= end)
+                    )
+
+                result = [item for item in result if in_time_window(item)]
+            elif op == "spatial_filter":
+                field = str(operation.get("field") or "geometry")
+                center = operation.get("center")
+                radius_km = operation.get("radius_km")
+                if not is_json_array(center) or len(center) != 2 or not isinstance(radius_km, (int, float)) or radius_km <= 0:
+                    return result, "spatial_filter requires center [longitude, latitude] and positive radius_km."
+                try:
+                    lon0, lat0 = float(center[0]), float(center[1])
+                    radius_value = float(radius_km)
+                except (TypeError, ValueError):
+                    return result, "spatial_filter requires numeric center and radius."
+                def within(item: dict[str, Any]) -> bool:
+                    geometry = item.get(field)
+                    coordinates = geometry.get("coordinates") if is_json_object(geometry) else geometry
+                    if not is_json_array(coordinates) or len(coordinates) < 2:
+                        return False
+                    try:
+                        lon, lat = float(coordinates[0]), float(coordinates[1])
+                    except (TypeError, ValueError):
+                        return False
+                    dlat = math.radians(lat - lat0)
+                    dlon = math.radians(lon - lon0)
+                    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat0)) * math.cos(math.radians(lat)) * math.sin(dlon / 2) ** 2
+                    return 6371.0 * 2 * math.atan2(math.sqrt(a), math.sqrt(max(0.0, 1 - a))) <= radius_value
+                result = [item for item in result if within(item)]
+            elif op == "sort":
+                field = str(operation.get("field") or "")
+                if not field:
+                    return result, "sort requires a field."
+                result.sort(key=lambda item: (item.get(field) is None, str(item.get(field) or "")), reverse=bool(operation.get("descending")))
+            elif op == "limit":
+                count = operation.get("value")
+                if not isinstance(count, int) or count < 1 or count > 10000:
+                    return result, "limit must be an integer between 1 and 10000."
+                result = result[:count]
+            elif op == "field_projection":
+                fields = operation.get("fields")
+                if not is_json_array(fields) or not fields:
+                    return result, "field_projection requires a non-empty fields list."
+                result = [{str(key): item.get(str(key)) for key in fields if str(key) in item} for item in result]
+            elif op == "aggregate":
+                field = str(operation.get("field") or "")
+                group_by = str(operation.get("group_by") or "")
+                if not field or not group_by:
+                    return result, "aggregate requires field and group_by."
+                groups: dict[str, list[float]] = {}
+                for item in result:
+                    value = item.get(field)
+                    group = str(item.get(group_by) or "")
+                    if isinstance(value, (int, float)):
+                        groups.setdefault(group, []).append(float(value))
+                result = [{group_by: group, field: sum(values), "count": len(values)} for group, values in groups.items()]
+        return result, None
+
+    # -------------------------------------------------------------------------
+    async def _prepare_provider_layer(
         self,
         arguments: dict[str, Any],
         context: AgentExecutionContext | None,
@@ -422,6 +1131,9 @@ class AgentToolCatalogService:
         query = str(filters.query or "").strip().casefold()
         category = str(filters.category or "").strip().casefold()
         geometry_type = str(filters.geometry_type or "").strip().casefold()
+        capability_domain = str(filters.capability_domain or "").strip().casefold()
+        temporal_support = str(filters.temporal_support or "").strip().casefold()
+        analysis_operation = str(filters.analysis_operation or "").strip().casefold()
         if query:
             items = [
                 item
@@ -453,6 +1165,49 @@ class AgentToolCatalogService:
                 == str(
                     json_object(item.get("metadata")).get("geometry_type") or ""
                 ).casefold()
+            ]
+        if capability_domain:
+            items = [
+                item
+                for item in items
+                if capability_domain
+                == str(
+                    item.get("capabilityDomain")
+                    or json_object(item.get("metadata")).get("capability_domain")
+                    or ""
+                ).casefold()
+            ]
+        if temporal_support:
+            items = [
+                item
+                for item in items
+                if temporal_support
+                == str(
+                    item.get("temporalSupport")
+                    or json_object(item.get("metadata")).get("temporal_support")
+                    or ""
+                ).casefold()
+            ]
+        if analysis_operation:
+            items = [
+                item
+                for item in items
+                if analysis_operation
+                in {
+                    str(item.get("analysisOperation") or "").casefold(),
+                    str(json_object(item.get("metadata")).get("analysis_operation") or "").casefold(),
+                }
+            ]
+        if filters.renderable is not None:
+            items = [
+                item
+                for item in items
+                if bool(
+                    item.get("renderable")
+                    if item.get("renderable") is not None
+                    else json_object(item.get("metadata")).get("renderable")
+                )
+                is filters.renderable
             ]
         items = sorted(items, key=lambda item: str(item.get("id") or ""))
         offset = self._decode_cursor(filters.cursor)
@@ -499,7 +1254,7 @@ class AgentToolCatalogService:
                 message=validation_error,
             )
 
-        scope_error = self._canonical_scope_error(context)
+        scope_error = self._canonical_scope_error(context, arguments)
         if scope_error is not None:
             return self._error_result(
                 capability_id=capability_id,
@@ -642,10 +1397,23 @@ class AgentToolCatalogService:
     @staticmethod
     def _canonical_scope_error(
         context: AgentExecutionContext | None,
+        arguments: dict[str, Any] | None = None,
     ) -> str | None:
         if context is None or context.canonical_request is None:
             return None
-        target_id = str(context.metadata.get("target_id") or "").strip()
+        arguments = arguments or {}
+        location_refs = arguments.get("location_refs")
+        target_id = str(
+            context.metadata.get("target_id")
+            or arguments.get("target_id")
+            or arguments.get("location_ref")
+            or (
+                location_refs[0]
+                if is_json_array(location_refs) and len(location_refs) == 1
+                else ""
+            )
+            or ""
+        ).strip()
         target = (
             context.canonical_request.target(target_id)
             if target_id
@@ -692,6 +1460,10 @@ class AgentToolCatalogService:
             "provider": item.get("provider"),
             "category": item.get("capabilityKind") or item.get("type"),
             "geometry_type": metadata.get("geometry_type"),
+            "capability_domain": item.get("capabilityDomain") or metadata.get("capability_domain"),
+            "temporal_support": item.get("temporalSupport") or metadata.get("temporal_support"),
+            "analysis_operation": item.get("analysisOperation") or metadata.get("analysis_operation"),
+            "renderable": item.get("renderable") if item.get("renderable") is not None else metadata.get("renderable"),
             "queryable": metadata.get("queryable"),
         }
 
@@ -842,7 +1614,19 @@ class AgentToolCatalogService:
         context: AgentExecutionContext | None,
     ) -> ResolvedLocation | GeospatialCapabilityExecutionResult:
         if context is not None and context.canonical_request is not None:
-            target_id = str(context.metadata.get("target_id") or "").strip()
+            raw_location_refs = arguments.get("location_refs")
+            location_refs = raw_location_refs if is_json_array(raw_location_refs) else []
+            target_id = str(
+                context.metadata.get("target_id")
+                or arguments.get("target_id")
+                or arguments.get("location_ref")
+                or (
+                    location_refs[0]
+                    if len(location_refs) == 1
+                    else ""
+                )
+                or ""
+            ).strip()
             if target_id:
                 target = context.canonical_request.target(target_id)
                 if target is None:

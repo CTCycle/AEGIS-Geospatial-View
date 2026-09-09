@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tests.conftest import run_async_in_thread
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import SimpleNamespace
 from typing import Any
 
@@ -769,13 +769,36 @@ class _NoOpCatalog:
 class _NativeLoop:
 
     # -------------------------------------------------------------------------
-    def __init__(self, result: AgentToolLoopResult) -> None:
+    def __init__(self, result: AgentToolLoopResult, *, prepare_map: bool = False) -> None:
         self.result = result
+        self.prepare_map = prepare_map
         self.requests: list[Any] = []
 
     # -------------------------------------------------------------------------
     async def run(self, request):
         self.requests.append(request)
+        if self.prepare_map and request.context.metadata.get("presentation_required"):
+            prepare_call = LLMToolCall(
+                id="prepare-map",
+                name="prepare_geospatial_map",
+                arguments={"evidence_refs": [], "location_refs": []},
+            )
+            prepare_result = LLMToolResult(
+                tool_call_id="prepare-map",
+                name="prepare_geospatial_map",
+                content={
+                    "ok": True,
+                    "data": {"operation": "map_session_created"},
+                    "error": None,
+                    "metadata": {},
+                },
+            )
+            return replace(
+                self.result,
+                tool_calls=[*self.result.tool_calls, prepare_call],
+                tool_results=[*self.result.tool_results, prepare_result],
+                stopped_reason="awaiting_render",
+            )
         return self.result
 
 ###############################################################################
@@ -1038,7 +1061,8 @@ def test_orchestrator_uses_verified_tool_map_session() -> None:
                 ],
                 iterations=1,
                 stopped_reason="final",
-            )
+            ),
+            prepare_map=True,
         )
         orchestrator = AgentOrchestrator(
             search_orchestrator=_SearchOrchestrator(),  # type: ignore[arg-type]
@@ -1082,7 +1106,7 @@ def test_orchestrator_clarifies_flood_comparison_before_provider_or_tool_executi
         history = _HistoryRepo()
         search_orchestrator = _NoResultSearchOrchestrator()
         native_loop = _NativeLoop(
-            AgentToolLoopResult(
+                AgentToolLoopResult(
                 final_text="must not execute",
                 tool_calls=[],
                 tool_results=[],
@@ -1153,7 +1177,7 @@ def test_orchestrator_does_not_build_a_map_when_tool_loop_only_chats() -> None:
                 ],
                 iterations=1,
                 stopped_reason="final",
-            )
+            ),
         )
         orchestrator = AgentOrchestrator(
             search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
@@ -1218,7 +1242,7 @@ def test_orchestrator_does_not_infer_requested_overlay_from_user_text() -> None:
                 ],
                 iterations=1,
                 stopped_reason="final",
-            )
+            ),
         )
         orchestrator = AgentOrchestrator(
             search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
@@ -1627,7 +1651,8 @@ def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
                 ],
                 iterations=1,
                 stopped_reason="final",
-            )
+            ),
+            prepare_map=True,
         )
         orchestrator = AgentOrchestrator(
             search_orchestrator=_SearchOrchestrator(),  # type: ignore[arg-type]
@@ -1760,7 +1785,8 @@ def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_orde
                 ],
                 iterations=1,
                 stopped_reason="final",
-            )
+            ),
+            prepare_map=True,
         )
         orchestrator = AgentOrchestrator(
             search_orchestrator=search_orchestrator,  # type: ignore[arg-type]

@@ -39,3 +39,4 @@ class AgentContextPackage(BaseModel):
     included_message_ids: list[int] = Field(default_factory=lambda: list[int]())
     summarized_through_turn_index: int = 0
     omitted_message_ids: list[int] = Field(default_factory=lambda: list[int]())
+    context_allocation: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())

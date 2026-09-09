@@ -46,7 +46,9 @@ def test_static_catalog_profile_is_exact_and_provider_scoped() -> None:
 
     assert usage.selected_context_window == 400_000
     assert usage.model_context_limit == 400_000
-    assert usage.usable_prompt_budget_tokens == 398_464
+    # Known models are still bounded by the application working-set ceiling,
+    # even when the provider advertises a much larger context window.
+    assert usage.usable_prompt_budget_tokens == 62_464
     assert usage.context_profile_source == "openai_model_catalog"
     assert usage.provider == "openai"
     assert usage.peak_request_tokens == usage.estimated_input_tokens

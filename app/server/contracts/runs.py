@@ -55,7 +55,7 @@ class ActiveConversationRunSnapshot(BaseModel):
     run_id: str
     run_version: int = Field(..., ge=1)
     state: AgentRunState
-    presentation_status: Literal["not_required", "pending", "ready", "failed"] = "not_required"
+    presentation_status: Literal["not_required", "pending", "ready", "failed", "render_timeout"] = "not_required"
     presentation: dict[str, Any] | None = None
 
 ###############################################################################
@@ -131,7 +131,7 @@ class AgentRunSnapshot(BaseModel):
     cancel_requested_at: datetime | None = None
     error_code: str | None = None
     error_message: str | None = None
-    presentation_status: Literal["not_required", "pending", "ready", "failed"] = "not_required"
+    presentation_status: Literal["not_required", "pending", "ready", "failed", "render_timeout"] = "not_required"
     presentation: dict[str, Any] | None = None
 
 ###############################################################################
