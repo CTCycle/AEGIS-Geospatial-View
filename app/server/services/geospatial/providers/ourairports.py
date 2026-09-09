@@ -16,6 +16,7 @@ class OurAirportsProvider(GeospatialProvider):
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload={
+                "type": "dataset-ingestion",
                 "renderingMode": "clustered-points",
                 "downloadUrl": "https://davidmegginson.github.io/ourairports-data/airports.csv",
                 "status": "source-ready",
