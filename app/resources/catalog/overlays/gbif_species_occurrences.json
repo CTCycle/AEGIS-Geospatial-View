@@ -127,5 +127,18 @@
     "timestampPath": null,
     "fieldMap": {},
     "expectedGeometry": "point"
+  },
+  "executionContract": {
+    "supported_operations": ["show", "search", "filter", "near", "around", "within_distance"],
+    "supported_scope_kinds": ["bbox", "radius"],
+    "temporal_modes": ["none", "historical"],
+    "required_inputs": ["location", "analysis_scope"],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "global",
+    "limitations": [
+      "Interactive occurrence results are bounded samples and must not be interpreted as complete inventories or absence evidence."
+    ],
+    "fallback_ids": []
   }
 }

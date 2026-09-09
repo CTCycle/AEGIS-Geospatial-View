@@ -358,6 +358,31 @@ def test_catalog_builds_stable_native_tools() -> None:
     ]
 
 ###############################################################################
+def test_native_map_preparation_waits_for_renderable_evidence() -> None:
+    service = _service()
+    context = _context()
+    context.metadata.update(
+        {
+            "presentation_required": True,
+            "resolved_location": {"label": "Rome", "latitude": 41.0, "longitude": 12.0},
+            "evidence_refs": [],
+            "allowed_capability_ids": ["weather_overlay"],
+        }
+    )
+
+    names_before_execution = [
+        tool.name for tool in service.build_native_tools(context)
+    ]
+    assert "execute_geospatial_capability" in names_before_execution
+    assert "prepare_geospatial_map" not in names_before_execution
+
+    context.metadata["evidence_refs"] = ["evidence-1"]
+    names_after_execution = [
+        tool.name for tool in service.build_native_tools(context)
+    ]
+    assert "prepare_geospatial_map" in names_after_execution
+
+###############################################################################
 def test_native_tool_descriptions_define_discovery_selection_boundaries() -> None:
     definitions = {
         item.name: item.description for item in _service().build_native_tools()

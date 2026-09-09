@@ -112,8 +112,8 @@ class PolicyEngine:
             allowed_tools.append("prepare_geospatial_map")
         if any(":" in layer for layer in parsed_request.requested_layers):
             allowed_tools.append("prepare_geospatial_map")
-        if parsed_request.normalized_action.requires_location:
-            allowed_tools.append("resolve_geospatial_location")
+        # Location resolution is completed by the canonical resolver before
+        # native tools are exposed.  Internal target IDs are never model-owned.
         if parsed_request.requested_layers or parsed_request.required_data_sources:
             allowed_tools.extend(
                 ["inspect_geospatial_evidence", "transform_geospatial_evidence"]
@@ -202,6 +202,32 @@ class PolicyEngine:
                 reason=f"Unknown geospatial capability '{capability_id}'.",
                 metadata={"code": "unsupported_capability"},
             )
+
+        coverage = str(capability.get("coverage") or "").strip().lower()
+        if coverage == "united-states":
+            resolved = getattr(context, "resolved_location", None)
+            canonical_request = getattr(context, "canonical_request", None)
+            target_id = str(
+                getattr(context, "metadata", {}).get("target_id") or ""
+            ).strip()
+            if canonical_request is not None and target_id:
+                target = canonical_request.target(target_id)
+                if target is not None:
+                    resolved = target.resolved_location
+            country = str(getattr(resolved, "country", None) or "").strip().lower()
+            if country and country not in {"us", "usa", "united states", "united states of america"}:
+                return ToolAuthorizationResult(
+                    allowed=False,
+                    reason=(
+                        f"Capability '{capability_id}' is unavailable outside its "
+                        "catalog coverage (United States)."
+                    ),
+                    metadata={
+                        "code": "unavailable_coverage",
+                        "coverage": "united-states",
+                        "country": country,
+                    },
+                )
 
         allowed_capability_ids = constraints.get("allowed_capability_ids")
         if (

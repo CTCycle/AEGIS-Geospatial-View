@@ -159,7 +159,7 @@ class NativeToolLoop:
                         if time.monotonic() > run_deadline
                         else "tool_budget_exhausted"
                     ),
-                    map_session=self._extract_map_session(all_results),
+                    map_session=self._extract_map_session(all_results, context),
                     model_calls=iteration - 1,
                     duplicate_tool_calls=duplicate_tool_calls,
                     no_progress_steps=no_progress_steps,
@@ -298,7 +298,7 @@ class NativeToolLoop:
                         if timeout_origin == "application_deadline"
                         else "provider_error"
                     ),
-                    map_session=self._extract_map_session(all_results),
+                    map_session=self._extract_map_session(all_results, context),
                     model_calls=iteration,
                     duplicate_tool_calls=duplicate_tool_calls,
                     no_progress_steps=no_progress_steps,
@@ -359,7 +359,7 @@ class NativeToolLoop:
                     tool_results=all_results,
                     iterations=iteration,
                     stopped_reason="provider_error",
-                    map_session=self._extract_map_session(all_results),
+                    map_session=self._extract_map_session(all_results, context),
                     model_calls=iteration,
                     duplicate_tool_calls=duplicate_tool_calls,
                     no_progress_steps=no_progress_steps,
@@ -393,7 +393,7 @@ class NativeToolLoop:
                         tool_results=all_results,
                         iterations=iteration,
                         stopped_reason=stop_reason,
-                        map_session=self._extract_map_session(all_results),
+                        map_session=self._extract_map_session(all_results, context),
                         model_calls=iteration,
                         duplicate_tool_calls=duplicate_tool_calls,
                         no_progress_steps=no_progress_steps,
@@ -417,7 +417,7 @@ class NativeToolLoop:
                         tool_results=all_results,
                         iterations=iteration,
                         stopped_reason="no_progress",
-                        map_session=self._extract_map_session(all_results),
+                        map_session=self._extract_map_session(all_results, context),
                         model_calls=iteration,
                         duplicate_tool_calls=duplicate_tool_calls,
                         no_progress_steps=no_progress_steps + 1,
@@ -462,7 +462,27 @@ class NativeToolLoop:
                 )
             results_list: list[LLMToolResult] = []
             for call in tool_calls:
-                fingerprint = self._call_fingerprint(call, context)
+                bound_call, bind_error = self._bind_geospatial_call(call, context)
+                if bind_error is not None:
+                    results_list.append(
+                        LLMToolResult(
+                            tool_call_id=call.id,
+                            name=call.name,
+                            content={
+                                "ok": False,
+                                "data": None,
+                                "error": {
+                                    "code": bind_error[0],
+                                    "message": bind_error[1],
+                                },
+                                "metadata": {},
+                            },
+                            is_error=True,
+                            error=bind_error[1],
+                        )
+                    )
+                    continue
+                fingerprint = self._call_fingerprint(bound_call, context)
                 if fingerprint in fingerprints:
                     duplicate_tool_calls += 1
                     results_list.append(
@@ -485,7 +505,7 @@ class NativeToolLoop:
                     continue
                 fingerprints.add(fingerprint)
                 results_list.append(
-                    await self._execute_tool_call(call, context, iteration)
+                    await self._execute_tool_call(bound_call, context, iteration)
                 )
             results = results_list
             all_results.extend(results)
@@ -510,7 +530,7 @@ class NativeToolLoop:
                     tool_results=all_results,
                     iterations=iteration,
                     stopped_reason="no_progress",
-                    map_session=self._extract_map_session(all_results),
+                    map_session=self._extract_map_session(all_results, context),
                     model_calls=iteration,
                     duplicate_tool_calls=duplicate_tool_calls,
                     no_progress_steps=no_progress_steps,
@@ -532,7 +552,7 @@ class NativeToolLoop:
             tool_results=all_results,
             iterations=self.max_iterations,
             stopped_reason="tool_budget_exhausted",
-            map_session=self._extract_map_session(all_results),
+            map_session=self._extract_map_session(all_results, context),
             model_calls=self.max_iterations,
             duplicate_tool_calls=duplicate_tool_calls,
             no_progress_steps=no_progress_steps,
@@ -649,6 +669,7 @@ class NativeToolLoop:
             call.name,
             {
                 "arguments": call.arguments,
+                "plan_step_id": context.metadata.get("native_bound_step_id"),
                 "target_id": target_id,
                 "analysis_scope": analysis_scope,
                 "temporal": temporal,
@@ -657,9 +678,90 @@ class NativeToolLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _bind_geospatial_call(
+        call: LLMToolCall,
+        context: AgentExecutionContext,
+    ) -> tuple[LLMToolCall, tuple[str, str] | None]:
+        """Bind a model capability choice to the next canonical plan step.
+
+        The model may select an allowlisted capability, but it cannot provide
+        application-owned target IDs or provider arguments.  The deterministic
+        planner remains the sole owner of those values.
+        """
+
+        context.metadata["native_bound_step_id"] = None
+        if call.name != "execute_geospatial_capability":
+            return call, None
+        capability_id = str(call.arguments.get("capability_id") or "").strip()
+        raw_steps = context.metadata.get("tool_plan_steps")
+        if not is_json_array(raw_steps):
+            return call, None
+        completed_raw = context.metadata.get("native_bound_plan_step_ids")
+        completed: set[str] = (
+            {str(item) for item in completed_raw}
+            if is_json_array(completed_raw)
+            else set()
+        )
+        for raw_step in raw_steps:
+            if not is_json_object(raw_step):
+                continue
+            step_id = str(raw_step.get("step_id") or "").strip()
+            if not step_id or step_id in completed:
+                continue
+            if str(raw_step.get("tool_name") or "") != call.name:
+                continue
+            planned_capability = str(raw_step.get("capability_id") or "").strip()
+            if planned_capability != capability_id:
+                continue
+            raw_arguments = raw_step.get("arguments")
+            planned_arguments = (
+                json_object(json_object(raw_arguments).get("arguments"))
+                if is_json_object(raw_arguments)
+                else {}
+            )
+            if not planned_arguments and raw_arguments not in ({}, None):
+                return call, (
+                    "planning_target_unbound",
+                    f"Deterministic plan step '{step_id}' has no validated arguments.",
+                )
+            completed.add(step_id)
+            context.metadata["native_bound_plan_step_ids"] = sorted(completed)
+            context.metadata["native_bound_step_id"] = step_id
+            target_id = str(raw_step.get("target_id") or "").strip() or None
+            if target_id is not None:
+                context.metadata["target_id"] = target_id
+            return (
+                LLMToolCall(
+                    id=call.id,
+                    name=call.name,
+                    arguments={
+                        "capability_id": planned_capability,
+                        "arguments": planned_arguments,
+                    },
+                ),
+                None,
+            )
+        return call, (
+            "capability_not_planned",
+            f"Capability '{capability_id}' has no unexecuted deterministic plan step.",
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _extract_map_session(
         results: list[LLMToolResult],
+        context: AgentExecutionContext | None = None,
     ) -> MapSession | None:
+        if context is not None:
+            prepared = context.metadata.get("prepared_map_session")
+            if is_json_object(prepared):
+                try:
+                    return MapSession.model_validate(prepared)
+                except Exception:  # noqa: BLE001
+                    LOGGER.warning(
+                        "Failed to validate prepared MapSession from execution context",
+                        exc_info=True,
+                    )
         for result in reversed(results):
             content = result.content if is_json_object(result.content) else None
             if content is None:
@@ -676,7 +778,12 @@ class NativeToolLoop:
             ms_raw = data.get("map_session")
             if ms_raw is None and is_json_object(summary):
                 ms_raw = summary.get("map_session")
-            if is_json_object(ms_raw):
+            if (
+                is_json_object(ms_raw)
+                and is_json_object(ms_raw.get("resolved_location"))
+                and is_json_object(ms_raw.get("overlay_collection"))
+                and is_json_array(ms_raw["overlay_collection"].get("instances"))
+            ):
                 try:
                     return MapSession.model_validate(ms_raw)
                 except Exception:
@@ -703,7 +810,7 @@ class NativeToolLoop:
         _ = content
         metadata = context.metadata or {}
         missing_fields = metadata.get("clarification_required")
-        map_session = NativeToolLoop._extract_map_session(results)
+        map_session = NativeToolLoop._extract_map_session(results, context)
         evidence_refs = [
             str(item)
             for item in cast(list[Any], metadata.get("evidence_refs") or [])
@@ -840,8 +947,40 @@ class NativeToolLoop:
         ):
             execution_budget.terminal_reason = None
         self._record_evidence_refs(context, envelope_payload)
+        data = envelope_payload.get("data")
+        if is_json_object(data):
+            candidate = data.get("map_session")
+            if candidate is None:
+                summary = data.get("summary")
+                if is_json_object(summary):
+                    candidate = summary.get("map_session")
+            if (
+                is_json_object(candidate)
+                and is_json_object(candidate.get("resolved_location"))
+                and is_json_object(candidate.get("overlay_collection"))
+                and is_json_array(candidate["overlay_collection"].get("instances"))
+            ):
+                # Keep the validated map candidate server-side while the model
+                # receives only the bounded evidence summary after truncation.
+                context.metadata["prepared_map_session"] = dict(candidate)
+        # Geometry and viewport validation remains server-owned.  The model
+        # receives only the bounded evidence summary; use the full candidate
+        # retained in context metadata for the shared typed validator without
+        # re-embedding provider payloads in the next model message.
+        validation_envelope = envelope_payload
+        validation_data = envelope_payload.get("data")
+        prepared_candidate = context.metadata.get("prepared_map_session")
+        if (
+            is_json_object(validation_data)
+            and "map_session" not in validation_data
+            and is_json_object(prepared_candidate)
+        ):
+            validation_envelope = {
+                **envelope_payload,
+                "data": {**validation_data, "map_session": prepared_candidate},
+            }
         validation_error = self._validate_geospatial_tool_output(
-            call, context, envelope_payload
+            call, context, validation_envelope
         )
         if validation_error is not None:
             envelope_payload = {

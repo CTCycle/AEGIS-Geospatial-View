@@ -841,10 +841,21 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         queryRenderedFeatures?: (geometry?: unknown, options?: unknown) => unknown;
       }).queryRenderedFeatures === 'function' && isGeoJsonOverlay(overlay)) {
         try {
+          // A clustered overlay may omit its optional label layer when the
+          // active style has no glyphs.  Passing that absent layer id to
+          // MapLibre makes queryRenderedFeatures throw and incorrectly turns
+          // a visibly rendered cluster/point layer into a render-ack failure.
+          const queryLayerIds = layerIds.filter((id) => (
+            Boolean(mapApi?.getLayer?.call(map, id))
+          ));
+          if (!queryLayerIds.length) {
+            renderedFeatureCount = 0;
+          } else {
           const features = (map as unknown as {
             queryRenderedFeatures: (geometry?: unknown, options?: unknown) => unknown;
-          }).queryRenderedFeatures(undefined, { layers: layerIds });
+          }).queryRenderedFeatures(undefined, { layers: queryLayerIds });
           renderedFeatureCount = Array.isArray(features) ? features.length : null;
+          }
         } catch {
           renderedFeatureCount = null;
         }

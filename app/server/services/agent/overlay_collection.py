@@ -392,8 +392,17 @@ class OverlayCollectionService:
         target_label_value = scope.label
         if not target_label_value:
             target_label_value = target.get("label") or target.get("raw_value")
-        target_label = cls._norm(target_label_value)
-        if not target_label:
+        target_labels = {
+            cls._norm(value)
+            for value in (
+                target_label_value,
+                target.get("place"),
+                target.get("normalized_value"),
+                target.get("raw_value"),
+            )
+            if value
+        }
+        if not target_labels:
             return False
         instance_labels = {
             cls._norm(instance.scope_key),
@@ -408,7 +417,17 @@ class OverlayCollectionService:
                 instance.resolved_location.city if instance.resolved_location else ""
             ),
         }
-        return target_label in instance_labels
+        return any(
+            target_label == instance_label
+            or (
+                len(target_label) >= 3
+                and len(instance_label) >= 3
+                and (target_label in instance_label or instance_label in target_label)
+            )
+            for target_label in target_labels
+            for instance_label in instance_labels
+            if target_label and instance_label
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

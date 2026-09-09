@@ -81,6 +81,9 @@ _NON_DATA_CONCEPT_TAGS = frozenset(
         "map_render",
         "map_display",
         "map_navigation",
+        "basemap_change",
+        "navigate_to",
+        "street_map",
         "navigate",
         "relocate",
         "focus",
@@ -316,7 +319,7 @@ class CapabilityResolver:
             return False
         if turn.poi_categories or turn.required_data_sources:
             return False
-        if turn.required_tool_category:
+        if turn.required_tool_category and turn.required_tool_category != "basemap":
             return False
         if any(
             command.action in {"add", "show", "update"}
