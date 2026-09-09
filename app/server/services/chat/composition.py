@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from server.repositories.chat_history import ChatHistoryRepository
 from server.repositories.conversations import ConversationRepository
+from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
@@ -59,6 +60,7 @@ def build_chat_runtime(
     crypto_service = geospatial_runtime.crypto_service
     history_repository = ChatHistoryRepository(database)
     conversation_repository = ConversationRepository(database)
+    evidence_repository = AgentEvidenceRepository(database)
     ollama_tool_capability_cache = OllamaToolCapabilityCache()
     llm_factory = LLMFactory(
         settings_repo=settings_repo,
@@ -116,6 +118,7 @@ def build_chat_runtime(
         tool_registry=tool_registry,
         policy_engine=policy_engine,
         geospatial_api_service=geospatial_api_service,
+        evidence_repository=evidence_repository,
     )
     native_tool_loop = NativeToolLoop(
         provider_factory=llm_factory,
