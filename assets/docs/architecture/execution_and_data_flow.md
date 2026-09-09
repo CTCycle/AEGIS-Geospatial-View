@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-09-08
+Last updated: 2026-09-09
 
 ## Layering
 
@@ -188,10 +188,11 @@ late result into a newer run.
 - `GeospatialCredentialResolver` resolves encrypted database credentials first,
   then environment fallbacks, for API, agent, and rendering paths.
 
-The native agent catalog also exposes provider-native discovery and rendering:
-`fetch_geospatial_provider_layers` returns normalized descriptors and
-`render_geospatial_provider_layer` converts one descriptor into a map-session
-overlay. Raw provider XML and provider credentials do not cross the API boundary.
+The native agent catalog exposes routed provider discovery and candidate map
+preparation: `fetch_geospatial_provider_layers` returns normalized descriptors,
+and `prepare_geospatial_map` converts validated evidence or an explicitly
+selected provider descriptor into a candidate map session. Raw provider XML,
+credentials, and unrestricted datasets do not cross the model boundary.
 
 Provider metadata manifests are registered only when a backend adapter exists. Basemap tile URLs stay manifest-backed and are served through proxy paths where applicable.
 

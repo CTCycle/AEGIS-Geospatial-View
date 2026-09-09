@@ -1,4 +1,4 @@
-# AEGIS custom agent runtime v3
+# AEGIS native-agent runtime v4
 
 AEGIS keeps one orchestrating agent.  Planning, scheduling, validation, and
 checkpointing are ordinary typed Python services; no LangGraph/LangChain agent
@@ -6,22 +6,17 @@ runtime is introduced.
 
 ```mermaid
 flowchart TD
-  U["User turn or steering update"] --> C["Resolve thread state and classify change"]
-  C --> P["Structured parse and complexity gate"]
-  P --> T["Create or revise typed task graph"]
-  P --> D["Compile one deterministic task"]
-  T --> S["Select runnable task"]
-  D --> S
-  S --> F["Deterministically filter capabilities"]
-  F --> V["Validate arguments and policy"]
-  V --> E["Execute with timeout and bounded retry"]
-  E --> N["Normalize result and persist evidence"]
-  N --> R["Reduce state and checkpoint"]
-  R --> Q{"Completion valid?"}
-  Q -->|Next task| S
-  Q -->|Gap or invalidation| T
-  Q -->|Clarification| H["Return unresolved question"]
-  Q -->|Complete or partial| Y["Grounded synthesis and validated renderables"]
+  U["User turn or steering update"] --> C["Structured interpretation and invariants"]
+  C --> R["Canonical route, allowlists, completion requirements"]
+  R --> N["Native model decision loop"]
+  N --> V["Authorize and validate one primitive"]
+  V --> E["Persist bounded evidence and rebuild state/tools"]
+  E --> Q{"Goal-aware completion?"}
+  Q -->|Pending| N
+  Q -->|Clarification or unsupported| H["Typed user-visible result"]
+  Q -->|Map prepared| A["Await browser render acknowledgement"]
+  Q -->|Text complete| Y["Grounded synthesis"]
+  A --> Y
 ```
 
 ## State boundary
@@ -32,7 +27,9 @@ flowchart TD
   contains the goal, dependency-aware tasks, geospatial working state, evidence
   references, assumptions, unresolved questions, and active map session.
 - `AgentRunState` is per-execution state: budgets, counters, canonical call
-  fingerprints, plan revision, no-progress detection, and completion reason.
+  fingerprints, plan revision, no-progress detection, and canonical stopping
+  reason. Native runs also carry capability domains, dynamic tool exposure
+  reasons, completion requirements, iteration traces, and context allocations.
 - `GeospatialWorkingState` keeps locations, scope/bounds/radius/CRS, exclusions,
   candidates, selected places, data sources, layers, features, temporal limits,
   and renderable references first-class.
@@ -51,20 +48,28 @@ failed predecessor blocks dependents.  Tool calls are fingerprinted from a
 canonical JSON representation, so a successful or non-retryable failed call is
 not repeated.  Transient retries are bounded and delayed by 250 ms.
 
-The native loop applies simple-run and complex-run budgets, a wall-clock budget,
-and a two-step no-progress stop.  Tool argument/domain validation remains in
-application code and occurs before a handler is called.
+Tool-capable models use the native loop immediately after deterministic
+interpretation. Explicitly non-tool-capable models may use the ordered
+deterministic executor. A native provider failure is surfaced; it never falls
+back to another model or silently replays the deterministic plan. The loop
+applies 12 iterations, 10 model calls, 20 tool calls, 32 meaningful state
+transitions, three no-progress decisions, one retry for an idempotent transient
+failure, and the five-minute hard ceiling. Tool argument/domain validation
+remains in application code and occurs before a handler is called.
 
 ## Context and evidence
 
-The model receives the current request, active directives, compact v3 task state,
-relevant geospatial evidence, unresolved failures, and a bounded recent-message
-window. Raw payloads remain addressable through evidence references and are not
-re-injected on every iteration. The canonical request interpretation is compiled
-once per turn after contextual merge and resolution. Every planned step carries
-the target and analysis-scope references from that contract. Follow-ups inherit
-only explicitly relevant committed targets and result references; a
-viewport-only follow-up changes the camera without refetching data.
+The model receives a typed working state, current goal and constraints,
+relevant geospatial evidence summaries, unresolved failures, and a token-aware
+recent-message projection. Raw payloads remain addressable through
+conversation-scoped evidence references and are never re-injected on every
+iteration. The canonical request interpretation is compiled once per turn;
+the native model owns primitive ordering while the deterministic boundary owns
+authorization, validation, persistence, and completion checks. The eight
+primitives are location resolution, capability discovery/description/execution,
+provider-layer discovery, evidence inspection/transformation, and map
+preparation. Map preparation is not visible completion until a matching
+MapLibre `map.render_ack` is accepted.
 
 ## Observability
 

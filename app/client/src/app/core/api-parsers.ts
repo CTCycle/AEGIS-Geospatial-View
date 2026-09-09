@@ -1375,6 +1375,7 @@ const normalizeActiveConversationRun = (
     presentation_status: value.presentation_status === 'pending'
       || value.presentation_status === 'ready'
       || value.presentation_status === 'failed'
+      || value.presentation_status === 'render_timeout'
       || value.presentation_status === 'not_required'
       ? value.presentation_status
       : 'not_required',

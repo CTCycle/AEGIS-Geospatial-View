@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Last updated: 2026-09-07
+Last updated: 2026-09-09
 
 ## Basics
 
@@ -17,6 +17,13 @@ Last updated: 2026-09-07
 - A layer warning or unchanged map: the upstream provider may have timed out,
   rate-limited, or returned invalid data. The app preserves the last valid map
   state instead of displaying a failed request as a successful layer.
+- A native-agent timeout: the selected provider/model remains authoritative.
+  A typed provider, run-deadline, or context-limit failure is returned; AEGIS
+  does not substitute another model or silently replay a deterministic plan.
+- A map says it is prepared but is not visible: preparation is intentionally
+  separate from browser acknowledgement. Check the realtime render status and
+  `map.render_ack`; a 90-second acknowledgement timeout retains the last
+  committed map and marks the candidate `render_timeout`.
 
 ## Operational Notes
 

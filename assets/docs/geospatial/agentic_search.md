@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-09-08
+Last updated: 2026-09-09
 
 ## Summary
 
@@ -9,12 +9,18 @@ The chat workflow separates structured parsing from provider-native tool calling
 1. `ParserService` emits evidence-oriented `TurnParseResult`, including prompt relationship, entity/layer targets, basemap changes, ambiguities, and frontend update type.
 2. A durable conversation task ledger records the supervised task and follow-up relationship.
 3. Semantic layer concepts are resolved against enabled manifest metadata before planning.
-4. Deterministic routing selects a narrow specialist group.
-5. A typed tool plan fixes capability IDs, arguments, dependencies, timeouts, retries, validation, and merge behavior before execution.
-6. `PolicyEngine` restricts both tool names and executable capability IDs.
-7. Known capabilities execute through `ToolPlanExecutor`; catalog discovery uses the bounded native tool loop.
-8. Verified results update the revisioned overlay collection, task status, and structured diagnostics.
-9. The configured agent model converts only those verified results into concise Markdown, with deterministic text retained as fallback.
+4. Deterministic routing selects a narrow specialist group, candidate capability
+   domains, allowlists, invariants, and completion requirements.
+5. A tool-capable model owns the native decision loop and chooses the next
+   exposed primitive; schemas and allowlists are rebuilt after every observation.
+6. `PolicyEngine` authorizes every tool and exact capability ID, while the
+   deterministic executor is used only when the configured model explicitly
+   lacks native tool support.
+7. Normalized results are persisted as bounded conversation-scoped evidence;
+   model messages receive references and summaries, never raw datasets.
+8. Verified results update the revisioned overlay collection, task status, and
+   structured diagnostics. Map preparation remains pending until browser
+   render acknowledgement.
 
 Location resolution is hierarchical and deterministic where evidence permits:
 coordinates take precedence, followed by address/POI/street, district or
@@ -76,8 +82,8 @@ deadline; the full pipeline is not restarted. OpenCode inference requests carry
 the conversation-scoped `x-opencode-session` header and a versioned AEGIS
 `User-Agent`; no model or provider fallback is performed.
 
-The current reliability budget is 75 seconds per turn, with 30 seconds reserved
-for structured intent extraction. A schema-correction request is sent only for
+The run starts with a 90-second interpretation budget and promotes once to a
+150-second simple or 300-second complex profile. A schema-correction request is sent only for
 an incomplete structured contract while at least 18 seconds remain in the
 extraction window; extraction transport timeouts are never retried and never
 restart the workflow. Provider fields `task_class`, `action_id`,
@@ -153,12 +159,14 @@ Unknown or low-confidence classifications normalize to `unknown` before policy s
 
 ## Native Geospatial Tools
 
+- `resolve_geospatial_location`
 - `list_geospatial_capabilities`
 - `describe_geospatial_capability`
 - `execute_geospatial_capability`
 - `fetch_geospatial_provider_layers` for explicitly routed and provider-allowlisted discovery only
-- `render_geospatial_provider_layer` for one explicitly selected normalized
-  provider-layer descriptor
+- `inspect_geospatial_evidence` for bounded metadata, schema, samples, statistics, and pages
+- `transform_geospatial_evidence` for allowlisted declarative vector/tabular operations
+- `prepare_geospatial_map` for candidate presentation before browser acknowledgement
 
 Catalog responses are deterministic, permission-aware, and capped at 50 items per page.
 
@@ -228,7 +236,8 @@ good visible map state.
 
 `execution_trace` contains bounded stage observations, durations, model/tool/retry
 counts, remaining deadline, timeout origin, terminal stage, a sanitized
-`parser_contract`, and per-stage `pipeline_reach` states. Parser telemetry records
+`parser_contract`, context allocations, native iteration traces, completion
+requirements, and per-stage `pipeline_reach` states. Parser telemetry records
 field presence/default counts, normalized intent, provider error category, and
 timeout origin. It is diagnostic metadata only and excludes prompts, user text,
 credentials, and provider payloads.

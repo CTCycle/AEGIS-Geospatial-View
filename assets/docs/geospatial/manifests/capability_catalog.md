@@ -1,6 +1,6 @@
 # Capability Catalog
 
-Last updated: 2026-09-04
+Last updated: 2026-09-09
 
 ## Purpose
 
@@ -96,4 +96,4 @@ Representative implemented layers include:
 | `get_weather_forecast` | fetch weather forecast | Open-Meteo |
 | `get_air_quality_forecast` | fetch air-quality forecast | Open-Meteo |
 | `get_nearby_poi` | fetch nearby points of interest | Overpass |
-| `render_geospatial_provider_layer` | render a provider-native layer descriptor | provider-neutral layer routing |
+| `prepare_geospatial_map` | prepare a candidate map from validated evidence or a provider descriptor | provider-neutral layer routing |

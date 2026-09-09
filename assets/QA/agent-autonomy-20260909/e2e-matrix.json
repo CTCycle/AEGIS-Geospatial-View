@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-09",
+  "baseline_commit": "1a802a35",
+  "implementation_commit": "pending-next-increment",
+  "provider_substitution": false,
+  "rows": [
+    {"id": "A", "request": "What are the coordinates of Rome?", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_APPLICABLE", "blocking_layer": "scenario matrix not invoked in this increment"},
+    {"id": "B", "request": "Find airports within 100 km of Zurich and summarize the results.", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_RUN", "blocking_layer": "scenario matrix not invoked in this increment"},
+    {"id": "C1", "request": "Show me recent wildfires around Rome on a map.", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_RUN", "blocking_layer": "real app/browser session not started"},
+    {"id": "C2", "request": "Map recent earthquake activity around Sicily.", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_RUN", "blocking_layer": "scenario matrix not invoked in this increment"},
+    {"id": "C3", "request": "Where are the relevant events? Show them visually.", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_RUN", "blocking_layer": "scenario matrix not invoked in this increment"},
+    {"id": "C4", "request": "Plot the results around this area.", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_RUN", "blocking_layer": "scenario matrix not invoked in this increment"},
+    {"id": "D", "request": "Where are the strongest recent earthquakes around Sicily? I want to see their distribution.", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_RUN", "blocking_layer": "scenario matrix not invoked in this increment"},
+    {"id": "E", "request": "Show recent earthquakes near Springfield.", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_RUN", "blocking_layer": "scenario matrix not invoked in this increment"},
+    {"id": "F", "request": "Show recent earthquakes around Sicily and active-fire detections around Rome, keep both layers, summarize their sources, and fit the view to all results.", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_RUN", "blocking_layer": "scenario matrix not invoked in this increment"},
+    {"id": "G", "request": "25-observation context refinement beyond the former 8K projection.", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_APPLICABLE", "blocking_layer": "scenario matrix not invoked in this increment"},
+    {"id": "H", "request": "Transient provider 503/timeout followed by idempotent recovery.", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_APPLICABLE", "blocking_layer": "scenario matrix not invoked in this increment"}
+  ],
+  "controlled_gate": {
+    "backend_unit": "919 passed",
+    "frontend_unit": "214 passed",
+    "frontend_build": "passed",
+    "pyright": "0 errors",
+    "ruff": "passed",
+    "alembic_head": "202609090001"
+  }
+}
