@@ -867,6 +867,23 @@ export interface ModelLibrarySourceStatus {
   reachable?: boolean | null;
   message?: string | null;
   model_count?: number | null;
+  structured_probe_status?: StructuredProbeStatus;
+  structured_probe_checked_at?: string | null;
+  structured_probe_expires_at?: string | null;
+}
+
+export type StructuredProbeStatus = 'not_tested' | 'passed' | 'failed' | 'timeout' | 'unsupported';
+
+export interface StructuredProbeResponse {
+  provider: string;
+  model: string;
+  protocol: string;
+  status: StructuredProbeStatus;
+  parse_status: string;
+  duration_ms: number | null;
+  checked_at: string | null;
+  expires_at: string | null;
+  message: string | null;
 }
 
 export interface ModelLibraryResponse {

@@ -43,6 +43,7 @@ import {
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
+  StructuredProbeResponse,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
@@ -111,6 +112,18 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   deepseekStatus: ModelLibrarySourceStatus | null = null;
   opencodeStatus: ModelLibrarySourceStatus | null = null;
   opencodeGoStatus: ModelLibrarySourceStatus | null = null;
+  structuredProbe: StructuredProbeResponse = {
+    provider: '',
+    model: '',
+    protocol: 'unknown',
+    status: 'not_tested',
+    parse_status: 'not_tested',
+    duration_ms: null,
+    checked_at: null,
+    expires_at: null,
+    message: 'This model has not been verified against the parser contract.',
+  };
+  isTestingStructuredProbe = false;
 
   providerFilter: ModelProviderFilter = 'all';
   private isDestroyed = false;
@@ -221,6 +234,38 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
+  get structuredProbeLabel(): string {
+    if (this.structuredProbe.status === 'passed') return 'Verified';
+    if (this.structuredProbe.status === 'not_tested') return 'Not verified';
+    return 'Needs attention';
+  }
+
+  async testSelectedModel(): Promise<void> {
+    if (
+      !this.settings.agent_model_provider
+      || !this.settings.agent_model_name
+      || this.isTestingStructuredProbe
+    ) {
+      return;
+    }
+    this.isTestingStructuredProbe = true;
+    this.statusText = `Testing ${this.settings.agent_model_name} against the parser contract...`;
+    this.changeDetectorRef.detectChanges();
+    try {
+      this.structuredProbe = await this.apiClient.runStructuredProbe();
+      this.statusText = this.structuredProbe.message ?? 'Structured parser probe completed.';
+    } catch (error: unknown) {
+      this.statusText = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not run the structured parser probe.',
+      );
+    } finally {
+      this.isTestingStructuredProbe = false;
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
+    }
+  }
+
   get unavailableAssignedOllamaModels(): string[] {
     const assignedModels = [
       this.settings.agent_model_provider === 'ollama' ? this.settings.agent_model_name : '',
@@ -324,6 +369,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.settings = updated;
+      this.structuredProbe = this.unverifiedProbe(updated);
       this.statusText = `Selected ${model.name} as agent model`;
       this.syncState();
     } catch (error: unknown) {
@@ -353,6 +399,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         'opencode-go': this.opencodeGoKey,
       });
       this.settings = updated;
+      this.structuredProbe = this.unverifiedProbe(updated);
       this.openaiKey = '';
       this.googleKey = '';
       this.deepseekKey = '';
@@ -418,6 +465,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         ollama_url: this.ollamaUrlDraft.trim() || 'http://127.0.0.1:11434',
       });
       this.settings = updated;
+      this.structuredProbe = this.unverifiedProbe(updated);
       this.ollamaUrlDraft = updated.ollama_url;
       this.statusText = 'Ollama settings saved';
       this.ollamaModalStatusText = 'Ollama settings saved.';
@@ -530,6 +578,20 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.settings.credential_health?.[provider]?.['api_key'] ?? 'unknown';
   }
 
+  private unverifiedProbe(settings: ModelSettingsResponse): StructuredProbeResponse {
+    return {
+      ...this.structuredProbe,
+      provider: settings.agent_model_provider,
+      model: settings.agent_model_name,
+      status: 'not_tested',
+      parse_status: 'not_tested',
+      duration_ms: null,
+      checked_at: null,
+      expires_at: null,
+      message: 'This model has not been verified against the parser contract.',
+    };
+  }
+
   private validateKeyInputs(): ApiKeyValidationErrors {
     const errors: ApiKeyValidationErrors = {};
     const openAiValue = this.openaiKey.trim();
@@ -572,6 +634,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.apiClient.fetchChatSettings(),
         this.apiClient.fetchChatModels(),
       ]);
+      let nextProbe: StructuredProbeResponse;
+      try {
+        nextProbe = await this.apiClient.fetchStructuredProbe();
+      } catch {
+        // Probe health must not make an otherwise selectable model library
+        // unavailable. Treat an unavailable health endpoint as unprobed.
+        nextProbe = this.unverifiedProbe(nextSettings);
+      }
       const dynamicProvider = this.dynamicProviderForSettings(nextSettings);
       let modelLibrary = baseLibrary;
       if (dynamicProvider) {
@@ -582,6 +652,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.settings = nextSettings;
+      this.structuredProbe = nextProbe;
       this.ollamaUrlDraft = nextSettings.ollama_url;
       this.applyModelLibrary(modelLibrary);
       const dynamicProviderFailed = dynamicProvider && modelLibrary.sources[dynamicProvider]?.ok === false;

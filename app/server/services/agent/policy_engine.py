@@ -282,10 +282,63 @@ class PolicyEngine:
     ) -> ClarificationRequest | None:
         if turn.task_class in {"map_search", "direct_query", "general_question"}:
             return None
+        clarification_plan = turn.clarification_plan
+        if is_json_object(clarification_plan):
+            blocking_fields = {
+                str(item).strip().casefold()
+                for item in clarification_plan.get("blocking_fields", [])
+                if str(item).strip()
+            }
+            if blocking_fields:
+                return self._clarification_for_fields(turn, blocking_fields)
+        return self._clarification_for_fields(turn, {"task"})
+
+    # -------------------------------------------------------------------------
+    def _clarification_for_fields(
+        self, turn: TurnParseResult, blocking_fields: set[str]
+    ) -> ClarificationRequest:
+        location = next(
+            (
+                str(signal.raw_value).strip()
+                for signal in turn.location_signals
+                if str(signal.raw_value).strip()
+            ),
+            "this location",
+        )
+        if blocking_fields & {"location", "anchor", "location_anchor"}:
+            question = "Which location should I use? Please provide a city, region, country, or coordinates."
+        elif blocking_fields & {
+            "operation",
+            "requested_operation",
+            "requested_action",
+            "action",
+            "task",
+        }:
+            question = f"What would you like me to show or find for {location}?"
+        elif "presentation" in blocking_fields or "presentation_mode" in blocking_fields:
+            question = f"Would you like {location} shown on the map, described in text, or both?"
+        elif blocking_fields & {"time_window", "temporal_window", "recent_window"}:
+            question = "Please specify the time window to use for the requested data."
+        elif blocking_fields & {
+            "magnitude_threshold_or_top_n",
+            "magnitude_threshold",
+            "threshold",
+            "top_n",
+        }:
+            question = "Please specify a magnitude threshold or a top-N count for the strongest results."
+        elif "analysis_radius" in blocking_fields:
+            question = "Please specify the distance to use for the geographic search."
+        else:
+            question = "Please specify the missing detail needed to complete this request."
+        missing_fields = (
+            ["location"]
+            if blocking_fields & {"location", "anchor", "location_anchor"}
+            else sorted(blocking_fields)
+        )
         return ClarificationRequest(
-            question="Can you clarify whether you want a map search or a direct answer?",
-            reason="Task class is unclear.",
-            missing_fields=["task"],
+            question=question,
+            reason="The request is missing a required semantic field.",
+            missing_fields=missing_fields,
         )
 
     # -------------------------------------------------------------------------

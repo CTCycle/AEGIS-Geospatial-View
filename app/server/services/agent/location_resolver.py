@@ -105,6 +105,10 @@ class LocationResolver:
         "netherlands": frozenset({"holland", "nederland", "nl"}),
         "australia": frozenset({"au"}),
         "canada": frozenset({"ca"}),
+        "iceland": frozenset({"island", "is"}),
+        "japan": frozenset({"nihon", "nippon", "jp"}),
+        "switzerland": frozenset({"schweiz", "suisse", "svizzera", "ch"}),
+        "georgia": frozenset({"ge"}),
     }
 
     # -------------------------------------------------------------------------
@@ -647,6 +651,17 @@ class LocationResolver:
             # validated locality in its address details preserves the explicit
             # target granularity for viewport policy and telemetry.
             resolved_type = signal.signal_type
+        elif signal.signal_type == "country" and geocoder_type in {
+            "administrative",
+            "region",
+            "state",
+            "province",
+            "county",
+        } and self._verified_country_administrative_candidate(geocoded, signal):
+            # Nominatim may return a country boundary as an administrative
+            # object. Preserve the requested country granularity only when the
+            # candidate carries matching country name and ISO evidence.
+            resolved_type = "country"
         hierarchy = self._build_hierarchy(
             signal=signal,
             context_signals=context_signals,
@@ -726,7 +741,9 @@ class LocationResolver:
             # is what lets a model-labelled city be discovered as a district.
             pass
         elif signal.signal_type == "country":
-            if result_type and result_type != "country":
+            if result_type and result_type != "country" and not self._verified_country_administrative_candidate(
+                candidate, signal
+            ):
                 return False
         elif signal.signal_type in {"city", "municipality"}:
             if address_type in {
@@ -876,6 +893,41 @@ class LocationResolver:
                 if not actual and not self._context_matches(display, expected):
                     return False
         return True
+
+    # -------------------------------------------------------------------------
+    def _verified_country_administrative_candidate(
+        self, candidate: dict[str, Any], signal: LocationSignal
+    ) -> bool:
+        target = self._normalize_text(signal.raw_value or signal.normalized_value or "")
+        target_aliases = self._country_aliases(target)
+        target_codes = self._country_codes(target)
+        address = json_object(candidate.get("address"))
+        namedetails = json_object(candidate.get("namedetails"))
+        actual_country = self._normalize_text(
+            str(address.get("country") or address.get("country_name") or "")
+        )
+        actual_code = self._normalize_text(str(address.get("country_code") or ""))
+        display = self._normalize_text(str(candidate.get("display_name") or ""))
+        if not actual_code or actual_code not in target_codes:
+            return False
+        candidate_name = self._normalize_text(str(candidate.get("name") or ""))
+        display_head = display.split(",", 1)[0].strip() if display else ""
+        if not ({candidate_name, display_head} & target_aliases):
+            # A subordinate administrative result such as
+            # ``Ile-de-France, France`` carries the requested country in its
+            # address, but its own name is not the requested country.
+            return False
+        actual_names = self._country_aliases(actual_country)
+        if actual_country and actual_names.intersection(target_aliases):
+            return True
+        localized_names = {
+            self._normalize_text(str(value))
+            for key, value in namedetails.items()
+            if str(key).casefold().startswith("name") and str(value).strip()
+        }
+        return bool(localized_names.intersection(target_aliases)) or (
+            bool(target) and self._contains_location_text(display, target)
+        )
 
     # -------------------------------------------------------------------------
     def _target_matches_candidate(
@@ -1082,6 +1134,16 @@ class LocationResolver:
             "holland": "nl",
             "australia": "au",
             "canada": "ca",
+            "iceland": "is",
+            "island": "is",
+            "japan": "jp",
+            "nihon": "jp",
+            "nippon": "jp",
+            "switzerland": "ch",
+            "schweiz": "ch",
+            "suisse": "ch",
+            "svizzera": "ch",
+            "georgia": "ge",
         }
         values = self._country_aliases(normalized) or {normalized}
         return {codes.get(item, item) for item in values if item}

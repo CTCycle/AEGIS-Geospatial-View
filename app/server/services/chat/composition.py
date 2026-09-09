@@ -24,6 +24,7 @@ from server.services.agent.tool_planner import DeterministicToolPlanner
 from server.services.chat.maintenance_service import ChatMaintenanceService
 from server.services.chat.model_library import ChatModelLibraryService
 from server.services.chat.settings_service import ChatSettingsService
+from server.services.chat.structured_probe import StructuredProbeService
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
 from server.services.chat.history_service import ChatHistoryService
 from server.services.geospatial.composition import GeospatialRuntime
@@ -43,6 +44,7 @@ class ChatRuntime:
     conversation_repository: ConversationRepository
     history_service: ChatHistoryService
     task_state_service: ConversationTaskStateService
+    structured_probe_service: StructuredProbeService | None = None
 
 ###############################################################################
 def build_chat_runtime(
@@ -90,6 +92,12 @@ def build_chat_runtime(
         capability_registry=capability_registry,
         runtime_registry=runtime_registry,
     )
+    structured_probe_service = StructuredProbeService(
+        parser_service=parser_service,
+        settings_service=settings_service,
+    )
+    settings_service.structured_probe_service = structured_probe_service
+    model_library_service.set_structured_probe_service(structured_probe_service)
     location_memory_service = LocationMemoryService()
     location_resolver = LocationResolver()
     policy_engine = PolicyEngine(
@@ -168,4 +176,5 @@ def build_chat_runtime(
             ),
         ),
         conversation_repository=conversation_repository,
+        structured_probe_service=structured_probe_service,
     )

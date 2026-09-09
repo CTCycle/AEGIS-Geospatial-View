@@ -139,6 +139,24 @@
 
       <aside class="settings-page__right-column" aria-label="Selected agent model">
         <app-selected-model-summary [summary]="selectedAgentModelSummary" [isLoading]="isLoadingModels"></app-selected-model-summary>
+        @if (selectedAgentModelSummary) {
+          <section class="settings-page__probe" aria-label="Structured parser verification">
+            <div>
+              <p class="settings-page__probe-label">Structured parser</p>
+              <strong>{{ structuredProbeLabel }}</strong>
+              @if (structuredProbe.message) {
+                <p>{{ structuredProbe.message }}</p>
+              }
+            </div>
+            <button
+              type="button"
+              class="primary-button"
+              [disabled]="isTestingStructuredProbe"
+              [attr.aria-busy]="isTestingStructuredProbe"
+              (click)="testSelectedModel()"
+            >{{ isTestingStructuredProbe ? 'Testing…' : 'Test selected model' }}</button>
+          </section>
+        }
       </aside>
     </div>
     <footer class="settings-page__status">{{ visibleStatusText }}</footer>

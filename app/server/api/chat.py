@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from server.common.paths import (
     CHAT_JOBS_ROUTE,
     CHAT_MODELS_ROUTE,
+    CHAT_STRUCTURED_PROBE_ROUTE,
     CHAT_OLLAMA_HEALTH_ROUTE,
     CHAT_OLLAMA_PULL_ROUTE,
     CHAT_OLLAMA_REFRESH_ROUTE,
@@ -30,6 +31,7 @@ from server.contracts.chat import (
     OllamaPullRequest,
     OllamaPullResponse,
     OllamaRefreshResponse,
+    StructuredProbeResponse,
 )
 from server.domain.jobs import BackgroundJobCreateResponse
 from server.services.chat.composition import ChatRuntime
@@ -89,6 +91,11 @@ async def chat_turn(
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ChatTurnResponse:
     try:
+        if runtime.conversation_repository.get_conversation(payload.conversation_id) is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found.",
+            )
         return await runtime.agent_orchestrator.run_turn(payload)
     except LLMConfigurationError as exc:
         raise HTTPException(
@@ -161,6 +168,40 @@ def get_settings(
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ModelSettingsResponse:
     return runtime.settings_service.get_settings()
+
+###############################################################################
+@router.get(
+    CHAT_STRUCTURED_PROBE_ROUTE,
+    response_model=StructuredProbeResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_structured_probe(
+    runtime: ChatRuntime = Depends(get_chat_runtime),
+) -> StructuredProbeResponse:
+    probe_service = runtime.structured_probe_service
+    if probe_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Structured probe is unavailable.",
+        )
+    return probe_service.latest()
+
+###############################################################################
+@router.post(
+    CHAT_STRUCTURED_PROBE_ROUTE,
+    response_model=StructuredProbeResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def run_structured_probe(
+    runtime: ChatRuntime = Depends(get_chat_runtime),
+) -> StructuredProbeResponse:
+    probe_service = runtime.structured_probe_service
+    if probe_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Structured probe is unavailable.",
+        )
+    return await probe_service.run()
 
 ###############################################################################
 @router.patch(

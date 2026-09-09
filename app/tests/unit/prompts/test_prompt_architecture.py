@@ -50,6 +50,7 @@ from server.services.llm.types import LLMRequest
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 SERVER_ROOT = REPOSITORY_ROOT / "app" / "server"
 PROMPTS_ROOT = SERVER_ROOT / "prompts"
+BACKEND_SOURCE_EXCLUSIONS = {".venv", "__pycache__"}
 PROMPT_MODULES = (
     "server.prompts",
     "server.prompts.common",
@@ -72,6 +73,17 @@ def _template_fields(template: str) -> set[str]:
         for _, field_name, _, _ in Formatter().parse(template)
         if field_name is not None
     }
+
+
+def _backend_python_files() -> tuple[Path, ...]:
+    return tuple(
+        path
+        for path in SERVER_ROOT.rglob("*.py")
+        if not any(
+            part in BACKEND_SOURCE_EXCLUSIONS
+            for part in path.relative_to(SERVER_ROOT).parts
+        )
+    )
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -185,7 +197,7 @@ def test_backend_has_no_obsolete_prompt_api_references() -> None:
         "get_parser_" + "system_prompt",
         "prompt_" + "within_budget",
     )
-    for path in SERVER_ROOT.rglob("*.py"):
+    for path in _backend_python_files():
         if PROMPTS_ROOT in path.parents:
             continue
         contents = path.read_text(encoding="utf-8")
@@ -203,7 +215,7 @@ def test_model_instructions_are_not_fragmented_outside_prompt_package() -> None:
     )
     findings = {
         f"{path}:{marker}"
-        for path in SERVER_ROOT.rglob("*.py")
+        for path in _backend_python_files()
         if PROMPTS_ROOT not in path.parents
         for marker in markers
         if marker in path.read_text(encoding="utf-8")

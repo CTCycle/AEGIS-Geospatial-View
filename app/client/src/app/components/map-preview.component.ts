@@ -834,6 +834,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         }
         return visibility !== 'none';
       });
+      const desiredVisible = metadataOnly || (this.overlayVisibility[overlay.id] ?? overlay.visible ?? true);
       const status = this.overlayRenderStatuses.find((item) => item.overlayId === overlay.id)?.status;
       let renderedFeatureCount: number | null = null;
       if (!metadataOnly && map && present && typeof (map as unknown as {
@@ -850,12 +851,14 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       }
       return {
         overlay_id: overlay.id,
+        capability_id: overlay.capability_id || overlay.id,
         source_present: metadataOnly || Boolean(
           mapApi?.getSource?.call(map, `overlay-source-${overlay.id}`),
         ),
-        layer_present: present && visible && styleValid && zoomRangeValid,
+        layer_present: present && styleValid && zoomRangeValid,
         loaded: status === 'loaded' || status === 'no-results' || metadataOnly,
         metadata_only: metadataOnly,
+        visibility_matches: metadataOnly || visible === desiredVisible,
         style_valid: styleValid,
         zoom_range_valid: zoomRangeValid,
         rendered_feature_count: renderedFeatureCount,

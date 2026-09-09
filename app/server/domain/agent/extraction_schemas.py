@@ -267,3 +267,28 @@ class LLMParserExtraction(BaseModel):
     )
     clarification_plan: LLMClarificationPlan | None = None
     viewport_intent: LLMViewportIntent | None = None
+
+
+###############################################################################
+class LLMParserExtractionProviderContract(LLMParserExtraction):
+    """Provider-facing contract with a required semantic envelope.
+
+    The normalized extraction model keeps defaults for deterministic internal
+    fixtures. Provider responses must explicitly provide these fields so a
+    sparse JSON object cannot be accepted as a usable interpretation.
+    """
+
+    task_class: Literal["map_search", "direct_query", "general_question", "unclear"] = Field(...)  # pyright: ignore[reportGeneralTypeIssues]
+    action_id: str = Field(...)  # pyright: ignore[reportGeneralTypeIssues]
+    requires_location: bool = Field(...)  # pyright: ignore[reportGeneralTypeIssues]
+    parser_confidence: float = Field(..., ge=0.0, le=1.0)  # pyright: ignore[reportGeneralTypeIssues]
+    relationship: Literal[  # pyright: ignore[reportGeneralTypeIssues]
+        "new_task",
+        "follow_up",
+        "correction",
+        "clarification",
+        "qa",
+        "simple_chat",
+        "failure_inquiry",
+    ] = Field(...)  # pyright: ignore[reportGeneralTypeIssues]
+    presentation_mode: Literal["text", "map", "both"] = Field(...)  # pyright: ignore[reportGeneralTypeIssues]

@@ -1,6 +1,7 @@
 import {
   API_BASE_URL,
   API_CHAT_MODELS_PATH,
+  API_CHAT_STRUCTURED_PROBE_PATH,
   API_CHAT_SETTINGS_PATH,
   API_CHAT_TURN_PATH,
   API_CONVERSATION_PATH,
@@ -28,6 +29,7 @@ import {
   parseModelSettingsResponse,
   parseOllamaHealthResponse,
   parseOllamaRefreshResponse,
+  parseStructuredProbeResponse,
 } from './api-parsers';
 import {
   CatalogResponse,
@@ -43,6 +45,7 @@ import {
   ModelLibraryResponse,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
+  StructuredProbeResponse,
   OllamaHealthResponse,
 } from './types';
 import { ApiRequestError } from './api-errors';
@@ -215,4 +218,20 @@ export const pullOllamaModel = async (model: string): Promise<GenericObjectRespo
 export const checkOllamaHealth = async (): Promise<OllamaHealthResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_HEALTH_PATH}`, { method: 'GET' });
   return parseOllamaHealthResponse(data);
+};
+
+export const fetchStructuredProbe = async (): Promise<StructuredProbeResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_STRUCTURED_PROBE_PATH}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  return parseStructuredProbeResponse(data);
+};
+
+export const runStructuredProbe = async (): Promise<StructuredProbeResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_STRUCTURED_PROBE_PATH}`, {
+    method: 'POST',
+    cache: 'no-store',
+  });
+  return parseStructuredProbeResponse(data);
 };

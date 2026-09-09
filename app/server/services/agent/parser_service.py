@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
@@ -16,6 +17,7 @@ from server.domain.agent.actions import AgentAction
 from server.domain.agent.extraction_schemas import (
     LLMLocationSignal,
     LLMParserExtraction,
+    LLMParserExtractionProviderContract,
 )
 from server.contracts.extraction import (
     ConversationContextSnapshot,
@@ -51,11 +53,12 @@ class ParserRunResult:
     turn_contract: TurnParseResult
     context_usage: dict[str, object] | None
     model_calls: int = 0
+    parser_contract: dict[str, object] | None = None
 
 ###############################################################################
 class ParserService:
-    PARSER_TIMEOUT_SECONDS = 35.0
-    RETRY_MIN_REMAINING_SECONDS = 1.0
+    PARSER_TIMEOUT_SECONDS = 30.0
+    RETRY_MIN_REMAINING_SECONDS = 18.0
     PARSER_MAX_OUTPUT_TOKENS = 2048
     MAX_HISTORY_MESSAGES = 4
     MAX_HISTORY_CONTENT_CHARS = 640
@@ -95,6 +98,9 @@ class ParserService:
         self._last_model_calls: ContextVar[int] = ContextVar(
             "aegis_parser_model_calls", default=0
         )
+        self._last_parser_contract: ContextVar[dict[str, object] | None] = ContextVar(
+            "aegis_parser_contract", default=None
+        )
         self._extraction_override: ContextVar[LLMParserExtraction | None] = ContextVar(
             "aegis_parser_extraction_override", default=None
         )
@@ -116,6 +122,17 @@ class ParserService:
     @property
     def last_model_calls(self) -> int:
         return self._last_model_calls.get()
+
+    # -------------------------------------------------------------------------
+    @property
+    def last_parser_contract(self) -> dict[str, object] | None:
+        value = self._last_parser_contract.get()
+        return dict(value) if is_json_object(value) else None
+
+    # -------------------------------------------------------------------------
+    @last_parser_contract.setter
+    def last_parser_contract(self, value: dict[str, object] | None) -> None:
+        self._last_parser_contract.set(dict(value) if is_json_object(value) else None)
 
     # -------------------------------------------------------------------------
     def _record_model_call(self) -> None:
@@ -865,9 +882,17 @@ class ParserService:
         )
         self.last_context_usage = None
         self._record_model_call()
-        payload = parser_provider.structured_output(
-            request=request, schema=LLMParserExtraction
-        )
+        try:
+            payload = parser_provider.structured_output(
+                request=request, schema=LLMParserExtractionProviderContract
+            )
+        except LLMResponseParsingError as exc:
+            if (
+                exc.code == "response_parsing_failed"
+                and "did not match" in exc.detail.casefold()
+            ):
+                exc.code = "contract_incomplete"
+            raise
         usage = getattr(payload, "context_usage", None)
         self.last_context_usage = dict(usage) if is_json_object(usage) else None
         try:
@@ -884,6 +909,12 @@ class ParserService:
                     else None
                 ),
             ) from exc
+        self.last_parser_contract = self._validate_semantic_contract(
+            extracted,
+            payload,
+            provider=provider_name,
+            model=model_name,
+        )
         LOGGER.debug(
             "Parser LLM extraction: provider=%s model=%s task=%s action=%s",
             provider_name,
@@ -931,9 +962,17 @@ class ParserService:
         )
         self.last_context_usage = None
         self._record_model_call()
-        payload = await parser_provider.astructured_output(
-            request=request, schema=LLMParserExtraction
-        )
+        try:
+            payload = await parser_provider.astructured_output(
+                request=request, schema=LLMParserExtractionProviderContract
+            )
+        except LLMResponseParsingError as exc:
+            if (
+                exc.code == "response_parsing_failed"
+                and "did not match" in exc.detail.casefold()
+            ):
+                exc.code = "contract_incomplete"
+            raise
         usage = getattr(payload, "context_usage", None)
         self.last_context_usage = dict(usage) if is_json_object(usage) else None
         try:
@@ -950,6 +989,12 @@ class ParserService:
                     else None
                 ),
             ) from exc
+        self.last_parser_contract = self._validate_semantic_contract(
+            extracted,
+            payload,
+            provider=provider_name,
+            model=model_name,
+        )
         LOGGER.debug(
             "Parser async extraction: provider=%s model=%s task=%s action=%s",
             provider_name,
@@ -958,6 +1003,102 @@ class ParserService:
             extracted.action_id,
         )
         return extracted
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _validate_semantic_contract(
+        cls,
+        extracted: LLMParserExtraction,
+        payload: object,
+        *,
+        provider: str,
+        model: str,
+    ) -> dict[str, object]:
+        required_fields = (
+            "task_class",
+            "action_id",
+            "requires_location",
+            "parser_confidence",
+            "relationship",
+            "presentation_mode",
+        )
+        supplied = getattr(payload, "provided_fields", None)
+        if not isinstance(supplied, (set, frozenset, list, tuple)):
+            supplied = payload.keys() if is_json_object(payload) else ()
+        supplied_fields = {
+            str(item) for item in cast(Iterable[object], supplied)
+        }
+        missing_fields = [field for field in required_fields if field not in supplied_fields]
+        if missing_fields:
+            raise LLMResponseParsingError(
+                provider=provider,
+                model=model,
+                stage="structured_intent_extraction",
+                code="contract_incomplete",
+                detail=(
+                    "The provider omitted required semantic fields: "
+                    + ", ".join(missing_fields)
+                ),
+            )
+
+        if extracted.task_class == "unclear":
+            plan = extracted.clarification_plan
+            has_plan = bool(
+                plan is not None
+                and plan.question.strip()
+                and any(field.strip() for field in plan.blocking_fields)
+            )
+            if not has_plan:
+                raise LLMResponseParsingError(
+                    provider=provider,
+                    model=model,
+                    stage="structured_intent_extraction",
+                    code="contract_incomplete",
+                    detail=(
+                        "An unclear task must include a blocking field and "
+                        "clarification plan."
+                    ),
+                )
+            status = "intentional_ambiguity"
+        elif extracted.task_class in {"map_search", "direct_query"}:
+            if (
+                extracted.action_id == AgentAction.UNKNOWN.value
+                and not cls._has_typed_execution_evidence(extracted)
+            ):
+                raise LLMResponseParsingError(
+                    provider=provider,
+                    model=model,
+                    stage="structured_intent_extraction",
+                    code="contract_incomplete",
+                    detail="Executable task did not include typed action evidence.",
+                )
+            status = "complete"
+        else:
+            status = "complete"
+
+        return {
+            "provider": provider,
+            "model": model,
+            "response_parse_status": status,
+            "task_class": extracted.task_class,
+            "action_id": extracted.action_id,
+            "location_signal_count": len(extracted.location_signals),
+            "required_field_presence": {
+                field: field in supplied_fields for field in required_fields
+            },
+            "provided_field_count": len(supplied_fields),
+            "defaulted_field_count": max(
+                0,
+                len(
+                    set(payload.keys()) - supplied_fields
+                )
+                if is_json_object(payload)
+                else 0,
+            ),
+            "parser_confidence": extracted.parser_confidence,
+            "provider_error_category": None,
+            "timeout_origin": None,
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1184,6 +1325,7 @@ class ParserService:
         provider_session_id: str | None = None,
     ) -> ParserRunResult:
         self.last_context_usage = None
+        self.last_parser_contract = None
         self._last_model_calls.set(0)
         normalized_recent = self._normalize_recent_messages(conversation_messages)
         parser_failure_ambiguity: str | None = None
@@ -1267,6 +1409,19 @@ class ParserService:
                 ambiguities=[failure_ambiguity],
                 parser_confidence=0.0,
             )
+            self.last_parser_contract = {
+                "provider": parser_provider_error.get("provider", self.provider or ""),
+                "model": parser_provider_error.get("model", self.model or ""),
+                "response_parse_status": "failed",
+                "task_class": "unclear",
+                "action_id": AgentAction.UNKNOWN.value,
+                "location_signal_count": 0,
+                "required_field_presence": {},
+                "defaulted_field_count": 0,
+                "parser_confidence": 0.0,
+                "provider_error_category": parser_failure_category,
+                "timeout_origin": parser_provider_error.get("timeout_origin"),
+            }
 
         # A model/provider failure must remain a failure.  Prose inspection
         # here would turn an unverified request into an executable map plan.
@@ -1494,6 +1649,7 @@ class ParserService:
                 else None
             ),
             model_calls=self.last_model_calls,
+            parser_contract=self.last_parser_contract,
         )
 
     # -------------------------------------------------------------------------
@@ -1591,12 +1747,14 @@ class ParserService:
                 turn_contract=result.turn_contract,
                 context_usage=usage,
                 model_calls=model_calls,
+                parser_contract=result.parser_contract,
             )
         else:
             result = ParserRunResult(
                 turn_contract=result.turn_contract,
                 context_usage=result.context_usage,
                 model_calls=model_calls,
+                parser_contract=result.parser_contract,
             )
         return result
 

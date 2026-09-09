@@ -505,7 +505,11 @@ class DeepSeekProvider(LLMProvider):
             )
         validator = getattr(schema, "model_validate", None)
         if not callable(validator):
-            return LLMStructuredOutput(loaded, context_usage=usage.to_dict())
+            return LLMStructuredOutput(
+                loaded,
+                context_usage=usage.to_dict(),
+                provided_fields=loaded.keys(),
+            )
         try:
             validated = validator(loaded)
         except Exception as exc:  # noqa: BLE001
@@ -518,7 +522,11 @@ class DeepSeekProvider(LLMProvider):
             ) from exc
         dumper = getattr(validated, "model_dump", None)
         payload = json_object(dumper(mode="json")) if callable(dumper) else loaded
-        return LLMStructuredOutput(payload, context_usage=usage.to_dict())
+        return LLMStructuredOutput(
+            payload,
+            context_usage=usage.to_dict(),
+            provided_fields=loaded.keys(),
+        )
 
     # -------------------------------------------------------------------------
     async def astructured_output(
@@ -612,7 +620,11 @@ class DeepSeekProvider(LLMProvider):
             )
         validator = getattr(schema, "model_validate", None)
         if not callable(validator):
-            return LLMStructuredOutput(loaded, context_usage=usage.to_dict())
+            return LLMStructuredOutput(
+                loaded,
+                context_usage=usage.to_dict(),
+                provided_fields=loaded.keys(),
+            )
         try:
             validated = validator(loaded)
         except Exception as exc:
@@ -625,7 +637,11 @@ class DeepSeekProvider(LLMProvider):
             ) from exc
         dumper = getattr(validated, "model_dump", None)
         payload = json_object(dumper(mode="json")) if callable(dumper) else loaded
-        return LLMStructuredOutput(payload, context_usage=usage.to_dict())
+        return LLMStructuredOutput(
+            payload,
+            context_usage=usage.to_dict(),
+            provided_fields=loaded.keys(),
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

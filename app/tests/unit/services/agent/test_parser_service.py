@@ -45,6 +45,8 @@ class _ProviderStub:
             "temporal_signal": {"mode": "none"},
             "ambiguities": [],
             "disallowed_patterns": [],
+            "relationship": "new_task",
+            "presentation_mode": "map",
             "parser_confidence": 0.9,
         }
 
@@ -59,7 +61,10 @@ class _FactoryStub:
 
     # -------------------------------------------------------------------------
     def __init__(self, payload: dict[str, object] | None = None) -> None:
-        self.provider = _ProviderStub(payload)
+        normalized = dict(payload or {})
+        normalized.setdefault("relationship", "new_task")
+        normalized.setdefault("presentation_mode", "map")
+        self.provider = _ProviderStub(normalized)
 
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str):  # noqa: ARG002

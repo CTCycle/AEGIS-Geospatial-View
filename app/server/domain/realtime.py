@@ -153,10 +153,12 @@ class RealtimeRenderAckPayload(BaseModel):
             raise ValueError("overlay_results are too large")
         allowed: set[str] = {
             "overlay_id",
+            "capability_id",
             "source_present",
             "layer_present",
             "loaded",
             "metadata_only",
+            "visibility_matches",
             "style_valid",
             "zoom_range_valid",
             "rendered_feature_count",
@@ -170,7 +172,19 @@ class RealtimeRenderAckPayload(BaseModel):
                 or len(item["overlay_id"]) > 160
             ):
                 raise ValueError("overlay result identity is invalid")
-            for key in ("source_present", "layer_present", "loaded", "metadata_only"):
+            if "capability_id" in item and (
+                not isinstance(item["capability_id"], str)
+                or not item["capability_id"]
+                or len(item["capability_id"]) > 160
+            ):
+                raise ValueError("overlay capability identity is invalid")
+            for key in (
+                "source_present",
+                "layer_present",
+                "loaded",
+                "metadata_only",
+                "visibility_matches",
+            ):
                 if key in item and not isinstance(item[key], bool):
                     raise ValueError(f"overlay result {key} must be boolean")
             if "rendered_feature_count" in item and (

@@ -441,12 +441,18 @@ class OpenAIProvider(LLMProvider):
         usage = apply_reported_usage(usage, raw)
         parsed = getattr(response, "output_parsed", None)
         if is_json_object(parsed):
-            return LLMStructuredOutput(parsed, context_usage=usage.to_dict())
+            return LLMStructuredOutput(
+                parsed,
+                context_usage=usage.to_dict(),
+                provided_fields=parsed.keys(),
+            )
         model_dump = getattr(parsed, "model_dump", None)
         if callable(model_dump):
             dumped = model_dump(mode="json")
             return LLMStructuredOutput(
-                json_object(dumped), context_usage=usage.to_dict()
+                json_object(dumped),
+                context_usage=usage.to_dict(),
+                provided_fields=getattr(parsed, "model_fields_set", None),
             )
         output_text = str(getattr(response, "output_text", "") or "")
         if output_text:
@@ -468,8 +474,12 @@ class OpenAIProvider(LLMProvider):
                     detail="The provider returned a JSON value instead of an object.",
                     context_usage=usage.to_dict(),
                 )
-            return LLMStructuredOutput(loaded, context_usage=usage.to_dict())
-        return LLMStructuredOutput({}, context_usage=usage.to_dict())
+            return LLMStructuredOutput(
+                loaded,
+                context_usage=usage.to_dict(),
+                provided_fields=loaded.keys(),
+            )
+        return LLMStructuredOutput({}, context_usage=usage.to_dict(), provided_fields=())
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:

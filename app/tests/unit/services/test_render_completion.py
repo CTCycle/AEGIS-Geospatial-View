@@ -372,6 +372,7 @@ def test_matching_render_ack_promotes_once_and_replay_is_idempotent(
                 "source_present": True,
                 "layer_present": True,
                 "loaded": True,
+                "visibility_matches": True,
                 "rendered_feature_count": 1,
             }
         ],
@@ -443,6 +444,7 @@ def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
                 "source_present": True,
                 "layer_present": True,
                 "loaded": True,
+                "visibility_matches": True,
                 "rendered_feature_count": 0,
             }
         ],

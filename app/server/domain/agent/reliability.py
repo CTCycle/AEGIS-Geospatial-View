@@ -5,14 +5,14 @@ from __future__ import annotations
 import asyncio
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Generator
 
 
-DEFAULT_RUN_SECONDS = 45.0
+DEFAULT_RUN_SECONDS = 75.0
 DEFAULT_STAGE_LIMITS: dict[str, float] = {
     "context_assembly": 2.0,
-    "structured_intent_extraction": 20.0,
+    "structured_intent_extraction": 30.0,
     "location_resolution": 12.0,
     "planning": 2.0,
     "tool_execution": 20.0,
@@ -58,6 +58,21 @@ def _new_stage_observations() -> list[StageObservation]:
     return []
 
 
+def _new_pipeline_reach() -> dict[str, str]:
+    return {
+        "context_assembly": "not_reached",
+        "structured_intent_extraction": "not_reached",
+        "policy": "not_reached",
+        "location_resolution": "not_reached",
+        "planning": "not_reached",
+        "tool_execution": "not_reached",
+        "map_assembly": "not_reached",
+        "render_ack": "not_reached",
+        "response_synthesis": "not_reached",
+        "persistence": "not_reached",
+    }
+
+
 ###############################################################################
 @dataclass
 class AgentExecutionBudget:
@@ -75,6 +90,9 @@ class AgentExecutionBudget:
     tool_calls: int = 0
     retry_count: int = 0
     terminal_reason: str | None = None
+    terminal_stage: str | None = None
+    parser_contract: dict[str, Any] | None = None
+    pipeline_reach: dict[str, str] = field(default_factory=_new_pipeline_reach)
 
     # -------------------------------------------------------------------------
     def __post_init__(self) -> None:
@@ -117,6 +135,35 @@ class AgentExecutionBudget:
     # -------------------------------------------------------------------------
     def record_retry(self) -> None:
         self.retry_count += 1
+
+    # -------------------------------------------------------------------------
+    def mark_stage_failed(
+        self,
+        stage: str,
+        *,
+        error_code: str | None = None,
+        timeout_origin: str | None = None,
+    ) -> None:
+        """Correct a returned failure that did not raise through ``observe``.
+
+        Parser services intentionally return a non-executable failure contract
+        so the response layer can provide a bounded diagnostic.  The stage
+        record still needs to reflect that extraction failed rather than
+        looking like a successful parse followed by policy clarification.
+        """
+        for index in range(len(self.observations) - 1, -1, -1):
+            observation = self.observations[index]
+            if observation.stage != stage:
+                continue
+            self.observations[index] = replace(
+                observation,
+                status="failed",
+                error_code=error_code or observation.error_code,
+                timeout_origin=timeout_origin or observation.timeout_origin,
+            )
+            break
+        self.pipeline_reach[stage] = "failed"
+        self.terminal_stage = self.terminal_stage or stage
 
     # -------------------------------------------------------------------------
     @contextmanager
@@ -163,19 +210,19 @@ class AgentExecutionBudget:
             error_code = str(getattr(exc, "code", "")) or type(exc).__name__
             raise
         finally:
-            self.observations.append(
-                StageObservation(
-                    stage=stage,
-                    status=status,
-                    duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
-                    deadline_remaining_ms=max(
-                        0, int(self.remaining_seconds() * 1000)
-                    ),
-                    error_code=error_code,
-                    timeout_origin=timeout_origin,
-                    metadata=dict(metadata or {}),
-                )
+            observation = StageObservation(
+                stage=stage,
+                status=status,
+                duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
+                deadline_remaining_ms=max(0, int(self.remaining_seconds() * 1000)),
+                error_code=error_code,
+                timeout_origin=timeout_origin,
+                metadata=dict(metadata or {}),
             )
+            self.observations.append(observation)
+            self.pipeline_reach[stage] = status
+            if status in {"failed", "timeout", "cancelled"}:
+                self.terminal_stage = self.terminal_stage or stage
 
     # -------------------------------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
@@ -186,5 +233,10 @@ class AgentExecutionBudget:
             "tool_calls": self.tool_calls,
             "retry_count": self.retry_count,
             "terminal_reason": self.terminal_reason,
+            "terminal_stage": self.terminal_stage,
+            "parser_contract": (
+                dict(self.parser_contract) if self.parser_contract is not None else None
+            ),
+            "pipeline_reach": dict(self.pipeline_reach),
             "stages": [item.to_dict() for item in self.observations[-32:]],
         }

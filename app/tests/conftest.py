@@ -6,6 +6,7 @@ Provides fixtures for Playwright page objects and API client.
 import asyncio
 import os
 from collections.abc import Coroutine
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, TypeVar
@@ -74,6 +75,24 @@ API_BASE_URL = _pick_first_non_empty(
     os.getenv("API_BASE_URL"),
     BACKEND_URL_FALLBACK,
 )
+
+###############################################################################
+@pytest.fixture(scope="session", autouse=True)
+def isolated_runtime_data(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Generator[None, None, None]:
+    """Keep application-startup tests away from the user's runtime database."""
+
+    previous_data_dir = os.environ.get("AEGIS_DATA_DIR")
+    if previous_data_dir is None:
+        os.environ["AEGIS_DATA_DIR"] = str(
+            tmp_path_factory.mktemp("aegis-runtime-data")
+        )
+    try:
+        yield
+    finally:
+        if previous_data_dir is None:
+            os.environ.pop("AEGIS_DATA_DIR", None)
 
 ###############################################################################
 class _SnapshotSaver:

@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-08-27
+Last updated: 2026-09-08
 
 ## Mounting
 
@@ -81,7 +81,18 @@ Defined in `app/server/api/chat.py`:
   `provider=opencode-go` fetches the selected live catalog using the saved
   provider API key. The response includes per-source `ok`, reachability, error,
   and model-count status; a provider catalog failure is not converted into a
-  usable empty catalog.
+  usable empty catalog. `reachable` means catalogue transport success only;
+  it is not inference or structured-output proof. Source statuses also expose
+  the separate process-local structured-probe status and expiry timestamps.
+- `GET /api/chat/models/structured-probe`
+  Returns the latest selected-provider/model parser probe, or `not_tested` when
+  no unexpired result exists. Results are keyed by provider, model, protocol,
+  base URL, and credential fingerprint and expire after 15 minutes.
+- `POST /api/chat/models/structured-probe`
+  Runs the selected model through the real structured parser contract using the
+  fixed `Show a map of Italy` request. It stops before geocoding, tools, map
+  assembly, and conversation persistence. A probe never changes model
+  selection or activates a fallback.
 - `GET /api/chat/settings`
   Reads persisted settings.
 - `PATCH /api/chat/settings`
@@ -176,6 +187,14 @@ return `400` for an unsupported provider and `502` when the upstream catalog
 cannot be loaded. Provider request failures are normalized into safe provider,
 stage, code, HTTP-status, and retryability metadata without exposing response
 bodies or credentials.
+
+`POST /api/chat/turn` first checks that the conversation exists and returns
+`404 Conversation not found.` without invoking the orchestrator when it does
+not. Agent runs use a 75-second absolute budget and a 30-second structured
+extraction stage. Extraction traces expose sanitized `parser_contract` and
+`pipeline_reach` state, including normalized intent, field presence/default
+counts, provider error category, timeout origin, terminal stage, and stage
+states; prompts, user text, credentials, and provider payloads are excluded.
 
 ### Intentional limitation contract
 
