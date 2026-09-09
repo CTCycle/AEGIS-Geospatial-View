@@ -47,6 +47,7 @@ export const API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH = (providerId: string)
 export const API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH = '/geospatial/providers/account-setup';
 export const API_CHAT_TURN_PATH = '/chat/turn';
 export const API_CHAT_MODELS_PATH = '/chat/models';
+export const API_CHAT_STRUCTURED_PROBE_PATH = '/chat/models/structured-probe';
 export const API_CHAT_SETTINGS_PATH = '/chat/settings';
 export const API_OLLAMA_REFRESH_PATH = '/chat/models/ollama/refresh';
 export const API_OLLAMA_PULL_PATH = '/chat/models/ollama/pull';

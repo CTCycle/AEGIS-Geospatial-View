@@ -84,10 +84,16 @@ class LLMStructuredOutput(dict[str, Any]):
         payload: dict[str, Any],
         *,
         context_usage: dict[str, Any] | None = None,
+        provided_fields: Iterable[str] | None = None,
     ) -> None:
         super().__init__(payload)
         self.context_usage = (
             dict(context_usage) if context_usage is not None else None
+        )
+        self.provided_fields = (
+            frozenset(str(field) for field in provided_fields)
+            if provided_fields is not None
+            else None
         )
 
 ###############################################################################

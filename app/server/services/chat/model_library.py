@@ -47,6 +47,43 @@ class ChatModelLibraryService:
         self.provider_factory = provider_factory
         self.ollama_unavailable_ttl_s = ollama_unavailable_ttl_s
         self._ollama_unavailable_cache: dict[str, _CachedOllamaFailure] = {}
+        self.structured_probe_service: object | None = None
+
+    # -------------------------------------------------------------------------
+    def set_structured_probe_service(self, service: object) -> None:
+        self.structured_probe_service = service
+
+    # -------------------------------------------------------------------------
+    def _structured_probe_status(self, provider: str) -> dict[str, object]:
+        service = self.structured_probe_service
+        latest = getattr(service, "latest", None) if service is not None else None
+        if not callable(latest):
+            return {
+                "structured_probe_status": "not_tested",
+                "structured_probe_checked_at": None,
+                "structured_probe_expires_at": None,
+            }
+        try:
+            result = latest()
+        except Exception:
+            return {
+                "structured_probe_status": "not_tested",
+                "structured_probe_checked_at": None,
+                "structured_probe_expires_at": None,
+            }
+        if getattr(result, "provider", None) != provider:
+            return {
+                "structured_probe_status": "not_tested",
+                "structured_probe_checked_at": None,
+                "structured_probe_expires_at": None,
+            }
+        return {
+            "structured_probe_status": str(
+                getattr(result, "status", "not_tested")
+            ),
+            "structured_probe_checked_at": getattr(result, "checked_at", None),
+            "structured_probe_expires_at": getattr(result, "expires_at", None),
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -181,14 +218,18 @@ class ChatModelLibraryService:
                 cloud.extend(dynamic_models)
                 sources[cloud_provider] = {
                     "ok": True,
+                    "reachable": True,
                     "message": None,
                     "model_count": len(dynamic_models),
+                    **self._structured_probe_status(cloud_provider),
                 }
             except Exception as exc:
                 sources[cloud_provider] = {
                     "ok": False,
+                    "reachable": False,
                     "message": str(exc) or f"Could not load {cloud_provider} models.",
                     "model_count": 0,
+                    **self._structured_probe_status(cloud_provider),
                 }
         deduped_cloud: dict[tuple[str, str], dict[str, object]] = {}
         for entry in cloud:
@@ -310,6 +351,7 @@ class ChatModelLibraryService:
                 "reachable": False,
                 "message": cached.message,
                 "model_count": 0,
+                **self._structured_probe_status("ollama"),
             }
         self._ollama_unavailable_cache.pop(ollama_url, None)
         ollama = OllamaProvider(
@@ -328,6 +370,7 @@ class ChatModelLibraryService:
                 "reachable": False,
                 "message": message,
                 "model_count": 0,
+                **self._structured_probe_status("ollama"),
             }
         return (
             [self.model_payload(model) for model in local_models],
@@ -336,5 +379,6 @@ class ChatModelLibraryService:
                 "reachable": True,
                 "message": None,
                 "model_count": len(local_models),
+                **self._structured_probe_status("ollama"),
             },
         )

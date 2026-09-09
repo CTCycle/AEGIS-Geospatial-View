@@ -323,7 +323,11 @@ class GoogleProvider(LLMProvider):
                 detail="The provider returned a JSON value instead of an object.",
                 context_usage=usage.to_dict(),
             )
-        return LLMStructuredOutput(loaded, context_usage=usage.to_dict())
+        return LLMStructuredOutput(
+            loaded,
+            context_usage=usage.to_dict(),
+            provided_fields=loaded.keys(),
+        )
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:

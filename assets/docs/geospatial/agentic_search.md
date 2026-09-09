@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-09-05
+Last updated: 2026-09-08
 
 ## Summary
 
@@ -76,6 +76,16 @@ deadline; the full pipeline is not restarted. OpenCode inference requests carry
 the conversation-scoped `x-opencode-session` header and a versioned AEGIS
 `User-Agent`; no model or provider fallback is performed.
 
+The current reliability budget is 75 seconds per turn, with 30 seconds reserved
+for structured intent extraction. A schema-correction request is sent only for
+an incomplete structured contract while at least 18 seconds remain in the
+extraction window; extraction transport timeouts are never retried and never
+restart the workflow. Provider fields `task_class`, `action_id`,
+`requires_location`, `parser_confidence`, `relationship`, and
+`presentation_mode` are required before normalization. Extraction is recorded as
+`complete`, `intentional_ambiguity`, or `contract_incomplete`; the last state is
+a failed extraction stage, not a policy clarification.
+
 ## Parser Contract
 
 `TurnParseResult` contains:
@@ -97,6 +107,12 @@ the conversation-scoped `x-opencode-session` header and a versioned AEGIS
 - an optional generic clarification plan describing blocking fields, choices, and whether valid visualization changes may be applied before clarification
 
 It does not contain provider-specific tool schemas, concrete executable tool names, or final map payloads.
+
+Clarification is field-specific. Place-only requests ask for the operation;
+missing anchors ask for a location; `recent` asks for a time window;
+`strongest` asks for a threshold or top-N; and “Where is …?” asks whether the
+result should be shown on the map, in text, or both. Explicit map commands are
+never routed to a generic task-class question.
 
 ## Capability Resolution
 
@@ -211,8 +227,17 @@ good visible map state.
 `tool_payload` remains available for raw tool trace and debugging, but it is not the primary source of truth for user-visible outcome.
 
 `execution_trace` contains bounded stage observations, durations, model/tool/retry
-counts, remaining deadline, timeout origin, and terminal reason. It is diagnostic
-metadata only and excludes prompts, credentials, and large external payloads.
+counts, remaining deadline, timeout origin, terminal stage, a sanitized
+`parser_contract`, and per-stage `pipeline_reach` states. Parser telemetry records
+field presence/default counts, normalized intent, provider error category, and
+timeout origin. It is diagnostic metadata only and excludes prompts, user text,
+credentials, and provider payloads.
+
+`GET` and `POST /api/chat/models/structured-probe` report the selected model's
+real parser-prompt/schema check. Results are process-local, keyed by provider,
+model, base URL, and credential fingerprint, and expire after 15 minutes. A
+catalogue transport's `reachable` flag is independent from structured inference
+proof; the catalogue also exposes the separate probe status.
 
 ## Overlay Collection And Inspection
 

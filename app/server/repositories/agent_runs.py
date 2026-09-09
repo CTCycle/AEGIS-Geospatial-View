@@ -393,24 +393,53 @@ class AgentRunRepository:
                         for item in overlay_results
                         if item.get("overlay_id")
                     }
+                    candidate_instances = self._candidate_overlay_instances(
+                        pending_response.get("map_session")
+                    )
+                    required_capability_instances: dict[str, list[dict[str, Any]]] = {}
+                    for required_id in required_overlay_ids:
+                        required_instance = candidate_instances.get(str(required_id))
+                        if required_instance is None:
+                            continue
+                        required_capability = str(
+                            required_instance.get("capability_id") or ""
+                        )
+                        if required_capability:
+                            required_capability_instances.setdefault(
+                                required_capability, []
+                            ).append(required_instance)
                     missing_overlays: list[str] = []
                     for raw_id in required_overlay_ids:
                         overlay_id = str(raw_id)
                         result = by_id.get(overlay_id)
                         if result is None:
-                            # Clients may use the stable capability ID when
-                            # reporting a layer. Accept that alias only when it
-                            # maps to exactly one required instance.
-                            aliases = [
-                                candidate
-                                for candidate in overlay_results
-                                if candidate.get("overlay_id") == overlay_id
-                            ]
+                            # Clients may report the stable capability ID. Accept
+                            # that alias only when it maps to one required
+                            # instance and the evidence declares the alias.
+                            instance = candidate_instances.get(overlay_id)
+                            capability_id = (
+                                str(instance.get("capability_id") or "")
+                                if instance is not None
+                                else ""
+                            )
+                            aliases = (
+                                [
+                                    candidate
+                                    for candidate in overlay_results
+                                    if candidate.get("overlay_id") == capability_id
+                                    or candidate.get("capability_id") == capability_id
+                                ]
+                                if len(required_capability_instances.get(capability_id, []))
+                                == 1
+                                else []
+                            )
                             result = aliases[0] if len(aliases) == 1 else None
                         if result is None or any(
                             result.get(name) is not True
                             for name in ("source_present", "layer_present", "loaded")
                         ):
+                            missing_overlays.append(overlay_id)
+                        elif result.get("visibility_matches") is not True:
                             missing_overlays.append(overlay_id)
                     if missing_overlays:
                         raise ValueError(
@@ -434,7 +463,20 @@ class AgentRunRepository:
                         ):
                             continue
                         result = by_id.get(str(overlay_id))
+                        if result is None:
+                            instance = pending_instances.get(str(overlay_id))
+                            capability_id = str(instance.get("capability_id") or "") if instance else ""
+                            aliases = [
+                                candidate
+                                for candidate in overlay_results
+                                if candidate.get("overlay_id") == capability_id
+                                or candidate.get("capability_id") == capability_id
+                            ]
+                            result = aliases[0] if len(aliases) == 1 else None
                         rendered_count = result.get("rendered_feature_count") if result else None
+                        instance = pending_instances.get(str(overlay_id))
+                        if instance is not None and instance.get("visible") is False:
+                            continue
                         if not isinstance(rendered_count, int) or rendered_count <= 0:
                             missing_features.append(str(overlay_id))
                     if missing_features:

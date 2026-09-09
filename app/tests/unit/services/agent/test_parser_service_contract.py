@@ -126,6 +126,8 @@ def test_parser_normalizes_explicit_null_overlay_patch() -> None:
                         "patch": None,
                     }
                 ],
+                "relationship": "new_task",
+                "presentation_mode": "map",
                 "parser_confidence": 0.9,
             }
 
@@ -177,6 +179,8 @@ def test_parser_retains_map_mutation_alongside_unsupported_direct_concept() -> N
                     }
                 ],
                 "requires_location": False,
+                "relationship": "new_task",
+                "presentation_mode": "map",
                 "parser_confidence": 0.9,
             }
 
@@ -232,6 +236,8 @@ def test_parser_recovers_bulk_overlay_mutation_from_typed_task_graph() -> None:
                     }
                 ],
                 "requires_location": False,
+                "relationship": "new_task",
+                "presentation_mode": "map",
                 "parser_confidence": 0.9,
             }
 
@@ -279,6 +285,8 @@ def test_parser_maps_unknown_model_action_to_generic_data_action_with_semantics(
                 "location_signals": [
                     {"signal_type": "city", "raw_value": "Rome", "confidence": 0.9}
                 ],
+                "relationship": "new_task",
+                "presentation_mode": "map",
                 "parser_confidence": 0.9,
             }
 
@@ -330,6 +338,7 @@ def test_parser_prioritizes_actionable_data_over_context_query_label() -> None:
                         "confidence": 0.9,
                     }
                 ],
+                "presentation_mode": "map",
                 "parser_confidence": 0.9,
             }
 
@@ -374,6 +383,7 @@ def test_parser_recovers_omitted_deictic_reference_for_memory_resolution() -> No
                 "tools_needed": True,
                 "requires_location": True,
                 "location_signals": [],
+                "presentation_mode": "map",
                 "parser_confidence": 0.9,
             }
 

@@ -35,6 +35,7 @@ describe('AgentReadinessService', () => {
       'fetchChatSettings',
       'fetchChatModels',
       'checkOllamaHealth',
+      'fetchStructuredProbe',
     ]);
     errors = jasmine.createSpyObj<UserFacingErrorService>('UserFacingErrorService', ['normalizeDisplayText']);
     errors.normalizeDisplayText.and.callFake((text: string, fallback: string) => text || fallback);
@@ -49,15 +50,26 @@ describe('AgentReadinessService', () => {
     service = TestBed.inject(AgentReadinessService);
   });
 
-  it('reports configured readiness without claiming live inference', async () => {
+  it('reports unprobed configured models without claiming live inference', async () => {
     apiClient.fetchChatSettings.and.resolveTo(settings());
+    apiClient.fetchStructuredProbe.and.resolveTo({
+      provider: 'openai',
+      model: 'gpt-4.1-mini',
+      protocol: 'openai-responses',
+      status: 'not_tested',
+      parse_status: 'not_tested',
+      duration_ms: null,
+      checked_at: null,
+      expires_at: null,
+      message: 'This model has not been verified against the parser contract.',
+    });
 
     const readiness = await service.loadReadiness();
 
     expect(readiness).toEqual({
-      status: 'active',
-      label: 'Configured',
-      message: 'gpt-4.1-mini is configured through OpenAI. Live inference is verified on the first request.',
+      status: 'unknown',
+      label: 'Not verified',
+      message: 'This model has not been verified against the parser contract.',
     });
   });
 

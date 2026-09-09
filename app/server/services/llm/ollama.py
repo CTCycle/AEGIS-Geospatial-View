@@ -731,8 +731,13 @@ class OllamaProvider(LLMProvider):
                 return LLMStructuredOutput(
                     json_object(dumper(mode="json")),
                     context_usage=usage.to_dict(),
+                    provided_fields=loaded.keys(),
                 )
-        return LLMStructuredOutput(loaded, context_usage=usage.to_dict())
+        return LLMStructuredOutput(
+            loaded,
+            context_usage=usage.to_dict(),
+            provided_fields=loaded.keys(),
+        )
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:

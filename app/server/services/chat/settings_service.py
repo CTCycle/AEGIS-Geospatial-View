@@ -44,6 +44,7 @@ class ChatSettingsService:
         self.crypto_service = crypto_service
         self.model_library_service = model_library_service
         self.context_profile_resolver = context_profile_resolver
+        self.structured_probe_service: object | None = None
 
     # -------------------------------------------------------------------------
     def get_settings(self) -> ModelSettingsResponse:
@@ -209,6 +210,9 @@ class ChatSettingsService:
             google_base_url=next_google_base_url,
             deepseek_base_url=next_deepseek_base_url,
         )
+        clear_probe = getattr(self.structured_probe_service, "clear", None)
+        if callable(clear_probe):
+            clear_probe()
         return self.get_settings()
 
     # -------------------------------------------------------------------------

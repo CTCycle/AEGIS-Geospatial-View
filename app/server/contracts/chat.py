@@ -173,6 +173,25 @@ class ModelLibrarySourceStatus(BaseModel):
     reachable: bool | None = None
     message: str | None = None
     model_count: int | None = None
+    structured_probe_status: Literal[
+        "not_tested", "passed", "failed", "timeout", "unsupported"
+    ] = "not_tested"
+    structured_probe_checked_at: datetime | None = None
+    structured_probe_expires_at: datetime | None = None
+
+###############################################################################
+class StructuredProbeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    model: str
+    protocol: str
+    status: Literal["not_tested", "passed", "failed", "timeout", "unsupported"]
+    parse_status: str
+    duration_ms: int | None = None
+    checked_at: datetime | None = None
+    expires_at: datetime | None = None
+    message: str | None = None
 
 ###############################################################################
 class SelectedModelContextResponse(BaseModel):

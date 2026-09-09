@@ -37,10 +37,18 @@ export class AgentReadinessService {
           message: issue,
         };
       }
+      const probe = await this.apiClient.fetchStructuredProbe();
+      if (probe.status !== 'passed') {
+        return {
+          status: probe.status === 'not_tested' ? 'unknown' : 'needs_attention',
+          label: probe.status === 'not_tested' ? 'Not verified' : 'Needs attention',
+          message: probe.message ?? 'The selected model has not passed the structured parser probe.',
+        };
+      }
       return {
         status: 'active',
         label: 'Configured',
-        message: this.describeActiveAgent(settings),
+        message: `${this.describeActiveAgent(settings)} Structured parser probe passed.`,
       };
     } catch {
       return {

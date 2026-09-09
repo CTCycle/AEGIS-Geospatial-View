@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from server.contracts.extraction import (
     ConversationContextSnapshot,
     DisallowedPattern,
@@ -349,6 +351,47 @@ def test_evaluate_preflight_rejects_unknown_task_class() -> None:
     assert result.plan.state == "reject"
     assert result.clarification is not None
     assert result.clarification.missing_fields == ["task"]
+    assert "What would you like me to show or find" in result.clarification.question
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("blocking_field", "expected_fragment"),
+    [
+        ("operation", "show or find for Rome"),
+        ("location", "Which location should I use?"),
+        ("time_window", "time window"),
+        ("magnitude_threshold_or_top_n", "threshold or a top-N"),
+        ("presentation_mode", "map, described in text, or both"),
+    ],
+)
+def test_preflight_uses_field_specific_clarification(
+    blocking_field: str, expected_fragment: str
+) -> None:
+    turn = TurnParseResult(
+        user_text="Where is Rome?",
+        conversation_context=ConversationContextSnapshot(),
+        task_class="unclear",
+        normalized_action=NormalizedAction(
+            action_id="unknown",
+            action_label="Unclear request",
+            requires_location=False,
+        ),
+        location_signals=[
+            LocationSignal(signal_type="city", raw_value="Rome", source="model")
+        ],
+        clarification_plan={
+            "question": "provider wording is replaced",
+            "reason": "A semantic field is missing.",
+            "blocking_fields": [blocking_field],
+        },
+    )
+
+    result = _engine().evaluate_preflight(turn)
+
+    assert result is not None
+    assert result.clarification is not None
+    assert expected_fragment.lower() in result.clarification.question.lower()
+    assert "Please specify what you would like AEGIS to do" not in result.clarification.question
 
 ###############################################################################
 def test_evaluate_preflight_clarifies_missing_location() -> None:

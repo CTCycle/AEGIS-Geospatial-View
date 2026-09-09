@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-09-05
+Last updated: 2026-09-08
 
 ## Layering
 
@@ -78,8 +78,8 @@ Geospatial API services are composed during application startup and accessed thr
 
 ## Chat Orchestration Pipeline
 
-1. `AgentOrchestrator` creates a run-local execution budget and loads volatile conversation task and visualization state.
-2. `ParserService` receives a bounded projection of the current request, compact active location/map state, relevant capability identities, and only minimal follow-up history. It produces structured intent, relationship, entities, typed overlay commands, visualization changes, and ambiguities using the selected agent model and the canonical parser builder.
+1. `AgentOrchestrator` creates a run-local 75-second execution budget and loads volatile conversation task and visualization state.
+2. `ParserService` receives a bounded projection of the current request, compact active location/map state, relevant capability identities, and only minimal follow-up history. It produces structured intent, relationship, entities, typed overlay commands, visualization changes, and ambiguities using the selected agent model and the canonical parser builder. The parser stage is capped at 30 seconds; only an incomplete semantic contract may receive one schema correction while at least 18 seconds remain.
 3. A deterministic location-resolution stage resolves coordinates, addresses/POIs, districts, cities, regions, and countries into one `ResolvedLocation` with a target and ordered geographic parents. That object is stored in `AgentExecutionContext` and is the only run-scoped location authority.
 4. `ConversationTaskStateService` creates or updates the current task record.
 5. `CapabilityResolver` converts semantic layer concepts into enabled executable manifest IDs or returns a structured clarification when no temporally compatible capability exists.
@@ -152,6 +152,12 @@ message sequence, and active-run relationship directly. Runs and events carry th
 conversation identity explicitly, and request/mutation access is validated against
 that conversation. There is no global or recently used chat session to resolve.
 
+Model Settings can run the same parser contract through
+`/api/chat/models/structured-probe`. Probe results are process-local and expire
+after 15 minutes; changing model settings or credentials invalidates the cache.
+The probe does not create a conversation, invoke geocoding, execute tools, or
+promote a map.
+
 Every model phase receives freshly assembled conversation directives, task state,
 map memory, summarized older turns, recent verbatim turns, verified tool outcomes,
 and policy constraints through the relevant canonical prompt builder. The current
@@ -162,7 +168,10 @@ Each run carries one absolute deadline and stage observations for context
 assembly, parsing, resolution, planning, tool execution, provider calls, map
 assembly, synthesis, persistence, and frontend delivery. Observations contain
 bounded durations, call/retry counts, safe identifiers, timeout origin, and the
-terminal reason; prompts, credentials, and large provider payloads are excluded.
+terminal reason. `execution_trace.parser_contract` records only sanitized field
+presence/default counts, normalized intent, error category, and timeout origin;
+`pipeline_reach` records the state of each stage. Prompts, user text,
+credentials, and large provider payloads are excluded.
 Provider transport timeouts, application deadline expiry, cancellation, and stale
 frontend runs are surfaced as distinct failure origins. Realtime stream cleanup
 cancels and awaits the active turn task so a disconnected client cannot publish a

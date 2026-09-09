@@ -78,9 +78,14 @@ PARSER_SYSTEM_PROMPT = (
     "only request, and both when a location fact is useful in text and on the map.\n"
     "17. Atomic tasks require stable ids, depends_on, required, input_refs, and "
     "output_refs; independent tasks must not depend on one another.\n"
-    "17a. Return the smallest valid object: use empty arrays, nulls, and default "
-    "values for fields not required by the current request. Return the JSON "
-    "object immediately; do not provide explanations or deliberation.\n"
+    "17a. Always provide task_class, action_id, requires_location, "
+    "parser_confidence, relationship, and presentation_mode explicitly. Do not "
+    "use unclear or unknown as a default. Use task_class=unclear only when the "
+    "request is genuinely ambiguous and clarification_plan contains a blocking "
+    "field and a specific question. Return the smallest valid object, using "
+    "empty arrays and nulls for optional fields not required by the request. "
+    "Return the JSON object immediately; do not provide explanations or "
+    "deliberation.\n"
     "18. Do not execute tools.\n"
     "19. Do not produce the user-facing answer.\n"
     "20. Return only the structured object required by the runtime."
@@ -89,8 +94,11 @@ PARSER_SYSTEM_PROMPT = (
 PARSER_SCHEMA_CORRECTION = (
     "SCHEMA CORRECTION: The previous structured output did not validate. "
     "Return exactly one structured object accepted by the runtime schema, "
-    "respecting every supplied enum and field type. Do not place relationship "
-    "values in task-class fields."
+    "respecting every supplied enum and field type. Explicitly include "
+    "task_class, action_id, requires_location, parser_confidence, relationship, "
+    "and presentation_mode. Do not place relationship values in task-class "
+    "fields. Use unclear only with a blocking field, reason, and targeted "
+    "clarification question."
 )
 
 ###############################################################################

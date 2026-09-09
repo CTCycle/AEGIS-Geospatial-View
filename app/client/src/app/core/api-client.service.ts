@@ -5,6 +5,7 @@ import {
   createConversation,
   fetchCatalog,
   fetchChatModels,
+  fetchStructuredProbe,
   fetchConversationSnapshot,
   fetchChatSettings,
   fetchGeospatialCameras,
@@ -16,6 +17,7 @@ import {
   refreshOllamaModels,
   sendChatTurn,
   updateChatSettings,
+  runStructuredProbe,
 } from './api';
 import {
   CatalogResponse,
@@ -31,6 +33,7 @@ import {
   ModelLibraryResponse,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
+  StructuredProbeResponse,
   OllamaHealthResponse,
 } from './types';
 
@@ -87,6 +90,14 @@ export class ApiClientService {
 
   updateChatSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {
     return updateChatSettings(payload);
+  }
+
+  fetchStructuredProbe(): Promise<StructuredProbeResponse> {
+    return fetchStructuredProbe();
+  }
+
+  runStructuredProbe(): Promise<StructuredProbeResponse> {
+    return runStructuredProbe();
   }
 
   refreshOllamaModels(): Promise<GenericObjectResponse> {

@@ -109,6 +109,7 @@ class LLMResponseParsingError(LLMStructuredOutputError):
         model: str,
         stage: str,
         detail: str,
+        code: str = "response_parsing_failed",
         context_usage: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(
@@ -116,7 +117,7 @@ class LLMResponseParsingError(LLMStructuredOutputError):
             provider=provider,
             model=model,
             stage=stage,
-            code="response_parsing_failed",
+            code=code,
             detail=detail,
             context_usage=context_usage,
         )

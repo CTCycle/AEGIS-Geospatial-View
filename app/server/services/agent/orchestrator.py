@@ -256,6 +256,7 @@ class AgentOrchestrator:
             usage=synthesis_usage,
         )
         response = self._with_phase_usage(response)
+        execution_budget.pipeline_reach["response_synthesis"] = "success"
         task_snapshot_for_persistence = self._task_snapshot_for_persistence(
             self.task_state_service.serialize(conversation_id),
             persisted.get("task_snapshot"),
@@ -314,6 +315,8 @@ class AgentOrchestrator:
                 execution_budget.terminal_reason = "operation_failed"
             else:
                 execution_budget.terminal_reason = "completed"
+        if execution_budget.terminal_stage is None and execution_budget.observations:
+            execution_budget.terminal_stage = execution_budget.observations[-1].stage
         response = response.model_copy(
             update={
                 "context_revision": revision,
@@ -790,6 +793,37 @@ class AgentOrchestrator:
                     "timeout_origin": timeout_origin,
                 },
             )
+            execution_budget.parser_contract = {
+                "provider": settings.agent_model_provider,
+                "model": settings.agent_model_name,
+                "response_parse_status": "failed",
+                "task_class": "unclear",
+                "action_id": "unknown",
+                "location_signal_count": 0,
+                "required_field_presence": {},
+                "defaulted_field_count": 0,
+                "parser_confidence": 0.0,
+                "provider_error_category": "provider_api",
+                "timeout_origin": timeout_origin,
+            }
+        parser_contract = (
+            parser_run.parser_contract
+            if parser_run is not None
+            else getattr(self.parser_service, "last_parser_contract", None)
+        )
+        if is_json_object(parser_contract):
+            execution_budget.parser_contract = dict(parser_contract)
+        if is_json_object(getattr(turn_contract, "provider_error", None)):
+            provider_error = cast(dict[str, object], turn_contract.provider_error)
+            execution_budget.mark_stage_failed(
+                "structured_intent_extraction",
+                error_code=str(provider_error.get("code") or "parser_failed"),
+                timeout_origin=(
+                    str(provider_error.get("timeout_origin"))
+                    if provider_error.get("timeout_origin")
+                    else None
+                ),
+            )
         parser_model_calls = max(
             int(getattr(parser_run, "model_calls", 0) or 0)
             if parser_run is not None
@@ -798,6 +832,9 @@ class AgentOrchestrator:
         )
         for _ in range(max(0, parser_model_calls)):
             execution_budget.record_model_call()
+        if parser_model_calls > 1:
+            for _ in range(parser_model_calls - 1):
+                execution_budget.record_retry()
         recovered_turn_contract = (
             self.deterministic_intent_recovery_service.recover_explicit_request(
                 user_message=payload.message,
@@ -825,6 +862,16 @@ class AgentOrchestrator:
             turn_contract=turn_contract,
             latest_memory=latest_memory,
         )
+        if is_json_object(execution_budget.parser_contract):
+            execution_budget.parser_contract.update(
+                {
+                    "normalized_task_class": turn_contract.task_class,
+                    "normalized_action_id": turn_contract.normalized_action.action_id,
+                    "normalized_requires_location": (
+                        turn_contract.normalized_action.requires_location
+                    ),
+                }
+            )
         LOGGER.debug(
             "chat_turn_parsed request_id=%s conversation_key=%s task=%s action=%s relationship=%s context_query=%s tools_needed=%s specialist_candidate=%s viewport_scope=%s basemap=%s layers=%s concepts=%s",
             request_id,
@@ -888,6 +935,7 @@ class AgentOrchestrator:
                 usage=context_usage.model_dump(mode="json"),
             )
         preflight_decision = self.policy_engine.evaluate_preflight(turn_contract)
+        execution_budget.pipeline_reach["policy"] = "success"
         resolved_location: ResolvedLocation | None = None
         resolved_locations: dict[str, ResolvedLocation] = {}
         if (
@@ -1222,6 +1270,7 @@ class AgentOrchestrator:
             for step in tool_plan.steps
         )
         if deterministic_tools_available:
+            execution_budget.pipeline_reach["tool_execution"] = "pending"
             response = await self.planned_turn_execution_service.execute(
                 request_id=request_id,
                 conversation_id=conversation_id,
@@ -1235,6 +1284,12 @@ class AgentOrchestrator:
                 tool_plan=tool_plan,
                 progress_callback=progress_callback,
             )
+            execution_budget.pipeline_reach["tool_execution"] = "success"
+            if response.map_session is not None:
+                execution_budget.pipeline_reach["map_assembly"] = "success"
+                execution_budget.pipeline_reach["render_ack"] = (
+                    "pending" if payload.defer_map_commit else "not_required"
+                )
             return response.model_copy(update={"canonical_request": canonical_request})
         build_native_tools = getattr(
             self.agent_tool_catalog_service, "build_native_tools", None
@@ -1247,6 +1302,7 @@ class AgentOrchestrator:
             )(native_context)
         else:
             native_tools = self.tool_registry.list_native_tools()
+        execution_budget.pipeline_reach["tool_execution"] = "pending"
         tool_loop_result = await self.native_tool_loop.run(
             AgentToolLoopRequest(
                 provider=settings.agent_model_provider,
@@ -1279,6 +1335,7 @@ class AgentOrchestrator:
                 ),
             )
         )
+        execution_budget.pipeline_reach["tool_execution"] = "success"
         decision_trace_steps = [
             "1.parse_structured_request",
             "2.build_policy_constraints",
@@ -1427,6 +1484,10 @@ class AgentOrchestrator:
                 len(map_session.overlay_collection.instances),
                 len(overlay_mutation_results),
             )
+        execution_budget.pipeline_reach["map_assembly"] = "success"
+        execution_budget.pipeline_reach["render_ack"] = (
+            "pending" if payload.defer_map_commit and map_session is not None else "not_required"
+        )
         self.turn_state_assembler.append_provider_events(tool_payload, map_session)
         memory_snapshot = await self.turn_state_assembler.build_updated_memory_snapshot(
             turn_contract=turn_contract,
