@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     JSON,
     String,
     Text,
@@ -275,6 +276,44 @@ class ConversationRecord(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+###############################################################################
+class AgentEvidenceRecord(Base):
+    """Compressed, conversation-scoped payload owned by the evidence store."""
+
+    __tablename__ = "agent_evidence"
+
+    id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    conversation_id: Mapped[str] = mapped_column(
+        String(80), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    run_id: Mapped[str | None] = mapped_column(
+        String(80), ForeignKey("agent_runs.id", ondelete="SET NULL")
+    )
+    kind: Mapped[str] = mapped_column(String(48), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    summary_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    provenance_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    payload_blob: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    uncompressed_byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    parent_evidence_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_agent_evidence_conversation_created", "conversation_id", "created_at"),
+        Index("ix_agent_evidence_run_id", "run_id"),
+        CheckConstraint(
+            "status IN ('available', 'partial', 'valid_empty', 'failed', 'superseded')",
+            name="ck_agent_evidence_status",
+        ),
+        CheckConstraint(
+            "uncompressed_byte_size >= 0", name="ck_agent_evidence_size_nonnegative"
+        ),
     )
 
 ###############################################################################
