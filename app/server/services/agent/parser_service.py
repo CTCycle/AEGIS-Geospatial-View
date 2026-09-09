@@ -60,7 +60,7 @@ class ParserRunResult:
 class ParserService:
     PARSER_TIMEOUT_SECONDS = 60.0
     RETRY_MIN_REMAINING_SECONDS = 24.0
-    PARSER_MAX_OUTPUT_TOKENS = 2048
+    PARSER_MAX_OUTPUT_TOKENS = 4096
     PARSER_INPUT_TOKEN_CEILING = 24_000
     MAX_CATALOG_IDENTITIES = 24
     _FAILURE_CATEGORIES = frozenset(
@@ -544,6 +544,73 @@ class ParserService:
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_analysis_scope(value: object) -> str:
+        """Normalize provider wording to the internal spatial-scope enum.
+
+        The provider-facing extraction contract intentionally keeps this field
+        open-ended so a model can describe a relationship in natural language.
+        The application contract is narrower, however, and must not let an
+        alias such as ``circle`` escape into ``GeographicRelationship`` and
+        crash the request after structured extraction already succeeded.
+        """
+
+        normalized = str(value or "").strip().casefold().replace("-", "_")
+        aliases = {
+            "point": "point",
+            "coordinate": "point",
+            "coordinates": "point",
+            "single_point": "point",
+            "bbox": "bbox",
+            "bounding_box": "bbox",
+            "box": "bbox",
+            "extent": "bbox",
+            "area": "bbox",
+            "region": "bbox",
+            "radius": "radius",
+            "circle": "radius",
+            "circular": "radius",
+            "distance": "radius",
+            "within_distance": "radius",
+            "within_radius": "radius",
+            "administrative": "administrative_geometry",
+            "administrative_boundary": "administrative_geometry",
+            "administrative_geometry": "administrative_geometry",
+            "admin_boundary": "administrative_geometry",
+            "feature": "feature_geometry",
+            "feature_geometry": "feature_geometry",
+            "geometry": "feature_geometry",
+            "viewport": "viewport",
+            "view": "viewport",
+            "current_view": "viewport",
+            "map_view": "viewport",
+        }
+        try:
+            return aliases[normalized]
+        except KeyError as exc:
+            raise ValueError(
+                f"Unsupported geographic analysis scope: {normalized or '<empty>'}"
+            ) from exc
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _geographic_relationships(
+        cls, extracted: LLMParserExtraction
+    ) -> list[GeographicRelationship]:
+        """Convert provider relationships into the strict internal contract."""
+
+        relationships: list[GeographicRelationship] = []
+        for item in extracted.geographic_relationships:
+            if not item.target.strip():
+                continue
+            payload = item.model_dump(mode="json")
+            payload["analysis_scope"] = cls._normalize_analysis_scope(
+                payload.get("analysis_scope")
+            )
+            relationships.append(GeographicRelationship.model_validate(payload))
+        return relationships
+
+    # -------------------------------------------------------------------------
     @classmethod
     def _overlay_commands(
         cls, extracted: LLMParserExtraction
@@ -861,7 +928,7 @@ class ParserService:
                 exc.code == "response_parsing_failed"
                 and "did not match" in exc.detail.casefold()
             ):
-                exc.code = "contract_incomplete"
+                exc.code = "structured_contract_incomplete"
             raise
         usage = getattr(payload, "context_usage", None)
         self.last_context_usage = dict(usage) if is_json_object(usage) else None
@@ -941,7 +1008,7 @@ class ParserService:
                 exc.code == "response_parsing_failed"
                 and "did not match" in exc.detail.casefold()
             ):
-                exc.code = "contract_incomplete"
+                exc.code = "structured_contract_incomplete"
             raise
         usage = getattr(payload, "context_usage", None)
         self.last_context_usage = dict(usage) if is_json_object(usage) else None
@@ -1004,7 +1071,7 @@ class ParserService:
                 provider=provider,
                 model=model,
                 stage="structured_intent_extraction",
-                code="contract_incomplete",
+                code="structured_contract_incomplete",
                 detail=(
                     "The provider omitted required semantic fields: "
                     + ", ".join(missing_fields)
@@ -1023,7 +1090,7 @@ class ParserService:
                     provider=provider,
                     model=model,
                     stage="structured_intent_extraction",
-                    code="contract_incomplete",
+                    code="structured_contract_incomplete",
                     detail=(
                         "An unclear task must include a blocking field and "
                         "clarification plan."
@@ -1039,7 +1106,7 @@ class ParserService:
                     provider=provider,
                     model=model,
                     stage="structured_intent_extraction",
-                    code="contract_incomplete",
+                    code="structured_contract_incomplete",
                     detail="Executable task did not include typed action evidence.",
                 )
             status = "complete"
@@ -1206,11 +1273,7 @@ class ParserService:
                 granularity=extracted.temporal_signal.granularity,
                 aggregation=extracted.temporal_signal.aggregation,
             ),
-            geographic_relationships=[
-                GeographicRelationship.model_validate(item.model_dump(mode="json"))
-                for item in extracted.geographic_relationships
-                if item.target.strip()
-            ],
+            geographic_relationships=cls._geographic_relationships(extracted),
             operations=list(extracted.operations),
             filters=dict(extracted.filters),
             presentation_requirements=dict(extracted.presentation_requirements),
@@ -1492,11 +1555,7 @@ class ParserService:
             granularity=extracted.temporal_signal.granularity,
             aggregation=extracted.temporal_signal.aggregation,
         )
-        geographic_relationships = [
-            GeographicRelationship.model_validate(item.model_dump(mode="json"))
-            for item in extracted.geographic_relationships
-            if item.target.strip()
-        ]
+        geographic_relationships = self._geographic_relationships(extracted)
         disallowed = [
             DisallowedPattern(
                 pattern_id=item.pattern_id,

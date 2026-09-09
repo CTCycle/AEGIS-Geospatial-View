@@ -4,6 +4,7 @@ from server.common.typing import is_json_object, json_array, json_object
 
 from dataclasses import dataclass
 from time import monotonic
+from threading import Lock
 from typing import cast
 from server.common.constants import OLLAMA_DEFAULT_HOST
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
@@ -24,6 +25,13 @@ class _CachedOllamaFailure:
     message: str
 
 ###############################################################################
+@dataclass
+class _CachedModelDescriptors:
+    expires_at: float
+    models: list[ModelDescriptor]
+    source: dict[str, object]
+
+###############################################################################
 class ModelLibrarySourceError(RuntimeError):
     pass
 
@@ -40,18 +48,34 @@ class ChatModelLibraryService:
         ollama_tool_capability_cache: OllamaToolCapabilityCache | None = None,
         provider_factory: LLMFactory,
         ollama_unavailable_ttl_s: float = 20.0,
+        dynamic_catalog_ttl_s: float = 900.0,
+        dynamic_catalog_failure_ttl_s: float = 60.0,
     ) -> None:
         self.ollama_tool_capability_cache = (
             ollama_tool_capability_cache or OllamaToolCapabilityCache()
         )
         self.provider_factory = provider_factory
         self.ollama_unavailable_ttl_s = ollama_unavailable_ttl_s
+        self.dynamic_catalog_ttl_s = dynamic_catalog_ttl_s
+        self.dynamic_catalog_failure_ttl_s = dynamic_catalog_failure_ttl_s
         self._ollama_unavailable_cache: dict[str, _CachedOllamaFailure] = {}
+        self._dynamic_catalog_cache: dict[str, _CachedModelDescriptors] = {}
+        self._ollama_model_cache: dict[str, _CachedModelDescriptors] = {}
+        self._catalog_lock = Lock()
         self.structured_probe_service: object | None = None
 
     # -------------------------------------------------------------------------
     def set_structured_probe_service(self, service: object) -> None:
         self.structured_probe_service = service
+
+    # -------------------------------------------------------------------------
+    def invalidate_dynamic_catalogs(self) -> None:
+        """Drop provider metadata after settings or credentials change."""
+
+        with self._catalog_lock:
+            self._dynamic_catalog_cache.clear()
+            self._ollama_model_cache.clear()
+            self._ollama_unavailable_cache.clear()
 
     # -------------------------------------------------------------------------
     def _structured_probe_status(self, provider: str) -> dict[str, object]:
@@ -211,35 +235,16 @@ class ChatModelLibraryService:
         ]
         sources: dict[str, dict[str, object]] = {}
         if cloud_provider in DYNAMIC_CLOUD_PROVIDERS:
-            try:
-                provider = self.provider_factory.get_provider(cloud_provider)
-                dynamic_models = [
-                    self.model_payload(item) for item in provider.list_models()
-                ]
-                cloud.extend(dynamic_models)
-                sources[cloud_provider] = {
-                    "ok": True,
-                    "reachable": True,
-                    "message": None,
-                    "model_count": len(dynamic_models),
-                    **(
-                        self._structured_probe_status(cloud_provider)
-                        if include_probe_status
-                        else {}
-                    ),
-                }
-            except Exception as exc:
-                sources[cloud_provider] = {
-                    "ok": False,
-                    "reachable": False,
-                    "message": str(exc) or f"Could not load {cloud_provider} models.",
-                    "model_count": 0,
-                    **(
-                        self._structured_probe_status(cloud_provider)
-                        if include_probe_status
-                        else {}
-                    ),
-                }
+            dynamic_descriptors, source = self._refresh_dynamic_catalog(cloud_provider)
+            cloud.extend(self.model_payload(item) for item in dynamic_descriptors)
+            sources[cloud_provider] = {
+                **source,
+                **(
+                    self._structured_probe_status(cloud_provider)
+                    if include_probe_status
+                    else {}
+                ),
+            }
         deduped_cloud: dict[tuple[str, str], dict[str, object]] = {}
         for entry in cloud:
             key = (str(entry.get("provider", "")), str(entry.get("id", "")))
@@ -254,6 +259,106 @@ class ChatModelLibraryService:
             "local": local,
             "sources": sources,
         }
+
+    # -------------------------------------------------------------------------
+    def find_cached_model(
+        self,
+        *,
+        provider: str,
+        model_name: str,
+        ollama_url: str,
+    ) -> dict[str, object] | None:
+        """Find model metadata without performing any provider I/O.
+
+        Context assembly calls this method exclusively.  Dynamic catalogs are
+        populated by explicit model-list/readiness requests and are therefore
+        never refreshed recursively while building a chat request.
+        """
+
+        normalized_provider = provider.strip()
+        normalized_model = model_name.strip()
+        if not normalized_provider or not normalized_model:
+            return None
+        now = monotonic()
+        dynamic_cached = self._dynamic_catalog_cache.get(normalized_provider)
+        ollama_cached = self._ollama_model_cache.get(
+            self.normalize_ollama_url(ollama_url)
+        )
+        candidates = [*get_cloud_model_catalog()]
+        if dynamic_cached is not None and dynamic_cached.expires_at > now:
+            candidates.extend(dynamic_cached.models)
+        if ollama_cached is not None and ollama_cached.expires_at > now:
+            candidates.extend(ollama_cached.models)
+        for item in candidates:
+            if item.provider != normalized_provider or item.name != normalized_model:
+                continue
+            # Context assembly is deliberately cache-only.  In particular,
+            # do not call Ollama /api/show here: that enrichment is an
+            # explicit model-readiness operation and would reintroduce
+            # provider I/O into the request context boundary.
+            return self.model_payload(item)
+        return None
+
+    # -------------------------------------------------------------------------
+    def _refresh_dynamic_catalog(
+        self, provider_name: str
+    ) -> tuple[list[ModelDescriptor], dict[str, object]]:
+        now = monotonic()
+        cached = self._dynamic_catalog_cache.get(provider_name)
+        if cached is not None and cached.expires_at > now:
+            return list(cached.models), dict(cached.source)
+        # Catalog refresh is an explicit operation.  Serialize refreshes so
+        # concurrent settings/model requests do not fan out to the provider.
+        with self._catalog_lock:
+            now = monotonic()
+            cached = self._dynamic_catalog_cache.get(provider_name)
+            if cached is not None and cached.expires_at > now:
+                return list(cached.models), dict(cached.source)
+            try:
+                provider = self.provider_factory.get_provider(provider_name)
+                models = list(provider.list_models())
+                source: dict[str, object] = {
+                    "ok": True,
+                    "reachable": True,
+                    "message": None,
+                    "model_count": len(models),
+                    "stale": False,
+                }
+                self._dynamic_catalog_cache[provider_name] = _CachedModelDescriptors(
+                    expires_at=now + self.dynamic_catalog_ttl_s,
+                    models=models,
+                    source=source,
+                )
+                return models, source
+            except Exception as exc:
+                message = str(exc) or f"Could not load {provider_name} models."
+                if cached is not None and cached.models:
+                    source: dict[str, object] = {
+                        **cached.source,
+                        "ok": False,
+                        "reachable": False,
+                        "message": message,
+                        "stale": True,
+                    }
+                    self._dynamic_catalog_cache[provider_name] = _CachedModelDescriptors(
+                        expires_at=now + self.dynamic_catalog_failure_ttl_s,
+                        models=list(cached.models),
+                        source=source,
+                    )
+                    return list(cached.models), source
+                source: dict[str, object] = {
+                    "ok": False,
+                    "reachable": False,
+                    "message": message,
+                    "model_count": 0,
+                    "stale": False,
+                }
+                self._dynamic_catalog_cache[provider_name] = _CachedModelDescriptors(
+                    expires_at=now + self.dynamic_catalog_failure_ttl_s,
+                    models=[],
+                    source=source,
+                )
+                return [], source
 
     # -------------------------------------------------------------------------
     def find_model(
@@ -359,8 +464,21 @@ class ChatModelLibraryService:
         *,
         include_probe_status: bool = True,
     ) -> tuple[list[dict[str, object]], dict[str, object]]:
-        cached = self._ollama_unavailable_cache.get(ollama_url)
+        cached_models = self._ollama_model_cache.get(ollama_url)
         now = monotonic()
+        if cached_models is not None and cached_models.expires_at > now:
+            return (
+                [self.model_payload(model) for model in cached_models.models],
+                {
+                    **cached_models.source,
+                    **(
+                        self._structured_probe_status("ollama")
+                        if include_probe_status
+                        else {}
+                    ),
+                },
+            )
+        cached = self._ollama_unavailable_cache.get(ollama_url)
         if cached is not None and cached.expires_at > now:
             return [], {
                 "ok": False,
@@ -396,6 +514,17 @@ class ChatModelLibraryService:
                     else {}
                 ),
             }
+        self._ollama_model_cache[ollama_url] = _CachedModelDescriptors(
+            expires_at=now + self.dynamic_catalog_ttl_s,
+            models=list(local_models),
+            source={
+                "ok": True,
+                "reachable": True,
+                "message": None,
+                "model_count": len(local_models),
+                "stale": False,
+            },
+        )
         return (
             [self.model_payload(model) for model in local_models],
             {

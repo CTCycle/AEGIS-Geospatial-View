@@ -210,6 +210,14 @@ class ChatSettingsService:
             google_base_url=next_google_base_url,
             deepseek_base_url=next_deepseek_base_url,
         )
+        invalidate_catalogs = getattr(
+            self.model_library_service, "invalidate_dynamic_catalogs", None
+        )
+        if callable(invalidate_catalogs):
+            invalidate_catalogs()
+        invalidate_profile = getattr(self.context_profile_resolver, "invalidate", None)
+        if callable(invalidate_profile):
+            invalidate_profile()
         clear_probe = getattr(self.structured_probe_service, "clear", None)
         if callable(clear_probe):
             clear_probe()

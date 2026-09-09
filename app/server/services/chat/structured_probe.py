@@ -176,7 +176,11 @@ class StructuredProbeService:
                     category == "model_capability"
                     or "unsupported" in code
                     or "incompatible" in code
-                    or code == "model_structured_output_unsupported"
+                    or code
+                    in {
+                        "model_structured_output_unsupported",
+                        "structured_schema_unsupported",
+                    }
                 ):
                     status = "unsupported"
                 elif "timeout" in code or "deadline" in code:

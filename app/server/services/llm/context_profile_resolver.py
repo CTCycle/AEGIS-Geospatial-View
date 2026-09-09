@@ -37,6 +37,7 @@ class ModelContextProfileResolver:
         self.settings_repo = settings_repo
         self.cache_ttl_seconds = cache_ttl_seconds
         self._cache: dict[tuple[str, str, str], _CachedProfile] = {}
+        self._configured_ollama_url = self._load_ollama_url_once()
 
     # -------------------------------------------------------------------------
     def resolve(self, provider: str, model: str) -> ModelContextProfile | None:
@@ -60,11 +61,10 @@ class ModelContextProfileResolver:
 
         profile: ModelContextProfile | None = None
         try:
-            descriptor = self.model_library_service.find_model(
+            descriptor = self.model_library_service.find_cached_model(
                 provider=normalized_provider,
                 model_name=normalized_model,
                 ollama_url=ollama_url,
-                include_probe_status=False,
             )
         except Exception:
             descriptor = None
@@ -98,9 +98,21 @@ class ModelContextProfileResolver:
         }
 
     # -------------------------------------------------------------------------
+    def invalidate(self) -> None:
+        self._cache.clear()
+        self._configured_ollama_url = self._load_ollama_url_once()
+
+    # -------------------------------------------------------------------------
     def _ollama_url(self) -> str:
-        settings = self.settings_repo.get_required()
-        return self.model_library_service.normalize_ollama_url(settings.ollama_url)
+        return self._configured_ollama_url
+
+    # -------------------------------------------------------------------------
+    def _load_ollama_url_once(self) -> str:
+        try:
+            settings = self.settings_repo.get_required()
+            return self.model_library_service.normalize_ollama_url(settings.ollama_url)
+        except Exception:
+            return self.model_library_service.normalize_ollama_url("")
 
     # -------------------------------------------------------------------------
     @staticmethod

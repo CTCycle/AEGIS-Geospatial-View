@@ -236,7 +236,7 @@ class OpenCodeProvider(DeepSeekProvider):
                 "Authorization": f"Bearer {self.api_key}",
                 "Accept": "application/json",
             },
-            timeout=20.0,
+            timeout=5.0,
         )
         response.raise_for_status()
         payload = response.json()

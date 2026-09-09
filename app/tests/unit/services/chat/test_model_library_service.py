@@ -185,6 +185,50 @@ def test_find_model_can_skip_probe_status_for_context_profile_lookup(monkeypatch
     assert _ProbeStatusMustNotRun.calls == 0
 
 ###############################################################################
+def test_find_cached_model_never_refreshes_dynamic_provider(monkeypatch) -> None:
+    class _ProviderThatMustNotBeCalled:
+        def list_models(self):  # noqa: ANN201
+            raise AssertionError("context lookup must not refresh a provider catalog")
+
+    service = ChatModelLibraryService(
+        provider_factory=_ProviderFactoryStub(_ProviderThatMustNotBeCalled()),
+    )
+    service._dynamic_catalog_cache["deepseek"] = model_library_module._CachedModelDescriptors(  # pyright: ignore[reportPrivateUsage]
+        expires_at=10**12,
+        models=[
+            ModelDescriptor(
+                name="cached-model",
+                description="Cached model",
+                provider="deepseek",
+                metadata={"context_window_tokens": 8192},
+            )
+        ],
+        source={"ok": True},
+    )
+
+    result = service.find_cached_model(
+        provider="deepseek",
+        model_name="cached-model",
+        ollama_url="http://127.0.0.1:11434",
+    )
+
+    assert result is not None
+    assert result["name"] == "cached-model"
+
+###############################################################################
+def test_find_cached_model_returns_none_without_catalog_refresh() -> None:
+    service = _build_service()
+
+    assert (
+        service.find_cached_model(
+            provider="opencode-go",
+            model_name="uncached-model",
+            ollama_url="http://127.0.0.1:11434",
+        )
+        is None
+    )
+
+###############################################################################
 def test_normalize_ollama_url_rewrites_localhost() -> None:
     assert (
         ChatModelLibraryService.normalize_ollama_url("http://localhost:11434")
