@@ -809,7 +809,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       if (message.payload['command'] === 'map.render_ack') {
         const ackRunId = this.readString(message.payload['run_id']);
         const presentationStatus = this.readString(message.payload['presentation_status']);
-        if (ackRunId === this.pendingRenderContext?.runId && presentationStatus === 'failed') {
+        if (ackRunId === this.pendingRenderContext?.runId
+          && (presentationStatus === 'failed' || presentationStatus === 'render_timeout')) {
           this.restoreCommittedMap('Map update failed; previous map retained');
           this.isLoading = false;
           this.activeRunId = undefined;
@@ -834,7 +835,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           this.restoreCommittedMap(
             state === 'cancelled'
               ? 'Map update cancelled; previous map retained'
-              : 'Map update failed; previous map retained',
+              : 'Map update failed or timed out; previous map retained',
           );
           this.pendingRenderContext = undefined;
           this.renderAckQueued = false;
@@ -944,11 +945,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           const message = String(event.payload['message'] ?? 'Failed');
           const errorCode = this.readString(event.payload['code']);
           const presentationStatus = this.readString(event.payload['presentation_status']);
-          if (presentationStatus === 'failed' || errorCode === 'render_failed') {
+          if (presentationStatus === 'failed'
+            || presentationStatus === 'render_timeout'
+            || errorCode === 'render_failed'
+            || errorCode === 'render_timeout') {
             // A durable render failure arrives as an ERROR event after the
             // browser has already displayed the candidate. Restore the last
             // acknowledged map before clearing the pending identity.
-            this.restoreCommittedMap('Map update failed; previous map retained');
+            this.restoreCommittedMap('Map update failed or timed out; previous map retained');
             this.pendingRenderContext = undefined;
             this.renderAckQueued = false;
           }

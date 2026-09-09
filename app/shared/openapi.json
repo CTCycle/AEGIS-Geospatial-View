@@ -1509,7 +1509,8 @@
               "not_required",
               "pending",
               "ready",
-              "failed"
+              "failed",
+              "render_timeout"
             ],
             "title": "Presentation Status",
             "default": "not_required"
@@ -6858,6 +6859,55 @@
               }
             ],
             "title": "Canonical Request Id"
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "native",
+              "deterministic"
+            ],
+            "title": "Execution Mode",
+            "default": "native"
+          },
+          "capability_domains": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capability Domains"
+          },
+          "candidate_capability_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Candidate Capability Ids"
+          },
+          "allowed_provider_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Provider Ids"
+          },
+          "presentation_required": {
+            "type": "boolean",
+            "title": "Presentation Required",
+            "default": false
+          },
+          "completion_requirements": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Completion Requirements"
+          },
+          "routing_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Routing Reasons"
           }
         },
         "additionalProperties": false,

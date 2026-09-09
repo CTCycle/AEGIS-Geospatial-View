@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-09-03
+Last updated: 2026-09-09
 
 ## Environment file
 
@@ -41,6 +41,16 @@ bounds, map defaults, job polling, chat defaults, Open-Meteo, Overpass,
 RainViewer, and NASA GIBS request tuning. It intentionally contains no
 database block. Database location and migration-lock settings come from the
 environment only.
+
+The `agent_execution` JSON block owns the complete agent deadline policy. Its
+defaults are 90 seconds for interpretation, 150 seconds for simple runs, and
+300 seconds for the complex hard ceiling; stage defaults are 5 seconds for
+context assembly, 60 seconds for structured extraction, 30 seconds for
+location resolution, 60 seconds per native model decision, 45 seconds of tool
+idle time, 90 seconds of tool absolute time, 20 seconds for map assembly, 30
+seconds for synthesis, 5 seconds for persistence, and 90 seconds for browser
+render acknowledgement. Smaller provider/model limits still win. These
+values are one typed policy block rather than independent environment knobs.
 
 Model provider API keys are entered through Settings and stored as encrypted
 database records. They are not database connection settings.

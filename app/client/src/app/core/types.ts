@@ -375,7 +375,7 @@ export interface MapSession {
   presentation?: PresentationStatus | null;
 }
 
-export type PresentationStatus = 'not_required' | 'pending' | 'ready' | 'failed';
+export type PresentationStatus = 'not_required' | 'pending' | 'ready' | 'failed' | 'render_timeout';
 
 export interface RenderRequirement {
   name: string;

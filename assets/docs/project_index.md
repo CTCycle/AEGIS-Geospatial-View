@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-08-20
+Last updated: 2026-09-09
 
 ## Purpose
 
@@ -15,8 +15,11 @@ environment and credential availability on top of those manifests.
 
 The implemented chat model surface includes static cloud catalog entries,
 Ollama local models, and on-demand catalogs for DeepSeek, OpenCode Zen, and
-OpenCode Go. The geospatial agent exposes five native tools, including
-provider-native layer discovery and normalized provider-layer rendering.
+OpenCode Go. Tool-capable geospatial runs use an immediate native-first loop
+with eight focused primitives, while deterministic planning remains the
+interpretation, authorization, validation, and explicit non-tool-capable mode.
+Normalized provider results and derived datasets live in the conversation-scoped
+`agent_evidence` store rather than model messages.
 
 ## Navigation Rules
 

@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-08-27
+Last updated: 2026-09-09
 
 ## SQLite-only relational storage
 
@@ -70,7 +70,7 @@ runtime code never calls `Base.metadata.create_all()`.
 Operators must back up a database before deployment. A failed startup never
 silently replaces an existing database file.
 
-The canonical schema contains 15 application tables plus `alembic_version`.
+The canonical schema contains 16 application tables plus `alembic_version`.
 Conversations own their context state, message history, message sequence, and
 active-run relationship directly; there are no `chat_sessions` or
 `conversation_contexts` tables.
@@ -79,7 +79,10 @@ active-run relationship directly; there are no `chat_sessions` or
 
 Core relational storage covers conversations and messages, agent runs and
 events, steering messages, model settings, encrypted model credentials, and
-seeded geospatial reference data. Sequencing, identity, active-run slots,
+seeded geospatial reference data. Conversation-scoped native-agent evidence is
+stored in compressed `agent_evidence` rows with bounded summaries, provenance,
+checksums, and parent references; conversation deletion cascades metadata and
+payload. Sequencing, identity, active-run slots,
 credential keys, and encryption-material versions are protected by database
 constraints. Payload columns use SQLAlchemy `JSON` directly.
 
