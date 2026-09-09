@@ -11,7 +11,7 @@ from server.services.llm.opencode_provider import (
     OPENCODE_PROVIDER,
     OpenCodeProvider,
 )
-from server.services.llm.errors import LLMProviderRequestError
+from server.services.llm.errors import LLMProviderRequestError, LLMResponseParsingError
 from server.services.llm.types import LLMRequest
 
 ###############################################################################
@@ -56,10 +56,24 @@ class _Completions:
                     ]
                 )
             ]
-        message = SimpleNamespace(
-            content=json.dumps({"answer": "structured"}),
-            tool_calls=[],
-        )
+        if kwargs.get("tools"):
+            message = SimpleNamespace(
+                content=None,
+                tool_calls=[
+                    SimpleNamespace(
+                        id="structured-call",
+                        function=SimpleNamespace(
+                            name="submit_structured_response",
+                            arguments=json.dumps({"answer": "structured"}),
+                        ),
+                    )
+                ],
+            )
+        else:
+            message = SimpleNamespace(
+                content=json.dumps({"answer": "structured"}),
+                tool_calls=[],
+            )
         return SimpleNamespace(
             choices=[SimpleNamespace(message=message, finish_reason="stop")]
         )
@@ -123,7 +137,7 @@ def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     assert provider.supports_tools("claude-opus-5") is False
 
 ###############################################################################
-def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -> None:
+def test_structured_output_uses_single_function_mode(monkeypatch) -> None:
     client = _Client()
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
     monkeypatch.setattr(provider, "_client", lambda: client)
@@ -141,9 +155,16 @@ def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -
 
     assert result == {"answer": "structured"}
     call = client.completions.calls[0]
-    assert call["response_format"] == {"type": "json_object"}
+    assert "response_format" not in call
+    # OpenCode Go thinking-mode models reject explicit tool_choice values.
+    # One canonical function is still strict because no alternate function is
+    # exposed and the response parser validates its exact name and payload.
+    assert "tool_choice" not in call
+    assert call["tools"][0]["function"]["name"] == "submit_structured_response"
+    assert call["tools"][0]["function"]["strict"] is True
+    assert "top-level JSON object" in call["tools"][0]["function"]["description"]
     assert call["max_tokens"] == 123
-    assert "JSON schema" in call["messages"][-1]["content"]
+    assert "JSON schema" not in call["messages"][-1]["content"]
     assert result.context_usage["response_schema_tokens"] == 0
 
 ###############################################################################
@@ -214,7 +235,7 @@ def test_timeout_failure_keeps_preflight_context_usage(monkeypatch) -> None:
     with pytest.raises(LLMProviderRequestError) as error:
         provider.structured_output(request, schema=_StructuredPayload)
 
-    assert error.value.code == "provider_timeout"
+    assert error.value.code == "structured_timeout"
     assert error.value.retryable is False
     assert error.value.context_usage is not None
     assert error.value.context_usage["estimated_input_tokens"] > 0
@@ -304,3 +325,35 @@ def test_opencode_rejects_messages_transport_without_guessing() -> None:
         provider.structured_output(request, schema=_StructuredPayload)
 
     assert error.value.code == "provider_transport_unsupported"
+
+###############################################################################
+def test_opencode_structured_wrapper_rejects_multiple_payloads() -> None:
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+    function = SimpleNamespace(
+        name="submit_structured_response",
+        arguments=json.dumps({"answer": "structured"}),
+    )
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer":"duplicate"}',
+                    tool_calls=[SimpleNamespace(id="one", function=function)],
+                )
+            )
+        ]
+    )
+
+    with pytest.raises(LLMResponseParsingError) as error:
+        provider._parse_structured_payload(  # pyright: ignore[reportPrivateUsage]
+            response,
+            _StructuredPayload,
+            LLMRequest(
+                model="deepseek-v4-flash",
+                provider_session_id="conversation-1",
+                messages=[],
+            ),
+            SimpleNamespace(to_dict=lambda: {}),
+        )
+
+    assert error.value.code == "structured_invalid_payload"

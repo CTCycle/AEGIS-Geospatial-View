@@ -47,6 +47,25 @@ def test_structural_coordinate_extraction_is_independent_of_execution_planning()
     assert extracted.latitude == 41.9
     assert extracted.longitude == 12.5
 
+
+def test_parser_normalizes_provider_distance_scope_alias() -> None:
+    extracted = LLMParserExtraction(
+        geographic_relationships=[
+            {
+                "relationship": "near",
+                "target": "Bologna",
+                "analysis_scope": "circle",
+                "distance_m": 20_000,
+            }
+        ]
+    )
+
+    relationships = ParserService._geographic_relationships(extracted)
+
+    assert len(relationships) == 1
+    assert relationships[0].analysis_scope == "radius"
+
+
 ###############################################################################
 class _PromptProvider:
 

@@ -43,6 +43,7 @@ RETIRED_DEEPSEEK_MODELS = frozenset({"deepseek-chat", "deepseek-reasoner"})
 ###############################################################################
 class DeepSeekProvider(LLMProvider):
     provider_name = "deepseek"
+    STRUCTURED_FUNCTION_NAME = "submit_structured_response"
 
     # -------------------------------------------------------------------------
     def __init__(self, *, api_key: str, base_url: str | None = None) -> None:
@@ -141,7 +142,7 @@ class DeepSeekProvider(LLMProvider):
                 "Authorization": f"Bearer {self.api_key}",
                 "Accept": "application/json",
             },
-            timeout=20.0,
+            timeout=5.0,
         )
         response.raise_for_status()
         payload = response.json()
@@ -435,71 +436,82 @@ class DeepSeekProvider(LLMProvider):
         return stream
 
     # -------------------------------------------------------------------------
-    def structured_output(
-        self, request: LLMRequest, schema: type[Any]
-    ) -> dict[str, Any]:
-        self._validate_model_selection(request)
-        model_json_schema = getattr(schema, "model_json_schema", None)
-        json_schema = (
-            json_object(model_json_schema()) if callable(model_json_schema) else {}
-        )
-        metadata = dict(request.metadata)
-        metadata[RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY] = True
-        request = prepare_request(
-            replace(
-                request,
-                response_json_schema=json_schema,
-                messages=self._messages_with_json_schema(request.messages, json_schema),
-                metadata=metadata,
-            ),
-            provider=self.provider_name,
-        )
-        usage = compute_context_usage(request, provider=self.provider_name)
-        try:
-            self._validate_request_capabilities(
-                replace(request, response_json_schema=json_schema)
-            )
-        except LLMStructuredOutputError as exc:
-            exc.context_usage = usage.to_dict()
-            raise
-        try:
-            max_tokens = self._request_max_tokens(request)
-            response = self._client_for_request(request).chat.completions.create(
-                model=request.model,
-                messages=self.normalize_tool_messages(request.messages),
-                temperature=request.temperature,
-                response_format={"type": "json_object"},
-                stream=False,
-                **({"max_tokens": max_tokens} if max_tokens is not None else {}),
-            )
-        except LLMProviderRequestError:
-            raise
-        except Exception as exc:
-            raise LLMProviderRequestError.from_exception(
-                exc,
-                provider=self.provider_name,
-                model=request.model,
-                stage="structured_output",
-                context_usage=usage.to_dict(),
-            ) from exc
-        raw = dump_response_payload(response)
-        usage = apply_reported_usage(usage, raw)
-        content, _ = self._parse_choice(response)
-        try:
-            loaded = json.loads(content or "{}")
-        except (TypeError, json.JSONDecodeError) as exc:
-            raise LLMResponseParsingError(
-                provider=self.provider_name,
-                model=request.model,
-                stage="structured_output",
-                detail="The provider returned invalid JSON for structured extraction.",
-                context_usage=usage.to_dict(),
-            ) from exc
+    def _uses_structured_function_transport(self) -> bool:
+        return self.provider_name in {"opencode", "opencode-go"}
+
+    # -------------------------------------------------------------------------
+    def _structured_function_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": self.STRUCTURED_FUNCTION_NAME,
+                "description": (
+                    "Return exactly one top-level JSON object whose properties are "
+                    "the extraction fields. Never wrap the arguments under "
+                    "provider_contract, token, result, or any other key."
+                ),
+                "parameters": schema,
+                "strict": True,
+            },
+        }
+
+    # -------------------------------------------------------------------------
+    def _parse_structured_payload(
+        self,
+        response: Any,
+        schema: type[Any],
+        request: LLMRequest,
+        usage: Any,
+    ) -> LLMStructuredOutput:
+        content, tool_calls = self._parse_choice(response)
+        if self._uses_structured_function_transport() and tool_calls:
+            if content.strip():
+                raise LLMResponseParsingError(
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="structured_output",
+                    code="structured_invalid_payload",
+                    detail="The provider returned both structured function arguments and content.",
+                    context_usage=usage.to_dict(),
+                )
+            if len(tool_calls) != 1:
+                raise LLMResponseParsingError(
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="structured_output",
+                    code="structured_invalid_payload",
+                    detail="The provider returned multiple structured extraction functions.",
+                    context_usage=usage.to_dict(),
+                )
+            call = tool_calls[0]
+            if call.name != self.STRUCTURED_FUNCTION_NAME or not call.arguments:
+                raise LLMResponseParsingError(
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="structured_output",
+                    code="structured_invalid_payload",
+                    detail="The provider returned an unexpected structured extraction function.",
+                    context_usage=usage.to_dict(),
+                )
+            loaded: object = call.arguments
+        else:
+            try:
+                loaded = json.loads(content or "{}")
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise LLMResponseParsingError(
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="structured_output",
+                    code="structured_invalid_payload",
+                    detail="The provider returned invalid JSON for structured extraction.",
+                    context_usage=usage.to_dict(),
+                ) from exc
         if not is_json_object(loaded):
             raise LLMResponseParsingError(
                 provider=self.provider_name,
                 model=request.model,
                 stage="structured_output",
+                code="structured_invalid_payload",
                 detail="The provider returned a JSON value instead of an object.",
                 context_usage=usage.to_dict(),
             )
@@ -517,6 +529,7 @@ class DeepSeekProvider(LLMProvider):
                 provider=self.provider_name,
                 model=request.model,
                 stage="structured_output",
+                code="structured_invalid_payload",
                 detail="The provider response did not match the requested extraction schema.",
                 context_usage=usage.to_dict(),
             ) from exc
@@ -529,7 +542,7 @@ class DeepSeekProvider(LLMProvider):
         )
 
     # -------------------------------------------------------------------------
-    async def astructured_output(
+    def structured_output(
         self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
         self._validate_model_selection(request)
@@ -539,11 +552,16 @@ class DeepSeekProvider(LLMProvider):
         )
         metadata = dict(request.metadata)
         metadata[RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY] = True
+        function_transport = self._uses_structured_function_transport()
         request = prepare_request(
             replace(
                 request,
-                response_json_schema=json_schema,
-                messages=self._messages_with_json_schema(request.messages, json_schema),
+                response_json_schema=None if function_transport else json_schema,
+                messages=(
+                    list(request.messages)
+                    if function_transport
+                    else self._messages_with_json_schema(request.messages, json_schema)
+                ),
                 metadata=metadata,
             ),
             provider=self.provider_name,
@@ -554,6 +572,88 @@ class DeepSeekProvider(LLMProvider):
                 replace(request, response_json_schema=json_schema)
             )
         except LLMStructuredOutputError as exc:
+            if exc.code == "model_structured_output_unsupported":
+                exc.code = "structured_schema_unsupported"
+            exc.context_usage = usage.to_dict()
+            raise
+        try:
+            max_tokens = self._request_max_tokens(request)
+            request_kwargs: dict[str, Any] = {
+                "model": request.model,
+                "messages": self.normalize_tool_messages(request.messages),
+                "temperature": request.temperature,
+                "stream": False,
+            }
+            if function_transport:
+                # OpenCode Go's thinking-mode models reject every explicit
+                # ``tool_choice`` value (including the otherwise standard
+                # forced-function object).  Supplying exactly one structured
+                # function leaves the provider no other tool to select while
+                # preserving its supported Chat Completions transport.  The
+                # response parser remains strict about the function name,
+                # cardinality, and typed payload.
+                request_kwargs["tools"] = [
+                    self._structured_function_schema(json_schema)
+                ]
+            else:
+                request_kwargs["response_format"] = {"type": "json_object"}
+            if max_tokens is not None:
+                request_kwargs["max_tokens"] = max_tokens
+            response = self._client_for_request(request).chat.completions.create(
+                **request_kwargs
+            )
+        except LLMProviderRequestError as exc:
+            if exc.code == "provider_timeout":
+                exc.code = "structured_timeout"
+            raise
+        except Exception as exc:
+            error = LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                context_usage=usage.to_dict(),
+            )
+            if error.code == "provider_timeout":
+                error.code = "structured_timeout"
+            raise error from exc
+        raw = dump_response_payload(response)
+        usage = apply_reported_usage(usage, raw)
+        return self._parse_structured_payload(response, schema, request, usage)
+
+    # -------------------------------------------------------------------------
+    async def astructured_output(
+        self, request: LLMRequest, schema: type[Any]
+    ) -> dict[str, Any]:
+        self._validate_model_selection(request)
+        model_json_schema = getattr(schema, "model_json_schema", None)
+        json_schema = (
+            json_object(model_json_schema()) if callable(model_json_schema) else {}
+        )
+        metadata = dict(request.metadata)
+        metadata[RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY] = True
+        function_transport = self._uses_structured_function_transport()
+        request = prepare_request(
+            replace(
+                request,
+                response_json_schema=None if function_transport else json_schema,
+                messages=(
+                    list(request.messages)
+                    if function_transport
+                    else self._messages_with_json_schema(request.messages, json_schema)
+                ),
+                metadata=metadata,
+            ),
+            provider=self.provider_name,
+        )
+        usage = compute_context_usage(request, provider=self.provider_name)
+        try:
+            self._validate_request_capabilities(
+                replace(request, response_json_schema=json_schema)
+            )
+        except LLMStructuredOutputError as exc:
+            if exc.code == "model_structured_output_unsupported":
+                exc.code = "structured_schema_unsupported"
             exc.context_usage = usage.to_dict()
             raise
         max_tokens = self._request_max_tokens(request)
@@ -571,27 +671,39 @@ class DeepSeekProvider(LLMProvider):
                 with_options = getattr(client, "with_options", None)
                 if callable(with_options):
                     request_client = with_options(timeout=remaining)
-            response = await request_client.chat.completions.create(
-                model=request.model,
-                messages=self.normalize_tool_messages(request.messages),
-                temperature=request.temperature,
-                response_format={"type": "json_object"},
-                stream=False,
-                **({"max_tokens": max_tokens} if max_tokens is not None else {}),
-            )
+            request_kwargs: dict[str, Any] = {
+                "model": request.model,
+                "messages": self.normalize_tool_messages(request.messages),
+                "temperature": request.temperature,
+                "stream": False,
+            }
+            if function_transport:
+                request_kwargs["tools"] = [
+                    self._structured_function_schema(json_schema)
+                ]
+            else:
+                request_kwargs["response_format"] = {"type": "json_object"}
+            if max_tokens is not None:
+                request_kwargs["max_tokens"] = max_tokens
+            response = await request_client.chat.completions.create(**request_kwargs)
         except asyncio.CancelledError:
             raise
-        except LLMProviderRequestError:
+        except LLMProviderRequestError as exc:
+            if exc.code == "provider_timeout":
+                exc.code = "structured_timeout"
             raise
         except Exception as exc:
-            raise LLMProviderRequestError.from_exception(
+            error = LLMProviderRequestError.from_exception(
                 exc,
                 provider=self.provider_name,
                 model=request.model,
                 stage="structured_output",
                 context_usage=usage.to_dict(),
                 elapsed_ms=max(0, int((time.perf_counter() - started) * 1000)),
-            ) from exc
+            )
+            if error.code == "provider_timeout":
+                error.code = "structured_timeout"
+            raise error from exc
         finally:
             try:
                 await client.close()
@@ -599,49 +711,7 @@ class DeepSeekProvider(LLMProvider):
                 pass
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
-        content, _ = self._parse_choice(response)
-        try:
-            loaded = json.loads(content or "{}")
-        except (TypeError, json.JSONDecodeError) as exc:
-            raise LLMResponseParsingError(
-                provider=self.provider_name,
-                model=request.model,
-                stage="structured_output",
-                detail="The provider returned invalid JSON for structured extraction.",
-                context_usage=usage.to_dict(),
-            ) from exc
-        if not is_json_object(loaded):
-            raise LLMResponseParsingError(
-                provider=self.provider_name,
-                model=request.model,
-                stage="structured_output",
-                detail="The provider returned a JSON value instead of an object.",
-                context_usage=usage.to_dict(),
-            )
-        validator = getattr(schema, "model_validate", None)
-        if not callable(validator):
-            return LLMStructuredOutput(
-                loaded,
-                context_usage=usage.to_dict(),
-                provided_fields=loaded.keys(),
-            )
-        try:
-            validated = validator(loaded)
-        except Exception as exc:
-            raise LLMResponseParsingError(
-                provider=self.provider_name,
-                model=request.model,
-                stage="structured_output",
-                detail="The provider response did not match the requested extraction schema.",
-                context_usage=usage.to_dict(),
-            ) from exc
-        dumper = getattr(validated, "model_dump", None)
-        payload = json_object(dumper(mode="json")) if callable(dumper) else loaded
-        return LLMStructuredOutput(
-            payload,
-            context_usage=usage.to_dict(),
-            provided_fields=loaded.keys(),
-        )
+        return self._parse_structured_payload(response, schema, request, usage)
 
     # -------------------------------------------------------------------------
     @staticmethod
