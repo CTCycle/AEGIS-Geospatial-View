@@ -1,8 +1,44 @@
 {
   "date": "2026-09-09",
-  "baseline_commit": "1a802a35",
-  "implementation_commit": "pending-next-increment",
+  "baseline_commit": "f6448248",
+  "implementation_commit": "working-tree-uncommitted",
   "provider_substitution": false,
+  "deferred_validation": false,
+  "validation_increment": {
+    "live_geospatial_provider_matrix": {
+      "status": "executed",
+      "artifact": "live-provider-matrix.json",
+      "total": 30,
+      "passed": 11,
+      "failed": 5,
+      "skipped": 14,
+      "strict_exit": 1
+    },
+    "configured_model_live_smoke": {
+      "status": "failed_honestly",
+      "artifact": "live-smoke-final/benchmark.json",
+      "provider": "opencode-go",
+      "model": "deepseek-v4-flash",
+      "http_status": 200,
+      "structured_extraction": "contract_incomplete",
+      "tool_calls": 0,
+      "provider_events": 0,
+      "map_session": false
+    },
+    "real_browser_configured_model": {
+      "status": "failed_honestly",
+      "artifact": "browser-live-20260909.md",
+      "visible_result": "Missing required argument 'target_id'.",
+      "map_session": false
+    },
+    "controlled_real_browser_maplibre": {
+      "status": "passed",
+      "artifact": "browser-maplibre-final/reports/controlled-map-completion.json",
+      "canvas_visible": true,
+      "rendered_feature_count": 1,
+      "console_errors": []
+    }
+  },
   "rows": [
     {"id": "A", "request": "What are the coordinates of Rome?", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_APPLICABLE", "blocking_layer": "scenario matrix not invoked in this increment"},
     {"id": "B", "request": "Find airports within 100 km of Zurich and summarize the results.", "controlled": "BLOCKED", "live": "UNAVAILABLE", "browser": "NOT_RUN", "blocking_layer": "scenario matrix not invoked in this increment"},

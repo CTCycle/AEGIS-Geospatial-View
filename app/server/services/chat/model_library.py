@@ -203,6 +203,7 @@ class ChatModelLibraryService:
         *,
         ollama_url: str,
         cloud_provider: str | None = None,
+        include_probe_status: bool = True,
     ) -> dict[str, object]:
         normalized_ollama_url = self.normalize_ollama_url(ollama_url)
         cloud: list[dict[str, object]] = [
@@ -221,7 +222,11 @@ class ChatModelLibraryService:
                     "reachable": True,
                     "message": None,
                     "model_count": len(dynamic_models),
-                    **self._structured_probe_status(cloud_provider),
+                    **(
+                        self._structured_probe_status(cloud_provider)
+                        if include_probe_status
+                        else {}
+                    ),
                 }
             except Exception as exc:
                 sources[cloud_provider] = {
@@ -229,13 +234,20 @@ class ChatModelLibraryService:
                     "reachable": False,
                     "message": str(exc) or f"Could not load {cloud_provider} models.",
                     "model_count": 0,
-                    **self._structured_probe_status(cloud_provider),
+                    **(
+                        self._structured_probe_status(cloud_provider)
+                        if include_probe_status
+                        else {}
+                    ),
                 }
         deduped_cloud: dict[tuple[str, str], dict[str, object]] = {}
         for entry in cloud:
             key = (str(entry.get("provider", "")), str(entry.get("id", "")))
             deduped_cloud[key] = entry
-        local, ollama_status = self._list_ollama_models(normalized_ollama_url)
+        local, ollama_status = self._list_ollama_models(
+            normalized_ollama_url,
+            include_probe_status=include_probe_status,
+        )
         sources["ollama"] = ollama_status
         return {
             "cloud": list(deduped_cloud.values()),
@@ -251,6 +263,7 @@ class ChatModelLibraryService:
         model_name: str,
         ollama_url: str,
         require_provider_availability: bool = False,
+        include_probe_status: bool = True,
     ) -> dict[str, object] | None:
         dynamic_cloud_provider = (
             provider if provider in DYNAMIC_CLOUD_PROVIDERS else None
@@ -258,6 +271,7 @@ class ChatModelLibraryService:
         library = self.list_models(
             ollama_url=self.normalize_ollama_url(ollama_url),
             cloud_provider=dynamic_cloud_provider,
+            include_probe_status=include_probe_status,
         )
         if require_provider_availability and provider in DYNAMIC_CLOUD_PROVIDERS:
             sources_value = library.get("sources", {})
@@ -342,6 +356,8 @@ class ChatModelLibraryService:
     def _list_ollama_models(
         self,
         ollama_url: str,
+        *,
+        include_probe_status: bool = True,
     ) -> tuple[list[dict[str, object]], dict[str, object]]:
         cached = self._ollama_unavailable_cache.get(ollama_url)
         now = monotonic()
@@ -351,7 +367,11 @@ class ChatModelLibraryService:
                 "reachable": False,
                 "message": cached.message,
                 "model_count": 0,
-                **self._structured_probe_status("ollama"),
+                **(
+                    self._structured_probe_status("ollama")
+                    if include_probe_status
+                    else {}
+                ),
             }
         self._ollama_unavailable_cache.pop(ollama_url, None)
         ollama = OllamaProvider(
@@ -370,7 +390,11 @@ class ChatModelLibraryService:
                 "reachable": False,
                 "message": message,
                 "model_count": 0,
-                **self._structured_probe_status("ollama"),
+                **(
+                    self._structured_probe_status("ollama")
+                    if include_probe_status
+                    else {}
+                ),
             }
         return (
             [self.model_payload(model) for model in local_models],
@@ -379,6 +403,10 @@ class ChatModelLibraryService:
                 "reachable": True,
                 "message": None,
                 "model_count": len(local_models),
-                **self._structured_probe_status("ollama"),
+                **(
+                    self._structured_probe_status("ollama")
+                    if include_probe_status
+                    else {}
+                ),
             },
         )

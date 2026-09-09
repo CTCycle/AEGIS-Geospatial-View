@@ -18,6 +18,7 @@ class _ModelLibrary:
     def __init__(self, descriptor: dict[str, object] | None) -> None:
         self.descriptor = descriptor
         self.find_calls = 0
+        self.last_find_kwargs = {}
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -27,6 +28,7 @@ class _ModelLibrary:
     # -------------------------------------------------------------------------
     def find_model(self, **kwargs):  # noqa: ANN003, ANN201
         self.find_calls += 1
+        self.last_find_kwargs = kwargs
         assert kwargs["ollama_url"] == "http://ollama.test"
         return self.descriptor
 
@@ -72,6 +74,7 @@ def test_resolver_caches_exact_dynamic_provider_metadata() -> None:
     assert first.maximum_output_tokens == 512
     assert first.metadata_source == "provider_models_api"
     assert library.find_calls == 1
+    assert library.last_find_kwargs["include_probe_status"] is False
 
 ###############################################################################
 def test_resolver_keeps_missing_dynamic_context_unknown() -> None:
