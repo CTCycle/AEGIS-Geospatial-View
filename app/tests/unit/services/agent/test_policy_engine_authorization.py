@@ -94,6 +94,8 @@ def test_policy_constraints_include_catalog_tools_only() -> None:
         "list_geospatial_capabilities",
         "describe_geospatial_capability",
         "execute_geospatial_capability",
+        "resolve_geospatial_location",
+        "prepare_geospatial_map",
     ]
 
 ###############################################################################

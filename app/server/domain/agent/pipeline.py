@@ -137,6 +137,13 @@ class ToolPlan(BaseModel):
     frontend_derivation: str = "derive_from_validated_results"
     partial_failure_policy: str = "retain_successful_required_results"
     canonical_request_id: str | None = None
+    execution_mode: Literal["native", "deterministic"] = "native"
+    capability_domains: list[str] = Field(default_factory=list)
+    candidate_capability_ids: list[str] = Field(default_factory=list)
+    allowed_provider_ids: list[str] = Field(default_factory=list)
+    presentation_required: bool = False
+    completion_requirements: list[str] = Field(default_factory=list)
+    routing_reasons: list[str] = Field(default_factory=list)
 
 ###############################################################################
 class ConversationTaskRecord(BaseModel):

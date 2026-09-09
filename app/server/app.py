@@ -125,6 +125,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         application_timezone=getattr(
             getattr(settings, "chat", None), "application_timezone", "UTC"
         ),
+        execution_settings=getattr(settings, "agent_execution", None),
     )
     chat_streaming_service = ChatStreamingService(chat_runtime.agent_orchestrator)
     event_repository = AgentRunEventRepository(database)
@@ -141,6 +142,11 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     render_completion_service = RenderCompletionService(
         run_repository=run_repository,
         event_publisher=run_event_publisher,
+        render_ack_timeout_seconds=getattr(
+            getattr(settings, "agent_execution", None),
+            "render_ack_seconds",
+            90.0,
+        ),
     )
     run_orchestrator = AgentRunOrchestrator(
         agent_orchestrator=chat_runtime.agent_orchestrator,

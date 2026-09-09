@@ -50,9 +50,11 @@ class RenderCompletionService:
         *,
         run_repository: AgentRunRepository,
         event_publisher: RunEventPublisher,
+        render_ack_timeout_seconds: float = 90.0,
     ) -> None:
         self.run_repository = run_repository
         self.event_publisher = event_publisher
+        self.render_ack_timeout_seconds = max(0.1, float(render_ack_timeout_seconds))
 
     # -------------------------------------------------------------------------
     def prepare(
@@ -178,6 +180,14 @@ class RenderCompletionService:
         payload: RealtimeRenderAckPayload,
     ) -> RenderAcknowledgementResult:
         acknowledgment = payload.model_dump(mode="json")
+        expire_pending = getattr(self.run_repository, "expire_pending_render", None)
+        if callable(expire_pending):
+            expire_pending(
+                conversation_id=conversation_id,
+                run_id=payload.run_id,
+                run_version=payload.run_version,
+                timeout_seconds=self.render_ack_timeout_seconds,
+            )
         try:
             snapshot, duplicate, pending_response = self.run_repository.acknowledge_render(
                 conversation_id=conversation_id,

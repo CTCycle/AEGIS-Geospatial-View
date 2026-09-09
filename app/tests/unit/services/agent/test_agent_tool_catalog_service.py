@@ -347,11 +347,14 @@ def test_catalog_builds_stable_native_tools() -> None:
     service = _service()
     names = [tool.name for tool in service.build_native_tools()]
     assert names == [
+        "resolve_geospatial_location",
         "list_geospatial_capabilities",
         "describe_geospatial_capability",
         "execute_geospatial_capability",
         "fetch_geospatial_provider_layers",
-        "render_geospatial_provider_layer",
+        "inspect_geospatial_evidence",
+        "transform_geospatial_evidence",
+        "prepare_geospatial_map",
     ]
 
 ###############################################################################
@@ -369,10 +372,7 @@ def test_native_tool_descriptions_define_discovery_selection_boundaries() -> Non
         "explicitly routed and policy-allowlisted"
         in definitions["fetch_geospatial_provider_layers"]
     )
-    assert (
-        "exact provider_id and layer_id"
-        in definitions["render_geospatial_provider_layer"]
-    )
+    assert "browser render acknowledgement" in definitions["prepare_geospatial_map"]
 
 ###############################################################################
 def test_catalog_pagination_is_deterministic() -> None:
@@ -521,10 +521,14 @@ def test_execute_rejects_direct_only_capability_for_map_request() -> None:
 def test_catalog_tools_register_with_tool_registry() -> None:
     registry = ToolRegistry(runtime_registry=_RuntimeRegistry())  # type: ignore[arg-type]
     _service().register_with(registry)
+    assert registry.has_native_tool("resolve_geospatial_location")
     assert registry.has_native_tool("list_geospatial_capabilities")
     assert registry.has_native_tool("fetch_geospatial_provider_layers")
-    assert registry.has_native_tool("render_geospatial_provider_layer")
-    assert len(registry.list_native_tools()) == 5
+    assert registry.has_native_tool("inspect_geospatial_evidence")
+    assert registry.has_native_tool("transform_geospatial_evidence")
+    assert registry.has_native_tool("prepare_geospatial_map")
+    assert not registry.has_native_tool("render_geospatial_provider_layer")
+    assert len(registry.list_native_tools()) == 8
 
 ###############################################################################
 def test_provider_layer_listing_does_not_render_first_layer_implicitly() -> None:
@@ -556,8 +560,9 @@ def test_provider_layer_listing_does_not_render_first_layer_implicitly() -> None
         )
     )
 
-    assert result["layers"][0]["layer_id"] == "layer-1"
-    assert "map_session" not in result
+    assert result["ok"] is True
+    assert result["summary"]["layer_count"] == 1
+    assert result["map_eligibility"] == "renderable"
     assert service.search_orchestrator is not None
     assert service.search_orchestrator.requests == []  # type: ignore[attr-defined]
 
@@ -585,7 +590,7 @@ def test_provider_layer_rendering_surfaces_failed_provider_without_map_success()
 
     service.search_orchestrator = _FailedSearchOrchestrator()  # type: ignore[assignment]
     result = run_async_in_thread(
-        service._render_provider_layer(
+        service._prepare_provider_layer(
             {"provider_id": "test", "layer_id": "layer-1"}, _context()
         )
     )

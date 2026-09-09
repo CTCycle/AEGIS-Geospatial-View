@@ -14,6 +14,7 @@ from server.prompts.context import build_compacted_history_summary
 CONTEXT_HEADROOM_TOKENS = 512
 # Application resource policy, not a claim about an unknown model's capacity.
 UNKNOWN_MODEL_INPUT_CEILING = 32_768
+KNOWN_APPLICATION_INPUT_CEILING = 64_000
 RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY = "_response_schema_embedded_in_messages"
 
 ###############################################################################
@@ -182,6 +183,7 @@ def _context_components(
     request: LLMRequest,
     profile: ModelContextProfile | None,
 ) -> tuple[int, int, int, int, int | None]:
+    metadata = _request_metadata(request)
     expected_output = _expected_output_tokens(request, profile)
     tool_tokens = (
         estimate_json_tokens([tool.__dict__ for tool in request.tools])
@@ -193,15 +195,36 @@ def _context_components(
         if request.metadata.get(RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY) is True
         else estimate_json_tokens(request.response_json_schema)
     )
-    limit = profile.context_window_tokens if profile is not None else None
-    usable = (
-        max(
-            0,
-            limit - expected_output - CONTEXT_HEADROOM_TOKENS,
-        )
-        if limit is not None
-        else None
+    model_limit = profile.context_window_tokens if profile is not None else None
+    declared_application_cap = _positive_int(
+        metadata.get("application_input_token_ceiling")
     )
+    application_cap = min(
+        declared_application_cap
+        or (
+            KNOWN_APPLICATION_INPUT_CEILING
+            if profile is not None
+            else UNKNOWN_MODEL_INPUT_CEILING
+        ),
+        KNOWN_APPLICATION_INPUT_CEILING,
+    )
+    # The application ceiling limits input working-set size; it is not a
+    # second model context window.  A very large requested output (for
+    # example a provider maximum of 128K) must therefore not consume the
+    # entire 64K application input budget.  Reserve output against the
+    # declared model window, while only subtracting it from the application
+    # ceiling when it is smaller than that ceiling.
+    application_usable = (
+        application_cap - expected_output - CONTEXT_HEADROOM_TOKENS
+        if expected_output < application_cap
+        else application_cap - CONTEXT_HEADROOM_TOKENS
+    )
+    model_usable = (
+        model_limit - expected_output - CONTEXT_HEADROOM_TOKENS
+        if model_limit is not None
+        else application_usable
+    )
+    usable = max(0, min(application_usable, model_usable))
     return expected_output, tool_tokens, schema_tokens, CONTEXT_HEADROOM_TOKENS, usable
 
 ###############################################################################
@@ -455,7 +478,7 @@ def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:
     usage = compute_context_usage(request, provider=provider)
     usable = usage.usable_prompt_budget_tokens
     if usable is None:
-        usable = UNKNOWN_MODEL_INPUT_CEILING
+        usable = _positive_int(request.metadata.get("application_input_token_ceiling")) or UNKNOWN_MODEL_INPUT_CEILING
     if usage.estimated_input_tokens <= usable:
         return request
     message_budget = max(

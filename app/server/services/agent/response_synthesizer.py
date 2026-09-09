@@ -48,7 +48,7 @@ class GroundedSynthesisResult(BaseModel):
 
 ###############################################################################
 class GroundedResponseSynthesizer:
-    SYNTHESIS_TIMEOUT_SECONDS = 35.0
+    SYNTHESIS_TIMEOUT_SECONDS = 30.0
     SYNTHESIS_MAX_OUTPUT_TOKENS = 1024
 
     # -------------------------------------------------------------------------
@@ -161,6 +161,8 @@ class GroundedResponseSynthesizer:
                         else {}
                     ),
                     "max_tokens": self.SYNTHESIS_MAX_OUTPUT_TOKENS,
+                    "application_input_token_ceiling": 32_000,
+                    "context_phase": "synthesis",
                     "purpose": "grounded_agent_response",
                     REQUEST_DEADLINE_METADATA_KEY: (
                         monotonic() + self.SYNTHESIS_TIMEOUT_SECONDS
@@ -303,6 +305,8 @@ class GroundedResponseSynthesizer:
                         else {}
                     ),
                     "max_tokens": self.SYNTHESIS_MAX_OUTPUT_TOKENS,
+                    "application_input_token_ceiling": 32_000,
+                    "context_phase": "synthesis",
                     "purpose": "grounded_agent_response",
                     REQUEST_DEADLINE_METADATA_KEY: deadline,
                 },

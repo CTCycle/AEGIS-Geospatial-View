@@ -28,12 +28,12 @@ def backend(tmp_path: Path):
     repository.engine.dispose()
 
 ###############################################################################
-def test_canonical_schema_has_fifteen_application_tables_and_version_table(
+def test_canonical_schema_has_sixteen_application_tables_and_version_table(
     backend,
 ) -> None:
     tables = set(inspect(backend.engine).get_table_names())
     assert "alembic_version" in tables
-    assert len(tables - {"alembic_version"}) == 15
+    assert len(tables - {"alembic_version"}) == 16
     assert {"chat_sessions", "conversation_contexts"}.isdisjoint(tables)
     assert "active_run_id" not in {
         column["name"]

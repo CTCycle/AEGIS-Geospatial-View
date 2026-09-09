@@ -16,7 +16,8 @@ if TYPE_CHECKING:
 
 # History is a linguistic projection; geometry and execution payloads remain
 # in their authoritative stores. This cap is independent of model capacity.
-HISTORY_TOKEN_CEILING = 8192
+KNOWN_MODEL_WORKING_SET_CEILING = 64_000
+UNKNOWN_MODEL_WORKING_SET_CEILING = 32_768
 
 ###############################################################################
 class AgentContextAssembler:
@@ -40,6 +41,7 @@ class AgentContextAssembler:
         task_state: dict[str, Any],
         map_memory: dict[str, Any],
         prior_summary: dict[str, Any] | None = None,
+        relevant_tool_outcomes: list[dict[str, Any]] | None = None,
     ) -> AgentContextPackage:
         profile = (
             self.context_profile_resolver.resolve(provider, model)
@@ -52,6 +54,7 @@ class AgentContextAssembler:
             if profile
             else None
         )
+        outcomes = list(relevant_tool_outcomes or [])
         mandatory = {
             "current_user_message": current_user_message,
             "active_instructions": [
@@ -61,11 +64,23 @@ class AgentContextAssembler:
             "map_memory": map_memory,
         }
         mandatory_tokens = estimate_json_tokens(mandatory)
-        usable = (
-            max(0, context_window - (output_reserve or 0) - 512)
+        application_ceiling = (
+            min(context_window, KNOWN_MODEL_WORKING_SET_CEILING)
             if context_window is not None
-            else 16_384
+            else UNKNOWN_MODEL_WORKING_SET_CEILING
         )
+        output_reserve_value = output_reserve or 0
+        application_usable = (
+            application_ceiling - output_reserve_value - 512
+            if output_reserve_value < application_ceiling
+            else application_ceiling - 512
+        )
+        model_usable = (
+            context_window - output_reserve_value - 512
+            if context_window is not None
+            else application_usable
+        )
+        usable = max(0, min(application_usable, model_usable))
         if mandatory_tokens > usable:
             raise LLMContextLimitError(
                 provider=provider,
@@ -76,11 +91,19 @@ class AgentContextAssembler:
                     f"of {usable:,} tokens for {model}."
                 ),
             )
-        history_budget = min(HISTORY_TOKEN_CEILING, max(0, usable - mandatory_tokens))
-        # Reserve a bounded share for older linguistic context before selecting
-        # recent messages; adding a summary afterwards must not exceed budget.
-        summary_budget = min(2048, history_budget // 4)
-        raw_budget = history_budget - summary_budget
+        working_budget = max(0, usable - mandatory_tokens)
+        evidence_budget = working_budget * 50 // 100
+        raw_budget = working_budget * 35 // 100
+        summary_budget = working_budget - evidence_budget - raw_budget
+        selected_outcomes: list[dict[str, Any]] = []
+        outcome_tokens = 0
+        for outcome in outcomes:
+            cost = estimate_json_tokens(outcome)
+            if outcome_tokens + cost > evidence_budget:
+                break
+            selected_outcomes.append(outcome)
+            outcome_tokens += cost
+        raw_capacity = raw_budget + max(0, evidence_budget - outcome_tokens)
         projected = [
             {
                 key: item[key]
@@ -93,7 +116,7 @@ class AgentContextAssembler:
         included_tokens = 0
         for message in reversed(projected):
             cost = estimate_json_tokens(message)
-            if included_tokens + cost > raw_budget:
+            if included_tokens + cost > raw_capacity:
                 break
             included.append(message)
             included_tokens += cost
@@ -105,6 +128,7 @@ class AgentContextAssembler:
         omitted_ids = [
             int(item["id"]) for item in omitted if isinstance(item.get("id"), int)
         ]
+        summary_capacity = summary_budget + max(0, raw_capacity - included_tokens)
         summary: dict[str, Any] | None = prior_summary
         summary_through = 0
         if omitted:
@@ -130,9 +154,9 @@ class AgentContextAssembler:
                 ),
                 "turn_facts": facts,
             }
-            while facts and estimate_json_tokens(summary) > summary_budget:
+            while facts and estimate_json_tokens(summary) > summary_capacity:
                 facts.pop(0)
-            if estimate_json_tokens(summary) > summary_budget:
+            if estimate_json_tokens(summary) > summary_capacity:
                 summary = None
         return AgentContextPackage(
             current_user_message=current_user_message,
@@ -141,8 +165,25 @@ class AgentContextAssembler:
             map_memory=map_memory,
             conversation_summary=summary,
             recent_messages=included,
-            relevant_tool_outcomes=[],
+            relevant_tool_outcomes=selected_outcomes,
             included_message_ids=included_ids,
             summarized_through_turn_index=summary_through,
             omitted_message_ids=omitted_ids,
+            context_allocation={
+                "phase": "parser",
+                "model": model,
+                "estimator_source": "model_profile" if profile is not None else "conservative_chars_per_token",
+                "usable_input_tokens": usable,
+                "mandatory_tokens": mandatory_tokens,
+                "evidence_budget": evidence_budget,
+                "evidence_tokens": outcome_tokens,
+                "conversation_budget": raw_capacity,
+                "conversation_tokens": included_tokens,
+                "summary_budget": summary_capacity,
+                "summary_tokens": estimate_json_tokens(summary) if summary is not None else 0,
+                "response_reserve_tokens": output_reserve or 0,
+                "safety_tokens": 512,
+                "compacted_ids": omitted_ids,
+                "mandatory_overflow": False,
+            },
         )

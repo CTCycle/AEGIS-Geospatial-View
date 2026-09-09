@@ -9,6 +9,7 @@ from server.domain.agent.interpretation import (
     CompletionRequirement,
 )
 from server.contracts.geospatial import MapSession
+from server.domain.agent.evidence import AgentStopEvaluation
 
 
 REQUIRED_COMPLETION_NAMES = (
@@ -26,6 +27,73 @@ REQUIRED_COMPLETION_NAMES = (
 ###############################################################################
 class CompletionEvaluator:
     """Keep task completion independent of provider or model wording."""
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def evaluate_proposed_stop(
+        *,
+        canonical_request: CanonicalRequestInterpretation | None,
+        presentation_required: bool,
+        map_prepared: bool,
+        evidence_refs: list[str] | None,
+        available_tools: list[str],
+        clarification_required: bool = False,
+        provider_error: bool = False,
+    ) -> AgentStopEvaluation:
+        """Evaluate a no-tool model response against durable requirements."""
+
+        if clarification_required:
+            return AgentStopEvaluation(
+                proposed=True,
+                satisfied=False,
+                reason="clarification_required",
+                pending_requirements=["user_input"],
+                useful_tools=[],
+            )
+        if provider_error:
+            return AgentStopEvaluation(
+                proposed=True,
+                satisfied=False,
+                reason="provider_error",
+                pending_requirements=[],
+                useful_tools=[],
+            )
+        if presentation_required:
+            if map_prepared:
+                return AgentStopEvaluation(
+                    proposed=True,
+                    satisfied=False,
+                    reason="awaiting_render",
+                    pending_requirements=["map_state_committed", "viewport_contains_results"],
+                    useful_tools=[],
+                )
+            return AgentStopEvaluation(
+                proposed=True,
+                satisfied=False,
+                reason="insufficient_evidence" if not available_tools else "no_progress",
+                pending_requirements=["prepare_geospatial_map"],
+                useful_tools=available_tools,
+            )
+        required = [
+            item.name
+            for item in (canonical_request.completion_requirements if canonical_request else [])
+            if item.required and item.status not in {"satisfied", "not_applicable"}
+        ]
+        if required and not evidence_refs:
+            return AgentStopEvaluation(
+                proposed=True,
+                satisfied=False,
+                reason="insufficient_evidence" if not available_tools else "no_progress",
+                pending_requirements=required,
+                useful_tools=available_tools,
+            )
+        return AgentStopEvaluation(
+            proposed=True,
+            satisfied=True,
+            reason="goal_satisfied",
+            pending_requirements=[],
+            useful_tools=[],
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -9,16 +9,19 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Generator
 
 
-DEFAULT_RUN_SECONDS = 75.0
+INTERPRETATION_RUN_SECONDS = 90.0
+SIMPLE_RUN_SECONDS = 150.0
+COMPLEX_RUN_SECONDS = 300.0
+DEFAULT_RUN_SECONDS = INTERPRETATION_RUN_SECONDS
 DEFAULT_STAGE_LIMITS: dict[str, float] = {
-    "context_assembly": 2.0,
-    "structured_intent_extraction": 30.0,
-    "location_resolution": 12.0,
-    "planning": 2.0,
-    "tool_execution": 20.0,
-    "map_assembly": 8.0,
-    "response_synthesis": 8.0,
-    "persistence": 3.0,
+    "context_assembly": 5.0,
+    "structured_intent_extraction": 60.0,
+    "location_resolution": 30.0,
+    "planning": 5.0,
+    "tool_execution": 90.0,
+    "map_assembly": 20.0,
+    "response_synthesis": 30.0,
+    "persistence": 5.0,
 }
 
 
@@ -79,6 +82,8 @@ class AgentExecutionBudget:
     """One absolute deadline and bounded counters for a complete run."""
 
     total_seconds: float = DEFAULT_RUN_SECONDS
+    hard_max_seconds: float = COMPLEX_RUN_SECONDS
+    simple_run_seconds: float = SIMPLE_RUN_SECONDS
     stage_limits: dict[str, float] = field(
         default_factory=lambda: dict(DEFAULT_STAGE_LIMITS)
     )
@@ -92,13 +97,39 @@ class AgentExecutionBudget:
     terminal_reason: str | None = None
     terminal_stage: str | None = None
     parser_contract: dict[str, Any] | None = None
+    execution_mode: str = "interpretation"
+    context_allocations: list[dict[str, Any]] = field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
+    iteration_traces: list[dict[str, Any]] = field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
+    completion_requirements: list[str] = field(
+        default_factory=lambda: list[str]()
+    )
+    stopping_reason: str | None = None
     pipeline_reach: dict[str, str] = field(default_factory=_new_pipeline_reach)
 
     # -------------------------------------------------------------------------
     def __post_init__(self) -> None:
-        if self.total_seconds <= 0:
+        if self.total_seconds <= 0 or self.total_seconds > self.hard_max_seconds:
             raise ValueError("total_seconds must be positive")
         self.deadline_monotonic = self.started_monotonic + self.total_seconds
+
+    # -------------------------------------------------------------------------
+    def promote(self, profile: str) -> None:
+        """Promote once from interpretation to a bounded run profile."""
+
+        requested = (
+            min(self.simple_run_seconds, self.hard_max_seconds)
+            if profile == "simple"
+            else self.hard_max_seconds
+        )
+        requested = min(requested, self.hard_max_seconds)
+        if requested <= self.total_seconds:
+            return
+        self.total_seconds = requested
+        self.deadline_monotonic = self.started_monotonic + requested
 
     deadline_monotonic: float = field(init=False)
 
@@ -135,6 +166,14 @@ class AgentExecutionBudget:
     # -------------------------------------------------------------------------
     def record_retry(self) -> None:
         self.retry_count += 1
+
+    # -------------------------------------------------------------------------
+    def record_context_allocation(self, allocation: dict[str, Any]) -> None:
+        self.context_allocations.append(dict(allocation))
+
+    # -------------------------------------------------------------------------
+    def record_iteration(self, trace: dict[str, Any]) -> None:
+        self.iteration_traces.append(dict(trace))
 
     # -------------------------------------------------------------------------
     def mark_stage_failed(
@@ -234,6 +273,11 @@ class AgentExecutionBudget:
             "retry_count": self.retry_count,
             "terminal_reason": self.terminal_reason,
             "terminal_stage": self.terminal_stage,
+            "execution_mode": self.execution_mode,
+            "completion_requirements": list(self.completion_requirements),
+            "stopping_reason": self.stopping_reason or self.terminal_reason,
+            "context_allocations": list(self.context_allocations[-16:]),
+            "iteration_traces": list(self.iteration_traces[-12:]),
             "parser_contract": (
                 dict(self.parser_contract) if self.parser_contract is not None else None
             ),

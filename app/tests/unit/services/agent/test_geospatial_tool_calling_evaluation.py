@@ -136,7 +136,7 @@ def _turn(
             ),
             "map_layers",
             None,
-            ["render_geospatial_provider_layer"],
+            ["prepare_geospatial_map"],
             [],
         ),
         (

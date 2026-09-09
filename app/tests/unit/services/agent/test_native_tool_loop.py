@@ -236,7 +236,8 @@ def test_native_tool_loop_replaces_working_state_instead_of_appending_it() -> No
             if "WORKING_STATE" in str(message.get("content"))
         ]
         assert len(working_states) == 2
-        assert '"completed_tool_results": []' in str(working_states[0]["content"])
+        assert '"task_ledger"' in str(working_states[0]["content"])
+        assert '"completed": []' in str(working_states[0]["content"])
         assert '"tool": "lookup"' in str(working_states[1]["content"])
         assert all(
             sum(
@@ -322,7 +323,7 @@ def test_native_tool_loop_stops_at_max_iterations() -> None:
                 temperature=0,
             )
         )
-        assert result.stopped_reason == "max_iterations"
+        assert result.stopped_reason == "tool_budget_exhausted"
         assert result.iterations == 2
 
     run_async_in_thread(_run())

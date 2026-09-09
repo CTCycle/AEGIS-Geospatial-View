@@ -62,7 +62,7 @@ def test_layer_plan_contains_location_arguments() -> None:
     assert plan.steps[0].arguments["arguments"]["location"] == "Rome"
 
 ###############################################################################
-def test_provider_layer_selection_uses_provider_render_tool() -> None:
+def test_provider_layer_selection_uses_map_preparation_tool() -> None:
     plan = DeterministicToolPlanner().build_plan(
         _turn(
             "Render the selected GIBS layer over Rome",
@@ -71,10 +71,8 @@ def test_provider_layer_selection_uses_provider_render_tool() -> None:
         "map_layers",
     )
 
-    assert [step.tool_name for step in plan.steps] == [
-        "render_geospatial_provider_layer"
-    ]
-    assert plan.steps[0].arguments == {
+    assert [step.tool_name for step in plan.steps] == ["prepare_geospatial_map"]
+    assert plan.steps[0].arguments["layer_options"] == {
         "provider_id": "gibs",
         "layer_id": "MODIS_Terra_CorrectedReflectance_TrueColor",
     }
@@ -270,5 +268,5 @@ def test_peer_targets_create_independent_provider_layer_steps() -> None:
     assert len(plan.steps) == 2
     assert [step.target_id for step in plan.steps] == ["target-1", "target-2"]
     assert all(
-        step.tool_name == "render_geospatial_provider_layer" for step in plan.steps
+        step.tool_name == "prepare_geospatial_map" for step in plan.steps
     )

@@ -35,6 +35,9 @@ class AgentToolLoopRequest:
     provider_session_id: str | None = None
     context: AgentExecutionContext = field(default_factory=AgentExecutionContext)
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
+    tool_resolver: Callable[
+        [AgentExecutionContext, list[LLMToolResult]], list[LLMToolDefinition]
+    ] | None = None
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -44,12 +47,17 @@ class AgentToolLoopResult:
     tool_results: list[LLMToolResult]
     iterations: int
     stopped_reason: Literal[
-        "final",
-        "max_iterations",
+        "goal_satisfied",
+        "awaiting_render",
+        "clarification_required",
+        "insufficient_evidence",
         "provider_error",
-        "tool_error",
-        "budget_exhausted",
+        "context_limit",
+        "tool_budget_exhausted",
+        "run_deadline_exhausted",
         "no_progress",
+        "cancelled",
+        "superseded",
     ]
     map_session: MapSession | None = None
     model_calls: int = 0

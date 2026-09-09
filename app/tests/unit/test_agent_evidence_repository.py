@@ -24,7 +24,10 @@ def test_evidence_round_trip_checksum_and_parent_provenance(tmp_path) -> None:  
         kind="tabular",
         media_type="application/json",
         status="available",
-        payload={"records": [{"id": "a", "value": 3}]},
+        payload={
+            "records": [{"id": "a", "value": 3}],
+            "provider_metadata": {"access_token": "must-not-persist"},
+        },
         summary={"record_count": 1, "api_key": "must-not-persist"},
         provenance={"provider": "test", "authorization": "redacted"},
     )
@@ -45,6 +48,7 @@ def test_evidence_round_trip_checksum_and_parent_provenance(tmp_path) -> None:  
     summary, raw = loaded
     assert summary.parent_evidence_ids == [parent.evidence_id]
     assert b'"id":"a"' in raw
+    assert b"access_token" not in raw
     assert "api_key" not in parent.summary
     assert "authorization" not in parent.provenance
 
@@ -63,6 +67,9 @@ def test_evidence_metadata_cascade_deletes_with_conversation(tmp_path) -> None: 
         summary={"status": "failed"},
     )
     assert repository.get_summary(item.evidence_id) is not None
+    other = ConversationRepository(database).create_conversation("Other")
+    assert repository.get_summary(item.evidence_id, conversation_id=other.id) is None
+    assert repository.get_payload(item.evidence_id, conversation_id=other.id) is None
     with database.session() as session:
         record = session.get(type(conversation), conversation.id)
         session.delete(record)

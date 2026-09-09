@@ -52,7 +52,9 @@ class AgentEvidenceEnvelope(BaseModel):
     map_eligibility: Literal["renderable", "not_renderable", "unknown"] = "unknown"
     error: dict[str, Any] | None = None
     pagination: dict[str, Any] | None = None
-    state_changes: list[dict[str, Any]] = Field(default_factory=list)
+    state_changes: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
 
 
 class AgentContextAllocation(BaseModel):
@@ -63,8 +65,11 @@ class AgentContextAllocation(BaseModel):
     estimator_source: str
     usable_input_tokens: int = Field(ge=0)
     mandatory_tokens: int = Field(default=0, ge=0)
+    evidence_budget: int = Field(default=0, ge=0)
     evidence_tokens: int = Field(default=0, ge=0)
+    conversation_budget: int = Field(default=0, ge=0)
     conversation_tokens: int = Field(default=0, ge=0)
+    summary_budget: int = Field(default=0, ge=0)
     summary_tokens: int = Field(default=0, ge=0)
     response_reserve_tokens: int = Field(default=0, ge=0)
     safety_tokens: int = Field(default=512, ge=0)
@@ -79,21 +84,33 @@ class AgentWorkingState(BaseModel):
 
     goal: str = ""
     explicit_constraints: dict[str, Any] = Field(default_factory=dict)
-    active_directives: list[dict[str, Any]] = Field(default_factory=list)
+    active_directives: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     canonical_request: dict[str, Any] = Field(default_factory=dict)
-    resolved_locations: list[dict[str, Any]] = Field(default_factory=list)
+    resolved_locations: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     task_ledger: dict[str, Any] = Field(default_factory=dict)
     completion_requirements: list[str] = Field(default_factory=list)
     render_status: str = "not_required"
     capability_domains: list[str] = Field(default_factory=list)
     routing_reasons: list[str] = Field(default_factory=list)
-    evidence: list[AgentEvidenceSummary] = Field(default_factory=list)
-    relevant_errors: list[dict[str, Any]] = Field(default_factory=list)
-    retries: list[dict[str, Any]] = Field(default_factory=list)
+    evidence: list[AgentEvidenceSummary] = Field(
+        default_factory=lambda: list[AgentEvidenceSummary]()
+    )
+    relevant_errors: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
+    retries: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     active_map_revision: str | None = None
     presentation_state: dict[str, Any] = Field(default_factory=dict)
-    available_tools: list[str] = Field(default_factory=list)
-    tool_exposure_reasons: dict[str, str] = Field(default_factory=dict)
+    available_tools: list[str] = Field(default_factory=lambda: list[str]())
+    tool_exposure_reasons: dict[str, str] = Field(
+        default_factory=lambda: dict[str, str]()
+    )
     context_budget: AgentContextAllocation | None = None
 
 
@@ -109,8 +126,10 @@ class AgentIterationTrace(BaseModel):
     started_at: str
     duration_ms: int = Field(default=0, ge=0)
     result_status: str
-    evidence_refs: list[str] = Field(default_factory=list)
-    state_changes: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
+    state_changes: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     pending_requirements: list[str] = Field(default_factory=list)
     retry_number: int = Field(default=0, ge=0)
     context_usage: dict[str, Any] = Field(default_factory=dict)
@@ -135,5 +154,5 @@ class AgentStopEvaluation(BaseModel):
         "cancelled",
         "superseded",
     ]
-    pending_requirements: list[str] = Field(default_factory=list)
-    useful_tools: list[str] = Field(default_factory=list)
+    pending_requirements: list[str] = Field(default_factory=lambda: list[str]())
+    useful_tools: list[str] = Field(default_factory=lambda: list[str]())
