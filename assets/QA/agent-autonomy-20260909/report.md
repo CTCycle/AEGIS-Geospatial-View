@@ -1,8 +1,8 @@
 # AEGIS native-agent autonomy implementation report
 
 Date: 2026-09-09
-Baseline: `1a802a35`
-Implementation increment: `731ff9bd` plus the pending native-first increment
+Baseline: `f6448248`
+Implementation increment: working tree E2E-enablement fix (uncommitted)
 Historical audit: `AGENTIC_PIPELINE_AUDIT.md` (unchanged)
 
 ## Outcome
@@ -59,16 +59,23 @@ preparation.
 | OpenAPI regeneration | PASS; `app/shared/openapi.json` updated |
 | Alembic heads | PASS — one head `202609090001` |
 | Whitespace (`git diff --check`) | PASS |
-| Live configured-provider matrix | NOT RUN — no provider/credential substitution permitted |
-| Real-app browser MapLibre matrix | NOT RUN in this increment — requires the configured app services and browser session |
+| Live geospatial provider matrix | EXECUTED — 30 checks: 11 passed, 5 failed, 14 skipped; strict exit reflects public-provider failures and unavailable configured sources; see `live-provider-matrix.json` |
+| Configured-model live smoke | EXECUTED — HTTP 200 and persisted response in 37.1s using `opencode-go / deepseek-v4-flash`; structured extraction failed honestly with 0 tool/provider/map events; see `live-smoke-final/benchmark.json` |
+| Real-app browser configured-model request | EXECUTED — Chrome visibly reached the configured app path; the model/tool path returned `Missing required argument 'target_id'`, with no map session; see `browser-live-20260909.md` |
+| Controlled real-browser MapLibre render handshake | PASS — visible canvas, loaded USGS earthquake fixture, one rendered feature, valid viewport, `status=ready`, zero console errors; see `browser-maplibre-final/reports/controlled-map-completion.json` |
 
 The controlled unit and contract gates prove routing, evidence ownership,
 dynamic schemas, context allocation, stopping/recovery, render-timeout state,
-and frontend contract behavior. They do not claim live-provider reliability or
-real-browser rendering; those rows remain explicitly unavailable in the matrix.
+and frontend contract behavior. The live rows now contain observed outcomes:
+the configured provider/model was exercised without substitution, while the
+controlled browser fixture separately proves the visible MapLibre render path.
 
 ## Remaining limitations
 
-Live provider/model execution and the full real-app browser matrix still need to
-be run with the configured runtime profile. No provider, model, credential,
-network source, or fallback model was substituted to manufacture those results.
+The configured live provider/model did not produce a successful map in this
+increment: one smoke request stopped at structured response parsing, and the
+real-browser request reached tool execution but failed on a missing `target_id`.
+The geospatial provider matrix also contains five public-provider failures and
+fourteen explicit configuration-dependent skips. These are recorded outcomes,
+not substituted passes. No provider, model, credential, network source, or
+fallback model was substituted to manufacture them.

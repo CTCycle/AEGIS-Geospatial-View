@@ -49,6 +49,17 @@ class _OllamaProviderUnavailableStub:
         return []
 
 ###############################################################################
+class _ProbeStatusMustNotRun:
+    calls = 0
+
+    # -------------------------------------------------------------------------
+    def latest(self):  # noqa: ANN201
+        type(self).calls += 1
+        raise AssertionError(
+            "structured probe status must be suppressed during context lookup"
+        )
+
+###############################################################################
 def _build_service() -> ChatModelLibraryService:
     return ChatModelLibraryService(
         provider_factory=_ProviderFactoryStub(_DeepSeekProviderStub([])),
@@ -138,6 +149,40 @@ def test_find_model_raises_when_deepseek_catalog_cannot_be_loaded(monkeypatch) -
         raise AssertionError(
             "Expected ModelLibrarySourceError for unavailable DeepSeek catalog."
         )
+
+###############################################################################
+def test_find_model_can_skip_probe_status_for_context_profile_lookup(monkeypatch) -> None:
+    monkeypatch.setattr(
+        model_library_module,
+        "OllamaProvider",
+        _OllamaProviderUnavailableStub,
+    )
+    service = ChatModelLibraryService(
+        provider_factory=_ProviderFactoryStub(
+            _DeepSeekProviderStub(
+                [
+                    ModelDescriptor(
+                        name="runtime-model",
+                        description="Runtime model",
+                        provider="deepseek",
+                    )
+                ]
+            )
+        )
+    )
+    _ProbeStatusMustNotRun.calls = 0
+    service.set_structured_probe_service(_ProbeStatusMustNotRun())
+
+    result = service.find_model(
+        provider="deepseek",
+        model_name="runtime-model",
+        ollama_url="http://127.0.0.1:11434",
+        include_probe_status=False,
+    )
+
+    assert result is not None
+    assert result["name"] == "runtime-model"
+    assert _ProbeStatusMustNotRun.calls == 0
 
 ###############################################################################
 def test_normalize_ollama_url_rewrites_localhost() -> None:

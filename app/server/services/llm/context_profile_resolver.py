@@ -64,6 +64,7 @@ class ModelContextProfileResolver:
                 provider=normalized_provider,
                 model_name=normalized_model,
                 ollama_url=ollama_url,
+                include_probe_status=False,
             )
         except Exception:
             descriptor = None
