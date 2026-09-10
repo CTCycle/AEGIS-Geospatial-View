@@ -10,6 +10,7 @@ from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.agent_loop import AgentLoop
+from server.services.agent.native_v2_turn import NativeV2TurnRunner
 from server.services.agent.capability_resolver import CapabilityResolver
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.native_v2_tools import register_native_v2_tools
@@ -52,6 +53,7 @@ class ChatRuntime:
     task_state_service: ConversationTaskStateService
     structured_probe_service: StructuredProbeService | None = None
     agent_loop: AgentLoop | None = None
+    native_v2_runner: NativeV2TurnRunner | None = None
 
 ###############################################################################
 def build_chat_runtime(
@@ -140,6 +142,10 @@ def build_chat_runtime(
             ),
         ),
     )
+    native_v2_runner = NativeV2TurnRunner(
+        agent_loop=agent_loop,
+        execution_settings=execution_settings,
+    )
     request_builder = RequestBuilder(capability_registry=capability_registry)
     agent_tool_catalog_service = AgentToolCatalogService(
         capability_registry=capability_registry,
@@ -186,6 +192,7 @@ def build_chat_runtime(
         history_service=history_service,
         task_state_service=task_state_service,
         agent_loop=agent_loop,
+        native_v2_runner=native_v2_runner,
         agent_orchestrator=AgentOrchestrator(
             search_orchestrator=search_orchestrator,
             parser_service=parser_service,
@@ -208,6 +215,7 @@ def build_chat_runtime(
             application_timezone=application_timezone,
             execution_settings=execution_settings,
             agent_loop=agent_loop,
+            native_v2_runner=native_v2_runner,
             capability_resolver=CapabilityResolver(
                 capability_registry=capability_registry,
                 runtime_registry=runtime_registry,
