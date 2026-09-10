@@ -1577,6 +1577,25 @@ class AgentOrchestrator:
         turn_contract = self.capability_resolver.resolve(
             turn_contract, canonical_request=canonical_request
         )
+        settings = self.settings_repo.get_required()
+        if self._agent_loop_mode() == "native_v2":
+            return await self._run_native_v2_compat_turn(
+                payload=payload,
+                request_id=request_id,
+                conversation_id=conversation_id,
+                conversation_key=conversation_key,
+                task=task,
+                turn_contract=turn_contract,
+                latest_memory=latest_memory,
+                recent_messages=recent_messages,
+                context_usage=context_usage,
+                canonical_request=canonical_request,
+                resolved_location=resolved_location,
+                resolved_locations=resolved_locations,
+                state_before=state_before,
+                settings=settings,
+                execution_budget=execution_budget,
+            )
         direct_response = await self.direct_turn_response_service.handle(
             request_id=request_id,
             conversation_id=conversation_id,
@@ -1611,25 +1630,6 @@ class AgentOrchestrator:
             )
             return clarification_response.model_copy(update={"canonical_request": canonical_request})
 
-        settings = self.settings_repo.get_required()
-        if self._agent_loop_mode() == "native_v2":
-            return await self._run_native_v2_compat_turn(
-                payload=payload,
-                request_id=request_id,
-                conversation_id=conversation_id,
-                conversation_key=conversation_key,
-                task=task,
-                turn_contract=turn_contract,
-                latest_memory=latest_memory,
-                recent_messages=recent_messages,
-                context_usage=context_usage,
-                canonical_request=canonical_request,
-                resolved_location=resolved_location,
-                resolved_locations=resolved_locations,
-                state_before=state_before,
-                settings=settings,
-                execution_budget=execution_budget,
-            )
         with self._stage_scope(
             execution_budget,
             "planning",

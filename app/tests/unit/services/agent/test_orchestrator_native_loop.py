@@ -12,7 +12,7 @@ from server.domain.agent.decision import (
     PolicyDecision,
     ResolvedLocation,
 )
-from server.contracts.chat import ChatTurnRequest
+from server.contracts.chat import ChatOperationResult, ChatTurnRequest, ChatTurnResponse
 from server.contracts.extraction import (
     ConversationContextSnapshot,
     LocationSignal,
@@ -1096,6 +1096,64 @@ def test_orchestrator_uses_verified_tool_map_session() -> None:
             == "execute_geospatial_capability"
         )
         assert policy.preflight_calls == 1
+
+    run_async_in_thread(_run())
+
+###############################################################################
+def test_native_v2_mode_bypasses_legacy_direct_response_shortcut() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=_SearchOrchestrator(),  # type: ignore[arg-type]
+            parser_service=_Parser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
+            native_tool_loop=_NativeLoop(
+                AgentToolLoopResult(
+                    final_text="unused",
+                    tool_calls=[],
+                    tool_results=[],
+                    iterations=0,
+                    stopped_reason="final",
+                )
+            ),  # type: ignore[arg-type]
+            agent_tool_catalog_service=_NoOpCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_service=history,
+            conversation_repository=history,  # type: ignore[arg-type]
+            execution_settings=SimpleNamespace(agent_loop_mode="native_v2"),
+        )
+        native_calls = 0
+
+        async def _native(**kwargs: Any) -> ChatTurnResponse:
+            nonlocal native_calls
+            native_calls += 1
+            return ChatTurnResponse(
+                request_id=kwargs["request_id"],
+                conversation_id=kwargs["conversation_id"],
+                assistant_message="Native response",
+                operation=ChatOperationResult(
+                    kind="direct_answer",
+                    status="success",
+                    message="Native response",
+                ),
+            )
+
+        async def _legacy_direct(**_: Any) -> None:
+            raise AssertionError("native-v2 must not use the legacy direct shortcut")
+
+        orchestrator._run_native_v2_compat_turn = _native  # type: ignore[method-assign]
+        orchestrator.direct_turn_response_service.handle = _legacy_direct  # type: ignore[method-assign]
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(conversation_id="native-conversation", message="show Rome")
+        )
+
+        assert native_calls == 1
+        assert response.assistant_message == "Native response"
 
     run_async_in_thread(_run())
 
