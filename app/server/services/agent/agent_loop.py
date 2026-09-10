@@ -179,6 +179,8 @@ class AgentLoop:
                     messages.extend(
                         self._tool_result_messages(result.tool_calls, tool_results)
                     )
+                    self._transition(state, AgentPhase.UPDATE_STATE)
+                    self._transition(state, AgentPhase.EVALUATE_STOP)
                     stop = self._evaluate_stop(
                         state,
                         route,
@@ -192,6 +194,7 @@ class AgentLoop:
                     continue
 
                 final_text = result.content.strip()
+                self._transition(state, AgentPhase.EVALUATE_STOP)
                 stop = self._evaluate_text_stop(state, route, final_text)
                 if stop is not None:
                     state.termination_reason = stop[0]
@@ -649,8 +652,8 @@ class AgentLoop:
         )
 
     # -------------------------------------------------------------------------
-    @staticmethod
     def _budget_outcome(
+        self,
         state: AgentState,
         request: AgentLoopRequest,
         reason: str,
@@ -661,7 +664,7 @@ class AgentLoop:
             else reason
         )
         state.termination_reason = stable_reason
-        state.phase = AgentPhase.FAILED
+        self._transition(state, AgentPhase.FAILED)
         return AgentLoopOutcome(
             final_text="The agent reached its configured execution limit.",
             state=state,
