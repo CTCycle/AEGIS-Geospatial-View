@@ -22,7 +22,10 @@ from server.repositories.conversations import ConversationRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.agent_loop import AgentLoop, AgentLoopRequest
 from server.services.agent.agent_state_factory import AgentStateFactory
-from server.services.agent.native_v2_turn import NativeV2TurnRunner
+from server.services.agent.native_v2_turn import (
+    NativeV2TurnRequest,
+    NativeV2TurnRunner,
+)
 from server.services.agent.capability_resolver import CapabilityResolver
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import CapabilityRoute
@@ -332,6 +335,141 @@ class AgentOrchestrator:
     # -------------------------------------------------------------------------
     def _agent_loop_mode(self) -> str:
         return str(getattr(self.execution_settings, "agent_loop_mode", "legacy"))
+
+    # -------------------------------------------------------------------------
+    async def _run_native_v2_compat_turn(
+        self,
+        *,
+        payload: ChatTurnRequest,
+        request_id: str,
+        conversation_id: str,
+        conversation_key: str,
+        task: Any,
+        turn_contract: Any,
+        latest_memory: dict[str, Any],
+        recent_messages: list[dict[str, Any]],
+        context_usage: ContextUsageResponse | None,
+        canonical_request: Any,
+        resolved_location: ResolvedLocation | None,
+        resolved_locations: dict[str, ResolvedLocation],
+        state_before: Any,
+        settings: Any,
+        execution_budget: AgentExecutionBudget,
+    ) -> ChatTurnResponse:
+        if self.native_v2_runner is None:
+            raise RuntimeError("Native-v2 mode requires a composed native runner.")
+        location_refs = dict(resolved_locations)
+        if resolved_location is not None and not location_refs:
+            location_refs["primary"] = resolved_location
+        evidence_refs = [
+            str(item.evidence_id)
+            for item in (
+                self.evidence_repository.list_summaries(
+                    conversation_id,
+                    limit=100,
+                )
+                if self.evidence_repository is not None
+                else []
+            )
+            if str(item.evidence_id).strip()
+        ]
+        native_response = await self.native_v2_runner.run(
+            NativeV2TurnRequest(
+                request_id=request_id,
+                conversation_id=conversation_id,
+                user_message=payload.message,
+                provider=settings.agent_model_provider,
+                model=settings.agent_model_name,
+                budget=execution_budget,
+                messages=[
+                    *recent_messages,
+                    {"role": "user", "content": payload.message},
+                ],
+                active_map_session=getattr(state_before, "active_map_session", None),
+                location_refs=location_refs,
+                evidence_refs=evidence_refs,
+                canonical_request=canonical_request,
+                defer_map_commit=payload.defer_map_commit,
+            )
+        )
+        tool_payload = _native_tool_payload(native_response)
+        map_session = native_response.map_session
+        operation = native_response.operation
+        failure = self.turn_state_assembler.failure_from_operation(
+            operation,
+            tool_payload,
+        )
+        execution_budget.pipeline_reach["tool_execution"] = "success"
+        execution_budget.pipeline_reach["map_assembly"] = (
+            "success" if map_session is not None else "not_reached"
+        )
+        execution_budget.pipeline_reach["render_ack"] = (
+            "pending" if map_session is not None else "not_required"
+        )
+        execution_budget.stopping_reason = str(
+            native_response.execution_trace.get("stopped_reason")
+            if native_response.execution_trace
+            else "native_v2"
+        )
+        self.task_state_service.update_task(
+            conversation_key,
+            task.task_id,
+            status="failed" if failure is not None else "completed",
+            progress_summary=operation.message,
+            failure=failure,
+            tool_result_refs=[
+                item.call_id
+                for item in native_response.tool_results
+                if item.call_id
+            ],
+        )
+        self.history_service.append_message(
+            conversation_id=conversation_id,
+            role="assistant",
+            content=native_response.assistant_message,
+            request_id=request_id,
+            structured_payload={
+                "native_v2": True,
+                "route": native_response.route.model_dump(mode="json")
+                if native_response.route is not None
+                else None,
+                "operation": operation.model_dump(mode="json"),
+                "canonical_request": canonical_request.model_dump(mode="json"),
+                "execution_trace": native_response.execution_trace,
+                "presentation_status": native_response.presentation_status,
+            },
+            tool_payload=tool_payload,
+            # A native candidate remains uncommitted until the browser proves
+            # the exact render, including for direct API compatibility calls.
+            map_session=None,
+        )
+        decision = AgentResponseBuilder.build_final_decision(
+            action_id=turn_contract.normalized_action.action_id,
+            operation=operation,
+            trace_steps=[
+                "native_v2.route",
+                "native_v2.tool_execution",
+                f"native_v2.stop:{execution_budget.stopping_reason}",
+            ],
+        )
+        return ChatTurnResponse(
+            request_id=request_id,
+            conversation_id=conversation_id,
+            assistant_message=native_response.assistant_message,
+            turn_contract=turn_contract,
+            decision=decision,
+            operation=operation,
+            tool_payload=tool_payload,
+            map_session=map_session,
+            memory_snapshot=dict(latest_memory),
+            context_usage=context_usage,
+            task_snapshot=self.task_state_service.snapshot(conversation_key),
+            tool_plan=None,
+            failure_diagnostic=failure,
+            visualization_update=None,
+            canonical_request=canonical_request,
+            execution_trace=native_response.execution_trace,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1478,6 +1616,24 @@ class AgentOrchestrator:
             return clarification_response.model_copy(update={"canonical_request": canonical_request})
 
         settings = self.settings_repo.get_required()
+        if self._agent_loop_mode() == "native_v2":
+            return await self._run_native_v2_compat_turn(
+                payload=payload,
+                request_id=request_id,
+                conversation_id=conversation_id,
+                conversation_key=conversation_key,
+                task=task,
+                turn_contract=turn_contract,
+                latest_memory=latest_memory,
+                recent_messages=recent_messages,
+                context_usage=context_usage,
+                canonical_request=canonical_request,
+                resolved_location=resolved_location,
+                resolved_locations=resolved_locations,
+                state_before=state_before,
+                settings=settings,
+                execution_budget=execution_budget,
+            )
         with self._stage_scope(
             execution_budget,
             "planning",
@@ -2268,3 +2424,35 @@ class AgentOrchestrator:
             visualization_update=visualization_update,
             canonical_request=canonical_request,
         )
+
+
+def _native_tool_payload(response: Any) -> dict[str, Any]:
+    results: list[dict[str, Any]] = []
+    for item in response.tool_results:
+        content: dict[str, Any] = {
+            "ok": item.status != "failed",
+            "status": item.status,
+            "summary": item.summary,
+            "evidence_refs": list(item.evidence_refs),
+            "map_candidate_id": item.map_candidate_id,
+        }
+        if item.error is not None:
+            content["error"] = item.error.model_dump(mode="json")
+        results.append(
+            {
+                "tool_call_id": item.call_id,
+                "name": item.tool_name,
+                "content": content,
+                "is_error": item.status == "failed",
+                "error": item.error.message if item.error is not None else None,
+            }
+        )
+    return {
+        "tool_results": results,
+        "stopped_reason": (
+            response.execution_trace.get("stopped_reason")
+            if response.execution_trace
+            else None
+        ),
+        "execution_trace": response.execution_trace,
+    }

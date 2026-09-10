@@ -179,7 +179,7 @@ def _operation(
             kind="error",
             status="failed",
             message=message,
-            failure_category=outcome.failure_category,
+            failure_category=_response_failure_category(outcome.failure_category),
         )
     return ChatOperationResult(
         kind="direct_answer",
@@ -210,6 +210,20 @@ def _fallback_message(outcome: AgentLoopOutcome) -> str:
     if outcome.stopped_reason == "insufficient_evidence":
         return "I could not verify enough evidence to complete the request."
     return "The agent completed without a final response."
+
+
+def _response_failure_category(value: str | None) -> str | None:
+    if value == "provider_error":
+        return "provider_api"
+    if value in {
+        "model_capability",
+        "provider_api",
+        "schema_definition",
+        "response_parsing",
+        "context_limit",
+    }:
+        return value
+    return None
 
 
 def _setting(settings: Any, name: str, default: int | float) -> Any:
