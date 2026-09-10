@@ -35,6 +35,18 @@ class CapabilityRoute(BaseModel):
 
 
 ###############################################################################
+class CapabilityRouteDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["accepted", "clarification", "no_capability", "rejected"]
+    route: CapabilityRoute
+    capability_ids: list[str] = Field(default_factory=list, max_length=12)
+    rejected_capability_ids: list[str] = Field(default_factory=list, max_length=8)
+    reason_codes: list[str] = Field(default_factory=list, max_length=16)
+    clarification_question: str | None = Field(default=None, max_length=500)
+
+
+###############################################################################
 class AgentPhase(StrEnum):
     RECEIVE_REQUEST = "receive_request"
     ROUTE_REQUEST = "route_request"
