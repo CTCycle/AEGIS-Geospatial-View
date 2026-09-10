@@ -146,8 +146,10 @@ class ChatTurnResponse(BaseModel):
     request_id: str
     conversation_id: str
     assistant_message: str
-    turn_contract: TurnParseResult
-    decision: PolicyDecision
+    # Legacy parser/policy projections remain readable for legacy mode but are
+    # optional for the native-v2 response contract.
+    turn_contract: TurnParseResult | None = None
+    decision: PolicyDecision | None = None
     operation: ChatOperationResult | None = None
     tool_payload: dict[str, Any] | None = None
     map_session: MapSession | None = None

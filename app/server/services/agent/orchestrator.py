@@ -437,27 +437,20 @@ class AgentOrchestrator:
                 "canonical_request": canonical_request.model_dump(mode="json"),
                 "execution_trace": native_response.execution_trace,
                 "presentation_status": native_response.presentation_status,
+                "tool_results": [
+                    item.model_dump(mode="json")
+                    for item in native_response.tool_results
+                ],
             },
             tool_payload=tool_payload,
             # A native candidate remains uncommitted until the browser proves
             # the exact render, including for direct API compatibility calls.
             map_session=None,
         )
-        decision = AgentResponseBuilder.build_final_decision(
-            action_id=turn_contract.normalized_action.action_id,
-            operation=operation,
-            trace_steps=[
-                "native_v2.route",
-                "native_v2.tool_execution",
-                f"native_v2.stop:{execution_budget.stopping_reason}",
-            ],
-        )
         return ChatTurnResponse(
             request_id=request_id,
             conversation_id=conversation_id,
             assistant_message=native_response.assistant_message,
-            turn_contract=turn_contract,
-            decision=decision,
             operation=operation,
             tool_payload=tool_payload,
             map_session=map_session,

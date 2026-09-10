@@ -7,7 +7,12 @@ from fastapi.testclient import TestClient
 
 from server.api.chat import get_chat_runtime, router
 from server.common.paths import CHAT_STRUCTURED_PROBE_ROUTE, CHAT_TURN_ROUTE
-from server.contracts.chat import ChatTurnRequest, StructuredProbeResponse
+from server.contracts.chat import (
+    ChatOperationResult,
+    ChatTurnRequest,
+    ChatTurnResponse,
+    StructuredProbeResponse,
+)
 
 ###############################################################################
 def _app() -> FastAPI:
@@ -53,6 +58,25 @@ def test_chat_turn_request_rejects_missing_conversation_id() -> None:
         assert "conversation_id" in str(exc)
     else:
         raise AssertionError("conversation_id must be required")
+
+
+def test_native_turn_response_does_not_require_legacy_parser_projections() -> None:
+    response = ChatTurnResponse(
+        request_id="native-1",
+        conversation_id="conv-1",
+        assistant_message="Evidence is ready.",
+        operation=ChatOperationResult(
+            kind="direct_answer",
+            status="success",
+            message="Evidence is ready.",
+        ),
+    )
+
+    assert response.turn_contract is None
+    assert response.decision is None
+    assert "turn_contract" not in response.model_dump(
+        mode="json", exclude_none=True
+    )
 
 
 def test_chat_turn_preflights_conversation_before_orchestrator() -> None:

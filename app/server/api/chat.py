@@ -84,6 +84,7 @@ async def create_chat_job(
 @router.post(
     CHAT_TURN_ROUTE,
     response_model=ChatTurnResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
 )
 async def chat_turn(

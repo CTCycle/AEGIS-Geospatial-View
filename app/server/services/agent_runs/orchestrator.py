@@ -427,7 +427,9 @@ class AgentRunOrchestrator:
                     if response.map_session is not None
                     else None,
                     "operation": response.operation.model_dump(mode="json"),
-                    "decision": response.decision.model_dump(mode="json"),
+                    "decision": response.decision.model_dump(mode="json")
+                    if response.decision is not None
+                    else None,
                     "task_snapshot": response.task_snapshot.model_dump(mode="json")
                     if response.task_snapshot is not None
                     else None,
@@ -440,6 +442,14 @@ class AgentRunOrchestrator:
                     if response.context_usage is not None
                     else None,
                     "execution_trace": response.execution_trace,
+                    "route": response.route.model_dump(mode="json")
+                    if response.route is not None
+                    else None,
+                    "presentation_status": response.presentation_status,
+                    "tool_results": [
+                        item.model_dump(mode="json")
+                        for item in response.tool_results
+                    ],
                 },
             )
             return
@@ -502,7 +512,9 @@ class AgentRunOrchestrator:
                 "operation": response.operation.model_dump(mode="json")
                 if response.operation is not None
                 else None,
-                "decision": response.decision.model_dump(mode="json"),
+                "decision": response.decision.model_dump(mode="json")
+                if response.decision is not None
+                else None,
                 "memory_snapshot": response.memory_snapshot,
                 "context_usage": response.context_usage.model_dump(mode="json")
                 if response.context_usage is not None
@@ -522,6 +534,14 @@ class AgentRunOrchestrator:
                     else None,
                 "context_revision": response.context_revision,
                 "execution_trace": response.execution_trace,
+                "route": response.route.model_dump(mode="json")
+                if response.route is not None
+                else None,
+                "presentation_status": response.presentation_status,
+                "tool_results": [
+                    item.model_dump(mode="json")
+                    for item in response.tool_results
+                ],
             },
         )
 

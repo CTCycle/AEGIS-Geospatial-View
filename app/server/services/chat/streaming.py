@@ -113,22 +113,4 @@ class ChatStreamingService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _serialize_chat_turn_response(response: ChatTurnResponse) -> dict[str, Any]:
-        return {
-            "conversation_id": response.conversation_id,
-            "request_id": response.request_id,
-            "assistant_message": response.assistant_message,
-            "turn_contract": response.turn_contract.model_dump(mode="json"),
-            "decision": response.decision.model_dump(mode="json"),
-            "operation": response.operation.model_dump(mode="json")
-            if response.operation is not None
-            else None,
-            "map_session": response.map_session.model_dump(mode="json")
-            if response.map_session is not None
-            else None,
-            "tool_payload": response.tool_payload,
-            "memory_snapshot": response.memory_snapshot,
-            "context_usage": response.context_usage.model_dump(mode="json")
-            if response.context_usage is not None
-            else None,
-            "execution_trace": response.execution_trace,
-        }
+        return response.model_dump(mode="json", exclude_none=True)

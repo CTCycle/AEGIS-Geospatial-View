@@ -839,8 +839,8 @@ export interface ChatTurnResponse {
   conversation_id: string;
   request_id: string;
   assistant_message: string;
-  turn_contract: TurnParseResult;
-  decision: PolicyDecision;
+  turn_contract?: TurnParseResult | null;
+  decision?: PolicyDecision | null;
   operation?: ChatOperationResult | null;
   tool_payload?: ToolPayload | null;
   map_session?: MapSession | null;
