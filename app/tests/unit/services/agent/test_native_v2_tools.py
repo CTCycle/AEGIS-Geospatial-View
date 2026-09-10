@@ -6,6 +6,8 @@ from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentPhase, AgentState, CapabilityRoute
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.native_v2_tools import register_native_v2_tools
+from server.services.agent.policy_engine import PolicyEngine
+from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.agent.tool_registry import ToolRegistry
 
 
@@ -135,3 +137,33 @@ def test_capability_schema_is_specialized_to_validated_shortlist() -> None:
         "capability_id"
     ]
     assert capability_schema["enum"] == ["places:hospitals"]
+
+
+def test_policy_authorizes_typed_capability_calls_once_against_route_and_runtime() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = _route()
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["places:hospitals"]
+    tool = registry.get("execute_geospatial_capability")
+    assert tool is not None
+    policy = PolicyEngine(
+        location_resolver=FakeResolver(),  # type: ignore[arg-type]
+        capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
+        runtime_registry=FakeRuntimeRegistry(),  # type: ignore[arg-type]
+    )
+
+    allowed = policy.authorize(
+        tool,
+        ExecuteCapabilityInput(capability_id="places:hospitals"),
+        state,
+    )
+    rejected = policy.authorize(
+        tool,
+        ExecuteCapabilityInput(capability_id="places:unknown"),
+        state,
+    )
+
+    assert allowed.allowed is True
+    assert rejected.allowed is False
+    assert rejected.metadata["code"] == "capability_not_shortlisted"
