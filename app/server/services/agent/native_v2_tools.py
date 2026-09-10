@@ -152,13 +152,19 @@ def register_native_v2_tools(
         ),
         _registration(
             name="apply_map_plan",
-            description="Prepare a typed map candidate from validated evidence.",
+            description=(
+                "Prepare a typed map candidate from validated location and evidence; "
+                "the server supplies the catalog default basemap when a new map "
+                "omits one."
+            ),
             input_model=ApplyMapPlanInput,
             handler=_apply_map_plan_handler(map_plan),
             domains=_MAP,
             phases=_MODEL_PHASE,
             visibility="model",
-            prerequisites=frozenset({"route", "location", "evidence"}),
+            # A location-only map is a valid candidate: it can contain a
+            # validated basemap and viewport without fabricating a data layer.
+            prerequisites=frozenset({"route", "location"}),
             idempotent=False,
         ),
     )
