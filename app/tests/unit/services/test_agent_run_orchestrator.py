@@ -216,6 +216,9 @@ def test_execute_run_marks_failed_operation_as_failed_run() -> None:
         event for event in publisher.events if event["type"] == RunEventType.ERROR
     )
     assert error_event["payload"]["context_usage"]["estimated_input_tokens"] == 321
+    assert error_event["payload"]["route"] is None
+    assert error_event["payload"]["presentation_status"] == "not_requested"
+    assert error_event["payload"]["tool_results"] == []
     context_event = next(
         event
         for event in publisher.events
