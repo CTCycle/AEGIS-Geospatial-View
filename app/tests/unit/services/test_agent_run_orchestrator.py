@@ -6,12 +6,17 @@ from server.services.geospatial.providers.base import ProviderAuthError
 from tests.conftest import run_async_in_thread
 from datetime import UTC, datetime
 
-from server.domain.agent.decision import PolicyDecision
+from server.domain.agent.decision import PolicyDecision, ResolvedLocation
 from server.contracts.runs import AgentRunSnapshot, AgentRunState
 from server.contracts.chat import (
     ChatOperationResult,
     ChatTurnResponse,
     ContextUsageResponse,
+)
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    ViewportPolicy,
 )
 from server.contracts.events import RunEventType
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
@@ -49,6 +54,7 @@ class _FakeRunRepository:
         self.snapshot = snapshot
         self.completed = False
         self.failed: tuple[str, str] | None = None
+        self.prepared: dict[str, object] | None = None
 
     # -------------------------------------------------------------------------
     def get_run(self, run_id: str) -> AgentRunSnapshot | None:
@@ -84,6 +90,25 @@ class _FakeRunRepository:
     ) -> tuple[AgentRunSnapshot, bool]:
         assert expected_run_version == self.snapshot.active_run_version
         return self.mark_completed(run_id), True
+
+    # -------------------------------------------------------------------------
+    def prepare_render(
+        self,
+        run_id: str,
+        expected_run_version: int,
+        presentation: dict[str, object],
+    ) -> tuple[AgentRunSnapshot, bool]:
+        assert run_id == self.snapshot.run_id
+        assert expected_run_version == self.snapshot.active_run_version
+        self.prepared = presentation
+        self.snapshot = self.snapshot.model_copy(
+            update={
+                "state": AgentRunState.AWAITING_RENDER,
+                "presentation_status": "pending",
+                "presentation": presentation,
+            }
+        )
+        return self.snapshot, True
 
     # -------------------------------------------------------------------------
     def mark_failed(self, run_id: str, code: str, message: str) -> AgentRunSnapshot:
@@ -127,6 +152,47 @@ class _FakeEventPublisher:
     # -------------------------------------------------------------------------
     async def publish(self, **kwargs):  # noqa: ANN003
         self.events.append(kwargs)
+
+###############################################################################
+class _FakeRenderCompletionService:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, run_repository: _FakeRunRepository) -> None:
+        self.run_repository = run_repository
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def has_blocking_data_failure(_map_session: MapSession) -> bool:
+        return False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def requires_browser_ack(_map_session: MapSession) -> bool:
+        return True
+
+    # -------------------------------------------------------------------------
+    def prepare(
+        self,
+        *,
+        run_id: str,
+        run_version: int,
+        response_payload: dict[str, object],
+    ) -> tuple[dict[str, object], bool]:
+        map_session = response_payload["map_session"]
+        assert isinstance(map_session, dict)
+        presentation = {
+            "status": "pending",
+            "map_session_id": map_session["session_id"],
+            "collection_revision": map_session["overlay_collection"]["revision"],
+            "run_id": run_id,
+            "run_version": run_version,
+        }
+        _snapshot, transitioned = self.run_repository.prepare_render(
+            run_id,
+            run_version,
+            presentation,
+        )
+        return presentation, transitioned
 
 ###############################################################################
 def _snapshot() -> AgentRunSnapshot:
@@ -192,6 +258,36 @@ def _failed_response() -> ChatTurnResponse:
     )
 
 ###############################################################################
+def _pending_map_response() -> ChatTurnResponse:
+    map_session = MapSession(
+        session_id="map_1",
+        resolved_location=ResolvedLocation(
+            label="Rome",
+            latitude=41.9028,
+            longitude=12.4964,
+        ),
+        basemap_id="osm_default",
+        viewport=ViewportPolicy(
+            center_latitude=41.9028,
+            center_longitude=12.4964,
+        ),
+        center={"latitude": 41.9028, "longitude": 12.4964},
+        overlay_collection=OverlayCollectionState(revision=0),
+    )
+    return ChatTurnResponse(
+        request_id="run_1",
+        conversation_id="conv_1",
+        assistant_message="The map candidate is awaiting render acknowledgment.",
+        operation=ChatOperationResult(
+            kind="map_session",
+            status="pending",
+            message="The map candidate is awaiting render acknowledgment.",
+        ),
+        map_session=map_session,
+        presentation_status="prepared",
+    )
+
+###############################################################################
 def test_execute_run_marks_failed_operation_as_failed_run() -> None:
     repository = _FakeRunRepository(_snapshot())
     publisher = _FakeEventPublisher()
@@ -225,6 +321,32 @@ def test_execute_run_marks_failed_operation_as_failed_run() -> None:
         if event["type"] == RunEventType.CONTEXT_USAGE
     )
     assert context_event["payload"]["phase"] == "parser"
+
+###############################################################################
+def test_execute_run_defers_pending_native_map_until_render_ack() -> None:
+    repository = _FakeRunRepository(_snapshot())
+    publisher = _FakeEventPublisher()
+    orchestrator = AgentRunOrchestrator(
+        agent_orchestrator=_FakeAgentOrchestrator(_pending_map_response()),  # type: ignore[arg-type]
+        run_repository=repository,  # type: ignore[arg-type]
+        event_publisher=publisher,  # type: ignore[arg-type]
+        conversation_repository=object(),  # type: ignore[arg-type]
+        render_completion_service=_FakeRenderCompletionService(repository),  # type: ignore[arg-type]
+        defer_map_completion=True,
+    )
+
+    run_async_in_thread(orchestrator.execute_run("run_1"))
+
+    assert repository.completed is False
+    assert repository.failed is None
+    assert repository.snapshot.state is AgentRunState.AWAITING_RENDER
+    assert repository.snapshot.presentation_status == "pending"
+    assert repository.prepared is not None
+    map_prepared = next(
+        event for event in publisher.events if event["type"] == RunEventType.MAP_PREPARED
+    )
+    assert map_prepared["payload"]["presentation"]["map_session_id"] == "map_1"
+    assert not any(event["type"] == RunEventType.COMPLETED for event in publisher.events)
 
 ###############################################################################
 def test_execute_run_includes_context_usage_in_clarification_event() -> None:

@@ -207,7 +207,7 @@ class AgentRunOrchestrator:
             and response.map_session is not None
             and response.operation is not None
             and response.operation.kind == "map_session"
-            and response.operation.status in {"success", "partial"}
+            and response.operation.status in {"success", "partial", "pending"}
         ):
             if self.render_completion_service.has_blocking_data_failure(
                 response.map_session
@@ -296,7 +296,7 @@ class AgentRunOrchestrator:
             and response.map_session is not None
             and response.operation is not None
             and response.operation.kind == "map_session"
-            and response.operation.status in {"success", "partial"}
+            and response.operation.status in {"success", "partial", "pending"}
         ):
             final_response_payload = response.model_dump(mode="json")
             if response.canonical_request is not None:
