@@ -281,3 +281,38 @@ def test_shadow_preview_exposes_route_tools_without_provider_or_tool_execution()
     assert preview.exposed_tool_names == ["test_tool"]
     assert provider.requests == []
     assert state.tool_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_map_route_text_cannot_stop_before_a_map_candidate_exists() -> None:
+    provider = FakeProvider(
+        [
+            LLMResult(
+                content="",
+                tool_calls=[
+                    LLMToolCall(
+                        id="route-map",
+                        name="route_request",
+                        arguments={
+                            "primary_domain": "map_rendering",
+                            "task_mode": "execute",
+                            "presentation": "map",
+                            "requires_location": False,
+                            "capability_queries": ["basemap"],
+                        },
+                    )
+                ],
+            ),
+            LLMResult(content="I prepared the map."),
+        ]
+    )
+    outcome = await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        )
+    )
+
+    assert outcome.stopped_reason == "insufficient_evidence"
