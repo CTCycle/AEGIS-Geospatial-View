@@ -16,6 +16,7 @@ from server.services.agent.agent_loop import AgentLoop, AgentLoopRequest
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.llm.errors import LLMProviderRequestError
 
 
 class FakeProvider:
@@ -256,6 +257,46 @@ async def test_successful_duplicate_call_replays_without_external_tool_execution
     assert outcome.final_text == "Duplicate handled."
     assert outcome.state.tool_calls == 1
     assert len(outcome.tool_results) == 2
+
+
+class RetryThenUnexpectedProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def achat(self, request: Any, **kwargs: Any) -> LLMResult:
+        self.calls += 1
+        if self.calls == 1:
+            raise LLMProviderRequestError(
+                provider="fake",
+                model="fake-model",
+                stage="chat",
+                code="temporary_failure",
+                retryable=True,
+            )
+        raise AssertionError("The model retry exceeded the run deadline.")
+
+
+@pytest.mark.asyncio
+async def test_model_retry_cannot_restart_after_run_deadline() -> None:
+    provider = RetryThenUnexpectedProvider()
+    loop = _loop(provider)  # type: ignore[arg-type]
+    request = AgentLoopRequest(
+        provider="fake",
+        model="fake-model",
+        state=_state(),
+        budget=AgentExecutionBudget(total_seconds=0.03, hard_max_seconds=0.03),
+    )
+
+    with pytest.raises(TimeoutError):
+        await loop._model_call(  # pyright: ignore[reportPrivateUsage]
+            request,
+            provider,  # type: ignore[arg-type]
+            [],
+            [],
+            tool_choice="none",
+        )
+
+    assert provider.calls == 1
 
 
 def test_shadow_preview_exposes_route_tools_without_provider_or_tool_execution() -> None:
