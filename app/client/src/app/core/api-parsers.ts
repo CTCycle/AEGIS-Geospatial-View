@@ -1393,13 +1393,19 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     ? undefined
     : requireApiArray(record.tool_results, endpoint, 'tool_results')
       .map((item, index) => parseNativeToolResult(item, endpoint, index));
+  const turnContract = record.turn_contract === undefined || record.turn_contract === null
+    ? record.turn_contract ?? undefined
+    : requireRecord(record.turn_contract, 'turn_contract') as unknown as ChatTurnResponse['turn_contract'];
+  const decision = record.decision === undefined || record.decision === null
+    ? record.decision ?? undefined
+    : requireRecord(record.decision, 'decision') as unknown as ChatTurnResponse['decision'];
 
   return {
     conversation_id: requireString(record.conversation_id, 'conversation_id'),
     request_id: requireString(record.request_id, 'request_id'),
     assistant_message: requireString(record.assistant_message, 'assistant_message'),
-    turn_contract: requireRecord(record.turn_contract, 'turn_contract') as unknown as ChatTurnResponse['turn_contract'],
-    decision: requireRecord(record.decision, 'decision') as unknown as ChatTurnResponse['decision'],
+    turn_contract: turnContract,
+    decision,
     operation: operation as unknown as ChatTurnResponse['operation'],
     tool_payload: toolPayload as ChatTurnResponse['tool_payload'],
     map_session: mapSession,

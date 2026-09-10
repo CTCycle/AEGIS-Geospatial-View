@@ -385,32 +385,44 @@ describe('core/api', () => {
       payload: {
         conversation_id: 'conv-1',
         assistant_message: 'ok',
-        turn_contract: {},
-        decision: {},
-      },
-    },
-    {
-      label: 'turn_contract',
-      payload: {
-        request_id: 'chat-1',
-        conversation_id: 'conv-1',
-        assistant_message: 'ok',
-        decision: {},
-      },
-    },
-    {
-      label: 'decision',
-      payload: {
-        request_id: 'chat-1',
-        conversation_id: 'conv-1',
-        assistant_message: 'ok',
-        turn_contract: {},
       },
     },
   ].forEach(({ label, payload }) => {
     it(`parseChatTurnResponse rejects missing ${label}`, () => {
       expect(() => parseChatTurnResponse(payload)).toThrow();
     });
+  });
+
+  it('accepts native-v2 responses without legacy parser and policy projections', () => {
+    const parsed = parseChatTurnResponse({
+      conversation_id: 'conv-native',
+      request_id: 'chat-native',
+      assistant_message: 'The evidence is ready.',
+      memory_snapshot: {},
+      operation: {
+        kind: 'direct_answer',
+        status: 'success',
+        message: 'The evidence is ready.',
+        warnings: [],
+      },
+      route: {
+        primary_domain: 'data_retrieval',
+        secondary_domains: [],
+        task_mode: 'execute',
+        presentation: 'text',
+        requires_location: false,
+        capability_queries: ['evidence'],
+        explicit_capability_ids: [],
+        clarification_question: null,
+      },
+      presentation_status: 'not_requested',
+      tool_results: [],
+      execution_trace: { stopped_reason: 'goal_satisfied' },
+    });
+
+    expect(parsed.turn_contract).toBeUndefined();
+    expect(parsed.decision).toBeUndefined();
+    expect(parsed.route?.task_mode).toBe('execute');
   });
 
   it('buildApiError builds ApiRequestError', async () => {
