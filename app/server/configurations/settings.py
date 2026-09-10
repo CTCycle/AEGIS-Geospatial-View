@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -69,11 +69,31 @@ class AgentExecutionSettings:
     location_resolution_seconds: float = 30.0
     native_model_call_seconds: float = 60.0
     tool_idle_seconds: float = 45.0
+    tool_execution_seconds: float = 45.0
     tool_absolute_seconds: float = 90.0
     map_assembly_seconds: float = 20.0
     synthesis_seconds: float = 30.0
     persistence_seconds: float = 5.0
     render_ack_seconds: float = 90.0
+    max_tool_result_chars: int = 4096
+    max_iterations: int = 12
+    simple_max_model_calls: int = 4
+    complex_max_model_calls: int = 10
+    simple_max_tool_calls: int = 6
+    complex_max_tool_calls: int = 20
+    simple_max_state_transitions: int = 10
+    complex_max_state_transitions: int = 32
+    max_parallel_tool_calls: int = 8
+    max_consecutive_tool_failures: int = 3
+    max_same_failed_fingerprint: int = 2
+    max_route_corrections: int = 1
+    max_validation_corrections: int = 2
+    model_max_attempts: int = 2
+    provider_max_attempts: int = 2
+    retry_backoff_base_seconds: float = 0.25
+    retry_backoff_max_seconds: float = 2.0
+    provider_request_seconds: float = 10.0
+    agent_loop_mode: Literal["legacy", "shadow", "native_v2"] = "legacy"
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -189,11 +209,31 @@ class JsonAgentExecutionSettings(StrictJsonSettings):
     location_resolution_seconds: float = Field(default=30.0, ge=0.1)
     native_model_call_seconds: float = Field(default=60.0, ge=0.1)
     tool_idle_seconds: float = Field(default=45.0, ge=0.1, le=45.0)
+    tool_execution_seconds: float = Field(default=45.0, ge=0.1, le=90.0)
     tool_absolute_seconds: float = Field(default=90.0, ge=0.1, le=90.0)
     map_assembly_seconds: float = Field(default=20.0, ge=0.1)
     synthesis_seconds: float = Field(default=30.0, ge=0.1)
     persistence_seconds: float = Field(default=5.0, ge=0.1)
     render_ack_seconds: float = Field(default=90.0, ge=0.1, le=90.0)
+    max_tool_result_chars: int = Field(default=4096, ge=128, le=100000)
+    max_iterations: int = Field(default=12, ge=1, le=100)
+    simple_max_model_calls: int = Field(default=4, ge=1, le=100)
+    complex_max_model_calls: int = Field(default=10, ge=1, le=100)
+    simple_max_tool_calls: int = Field(default=6, ge=1, le=200)
+    complex_max_tool_calls: int = Field(default=20, ge=1, le=500)
+    simple_max_state_transitions: int = Field(default=10, ge=1, le=500)
+    complex_max_state_transitions: int = Field(default=32, ge=1, le=1000)
+    max_parallel_tool_calls: int = Field(default=8, ge=1, le=32)
+    max_consecutive_tool_failures: int = Field(default=3, ge=1, le=20)
+    max_same_failed_fingerprint: int = Field(default=2, ge=1, le=20)
+    max_route_corrections: int = Field(default=1, ge=0, le=10)
+    max_validation_corrections: int = Field(default=2, ge=0, le=20)
+    model_max_attempts: int = Field(default=2, ge=1, le=10)
+    provider_max_attempts: int = Field(default=2, ge=1, le=10)
+    retry_backoff_base_seconds: float = Field(default=0.25, ge=0.0, le=60.0)
+    retry_backoff_max_seconds: float = Field(default=2.0, ge=0.0, le=120.0)
+    provider_request_seconds: float = Field(default=10.0, ge=0.1, le=120.0)
+    agent_loop_mode: Literal["legacy", "shadow", "native_v2"] = "legacy"
 
 ###############################################################################
 class JsonOpenMeteoSettings(StrictJsonSettings):
@@ -364,11 +404,31 @@ class AppSettings(BaseSettings):
                 location_resolution_seconds=self.agent_execution.location_resolution_seconds,
                 native_model_call_seconds=self.agent_execution.native_model_call_seconds,
                 tool_idle_seconds=self.agent_execution.tool_idle_seconds,
+                tool_execution_seconds=self.agent_execution.tool_execution_seconds,
                 tool_absolute_seconds=self.agent_execution.tool_absolute_seconds,
                 map_assembly_seconds=self.agent_execution.map_assembly_seconds,
                 synthesis_seconds=self.agent_execution.synthesis_seconds,
                 persistence_seconds=self.agent_execution.persistence_seconds,
                 render_ack_seconds=self.agent_execution.render_ack_seconds,
+                max_tool_result_chars=self.agent_execution.max_tool_result_chars,
+                max_iterations=self.agent_execution.max_iterations,
+                simple_max_model_calls=self.agent_execution.simple_max_model_calls,
+                complex_max_model_calls=self.agent_execution.complex_max_model_calls,
+                simple_max_tool_calls=self.agent_execution.simple_max_tool_calls,
+                complex_max_tool_calls=self.agent_execution.complex_max_tool_calls,
+                simple_max_state_transitions=self.agent_execution.simple_max_state_transitions,
+                complex_max_state_transitions=self.agent_execution.complex_max_state_transitions,
+                max_parallel_tool_calls=self.agent_execution.max_parallel_tool_calls,
+                max_consecutive_tool_failures=self.agent_execution.max_consecutive_tool_failures,
+                max_same_failed_fingerprint=self.agent_execution.max_same_failed_fingerprint,
+                max_route_corrections=self.agent_execution.max_route_corrections,
+                max_validation_corrections=self.agent_execution.max_validation_corrections,
+                model_max_attempts=self.agent_execution.model_max_attempts,
+                provider_max_attempts=self.agent_execution.provider_max_attempts,
+                retry_backoff_base_seconds=self.agent_execution.retry_backoff_base_seconds,
+                retry_backoff_max_seconds=self.agent_execution.retry_backoff_max_seconds,
+                provider_request_seconds=self.agent_execution.provider_request_seconds,
+                agent_loop_mode=self.agent_execution.agent_loop_mode,
             ),
             openmeteo=OpenMeteoSettings(
                 weather_base_url=self.openmeteo.weather_base_url,

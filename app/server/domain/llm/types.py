@@ -130,7 +130,8 @@ class LLMToolDefinition:
 class LLMToolCall:
     id: str | None = None
     name: str = ""
-    arguments: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+    arguments: dict[str, Any] | None = None
+    parse_error: str | None = None
 
 ###############################################################################
 @dataclass(frozen=True)

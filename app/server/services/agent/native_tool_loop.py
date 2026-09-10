@@ -542,6 +542,32 @@ class NativeToolLoop:
                 )
             results_list: list[LLMToolResult] = []
             for call in tool_calls:
+                if call.parse_error is not None or call.arguments is None:
+                    # Preserve provider-frame failures as a typed tool result.
+                    # Malformed JSON must never become an empty argument object
+                    # that can reach a real handler.
+                    message = "The model returned malformed tool-call arguments."
+                    results_list.append(
+                        LLMToolResult(
+                            tool_call_id=call.id,
+                            name=call.name,
+                            content={
+                                "ok": False,
+                                "data": None,
+                                "error": {
+                                    "code": "malformed_call",
+                                    "message": message,
+                                },
+                                "metadata": {
+                                    "parse_error": call.parse_error
+                                    or "arguments_missing"
+                                },
+                            },
+                            is_error=True,
+                            error=message,
+                        )
+                    )
+                    continue
                 bound_call, bind_error = self._bind_geospatial_call(call, context)
                 if bind_error is not None:
                     results_list.append(
@@ -779,7 +805,8 @@ class NativeToolLoop:
         context.metadata["native_bound_step_id"] = None
         if call.name != "execute_geospatial_capability":
             return call, None
-        capability_id = str(call.arguments.get("capability_id") or "").strip()
+        arguments = call.arguments or {}
+        capability_id = str(arguments.get("capability_id") or "").strip()
         raw_steps = context.metadata.get("tool_plan_steps")
         if not is_json_array(raw_steps):
             return call, None
@@ -1027,7 +1054,7 @@ class NativeToolLoop:
                 ):
                     envelope = await asyncio.wait_for(
                         self.tool_registry.execute_native_tool(
-                            call.name, call.arguments, context
+                            call.name, call.arguments or {}, context
                         ),
                         timeout=max(0.001, timeout),
                     )
@@ -1183,15 +1210,14 @@ class NativeToolLoop:
                     ),
                     None,
                 )
-        capability_id = (
-            str(call.arguments.get("capability_id") or "").strip() or None
-        )
+        arguments = call.arguments or {}
+        capability_id = str(arguments.get("capability_id") or "").strip() or None
         step = ToolPlanStep(
             step_id=f"native:{call.id}",
             tool_name=call.name,
             capability_id=capability_id,
             reason="Native geospatial call validated against the canonical request.",
-            arguments=dict(call.arguments),
+            arguments=dict(arguments),
             target_id=target_id,
             analysis_scope=analysis_scope,
         )
@@ -1258,7 +1284,7 @@ class NativeToolLoop:
         ):
             return f"Tool '{call.name}' is not allowed by policy constraints."
         if call.name == "execute_geospatial_capability":
-            capability_id = str(call.arguments.get("capability_id") or "")
+            capability_id = str((call.arguments or {}).get("capability_id") or "")
             allowed_capabilities = constraints.get("allowed_capability_ids")
             if (
                 is_json_array(allowed_capabilities)
@@ -1267,7 +1293,7 @@ class NativeToolLoop:
             ):
                 return f"Capability '{capability_id}' is not allowed by policy constraints."
         if call.name == "fetch_geospatial_provider_layers":
-            provider_id = str(call.arguments.get("provider_id") or "").lower()
+            provider_id = str((call.arguments or {}).get("provider_id") or "").lower()
             allowed_providers = constraints.get("allowed_provider_ids")
             if not is_json_array(allowed_providers) or provider_id not in set(
                 map(str, allowed_providers)
