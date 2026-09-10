@@ -30,9 +30,11 @@ def run_startup_validations(credentials_repo: CredentialRepository) -> None:
     ):
         for item in getattr(catalog_snapshot, collection_name):
             capability_id = str(item.get("id") or "").strip()
+            agentic_use = item.get("agenticUse")
             if (
                 capability_id
-                and runtime_registry.is_enabled(capability_id)
+                and is_json_object(agentic_use)
+                and bool(agentic_use.get("defaultEnabled"))
                 and not is_json_object(item.get("executionContract"))
             ):
                 missing_execution_contracts.append(capability_id)
