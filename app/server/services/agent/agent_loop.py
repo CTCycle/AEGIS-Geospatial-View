@@ -329,8 +329,6 @@ class AgentLoop:
         tool_choice: str,
     ) -> LLMResult:
         request.budget.ensure_available("model_step")
-        remaining = request.budget.remaining_seconds()
-        timeout = min(max(0.01, remaining), max(0.01, request.max_model_call_seconds))
         llm_request = LLMRequest(
             model=request.model,
             provider=request.provider,
@@ -343,6 +341,12 @@ class AgentLoop:
         attempts = 0
         while True:
             attempts += 1
+            request.budget.ensure_available("model_step")
+            remaining = request.budget.remaining_seconds()
+            timeout = min(
+                remaining,
+                max(0.01, request.max_model_call_seconds),
+            )
             request.state.model_calls += 1
             request.budget.record_model_call()
             try:
@@ -358,7 +362,11 @@ class AgentLoop:
                 if not exc.retryable or attempts >= 2:
                     raise
                 request.budget.record_retry()
-                await asyncio.sleep(min(0.25, request.budget.remaining_seconds()))
+                request.budget.ensure_available("model_retry")
+                await asyncio.sleep(
+                    min(0.25, request.budget.remaining_seconds())
+                )
+                request.budget.ensure_available("model_retry")
 
     # -------------------------------------------------------------------------
     async def _execute_calls(
