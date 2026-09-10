@@ -115,6 +115,27 @@ describe('realtime parsers', () => {
       },
       map_session: { session_id: 42 },
       task_snapshot: { conversation_key: 'conversation-1', tasks: [{ malformed: true }] },
+      route: {
+        primary_domain: 'data_retrieval',
+        secondary_domains: [],
+        task_mode: 'execute',
+        presentation: 'text',
+        requires_location: false,
+        capability_queries: ['evidence'],
+        explicit_capability_ids: [],
+        clarification_question: null,
+      },
+      presentation_status: 'not_requested',
+      tool_results: [{
+        call_id: 'call-1',
+        tool_name: 'execute_geospatial_capability',
+        status: 'success',
+        summary: 'Evidence fetched.',
+        evidence_refs: ['evidence-1'],
+        map_candidate_id: null,
+        error: null,
+      }],
+      execution_trace: { stopped_reason: 'goal_satisfied' },
     });
 
     expect(parsed.contextRevision).toBe(3);
@@ -125,5 +146,10 @@ describe('realtime parsers', () => {
     expect(parsed.decision?.plan.action_id).toBe('location_lookup');
     expect(parsed.mapSession).toBeUndefined();
     expect(parsed.taskSnapshot).toBeUndefined();
+    expect(parsed.route?.primary_domain).toBe('data_retrieval');
+    expect(parsed.presentationStatus).toBe('not_requested');
+    expect(parsed.toolResults?.[0].evidence_refs).toEqual(['evidence-1']);
+    const executionTrace: Record<string, unknown> = parsed.executionTrace ?? {};
+    expect(executionTrace['stopped_reason']).toBe('goal_satisfied');
   });
 });
