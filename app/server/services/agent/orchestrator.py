@@ -640,13 +640,20 @@ class AgentOrchestrator:
         )
         response = self._with_phase_usage(response)
         execution_budget.pipeline_reach["response_synthesis"] = "success"
+        # Native-v2 map sessions are always candidates.  The direct chat API
+        # cannot provide browser render evidence, so a native candidate must
+        # remain outside durable active-map state even when the legacy request
+        # flag is left at its default value.
+        defer_map_commit = payload.defer_map_commit or (
+            self._agent_loop_mode() == "native_v2" and response.map_session is not None
+        )
         task_snapshot_for_persistence = self._task_snapshot_for_persistence(
             self.task_state_service.serialize(conversation_id),
             persisted.get("task_snapshot"),
-            defer_map_commit=payload.defer_map_commit,
+            defer_map_commit=defer_map_commit,
             has_map_candidate=response.map_session is not None,
         )
-        if payload.defer_map_commit and response.map_session is not None:
+        if defer_map_commit and response.map_session is not None:
             # Keep the candidate in the run response, but never make it the
             # conversation's active visualization before browser validation.
             # The map assembler updates the in-memory task state while it
@@ -689,7 +696,7 @@ class AgentOrchestrator:
             if response.operation is not None and response.operation.kind == "clarification":
                 execution_budget.terminal_reason = "clarification_required"
             elif (
-                payload.defer_map_commit
+                defer_map_commit
                 and response.map_session is not None
                 and response.operation is not None
                 and response.operation.kind == "map_session"
