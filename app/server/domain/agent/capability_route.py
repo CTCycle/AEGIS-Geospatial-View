@@ -14,22 +14,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.contracts.geospatial import MapSession
+from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.domain.agent.tool_result import ToolResult
-
-
-###############################################################################
-class CapabilityDomain(StrEnum):
-    CONVERSATION = "conversation"
-    PLACE_SEARCH = "place_search"
-    DATA_RETRIEVAL = "data_retrieval"
-    SPATIAL_ANALYSIS = "spatial_analysis"
-    ROUTING = "routing"
-    MAP_RENDERING = "map_rendering"
-    MAP_STATE = "map_state"
-    PROVIDER_DISCOVERY = "provider_discovery"
-    MIXED = "mixed"
 
 
 ###############################################################################

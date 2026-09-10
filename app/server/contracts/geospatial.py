@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from server.common.time import utc_now
 from server.contracts.extraction import ViewportIntent
+from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.decision import ResolvedLocation
 
 TimeMode = Literal["current", "historical", "forecast"]
@@ -377,6 +378,9 @@ class AgenticUsePolicy(BaseModel):
     default_enabled: bool = Field(alias="defaultEnabled")
     manual_toggle: bool = Field(alias="manualToggle")
     planner_hints: list[str] = Field(default_factory=list, alias="plannerHints")
+    domains: list[CapabilityDomain] = Field(default_factory=list)
+    intent_tags: list[str] = Field(default_factory=list, alias="intentTags")
+    dependencies: list[str] = Field(default_factory=list)
     required_user_action: list[str] = Field(
         default_factory=list, alias="requiredUserAction"
     )
