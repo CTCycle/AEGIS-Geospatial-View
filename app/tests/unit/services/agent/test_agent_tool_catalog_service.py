@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from tests.conftest import run_async_in_thread
 from types import SimpleNamespace
 from typing import Any
@@ -464,6 +466,30 @@ def test_capability_description_includes_executable_schema() -> None:
     service = _service()
     descriptor = service.describe_geospatial_capability("coordinates_tool")
     assert descriptor["argument_schema"]["required"] == ["location"]
+
+###############################################################################
+def test_capability_without_argument_schema_fails_closed() -> None:
+    service = _service()
+    service.capability_registry.capabilities.append(
+        {
+            "id": "schema_less_tool",
+            "name": "Schema-less Tool",
+            "description": "Missing executable schema",
+            "provider": "test",
+            "type": "direct-tool",
+            "capabilityKind": "analysis-tool",
+            "metadata": {},
+        }
+    )
+
+    with pytest.raises(ValueError, match="does not declare an executable argument schema"):
+        service.describe_geospatial_capability("schema_less_tool")
+
+    result = run_async_in_thread(
+        service.execute_geospatial_capability("schema_less_tool", {})
+    )
+    assert result["ok"] is False
+    assert result["error"]["code"] == "missing_argument_schema"
 
 ###############################################################################
 def test_execute_rejects_invalid_nested_arguments() -> None:
