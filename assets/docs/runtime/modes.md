@@ -1,6 +1,6 @@
 # Runtime Modes
 
-Last updated: 2026-08-02
+Last updated: 2026-09-10
 
 ## Supported Modes
 
@@ -15,6 +15,16 @@ Last updated: 2026-08-02
 
 - Orchestrator: `app/tests/run_tests.bat`
 - Starts backend and frontend, then runs pytest and browser validation
+
+### Agent Loop Rollout
+
+`agent_execution.agent_loop_mode` controls the temporary migration boundary:
+
+- `legacy` (default) retains the parser/planner compatibility path.
+- `shadow` computes native exposure without external model, provider, evidence,
+  or map execution.
+- `native_v2` runs the typed route-first native loop. Direct map responses remain
+  `prepared_unverified` until a realtime browser acknowledgment path is used.
 
 ### Browser Validation Tooling
 
