@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentPhase, AgentState, CapabilityRoute
 from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
+from server.services.agent.capability_execution import ToolExecutionContext
 from server.services.agent.native_v2_tools import register_native_v2_tools
+from server.services.agent.native_v2_tools import _execute_capability_handler
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.agent.tool_registry import ToolRegistry
@@ -46,6 +51,27 @@ class FakeEvidenceRepository:
     pass
 
 
+class FakeCapabilityExecutionService:
+    def __init__(self) -> None:
+        self.context: ToolExecutionContext | None = None
+
+    async def execute_capability(
+        self,
+        _request: ExecuteCapabilityInput,
+        context: ToolExecutionContext,
+        *,
+        location: ResolvedLocation | None = None,
+    ) -> ToolResult:
+        self.context = context
+        return ToolResult(
+            call_id=context.call_id,
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="ok",
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+
+
 def _registry() -> ToolRegistry:
     runtime = FakeRuntimeRegistry()
     registry = ToolRegistry(runtime_registry=runtime)  # type: ignore[arg-type]
@@ -67,6 +93,37 @@ def _state() -> AgentState:
         phase=AgentPhase.ROUTE_REQUEST,
         user_message="show hospitals",
     )
+
+
+@pytest.mark.asyncio
+async def test_capability_handler_uses_persisted_run_id_not_request_id() -> None:
+    service = FakeCapabilityExecutionService()
+    state = _state()
+    state.run_id = "run-1"
+
+    result = await _execute_capability_handler(service)(
+        ExecuteCapabilityInput(capability_id="places:hospitals"),
+        state,
+    )
+
+    assert result.status == "success"
+    assert service.context is not None
+    assert service.context.run_id == "run-1"
+    assert service.context.run_id != state.request_id
+
+
+@pytest.mark.asyncio
+async def test_compatibility_state_has_no_foreign_run_id() -> None:
+    service = FakeCapabilityExecutionService()
+    state = _state()
+
+    await _execute_capability_handler(service)(
+        ExecuteCapabilityInput(capability_id="places:hospitals"),
+        state,
+    )
+
+    assert service.context is not None
+    assert service.context.run_id is None
 
 
 def _route() -> CapabilityRoute:

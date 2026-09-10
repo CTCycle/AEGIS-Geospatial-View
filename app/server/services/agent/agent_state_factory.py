@@ -17,6 +17,7 @@ class AgentStateFactory:
     def create(
         *,
         request_id: str,
+        run_id: str | None = None,
         conversation_id: str,
         user_message: str,
         active_map_session: MapSession | None = None,
@@ -30,6 +31,7 @@ class AgentStateFactory:
             raise ValueError("Agent requests require request and conversation IDs.")
         return AgentState(
             request_id=str(request_id),
+            run_id=str(run_id) if run_id is not None else None,
             conversation_id=str(conversation_id),
             phase=AgentPhase.RECEIVE_REQUEST,
             user_message=normalized_message,
