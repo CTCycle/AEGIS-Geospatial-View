@@ -65,6 +65,43 @@ def test_shared_http_rejects_redirects_and_limits_response_bytes(monkeypatch) ->
         )
 
 ###############################################################################
+def test_shared_http_uses_scoped_remaining_timeout(monkeypatch) -> None:
+    timeouts: list[float | None] = []
+
+    ###############################################################################
+    class _Response:
+        status_code = 200
+        headers = {"content-length": "2"}
+
+        # -------------------------------------------------------------------------
+        async def __aenter__(self):
+            return self
+
+        # -------------------------------------------------------------------------
+        async def __aexit__(self, *args):
+            return None
+
+        # -------------------------------------------------------------------------
+        async def aiter_bytes(self):
+            yield b"ok"
+
+    ###############################################################################
+    class _Client:
+
+        # -------------------------------------------------------------------------
+        def stream(self, *args, **kwargs):
+            timeouts.append(kwargs.get("timeout"))
+            return _Response()
+
+    async def _fetch() -> bytes:
+        with provider_http.request_timeout_scope(0.37):
+            return await provider_http.fetch_bytes_url("https://example.test/data")
+
+    monkeypatch.setattr(provider_http, "_ASYNC_HTTP_CLIENT", _Client())
+    assert run_async_in_thread(_fetch()) == b"ok"
+    assert timeouts == [pytest.approx(0.37)]
+
+###############################################################################
 def test_shared_http_preserves_retry_after_without_exposing_headers() -> None:
     with pytest.raises(ProviderRateLimitError) as error:
         provider_http._raise_for_status(
