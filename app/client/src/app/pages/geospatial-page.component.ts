@@ -950,6 +950,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           const message = String(event.payload['message'] ?? 'Failed');
           const errorCode = this.readString(event.payload['code']);
           const presentationStatus = this.readString(event.payload['presentation_status']);
+          if (parsed.operation !== undefined) {
+            this.lastOperation = parsed.operation;
+          }
+          if (parsed.presentationStatus !== undefined) {
+            this.presentationStatus = parsed.presentationStatus;
+          }
           if (presentationStatus === 'failed'
             || presentationStatus === 'render_timeout'
             || errorCode === 'render_failed'
