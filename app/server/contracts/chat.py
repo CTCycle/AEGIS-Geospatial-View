@@ -160,6 +160,13 @@ class ChatTurnResponse(BaseModel):
     context_revision: int | None = None
     execution_trace: dict[str, Any] | None = None
     canonical_request: CanonicalRequestInterpretation | None = None
+    # Native-v2 fields are additive while the legacy response envelope remains
+    # the public compatibility shape during migration.
+    route: CapabilityRoute | None = None
+    presentation_status: Literal[
+        "not_requested", "prepared", "prepared_unverified", "ready", "failed"
+    ] = "not_requested"
+    tool_results: list[NativeToolResultSummary] = Field(default_factory=list)
 
 ###############################################################################
 class ChatStreamEvent(BaseModel):
