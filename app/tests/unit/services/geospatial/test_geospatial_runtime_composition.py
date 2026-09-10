@@ -66,6 +66,11 @@ def test_search_and_chat_consume_shared_geospatial_runtime(sqlite_backend) -> No
     )
     assert chat_runtime.agent_loop is chat_runtime.agent_orchestrator.agent_loop
     assert chat_runtime.agent_loop is not None
+    assert (
+        chat_runtime.native_v2_runner
+        is chat_runtime.agent_orchestrator.native_v2_runner
+    )
+    assert chat_runtime.native_v2_runner is not None
     assert {
         tool.definition.name
         for tool in chat_runtime.agent_loop.tool_registry._registered_tools.values()

@@ -15,6 +15,8 @@ from server.domain.agent.pipeline import (
     VisualizationUpdate,
 )
 from server.domain.agent.interpretation import CanonicalRequestInterpretation
+from server.domain.agent.capability_route import CapabilityRoute
+from server.domain.agent.tool_result import ToolExecutionError
 from server.contracts.extraction import TurnParseResult
 from server.contracts.geospatial import MapSession
 
@@ -103,6 +105,39 @@ class ChatOperationResult(BaseModel):
         ]
         | None
     ) = None
+
+
+class NativeToolResultSummary(BaseModel):
+    """Bounded model-independent summary of one native-v2 tool result."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    call_id: str
+    tool_name: str
+    status: Literal["success", "valid_empty", "partial", "failed"]
+    summary: str
+    evidence_refs: list[str] = Field(default_factory=list)
+    map_candidate_id: str | None = None
+    error: ToolExecutionError | None = None
+
+
+class NativeV2TurnResponse(BaseModel):
+    """Temporary native-v2 response shape used during migration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: str
+    conversation_id: str
+    assistant_message: str
+    route: CapabilityRoute | None = None
+    operation: ChatOperationResult
+    map_session: MapSession | None = None
+    presentation_status: Literal[
+        "not_requested", "prepared", "prepared_unverified", "ready", "failed"
+    ]
+    tool_results: list[NativeToolResultSummary] = Field(default_factory=list)
+    canonical_request: CanonicalRequestInterpretation | None = None
+    execution_trace: dict[str, Any] | None = None
 
 ###############################################################################
 class ChatTurnResponse(BaseModel):

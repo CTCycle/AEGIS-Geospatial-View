@@ -22,6 +22,7 @@ from server.repositories.conversations import ConversationRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.agent_loop import AgentLoop, AgentLoopRequest
 from server.services.agent.agent_state_factory import AgentStateFactory
+from server.services.agent.native_v2_turn import NativeV2TurnRunner
 from server.services.agent.capability_resolver import CapabilityResolver
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import CapabilityRoute
@@ -122,6 +123,7 @@ class AgentOrchestrator:
         application_timezone: str = "UTC",
         execution_settings: Any | None = None,
         agent_loop: AgentLoop | None = None,
+        native_v2_runner: NativeV2TurnRunner | None = None,
     ) -> None:
         self.search_orchestrator = search_orchestrator
         self.parser_service = parser_service
@@ -154,6 +156,7 @@ class AgentOrchestrator:
         self.application_timezone = application_timezone
         self.execution_settings = execution_settings
         self.agent_loop = agent_loop
+        self.native_v2_runner = native_v2_runner
         self.deterministic_intent_recovery_service = (
             DeterministicIntentRecoveryService()
         )
