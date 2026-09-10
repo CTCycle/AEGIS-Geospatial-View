@@ -2407,6 +2407,21 @@
         ],
         "title": "CapabilityCandidate"
       },
+      "CapabilityDomain": {
+        "type": "string",
+        "enum": [
+          "conversation",
+          "place_search",
+          "data_retrieval",
+          "spatial_analysis",
+          "routing",
+          "map_rendering",
+          "map_state",
+          "provider_discovery",
+          "mixed"
+        ],
+        "title": "CapabilityDomain"
+      },
       "CapabilityImplementationStatus": {
         "properties": {
           "capability_id": {
@@ -2477,6 +2492,80 @@
           "visual_tested"
         ],
         "title": "CapabilityImplementationStatus"
+      },
+      "CapabilityRoute": {
+        "properties": {
+          "primary_domain": {
+            "$ref": "#/components/schemas/CapabilityDomain"
+          },
+          "secondary_domains": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityDomain"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Secondary Domains"
+          },
+          "task_mode": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "execute",
+              "clarify"
+            ],
+            "title": "Task Mode"
+          },
+          "presentation": {
+            "type": "string",
+            "enum": [
+              "text",
+              "map",
+              "both"
+            ],
+            "title": "Presentation"
+          },
+          "requires_location": {
+            "type": "boolean",
+            "title": "Requires Location"
+          },
+          "capability_queries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Capability Queries"
+          },
+          "explicit_capability_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Explicit Capability Ids"
+          },
+          "clarification_question": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarification Question"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "primary_domain",
+          "task_mode",
+          "presentation",
+          "requires_location"
+        ],
+        "title": "CapabilityRoute"
       },
       "ChatOperationResult": {
         "properties": {
@@ -2620,11 +2709,6 @@
           "conversation_id": {
             "type": "string",
             "title": "Conversation Id"
-          },
-          "defer_map_commit": {
-            "type": "boolean",
-            "title": "Defer Map Commit",
-            "default": false
           }
         },
         "additionalProperties": false,
@@ -2650,10 +2734,24 @@
             "title": "Assistant Message"
           },
           "turn_contract": {
-            "$ref": "#/components/schemas/TurnParseResult"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TurnParseResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "decision": {
-            "$ref": "#/components/schemas/PolicyDecision"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicyDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "operation": {
             "anyOf": [
@@ -2774,6 +2872,35 @@
                 "type": "null"
               }
             ]
+          },
+          "route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CapabilityRoute"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "presentation_status": {
+            "type": "string",
+            "enum": [
+              "not_requested",
+              "prepared",
+              "prepared_unverified",
+              "ready",
+              "failed"
+            ],
+            "title": "Presentation Status",
+            "default": "not_requested"
+          },
+          "tool_results": {
+            "items": {
+              "$ref": "#/components/schemas/NativeToolResultSummary"
+            },
+            "type": "array",
+            "title": "Tool Results"
           }
         },
         "additionalProperties": false,
@@ -2781,9 +2908,7 @@
         "required": [
           "request_id",
           "conversation_id",
-          "assistant_message",
-          "turn_contract",
-          "decision"
+          "assistant_message"
         ],
         "title": "ChatTurnResponse"
       },
@@ -5749,6 +5874,70 @@
         "type": "object",
         "title": "ModelSettingsUpdateRequest"
       },
+      "NativeToolResultSummary": {
+        "properties": {
+          "call_id": {
+            "type": "string",
+            "title": "Call Id"
+          },
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "valid_empty",
+              "partial",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Refs"
+          },
+          "map_candidate_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Map Candidate Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolExecutionError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "call_id",
+          "tool_name",
+          "status",
+          "summary"
+        ],
+        "title": "NativeToolResultSummary",
+        "description": "Bounded model-independent summary of one native-v2 tool result."
+      },
       "NormalizedAction": {
         "properties": {
           "action_id": {
@@ -6766,6 +6955,94 @@
         "type": "object",
         "title": "TemporalSignal"
       },
+      "ToolExecutionError": {
+        "properties": {
+          "error_type": {
+            "type": "string",
+            "enum": [
+              "malformed_call",
+              "unknown_tool",
+              "schema_validation",
+              "semantic_validation",
+              "policy_rejection",
+              "state_conflict",
+              "timeout",
+              "rate_limit",
+              "authentication",
+              "provider_unavailable",
+              "provider_malformed_response",
+              "invalid_tool_output",
+              "internal_error"
+            ],
+            "title": "Error Type"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "retryable": {
+            "type": "boolean",
+            "title": "Retryable"
+          },
+          "recovery": {
+            "type": "string",
+            "enum": [
+              "correct_arguments",
+              "retry_transport",
+              "choose_alternate_tool",
+              "replan",
+              "request_user_input",
+              "terminal"
+            ],
+            "title": "Recovery"
+          },
+          "validation_errors": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationIssue"
+            },
+            "type": "array",
+            "title": "Validation Errors"
+          },
+          "upstream_status": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 599.0,
+                "minimum": 100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Status"
+          },
+          "timeout_origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Origin"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "error_type",
+          "code",
+          "message",
+          "retryable",
+          "recovery"
+        ],
+        "title": "ToolExecutionError"
+      },
       "ToolInputBinding": {
         "properties": {
           "target": {
@@ -7426,6 +7703,30 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ValidationIssue": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path",
+          "code",
+          "message"
+        ],
+        "title": "ValidationIssue"
       },
       "ViewportIntent": {
         "properties": {
