@@ -4,12 +4,17 @@ from server.common.typing import is_json_array, is_json_object, json_object
 
 from typing import Any
 
+from pydantic import BaseModel
+
 from server.domain.agent.decision import (
     ClarificationRequest,
     DecisionTrace,
     ExecutionPlan,
     PolicyDecision,
 )
+from server.domain.agent.capability_domains import CapabilityDomain
+from server.domain.agent.capability_route import AgentState
+from server.domain.agent.tools import RegisteredTool
 from server.domain.agent.policies import (
     AgentPolicyConstraints,
     ToolAuthorizationResult,
@@ -158,6 +163,83 @@ class PolicyEngine:
                 allowed=False,
                 reason=f"Tool '{tool_name}' is not allowed by policy constraints.",
             )
+        return ToolAuthorizationResult(allowed=True)
+
+    # -------------------------------------------------------------------------
+    def authorize(
+        self,
+        tool: RegisteredTool,
+        arguments: BaseModel,
+        state: AgentState,
+    ) -> ToolAuthorizationResult:
+        """Authorize one typed native-v2 call after schema validation.
+
+        The legacy ``authorize_tool_call`` method operates on an execution
+        context and remains available for the old native loop.  Native-v2
+        passes the typed registration and state directly so policy is applied
+        exactly once at the canonical executor boundary.
+        """
+
+        route = state.route
+        if route is None:
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="A validated capability route is required.",
+                metadata={"code": "route_required"},
+            )
+        if tool.domains and CapabilityDomain.MIXED not in tool.domains:
+            route_domains = {route.primary_domain, *route.secondary_domains}
+            route_allows_tool = bool(tool.domains.intersection(route_domains))
+            special_route_tools = {
+                "resolve_geospatial_location",
+                "inspect_evidence",
+                "transform_evidence",
+            }
+            if tool.definition.name == "apply_map_plan":
+                route_allows_tool = route.presentation in {"map", "both"}
+            elif tool.definition.name in special_route_tools:
+                route_allows_tool = True
+            if not route_allows_tool:
+                return ToolAuthorizationResult(
+                    allowed=False,
+                    reason="Tool is outside the validated capability route.",
+                    metadata={"code": "route_domain_mismatch"},
+                )
+
+        capability_id = str(
+            getattr(arguments, "capability_id", None) or ""
+        ).strip()
+        if capability_id:
+            if state.capability_ids and capability_id not in state.capability_ids:
+                return ToolAuthorizationResult(
+                    allowed=False,
+                    reason="Capability is outside the validated shortlist.",
+                    metadata={"code": "capability_not_shortlisted"},
+                )
+            capability = (
+                self.capability_registry.get_capability(capability_id)
+                if self.capability_registry is not None
+                else None
+            )
+            if capability is None:
+                return ToolAuthorizationResult(
+                    allowed=False,
+                    reason="Capability is not present in the catalog.",
+                    metadata={"code": "unknown_capability"},
+                )
+            if self.runtime_registry is not None:
+                if not self.runtime_registry.is_enabled(capability_id):
+                    return ToolAuthorizationResult(
+                        allowed=False,
+                        reason="Capability is disabled.",
+                        metadata={"code": "capability_disabled"},
+                    )
+                if not self.runtime_registry.access_available(capability_id):
+                    return ToolAuthorizationResult(
+                        allowed=False,
+                        reason="Capability access is unavailable.",
+                        metadata={"code": "capability_unavailable"},
+                    )
         return ToolAuthorizationResult(allowed=True)
 
     # -------------------------------------------------------------------------
