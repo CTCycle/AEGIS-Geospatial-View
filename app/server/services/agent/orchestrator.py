@@ -469,6 +469,9 @@ class AgentOrchestrator:
             visualization_update=None,
             canonical_request=canonical_request,
             execution_trace=native_response.execution_trace,
+            route=native_response.route,
+            presentation_status=native_response.presentation_status,
+            tool_results=native_response.tool_results,
         )
 
     # -------------------------------------------------------------------------

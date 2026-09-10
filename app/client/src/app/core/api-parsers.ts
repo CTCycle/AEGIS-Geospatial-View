@@ -23,6 +23,9 @@ import {
   ModelCardDescriptor,
   ModelLibraryResponse,
   ModelSettingsResponse,
+  NativeCapabilityRoute,
+  NativeToolResultSummary,
+  PresentationStatus,
   SelectedModelContext,
   StructuredProbeResponse,
   StructuredProbeStatus,
@@ -1263,6 +1266,63 @@ export const parseOllamaHealthResponse = (value: unknown): OllamaHealthResponse 
   };
 };
 
+const NATIVE_PRESENTATION_STATUSES: PresentationStatus[] = [
+  'not_requested',
+  'prepared',
+  'prepared_unverified',
+  'ready',
+  'failed',
+];
+
+const parseNativeToolResult = (
+  value: unknown,
+  endpoint: string,
+  index: number,
+): NativeToolResultSummary => {
+  const field = `tool_results[${index}]`;
+  const item = requireApiRecord(value, endpoint, field);
+  const status = requireApiString(item, 'status', endpoint);
+  if (!['success', 'valid_empty', 'partial', 'failed'].includes(status)) {
+    return apiContract(endpoint, `${field}.status is unsupported`, status);
+  }
+  const error = item.error === undefined
+    ? undefined
+    : item.error === null
+      ? null
+      : requireApiJsonObject(item.error, endpoint, `${field}.error`);
+  return {
+    call_id: requireApiString(item, 'call_id', endpoint),
+    tool_name: requireApiString(item, 'tool_name', endpoint),
+    status: status as NativeToolResultSummary['status'],
+    summary: requireApiString(item, 'summary', endpoint),
+    evidence_refs: requireApiStringArray(item, 'evidence_refs', endpoint),
+    map_candidate_id: optionalApiString(item, 'map_candidate_id', endpoint),
+    error,
+  };
+};
+
+const parseNativeRoute = (value: unknown, endpoint: string): NativeCapabilityRoute => {
+  const route = requireApiRecord(value, endpoint, 'route');
+  const taskMode = requireApiString(route, 'task_mode', endpoint);
+  if (!['answer', 'execute', 'clarify'].includes(taskMode)) {
+    return apiContract(endpoint, 'route.task_mode is unsupported', taskMode);
+  }
+  const presentation = requireApiString(route, 'presentation', endpoint);
+  if (!['text', 'map', 'both'].includes(presentation)) {
+    return apiContract(endpoint, 'route.presentation is unsupported', presentation);
+  }
+  return {
+    primary_domain: requireApiString(route, 'primary_domain', endpoint),
+    secondary_domains: requireApiStringArray(route, 'secondary_domains', endpoint),
+    task_mode: taskMode as NativeCapabilityRoute['task_mode'],
+    presentation: presentation as NativeCapabilityRoute['presentation'],
+    requires_location: requireApiBoolean(route, 'requires_location', endpoint),
+    capability_queries: requireApiStringArray(route, 'capability_queries', endpoint),
+    explicit_capability_ids: requireApiStringArray(route, 'explicit_capability_ids', endpoint),
+    clarification_question: optionalApiString(route, 'clarification_question', endpoint),
+  };
+};
+
 export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   const endpoint = 'chat turn';
   const record = requireApiRecord(value, endpoint);
@@ -1317,6 +1377,22 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   const canonicalRequest = record.canonical_request === undefined || record.canonical_request === null
     ? record.canonical_request ?? undefined
     : optionalApiRecord(record, 'canonical_request', endpoint);
+  const route = record.route === undefined || record.route === null
+    ? record.route ?? undefined
+    : parseNativeRoute(record.route, endpoint);
+  const executionTrace = record.execution_trace === undefined || record.execution_trace === null
+    ? record.execution_trace ?? undefined
+    : requireApiJsonObject(record.execution_trace, endpoint, 'execution_trace');
+  const presentationStatus = record.presentation_status === undefined
+    ? undefined
+    : typeof record.presentation_status === 'string'
+      && NATIVE_PRESENTATION_STATUSES.includes(record.presentation_status as PresentationStatus)
+      ? record.presentation_status as PresentationStatus
+      : apiContract(endpoint, 'presentation_status is unsupported', record.presentation_status);
+  const toolResults = record.tool_results === undefined
+    ? undefined
+    : requireApiArray(record.tool_results, endpoint, 'tool_results')
+      .map((item, index) => parseNativeToolResult(item, endpoint, index));
 
   return {
     conversation_id: requireString(record.conversation_id, 'conversation_id'),
@@ -1335,6 +1411,10 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     visualization_update: visualizationUpdate as unknown as ChatTurnResponse['visualization_update'],
     context_revision: contextRevision,
     canonical_request: canonicalRequest as ChatTurnResponse['canonical_request'],
+    execution_trace: executionTrace as ChatTurnResponse['execution_trace'],
+    route: route as ChatTurnResponse['route'],
+    presentation_status: presentationStatus,
+    tool_results: toolResults,
   };
 };
 

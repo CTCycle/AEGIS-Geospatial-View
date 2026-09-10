@@ -193,6 +193,27 @@ describe('core/api', () => {
         model: 'llama3.2',
         usage_source: 'provider_reported',
       },
+      route: {
+        primary_domain: 'weather',
+        secondary_domains: [],
+        task_mode: 'answer',
+        presentation: 'text',
+        requires_location: false,
+        capability_queries: ['weather'],
+        explicit_capability_ids: [],
+        clarification_question: null,
+      },
+      presentation_status: 'prepared_unverified',
+      tool_results: [{
+        call_id: 'call-1',
+        tool_name: 'execute_geospatial_capability',
+        status: 'success',
+        summary: 'Weather fetched.',
+        evidence_refs: ['evidence-1'],
+        map_candidate_id: null,
+        error: null,
+      }],
+      execution_trace: { phases: ['route_request', 'execute_tool'] },
     });
     expect(parsed.request_id).toBe('chat-abc');
     expect(parsed.conversation_id).toBe('conv-abc');
@@ -200,6 +221,23 @@ describe('core/api', () => {
     expect(parsed.operation?.kind).toBe('direct_answer');
     expect(parsed.context_usage?.selected_context_window).toBe(2048);
     expect(parsed.context_usage?.usage_source).toBe('provider_reported');
+    expect(parsed.route?.primary_domain).toBe('weather');
+    expect(parsed.presentation_status).toBe('prepared_unverified');
+    expect(parsed.tool_results?.[0].call_id).toBe('call-1');
+    const executionTrace = parsed.execution_trace as Record<string, unknown> | null | undefined;
+    expect(executionTrace?.phases).toEqual(['route_request', 'execute_tool']);
+  });
+
+  it('rejects malformed native-v2 presentation metadata', () => {
+    expect(() => parseChatTurnResponse({
+      conversation_id: 'conv-abc',
+      request_id: 'chat-abc',
+      assistant_message: 'done',
+      turn_contract: {},
+      decision: {},
+      memory_snapshot: {},
+      presentation_status: 'pending',
+    })).toThrowError(/Invalid chat turn API response/);
   });
 
   it('preserves provider provenance metadata instead of dropping it at the API boundary', () => {

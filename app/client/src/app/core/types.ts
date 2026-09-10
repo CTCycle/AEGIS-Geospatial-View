@@ -375,7 +375,15 @@ export interface MapSession {
   presentation?: PresentationStatus | null;
 }
 
-export type PresentationStatus = 'not_required' | 'pending' | 'ready' | 'failed' | 'render_timeout';
+export type PresentationStatus =
+  | 'not_required'
+  | 'not_requested'
+  | 'pending'
+  | 'prepared'
+  | 'prepared_unverified'
+  | 'ready'
+  | 'failed'
+  | 'render_timeout';
 
 export interface RenderRequirement {
   name: string;
@@ -806,6 +814,27 @@ export interface VisualizationUpdate {
   clarification?: string | null;
 }
 
+export interface NativeToolResultSummary {
+  call_id: string;
+  tool_name: string;
+  status: 'success' | 'valid_empty' | 'partial' | 'failed';
+  summary: string;
+  evidence_refs: string[];
+  map_candidate_id?: string | null;
+  error?: Record<string, JsonValue> | null;
+}
+
+export interface NativeCapabilityRoute {
+  primary_domain: string;
+  secondary_domains: string[];
+  task_mode: 'answer' | 'execute' | 'clarify';
+  presentation: 'text' | 'map' | 'both';
+  requires_location: boolean;
+  capability_queries: string[];
+  explicit_capability_ids: string[];
+  clarification_question?: string | null;
+}
+
 export interface ChatTurnResponse {
   conversation_id: string;
   request_id: string;
@@ -823,6 +852,10 @@ export interface ChatTurnResponse {
   visualization_update?: VisualizationUpdate | null;
   context_revision?: number | null;
   canonical_request?: Record<string, JsonValue> | null;
+  execution_trace?: Record<string, JsonValue> | null;
+  route?: NativeCapabilityRoute | null;
+  presentation_status?: PresentationStatus;
+  tool_results?: NativeToolResultSummary[];
 }
 
 export type ChatStreamEventType =
