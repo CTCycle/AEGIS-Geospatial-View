@@ -9,7 +9,11 @@ from typing import Any
 
 from openai import OpenAI
 
-from server.services.llm.base import LLMProvider
+from server.services.llm.base import (
+    LLMProvider,
+    normalize_native_tool_name,
+    parse_native_tool_arguments,
+)
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
 from server.services.llm.context_budget import (
     apply_reported_usage,
@@ -260,17 +264,16 @@ class OpenAIProvider(LLMProvider):
             item = json_object(raw_item)
             if not item or item.get("type") != "function_call":
                 continue
-            args: Any = item.get("arguments") or {}
-            if isinstance(args, str):
-                try:
-                    args = json.loads(args)
-                except json.JSONDecodeError:
-                    args = {}
+            args, parse_error = parse_native_tool_arguments(item.get("arguments"))
+            name, parse_error = normalize_native_tool_name(
+                item.get("name"), parse_error
+            )
             calls.append(
                 LLMToolCall(
                     id=item.get("call_id") or item.get("id"),
-                    name=str(item.get("name") or ""),
-                    arguments=json_object(args),
+                    name=name,
+                    arguments=args,
+                    parse_error=parse_error,
                 )
             )
         return calls

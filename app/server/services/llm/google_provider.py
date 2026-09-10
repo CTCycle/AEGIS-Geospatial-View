@@ -10,7 +10,11 @@ from typing import Any
 from google import genai
 from google.genai import types as genai_types
 
-from server.services.llm.base import LLMProvider
+from server.services.llm.base import (
+    LLMProvider,
+    normalize_native_tool_name,
+    parse_native_tool_arguments,
+)
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
 from server.services.llm.context_budget import (
     apply_reported_usage,
@@ -132,12 +136,18 @@ class GoogleProvider(LLMProvider):
                 )
                 if not is_json_object(function_call):
                     continue
-                args: dict[str, Any] = json_object(function_call.get("args"))
+                args, parse_error = parse_native_tool_arguments(
+                    function_call.get("args")
+                )
+                name, parse_error = normalize_native_tool_name(
+                    function_call.get("name"), parse_error
+                )
                 calls.append(
                     LLMToolCall(
                         id=function_call.get("id"),
-                        name=str(function_call.get("name") or ""),
-                        arguments=json_object(args),
+                        name=name,
+                        arguments=args,
+                        parse_error=parse_error,
                     )
                 )
         return calls

@@ -12,7 +12,11 @@ from typing import Any, cast
 import httpx
 from openai import AsyncOpenAI, OpenAI
 
-from server.services.llm.base import LLMProvider
+from server.services.llm.base import (
+    LLMProvider,
+    normalize_native_tool_name,
+    parse_native_tool_arguments,
+)
 from server.services.llm.context_budget import (
     apply_reported_usage,
     compute_context_usage,
@@ -905,19 +909,16 @@ class DeepSeekProvider(LLMProvider):
         for call in raw_tool_calls:
             function = getattr(call, "function", None)
             arguments = getattr(function, "arguments", None)
-            parsed_arguments: dict[str, Any] = {}
-            if isinstance(arguments, str):
-                try:
-                    loaded = json.loads(arguments)
-                    if is_json_object(loaded):
-                        parsed_arguments = loaded
-                except json.JSONDecodeError:
-                    parsed_arguments = {}
+            parsed_arguments, parse_error = parse_native_tool_arguments(arguments)
+            name, parse_error = normalize_native_tool_name(
+                getattr(function, "name", None), parse_error
+            )
             tool_calls.append(
                 LLMToolCall(
                     id=getattr(call, "id", None),
-                    name=str(getattr(function, "name", "") or ""),
+                    name=name,
                     arguments=parsed_arguments,
+                    parse_error=parse_error,
                 )
             )
         return text, tool_calls

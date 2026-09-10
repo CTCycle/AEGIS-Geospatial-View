@@ -10,7 +10,11 @@ from typing import Any, TextIO
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from server.services.llm.base import LLMProvider
+from server.services.llm.base import (
+    LLMProvider,
+    normalize_native_tool_name,
+    parse_native_tool_arguments,
+)
 from server.services.llm.context_budget import (
     apply_reported_usage,
     compute_context_usage,
@@ -526,11 +530,16 @@ class OllamaProvider(LLMProvider):
             if not item:
                 continue
             function = json_object(item.get("function"))
+            args, parse_error = parse_native_tool_arguments(function.get("arguments"))
+            name, parse_error = normalize_native_tool_name(
+                function.get("name") or item.get("name"), parse_error
+            )
             calls.append(
                 LLMToolCall(
                     id=item.get("id"),
-                    name=str(function.get("name") or item.get("name") or ""),
-                    arguments=json_object(function.get("arguments")),
+                    name=name,
+                    arguments=args,
+                    parse_error=parse_error,
                 )
             )
         return calls

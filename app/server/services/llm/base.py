@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
@@ -14,6 +15,43 @@ from server.services.llm.types import (
     ModelDescriptor,
 )
 from server.services.llm.errors import LLMRequestSchemaError, LLMStructuredOutputError
+
+
+###############################################################################
+def parse_native_tool_arguments(
+    value: object,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Parse one provider tool-argument frame without losing protocol errors.
+
+    An empty object is valid only when the provider actually supplied an empty
+    object.  Missing, malformed, scalar, and array values stay distinguishable
+    so the agent loop can return a recoverable malformed-call result.
+    """
+
+    if value is None:
+        return None, "arguments_missing"
+    if isinstance(value, dict):
+        return dict(value), None
+    if isinstance(value, str):
+        try:
+            loaded = json.loads(value)
+        except json.JSONDecodeError:
+            return None, "invalid_json"
+        if isinstance(loaded, dict):
+            return dict(loaded), None
+        return None, "arguments_not_object"
+    return None, "arguments_not_object"
+
+
+###############################################################################
+def normalize_native_tool_name(
+    value: object,
+    parse_error: str | None,
+) -> tuple[str, str | None]:
+    """Normalize a function name and preserve missing-name diagnostics."""
+
+    name = str(value or "").strip()
+    return name, parse_error or ("missing_name" if not name else None)
 
 ###############################################################################
 class LLMProvider(ABC):
