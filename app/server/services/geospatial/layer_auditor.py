@@ -412,6 +412,19 @@ def _validate_manifest(path: Path, report: LayerAuditReport) -> None:
             manifest_id=manifest.id,
             message="Manifest appears to contain a secret-like value.",
         )
+    agentic_use = json_object(payload.get("agenticUse"))
+    if (
+        path.parent.name != "providers"
+        and bool(agentic_use.get("defaultEnabled"))
+        and not is_json_object(payload.get("executionContract"))
+    ):
+        _add_issue(
+            report,
+            path=path,
+            severity="error",
+            manifest_id=manifest.id,
+            message="Enabled executable capability must declare executionContract.",
+        )
     _validate_auth_policy(path, manifest, report)
     _validate_renderability(path, manifest, report)
 
