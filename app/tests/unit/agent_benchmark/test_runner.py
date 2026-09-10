@@ -45,6 +45,85 @@ def test_model_lane_evaluates_structured_tool_and_map_evidence() -> None:
     assert evaluation["duplicate_tool_calls"] == 0
 
 ###############################################################################
+def test_model_lane_adapts_native_v2_map_evidence() -> None:
+    evaluation = evaluate_model_scenario(
+        {
+            "assertions": ["one_location_tool", "rendered_map", "valid_arguments"],
+            "expected": {
+                "task_classes": ["map_search"],
+                "capability_families": ["location"],
+                "clarification": "not_required",
+                "minimum_tool_count": 1,
+                "rendering_types": ["map", "point"],
+                "provenance_required": True,
+                "fabrication_forbidden": True,
+            },
+        },
+        [
+            {
+                "status_code": 200,
+                "tool_calls": [],
+                "tool_results": [
+                    {
+                        "tool_call_id": "call-location",
+                        "name": "resolve_geospatial_location",
+                        "content": {
+                            "ok": True,
+                            "status": "success",
+                            "summary": "Resolved Zurich.",
+                        },
+                        "is_error": False,
+                    },
+                    {
+                        "tool_call_id": "call-map",
+                        "name": "apply_map_plan",
+                        "content": {
+                            "ok": True,
+                            "status": "success",
+                            "summary": "A map candidate was prepared.",
+                        },
+                        "is_error": False,
+                    },
+                ],
+                "provider_events": [],
+                "request_fingerprints": [],
+                "map_session": {
+                    "resolved_location": {
+                        "latitude": 47.3744,
+                        "longitude": 8.5410,
+                        "provenance": {
+                            "provider": "nominatim",
+                            "fetched_at": "2026-09-10T10:00:00Z",
+                        },
+                    },
+                    "center": {"latitude": 47.3744, "longitude": 8.5410},
+                    "basemap": {"id": "esri_world_imagery"},
+                },
+                "response": {
+                    "assistant_message": "The map is ready.",
+                    "operation": {
+                        "kind": "map_session",
+                        "status": "pending",
+                    },
+                    "route": {
+                        "primary_domain": "place_search",
+                        "task_mode": "execute",
+                        "presentation": "map",
+                        "requires_location": True,
+                    },
+                    "execution_trace": {
+                        "execution_mode": "native_v2",
+                    },
+                },
+            }
+        ],
+    )
+
+    assert evaluation["passed"] is True
+    assert evaluation["tool_calls"] == 2
+    assert evaluation["execution_evidence"] == 2
+
+###############################################################################
 def test_model_lane_scores_ambiguous_location_clarification() -> None:
     evaluation = evaluate_model_scenario(
         {"assertions": ["clarification_or_context_resolution"]},
