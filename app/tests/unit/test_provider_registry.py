@@ -14,6 +14,7 @@ from server.services.geospatial.providers.base import (
     ProviderAuthError,
     ProviderCircuitOpenError,
     ProviderRequest,
+    ProviderRateLimitError,
     ProviderResponse,
     ProviderTimeoutError,
     ProviderUnavailableError,
@@ -75,6 +76,27 @@ class _AuthProvider:
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         self.calls += 1
         raise ProviderAuthError("missing key")
+
+###############################################################################
+class _RateLimitedProvider:
+    provider_id = "rate-limited"
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.calls = 0
+
+    # -------------------------------------------------------------------------
+    async def fetch(self, request: ProviderRequest) -> ProviderResponse:
+        self.calls += 1
+        if self.calls == 1:
+            raise ProviderRateLimitError(
+                "slow down", retry_after_seconds=0.0
+            )
+        return ProviderResponse(
+            capability_id=request.capability_id,
+            provider_id=self.provider_id,
+            payload={"attempts": self.calls},
+        )
 
 ###############################################################################
 class _SavedCredentialRepository:
@@ -218,6 +240,24 @@ def test_provider_registry_retries_transient_provider_failure() -> None:
 
     response = run_async_in_thread(
         registry.fetch("flaky", ProviderRequest(capability_id="flaky_layer"))
+    )
+
+    assert response.payload == {"attempts": 2}
+
+###############################################################################
+def test_provider_registry_retries_bounded_rate_limit_after_retry_after() -> None:
+    provider = _RateLimitedProvider()
+    registry = ProviderRegistry(
+        providers=[provider],
+        execution_policy=ProviderExecutionPolicy(
+            max_attempts=2,
+            retry_backoff_base_seconds=0.0,
+            retry_backoff_max_seconds=0.0,
+        ),
+    )
+
+    response = run_async_in_thread(
+        registry.fetch("rate-limited", ProviderRequest(capability_id="limited"))
     )
 
     assert response.payload == {"attempts": 2}

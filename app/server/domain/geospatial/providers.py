@@ -36,7 +36,9 @@ class ProviderResponse:
 @dataclass(frozen=True)
 class ProviderExecutionPolicy:
     timeout_seconds: float = 10.0
-    max_attempts: int = 1
+    max_attempts: int = 2
+    retry_backoff_base_seconds: float = 0.25
+    retry_backoff_max_seconds: float = 2.0
     circuit_breaker_failures: int = 3
     circuit_recovery_seconds: float = 60.0
 

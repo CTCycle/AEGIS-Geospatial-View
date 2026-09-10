@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from collections.abc import Callable
 from time import monotonic
 from typing import Any, cast
@@ -19,6 +20,7 @@ from server.services.geospatial.providers.base import (
     ProviderError,
     ProviderRequest,
     ProviderResponse,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     ProviderUnavailableError,
     response_without_credentials,
@@ -166,6 +168,12 @@ class ProviderRegistry:
         self._min_call_interval_s[normalized] = max(0.0, float(min_call_interval_s))
 
     # -------------------------------------------------------------------------
+    def configure_execution_policy(self, policy: ProviderExecutionPolicy) -> None:
+        """Replace the bounded transport policy used by provider calls."""
+
+        self.execution_policy = policy
+
+    # -------------------------------------------------------------------------
     def build_from_manifests(self) -> None:
         if self._manifest_providers_built:
             return
@@ -216,7 +224,10 @@ class ProviderRegistry:
         provider = self.get(normalized)
         self._ensure_circuit_closed(normalized)
         await self._wait_for_rate_limit(normalized)
-        attempts = max(1, int(self.execution_policy.max_attempts))
+        # Provider transport is the only retry owner below the tool boundary.
+        # Keep the external attempt count bounded even if a stale configuration
+        # requests a larger value.
+        attempts = min(2, max(1, int(self.execution_policy.max_attempts)))
         last_error: ProviderError | None = None
         for attempt in range(attempts):
             started = monotonic()
@@ -240,13 +251,21 @@ class ProviderRegistry:
             except TimeoutError as exc:
                 last_error = ProviderTimeoutError(f"Provider '{normalized}' timed out.")
                 self._record_failure(normalized)
-                if attempt + 1 >= attempts:
+                if not self._should_retry(attempt, last_error, attempts):
                     raise last_error from exc
+                await self._wait_before_retry(attempt, last_error)
+            except ProviderRateLimitError as exc:
+                last_error = exc
+                self._record_failure(normalized)
+                if not self._should_retry(attempt, last_error, attempts):
+                    raise
+                await self._wait_before_retry(attempt, last_error)
             except ProviderUnavailableError as exc:
                 last_error = exc
                 self._record_failure(normalized)
-                if attempt + 1 >= attempts:
+                if not self._should_retry(attempt, last_error, attempts):
                     raise
+                await self._wait_before_retry(attempt, last_error)
             except ProviderError:
                 self._record_failure(normalized)
                 raise
@@ -268,6 +287,43 @@ class ProviderRegistry:
         if last_error is not None:
             raise last_error
         raise ProviderUnavailableError(f"Provider '{normalized}' did not return data.")
+
+    # -------------------------------------------------------------------------
+    def _should_retry(
+        self,
+        attempt: int,
+        error: ProviderError,
+        attempts: int,
+    ) -> bool:
+        if attempt + 1 >= attempts:
+            return False
+        return self._retry_delay_seconds(attempt, error) is not None
+
+    # -------------------------------------------------------------------------
+    async def _wait_before_retry(self, attempt: int, error: ProviderError) -> None:
+        delay = self._retry_delay_seconds(attempt, error)
+        if delay is not None and delay > 0:
+            await asyncio.sleep(delay)
+
+    # -------------------------------------------------------------------------
+    def _retry_delay_seconds(
+        self, attempt: int, error: ProviderError
+    ) -> float | None:
+        maximum = max(0.0, float(self.execution_policy.retry_backoff_max_seconds))
+        retry_after = getattr(error, "retry_after_seconds", None)
+        if retry_after is not None:
+            if not isinstance(retry_after, (int, float)) or not math.isfinite(
+                float(retry_after)
+            ):
+                retry_after = None
+            elif retry_after < 0 or retry_after > maximum:
+                # A response asking us to wait longer than the bounded retry
+                # window is terminal for this request.
+                return None
+            else:
+                return float(retry_after)
+        base = max(0.0, float(self.execution_policy.retry_backoff_base_seconds))
+        return min(maximum, base * (2**attempt))
 
     # -------------------------------------------------------------------------
     async def list_layers(

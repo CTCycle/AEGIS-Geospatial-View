@@ -44,6 +44,7 @@ from server.services.agent_runs.steering import RunSteeringService
 from server.services.agent_runs.realtime import RealtimeConnectionRegistry
 from server.services.agent_runs.metrics import RealtimeMetrics
 from server.services.geospatial.composition import build_geospatial_runtime
+from server.domain.geospatial.providers import ProviderExecutionPolicy
 from server.services.jobs import BackgroundJobService
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
@@ -113,6 +114,28 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         raise
 
     geospatial_runtime = build_geospatial_runtime(database)
+    execution_settings = getattr(settings, "agent_execution", None)
+    provider_registry = geospatial_runtime.provider_registry
+    configure_execution_policy = getattr(
+        provider_registry, "configure_execution_policy", None
+    )
+    if callable(configure_execution_policy) and execution_settings is not None:
+        configure_execution_policy(
+            ProviderExecutionPolicy(
+                timeout_seconds=float(
+                    getattr(execution_settings, "provider_request_seconds", 10.0)
+                ),
+                max_attempts=int(
+                    getattr(execution_settings, "provider_max_attempts", 2)
+                ),
+                retry_backoff_base_seconds=float(
+                    getattr(execution_settings, "retry_backoff_base_seconds", 0.25)
+                ),
+                retry_backoff_max_seconds=float(
+                    getattr(execution_settings, "retry_backoff_max_seconds", 2.0)
+                ),
+            )
+        )
     search_runtime = build_search_runtime(
         capability_registry=geospatial_runtime.capability_registry,
         provider_registry=geospatial_runtime.provider_registry,
