@@ -344,8 +344,8 @@ class AgentOrchestrator:
         request_id: str,
         conversation_id: str,
         conversation_key: str,
-        task: Any,
-        turn_contract: Any,
+        task: Any | None,
+        turn_contract: Any | None,
         latest_memory: dict[str, Any],
         recent_messages: list[dict[str, Any]],
         context_usage: ContextUsageResponse | None,
@@ -411,18 +411,19 @@ class AgentOrchestrator:
             if native_response.execution_trace
             else "native_v2"
         )
-        self.task_state_service.update_task(
-            conversation_key,
-            task.task_id,
-            status="failed" if failure is not None else "completed",
-            progress_summary=operation.message,
-            failure=failure,
-            tool_result_refs=[
-                item.call_id
-                for item in native_response.tool_results
-                if item.call_id
-            ],
-        )
+        if task is not None:
+            self.task_state_service.update_task(
+                conversation_key,
+                task.task_id,
+                status="failed" if failure is not None else "completed",
+                progress_summary=operation.message,
+                failure=failure,
+                tool_result_refs=[
+                    item.call_id
+                    for item in native_response.tool_results
+                    if item.call_id
+                ],
+            )
         self.history_service.append_message(
             conversation_id=conversation_id,
             role="assistant",
@@ -434,7 +435,11 @@ class AgentOrchestrator:
                 if native_response.route is not None
                 else None,
                 "operation": operation.model_dump(mode="json"),
-                "canonical_request": canonical_request.model_dump(mode="json"),
+                "canonical_request": (
+                    canonical_request.model_dump(mode="json")
+                    if canonical_request is not None
+                    else None
+                ),
                 "execution_trace": native_response.execution_trace,
                 "presentation_status": native_response.presentation_status,
                 "tool_results": [
@@ -1090,6 +1095,29 @@ class AgentOrchestrator:
         execution_budget.record_context_allocation(context_package.context_allocation)
         recent_messages = context_package.recent_messages
 
+        if self._agent_loop_mode() == "native_v2":
+            execution_budget.execution_mode = "native_v2"
+            execution_budget.pipeline_reach[
+                "structured_intent_extraction"
+            ] = "skipped_native_v2"
+            return await self._run_native_v2_compat_turn(
+                payload=payload,
+                request_id=request_id,
+                conversation_id=conversation_id,
+                conversation_key=conversation_key,
+                task=None,
+                turn_contract=None,
+                latest_memory=latest_memory,
+                recent_messages=recent_messages,
+                context_usage=None,
+                canonical_request=None,
+                resolved_location=None,
+                resolved_locations={},
+                state_before=state_before,
+                settings=settings,
+                execution_budget=execution_budget,
+            )
+
         parser_kwargs: dict[str, Any] = {
             "user_message": payload.message,
             "memory_snapshot": latest_memory,
@@ -1584,25 +1612,6 @@ class AgentOrchestrator:
         turn_contract = self.capability_resolver.resolve(
             turn_contract, canonical_request=canonical_request
         )
-        settings = self.settings_repo.get_required()
-        if self._agent_loop_mode() == "native_v2":
-            return await self._run_native_v2_compat_turn(
-                payload=payload,
-                request_id=request_id,
-                conversation_id=conversation_id,
-                conversation_key=conversation_key,
-                task=task,
-                turn_contract=turn_contract,
-                latest_memory=latest_memory,
-                recent_messages=recent_messages,
-                context_usage=context_usage,
-                canonical_request=canonical_request,
-                resolved_location=resolved_location,
-                resolved_locations=resolved_locations,
-                state_before=state_before,
-                settings=settings,
-                execution_budget=execution_budget,
-            )
         direct_response = await self.direct_turn_response_service.handle(
             request_id=request_id,
             conversation_id=conversation_id,
