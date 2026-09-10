@@ -157,7 +157,33 @@ async def test_loop_routes_exposes_tools_and_finishes_from_final_model_text() ->
         "required",
         "auto",
     ]
+    assert provider.requests[0]["request"].provider_session_id == state.conversation_id
     assert state.transition_trace
+
+
+@pytest.mark.asyncio
+async def test_opencode_go_native_calls_use_conversation_session_and_compatible_thinking_mode() -> None:
+    provider = FakeProvider([LLMResult(content="ready")])
+    loop = _loop(provider)
+    state = _state()
+    request = AgentLoopRequest(
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+        state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+    )
+
+    await loop._model_call(  # pyright: ignore[reportPrivateUsage]
+        request,
+        provider,  # type: ignore[arg-type]
+        [],
+        [],
+        tool_choice="none",
+    )
+
+    captured = provider.requests[0]["request"]
+    assert captured.provider_session_id == state.conversation_id
+    assert captured.metadata["thinking_mode"] == "disabled"
 
 
 @pytest.mark.asyncio
@@ -223,6 +249,9 @@ async def test_successful_tool_is_followed_by_one_final_model_step() -> None:
     assert outcome.final_text == "The tool result is complete."
     assert len(provider.requests) == 3
     assert outcome.state.tool_calls == 1
+    assistant_message = provider.requests[2]["request"].messages[1]
+    assert assistant_message["tool_calls"][0]["name"] == "test_tool"
+    assert assistant_message["tool_calls"][0]["arguments"] == {}
 
 
 @pytest.mark.asyncio

@@ -329,14 +329,22 @@ class AgentLoop:
         tool_choice: str,
     ) -> LLMResult:
         request.budget.ensure_available("model_step")
+        metadata = {"supports_tools": True}
+        if request.provider.strip().lower() == "opencode-go":
+            # OpenCode Go's thinking-mode models reject explicit tool_choice
+            # values while tools are enabled.  Disabling thinking selects the
+            # provider's compatible native-tool contract without changing the
+            # configured provider or model.
+            metadata["thinking_mode"] = "disabled"
         llm_request = LLMRequest(
             model=request.model,
             provider=request.provider,
+            provider_session_id=request.state.conversation_id,
             messages=messages,
             temperature=request.temperature,
             tools=tools or None,
             tool_choice=tool_choice,
-            metadata={"supports_tools": True},
+            metadata=metadata,
         )
         attempts = 0
         while True:
@@ -557,11 +565,8 @@ class AgentLoop:
                 "tool_calls": [
                     {
                         "id": call.id,
-                        "type": "function",
-                        "function": {
-                            "name": call.name,
-                            "arguments": json.dumps(call.arguments or {}),
-                        },
+                        "name": call.name,
+                        "arguments": call.arguments or {},
                     }
                     for call in result.tool_calls
                 ],

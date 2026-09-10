@@ -337,6 +337,7 @@ class DeepSeekProvider(LLMProvider):
         max_tokens = self._request_max_tokens(effective_request)
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
+        kwargs.update(self._request_thinking_options(effective_request))
         if native_tools:
             kwargs["tools"] = [
                 self.tool_to_openai_schema(tool) for tool in native_tools
