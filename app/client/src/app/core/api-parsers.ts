@@ -1274,7 +1274,7 @@ const NATIVE_PRESENTATION_STATUSES: PresentationStatus[] = [
   'failed',
 ];
 
-const parseNativeToolResult = (
+export const parseNativeToolResult = (
   value: unknown,
   endpoint: string,
   index: number,
@@ -1301,7 +1301,7 @@ const parseNativeToolResult = (
   };
 };
 
-const parseNativeRoute = (value: unknown, endpoint: string): NativeCapabilityRoute => {
+export const parseNativeRoute = (value: unknown, endpoint: string): NativeCapabilityRoute => {
   const route = requireApiRecord(value, endpoint, 'route');
   const taskMode = requireApiString(route, 'task_mode', endpoint);
   if (!['answer', 'execute', 'clarify'].includes(taskMode)) {

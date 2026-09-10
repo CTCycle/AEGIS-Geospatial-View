@@ -42,6 +42,7 @@ import {
   RealtimeServerMessage,
   RealtimeConnectionState,
   RunEvent,
+  PresentationStatus,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
@@ -90,6 +91,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   agentReadiness = INITIAL_AGENT_READINESS_STATE;
   catalog?: CatalogResponse;
   mapRenderState: 'preparing' | 'ready' | 'failed' = 'preparing';
+  presentationStatus?: PresentationStatus;
 
   isLoading = false;
   progressPercent = 0;
@@ -385,6 +387,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.memorySnapshot = {};
     this.contextUsage = undefined;
     this.mapSession = undefined;
+    this.presentationStatus = undefined;
     this.pendingMapSession = undefined;
     this.committedMapSession = undefined;
     this.pendingRenderContext = undefined;
@@ -495,6 +498,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         && ['pending', 'running', 'updating', 'awaiting_render'].includes(snapshot.active_run.state);
       this.streamState = 'idle';
       this.mapSession = undefined;
+      this.presentationStatus = snapshot.active_run?.presentation_status;
       this.pendingMapSession = undefined;
       this.committedMapSession = undefined;
       this.pendingRenderContext = undefined;
@@ -586,6 +590,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.memorySnapshot = {};
     this.contextUsage = undefined;
     this.mapSession = undefined;
+    this.presentationStatus = undefined;
     this.pendingMapSession = undefined;
     this.committedMapSession = undefined;
     this.pendingRenderContext = undefined;
@@ -949,6 +954,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
             || presentationStatus === 'render_timeout'
             || errorCode === 'render_failed'
             || errorCode === 'render_timeout') {
+            this.presentationStatus = 'failed';
             // A durable render failure arrives as an ERROR event after the
             // browser has already displayed the candidate. Restore the last
             // acknowledged map before clearing the pending identity.
@@ -989,6 +995,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
             };
             this.renderAckQueued = false;
             this.handleMapSession(mapSession);
+            this.presentationStatus = 'prepared';
             this.mapRenderState = 'preparing';
             this.status = 'Map data ready; rendering';
             this.progressStage = 'awaiting_render';
@@ -1087,6 +1094,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (parsed.memorySnapshot !== undefined) {
       this.memorySnapshot = parsed.memorySnapshot;
     }
+    if (parsed.presentationStatus !== undefined) {
+      this.presentationStatus = parsed.presentationStatus;
+    }
     this.applyContextUsage(parsed.contextUsage);
   }
 
@@ -1127,6 +1137,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     this.lastDecision = result.decision;
     this.lastOperation = operation;
+    this.presentationStatus = result.presentation_status;
     this.memorySnapshot = result.memory_snapshot ?? {};
     this.applyContextUsage(result.context_usage);
     this.assistantDraft = '';

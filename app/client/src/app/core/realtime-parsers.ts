@@ -1,5 +1,11 @@
 import { REALTIME_PROTOCOL_VERSION } from './constants';
-import { normalizeConversationTaskSnapshot, normalizeMapSession, parseContextUsage } from './api-parsers';
+import {
+  normalizeConversationTaskSnapshot,
+  normalizeMapSession,
+  parseContextUsage,
+  parseNativeRoute,
+  parseNativeToolResult,
+} from './api-parsers';
 import { isFiniteNumber, isJsonObject, isRecord, isStringArray } from './type-guards';
 import type {
   ChatOperationResult,
@@ -8,7 +14,10 @@ import type {
   JsonObject,
   JsonValue,
   MapSession,
+  NativeCapabilityRoute,
+  NativeToolResultSummary,
   PolicyDecision,
+  PresentationStatus,
   RealtimeServerMessage,
   RunEvent,
   RunEventType,
@@ -63,6 +72,10 @@ export interface ParsedRunCompletionPayload {
   memorySnapshot?: Record<string, JsonValue>;
   contextUsage?: ContextUsage | null;
   taskSnapshot?: ConversationTaskSnapshot;
+  route?: NativeCapabilityRoute | null;
+  presentationStatus?: PresentationStatus;
+  toolResults?: NativeToolResultSummary[];
+  executionTrace?: Record<string, JsonValue> | null;
 }
 
 const hasOwn = (value: JsonObject, key: string): boolean =>
@@ -79,6 +92,14 @@ const isRunEventType = (value: unknown): value is RunEventType =>
 
 const isRunEventVisibility = (value: unknown): value is RunEventVisibility =>
   typeof value === 'string' && RUN_EVENT_VISIBILITIES.includes(value as RunEventVisibility);
+
+const NATIVE_PRESENTATION_STATUSES: readonly PresentationStatus[] = [
+  'not_requested',
+  'prepared',
+  'prepared_unverified',
+  'ready',
+  'failed',
+];
 
 const isOperationKind = (value: unknown): value is ChatOperationResult['kind'] =>
   typeof value === 'string' && OPERATION_KINDS.includes(value as ChatOperationResult['kind']);
@@ -338,6 +359,42 @@ export const parseRunCompletionPayload = (value: unknown): ParsedRunCompletionPa
 
   if (hasOwn(value, 'task_snapshot')) {
     parsed.taskSnapshot = normalizeConversationTaskSnapshot(value['task_snapshot']);
+  }
+
+  if (hasOwn(value, 'route')) {
+    if (value['route'] === null) {
+      parsed.route = null;
+    } else {
+      try {
+        parsed.route = parseNativeRoute(value['route'], 'realtime completion');
+      } catch {
+        parsed.route = undefined;
+      }
+    }
+  }
+
+  const presentationStatus = value['presentation_status'];
+  if (typeof presentationStatus === 'string'
+    && NATIVE_PRESENTATION_STATUSES.includes(presentationStatus as PresentationStatus)) {
+    parsed.presentationStatus = presentationStatus as PresentationStatus;
+  }
+
+  if (Array.isArray(value['tool_results'])) {
+    const results: NativeToolResultSummary[] = [];
+    try {
+      value['tool_results'].forEach((item, index) => {
+        results.push(parseNativeToolResult(item, 'realtime completion', index));
+      });
+      parsed.toolResults = results;
+    } catch {
+      parsed.toolResults = undefined;
+    }
+  }
+
+  if (value['execution_trace'] === null) {
+    parsed.executionTrace = null;
+  } else if (isJsonObject(value['execution_trace'])) {
+    parsed.executionTrace = value['execution_trace'];
   }
 
   return parsed;
