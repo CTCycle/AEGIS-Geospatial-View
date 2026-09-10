@@ -1,26 +1,25 @@
 # Agentic Search
 
-Last updated: 2026-09-09
+Last updated: 2026-09-10
 
 ## Summary
 
-The chat workflow separates structured parsing from provider-native tool calling:
+The chat workflow supports a temporary legacy-to-native rollout:
 
-1. `ParserService` emits evidence-oriented `TurnParseResult`, including prompt relationship, entity/layer targets, basemap changes, ambiguities, and frontend update type.
-2. A durable conversation task ledger records the supervised task and follow-up relationship.
-3. Semantic layer concepts are resolved against enabled manifest metadata before planning.
-4. Deterministic routing selects a narrow specialist group, candidate capability
-   domains, allowlists, invariants, and completion requirements.
-5. A tool-capable model owns the native decision loop and chooses the next
-   exposed primitive; schemas and allowlists are rebuilt after every observation.
-6. `PolicyEngine` authorizes every tool and exact capability ID, while the
-   deterministic executor is used only when the configured model explicitly
-   lacks native tool support.
-7. Normalized results are persisted as bounded conversation-scoped evidence;
+1. `legacy` keeps the existing parser, deterministic recovery/planning path, and
+   compatibility response projections.
+2. `shadow` computes native route/tool exposure from the legacy interpretation
+   without model, provider, evidence, or map execution.
+3. `native_v2` assembles context once, starts with the model-owned
+   `route_request` tool, validates the route and progressively constrained
+   registry exposure, then runs the bounded native state machine.
+4. The native loop executes through one typed validation/execution boundary;
+   normalized results are persisted as bounded conversation-scoped evidence and
    model messages receive references and summaries, never raw datasets.
-8. Verified results update the revisioned overlay collection, task status, and
-   structured diagnostics. Map preparation remains pending until browser
-   render acknowledgement.
+5. The typed response builder emits one operation, route, tool summaries, trace,
+   and optional map candidate. Direct native map responses are
+   `prepared_unverified`; realtime candidates remain pending until matching
+   browser `map.render_ack` evidence.
 
 Location resolution is hierarchical and deterministic where evidence permits:
 coordinates take precedence, followed by address/POI/street, district or
@@ -51,27 +50,29 @@ The agentic path uses the current normalized routing and capability contracts.
 ## Prompt Architecture
 
 `app/server/prompts/` is the sole source of free-form model instructions and
-prompt templates. `parser.py` defines structured turn-interpretation guidance,
-`agent.py` defines native-agent and replaceable working-state messages,
+prompt templates. `parser.py` defines legacy structured turn-interpretation guidance,
+`prompts/agent.py` defines native route/tool instructions, and
+`domain/agent/capability_route.py` defines their typed contract,
 `response.py` defines grounded synthesis, `context.py` defines the compacted
 history envelope, and `providers.py` defines provider-specific protocol
 instructions. Builders compose literal fragments at the model boundary.
 
-The Pydantic extraction model remains the sole structural parser contract;
-prompt prose describes meaning and decision criteria without duplicating its
-fields or enums. Deterministic orchestration, planning, policy, retries, and
-budgets remain in `services/agent/` and `services/llm/`. No business service
-defines free-form model instructions inline.
+The Pydantic extraction model remains the legacy structural parser contract;
+native-v2 uses the compact `CapabilityRoute` and typed tool input models.
+Deterministic orchestration, policy, retries, and budgets remain in
+`services/agent/` and `services/llm/`. No business service defines free-form
+model instructions inline.
 
 ## Conversation Context
 
 `conversation_id` isolates history, directives, tasks, map memory, summaries, and
 tool outcomes. Explicit durable instructions enter a structured directive ledger;
 later conflicts supersede earlier directives. Context is rebuilt for the selected
-model using declared input/output limits, schema overhead, and safety margin. The
-parser receives a bounded projection rather than full prior task/map snapshots or
-raw tool payloads; explicit locations suppress stale location history, while only
-explicit follow-ups receive minimal recent context.
+model using declared input/output limits, schema overhead, and safety margin.
+Legacy parsing receives a bounded projection rather than full prior task/map
+snapshots or raw tool payloads. Native-v2 gives the same bounded context package
+to `AgentStateFactory`; the loop carries only typed locations, evidence refs,
+route state, and normalized tool results.
 
 Every request also has a run-scoped absolute deadline, bounded stage budgets, and
 safe stage telemetry. Provider calls use their native async transports; OpenCode
@@ -92,7 +93,7 @@ restart the workflow. Provider fields `task_class`, `action_id`,
 `complete`, `intentional_ambiguity`, or `contract_incomplete`; the last state is
 a failed extraction stage, not a policy clarification.
 
-## Parser Contract
+## Legacy Parser Contract
 
 `TurnParseResult` contains:
 
@@ -159,14 +160,13 @@ Unknown or low-confidence classifications normalize to `unknown` before policy s
 
 ## Native Geospatial Tools
 
+- `route_request` (internal bootstrap route)
 - `resolve_geospatial_location`
-- `list_geospatial_capabilities`
-- `describe_geospatial_capability`
+- `discover_geospatial_capabilities`
 - `execute_geospatial_capability`
-- `fetch_geospatial_provider_layers` for explicitly routed and provider-allowlisted discovery only
-- `inspect_geospatial_evidence` for bounded metadata, schema, samples, statistics, and pages
-- `transform_geospatial_evidence` for allowlisted declarative vector/tabular operations
-- `prepare_geospatial_map` for candidate presentation before browser acknowledgement
+- `inspect_evidence` for bounded metadata, schema, samples, statistics, and pages
+- `transform_evidence` for allowlisted declarative vector/tabular operations
+- `apply_map_plan` for typed candidate presentation before browser acknowledgement
 
 Catalog responses are deterministic, permission-aware, and capped at 50 items per page.
 

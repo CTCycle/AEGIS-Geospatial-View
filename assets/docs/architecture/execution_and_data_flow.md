@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-09-09
+Last updated: 2026-09-10
 
 ## Layering
 
@@ -78,6 +78,21 @@ Geospatial API services are composed during application startup and accessed thr
 
 ## Chat Orchestration Pipeline
 
+The temporary `agent_execution.agent_loop_mode` rollout setting selects one of
+three execution boundaries:
+
+- `legacy` (default): the parser, deterministic policy/planning path, and
+  existing native-tool fallback remain available for compatibility.
+- `shadow`: the legacy path executes while the native registry computes a
+  bounded exposure preview with no model, provider, tool, evidence, or map
+  egress.
+- `native_v2`: context assembly is followed directly by `NativeV2TurnRunner`
+  and the bounded `AgentLoop`; the legacy parser, recovery, specialist router,
+  capability resolver, policy preflight, and deterministic planner are not
+  invoked.
+
+### Legacy-compatible pipeline
+
 1. `AgentOrchestrator` creates a run-local 75-second execution budget and loads volatile conversation task and visualization state.
 2. `ParserService` receives a bounded projection of the current request, compact active location/map state, relevant capability identities, and only minimal follow-up history. It produces structured intent, relationship, entities, typed overlay commands, visualization changes, and ambiguities using the selected agent model and the canonical parser builder. The parser stage is capped at 30 seconds; only an incomplete semantic contract may receive one schema correction while at least 18 seconds remain.
 3. A deterministic location-resolution stage resolves coordinates, addresses/POIs, districts, cities, regions, and countries into one `ResolvedLocation` with a target and ordered geographic parents. That object is stored in `AgentExecutionContext` and is the only run-scoped location authority.
@@ -98,6 +113,23 @@ Geospatial API services are composed during application startup and accessed thr
     update.
 13. Task status, failure details, and active visualization are updated before persistence.
 
+### Native-v2 pipeline
+
+Native-v2 keeps the lifecycle and persistence boundary shared with legacy mode:
+
+1. `AgentOrchestrator` loads idempotency, conversation history, directives,
+   task/map memory, and the bounded context package.
+2. `NativeV2TurnRunner` creates typed `AgentState` and invokes `AgentLoop`.
+3. `AgentLoop` asks the model for `route_request`, validates the route, exposes
+   only registry tools allowed for the current state, executes through the
+   canonical typed executor, and stops on evidence/completion/deadline rules.
+4. `NativeV2ResponseBuilder` emits one operation, bounded tool-result summaries,
+   route metadata, execution trace, and an optional map candidate.
+5. The orchestrator persists one terminal conversation state. Native map
+   candidates remain outside durable active-map memory until render evidence is
+   available; direct responses report `prepared_unverified`, while realtime
+   runs continue through `map_prepared` and `map.render_ack`.
+
 For a map request, the lifecycle continues after backend preparation. The
 orchestrator persists the candidate presentation as `awaiting_render` and
 publishes `map_prepared` with the exact run version, map session ID, collection
@@ -111,15 +143,17 @@ Only then does it publish the final response and completed event. Duplicate
 matching acknowledgments return the stored result; stale, conflicting, or
 superseded acknowledgments cannot mutate state.
 
-Direct responses (parser failures, capability questions, failure inquiries, and
-preflight rejection/clarification) are handled by
-`DirectTurnResponseService`. The orchestrator delegates these branches while
-retaining the normal tool execution path.
+In legacy mode, parser failures, capability questions, failure inquiries, and
+preflight rejection/clarification are handled by `DirectTurnResponseService`.
+Native-v2 uses the loop's typed clarification/failure outcomes instead of this
+shortcut.
 
 The direct `POST /api/chat/turn` route keeps its immediate response behavior;
-it does not introduce a second headless render-ack transport. For realtime map
-runs, browser acknowledgment remains client-reported rendering evidence and
-the backend render/completion checks remain authoritative.
+it does not introduce a second headless render-ack transport. In native-v2 a
+direct map response is a prepared, unverified candidate and is not promoted to
+durable active-map memory. For realtime map runs, browser acknowledgment
+remains client-reported rendering evidence and the backend render/completion
+checks remain authoritative.
 
 Location resolution ranks coordinates first, then address/POI/street, district or
 neighborhood, city or municipality, region/state, and country. Deictic words are
