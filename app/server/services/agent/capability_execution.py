@@ -10,6 +10,7 @@ from typing import Any, Protocol
 from uuid import uuid4
 
 from server.domain.agent.evidence import EvidenceKind, EvidenceStatus
+from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -93,6 +94,8 @@ class CapabilityExecutionService:
         self,
         request: ExecuteCapabilityInput,
         context: ToolExecutionContext,
+        *,
+        location: ResolvedLocation | None = None,
     ) -> ToolResult:
         started = time.perf_counter()
         capability_id = request.capability_id
@@ -182,7 +185,7 @@ class CapabilityExecutionService:
             capability_id=capability_id,
             bbox=_bbox(request.bbox),
             time=request_time,
-            params=_provider_params(request),
+            params=_provider_params(request, location=location),
         )
         try:
             response = await self.provider_registry.fetch(
@@ -418,8 +421,19 @@ def _bbox(value: list[float] | None) -> tuple[float, float, float, float] | None
     return tuple(float(item) for item in value)  # type: ignore[return-value]
 
 
-def _provider_params(request: ExecuteCapabilityInput) -> dict[str, Any]:
+def _provider_params(
+    request: ExecuteCapabilityInput,
+    *,
+    location: ResolvedLocation | None = None,
+) -> dict[str, Any]:
     params = dict(request.arguments)
+    if location is not None:
+        # Provider adapters are deliberately location-agnostic at the model
+        # boundary.  Inject the server-resolved point after tool validation so
+        # a location_ref is useful to every provider without trusting model
+        # supplied coordinates.
+        params["latitude"] = location.latitude
+        params["longitude"] = location.longitude
     if request.operation is not None:
         params.setdefault("operation", request.operation)
     if request.location_ref is not None:

@@ -356,7 +356,10 @@ def _legacy_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:
     if kind in {"search-index", "camera-network"}:
         return {CapabilityDomain.PLACE_SEARCH, CapabilityDomain.DATA_RETRIEVAL}
     if kind in {"analysis-tool"}:
-        return {CapabilityDomain.SPATIAL_ANALYSIS}
+        # Direct point insights (weather, air quality, elevation, etc.) are
+        # executable data retrieval even when their legacy kind predates the
+        # explicit agenticUse domain declaration.
+        return {CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.SPATIAL_ANALYSIS}
     if kind in {"vector-overlay", "raster-overlay", "dataset-ingestion"}:
         return {CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING}
     if kind == "metadata-only":
@@ -379,6 +382,11 @@ def _searchable_text(capability: dict[str, Any]) -> set[str]:
         agentic_use.get("intentTags") if isinstance(agentic_use, dict) else None,
         metadata.get("keywords") if isinstance(metadata, dict) else None,
         metadata.get("action_tags") if isinstance(metadata, dict) else None,
+        metadata.get("supported_categories") if isinstance(metadata, dict) else None,
+        metadata.get("task_tags") if isinstance(metadata, dict) else None,
+        metadata.get("primary_use_cases") if isinstance(metadata, dict) else None,
+        metadata.get("search_examples") if isinstance(metadata, dict) else None,
+        metadata.get("human_summary") if isinstance(metadata, dict) else None,
     ]
     return {
         token

@@ -27,8 +27,16 @@ class _Runtime:
 def _router(runtime: _Runtime | None = None) -> CapabilityRouter:
     registry = CapabilityRegistry.from_catalog_snapshot(
         GeospatialManifestSnapshot(
-            providers=(),
-            basemaps=[],
+        providers=(),
+            basemaps=[
+                {
+                    "id": "osm_default",
+                    "name": "OpenStreetMap",
+                    "provider": "osm_tiles",
+                    "capabilityKind": "basemap",
+                    "agenticUse": {"domains": ["map_rendering"]},
+                }
+            ],
             overlays=[
                 {
                     "id": "traffic",
@@ -119,3 +127,16 @@ def test_router_handles_runtime_disabled_explicit_candidate() -> None:
     assert decision.status == "no_capability"
     assert decision.rejected_capability_ids == ["traffic"]
     assert "capability_disabled" in decision.reason_codes
+
+
+def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools() -> None:
+    decision = _router().validate_route(
+        _route(requires_location=False),
+        user_message="Show traffic on a new map.",
+        active_state=_state(),
+    )
+
+    assert decision.status == "accepted"
+    assert decision.route.requires_location is True
+    assert "location_required_for_new_map" in decision.reason_codes
+    assert "osm_default" not in decision.capability_ids

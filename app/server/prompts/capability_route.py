@@ -25,7 +25,10 @@ CAPABILITY_ROUTE_SYSTEM_PROMPT = (
     "5. Put concepts such as weather, hospitals, traffic, or boundaries in "
     "capability_queries. Do not put coordinates, radii, filters, time windows, "
     "or provider arguments in the route.\n"
-    "6. requires_location describes a prerequisite, not a location value.\n"
+    "6. requires_location describes a prerequisite, not a location value. Set it "
+    "to true for a named place, address, region, coordinate, or any new map; set "
+    "it to false only for a genuinely location-independent request or an active "
+    "map update.\n"
     "7. Use secondary_domains for at most three genuinely related domains.\n"
     "8. Return the tool call immediately without explanations or deliberation."
 )

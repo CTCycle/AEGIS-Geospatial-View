@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import re
 
 from server.contracts.extraction import LocationSignal
 from server.domain.agent.decision import ClarificationRequest, ResolvedLocation
@@ -39,6 +40,11 @@ _LOCATION_TYPES = frozenset(
     }
 )
 
+_COORDINATE_PAIR_RE = re.compile(
+    r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[,;\s]\s*"
+    r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*$"
+)
+
 
 class LocationToolHandler:
     def __init__(self, *, resolver: LocationResolver) -> None:
@@ -67,15 +73,28 @@ class LocationToolHandler:
                 started=started,
             )
 
-        expected_type = str(request.expected_location_type or "city").casefold()
-        signal_type = expected_type if expected_type in _LOCATION_TYPES else "city"
-        signal = LocationSignal(
-            signal_type=signal_type,  # type: ignore[arg-type]
-            raw_value=query,
-            normalized_value=query,
-            confidence=1.0,
-            source="model",
-        )
+        coordinates = _parse_coordinate_pair(query)
+        if coordinates is not None:
+            latitude, longitude = coordinates
+            signal = LocationSignal(
+                signal_type="coordinates",
+                raw_value=query,
+                normalized_value=query,
+                latitude=latitude,
+                longitude=longitude,
+                confidence=1.0,
+                source="model",
+            )
+        else:
+            expected_type = str(request.expected_location_type or "city").casefold()
+            signal_type = expected_type if expected_type in _LOCATION_TYPES else "city"
+            signal = LocationSignal(
+                signal_type=signal_type,  # type: ignore[arg-type]
+                raw_value=query,
+                normalized_value=query,
+                confidence=1.0,
+                source="model",
+            )
         memory_snapshot = _memory_snapshot(state)
         result = await self.resolver.resolve_location_signals(
             [signal], memory_snapshot
@@ -94,6 +113,16 @@ class LocationToolHandler:
 def _target_key(request: ResolveLocationInput) -> str:
     value = request.target_id or request.candidate_id or request.query or "location"
     return " ".join(value.casefold().split())
+
+
+def _parse_coordinate_pair(query: str) -> tuple[float, float] | None:
+    match = _COORDINATE_PAIR_RE.fullmatch(query)
+    if match is None:
+        return None
+    latitude, longitude = (float(value) for value in match.groups())
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        return None
+    return latitude, longitude
 
 
 def _memory_snapshot(state: AgentState) -> dict[str, object]:

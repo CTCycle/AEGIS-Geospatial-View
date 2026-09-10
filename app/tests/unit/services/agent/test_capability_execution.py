@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from server.domain.geospatial.providers import ProviderResponse
+from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.capability_execution import (
     CapabilityExecutionService,
     ToolExecutionContext,
@@ -213,3 +214,29 @@ async def test_evidence_persistence_failure_is_a_typed_result() -> None:
     assert result.status == "failed"
     assert result.error is not None
     assert result.error.error_type == "provider_malformed_response"
+
+
+@pytest.mark.asyncio
+async def test_resolved_location_is_forwarded_as_provider_coordinates() -> None:
+    response = ProviderResponse(
+        capability_id="places:hospitals",
+        provider_id="overpass",
+        payload={"features": []},
+    )
+    provider = FakeProviderRegistry(response)
+    await _service(provider).execute_capability(
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals",
+            location_ref="zurich",
+        ),
+        ToolExecutionContext(conversation_id="conversation-1"),
+        location=ResolvedLocation(
+            label="Zurich",
+            latitude=47.3769,
+            longitude=8.5417,
+        ),
+    )
+
+    request = provider.requests[0][1]
+    assert request.params["latitude"] == 47.3769  # type: ignore[attr-defined]
+    assert request.params["longitude"] == 8.5417  # type: ignore[attr-defined]
