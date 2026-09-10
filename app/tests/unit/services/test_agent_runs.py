@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 from tests.conftest import run_async_in_thread
 
 import pytest
@@ -539,3 +540,63 @@ def test_stale_render_ack_cannot_mutate_pending_candidate(run_repositories) -> N
             acknowledgment={"status": "ready"},
         )
     assert run_repositories["runs"].get_run(run.run_id).state.value == "awaiting_render"
+
+
+###############################################################################
+def test_render_deadline_starts_when_candidate_enters_awaiting_render(
+    run_repositories,
+) -> None:
+    lifecycle, _, _, _ = _services(run_repositories)
+    conversation = lifecycle.create_conversation(title="Render deadline")
+    run = run_async_in_thread(
+        lifecycle.create_run(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Show Rome"),
+        )
+    )
+    run_repositories["runs"].prepare_render(
+        run.run_id,
+        run.run_version,
+        {
+            "status": "pending",
+            "map_session_id": "map-session-deadline",
+            "collection_revision": 1,
+            "pending_response": {
+                "map_session": {
+                    "session_id": "map-session-deadline",
+                    "overlay_collection": {"collection_id": "active-map", "revision": 1, "instances": []},
+                }
+            },
+            "required_render_checks": {},
+            "completion_requirements": [],
+        },
+    )
+
+    with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
+        record = session.get(AgentRunRecord, run.run_id)
+        assert record is not None
+        assert record.render_prepared_at is not None
+        record.created_at = datetime.now(UTC) - timedelta(seconds=120)
+        session.commit()
+
+    assert run_repositories["runs"].expire_pending_render(
+        conversation_id=conversation.conversation_id,
+        run_id=run.run_id,
+        run_version=run.run_version,
+        timeout_seconds=90,
+    ) is None
+
+    with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
+        record = session.get(AgentRunRecord, run.run_id)
+        assert record is not None
+        record.render_prepared_at = datetime.now(UTC) - timedelta(seconds=120)
+        session.commit()
+
+    expired = run_repositories["runs"].expire_pending_render(
+        conversation_id=conversation.conversation_id,
+        run_id=run.run_id,
+        run_version=run.run_version,
+        timeout_seconds=90,
+    )
+    assert expired is not None
+    assert expired.presentation_status == "render_timeout"

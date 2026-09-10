@@ -18,6 +18,7 @@ from server.contracts.geospatial import (
     MapSession,
     OverlayCollectionState,
     OverlayInstance,
+    ViewportPolicy,
 )
 from server.services.agent.agent_tool_catalog_service import (
     AgentToolCatalogService,
@@ -381,6 +382,55 @@ def test_native_map_preparation_waits_for_renderable_evidence() -> None:
         tool.name for tool in service.build_native_tools(context)
     ]
     assert "prepare_geospatial_map" in names_after_execution
+
+###############################################################################
+def test_map_preparation_merges_all_evidence_sessions() -> None:
+    location = ResolvedLocation(
+        label="Rome",
+        latitude=41.9028,
+        longitude=12.4964,
+        source="test",
+        confidence=1.0,
+    )
+    viewport = ViewportPolicy(
+        center_latitude=location.latitude,
+        center_longitude=location.longitude,
+        radius_m=100_000,
+    )
+
+    def session(capability_id: str) -> MapSession:
+        instance_id = f"instance-{capability_id}"
+        return MapSession(
+            session_id="map-1",
+            resolved_location=location,
+            basemap_id="osm_default",
+            viewport=viewport,
+            overlay_collection=OverlayCollectionState(
+                instances=[
+                    OverlayInstance(
+                        instance_id=instance_id,
+                        capability_id=capability_id,
+                        label=capability_id,
+                        provider="test",
+                        overlay_type="vector-overlay",
+                        rendering_mode="geojson",
+                        resolved_location=location,
+                        viewport=viewport.model_dump(mode="json"),
+                        descriptor={"id": instance_id},
+                    )
+                ]
+            ),
+        )
+
+    merged = AgentToolCatalogService._merge_map_sessions(
+        [session("weather"), session("earthquakes")]
+    )
+
+    assert merged is not None
+    assert [item.capability_id for item in merged.overlay_collection.instances] == [
+        "weather",
+        "earthquakes",
+    ]
 
 ###############################################################################
 def test_native_tool_descriptions_define_discovery_selection_boundaries() -> None:

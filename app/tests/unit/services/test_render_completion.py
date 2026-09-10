@@ -283,6 +283,30 @@ def test_acknowledgment_payload_is_bounded_and_requires_valid_viewport() -> None
     )
     assert payload.viewport_bounds == [12.3, 41.7, 12.7, 42.1]
 
+    raster_payload = RealtimeRenderAckPayload(
+        run_id="run-raster",
+        run_version=1,
+        map_session_id="map-session-raster",
+        collection_revision=0,
+        status="ready",
+        viewport_bounds=[-105.2, 39.5, -104.7, 40.1],
+        overlay_results=[
+            {
+                "overlay_id": "noaa-radar-denver",
+                "capability_id": "noaa_radar",
+                "source_present": True,
+                "layer_present": True,
+                "loaded": True,
+                "metadata_only": False,
+                "visibility_matches": True,
+                "style_valid": True,
+                "zoom_range_valid": True,
+                "rendered_feature_count": None,
+            }
+        ],
+    )
+    assert raster_payload.overlay_results[0]["rendered_feature_count"] is None
+
     with pytest.raises(ValueError):
         RealtimeRenderAckPayload(
             run_id="run-1",

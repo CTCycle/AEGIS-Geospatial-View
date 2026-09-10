@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from server.contracts.extraction import (
     ConversationContextSnapshot,
     GeographicRelationship,
@@ -271,6 +273,20 @@ def test_proximity_and_recent_without_defined_defaults_are_ambiguous() -> None:
 
 
 ###############################################################################
+def test_explicit_recent_qualifier_is_guarded_when_model_omits_temporal_signal() -> None:
+    canonical = RequestInterpreter().compile(
+        request_id="request-ambiguity-2",
+        turn=_turn(
+            user_text="Show recent earthquakes in Tokyo",
+            temporal_signal=TemporalSignal(mode="none"),
+        ),
+        resolved_location=_location("Tokyo, Japan", 35.6762, 139.6503),
+    )
+
+    assert "recent_requires_time_window" in canonical.ambiguities
+
+
+###############################################################################
 def test_relative_temporal_bounds_resolve_once_in_client_timezone() -> None:
     canonical = RequestInterpreter().compile(
         request_id="request-time-1",
@@ -289,6 +305,19 @@ def test_relative_temporal_bounds_resolve_once_in_client_timezone() -> None:
     assert temporal.resolved_once is True
     assert temporal.start_time_iso == "2026-09-05T00:00:00+02:00"
     assert temporal.end_time_iso == "2026-09-06T00:00:00+02:00"
+
+
+###############################################################################
+def test_relative_hour_window_is_resolved_from_the_request_reference_time() -> None:
+    bounds = RequestInterpreter._relative_bounds(
+        "use the last 2 hours",
+        datetime(2026, 9, 5, 12, 30, tzinfo=UTC),
+    )
+
+    assert bounds == (
+        "2026-09-05T10:30:00+00:00",
+        "2026-09-05T12:30:00+00:00",
+    )
 
 
 ###############################################################################

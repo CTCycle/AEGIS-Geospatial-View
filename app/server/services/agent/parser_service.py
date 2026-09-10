@@ -864,6 +864,10 @@ class ParserService:
                     else {}
                 ),
                 "max_tokens": self.PARSER_MAX_OUTPUT_TOKENS,
+                # Parsing is a bounded contract-classification step. Keep the
+                # configured provider/model and reserve reasoning-mode calls
+                # for the later agent/tool stages where deliberation is useful.
+                "thinking_mode": "disabled",
                 "application_input_token_ceiling": self.PARSER_INPUT_TOKEN_CEILING,
                 "context_phase": "parser",
                 "purpose": "structured_intent_extraction",
@@ -1198,6 +1202,74 @@ class ParserService:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def _recover_verbatim_typed_locations(
+        cls,
+        user_message: str,
+        extracted: LLMParserExtraction,
+    ) -> list[LLMLocationSignal]:
+        """Promote typed entity evidence when the model omitted location signals.
+
+        The parser remains authoritative for intent. This supplements only
+        with entity fields that the model explicitly marked as required
+        locations and that occur verbatim in the current request; catalog
+        terms and arbitrary prose are never treated as places.
+        """
+
+        semantic_terms = {
+            cls._normalize_category_text(value)
+            for value in [
+                *extracted.requested_layers,
+                *extracted.requested_concepts,
+                *extracted.requested_attributes,
+                *extracted.required_data_sources,
+                extracted.required_tool_category or "",
+                extracted.requested_basemap or "",
+                *[
+                    layer
+                    for task in extracted.atomic_tasks
+                    for layer in task.required_layers
+                ],
+            ]
+            if cls._normalize_category_text(value)
+        }
+        candidates: list[str] = []
+        if extracted.map_target:
+            candidates.append(extracted.map_target)
+        for relationship in extracted.geographic_relationships:
+            candidates.extend(
+                item
+                for item in (relationship.target, relationship.reference)
+                if item
+            )
+        for task in extracted.atomic_tasks:
+            candidates.extend(task.required_entities)
+
+        signals: list[LLMLocationSignal] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            raw_value = " ".join(str(candidate or "").split()).strip()
+            normalized = cls._normalize_category_text(raw_value)
+            if (
+                not raw_value
+                or not normalized
+                or normalized in semantic_terms
+                or not cls._contains_verbatim_span(user_message, raw_value)
+                or normalized in seen
+            ):
+                continue
+            seen.add(normalized)
+            signals.append(
+                LLMLocationSignal(
+                    signal_type="address",
+                    raw_value=raw_value,
+                    normalized_value=raw_value,
+                    confidence=0.84,
+                )
+            )
+        return signals
+
+    # -------------------------------------------------------------------------
+    @classmethod
     def build_parser_failure_turn_result(
         cls,
         *,
@@ -1492,6 +1564,14 @@ class ParserService:
                 extracted = extracted.model_copy(
                     update={"location_signals": [coordinate_signal]}
                 )
+            else:
+                typed_locations = self._recover_verbatim_typed_locations(
+                    user_message, extracted
+                )
+                if typed_locations:
+                    extracted = extracted.model_copy(
+                        update={"location_signals": typed_locations}
+                    )
 
         extracted_location_signals = list(extracted.location_signals)
         verbatim_signals = [

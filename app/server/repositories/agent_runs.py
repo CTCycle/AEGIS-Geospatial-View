@@ -133,6 +133,7 @@ class AgentRunRepository:
                 previous.error_message = "A newer request replaced the pending map."
                 previous.presentation_status = "not_required"
                 previous.presentation_json = None
+                previous.render_prepared_at = None
             record = AgentRunRecord(
                 id=f"run_{uuid4().hex}",
                 conversation_id=conversation_id,
@@ -285,6 +286,7 @@ class AgentRunRepository:
         presentation: dict[str, Any],
     ) -> tuple[AgentRunSnapshot, bool]:
         """Move a valid map candidate into the durable awaiting-render state."""
+        prepared_at = datetime.now(UTC)
         with self._session_factory() as session:
             updated = cast(
                 CursorResult[Any],
@@ -308,6 +310,7 @@ class AgentRunRepository:
                         active_slot=None,
                         presentation_status="pending",
                         presentation_json=presentation,
+                        render_prepared_at=prepared_at,
                     )
                 ),
             )
@@ -654,6 +657,7 @@ class AgentRunRepository:
             else:
                 raise ValueError("Unsupported render acknowledgment status.")
             run.active_slot = None
+            run.render_prepared_at = None
             if self._event_repository is not None:
                 event_ids: list[str] = []
                 for event_create in durable_event_creates:
@@ -692,12 +696,13 @@ class AgentRunRepository:
             )
             if run is None:
                 return None
-            created_at = (
-                run.created_at.replace(tzinfo=UTC)
-                if run.created_at.tzinfo is None
-                else run.created_at
+            prepared_at = run.render_prepared_at or run.started_at or run.created_at
+            prepared_at = (
+                prepared_at.replace(tzinfo=UTC)
+                if prepared_at.tzinfo is None
+                else prepared_at
             )
-            if created_at > cutoff:
+            if prepared_at > cutoff:
                 return None
             run.state = AgentRunState.FAILED.value
             run.active_slot = None
@@ -964,10 +969,10 @@ class AgentRunRepository:
             error_code=record.error_code,
             error_message=record.error_message,
             presentation_status=cast(
-                Literal["not_required", "pending", "ready", "failed"],
+                Literal["not_required", "pending", "ready", "failed", "render_timeout"],
                 record.presentation_status
                 if record.presentation_status
-                in {"not_required", "pending", "ready", "failed"}
+                in {"not_required", "pending", "ready", "failed", "render_timeout"}
                 else "not_required",
             ),
             presentation=record.presentation_json,

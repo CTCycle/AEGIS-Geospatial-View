@@ -3,11 +3,14 @@ from __future__ import annotations
 import unicodedata
 from typing import Any, cast
 
-from server.common.typing import is_json_array, json_array, json_object
+from server.common.typing import json_array, json_object
 
 from server.contracts.extraction import TurnParseResult
 from server.domain.agent.interpretation import CanonicalRequestInterpretation
-from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.capability_registry import (
+    CapabilityRegistry,
+    normalized_execution_contract,
+)
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
@@ -200,6 +203,19 @@ class CapabilityResolver:
             turn,
             canonical_request=canonical_request,
         )
+        semantic_group_id, grouped_semantic_values = self._resolve_semantic_group(
+            turn.requested_concepts,
+            turn,
+            canonical_request,
+        )
+        resolved_group_ids = [semantic_group_id] if semantic_group_id else []
+        for command in overlay_commands:
+            _, command_group_values = self._resolve_semantic_group(
+                [*command.selector.concepts, *command.selector.labels],
+                turn,
+                canonical_request,
+            )
+            grouped_semantic_values.update(command_group_values)
         for command in overlay_commands:
             if command.action not in {"add", "show", "update"}:
                 continue
@@ -208,7 +224,7 @@ class CapabilityResolver:
             requested.extend(command.selector.labels)
         requested = self._dedupe(requested)
 
-        resolved: list[str] = []
+        resolved: list[str] = list(resolved_group_ids)
         unresolved: list[str] = []
         poi_capability = (
             self._resolve_one("poi", turn, canonical_request)
@@ -216,6 +232,8 @@ class CapabilityResolver:
             else None
         )
         for layer in requested:
+            if self._normalize_text(layer) in grouped_semantic_values:
+                continue
             capability_id = self._resolve_one(layer, turn, canonical_request)
             if capability_id is None:
                 if poi_capability and self._is_poi_refinement(layer, turn):
@@ -238,6 +256,10 @@ class CapabilityResolver:
                     "requested_layers": resolved,
                     "requested_concepts": self._dedupe(turn.requested_concepts),
                     "overlay_commands": overlay_commands,
+                    # Capability limitations are derived from this resolver's
+                    # executable catalog check.  Do not carry a model-written
+                    # limitation forward after every requested value resolved.
+                    "capability_limitations": [],
                 }
             )
 
@@ -514,16 +536,48 @@ class CapabilityResolver:
         resolved_commands: list[Any] = []
         for command in commands:
             selector = command.selector
-            capability_ids: list[str] = []
+            resolved_capability_ids: list[str] = []
+            unresolved_capability_ids: list[str] = []
             for value in selector.capability_ids:
                 capability_id = self._resolve_one(value, turn, canonical_request)
-                normalized = capability_id or str(value).strip()
-                if normalized and normalized not in capability_ids:
-                    capability_ids.append(normalized)
-            for value in [*selector.concepts, *selector.labels]:
-                capability_id = self._resolve_one(value, turn, canonical_request)
-                if capability_id is not None and capability_id not in capability_ids:
-                    capability_ids.append(capability_id)
+                if capability_id and capability_id not in resolved_capability_ids:
+                    resolved_capability_ids.append(capability_id)
+                elif str(value).strip() and str(value).strip() not in unresolved_capability_ids:
+                    unresolved_capability_ids.append(str(value).strip())
+            semantic_capability_ids: list[str] = []
+            semantic_values = [*selector.concepts, *selector.labels]
+            semantic_group_id, _ = self._resolve_semantic_group(
+                semantic_values,
+                turn,
+                canonical_request,
+            )
+            if semantic_group_id is not None:
+                semantic_capability_ids.append(semantic_group_id)
+            else:
+                for value in semantic_values:
+                    capability_id = self._resolve_one(
+                        value,
+                        turn,
+                        canonical_request,
+                    )
+                    if (
+                        capability_id is not None
+                        and capability_id not in semantic_capability_ids
+                    ):
+                        semantic_capability_ids.append(capability_id)
+            capability_ids = [*resolved_capability_ids]
+            if command.action in {"add", "show", "update"} and semantic_capability_ids:
+                # For a fetching command, a semantic selector is authoritative
+                # when a model-supplied capability ID is incompatible with the
+                # canonical scope.  Keep the incompatible ID for non-fetching
+                # commands so an explicit hide/remove request can still report
+                # an unmatched target instead of silently disappearing.
+                capability_ids.extend(semantic_capability_ids)
+            else:
+                capability_ids.extend(
+                    [*unresolved_capability_ids, *semantic_capability_ids]
+                )
+            capability_ids = list(dict.fromkeys(capability_ids))
             if capability_ids != selector.capability_ids:
                 command = command.model_copy(
                     update={
@@ -534,6 +588,50 @@ class CapabilityResolver:
                 )
             resolved_commands.append(command)
         return resolved_commands
+
+    # -------------------------------------------------------------------------
+    def _resolve_semantic_group(
+        self,
+        values: list[str],
+        turn: TurnParseResult,
+        canonical_request: CanonicalRequestInterpretation | None = None,
+    ) -> tuple[str | None, set[str]]:
+        """Resolve related semantic terms as one catalog query when possible."""
+
+        semantic_values = self._dedupe(
+            [str(value).strip() for value in values if str(value).strip()]
+        )
+        if len(semantic_values) < 2:
+            return None, set()
+
+        query = " ".join(semantic_values)
+        candidates = [
+            item
+            for item in self._all_capabilities()
+            if self._is_usable(item, turn, canonical_request)
+            and self._query_token_coverage(query, item) == 1.0
+        ]
+        role_candidates = [
+            item
+            for item in candidates
+            if self._matches_task_role(item, turn.task_class)
+        ]
+        if role_candidates:
+            candidates = role_candidates
+
+        ranked = sorted(
+            (
+                (self._score(query, item), str(item.get("id") or ""))
+                for item in candidates
+            ),
+            key=lambda value: (-value[0], value[1]),
+        )
+        ranked = [item for item in ranked if item[0] > 0 and item[1]]
+        if not ranked or len([item for item in ranked if item[0] == ranked[0][0]]) != 1:
+            return None, set()
+        return ranked[0][1], {
+            self._normalize_text(value) for value in semantic_values
+        }
 
     # -------------------------------------------------------------------------
     def _resolve_one(
@@ -648,14 +746,21 @@ class CapabilityResolver:
             requested_scopes = {
                 constraint.analysis_scope
                 for constraint in canonical_request.spatial_constraints
+                # A preserved map viewport is presentation context, not a
+                # provider-side analysis scope.  The resolved active location
+                # remains available as the typed location input.
+                if constraint.provenance != "viewport"
             }
             declared_scopes = set(contract.get("supported_scope_kinds") or [])
             # An explicitly requested radius, feature geometry, or viewport is
             # a semantic requirement.  An empty declaration is unknown support,
             # not an implicit wildcard, so do not route the request there.
             scopes_to_check = requested_scopes if declared_scopes else explicit_scopes
-            if scopes_to_check and (
-                not declared_scopes or not scopes_to_check.issubset(declared_scopes)
+            if scopes_to_check and not self._scope_is_compatible(
+                capability,
+                contract,
+                scopes_to_check,
+                task_class=turn.task_class,
             ):
                 return False
             coverage = str(contract.get("coverage") or capability.get("coverage") or "").casefold()
@@ -675,14 +780,54 @@ class CapabilityResolver:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
-        raw = capability.get("executionContract") or capability.get(
-            "execution_contract"
+    def _scope_is_compatible(
+        capability: dict[str, Any],
+        contract: dict[str, Any],
+        requested_scopes: set[str],
+        *,
+        task_class: str | None = None,
+    ) -> bool:
+        declared_scopes = {
+            str(item).strip().casefold()
+            for item in contract.get("supported_scope_kinds", [])
+            if str(item).strip()
+        }
+        if declared_scopes and requested_scopes.issubset(declared_scopes):
+            return True
+
+        # A map request anchored by a point can render a raster overlay over
+        # the derived map viewport.  The provider contract remains bbox-based;
+        # the point is the canonical target used to construct that viewport,
+        # not an assertion that the raster has point analysis semantics.
+        render_support = str(contract.get("render_support") or "").casefold()
+        if (
+            task_class == "map_search"
+            and requested_scopes == {"point"}
+            and "bbox" in declared_scopes
+            and render_support == "raster"
+        ):
+            return True
+        if requested_scopes != {"radius"} or "point" not in declared_scopes:
+            return False
+
+        # A compound request can combine an area-search layer with a point
+        # observation at the same resolved target.  A point-only metadata
+        # product may participate in that request without pretending to
+        # filter its sampled value across the full area.
+        output_geometry = str(
+            contract.get("output_geometry_type")
+            or capability.get("geometry_type")
+            or ""
+        ).casefold()
+        return (
+            render_support in {"metadata_only", "metadata-only"}
+            and output_geometry == "point"
         )
-        if not isinstance(raw, dict):
-            metadata = json_object(capability.get("metadata"))
-            raw = metadata.get("execution_contract")
-        return cast(dict[str, Any], raw) if isinstance(raw, dict) else {}
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
+        return normalized_execution_contract(capability)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -718,17 +863,11 @@ class CapabilityResolver:
             return True
 
         metadata = json_object(capability.get("metadata"))
-        execution_contract = json_object(
-            capability.get("executionContract") or capability.get("execution_contract")
-        )
+        execution_contract = normalized_execution_contract(capability)
         declared_modes = execution_contract.get("temporal_modes")
-        if not is_json_array(declared_modes):
-            declared_modes = metadata.get("supported_temporal_modes")
-        if not is_json_array(declared_modes):
-            declared_modes = capability.get("supported_temporal_modes")
         if temporal.mode != "none":
             if (
-                (not is_json_array(declared_modes) or not declared_modes)
+                not declared_modes
                 and temporal.mode != "current"
             ):
                 # ``current`` is the established provider default for legacy
@@ -736,7 +875,7 @@ class CapabilityResolver:
                 # their support explicitly because silently substituting one
                 # for another changes the meaning of the request.
                 return False
-            if not is_json_array(declared_modes) or not declared_modes:
+            if not declared_modes:
                 return True
             allowed_modes = {
                 str(item).strip().casefold()
@@ -747,12 +886,8 @@ class CapabilityResolver:
                 return False
 
         declared_aggregations = execution_contract.get("supported_aggregations")
-        if not is_json_array(declared_aggregations):
-            declared_aggregations = metadata.get("supported_aggregations")
-        if not is_json_array(declared_aggregations):
-            declared_aggregations = capability.get("supported_aggregations")
         if temporal.aggregation != "none":
-            if not is_json_array(declared_aggregations) or not declared_aggregations:
+            if not declared_aggregations:
                 return False
             allowed_aggregations = {
                 str(item).strip().casefold()

@@ -155,17 +155,31 @@ def test_structured_output_uses_single_function_mode(monkeypatch) -> None:
 
     assert result == {"answer": "structured"}
     call = client.completions.calls[0]
-    assert "response_format" not in call
-    # OpenCode Go thinking-mode models reject explicit tool_choice values.
-    # One canonical function is still strict because no alternate function is
-    # exposed and the response parser validates its exact name and payload.
-    assert "tool_choice" not in call
+    assert len(call["tools"]) == 1
     assert call["tools"][0]["function"]["name"] == "submit_structured_response"
-    assert call["tools"][0]["function"]["strict"] is True
-    assert "top-level JSON object" in call["tools"][0]["function"]["description"]
+    assert call["tools"][0]["function"]["parameters"] == _StructuredPayload.model_json_schema()
+    assert "response_format" not in call
+    assert "tool_choice" not in call
     assert call["max_tokens"] == 123
-    assert "JSON schema" not in call["messages"][-1]["content"]
     assert result.context_usage["response_schema_tokens"] == 0
+
+###############################################################################
+def test_structured_output_forwards_explicit_thinking_mode(monkeypatch) -> None:
+    client = _Client()
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+    monkeypatch.setattr(provider, "_client", lambda: client)
+    request = LLMRequest(
+        model="deepseek-v4-flash",
+        provider_session_id="conversation-1",
+        messages=[{"role": "user", "content": "Hello"}],
+        metadata={"thinking_mode": "disabled"},
+    )
+
+    provider.structured_output(request, schema=_StructuredPayload)
+
+    assert client.completions.calls[0]["extra_body"] == {
+        "thinking": {"type": "disabled"}
+    }
 
 ###############################################################################
 def test_chat_forwards_bounded_output_tokens(monkeypatch) -> None:

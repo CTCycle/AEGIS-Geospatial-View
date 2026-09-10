@@ -8,8 +8,8 @@ from collections.abc import Callable
 from typing import Any, Iterable, cast
 import unicodedata
 
-from server.common.typing import json_array, json_object
-from server.contracts.extraction import OverlayCommand, OverlaySelector
+from server.common.typing import is_json_object, json_array, json_object
+from server.contracts.extraction import OverlayCommand, OverlayScope, OverlaySelector
 from server.contracts.geospatial import (
     MapSession,
     MapInspection,
@@ -328,6 +328,107 @@ class OverlayCollectionService:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def _location_attributes(cls, value: object) -> dict[str, str]:
+        raw: dict[str, Any]
+        if isinstance(value, ResolvedLocation):
+            raw = value.model_dump(mode="json")
+        elif is_json_object(value):
+            raw = value
+        else:
+            return {}
+        aliases = {
+            "city": ("city", "town", "village", "municipality", "place"),
+            "region": ("region", "state", "county"),
+            "country": ("country", "country_name", "country_code"),
+        }
+        attributes: dict[str, str] = {}
+        for canonical, keys in aliases.items():
+            for key in keys:
+                candidate = raw.get(key)
+                if isinstance(candidate, str) and candidate.strip():
+                    attributes[canonical] = cls._norm(candidate)
+                    break
+        return attributes
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _location_labels(cls, value: object) -> set[str]:
+        raw: dict[str, Any]
+        if isinstance(value, ResolvedLocation):
+            raw = value.model_dump(mode="json")
+        elif is_json_object(value):
+            raw = value
+        else:
+            return set()
+        values = [
+            raw.get("label"),
+            raw.get("normalized_value"),
+            raw.get("raw_value"),
+            raw.get("city"),
+            raw.get("country"),
+        ]
+        return {cls._norm(item) for item in values if cls._norm(item)}
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def scope_matches_location(
+        cls,
+        scope: OverlayScope,
+        location: ResolvedLocation | dict[str, Any],
+    ) -> bool:
+        """Match a location scope against a canonical or partial location.
+
+        Extraction providers may describe the same target with coordinates, a
+        canonical label, or a bounded subset such as city/country.  The map
+        session owns the resolved target, so those equivalent representations
+        must share one collection identity.
+        """
+        if scope.kind != "location":
+            return False
+        target = dict(scope.location or {})
+        if not target and not scope.label:
+            return True
+
+        target_attributes = cls._location_attributes(target)
+        location_attributes = cls._location_attributes(location)
+        if target_attributes:
+            if any(
+                key in location_attributes
+                and location_attributes[key] != value
+                for key, value in target_attributes.items()
+            ):
+                return False
+            if all(key in location_attributes for key in target_attributes):
+                return True
+
+        target_values = [
+            scope.label,
+            target.get("label"),
+            target.get("normalized_value"),
+            target.get("raw_value"),
+            target.get("place"),
+            target.get("city"),
+            target.get("country"),
+        ]
+        target_labels = {cls._norm(item) for item in target_values if cls._norm(item)}
+        location_labels = cls._location_labels(location)
+        for target_label in target_labels:
+            target_tokens = cls._tokens(target_label)
+            for location_label in location_labels:
+                location_tokens = cls._tokens(location_label)
+                if target_label == location_label or (
+                    target_tokens
+                    and location_tokens
+                    and (
+                        target_tokens.issubset(location_tokens)
+                        or location_tokens.issubset(target_tokens)
+                    )
+                ):
+                    return True
+        return False
+
+    # -------------------------------------------------------------------------
+    @classmethod
     def _scope_matches(
         cls,
         instance: OverlayInstance,
@@ -389,6 +490,13 @@ class OverlayCollectionService:
                     instance_radius
                 )
             return target_point == instance_point
+        if cls.scope_matches_location(
+            scope,
+            instance.resolved_location.model_dump(mode="json")
+            if instance.resolved_location is not None
+            else instance.scope,
+        ):
+            return True
         target_label_value = scope.label
         if not target_label_value:
             target_label_value = target.get("label") or target.get("raw_value")
@@ -1129,6 +1237,44 @@ class OverlayCollectionService:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def merge_instances(
+        cls,
+        base: OverlayCollectionState,
+        additions: Iterable[OverlayInstance],
+    ) -> OverlayCollectionState:
+        """Union rendered instances by identity and scoped location."""
+
+        instances = [item.model_copy(deep=True) for item in base.instances]
+        changed = False
+        for addition in additions:
+            matching_index = next(
+                (
+                    index
+                    for index, current in enumerate(instances)
+                    if current.instance_id == addition.instance_id
+                    or (
+                        current.capability_id == addition.capability_id
+                        and cls._same_overlay_location(current, addition)
+                    )
+                ),
+                None,
+            )
+            if matching_index is None:
+                instances.append(addition.model_copy(deep=True))
+                changed = True
+            elif instances[matching_index] != addition:
+                # A later provider result is authoritative for the same
+                # capability and scoped location.
+                instances[matching_index] = addition.model_copy(deep=True)
+                changed = True
+        next_revision = base.revision + 1 if changed else base.revision
+        return base.model_copy(
+            update={"instances": instances, "revision": next_revision},
+            deep=True,
+        )
+
+    # -------------------------------------------------------------------------
+    @classmethod
     def merge_into_map_session(
         cls,
         session: MapSession,
@@ -1138,4 +1284,19 @@ class OverlayCollectionService:
         return session.model_copy(
             update={"overlay_collection": collection},
             deep=True,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _same_overlay_location(
+        left: OverlayInstance,
+        right: OverlayInstance,
+    ) -> bool:
+        left_location = left.resolved_location
+        right_location = right.resolved_location
+        if left_location is None or right_location is None:
+            return left.scope_key == right.scope_key
+        return (
+            abs(left_location.latitude - right_location.latitude) <= 1e-6
+            and abs(left_location.longitude - right_location.longitude) <= 1e-6
         )

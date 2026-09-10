@@ -187,7 +187,7 @@ class RealtimeRenderAckPayload(BaseModel):
             ):
                 if key in item and not isinstance(item[key], bool):
                     raise ValueError(f"overlay result {key} must be boolean")
-            if "rendered_feature_count" in item and (
+            if "rendered_feature_count" in item and item["rendered_feature_count"] is not None and (
                 not isinstance(item["rendered_feature_count"], int)
                 or item["rendered_feature_count"] < 0
             ):

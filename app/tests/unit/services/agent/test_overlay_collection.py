@@ -142,7 +142,7 @@ def test_location_scoped_remove_does_not_remove_other_scope() -> None:
     assert result.removed_instance_ids == ["weather-zurich"]
 
 
-def test_location_scope_matches_canonical_place_alias_without_coordinates() -> None:
+def test_location_scope_matches_partial_canonical_place_without_coordinates() -> None:
     bologna = _instance(
         "species-bologna",
         "gbif_species_occurrences",
@@ -157,8 +157,8 @@ def test_location_scope_matches_canonical_place_alias_without_coordinates() -> N
         scope=OverlayScope(
             kind="location",
             location={
-                "place": "Bologna",
-                "normalized_value": "Bologna, Italy",
+                "city": "Bologna",
+                "country": "Italy",
                 "radius_m": 20_000,
             },
             label="Species records within 20 km of Bologna",
@@ -440,6 +440,47 @@ def test_add_reuses_same_capability_and_scope_identity() -> None:
     assert len(second.instances) == 1
     assert second.instances[0].instance_id == first.instances[0].instance_id
     assert second_result.added_instance_ids == []
+
+###############################################################################
+def test_missing_location_scope_binds_to_the_map_session_target() -> None:
+    weather = _instance(
+        "weather-zurich",
+        "openmeteo_weather_forecast",
+        label="Weather",
+        scope_key="Zurich",
+        latitude=47.37,
+        longitude=8.54,
+    )
+    session = MapSession(
+        session_id="map-1",
+        resolved_location=ResolvedLocation(
+            label="Zurich", latitude=47.37, longitude=8.54
+        ),
+        basemap_id="osm_default",
+        viewport=ViewportPolicy(
+            center_latitude=47.37,
+            center_longitude=8.54,
+            radius_m=2_500,
+        ),
+        overlay_collection=OverlayCollectionState(instances=[weather]),
+    )
+
+    updated, results = AgentTurnStateAssembler.apply_overlay_commands(
+        session,
+        [
+            OverlayCommand(
+                action="add",
+                selector=OverlaySelector(
+                    capability_ids=["openmeteo_weather_forecast"]
+                ),
+                scope=OverlayScope(kind="location"),
+            )
+        ],
+    )
+
+    assert len(updated.overlay_collection.instances) == 1
+    assert results[0].added_instance_ids == []
+    assert updated.overlay_collection.revision == 0
 
 ###############################################################################
 def test_catalog_selector_filters_provider_type_and_tags() -> None:
@@ -747,6 +788,76 @@ def test_tool_map_session_is_merged_into_active_map_without_refetch() -> None:
         "census_tigerweb_hydrography",
     }
     assert merged.overlay_collection.revision == 1
+
+
+###############################################################################
+def test_server_side_prepared_sessions_are_merged_without_reembedding_payload() -> None:
+    location = ResolvedLocation(
+        label="Rome",
+        latitude=41.9028,
+        longitude=12.4964,
+        country="Italy",
+    )
+    overlay = _instance(
+        "raster-rome",
+        "rainviewer_precipitation_radar",
+        label="Precipitation radar",
+        scope_key="Rome",
+        latitude=location.latitude,
+        longitude=location.longitude,
+    )
+    prepared = MapSession(
+        session_id="prepared-raster",
+        resolved_location=location,
+        basemap_id="osm_default",
+        viewport=ViewportPolicy(
+            center_latitude=location.latitude,
+            center_longitude=location.longitude,
+        ),
+        overlay_collection=OverlayCollectionState(instances=[overlay]),
+    )
+    prepared_second = prepared.model_copy(
+        update={
+            "overlay_collection": OverlayCollectionState(
+                instances=[
+                    overlay.model_copy(
+                        update={
+                            "instance_id": "vector-rome",
+                            "capability_id": "openmeteo_weather_forecast",
+                            "label": "Weather observations",
+                            "overlay_type": "point",
+                            "rendering_mode": "circle",
+                        }
+                    )
+                ]
+            )
+        }
+    )
+    assembler = object.__new__(AgentTurnStateAssembler)
+
+    merged = run_async_in_thread(
+        assembler.build_combined_map_session_from_tool_results(
+            tool_payload={"tool_results": []},
+            turn_contract=SimpleNamespace(
+                location_signals=[],
+                requested_basemap=None,
+                overlay_commands=[],
+                relationship="new_task",
+                operations=[],
+            ),
+            latest_memory={},
+            resolved_location=location,
+            prepared_map_sessions=[
+                prepared.model_dump(mode="json"),
+                prepared_second.model_dump(mode="json"),
+            ],
+        )
+    )
+
+    assert isinstance(merged, MapSession)
+    assert {
+        item.capability_id for item in merged.overlay_collection.instances
+    } == {"rainviewer_precipitation_radar", "openmeteo_weather_forecast"}
 
 
 ###############################################################################

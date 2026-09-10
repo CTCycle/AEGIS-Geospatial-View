@@ -98,9 +98,29 @@ class AgentTurnStateAssembler:
         candidate_catalog = OverlayCollectionService.catalog_from_collection(
             OverlayCollectionService.from_map_session(session)
         )
+        target_location = session.resolved_location.model_dump(mode="json")
+        bound_commands = [
+            command.model_copy(
+                update={
+                    "scope": command.scope.model_copy(
+                        update={
+                            "location": target_location,
+                            "label": target_location.get("label"),
+                        }
+                    )
+                }
+            )
+            if (
+                OverlayCollectionService.scope_matches_location(
+                    command.scope, session.resolved_location
+                )
+            )
+            else command
+            for command in commands
+        ]
         current_collection, results = OverlayCollectionService.apply_commands(
             collection,
-            commands,
+            bound_commands,
             catalog=candidate_catalog,
             current_view=current_view,
             basemap=basemap,
@@ -856,6 +876,7 @@ class AgentTurnStateAssembler:
         latest_memory: dict[str, Any] | None,
         resolved_location: ResolvedLocation | None = None,
         canonical_request: CanonicalRequestInterpretation | None = None,
+        prepared_map_sessions: list[dict[str, Any]] | None = None,
     ) -> MapSession | ClarificationRequest | None:
         if not is_json_object(tool_payload):
             return None
@@ -875,6 +896,22 @@ class AgentTurnStateAssembler:
             else None
         )
         candidate_map_sessions: list[MapSession] = []
+
+        # Native execution keeps complete validated map candidates server-side
+        # while the model-facing envelope exposes only bounded summaries.  Use
+        # those candidates as the same input contract as a full tool payload;
+        # this also preserves every overlay when one turn executes multiple
+        # capabilities.
+        for raw_session in prepared_map_sessions or []:
+            map_session = self._map_session_from_memory(raw_session)
+            if map_session is None:
+                continue
+            candidate_map_sessions.append(map_session)
+            if basemap_id is None:
+                basemap_id = map_session.basemap_id
+            for overlay_id in self._overlay_capability_ids(map_session):
+                if overlay_id not in overlay_ids:
+                    overlay_ids.append(overlay_id)
 
         canonical_target = (
             canonical_request.primary_target
@@ -907,6 +944,10 @@ class AgentTurnStateAssembler:
                 if str(item).strip()
             ]
             map_payload = data.get("map_session")
+            if not is_json_object(map_payload):
+                summary = data.get("summary")
+                if is_json_object(summary):
+                    map_payload = summary.get("map_session")
             if is_json_object(map_payload):
                 map_session = self._map_session_from_memory(map_payload)
                 if map_session is not None:
@@ -1076,7 +1117,7 @@ class AgentTurnStateAssembler:
                 instance.model_copy(deep=True)
                 for instance in session.overlay_collection.instances
             )
-        candidate_collection = cls._merge_overlay_instances(
+        candidate_collection = OverlayCollectionService.merge_instances(
             OverlayCollectionState(), candidate_instances
         )
         candidate = OverlayCollectionService.merge_into_map_session(
@@ -1109,7 +1150,7 @@ class AgentTurnStateAssembler:
         active = cls._with_canonical_location(
             active_map_session, canonical_location, rewrite_instances=False
         )
-        merged_collection = cls._merge_overlay_instances(
+        merged_collection = OverlayCollectionService.merge_instances(
             active.overlay_collection,
             [*active.overlay_collection.instances, *candidate_collection.instances],
         )
@@ -1211,58 +1252,6 @@ class AgentTurnStateAssembler:
         return (
             abs(left.latitude - right.latitude) <= 1e-6
             and abs(left.longitude - right.longitude) <= 1e-6
-        )
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _merge_overlay_instances(
-        cls,
-        base: OverlayCollectionState,
-        additions: list[OverlayInstance],
-    ) -> OverlayCollectionState:
-        """Union instances by stable id, then by capability and location."""
-        instances = [item.model_copy(deep=True) for item in base.instances]
-        changed = False
-        for addition in additions:
-            matching_index = next(
-                (
-                    index
-                    for index, current in enumerate(instances)
-                    if current.instance_id == addition.instance_id
-                    or (
-                        current.capability_id == addition.capability_id
-                        and cls._same_overlay_location(current, addition)
-                    )
-                ),
-                None,
-            )
-            if matching_index is None:
-                instances.append(addition.model_copy(deep=True))
-                changed = True
-            elif instances[matching_index] != addition:
-                # Provider-backed data from the current tool result is newer
-                # than an active snapshot with the same scoped capability.
-                instances[matching_index] = addition.model_copy(deep=True)
-                changed = True
-        next_revision = base.revision + 1 if changed else base.revision
-        return base.model_copy(
-            update={"instances": instances, "revision": next_revision},
-            deep=True,
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _same_overlay_location(
-        left: OverlayInstance,
-        right: OverlayInstance,
-    ) -> bool:
-        left_location = left.resolved_location
-        right_location = right.resolved_location
-        if left_location is None or right_location is None:
-            return left.scope_key == right.scope_key
-        return (
-            abs(left_location.latitude - right_location.latitude) <= 1e-6
-            and abs(left_location.longitude - right_location.longitude) <= 1e-6
         )
 
     # -------------------------------------------------------------------------

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_array, is_json_object, json_object
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
 from typing import Any, cast
 
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.contracts.extraction import TurnParseResult
-from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.capability_registry import (
+    CapabilityRegistry,
+    normalized_execution_contract,
+)
 
 ###############################################################################
 class ToolArgumentBuilder:
@@ -286,6 +289,11 @@ class ToolArgumentBuilder:
             if self.capability_registry is not None
             else {}
         ) or {}
+        point_sample_for_area = self._uses_point_sample_for_area(
+            capability,
+            canonical_request=canonical_request,
+            target_id=target_id,
+        )
         metadata = json_object(capability.get("metadata"))
         is_direct = (
             str(capability.get("type") or "").casefold() == "direct-tool"
@@ -352,7 +360,7 @@ class ToolArgumentBuilder:
             and turn.viewport_intent is not None
         ):
             radius_m = turn.viewport_intent.radius_hint_m
-        if radius_m is not None:
+        if radius_m is not None and not point_sample_for_area:
             arguments["radius_m"] = radius_m
         canonical_limit = canonical_filters.get("limit")
         if canonical_request is not None:
@@ -386,3 +394,44 @@ class ToolArgumentBuilder:
                 )
             )
         return {key: value for key, value in arguments.items() if value is not None}
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _uses_point_sample_for_area(
+        capability: dict[str, Any],
+        *,
+        canonical_request: CanonicalRequestInterpretation | None,
+        target_id: str | None,
+    ) -> bool:
+        if canonical_request is None:
+            return False
+        constraint = next(
+            (
+                item
+                for item in canonical_request.spatial_constraints
+                if item.analysis_scope == "radius"
+                and (target_id is None or item.target_id == target_id)
+            ),
+            None,
+        )
+        if constraint is None:
+            return False
+        metadata = json_object(capability.get("metadata"))
+        contract = normalized_execution_contract(capability)
+        declared_scopes = {
+            str(item).strip().casefold()
+            for item in json_array(contract.get("supported_scope_kinds"))
+            if str(item).strip()
+        }
+        render_support = str(contract.get("render_support") or "").casefold()
+        output_geometry = str(
+            contract.get("output_geometry_type")
+            or metadata.get("geometry_type")
+            or ""
+        ).casefold()
+        return (
+            "radius" not in declared_scopes
+            and "point" in declared_scopes
+            and render_support in {"metadata_only", "metadata-only"}
+            and output_geometry == "point"
+        )

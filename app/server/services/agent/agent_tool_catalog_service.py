@@ -25,9 +25,15 @@ from server.contracts.extraction import (
     LocationSignalType,
     TurnParseResult,
 )
-from server.contracts.geospatial import MapSession, ProviderLayerSelection
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    OverlayInstance,
+    ProviderLayerSelection,
+)
 from server.domain.agent.policies import ToolAuthorizationResult
 from server.services.agent.location_resolver import LocationResolver
+from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -563,6 +569,14 @@ class AgentToolCatalogService:
             # model-facing evidence envelope below contains only a bounded
             # identity summary and never re-serializes provider geometry.
             context.metadata["prepared_map_session"] = dict(map_session_payload)
+            prepared_sessions = context.metadata.get("prepared_map_sessions")
+            if not is_json_array(prepared_sessions):
+                prepared_sessions = []
+                context.metadata["prepared_map_sessions"] = prepared_sessions
+            # Keep each successful candidate.  A provider may reuse a
+            # session identifier for separate layers, and the shared map
+            # assembler deduplicates stable overlay instances when needed.
+            prepared_sessions.append(dict(map_session_payload))
         status = "available" if ok else "failed"
         if ok and payload.get("direct_result") in (None, [], {}, "") and map_session is None:
             status = "valid_empty"
@@ -809,7 +823,7 @@ class AgentToolCatalogService:
         ]
         if not evidence_refs and not location_refs:
             return AgentEvidenceEnvelope(ok=False, status="error", error={"code": "missing_map_input", "message": "Map preparation requires evidence or location references."}).model_dump(mode="json")
-        map_session: MapSession | None = None
+        map_sessions: list[MapSession] = []
         if self.evidence_repository is not None:
             for ref in evidence_refs:
                 item = self.evidence_repository.get_payload(
@@ -826,10 +840,10 @@ class AgentToolCatalogService:
                 candidate = payload.get("map_session") if is_json_object(payload) else None
                 if is_json_object(candidate):
                     try:
-                        map_session = MapSession.model_validate(candidate)
-                        break
+                        map_sessions.append(MapSession.model_validate(candidate))
                     except Exception:
                         continue
+        map_session = self._merge_map_sessions(map_sessions)
         layer_options = arguments.get("layer_options")
         if map_session is None and is_json_object(layer_options):
             provider_id = str(layer_options.get("provider_id") or "").strip()
@@ -901,6 +915,33 @@ class AgentToolCatalogService:
             "map_eligibility": "renderable",
             "state_changes": [{"type": "map_prepared", "render_status": "awaiting_render"}],
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _merge_map_sessions(sessions: list[MapSession]) -> MapSession | None:
+        """Combine every validated evidence map into one renderable session."""
+
+        if not sessions:
+            return None
+        candidate = sessions[-1].model_copy(deep=True)
+        instances: list[OverlayInstance] = []
+        warnings: list[str] = []
+        for session in sessions:
+            instances.extend(
+                item.model_copy(deep=True)
+                for item in session.overlay_collection.instances
+            )
+            warnings.extend(session.compliance_warnings)
+        collection = OverlayCollectionService.merge_instances(
+            OverlayCollectionState(), instances
+        )
+        return candidate.model_copy(
+            update={
+                "overlay_collection": collection,
+                "compliance_warnings": list(dict.fromkeys(warnings)),
+            },
+            deep=True,
+        )
 
     # -------------------------------------------------------------------------
     def _persist_evidence(

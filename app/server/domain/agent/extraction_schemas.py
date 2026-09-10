@@ -1,13 +1,43 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, cast, get_args
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from server.domain.agent.actions import AgentAction
 
 ###############################################################################
-class LLMTemporalSignal(BaseModel):
+_NULL_SENTINELS = frozenset({"null", "none", "nil"})
+
+
+class _ExtractionModel(BaseModel):
+    """Shared provider-boundary normalization for typed parser payloads.
+
+    Some OpenAI-compatible providers serialize a JSON null for an optional
+    field as a textual sentinel.  Normalize that representation only when the
+    destination field explicitly permits ``None``; required text fields and
+    enum values therefore remain strict.
+    """
+
+    # -------------------------------------------------------------------------
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_nullable_sentinels(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        normalized: dict[str, Any] = dict(cast(Any, value))
+        for name, field in cls.model_fields.items():
+            raw: Any = normalized.get(name)
+            if (
+                isinstance(raw, str)
+                and raw.strip().casefold() in _NULL_SENTINELS
+                and type(None) in get_args(field.annotation)
+            ):
+                normalized[name] = None
+        return normalized
+
+
+class LLMTemporalSignal(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     mode: Literal["current", "historical", "forecast", "none"] = "none"
@@ -23,7 +53,7 @@ class LLMTemporalSignal(BaseModel):
     )
 
 ###############################################################################
-class LLMGeographicRelationship(BaseModel):
+class LLMGeographicRelationship(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     relationship: str = "in"
@@ -33,7 +63,7 @@ class LLMGeographicRelationship(BaseModel):
     distance_m: float | None = Field(default=None, gt=0.0)
 
 ###############################################################################
-class LLMContextQuery(BaseModel):
+class LLMContextQuery(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     kind: Literal[
@@ -47,7 +77,7 @@ class LLMContextQuery(BaseModel):
     ] = "none"
 
 ###############################################################################
-class LLMLocationSignal(BaseModel):
+class LLMLocationSignal(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     signal_type: Literal[
@@ -79,7 +109,7 @@ class LLMLocationSignal(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 ###############################################################################
-class LLMDisallowedPattern(BaseModel):
+class LLMDisallowedPattern(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     pattern_id: str
@@ -87,7 +117,7 @@ class LLMDisallowedPattern(BaseModel):
     matched_text: str
 
 ###############################################################################
-class LLMAtomicTask(BaseModel):
+class LLMAtomicTask(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     summary: str
@@ -106,7 +136,7 @@ class LLMAtomicTask(BaseModel):
     )
 
 ###############################################################################
-class LLMClarificationOption(BaseModel):
+class LLMClarificationOption(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     option_id: str
@@ -114,7 +144,7 @@ class LLMClarificationOption(BaseModel):
     description: str | None = None
 
 ###############################################################################
-class LLMClarificationPlan(BaseModel):
+class LLMClarificationPlan(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     question: str
@@ -127,7 +157,7 @@ class LLMClarificationPlan(BaseModel):
     apply_visualization_changes: bool = False
 
 ###############################################################################
-class LLMViewportIntent(BaseModel):
+class LLMViewportIntent(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     scope: Literal[
@@ -146,7 +176,7 @@ class LLMViewportIntent(BaseModel):
     reason: str | None = None
 
 ###############################################################################
-class LLMOverlaySelector(BaseModel):
+class LLMOverlaySelector(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     instance_ids: list[str] = Field(default_factory=lambda: list[str]())
@@ -160,7 +190,7 @@ class LLMOverlaySelector(BaseModel):
     visibility: Literal["any", "visible", "hidden"] = "any"
 
 ###############################################################################
-class LLMOverlayScope(BaseModel):
+class LLMOverlayScope(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     kind: Literal["global", "current_view", "location"] = "global"
@@ -168,7 +198,7 @@ class LLMOverlayScope(BaseModel):
     label: str | None = None
 
 ###############################################################################
-class LLMOverlayPatch(BaseModel):
+class LLMOverlayPatch(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     opacity: float | None = Field(default=None, ge=0.0, le=1.0)
@@ -177,14 +207,14 @@ class LLMOverlayPatch(BaseModel):
     format: str | None = None
 
 ###############################################################################
-class LLMOverlayStateReference(BaseModel):
+class LLMOverlayStateReference(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     collection_id: str = "active-map"
     revision: int = Field(default=0, ge=0)
 
 ###############################################################################
-class LLMOverlayCommand(BaseModel):
+class LLMOverlayCommand(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     action: Literal["add", "remove", "keep_only", "show", "hide", "update"]
@@ -198,7 +228,7 @@ class LLMOverlayCommand(BaseModel):
     )
 
 ###############################################################################
-class LLMParserExtraction(BaseModel):
+class LLMParserExtraction(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
     task_class: Literal["map_search", "direct_query", "general_question", "unclear"] = (

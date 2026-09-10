@@ -15,6 +15,7 @@ from server.contracts.extraction import (
 )
 from server.domain.agent.interpretation import (
     CanonicalRequestInterpretation,
+    CanonicalSpatialConstraint,
     CanonicalTemporalConstraints,
 )
 from server.services.agent.capability_resolver import CapabilityResolver
@@ -105,6 +106,101 @@ def test_temporal_capability_check_uses_canonical_request_over_stale_turn() -> N
         is False
     )
 
+
+def test_temporal_capability_check_uses_inferred_legacy_forecast_support() -> None:
+    turn = _turn(
+        "Show the weather forecast around Example City",
+        "openmeteo_pressure_humidity_wind",
+        temporal_mode="forecast",
+    )
+    capability = {
+        "type": "time-series-insight",
+        "capabilityKind": "analysis-tool",
+        "capabilities": ["weather", "forecast"],
+        "metadata": {
+            "geometry_type": "point",
+            "queryable": True,
+            "vectorizable": True,
+        },
+    }
+
+    assert CapabilityResolver._supports_temporal_request(capability, turn) is True
+
+
+def test_explicit_empty_contract_does_not_infer_legacy_forecast_support() -> None:
+    turn = _turn(
+        "Show the weather forecast around Example City",
+        "openmeteo_pressure_humidity_wind",
+        temporal_mode="forecast",
+    )
+    capability = {
+        "type": "time-series-insight",
+        "capabilityKind": "analysis-tool",
+        "capabilities": ["weather", "forecast"],
+        "metadata": {
+            "geometry_type": "point",
+            "queryable": True,
+            "vectorizable": True,
+        },
+        "executionContract": {},
+    }
+
+    assert CapabilityResolver._supports_temporal_request(capability, turn) is False
+
+
+def test_keeps_point_metadata_capability_in_area_scoped_request() -> None:
+    turn = _turn(
+        "Show weather and earthquakes within 100 km of Denver",
+        "openmeteo_weather_forecast",
+        temporal_mode="current",
+    )
+    canonical = CanonicalRequestInterpretation(
+        request_id="area-combination-1",
+        primary_intent="data_layer_query",
+        spatial_constraints=[
+            CanonicalSpatialConstraint(
+                relationship="within_distance",
+                target_id="target-1",
+                analysis_scope="radius",
+                distance_m=100_000,
+                provenance="explicit",
+            )
+        ],
+    )
+
+    resolved = _resolver().resolve(turn, canonical_request=canonical)
+
+    assert resolved.requested_layers == ["openmeteo_weather_forecast"]
+    assert resolved.clarification_plan is None
+
+
+###############################################################################
+def test_resolves_legacy_point_analysis_capability_in_explicit_area_scope() -> None:
+    turn = _turn(
+        "Map current temperature and humidity around Example City",
+        "openmeteo_pressure_humidity_wind",
+        temporal_mode="current",
+    )
+    canonical = CanonicalRequestInterpretation(
+        request_id="legacy-point-area-1",
+        primary_intent="data_layer_query",
+        spatial_constraints=[
+            CanonicalSpatialConstraint(
+                relationship="around",
+                target_id="target-1",
+                analysis_scope="radius",
+                distance_m=None,
+                provenance="explicit",
+            )
+        ],
+    )
+
+    resolved = _resolver().resolve(turn, canonical_request=canonical)
+
+    assert resolved.requested_layers == ["openmeteo_pressure_humidity_wind"]
+    assert resolved.clarification_plan is None
+
+
 ###############################################################################
 def test_resolves_precipitation_radar_semantics() -> None:
     resolved = _resolver().resolve(
@@ -129,6 +225,62 @@ def test_resolves_forecast_semantics() -> None:
         )
     )
     assert resolved.requested_layers == ["openmeteo_weather_forecast"]
+
+
+###############################################################################
+def test_resolves_related_semantic_terms_as_one_catalog_capability() -> None:
+    turn = _turn(
+        "Add the weather forecast layer around Example City",
+        "weather",
+        temporal_mode="forecast",
+    ).model_copy(
+        update={
+            "requested_layers": [],
+            "requested_concepts": ["weather", "forecast"],
+            "overlay_commands": [
+                OverlayCommand(
+                    action="add",
+                    selector=OverlaySelector(concepts=["weather", "forecast"]),
+                )
+            ],
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.requested_layers == ["openmeteo_weather_forecast"]
+    assert resolved.overlay_commands[0].selector.capability_ids == [
+        "openmeteo_weather_forecast"
+    ]
+    assert resolved.clarification_plan is None
+
+
+###############################################################################
+def test_preserves_capability_for_preserved_viewport_context() -> None:
+    turn = _turn(
+        "Add the forecast layer to the current map",
+        "openmeteo_weather_forecast",
+        temporal_mode="forecast",
+    )
+    canonical = CanonicalRequestInterpretation(
+        request_id="preserved-viewport-1",
+        primary_intent="data_layer_query",
+        spatial_constraints=[
+            CanonicalSpatialConstraint(
+                relationship="visible_area",
+                target_id="target-1",
+                analysis_scope="viewport",
+                provenance="viewport",
+            )
+        ],
+        temporal_constraints=CanonicalTemporalConstraints(mode="forecast"),
+    )
+
+    resolved = _resolver().resolve(turn, canonical_request=canonical)
+
+    assert resolved.requested_layers == ["openmeteo_weather_forecast"]
+    assert resolved.clarification_plan is None
+
 
 ###############################################################################
 def test_preserves_canonical_capability_ids_inside_overlay_commands() -> None:
@@ -169,6 +321,47 @@ def test_preserves_unmatched_capability_ids_for_focused_clarification() -> None:
     resolved = _resolver().resolve(turn)
 
     assert resolved.overlay_commands[0].selector.capability_ids == ["fictional_overlay"]
+
+
+def test_fetching_selector_prefers_scope_compatible_semantic_capability() -> None:
+    turn = _turn("Show weather within 100 km of Denver", "").model_copy(
+        update={
+            "requested_layers": [],
+            "capability_limitations": [
+                "No enabled executable layer matched: noaa_weather_alerts."
+            ],
+            "overlay_commands": [
+                OverlayCommand(
+                    action="add",
+                    selector=OverlaySelector(
+                        capability_ids=["noaa_weather_alerts"],
+                        concepts=["weather"],
+                    ),
+                )
+            ],
+        }
+    )
+    canonical = CanonicalRequestInterpretation(
+        request_id="semantic-scope-fallback-1",
+        primary_intent="data_layer_query",
+        spatial_constraints=[
+            CanonicalSpatialConstraint(
+                relationship="within_distance",
+                target_id="target-1",
+                analysis_scope="radius",
+                distance_m=100_000,
+                provenance="explicit",
+            )
+        ],
+    )
+
+    resolved = _resolver().resolve(turn, canonical_request=canonical)
+
+    assert resolved.requested_layers == ["openmeteo_weather_forecast"]
+    assert resolved.overlay_commands[0].selector.capability_ids == [
+        "openmeteo_weather_forecast"
+    ]
+    assert resolved.capability_limitations == []
 
 ###############################################################################
 def test_unsupported_direct_values_preserve_valid_overlay_mutation() -> None:
