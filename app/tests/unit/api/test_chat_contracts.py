@@ -60,6 +60,22 @@ def test_chat_turn_request_rejects_missing_conversation_id() -> None:
         raise AssertionError("conversation_id must be required")
 
 
+def test_chat_turn_does_not_expose_map_commit_switch_over_http() -> None:
+    response = TestClient(_app()).post(
+        f"/api/chat{CHAT_TURN_ROUTE}",
+        json={
+            "message": "Show Rome",
+            "conversation_id": "conv-1",
+            "defer_map_commit": True,
+        },
+    )
+
+    assert response.status_code == 422
+    assert any(
+        error["loc"][-1] == "defer_map_commit" for error in response.json()["detail"]
+    )
+
+
 def test_native_turn_response_does_not_require_legacy_parser_projections() -> None:
     response = ChatTurnResponse(
         request_id="native-1",

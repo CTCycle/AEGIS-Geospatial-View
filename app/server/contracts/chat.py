@@ -41,10 +41,6 @@ class ChatTurnRequest(BaseModel):
     timezone: str | None = Field(default=None, max_length=64)
     request_id: str | None = None
     conversation_id: str
-    # Interactive realtime runs defer promotion of a candidate map until the
-    # browser acknowledges the exact rendered revision.  Direct API callers
-    # retain the historical immediate-commit behavior by default.
-    defer_map_commit: bool = False
 
 ###############################################################################
 class ContextUsageResponse(BaseModel):

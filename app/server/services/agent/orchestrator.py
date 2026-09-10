@@ -355,6 +355,7 @@ class AgentOrchestrator:
         state_before: Any,
         settings: Any,
         execution_budget: AgentExecutionBudget,
+        defer_map_commit: bool,
     ) -> ChatTurnResponse:
         if self.native_v2_runner is None:
             raise RuntimeError("Native-v2 mode requires a composed native runner.")
@@ -389,7 +390,7 @@ class AgentOrchestrator:
                 location_refs=location_refs,
                 evidence_refs=evidence_refs,
                 canonical_request=canonical_request,
-                defer_map_commit=payload.defer_map_commit,
+                defer_map_commit=defer_map_commit,
             )
         )
         tool_payload = _native_tool_payload(native_response)
@@ -511,6 +512,8 @@ class AgentOrchestrator:
         self,
         payload: ChatTurnRequest,
         progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
+        *,
+        defer_map_commit: bool = False,
     ) -> ChatTurnResponse:
         # Conversation state, task state, and persistence revisions are
         # mutable by design. Serialize turns for one conversation so a stale
@@ -519,7 +522,11 @@ class AgentOrchestrator:
             payload.conversation_id, asyncio.Lock()
         )
         async with lock:
-            return await self._run_turn_serialized(payload, progress_callback)
+            return await self._run_turn_serialized(
+                payload,
+                progress_callback,
+                defer_map_commit=defer_map_commit,
+            )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -603,6 +610,8 @@ class AgentOrchestrator:
         self,
         payload: ChatTurnRequest,
         progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
+        *,
+        defer_map_commit: bool = False,
     ) -> ChatTurnResponse:
         execution_budget = self._new_execution_budget()
         conversation_id = payload.conversation_id
@@ -634,6 +643,7 @@ class AgentOrchestrator:
             payload,
             progress_callback,
             execution_budget=execution_budget,
+            defer_map_commit=defer_map_commit,
         )
         synthesis_usage = getattr(self.response_synthesizer, "last_context_usage", None)
         self._emit_context_usage(
@@ -649,16 +659,16 @@ class AgentOrchestrator:
         # cannot provide browser render evidence, so a native candidate must
         # remain outside durable active-map state even when the legacy request
         # flag is left at its default value.
-        defer_map_commit = payload.defer_map_commit or (
+        effective_defer_map_commit = defer_map_commit or (
             self._agent_loop_mode() == "native_v2" and response.map_session is not None
         )
         task_snapshot_for_persistence = self._task_snapshot_for_persistence(
             self.task_state_service.serialize(conversation_id),
             persisted.get("task_snapshot"),
-            defer_map_commit=defer_map_commit,
+            defer_map_commit=effective_defer_map_commit,
             has_map_candidate=response.map_session is not None,
         )
-        if defer_map_commit and response.map_session is not None:
+        if effective_defer_map_commit and response.map_session is not None:
             # Keep the candidate in the run response, but never make it the
             # conversation's active visualization before browser validation.
             # The map assembler updates the in-memory task state while it
@@ -701,7 +711,7 @@ class AgentOrchestrator:
             if response.operation is not None and response.operation.kind == "clarification":
                 execution_budget.terminal_reason = "clarification_required"
             elif (
-                defer_map_commit
+                effective_defer_map_commit
                 and response.map_session is not None
                 and response.operation is not None
                 and response.operation.kind == "map_session"
@@ -1006,6 +1016,7 @@ class AgentOrchestrator:
         progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
         *,
         execution_budget: AgentExecutionBudget | None = None,
+        defer_map_commit: bool = False,
     ) -> ChatTurnResponse:
         execution_budget = execution_budget or self._new_execution_budget()
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
@@ -1116,6 +1127,7 @@ class AgentOrchestrator:
                 state_before=state_before,
                 settings=settings,
                 execution_budget=execution_budget,
+                defer_map_commit=defer_map_commit,
             )
 
         parser_kwargs: dict[str, Any] = {
@@ -1822,7 +1834,7 @@ class AgentOrchestrator:
                     if step.capability_id is not None
                 ],
                 "specialist": specialist,
-                "defer_map_commit": payload.defer_map_commit,
+                "defer_map_commit": defer_map_commit,
                 "execution_mode": execution_mode,
                 "capability_domains": tool_plan.capability_domains,
                 "candidate_capability_ids": tool_plan.candidate_capability_ids,
@@ -1898,7 +1910,7 @@ class AgentOrchestrator:
             if response.map_session is not None:
                 execution_budget.pipeline_reach["map_assembly"] = "success"
                 execution_budget.pipeline_reach["render_ack"] = (
-                    "pending" if payload.defer_map_commit else "not_required"
+                    "pending" if defer_map_commit else "not_required"
                 )
             return response.model_copy(update={"canonical_request": canonical_request})
         build_native_tools = getattr(
@@ -2178,7 +2190,7 @@ class AgentOrchestrator:
             )
         execution_budget.pipeline_reach["map_assembly"] = "success"
         execution_budget.pipeline_reach["render_ack"] = (
-            "pending" if payload.defer_map_commit and map_session is not None else "not_required"
+            "pending" if defer_map_commit and map_session is not None else "not_required"
         )
         self.turn_state_assembler.append_provider_events(tool_payload, map_session)
         memory_snapshot = await self.turn_state_assembler.build_updated_memory_snapshot(
@@ -2245,7 +2257,7 @@ class AgentOrchestrator:
                 if is_json_object(item) and item.get("tool_call_id")
             ],
         )
-        if not payload.defer_map_commit:
+        if not defer_map_commit:
             self.task_state_service.set_active_visualization(
                 conversation_key, map_session, tool_payload=tool_payload
             )
@@ -2316,7 +2328,7 @@ class AgentOrchestrator:
                 if is_json_object(item) and item.get("tool_call_id")
             ],
         )
-        if not payload.defer_map_commit:
+        if not defer_map_commit:
             self.task_state_service.set_active_visualization(
                 conversation_key, map_session, tool_payload=tool_payload
             )
@@ -2380,7 +2392,7 @@ class AgentOrchestrator:
         # follow-up cannot inherit an unacknowledged map as authoritative.
         history_memory_snapshot = (
             latest_memory
-            if payload.defer_map_commit and map_session is not None
+            if defer_map_commit and map_session is not None
             else memory_snapshot
         )
         self.history_service.append_message(
@@ -2408,7 +2420,7 @@ class AgentOrchestrator:
             # run presentation retains it for the render handshake.
             map_session=(
                 map_session.model_dump(mode="json")
-                if map_session is not None and not payload.defer_map_commit
+                if map_session is not None and not defer_map_commit
                 else None
             ),
         )

@@ -25,7 +25,7 @@ class _FakeAgentOrchestrator:
         self.response = response
 
     # -------------------------------------------------------------------------
-    async def run_turn(self, payload, progress_callback=None):  # noqa: ANN001
+    async def run_turn(self, payload, progress_callback=None, **_kwargs):  # noqa: ANN001
         _ = payload
         if progress_callback is not None and self.response.context_usage is not None:
             progress_callback(

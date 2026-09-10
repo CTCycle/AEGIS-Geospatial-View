@@ -128,9 +128,9 @@ class AgentRunOrchestrator:
                     request_id=run_id,
                     title=snapshot.original_request[:120],
                     conversation_id=snapshot.conversation_id,
-                    defer_map_commit=True,
                 ),
                 progress_callback=on_agent_progress,
+                defer_map_commit=True,
             )
         except Exception as exc:
             latest = self.run_repository.get_run(run_id) or snapshot
