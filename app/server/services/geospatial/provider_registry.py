@@ -34,6 +34,7 @@ from server.services.geospatial.providers.fema import FEMAProvider
 from server.services.geospatial.providers.gbif import GBIFProvider
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
+from server.services.geospatial.providers.http import request_timeout_scope
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
 from server.services.geospatial.providers.nasa_firms import NASAFIRMSProvider
 from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
@@ -224,12 +225,22 @@ class ProviderRegistry:
         provider = self.get(normalized)
         self._ensure_circuit_closed(normalized)
         await self._wait_for_rate_limit(normalized)
+        deadline = monotonic() + max(
+            0.01, float(self.execution_policy.timeout_seconds)
+        )
         # Provider transport is the only retry owner below the tool boundary.
         # Keep the external attempt count bounded even if a stale configuration
         # requests a larger value.
         attempts = min(2, max(1, int(self.execution_policy.max_attempts)))
         last_error: ProviderError | None = None
         for attempt in range(attempts):
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                timeout_error = ProviderTimeoutError(
+                    f"Provider '{normalized}' timed out."
+                )
+                self._record_failure(normalized)
+                raise timeout_error from last_error
             started = monotonic()
             LOGGER.debug(
                 "provider_request provider=%s capability=%s attempt=%s bbox=%s zoom=%s time=%s params=%s",
@@ -242,10 +253,11 @@ class ProviderRegistry:
                 safe_request_params(request.params),
             )
             try:
-                response = await asyncio.wait_for(
-                    self._fetch_provider(provider, request),
-                    timeout=max(0.01, float(self.execution_policy.timeout_seconds)),
-                )
+                with request_timeout_scope(remaining):
+                    response = await asyncio.wait_for(
+                        self._fetch_provider(provider, request),
+                        timeout=remaining,
+                    )
             except ProviderAuthError:
                 raise
             except TimeoutError as exc:
@@ -253,19 +265,19 @@ class ProviderRegistry:
                 self._record_failure(normalized)
                 if not self._should_retry(attempt, last_error, attempts):
                     raise last_error from exc
-                await self._wait_before_retry(attempt, last_error)
+                await self._wait_before_retry(attempt, last_error, deadline=deadline)
             except ProviderRateLimitError as exc:
                 last_error = exc
                 self._record_failure(normalized)
                 if not self._should_retry(attempt, last_error, attempts):
                     raise
-                await self._wait_before_retry(attempt, last_error)
+                await self._wait_before_retry(attempt, last_error, deadline=deadline)
             except ProviderUnavailableError as exc:
                 last_error = exc
                 self._record_failure(normalized)
                 if not self._should_retry(attempt, last_error, attempts):
                     raise
-                await self._wait_before_retry(attempt, last_error)
+                await self._wait_before_retry(attempt, last_error, deadline=deadline)
             except ProviderError:
                 self._record_failure(normalized)
                 raise
@@ -300,8 +312,16 @@ class ProviderRegistry:
         return self._retry_delay_seconds(attempt, error) is not None
 
     # -------------------------------------------------------------------------
-    async def _wait_before_retry(self, attempt: int, error: ProviderError) -> None:
+    async def _wait_before_retry(
+        self,
+        attempt: int,
+        error: ProviderError,
+        *,
+        deadline: float | None = None,
+    ) -> None:
         delay = self._retry_delay_seconds(attempt, error)
+        if delay is not None and deadline is not None:
+            delay = min(delay, max(0.0, deadline - monotonic()))
         if delay is not None and delay > 0:
             await asyncio.sleep(delay)
 
@@ -343,11 +363,15 @@ class ProviderRegistry:
             )
         self._ensure_circuit_closed(normalized)
         await self._wait_for_rate_limit(normalized)
+        remaining = max(
+            0.01, float(self.execution_policy.timeout_seconds)
+        )
         try:
-            return await asyncio.wait_for(
-                list_layers(query=query, limit=limit, refresh=refresh),
-                timeout=max(0.01, float(self.execution_policy.timeout_seconds)),
-            )
+            with request_timeout_scope(remaining):
+                return await asyncio.wait_for(
+                    list_layers(query=query, limit=limit, refresh=refresh),
+                    timeout=remaining,
+                )
         except TimeoutError as exc:
             self._record_failure(normalized)
             raise ProviderTimeoutError(f"Provider '{normalized}' timed out.") from exc
@@ -371,11 +395,15 @@ class ProviderRegistry:
             )
         self._ensure_circuit_closed(normalized)
         await self._wait_for_rate_limit(normalized)
+        remaining = max(
+            0.01, float(self.execution_policy.timeout_seconds)
+        )
         try:
-            return await asyncio.wait_for(
-                describe_layer(layer_id, refresh=refresh),
-                timeout=max(0.01, float(self.execution_policy.timeout_seconds)),
-            )
+            with request_timeout_scope(remaining):
+                return await asyncio.wait_for(
+                    describe_layer(layer_id, refresh=refresh),
+                    timeout=remaining,
+                )
         except TimeoutError as exc:
             self._record_failure(normalized)
             raise ProviderTimeoutError(f"Provider '{normalized}' timed out.") from exc

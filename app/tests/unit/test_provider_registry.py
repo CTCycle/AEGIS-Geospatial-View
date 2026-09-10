@@ -37,7 +37,12 @@ class _TimeoutProvider:
     provider_id = "slow"
 
     # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.calls = 0
+
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
+        self.calls += 1
         await asyncio.sleep(1.0)
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -243,6 +248,30 @@ def test_provider_registry_retries_transient_provider_failure() -> None:
     )
 
     assert response.payload == {"attempts": 2}
+
+###############################################################################
+def test_provider_registry_does_not_retry_after_deadline_expires() -> None:
+    provider = _TimeoutProvider()
+    registry = ProviderRegistry(
+        providers=[provider],
+        execution_policy=ProviderExecutionPolicy(
+            timeout_seconds=0.01,
+            max_attempts=2,
+            retry_backoff_base_seconds=0.0,
+            retry_backoff_max_seconds=0.0,
+        ),
+    )
+
+    try:
+        run_async_in_thread(
+            registry.fetch("slow", ProviderRequest(capability_id="slow_layer"))
+        )
+    except ProviderTimeoutError:
+        pass
+    else:
+        raise AssertionError("Slow provider unexpectedly succeeded.")
+
+    assert provider.calls == 1
 
 ###############################################################################
 def test_provider_registry_retries_bounded_rate_limit_after_retry_after() -> None:

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import inspect
+from contextlib import contextmanager
+from contextvars import ContextVar
 from email.utils import parsedate_to_datetime
 from datetime import UTC, datetime
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, Iterator
 
 import httpx
 
@@ -29,6 +31,25 @@ _ASYNC_HTTP_CLIENT = httpx.AsyncClient(
     timeout=_DEFAULT_TIMEOUT,
     follow_redirects=False,
 )
+_REQUEST_TIMEOUT_SECONDS: ContextVar[float | None] = ContextVar(
+    "provider_request_timeout_seconds",
+    default=None,
+)
+
+###############################################################################
+@contextmanager
+def request_timeout_scope(timeout_seconds: float | None) -> Iterator[None]:
+    """Apply one provider request's remaining timeout to shared HTTP helpers."""
+
+    token = _REQUEST_TIMEOUT_SECONDS.set(
+        None
+        if timeout_seconds is None
+        else max(0.001, float(timeout_seconds))
+    )
+    try:
+        yield
+    finally:
+        _REQUEST_TIMEOUT_SECONDS.reset(token)
 
 ###############################################################################
 async def fetch_json_url(url: str, headers: dict[str, str] | None = None) -> Any:
@@ -48,8 +69,12 @@ async def fetch_bytes_url(
     max_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
 ) -> bytes:
     try:
+        request_kwargs: dict[str, Any] = {"headers": headers or {}}
+        timeout_seconds = _REQUEST_TIMEOUT_SECONDS.get()
+        if timeout_seconds is not None:
+            request_kwargs["timeout"] = timeout_seconds
         async with _ASYNC_HTTP_CLIENT.stream(
-            "GET", url, headers=headers or {}
+            "GET", url, **request_kwargs
         ) as response:
             _raise_for_status(response)
             content_length = response.headers.get("content-length")
