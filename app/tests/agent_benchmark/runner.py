@@ -55,9 +55,108 @@ def _response(trace: dict[str, Any]) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 ###############################################################################
+def _is_native_v2_trace(trace: dict[str, Any]) -> bool:
+    execution_trace = _response(trace).get("execution_trace")
+    return (
+        isinstance(execution_trace, dict)
+        and execution_trace.get("execution_mode") == "native_v2"
+    )
+
+###############################################################################
+def _native_result_capability_id(result: dict[str, Any]) -> str | None:
+    content = result.get("content")
+    content = content if isinstance(content, dict) else {}
+    for source in (result, content):
+        capability_id = source.get("capability_id")
+        if isinstance(capability_id, str) and capability_id.strip():
+            return capability_id.strip()
+
+    tool_name = result.get("name") or result.get("tool_name")
+    if tool_name == "resolve_geospatial_location":
+        return "location"
+
+    summary = content.get("summary") or result.get("summary")
+    if isinstance(summary, str):
+        match = re.search(r"capability\s+['\"]([^'\"]+)['\"]", summary, re.I)
+        if match:
+            return match.group(1).strip()
+    return None
+
+###############################################################################
+def _native_tool_calls(trace: dict[str, Any]) -> list[dict[str, Any]]:
+    if not _is_native_v2_trace(trace):
+        return []
+    results = trace.get("tool_results", [])
+    if not isinstance(results, list):
+        return []
+
+    calls: list[dict[str, Any]] = []
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        tool_name = result.get("name") or result.get("tool_name")
+        if not isinstance(tool_name, str) or not tool_name.strip():
+            continue
+        content = result.get("content")
+        content = content if isinstance(content, dict) else {}
+        status = result.get("status") or content.get("status")
+        valid = (
+            result.get("is_error") is not True
+            and result.get("error") in (None, "")
+            and status not in {"failed", "error"}
+        )
+        call: dict[str, Any] = {
+            "name": tool_name,
+            "arguments": {},
+            "tool_call_id": result.get("tool_call_id") or result.get("call_id"),
+            "_native": True,
+            "_native_valid": valid,
+        }
+        capability_id = _native_result_capability_id(result)
+        if capability_id:
+            call["_capability_id"] = capability_id
+        calls.append(call)
+    return calls
+
+###############################################################################
 def _contract(trace: dict[str, Any]) -> dict[str, Any]:
     value = _response(trace).get("turn_contract")
-    return value if isinstance(value, dict) else {}
+    if isinstance(value, dict) and value:
+        return value
+    if not _is_native_v2_trace(trace):
+        return value if isinstance(value, dict) else {}
+
+    response = _response(trace)
+    route = response.get("route")
+    operation = response.get("operation")
+    operation_kind = operation.get("kind") if isinstance(operation, dict) else None
+    task_mode = route.get("task_mode") if isinstance(route, dict) else None
+    presentation = route.get("presentation") if isinstance(route, dict) else None
+    if task_mode == "clarify" or operation_kind == "clarification":
+        task_class = "unclear"
+    elif presentation in {"map", "both"} or (
+        isinstance(route, dict) and route.get("requires_location") is True
+    ):
+        task_class = "map_search"
+    elif task_mode == "execute":
+        task_class = "direct_query"
+    elif not route and operation_kind == "clarification":
+        task_class = "unclear"
+    else:
+        task_class = "general_question"
+
+    contract: dict[str, Any] = {
+        "task_class": task_class,
+        "tools_needed": bool(_native_tool_calls(trace)),
+        "requested_layers": (
+            route.get("explicit_capability_ids", [])
+            if isinstance(route, dict)
+            else []
+        ),
+    }
+    if task_class == "unclear":
+        contract["clarification_plan"] = {"state": "clarify"}
+    return contract
 
 ###############################################################################
 def _map_session(trace: dict[str, Any]) -> dict[str, Any] | None:
@@ -66,12 +165,14 @@ def _map_session(trace: dict[str, Any]) -> dict[str, Any] | None:
 
 ###############################################################################
 def _tool_calls(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        item
-        for trace in traces
-        for item in trace.get("tool_calls", [])
-        if isinstance(item, dict)
-    ]
+    calls: list[dict[str, Any]] = []
+    for trace in traces:
+        legacy_calls = trace.get("tool_calls", [])
+        if isinstance(legacy_calls, list) and legacy_calls:
+            calls.extend(item for item in legacy_calls if isinstance(item, dict))
+        else:
+            calls.extend(_native_tool_calls(trace))
+    return calls
 
 ###############################################################################
 def _tool_results(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -96,6 +197,9 @@ def _provider_events(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _capability_ids(tool_calls: list[dict[str, Any]]) -> set[str]:
     capability_ids: set[str] = set()
     for call in tool_calls:
+        native_capability_id = call.get("_capability_id")
+        if isinstance(native_capability_id, str) and native_capability_id.strip():
+            capability_ids.add(native_capability_id.strip())
         arguments = call.get("arguments")
         if not isinstance(arguments, dict):
             continue
@@ -289,6 +393,13 @@ def _valid_tool_arguments(
                 for trace in traces
                 for event in trace.get("provider_events", [])
             )
+        )
+
+    native_calls = [call for call in tool_calls if call.get("_native") is True]
+    if native_calls:
+        return all(call.get("_native_valid") is True for call in native_calls) and all(
+            call.get("_native") is True or call.get("arguments", {})
+            for call in tool_calls
         )
 
     def valid_value(key: str, value: Any) -> bool:
@@ -808,6 +919,12 @@ def _observed_rendering_types(traces: list[dict[str, Any]]) -> set[str]:
 ###############################################################################
 def _has_structured_clarification(trace: dict[str, Any]) -> bool:
     response = _response(trace)
+    operation = response.get("operation")
+    if isinstance(operation, dict) and operation.get("kind") == "clarification":
+        return True
+    route = response.get("route")
+    if isinstance(route, dict) and route.get("task_mode") == "clarify":
+        return True
     decision = response.get("decision")
     if isinstance(decision, dict):
         plan = decision.get("plan")
@@ -848,6 +965,31 @@ def _has_provider_provenance(result: dict[str, Any]) -> bool:
         and bool(provider.strip())
         and isinstance(fetched_at, str)
         and bool(fetched_at.strip())
+    )
+
+###############################################################################
+def _has_native_location_provenance(
+    traces: list[dict[str, Any]], capabilities: set[str]
+) -> bool:
+    location_tokens = _CAPABILITY_FAMILY_TOKENS["location"]
+    has_data_capability = any(
+        not any(token in capability.casefold() for token in location_tokens)
+        for capability in capabilities
+    )
+    if has_data_capability:
+        return False
+    return any(
+        _is_native_v2_trace(trace)
+        and _map_has_location(_map_session(trace))
+        and isinstance(
+            (_map_session(trace) or {}).get("resolved_location"), dict
+        )
+        and _has_provider_provenance(
+            (_map_session(trace) or {}).get("resolved_location", {}).get(
+                "provenance", {}
+            )
+        )
+        for trace in traces
     )
 
 
@@ -1009,14 +1151,19 @@ def _evaluate_expected_properties(
     tool_result_provenance = bool(successful_results) and all(
         _has_provider_provenance(result) for result in successful_results
     )
+    native_location_provenance = _has_native_location_provenance(
+        traces, capabilities
+    )
     # Control-plane capability selections do not themselves have provider
     # provenance. The verified location/map provider event is the authoritative
     # evidence for those executions; data-bearing tool results still need their
     # own provenance when no provider event exists.
     provenance_evidence = (
-        tool_result_provenance or provider_event_provenance
+        tool_result_provenance or provider_event_provenance or native_location_provenance
         if successful_results
-        else provider_event_provenance or bool(explicit_coordinate_evidence_count)
+        else provider_event_provenance
+        or native_location_provenance
+        or bool(explicit_coordinate_evidence_count)
     )
     provenance_passed = (
         allowed_clarification or not provenance_required or provenance_evidence
@@ -1033,9 +1180,11 @@ def _evaluate_expected_properties(
 
     if expected.get("fabrication_forbidden") is True:
         grounded = (
-            tool_result_provenance or provider_event_provenance
+            tool_result_provenance or provider_event_provenance or native_location_provenance
             if successful_results
-            else provider_event_provenance or bool(explicit_coordinate_evidence_count)
+            else provider_event_provenance
+            or native_location_provenance
+            or bool(explicit_coordinate_evidence_count)
         )
         grounded_or_limited = grounded or _has_explicit_limitation(traces)
         results.append(
@@ -1249,7 +1398,7 @@ def _evaluate_model_assertion(
         )
         passed = (
             bool(_answer(last_trace).strip())
-            and not last_trace.get("tool_calls")
+            and not _tool_calls([last_trace])
             and (
                 not any(
                     marker in _answer(last_trace).casefold() for marker in bad_markers
@@ -1371,7 +1520,7 @@ def _evaluate_model_assertion(
             else "The correction did not produce a consistent new map location.",
         )
     if name == "context_answer_without_tool":
-        passed = bool(_answer(last_trace).strip()) and not last_trace.get("tool_calls")
+        passed = bool(_answer(last_trace).strip()) and not _tool_calls([last_trace])
         return _assertion_result(
             name,
             passed,
@@ -1461,7 +1610,7 @@ def evaluate_model_scenario(
         if isinstance(fingerprint, str)
     ]
     unnecessary_tool_calls = sum(
-        len(trace.get("tool_calls", []))
+        len(_tool_calls([trace]))
         for trace in traces
         if _contract(trace).get("task_class") == "general_question"
         or (
@@ -1885,27 +2034,27 @@ def run_manifest(
                     if isinstance(tool_payload, dict)
                     else []
                 )
-                trace.append(
-                    {
-                        "prompt": turn,
-                        "duration_seconds": time.perf_counter() - turn_started,
-                        "status_code": response.status_code,
-                        "tool_calls": tool_calls,
-                        "tool_results": tool_payload.get("tool_results", [])
-                        if isinstance(tool_payload, dict)
-                        else [],
-                        "provider_events": tool_payload.get("provider_events", [])
-                        if isinstance(tool_payload, dict)
-                        else [],
-                        "response": payload,
-                        "map_session": payload.get("map_session"),
-                        "request_fingerprints": [
-                            _fingerprint(item)
-                            for item in tool_calls
-                            if isinstance(item, dict)
-                        ],
-                    }
-                )
+                trace_item = {
+                    "prompt": turn,
+                    "duration_seconds": time.perf_counter() - turn_started,
+                    "status_code": response.status_code,
+                    "tool_calls": tool_calls,
+                    "tool_results": tool_payload.get("tool_results", [])
+                    if isinstance(tool_payload, dict)
+                    else [],
+                    "provider_events": tool_payload.get("provider_events", [])
+                    if isinstance(tool_payload, dict)
+                    else [],
+                    "response": payload,
+                    "map_session": payload.get("map_session"),
+                    "request_fingerprints": [],
+                }
+                trace_item["request_fingerprints"] = [
+                    _fingerprint(item)
+                    for item in _tool_calls([trace_item])
+                    if isinstance(item, dict)
+                ]
+                trace.append(trace_item)
             evaluation = evaluate_model_scenario(scenario, trace)
             blocked_reasons = [
                 reason
