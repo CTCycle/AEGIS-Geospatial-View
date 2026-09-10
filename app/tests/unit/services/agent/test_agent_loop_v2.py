@@ -7,7 +7,7 @@ import pytest
 from pydantic import BaseModel
 
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentPhase, AgentState
+from server.domain.agent.capability_route import AgentPhase, AgentState, CapabilityRoute
 from server.domain.agent.reliability import AgentExecutionBudget
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.domain.agent.tools import RegisteredTool
@@ -256,3 +256,28 @@ async def test_successful_duplicate_call_replays_without_external_tool_execution
     assert outcome.final_text == "Duplicate handled."
     assert outcome.state.tool_calls == 1
     assert len(outcome.tool_results) == 2
+
+
+def test_shadow_preview_exposes_route_tools_without_provider_or_tool_execution() -> None:
+    provider = FakeProvider([])
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        requires_location=False,
+    )
+    state.capability_ids = ["places:hospitals"]
+    preview = _loop(provider).preview(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        )
+    )
+
+    assert preview.stopped_reason == "shadow_preview"
+    assert preview.exposed_tool_names == ["test_tool"]
+    assert provider.requests == []
+    assert state.tool_calls == 0

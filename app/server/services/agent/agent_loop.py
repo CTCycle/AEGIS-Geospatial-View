@@ -90,6 +90,17 @@ class AgentLoopOutcome:
     failure_detail: str | None = None
 
 
+@dataclass(frozen=True)
+class AgentLoopPreview:
+    """Route/exposure result for shadow mode; it never calls a provider."""
+
+    state: AgentState
+    route: CapabilityRoute | None
+    exposed_tool_names: list[str] = field(default_factory=list)
+    stopped_reason: str = "shadow_preview"
+    failure_detail: str | None = None
+
+
 ###############################################################################
 class AgentLoop:
     """Own routing, progressive tool exposure, execution, and stopping."""
@@ -198,6 +209,31 @@ class AgentLoop:
             return self._failed(state, request, "The selected model could not complete this request.", category=exc.category)
         except Exception:
             return self._failed(state, request, "The agent stopped after an unexpected execution failure.", category="provider_error")
+
+    # -------------------------------------------------------------------------
+    def preview(self, request: AgentLoopRequest) -> AgentLoopPreview:
+        """Compute native exposure from an existing route without egress."""
+
+        state = request.state
+        route = state.route
+        if route is None:
+            state.termination_reason = "failed"
+            self._transition(state, AgentPhase.FAILED)
+            return AgentLoopPreview(
+                state=state,
+                route=None,
+                stopped_reason="failed",
+                failure_detail="Shadow exposure requires a validated route.",
+            )
+        self._transition(state, AgentPhase.BUILD_TOOL_CONTEXT)
+        exposed = self.tool_registry.expose(state)
+        state.termination_reason = "shadow_preview"
+        self._transition(state, AgentPhase.FINALIZE)
+        return AgentLoopPreview(
+            state=state,
+            route=route,
+            exposed_tool_names=[item.name for item in exposed],
+        )
 
     # -------------------------------------------------------------------------
     async def _route(
@@ -624,4 +660,9 @@ class AgentLoop:
         )
 
 
-__all__ = ["AgentLoop", "AgentLoopOutcome", "AgentLoopRequest"]
+__all__ = [
+    "AgentLoop",
+    "AgentLoopOutcome",
+    "AgentLoopPreview",
+    "AgentLoopRequest",
+]

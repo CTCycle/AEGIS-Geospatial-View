@@ -20,8 +20,11 @@ from server.contracts.chat import (
 from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
-from server.services.agent.agent_loop import AgentLoop
+from server.services.agent.agent_loop import AgentLoop, AgentLoopRequest
+from server.services.agent.agent_state_factory import AgentStateFactory
 from server.services.agent.capability_resolver import CapabilityResolver
+from server.domain.agent.capability_domains import CapabilityDomain
+from server.domain.agent.capability_route import CapabilityRoute
 from server.domain.agent.decision import (
     ClarificationRequest,
     ExecutionPlan,
@@ -211,6 +214,121 @@ class AgentOrchestrator:
                 ):
                     catalog.append(capability)
         return catalog
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _shadow_route(
+        turn_contract: Any,
+        tool_plan: Any,
+        *,
+        presentation_required: bool,
+    ) -> CapabilityRoute:
+        domains: list[CapabilityDomain] = []
+        for raw_domain in getattr(tool_plan, "capability_domains", []) or []:
+            try:
+                domain = CapabilityDomain(str(raw_domain))
+            except ValueError:
+                continue
+            if domain not in domains:
+                domains.append(domain)
+        if not domains:
+            domains = [CapabilityDomain.DATA_RETRIEVAL]
+        capability_ids = [
+            str(step.capability_id).strip()
+            for step in getattr(tool_plan, "steps", []) or []
+            if getattr(step, "capability_id", None)
+            and str(step.capability_id).strip()
+        ]
+        return CapabilityRoute(
+            primary_domain=domains[0],
+            secondary_domains=domains[1:4],
+            task_mode="execute" if capability_ids else "answer",
+            presentation="both" if presentation_required else "text",
+            requires_location=bool(
+                getattr(turn_contract.normalized_action, "requires_location", False)
+            ),
+            capability_queries=[
+                str(item).strip()
+                for item in getattr(turn_contract, "requested_concepts", [])
+                if str(item).strip()
+            ][:4],
+            explicit_capability_ids=capability_ids[:8],
+        )
+
+    # -------------------------------------------------------------------------
+    def _run_shadow_exposure_preview(
+        self,
+        *,
+        payload: ChatTurnRequest,
+        request_id: str,
+        conversation_id: str,
+        turn_contract: Any,
+        tool_plan: Any,
+        presentation_required: bool,
+        resolved_location: ResolvedLocation | None,
+        resolved_locations: dict[str, ResolvedLocation],
+        state_before: Any,
+        settings: Any,
+        execution_budget: AgentExecutionBudget,
+    ) -> None:
+        if self.agent_loop is None or self._agent_loop_mode() != "shadow":
+            return
+        location_refs = dict(resolved_locations)
+        if resolved_location is not None and not location_refs:
+            location_refs["primary"] = resolved_location
+        evidence_refs = [
+            str(item.evidence_id)
+            for item in (
+                self.evidence_repository.list_summaries(
+                    conversation_id,
+                    limit=100,
+                )
+                if self.evidence_repository is not None
+                else []
+            )
+            if str(item.evidence_id).strip()
+        ]
+        shadow_state = AgentStateFactory.create(
+            request_id=request_id,
+            conversation_id=conversation_id,
+            user_message=payload.message,
+            active_map_session=getattr(state_before, "active_map_session", None),
+            location_refs=location_refs,
+            evidence_refs=evidence_refs,
+        )
+        shadow_state.route = self._shadow_route(
+            turn_contract,
+            tool_plan,
+            presentation_required=presentation_required,
+        )
+        shadow_state.capability_ids = [
+            str(step.capability_id).strip()
+            for step in getattr(tool_plan, "steps", []) or []
+            if getattr(step, "capability_id", None)
+            and str(step.capability_id).strip()
+        ][:12]
+        preview = self.agent_loop.preview(
+            AgentLoopRequest(
+                provider=settings.agent_model_provider,
+                model=settings.agent_model_name,
+                state=shadow_state,
+                budget=execution_budget,
+                max_model_calls=0,
+            )
+        )
+        LOGGER.info(
+            "native_shadow_exposure request_id=%s route_domain=%s presentation=%s legacy_capabilities=%s exposed_tools=%s failure=%s",
+            request_id,
+            preview.route.primary_domain.value if preview.route else "-",
+            preview.route.presentation if preview.route else "-",
+            ",".join(shadow_state.capability_ids) or "-",
+            ",".join(preview.exposed_tool_names) or "-",
+            preview.failure_detail or "-",
+        )
+
+    # -------------------------------------------------------------------------
+    def _agent_loop_mode(self) -> str:
+        return str(getattr(self.execution_settings, "agent_loop_mode", "legacy"))
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1623,6 +1741,19 @@ class AgentOrchestrator:
             )(native_context)
         else:
             native_tools = self.tool_registry.list_native_tools()
+        self._run_shadow_exposure_preview(
+            payload=payload,
+            request_id=request_id,
+            conversation_id=conversation_id,
+            turn_contract=turn_contract,
+            tool_plan=tool_plan,
+            presentation_required=presentation_required,
+            resolved_location=resolved_location,
+            resolved_locations=resolved_locations,
+            state_before=state_before,
+            settings=settings,
+            execution_budget=execution_budget,
+        )
         execution_budget.pipeline_reach["tool_execution"] = "pending"
         tool_loop_result = await self.native_tool_loop.run(
             AgentToolLoopRequest(
