@@ -67,6 +67,7 @@ class AgentState(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     request_id: str
+    run_id: str | None = None
     conversation_id: str
     phase: AgentPhase
     user_message: str

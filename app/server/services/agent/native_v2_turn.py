@@ -33,6 +33,7 @@ class NativeV2TurnRequest:
     evidence_refs: list[str] = field(default_factory=list)
     canonical_request: CanonicalRequestInterpretation | None = None
     defer_map_commit: bool = False
+    run_id: str | None = None
 
 
 class NativeV2TurnRunner:
@@ -45,6 +46,7 @@ class NativeV2TurnRunner:
     async def run(self, request: NativeV2TurnRequest) -> NativeV2TurnResponse:
         state = AgentStateFactory.create(
             request_id=request.request_id,
+            run_id=request.run_id,
             conversation_id=request.conversation_id,
             user_message=request.user_message,
             active_map_session=request.active_map_session,

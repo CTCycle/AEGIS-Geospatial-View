@@ -205,7 +205,7 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
             request,
             ToolExecutionContext(
                 conversation_id=state.conversation_id,
-                run_id=state.request_id,
+                run_id=state.run_id,
             ),
             location=location,
         )
@@ -236,7 +236,7 @@ def _apply_map_plan_handler(service: MapPlanService) -> Any:
             state,
             ToolExecutionContext(
                 conversation_id=state.conversation_id,
-                run_id=state.request_id,
+                run_id=state.run_id,
             ),
         )
 

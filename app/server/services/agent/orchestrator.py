@@ -342,6 +342,7 @@ class AgentOrchestrator:
         *,
         payload: ChatTurnRequest,
         request_id: str,
+        run_id: str | None,
         conversation_id: str,
         conversation_key: str,
         task: Any | None,
@@ -377,6 +378,7 @@ class AgentOrchestrator:
         native_response = await self.native_v2_runner.run(
             NativeV2TurnRequest(
                 request_id=request_id,
+                run_id=run_id,
                 conversation_id=conversation_id,
                 user_message=payload.message,
                 provider=settings.agent_model_provider,
@@ -514,6 +516,7 @@ class AgentOrchestrator:
         progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
         *,
         defer_map_commit: bool = False,
+        agent_run_id: str | None = None,
     ) -> ChatTurnResponse:
         # Conversation state, task state, and persistence revisions are
         # mutable by design. Serialize turns for one conversation so a stale
@@ -526,6 +529,7 @@ class AgentOrchestrator:
                 payload,
                 progress_callback,
                 defer_map_commit=defer_map_commit,
+                agent_run_id=agent_run_id,
             )
 
     # -------------------------------------------------------------------------
@@ -612,6 +616,7 @@ class AgentOrchestrator:
         progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
         *,
         defer_map_commit: bool = False,
+        agent_run_id: str | None = None,
     ) -> ChatTurnResponse:
         execution_budget = self._new_execution_budget()
         conversation_id = payload.conversation_id
@@ -644,6 +649,7 @@ class AgentOrchestrator:
             progress_callback,
             execution_budget=execution_budget,
             defer_map_commit=defer_map_commit,
+            agent_run_id=agent_run_id,
         )
         synthesis_usage = getattr(self.response_synthesizer, "last_context_usage", None)
         self._emit_context_usage(
@@ -1017,6 +1023,7 @@ class AgentOrchestrator:
         *,
         execution_budget: AgentExecutionBudget | None = None,
         defer_map_commit: bool = False,
+        agent_run_id: str | None = None,
     ) -> ChatTurnResponse:
         execution_budget = execution_budget or self._new_execution_budget()
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
@@ -1114,6 +1121,7 @@ class AgentOrchestrator:
             return await self._run_native_v2_compat_turn(
                 payload=payload,
                 request_id=request_id,
+                run_id=agent_run_id,
                 conversation_id=conversation_id,
                 conversation_key=conversation_key,
                 task=None,
