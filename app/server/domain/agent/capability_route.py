@@ -87,4 +87,5 @@ class AgentState(BaseModel):
     tool_calls: int = Field(default=0, ge=0)
     transitions: int = Field(default=0, ge=0)
     transition_trace: list[dict[str, str]] = Field(default_factory=list)
+    exposure_trace: list[dict[str, str]] = Field(default_factory=list)
     termination_reason: str | None = None

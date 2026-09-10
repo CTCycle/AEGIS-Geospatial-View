@@ -64,3 +64,17 @@ def test_search_and_chat_consume_shared_geospatial_runtime(sqlite_backend) -> No
         chat_runtime.agent_orchestrator.tool_registry.runtime_registry
         is geospatial_runtime.runtime_registry
     )
+    assert chat_runtime.agent_loop is chat_runtime.agent_orchestrator.agent_loop
+    assert chat_runtime.agent_loop is not None
+    assert {
+        tool.definition.name
+        for tool in chat_runtime.agent_loop.tool_registry._registered_tools.values()
+    } == {
+        "route_request",
+        "resolve_geospatial_location",
+        "discover_geospatial_capabilities",
+        "execute_geospatial_capability",
+        "inspect_evidence",
+        "transform_evidence",
+        "apply_map_plan",
+    }

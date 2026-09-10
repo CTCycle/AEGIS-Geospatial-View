@@ -363,8 +363,6 @@ class AgentLoop:
                     state,
                     request.budget,
                 )
-                if result.status == "failed":
-                    state.tool_calls += 1
                 self._transition(state, AgentPhase.NORMALIZE_RESULT)
                 return result
 

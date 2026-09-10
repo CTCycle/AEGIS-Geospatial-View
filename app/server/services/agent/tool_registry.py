@@ -60,6 +60,11 @@ class ToolRegistry:
 
         exposed: list[LLMToolDefinition] = []
         for registered in self._registered_tools.values():
+            if (
+                registered.visibility == "internal"
+                and state.phase.value != "route_request"
+            ):
+                continue
             if state.phase not in registered.phases:
                 continue
             if not self._prerequisites_satisfied(registered.prerequisites, state):
@@ -78,6 +83,14 @@ class ToolRegistry:
                     parameters_json_schema=schema,
                 )
             exposed.append(definition)
+            if len(state.exposure_trace) < 64:
+                state.exposure_trace.append(
+                    {
+                        "phase": state.phase.value,
+                        "tool": definition.name,
+                        "reason": "phase_and_prerequisites_satisfied",
+                    }
+                )
         return exposed
 
     # -------------------------------------------------------------------------
@@ -85,12 +98,27 @@ class ToolRegistry:
     def _prerequisites_satisfied(
         prerequisites: frozenset[str], state: AgentState
     ) -> bool:
+        has_location = bool(state.location_refs) or state.active_map_session is not None
         for prerequisite in prerequisites:
             if prerequisite == "route" and state.route is None:
                 return False
             if prerequisite == "capability_shortlist" and not state.capability_ids:
                 return False
+            if prerequisite == "capability_shortlist_missing" and state.capability_ids:
+                return False
             if prerequisite == "location" and not state.location_refs:
+                return False
+            if prerequisite == "location_required" and (
+                state.route is None or not state.route.requires_location
+            ):
+                return False
+            if prerequisite == "location_missing" and has_location:
+                return False
+            if prerequisite == "location_if_required" and (
+                state.route is not None
+                and state.route.requires_location
+                and not has_location
+            ):
                 return False
             if prerequisite == "evidence" and not state.evidence_refs:
                 return False

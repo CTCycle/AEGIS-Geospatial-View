@@ -44,6 +44,10 @@ class ToolExecutor:
     ) -> ToolResult:
         started = time.perf_counter()
         call_id = tool_call.id or f"call_{uuid4().hex}"
+        # Count every model-issued attempt, including malformed and rejected
+        # calls.  The loop budget is an attempt budget, not only a successful
+        # provider-execution budget.
+        state.tool_calls += 1
         if tool_call.parse_error is not None or tool_call.arguments is None:
             return self._failure(
                 call_id=call_id,
@@ -189,7 +193,6 @@ class ToolExecutor:
                     recovery="terminal",
                 ),
             )
-        state.tool_calls += 1
         state.tool_results.append(result)
         return result
 
