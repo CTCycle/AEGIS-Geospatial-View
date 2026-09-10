@@ -20,6 +20,7 @@ from server.contracts.chat import (
 from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
+from server.services.agent.agent_loop import AgentLoop
 from server.services.agent.capability_resolver import CapabilityResolver
 from server.domain.agent.decision import (
     ClarificationRequest,
@@ -117,6 +118,7 @@ class AgentOrchestrator:
         context_profile_resolver: ModelContextProfileResolver | None = None,
         application_timezone: str = "UTC",
         execution_settings: Any | None = None,
+        agent_loop: AgentLoop | None = None,
     ) -> None:
         self.search_orchestrator = search_orchestrator
         self.parser_service = parser_service
@@ -148,6 +150,7 @@ class AgentOrchestrator:
         self.direct_turn_response_service = direct_turn_response_service
         self.application_timezone = application_timezone
         self.execution_settings = execution_settings
+        self.agent_loop = agent_loop
         self.deterministic_intent_recovery_service = (
             DeterministicIntentRecoveryService()
         )

@@ -9,7 +9,10 @@ from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
+from server.services.agent.agent_loop import AgentLoop
 from server.services.agent.capability_resolver import CapabilityResolver
+from server.services.agent.capability_router import CapabilityRouter
+from server.services.agent.native_v2_tools import register_native_v2_tools
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.direct_turn_response import DirectTurnResponseService
 from server.services.agent.location_memory import LocationMemoryService
@@ -19,6 +22,7 @@ from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent.parser_service import ParserService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.tool_argument_builder import ToolArgumentBuilder
@@ -47,6 +51,7 @@ class ChatRuntime:
     history_service: ChatHistoryService
     task_state_service: ConversationTaskStateService
     structured_probe_service: StructuredProbeService | None = None
+    agent_loop: AgentLoop | None = None
 
 ###############################################################################
 def build_chat_runtime(
@@ -110,6 +115,31 @@ def build_chat_runtime(
         runtime_registry=runtime_registry,
     )
     tool_registry = ToolRegistry(runtime_registry=runtime_registry)
+    register_native_v2_tools(
+        tool_registry,
+        capability_registry=capability_registry,
+        runtime_registry=runtime_registry,
+        provider_registry=geospatial_runtime.provider_registry,
+        evidence_repository=evidence_repository,
+        location_resolver=location_resolver,
+    )
+    agent_loop = AgentLoop(
+        provider_factory=llm_factory,
+        capability_router=CapabilityRouter(
+            capability_registry=capability_registry,
+            runtime_registry=runtime_registry,
+        ),
+        tool_registry=tool_registry,
+        tool_executor=ToolExecutor(
+            tool_registry=tool_registry,
+            policy_engine=policy_engine,
+            timeout_seconds=(
+                execution_settings.tool_execution_seconds
+                if execution_settings is not None
+                else 45.0
+            ),
+        ),
+    )
     request_builder = RequestBuilder(capability_registry=capability_registry)
     agent_tool_catalog_service = AgentToolCatalogService(
         capability_registry=capability_registry,
@@ -155,6 +185,7 @@ def build_chat_runtime(
         ),
         history_service=history_service,
         task_state_service=task_state_service,
+        agent_loop=agent_loop,
         agent_orchestrator=AgentOrchestrator(
             search_orchestrator=search_orchestrator,
             parser_service=parser_service,
@@ -176,6 +207,7 @@ def build_chat_runtime(
             context_profile_resolver=context_profile_resolver,
             application_timezone=application_timezone,
             execution_settings=execution_settings,
+            agent_loop=agent_loop,
             capability_resolver=CapabilityResolver(
                 capability_registry=capability_registry,
                 runtime_registry=runtime_registry,
