@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-09-09
+Last updated: 2026-09-10
 
 ## Environment file
 
@@ -51,6 +51,9 @@ idle time, 90 seconds of tool absolute time, 20 seconds for map assembly, 30
 seconds for synthesis, 5 seconds for persistence, and 90 seconds for browser
 render acknowledgement. Smaller provider/model limits still win. These
 values are one typed policy block rather than independent environment knobs.
+The same block exposes `agent_loop_mode`: `legacy` is the default,
+`shadow` computes native exposure without external execution, and `native_v2`
+enables the route-first typed loop for controlled validation.
 
 Model provider API keys are entered through Settings and stored as encrypted
 database records. They are not database connection settings.
