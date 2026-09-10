@@ -159,7 +159,8 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
         longitude=8.5417,
     )
     assert [tool.name for tool in registry.expose(state)] == [
-        "execute_geospatial_capability"
+        "execute_geospatial_capability",
+        "apply_map_plan",
     ]
 
     state.evidence_refs.append("evidence-1")

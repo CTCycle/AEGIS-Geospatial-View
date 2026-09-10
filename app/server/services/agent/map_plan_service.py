@@ -5,9 +5,14 @@ from __future__ import annotations
 import time
 from typing import Any, Protocol
 
+from server.common.typing import json_object
 from server.domain.agent.capability_route import AgentState
 from server.domain.agent.evidence import AgentEvidenceEnvelope
-from server.domain.agent.map_plan import AddEvidenceLayerAction, MapPlan
+from server.domain.agent.map_plan import (
+    AddEvidenceLayerAction,
+    MapPlan,
+    SetBasemapAction,
+)
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -40,6 +45,7 @@ class MapPlanService:
         evidence_repository: EvidenceReader | AgentEvidenceRepository | None = None,
         session_builder: MapSessionBuilder | None = None,
     ) -> None:
+        self.capability_registry = capability_registry
         self.evidence_repository = evidence_repository
         self.session_builder = session_builder or MapSessionBuilder(
             capability_registry=capability_registry
@@ -78,13 +84,18 @@ class MapPlanService:
                 recovery="request_user_input",
             )
 
+        effective_actions = self._with_default_basemap(
+            plan.actions,
+            active_session=active_session,
+        )
+        effective_plan = plan.model_copy(update={"actions": effective_actions})
         try:
-            evidence = self._evidence_for_plan(plan, state, context)
+            evidence = self._evidence_for_plan(effective_plan, state, context)
             candidate = await self.session_builder.build(
                 location=location,
                 evidence=evidence,
                 active_session=active_session,
-                actions=plan.actions,
+                actions=effective_actions,
             )
         except MapPlanBuildError as exc:
             return self._failure(
@@ -123,7 +134,7 @@ class MapPlanService:
         state.prepared_map_session = candidate
         evidence_refs = [
             action.evidence_ref
-            for action in plan.actions
+            for action in effective_actions
             if isinstance(action, AddEvidenceLayerAction)
         ]
         summary = {
@@ -146,6 +157,42 @@ class MapPlanService:
                 evidence_refs=list(dict.fromkeys(evidence_refs)),
             ),
         )
+
+    # -------------------------------------------------------------------------
+    def _with_default_basemap(
+        self,
+        actions: list[Any],
+        *,
+        active_session: Any | None,
+    ) -> list[Any]:
+        if active_session is not None or any(
+            isinstance(action, SetBasemapAction) for action in actions
+        ):
+            return list(actions)
+        return [
+            SetBasemapAction(
+                action="set_basemap",
+                capability_id=self._default_basemap_id(),
+            ),
+            *actions,
+        ]
+
+    def _default_basemap_id(self) -> str:
+        try:
+            basemaps = self.capability_registry.list_basemaps()
+        except AttributeError:
+            basemaps = []
+        candidates = [
+            (
+                not bool(json_object(item.get("agenticUse")).get("defaultEnabled")),
+                str(item.get("id") or "").strip(),
+            )
+            for item in basemaps
+            if isinstance(item, dict) and str(item.get("id") or "").strip()
+        ]
+        if candidates:
+            return min(candidates)[1]
+        return "osm_default"
 
     # -------------------------------------------------------------------------
     def _evidence_for_plan(

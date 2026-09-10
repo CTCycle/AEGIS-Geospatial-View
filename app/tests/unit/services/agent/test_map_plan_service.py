@@ -25,6 +25,9 @@ LOCATION = ResolvedLocation(label="Zurich HB", latitude=47.378, longitude=8.540)
 
 
 class FakeCapabilityRegistry:
+    def list_basemaps(self) -> list[dict[str, object]]:
+        return [{"id": "basemap:osm"}]
+
     def get_capability(self, capability_id: str) -> dict[str, object] | None:
         values = {
             "basemap:osm": {
@@ -153,6 +156,27 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
         "render_status": "awaiting_render",
     }
     assert "features" not in result.model_dump(mode="json")
+
+
+@pytest.mark.asyncio
+async def test_location_only_plan_gets_catalog_default_basemap() -> None:
+    state = _state()
+    state.evidence_refs = []
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=0,
+            actions=[
+                SetViewportAction(action="set_viewport", strategy="fit_location"),
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert state.prepared_map_session.basemap_id == "basemap:osm"
+    assert state.prepared_map_session.overlay_collection.instances == []
 
 
 @pytest.mark.asyncio
