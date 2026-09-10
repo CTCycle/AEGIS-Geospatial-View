@@ -486,6 +486,14 @@ class AgentRunOrchestrator:
                     if response.context_usage is not None
                     else None,
                     "execution_trace": response.execution_trace,
+                    "route": response.route.model_dump(mode="json")
+                    if response.route is not None
+                    else None,
+                    "presentation_status": response.presentation_status,
+                    "tool_results": [
+                        item.model_dump(mode="json")
+                        for item in response.tool_results
+                    ],
                 },
             )
             return
