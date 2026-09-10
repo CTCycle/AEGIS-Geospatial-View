@@ -490,6 +490,14 @@ describe('pages/geospatial-page.component', () => {
       visibility: 'user',
       payload: {
         message: 'Provider timed out.',
+        operation: {
+          kind: 'error',
+          status: 'failed',
+          message: 'Provider timed out.',
+          warnings: [],
+        },
+        presentation_status: 'not_requested',
+        tool_results: [],
         context_usage: {
           estimated_input_tokens: 321,
           selected_context_window: null,
@@ -503,6 +511,8 @@ describe('pages/geospatial-page.component', () => {
     });
     expect(component.messages.length).toBe(1);
     expect(component.status).toBe('Agent needs attention');
+    expect(component.lastOperation?.kind).toBe('error');
+    expect(component.presentationStatus).toBe('not_requested');
     expect(component.contextUsage?.estimated_input_tokens).toBe(321);
     expect(component.contextUsageLabel).toBe('Context limit unavailable');
     expect(component.contextUsageDetail).toContain('max context unavailable');
