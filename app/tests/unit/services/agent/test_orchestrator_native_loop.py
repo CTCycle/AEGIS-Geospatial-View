@@ -146,6 +146,19 @@ class _Parser:
         )
 
 ###############################################################################
+class _ParserMustNotRun(_Parser):
+    # -------------------------------------------------------------------------
+    def parse_turn(
+        self,
+        user_message: str,
+        memory_snapshot: dict,
+        conversation_messages: list[dict],
+        **_kwargs: Any,
+    ) -> TurnParseResult:
+        _ = user_message, memory_snapshot, conversation_messages
+        raise AssertionError("native-v2 must not invoke the legacy parser")
+
+###############################################################################
 class _FloodComparisonParser(_Parser):
 
     # -------------------------------------------------------------------------
@@ -1106,7 +1119,7 @@ def test_native_v2_mode_bypasses_legacy_direct_response_shortcut() -> None:
         history = _HistoryRepo()
         orchestrator = AgentOrchestrator(
             search_orchestrator=_SearchOrchestrator(),  # type: ignore[arg-type]
-            parser_service=_Parser(),  # type: ignore[arg-type]
+            parser_service=_ParserMustNotRun(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
             tool_registry=_test_tool_registry(),
