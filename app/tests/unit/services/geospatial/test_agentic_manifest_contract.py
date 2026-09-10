@@ -88,3 +88,32 @@ def test_route_contract_remains_independent_of_provider_arguments() -> None:
     )
 
     assert "radius_m" not in route.model_dump()
+
+
+def test_legacy_analysis_tool_is_shortlisted_for_data_retrieval() -> None:
+    snapshot = GeospatialManifestSnapshot(
+        providers=(),
+        basemaps=[],
+        overlays=[],
+        cameras=[],
+        transit=[],
+        tools=[
+            {
+                "id": "weather_direct",
+                "name": "Weather Forecast",
+                "provider": "openmeteo",
+                "capabilityKind": "analysis-tool",
+                "description": "Current weather and forecast measurements.",
+                "capabilities": ["weather", "forecast"],
+            }
+        ],
+        runtime_profiles=(),
+    )
+    candidates = CapabilityRegistry.from_catalog_snapshot(snapshot).shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL},
+        queries=["current weather"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+    )
+
+    assert [item["id"] for item in candidates] == ["weather_direct"]

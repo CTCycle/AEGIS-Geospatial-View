@@ -33,7 +33,6 @@ class CapabilityRouter:
     ) -> CapabilityRouteDecision:
         """Validate route semantics and return only an eligible shortlist."""
 
-        _ = user_message
         reasons: list[str] = []
         rejected: list[str] = []
         valid_explicit_ids: list[str] = []
@@ -53,6 +52,18 @@ class CapabilityRouter:
                 reasons.append("capability_unavailable")
                 continue
             valid_explicit_ids.append(normalized_id)
+
+        # A new map cannot be prepared without a validated location.  Keep this
+        # prerequisite server-owned so a model route that asks for a map but
+        # forgets it still enters the typed location tool phase.
+        if (
+            proposed.task_mode == "execute"
+            and proposed.presentation in {"map", "both"}
+            and active_state.active_map_session is None
+            and not proposed.requires_location
+        ):
+            proposed = proposed.model_copy(update={"requires_location": True})
+            reasons.append("location_required_for_new_map")
 
         route_domains = {proposed.primary_domain, *proposed.secondary_domains}
         if proposed.primary_domain is CapabilityDomain.MAP_STATE:
@@ -101,7 +112,7 @@ class CapabilityRouter:
         capability_ids = [
             str(item.get("id") or "").strip()
             for item in candidates
-            if str(item.get("id") or "").strip()
+            if str(item.get("id") or "").strip() and _is_executable_candidate(item)
         ]
 
         if proposed.task_mode == "execute" and not capability_ids:
@@ -120,3 +131,14 @@ class CapabilityRouter:
             rejected_capability_ids=rejected,
             reason_codes=list(dict.fromkeys(reasons)),
         )
+
+
+def _is_executable_candidate(capability: dict[str, object]) -> bool:
+    """Keep renderer-only descriptors out of the generic provider tool."""
+
+    kind = str(
+        capability.get("capabilityKind")
+        or capability.get("capability_kind")
+        or ""
+    ).strip().casefold()
+    return kind != "basemap"

@@ -39,6 +39,7 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.agent.location_resolver import LocationResolver
+from server.domain.agent.decision import ResolvedLocation
 
 
 _MODEL_PHASE = frozenset({AgentPhase.BUILD_TOOL_CONTEXT})
@@ -199,15 +200,32 @@ def _registration(
 
 def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
     async def execute(request: ExecuteCapabilityInput, state: AgentState) -> ToolResult:
+        location = _location_for_request(request, state)
         return await service.execute_capability(
             request,
             ToolExecutionContext(
                 conversation_id=state.conversation_id,
                 run_id=state.request_id,
             ),
+            location=location,
         )
 
     return execute
+
+
+def _location_for_request(
+    request: ExecuteCapabilityInput, state: AgentState
+) -> ResolvedLocation | None:
+    requested = " ".join(str(request.location_ref or "").casefold().split())
+    if requested:
+        for key, location in state.location_refs.items():
+            if " ".join(str(key).casefold().split()) == requested:
+                return location
+    if state.location_refs:
+        return next(iter(state.location_refs.values()))
+    if state.active_map_session is not None:
+        return state.active_map_session.resolved_location
+    return None
 
 
 def _apply_map_plan_handler(service: MapPlanService) -> Any:

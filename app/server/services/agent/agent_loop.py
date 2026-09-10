@@ -277,7 +277,7 @@ class AgentLoop:
                     )
                     if decision.status == "accepted":
                         request.state.capability_ids = list(decision.capability_ids)
-                        return None, "", proposed
+                        return None, "", decision.route
                     if decision.status == "clarification":
                         return (
                             decision.clarification_question
