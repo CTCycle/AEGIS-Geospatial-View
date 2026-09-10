@@ -2,12 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, Literal, TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.domain.agent.actions import AgentAction
+from server.domain.agent.capability_domains import CapabilityDomain
+from server.domain.agent.tool_result import ToolResult
 from server.domain.llm.types import LLMToolDefinition
+
+if TYPE_CHECKING:
+    from server.domain.agent.capability_route import AgentPhase, AgentState
 
 ###############################################################################
 class AgentToolName(str, Enum):
@@ -82,3 +88,26 @@ class ToolExecutionEnvelope:
 class RegisteredNativeTool:
     definition: LLMToolDefinition
     handler: Any
+
+
+ToolHandler = Callable[[BaseModel, "AgentState"], Awaitable[Any]]
+ToolResultNormalizer = Callable[[Any, str], ToolResult]
+ToolSemanticValidator = Callable[[BaseModel, "AgentState"], list[str]]
+
+
+###############################################################################
+@dataclass(frozen=True)
+class RegisteredTool:
+    """One typed tool registration used by the native-v2 exposure path."""
+
+    definition: LLMToolDefinition
+    input_model: type[BaseModel]
+    handler: ToolHandler
+    domains: frozenset[CapabilityDomain]
+    phases: frozenset["AgentPhase"]
+    visibility: Literal["model", "internal"]
+    prerequisites: frozenset[str]
+    timeout_key: str
+    idempotent: bool
+    result_normalizer: ToolResultNormalizer
+    semantic_validator: ToolSemanticValidator | None = None
