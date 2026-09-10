@@ -116,5 +116,17 @@
     "timestampPath": null,
     "fieldMap": {},
     "expectedGeometry": "raster-grid"
+  },
+  "executionContract": {
+    "supported_operations": ["show"],
+    "supported_scope_kinds": ["viewport", "bbox"],
+    "temporal_modes": ["current"],
+    "temporal_windows": ["static"],
+    "required_inputs": ["location"],
+    "output_geometry_type": "raster-grid",
+    "render_support": "raster",
+    "coverage": "global",
+    "limitations": ["Public tile service is best effort."],
+    "fallback_ids": []
   }
 }

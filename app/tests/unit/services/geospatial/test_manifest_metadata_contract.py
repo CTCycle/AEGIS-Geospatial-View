@@ -34,6 +34,19 @@ def test_all_manifest_entries_expose_source_traits() -> None:
                     missing.append(f"{collection_name}:{item['id']}:metadata.{field}")
     assert not missing
 
+
+def test_enabled_executable_manifests_declare_execution_contracts() -> None:
+    payload = GeospatialManifestLoader().load_all()
+    missing = [
+        f"{collection_name}:{item['id']}"
+        for collection_name in ("basemaps", "overlays", "cameras", "transit", "tools")
+        for item in payload[collection_name]
+        if bool(dict(item.get("agenticUse") or {}).get("defaultEnabled"))
+        and not isinstance(item.get("executionContract"), dict)
+    ]
+
+    assert not missing
+
 ###############################################################################
 def test_credentialed_capabilities_are_not_healthy_without_credentials(
     monkeypatch,

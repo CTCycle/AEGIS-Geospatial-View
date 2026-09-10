@@ -129,5 +129,17 @@
       180,
       90
     ]
+  },
+  "executionContract": {
+    "supported_operations": ["show", "search", "filter", "near", "within_distance"],
+    "supported_scope_kinds": ["bbox", "radius"],
+    "temporal_modes": ["current"],
+    "temporal_windows": ["monthly_snapshot"],
+    "required_inputs": ["location", "analysis_scope"],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "global",
+    "limitations": ["Dataset freshness and coverage depend on the current Overture release."],
+    "fallback_ids": []
   }
 }

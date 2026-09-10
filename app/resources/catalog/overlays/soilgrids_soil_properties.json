@@ -67,5 +67,17 @@
     "knownLimitations": ["SoilGrids is a modeled 250 m product and is not a substitute for local soil sampling.", "The public OGC service is external and best-effort.", "AEGIS does not render SoilGrids directly as a Web Mercator map because the service does not advertise EPSG:3857."]
   },
   "cachePolicy": {"mode": "memory", "ttlSeconds": 86400, "staleWhileRevalidateSeconds": 86400},
-  "normalization": {"geometryPath": null, "idPath": null, "timestampPath": null, "fieldMap": {}, "expectedGeometry": "not-applicable"}
+  "normalization": {"geometryPath": null, "idPath": null, "timestampPath": null, "fieldMap": {}, "expectedGeometry": "not-applicable"},
+  "executionContract": {
+    "supported_operations": ["show", "inspect"],
+    "supported_scope_kinds": ["point", "bbox"],
+    "temporal_modes": ["current"],
+    "temporal_windows": ["modeled_snapshot"],
+    "required_inputs": ["location", "analysis_scope"],
+    "output_geometry_type": "raster-grid",
+    "render_support": "metadata_only",
+    "coverage": "global",
+    "limitations": ["Modeled 250 m product; not a substitute for local soil sampling."],
+    "fallback_ids": []
+  }
 }

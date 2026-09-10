@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
 from server.services.agent.tool_registry import ToolRegistry
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -18,6 +19,28 @@ def run_startup_validations(credentials_repo: CredentialRepository) -> None:
         catalog_snapshot=catalog_snapshot,
         credentials_repo=credentials_repo,
     )
+
+    missing_execution_contracts: list[str] = []
+    for collection_name in (
+        "basemaps",
+        "overlays",
+        "cameras",
+        "transit",
+        "tools",
+    ):
+        for item in getattr(catalog_snapshot, collection_name):
+            capability_id = str(item.get("id") or "").strip()
+            if (
+                capability_id
+                and runtime_registry.is_enabled(capability_id)
+                and not is_json_object(item.get("executionContract"))
+            ):
+                missing_execution_contracts.append(capability_id)
+    if missing_execution_contracts:
+        raise RuntimeError(
+            "Enabled executable capabilities missing execution contracts: "
+            + ", ".join(sorted(missing_execution_contracts))
+        )
 
     tool_registry = ToolRegistry(runtime_registry=runtime_registry)
     bindings = tool_registry.load_tool_bindings()

@@ -70,5 +70,17 @@
     "timestampPath": null,
     "fieldMap": {},
     "expectedGeometry": "vector-tile"
+  },
+  "executionContract": {
+    "supported_operations": ["show"],
+    "supported_scope_kinds": ["viewport", "bbox"],
+    "temporal_modes": ["current"],
+    "temporal_windows": ["static_style"],
+    "required_inputs": ["location"],
+    "output_geometry_type": "vector-tile",
+    "render_support": "raster",
+    "coverage": "global",
+    "limitations": ["Public style service has no contractual SLA."],
+    "fallback_ids": []
   }
 }
