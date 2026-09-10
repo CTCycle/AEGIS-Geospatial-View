@@ -7,7 +7,9 @@ from datetime import datetime
 from typing import Any
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
+from server.domain.agent.capability_route import AgentState
 from server.domain.agent.tools import (
+    RegisteredTool,
     RegisteredNativeTool,
     ToolError,
     ToolExecutionEnvelope,
@@ -36,6 +38,65 @@ class ToolRegistry:
         self.runtime_registry = runtime_registry
         self._handlers: dict[str, ToolHandler] = {}
         self._native_tools: dict[str, RegisteredNativeTool] = {}
+        self._registered_tools: dict[str, RegisteredTool] = {}
+
+    # -------------------------------------------------------------------------
+    def register(self, tool: RegisteredTool) -> None:
+        """Register one typed tool for the native-v2 exposure path."""
+
+        if not tool.definition.name.strip():
+            raise ValueError("Registered tools must have a non-empty name.")
+        if tool.definition.name in self._registered_tools:
+            raise ValueError(f"Tool '{tool.definition.name}' is already registered.")
+        self._registered_tools[tool.definition.name] = tool
+
+    # -------------------------------------------------------------------------
+    def get(self, name: str) -> RegisteredTool | None:
+        return self._registered_tools.get(name)
+
+    # -------------------------------------------------------------------------
+    def expose(self, state: AgentState) -> list[LLMToolDefinition]:
+        """Return only tools valid for the current native-v2 state."""
+
+        exposed: list[LLMToolDefinition] = []
+        for registered in self._registered_tools.values():
+            if state.phase not in registered.phases:
+                continue
+            if not self._prerequisites_satisfied(registered.prerequisites, state):
+                continue
+            definition = registered.definition
+            if definition.name == "execute_geospatial_capability" and state.capability_ids:
+                schema = dict(definition.parameters_json_schema)
+                properties = dict(schema.get("properties") or {})
+                capability_schema = dict(properties.get("capability_id") or {})
+                capability_schema["enum"] = list(state.capability_ids)
+                properties["capability_id"] = capability_schema
+                schema["properties"] = properties
+                definition = LLMToolDefinition(
+                    name=definition.name,
+                    description=definition.description,
+                    parameters_json_schema=schema,
+                )
+            exposed.append(definition)
+        return exposed
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _prerequisites_satisfied(
+        prerequisites: frozenset[str], state: AgentState
+    ) -> bool:
+        for prerequisite in prerequisites:
+            if prerequisite == "route" and state.route is None:
+                return False
+            if prerequisite == "capability_shortlist" and not state.capability_ids:
+                return False
+            if prerequisite == "location" and not state.location_refs:
+                return False
+            if prerequisite == "evidence" and not state.evidence_refs:
+                return False
+            if prerequisite == "active_map" and state.active_map_session is None:
+                return False
+        return True
 
     # -------------------------------------------------------------------------
     def register_native_tool(
