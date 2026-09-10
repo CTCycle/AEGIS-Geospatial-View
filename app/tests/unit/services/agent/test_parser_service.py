@@ -402,6 +402,50 @@ def test_parser_service_does_not_create_heuristic_location_fallbacks() -> None:
     assert result.ambiguities == ["missing_location"]
 
 ###############################################################################
+def test_parser_promotes_verbatim_typed_entity_when_location_signal_is_omitted() -> None:
+    parser = ParserService(
+        llm_factory=_FactoryStub(
+            {
+                "task_class": "map_search",
+                "action_id": "map_search",
+                "action_label": "Radar map",
+                "requires_location": True,
+                "location_signals": [],
+                "requested_layers": ["rainviewer_precipitation_radar"],
+                "requested_concepts": ["rain", "radar"],
+                "atomic_tasks": [
+                    {
+                        "summary": "Show radar over Denver, Colorado, United States",
+                        "task_type": "overlay",
+                        "required_entities": ["Denver, Colorado, United States"],
+                        "required_layers": ["rainviewer_precipitation_radar"],
+                    }
+                ],
+                "temporal_signal": {"mode": "current"},
+                "presentation_mode": "map",
+                "parser_confidence": 0.9,
+            }
+        ),
+        settings_repo=object(),
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+    )
+
+    result = parser.parse_turn(
+        user_message=(
+            "Show recent rain radar over Denver, Colorado, United States on the map."
+        ),
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+
+    assert [item.raw_value for item in result.location_signals] == [
+        "Denver, Colorado, United States"
+    ]
+    assert "missing_location" not in result.ambiguities
+
+
+###############################################################################
 def test_parser_domain_boundary_preserves_typed_fields_without_prose_inference() -> (
     None
 ):

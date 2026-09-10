@@ -3,7 +3,10 @@ from __future__ import annotations
 import pytest
 from time import monotonic
 
-from server.domain.agent.extraction_schemas import LLMParserExtraction
+from server.domain.agent.extraction_schemas import (
+    LLMParserExtraction,
+    LLMParserExtractionProviderContract,
+)
 from server.prompts.parser import PARSER_SCHEMA_CORRECTION, build_parser_prompt
 from server.services.agent.parser_service import ParserService
 from server.services.llm.errors import LLMProviderRequestError, LLMResponseParsingError
@@ -64,6 +67,30 @@ def test_parser_normalizes_provider_distance_scope_alias() -> None:
 
     assert len(relationships) == 1
     assert relationships[0].analysis_scope == "radius"
+
+
+def test_parser_normalizes_nullable_provider_sentinels_at_the_schema_boundary() -> None:
+    extracted = LLMParserExtractionProviderContract.model_validate(
+        {
+            "task_class": "map_search",
+            "action_id": "map_search",
+            "requires_location": True,
+            "parser_confidence": 0.9,
+            "relationship": "new_task",
+            "presentation_mode": "map",
+            "requested_basemap": "null",
+            "radius_m": "NONE",
+            "viewport_intent": "nil",
+            "temporal_signal": {"raw_text": "NULL"},
+            "geographic_relationships": [{"reference": "none"}],
+        }
+    )
+
+    assert extracted.requested_basemap is None
+    assert extracted.radius_m is None
+    assert extracted.viewport_intent is None
+    assert extracted.temporal_signal.raw_text is None
+    assert extracted.geographic_relationships[0].reference is None
 
 
 ###############################################################################

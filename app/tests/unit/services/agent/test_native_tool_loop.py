@@ -452,6 +452,58 @@ def test_native_tool_loop_uses_the_latest_map_session_result() -> None:
 
 
 ###############################################################################
+def test_textual_stop_waits_for_all_planned_native_capabilities() -> None:
+    location = ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5)
+    session = MapSession(
+        session_id="native-map",
+        resolved_location=location,
+        basemap_id="osm",
+        viewport=ViewportPolicy(center_latitude=41.9, center_longitude=12.5),
+        overlay_collection=OverlayCollectionState(),
+    )
+    context = AgentExecutionContext(
+        canonical_request=CanonicalRequestInterpretation(
+            request_id="native-complete-1",
+            primary_intent="data_layer_query",
+        ),
+        metadata={
+            "presentation_required": True,
+            "prepared_map_session": session.model_dump(mode="json"),
+            "tool_plan_steps": [
+                {
+                    "step_id": "step-1",
+                    "tool_name": "execute_geospatial_capability",
+                    "capability_id": "first-layer",
+                },
+                {
+                    "step_id": "step-2",
+                    "tool_name": "execute_geospatial_capability",
+                    "capability_id": "second-layer",
+                },
+            ],
+        },
+    )
+
+    result = NativeToolLoop._evaluate_textual_stop(
+        "The map is ready.",
+        context,
+        [],
+        ["execute_geospatial_capability"],
+    )
+
+    assert result is None
+    assert context.metadata["pending_native_plan_step_ids"] == ["step-1", "step-2"]
+
+    context.metadata["completed_native_plan_step_ids"] = ["step-1", "step-2"]
+    assert (
+        NativeToolLoop.pending_native_plan_step_ids(
+            context, {"step-1", "step-2"}
+        )
+        == []
+    )
+
+
+###############################################################################
 def test_native_geospatial_output_uses_the_canonical_scope_contract() -> None:
     location = ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5)
     canonical = CanonicalRequestInterpretation(

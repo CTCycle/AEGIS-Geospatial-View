@@ -16,6 +16,7 @@ from server.domain.agent.interpretation import (
 )
 from server.services.agent.request_interpreter import RequestInterpreter
 from server.services.agent.tool_argument_builder import ToolArgumentBuilder
+from server.services.geospatial.capability_registry import CapabilityRegistry
 
 ###############################################################################
 def _turn(temporal: TemporalSignal) -> TurnParseResult:
@@ -142,6 +143,61 @@ def test_canonical_radius_does_not_fall_back_to_geocoder_bbox() -> None:
     assert arguments["latitude"] == 47.3769
     assert arguments["longitude"] == 8.5417
     assert arguments["radius_m"] == 5000.0
+    assert "bbox" not in arguments
+
+
+def test_point_metadata_capability_uses_target_point_in_area_search() -> None:
+    turn = _turn(TemporalSignal(mode="current")).model_copy(
+        update={
+            "task_class": "map_search",
+            "user_text": "Show weather within 100 km of Zurich",
+            "radius_m": 100_000.0,
+            "requested_layers": ["openmeteo_weather_forecast"],
+        }
+    )
+    location = ResolvedLocation(
+        label="Zurich, Switzerland",
+        latitude=47.3769,
+        longitude=8.5417,
+        location_type="city",
+    )
+    canonical = CanonicalRequestInterpretation(
+        request_id="point-sample-area-1",
+        primary_intent="data_layer_query",
+        targets=[
+            CanonicalTarget(
+                target_id="target-1",
+                original_text="Zurich",
+                entity_kind="city",
+                resolved_location=location,
+                resolution_status="resolved",
+            )
+        ],
+        spatial_constraints=[
+            CanonicalSpatialConstraint(
+                relationship="within_distance",
+                target_id="target-1",
+                analysis_scope="radius",
+                distance_m=100_000.0,
+                provenance="explicit",
+            )
+        ],
+    )
+
+    arguments = ToolArgumentBuilder(
+        capability_registry=CapabilityRegistry()
+    ).build_capability_arguments(
+        "openmeteo_weather_forecast",
+        turn,
+        {},
+        resolved_location=location,
+        canonical_request=canonical,
+        target_id="target-1",
+    )
+
+    assert arguments["latitude"] == location.latitude
+    assert arguments["longitude"] == location.longitude
+    assert "radius_m" not in arguments
     assert "bbox" not in arguments
 
 

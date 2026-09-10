@@ -2514,9 +2514,27 @@ def test_orchestrator_recovers_explicit_map_request_after_parser_timeout() -> No
         assert response.turn_contract.provider_error is not None
         assert response.turn_contract.provider_error["recovered"] is True
         assert any(
-            "structured agent extraction timed out" in warning.casefold()
+            "structured agent extraction failed" in warning.casefold()
             for warning in response.operation.warnings
         )
         assert native_loop.requests == []
 
     run_async_in_thread(_run())
+
+###############################################################################
+def test_tool_result_map_session_is_a_valid_map_assembly_input() -> None:
+    payload = {
+        "tool_results": [
+            {
+                "content": {
+                    "ok": True,
+                    "data": {"map_session": {"session_id": "map-1"}},
+                }
+            }
+        ]
+    }
+
+    assert _ProductionAgentOrchestrator._tool_results_contain_map_session(payload) is True
+    assert _ProductionAgentOrchestrator._tool_results_contain_map_session(
+        {"tool_results": [{"content": {"ok": True, "data": {}}}]}
+    ) is False

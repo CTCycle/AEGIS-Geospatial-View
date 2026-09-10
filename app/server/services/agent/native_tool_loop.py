@@ -112,6 +112,16 @@ class NativeToolLoop:
         transition_budget = min(self.max_state_transitions, 32 if not simple_run else 10)
         premature_stop_proposals = 0
         context_usages: list[dict[str, Any]] = []
+        completed_native_plan_step_ids: set[str] = {
+            str(item).strip()
+            for item in cast(
+                list[Any], context.metadata.get("completed_native_plan_step_ids") or []
+            )
+            if str(item).strip()
+        }
+        context.metadata["completed_native_plan_step_ids"] = sorted(
+            completed_native_plan_step_ids
+        )
         execution_budget = context.execution_budget
         run_deadline = (
             execution_budget.deadline_monotonic
@@ -370,6 +380,72 @@ class NativeToolLoop:
                 )
 
             if not response.tool_calls:
+                pending_native_plan_step_ids = self.pending_native_plan_step_ids(
+                    context,
+                    completed_native_plan_step_ids,
+                )
+                if pending_native_plan_step_ids:
+                    context.metadata["pending_native_plan_step_ids"] = (
+                        pending_native_plan_step_ids
+                    )
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": response.content or "",
+                        }
+                    )
+                    messages.append(
+                        {
+                            # Keep the continuation in the conversational
+                            # message sequence.  OpenAI-compatible providers
+                            # reject a system message inserted after an
+                            # assistant/tool exchange.
+                            "role": "user",
+                            "content": (
+                                "Required planned capabilities remain unexecuted: "
+                                + ", ".join(pending_native_plan_step_ids)
+                                + ". Continue with the next allowed native tool; "
+                                "do not claim completion until every required step succeeds."
+                            ),
+                        }
+                    )
+                    premature_stop_proposals += 1
+                    if premature_stop_proposals >= 2:
+                        self._record_iteration_trace(
+                            context,
+                            iteration=iteration,
+                            available_tools=current_tools,
+                            selected_tool=None,
+                            result_status="no_progress",
+                            results=all_results,
+                            started=iteration_started,
+                            stopping_evaluation={
+                                "reason": "required_capabilities_pending",
+                                "pending_plan_step_ids": pending_native_plan_step_ids,
+                            },
+                        )
+                        return AgentToolLoopResult(
+                            final_text=(
+                                "The agent stopped before executing all required "
+                                "capability steps."
+                            ),
+                            tool_calls=all_calls,
+                            tool_results=all_results,
+                            iterations=iteration,
+                            stopped_reason="no_progress",
+                            map_session=self._extract_map_session(all_results, context),
+                            model_calls=iteration,
+                            duplicate_tool_calls=duplicate_tool_calls,
+                            no_progress_steps=no_progress_steps + 1,
+                            failure_category="model_capability",
+                            failure_detail=(
+                                "Required native capability steps remained "
+                                "unexecuted: "
+                                + ", ".join(pending_native_plan_step_ids)
+                            ),
+                            context_usages=list(context_usages),
+                        )
+                    continue
                 stop_reason = self._evaluate_textual_stop(
                     response.content,
                     context,
@@ -426,7 +502,11 @@ class NativeToolLoop:
                 messages.append({"role": "assistant", "content": response.content or ""})
                 messages.append(
                     {
-                        "role": "system",
+                        # Keep the continuation in the conversational message
+                        # sequence.  OpenAI-compatible providers reject a
+                        # system message inserted after an assistant/tool
+                        # exchange.
+                        "role": "user",
                         "content": "The response proposed a stop, but required tasks remain pending. Continue with one allowed native tool or state a typed clarification/error.",
                     }
                 )
@@ -504,9 +584,16 @@ class NativeToolLoop:
                     )
                     continue
                 fingerprints.add(fingerprint)
-                results_list.append(
-                    await self._execute_tool_call(bound_call, context, iteration)
-                )
+                bound_step_id = str(
+                    context.metadata.get("native_bound_step_id") or ""
+                ).strip()
+                result = await self._execute_tool_call(bound_call, context, iteration)
+                results_list.append(result)
+                if bound_step_id and not result.is_error:
+                    completed_native_plan_step_ids.add(bound_step_id)
+                    context.metadata["completed_native_plan_step_ids"] = sorted(
+                        completed_native_plan_step_ids
+                    )
             results = results_list
             all_results.extend(results)
             self._record_iteration_trace(
@@ -809,6 +896,20 @@ class NativeToolLoop:
 
         _ = content
         metadata = context.metadata or {}
+        completed_step_ids = {
+            str(item).strip()
+            for item in cast(
+                list[Any], metadata.get("completed_native_plan_step_ids") or []
+            )
+            if str(item).strip()
+        }
+        pending_native_plan_step_ids = NativeToolLoop.pending_native_plan_step_ids(
+            context,
+            completed_step_ids,
+        )
+        if pending_native_plan_step_ids:
+            metadata["pending_native_plan_step_ids"] = pending_native_plan_step_ids
+            return None
         missing_fields = metadata.get("clarification_required")
         map_session = NativeToolLoop._extract_map_session(results, context)
         evidence_refs = [
@@ -840,6 +941,25 @@ class NativeToolLoop:
         if evaluation.reason == "insufficient_evidence":
             return "insufficient_evidence"
         return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def pending_native_plan_step_ids(
+        context: AgentExecutionContext,
+        completed_step_ids: set[str],
+    ) -> list[str]:
+        raw_steps = context.metadata.get("tool_plan_steps")
+        if not is_json_array(raw_steps):
+            return []
+        required = [
+            str(item.get("step_id") or "").strip()
+            for item in raw_steps
+            if is_json_object(item)
+            and str(item.get("tool_name") or "") == "execute_geospatial_capability"
+            and str(item.get("capability_id") or "").strip()
+            and str(item.get("step_id") or "").strip()
+        ]
+        return [step_id for step_id in dict.fromkeys(required) if step_id not in completed_step_ids]
 
     # -------------------------------------------------------------------------
     async def _execute_tool_call(

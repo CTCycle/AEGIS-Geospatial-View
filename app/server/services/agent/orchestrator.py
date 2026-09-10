@@ -5,6 +5,7 @@ from server.common.typing import is_json_object, json_array, json_object
 from collections.abc import Awaitable, Callable
 import asyncio
 from contextlib import contextmanager
+from dataclasses import replace
 import inspect
 from time import monotonic
 from typing import Any, Generator, cast
@@ -173,6 +174,74 @@ class AgentOrchestrator:
             active_directives=self._active_directives,
             history_service=self.history_service,
         )
+
+    # -------------------------------------------------------------------------
+    def _deterministic_recovery_catalog(self) -> list[dict[str, Any]]:
+        """Expose enabled map-capability vocabulary to timeout recovery."""
+
+        registry = getattr(self.capability_resolver, "capability_registry", None)
+        runtime = getattr(self.capability_resolver, "runtime_registry", None)
+        if registry is None or runtime is None:
+            return []
+        catalog: list[dict[str, Any]] = []
+        for collection_name in (
+            "list_overlays",
+            "list_cameras",
+            "list_transit",
+            "list_tools",
+        ):
+            collection = getattr(registry, collection_name, None)
+            if not callable(collection):
+                continue
+            collection_items: object = collection()
+            if not isinstance(collection_items, list):
+                continue
+            for raw_capability in cast(list[object], collection_items):
+                capability = raw_capability
+                if not is_json_object(capability):
+                    continue
+                capability_id = str(capability.get("id") or "").strip()
+                if (
+                    capability_id
+                    and runtime.is_enabled(capability_id)
+                    and runtime.supports_mode(capability_id, "map")
+                ):
+                    catalog.append(capability)
+        return catalog
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _tool_results_contain_map_session(
+        tool_payload: dict[str, Any],
+    ) -> bool:
+        """Identify validated-map candidates returned by execution tools.
+
+        ``prepare_geospatial_map`` is a useful explicit tool, but it is not a
+        required second step when an execution tool already returned a
+        provider-backed ``map_session``.  The map assembler still validates
+        and merges that payload before it becomes presentation state.
+        """
+
+        for result in json_array(tool_payload.get("tool_results")):
+            if not is_json_object(result):
+                continue
+            content = result.get("content")
+            if not is_json_object(content) or content.get("ok") is False:
+                continue
+            data = content.get("data")
+            if not is_json_object(data):
+                continue
+            candidate = data.get("map_session")
+            if not is_json_object(candidate):
+                summary = data.get("summary")
+                candidate = (
+                    summary.get("map_session")
+                    if is_json_object(summary)
+                    else None
+                )
+            if is_json_object(candidate):
+                return True
+        return False
 
     # -------------------------------------------------------------------------
     async def run_turn(
@@ -913,6 +982,8 @@ class AgentOrchestrator:
                 user_message=payload.message,
                 memory_snapshot=latest_memory,
                 conversation_messages=recent_messages,
+                capability_catalog=self._deterministic_recovery_catalog(),
+                latest_contract=latest_contract,
                 provider_error=(
                     turn_contract.provider_error
                     if is_json_object(turn_contract.provider_error)
@@ -931,6 +1002,22 @@ class AgentOrchestrator:
                 recovered_turn_contract.normalized_action.action_id,
             )
             turn_contract = recovered_turn_contract
+        else:
+            continued_turn_contract = (
+                self.deterministic_intent_recovery_service.continue_pending_request(
+                    turn=turn_contract,
+                    user_message=payload.message,
+                    latest_contract=latest_contract,
+                    capability_catalog=self._deterministic_recovery_catalog(),
+                )
+            )
+            if continued_turn_contract is not None:
+                LOGGER.info(
+                    "clarification_contract_continued request_id=%s action=%s",
+                    request_id,
+                    continued_turn_contract.normalized_action.action_id,
+                )
+                turn_contract = continued_turn_contract
         turn_contract = self.turn_history_service.merge_memory_location_signals(
             turn_contract=turn_contract,
             latest_memory=latest_memory,
@@ -1202,6 +1289,29 @@ class AgentOrchestrator:
                     reason="The request is missing " + " and ".join(reasons) + ".",
                     missing_fields=missing_fields,
                 ),
+            )
+        if (
+            preflight_decision is not None
+            and preflight_decision.clarification is not None
+        ):
+            clarification = preflight_decision.clarification
+            turn_contract = turn_contract.model_copy(
+                update={
+                    "clarification_plan": {
+                        "blocking_fields": list(clarification.missing_fields),
+                        "question": clarification.question,
+                        "reason": clarification.reason,
+                    },
+                    "expected_frontend_update": "clarification",
+                    "ambiguities": list(
+                        dict.fromkeys(
+                            [
+                                *turn_contract.ambiguities,
+                                *clarification.missing_fields,
+                            ]
+                        )
+                    ),
+                }
             )
         # Capability routing runs after location resolution and canonical
         # compilation. Providers therefore validate the request's declared
@@ -1550,6 +1660,33 @@ class AgentOrchestrator:
         )
         execution_budget.pipeline_reach["tool_execution"] = "success"
         execution_budget.stopping_reason = tool_loop_result.stopped_reason
+        pending_native_plan_step_ids = NativeToolLoop.pending_native_plan_step_ids(
+            native_context,
+            {
+                str(item).strip()
+                for item in cast(
+                    list[Any],
+                    native_context.metadata.get("completed_native_plan_step_ids")
+                    or [],
+                )
+                if str(item).strip()
+            },
+        )
+        if pending_native_plan_step_ids:
+            LOGGER.warning(
+                "native_execution_incomplete request_id=%s pending_steps=%s",
+                request_id,
+                ",".join(pending_native_plan_step_ids),
+            )
+            tool_loop_result = replace(
+                tool_loop_result,
+                failure_category=tool_loop_result.failure_category or "model_capability",
+                failure_detail=tool_loop_result.failure_detail
+                or (
+                    "Required native capability steps remained unexecuted: "
+                    + ", ".join(pending_native_plan_step_ids)
+                ),
+            )
         decision_trace_steps = [
             "1.parse_structured_request",
             "2.build_policy_constraints",
@@ -1582,6 +1719,7 @@ class AgentOrchestrator:
             "failure_detail": tool_loop_result.failure_detail,
             "timeout_origin": tool_loop_result.timeout_origin,
             "context_usages": tool_loop_result.context_usages,
+            "pending_native_plan_step_ids": pending_native_plan_step_ids,
         }
         with self._stage_scope(
             execution_budget,
@@ -1595,14 +1733,27 @@ class AgentOrchestrator:
                 for item in json_array(tool_payload.get("tool_results"))
                 if is_json_object(item)
             )
+            prepared_map_sessions = [
+                item
+                for item in json_array(
+                    native_context.metadata.get("prepared_map_sessions")
+                )
+                if is_json_object(item)
+            ]
             # A native map-session hint is not, by itself, proof that the
-            # presentation inputs were validated and prepared.  The map
-            # assembler must only run for a presentation turn after the
-            # native prepare operation has completed (or for a non-map turn).
-            # This keeps provider/tool failures from being reinterpreted as a
-            # successful map merely because a loop result carried a partial
-            # session object.
-            map_input_ready = not presentation_required or prepared_by_native
+            # presentation inputs were validated and prepared.  A complete
+            # provider-backed map_session returned by an execution tool is a
+            # valid alternative to the explicit prepare operation; the map
+            # assembler validates the payload before publishing it.
+            map_input_ready = (
+                not pending_native_plan_step_ids
+                and (
+                    not presentation_required
+                or prepared_by_native
+                or bool(prepared_map_sessions)
+                or self._tool_results_contain_map_session(tool_payload)
+                )
+            )
             map_result = (
                 await self.turn_state_assembler.build_combined_map_session_from_tool_results(
                     tool_payload=tool_payload,
@@ -1610,6 +1761,7 @@ class AgentOrchestrator:
                     latest_memory=latest_memory,
                     resolved_location=resolved_location,
                     canonical_request=canonical_request,
+                    prepared_map_sessions=prepared_map_sessions,
                 )
                 if map_input_ready
                 else None

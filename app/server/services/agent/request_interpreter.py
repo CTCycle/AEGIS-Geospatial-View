@@ -248,9 +248,13 @@ class RequestInterpreter:
             )
         ):
             ambiguities.append("spatial_distance_required")
-        temporal_text = (turn.temporal_signal.raw_text or "").casefold()
+        temporal_text = " ".join(
+            item.strip()
+            for item in (turn.temporal_signal.raw_text or "", turn.user_text)
+            if item and item.strip()
+        ).casefold()
         if (
-            "recent" in temporal_text
+            re.search(r"\brecent\b", temporal_text)
             and turn.temporal_signal.start_time_iso is None
             and turn.temporal_signal.end_time_iso is None
         ):
@@ -507,6 +511,22 @@ class RequestInterpreter:
             )
             start = end - timedelta(days=7)
             return start.isoformat(), end.isoformat()
+        match = re.search(
+            r"\b(?:last|past|previous)\s+(\d{1,3})\s+"
+            r"(minutes?|mins?|hours?|hrs?|weeks?)\b",
+            raw_text,
+        )
+        if match:
+            amount = int(match.group(1))
+            unit = match.group(2)
+            if amount > 0:
+                if unit.startswith(("minute", "min")):
+                    delta = timedelta(minutes=amount)
+                elif unit.startswith(("hour", "hr")):
+                    delta = timedelta(hours=amount)
+                else:
+                    delta = timedelta(weeks=amount)
+                return (base - delta).isoformat(), base.isoformat()
         match = re.search(r"\b(?:last|past)\s+(\d{1,3})\s+days?\b", raw_text)
         if match:
             days = int(match.group(1))

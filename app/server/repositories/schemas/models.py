@@ -354,6 +354,9 @@ class AgentRunRecord(Base):
     # values at the boundary instead of propagating ``dict[Unknown, Unknown]``
     # through the run lifecycle.
     presentation_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # The render deadline starts when a candidate enters the awaiting-render
+    # state, not when the run was created or when model/tool work began.
+    render_prepared_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     __table_args__ = (
         Index("ix_agent_runs_conversation_id", "conversation_id"),

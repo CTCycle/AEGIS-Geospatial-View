@@ -7,7 +7,7 @@ import json
 import time
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from openai import AsyncOpenAI, OpenAI
@@ -122,6 +122,14 @@ class DeepSeekProvider(LLMProvider):
         if configured is None:
             return None
         return min(configured, maximum) if maximum is not None else configured
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _request_thinking_options(request: LLMRequest) -> dict[str, Any]:
+        mode = str(request.metadata.get("thinking_mode") or "").strip().lower()
+        if mode not in {"enabled", "disabled"}:
+            return {}
+        return {"extra_body": {"thinking": {"type": mode}}}
 
     # -------------------------------------------------------------------------
     def _validate_model_selection(self, request: LLMRequest) -> None:
@@ -247,6 +255,7 @@ class DeepSeekProvider(LLMProvider):
         max_tokens = self._request_max_tokens(effective_request)
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
+        kwargs.update(self._request_thinking_options(effective_request))
         if native_tools:
             kwargs["tools"] = [
                 self.tool_to_openai_schema(tool) for tool in native_tools
@@ -525,12 +534,40 @@ class DeepSeekProvider(LLMProvider):
         try:
             validated = validator(loaded)
         except Exception as exc:  # noqa: BLE001
+            validation_errors = getattr(exc, "errors", None)
+            invalid_paths: list[str] = []
+            if callable(validation_errors):
+                try:
+                    error_items: object = validation_errors()
+                    if not isinstance(error_items, list):
+                        error_items = []
+                    for raw_item in cast(list[object], error_items):
+                        if not is_json_object(raw_item):
+                            continue
+                        item = raw_item
+                        raw_location = item.get("loc")
+                        location_parts: Sequence[object] = (
+                            cast(Sequence[object], raw_location)
+                            if isinstance(raw_location, (list, tuple))
+                            else ()
+                        )
+                        location = ".".join(
+                            str(part) for part in location_parts
+                        ).strip()
+                        error_type = str(item.get("type") or "invalid").strip()
+                        if location:
+                            invalid_paths.append(f"{location} ({error_type})")
+                except Exception:  # noqa: BLE001
+                    invalid_paths = []
+            detail = "The provider response did not match the requested extraction schema."
+            if invalid_paths:
+                detail += " Invalid fields: " + ", ".join(invalid_paths[:8]) + "."
             raise LLMResponseParsingError(
                 provider=self.provider_name,
                 model=request.model,
                 stage="structured_output",
                 code="structured_invalid_payload",
-                detail="The provider response did not match the requested extraction schema.",
+                detail=detail,
                 context_usage=usage.to_dict(),
             ) from exc
         dumper = getattr(validated, "model_dump", None)
@@ -599,6 +636,7 @@ class DeepSeekProvider(LLMProvider):
                 request_kwargs["response_format"] = {"type": "json_object"}
             if max_tokens is not None:
                 request_kwargs["max_tokens"] = max_tokens
+            request_kwargs.update(self._request_thinking_options(request))
             response = self._client_for_request(request).chat.completions.create(
                 **request_kwargs
             )
@@ -685,6 +723,7 @@ class DeepSeekProvider(LLMProvider):
                 request_kwargs["response_format"] = {"type": "json_object"}
             if max_tokens is not None:
                 request_kwargs["max_tokens"] = max_tokens
+            request_kwargs.update(self._request_thinking_options(request))
             response = await request_client.chat.completions.create(**request_kwargs)
         except asyncio.CancelledError:
             raise
