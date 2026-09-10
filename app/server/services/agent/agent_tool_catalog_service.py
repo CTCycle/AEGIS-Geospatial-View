@@ -44,6 +44,11 @@ from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
 ###############################################################################
+class CapabilityArgumentSchemaError(ValueError):
+    """Raised when a catalog capability cannot be validated for execution."""
+
+
+###############################################################################
 class AgentToolCatalogService:
 
     # -------------------------------------------------------------------------
@@ -1362,7 +1367,7 @@ class AgentToolCatalogService:
         return {
             "capability_id": capability_id,
             "manifest": capability,
-            "argument_schema": self._argument_schema_for(capability),
+            "argument_schema": self._require_argument_schema(capability),
         }
 
     # -------------------------------------------------------------------------
@@ -1373,7 +1378,16 @@ class AgentToolCatalogService:
         *,
         context: AgentExecutionContext | None = None,
     ) -> GeospatialCapabilityExecutionResult:
-        descriptor = self.describe_geospatial_capability(capability_id)
+        try:
+            descriptor = self.describe_geospatial_capability(capability_id)
+        except CapabilityArgumentSchemaError as exc:
+            return self._error_result(
+                capability_id=capability_id,
+                arguments=arguments,
+                operation="invalid_arguments",
+                code="missing_argument_schema",
+                message=str(exc),
+            )
         validation_error = ToolRegistry._validate_arguments(  # pyright: ignore[reportPrivateUsage]
             descriptor["argument_schema"],
             arguments,
@@ -1602,14 +1616,17 @@ class AgentToolCatalogService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _argument_schema_for(capability: dict[str, Any]) -> dict[str, Any]:
+    def _require_argument_schema(capability: dict[str, Any]) -> dict[str, Any]:
         metadata = json_object(capability.get("metadata"))
         schema = metadata.get("parameters_json_schema") or metadata.get(
             "argument_schema"
         )
         if is_json_object(schema):
             return schema
-        return {"type": "object", "properties": {}}
+        capability_id = str(capability.get("id") or "unknown")
+        raise CapabilityArgumentSchemaError(
+            f"Capability '{capability_id}' does not declare an executable argument schema."
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
