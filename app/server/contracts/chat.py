@@ -214,6 +214,7 @@ class ModelLibrarySourceStatus(BaseModel):
 
     ok: bool
     reachable: bool | None = None
+    stale: bool = False
     message: str | None = None
     model_count: int | None = None
     structured_probe_status: Literal[

@@ -468,6 +468,24 @@ def test_capability_description_includes_executable_schema() -> None:
     assert descriptor["argument_schema"]["required"] == ["location"]
 
 ###############################################################################
+def test_loaded_catalog_entries_receive_the_canonical_argument_schema() -> None:
+    from server.services.geospatial.manifest_loader import GeospatialManifestLoader
+
+    entries = GeospatialManifestLoader().load_all()
+    weather = next(
+        item
+        for item in entries["overlays"]
+        if item["id"] == "openmeteo_weather_forecast"
+    )
+
+    schema = AgentToolCatalogService._require_argument_schema(weather)
+
+    assert schema["additionalProperties"] is False
+    assert "latitude" in schema["properties"]
+    assert "bbox" in schema["properties"]
+    assert "temporal_mode" in schema["properties"]
+
+###############################################################################
 def test_capability_without_argument_schema_fails_closed() -> None:
     service = _service()
     service.capability_registry.capabilities.append(

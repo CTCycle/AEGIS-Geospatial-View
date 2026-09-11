@@ -898,6 +898,7 @@ export interface ModelCardDescriptor {
 export interface ModelLibrarySourceStatus {
   ok: boolean;
   reachable?: boolean | null;
+  stale?: boolean;
   message?: string | null;
   model_count?: number | null;
   structured_probe_status?: StructuredProbeStatus;
