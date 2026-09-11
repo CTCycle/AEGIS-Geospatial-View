@@ -146,6 +146,7 @@ class NativeV2ResponseBuilder:
                 "exposure_trace": list(state.exposure_trace[-64:]),
                 "termination_reason": state.termination_reason,
             },
+            location_refs=dict(state.location_refs),
         )
 
 
