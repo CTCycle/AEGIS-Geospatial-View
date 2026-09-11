@@ -54,6 +54,18 @@ def test_catalog_exposes_a_renderable_public_satellite_basemap() -> None:
     assert render["attribution"]
 
 ###############################################################################
+def test_satellite_basemap_declares_location_execution_arguments() -> None:
+    registry = CapabilityRegistry(manifest_loader=GeospatialManifestLoader())
+    satellite = registry.get_capability("esri_world_imagery")
+
+    assert satellite is not None
+    argument_schema = satellite["metadata"]["argument_schema"]
+    assert argument_schema["type"] == "object"
+    assert "location" in argument_schema["properties"]
+    assert "latitude" in argument_schema["properties"]
+    assert "longitude" in argument_schema["properties"]
+
+###############################################################################
 def test_catalog_marks_key_required_capabilities_unavailable_without_credentials(
     monkeypatch,
 ) -> None:

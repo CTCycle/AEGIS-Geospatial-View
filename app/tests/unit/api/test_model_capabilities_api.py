@@ -40,6 +40,7 @@ class _ModelLibraryService:
                 "ollama": {
                     "ok": True,
                     "reachable": True,
+                    "stale": False,
                     "message": None,
                     "model_count": 1,
                 }
@@ -94,6 +95,7 @@ def test_models_endpoint_returns_capability_metadata() -> None:
     assert response.local[0].supports_structured_output is True
     assert response.local[0].tool_support_source == "ollama_probe"
     assert response.sources["ollama"].reachable is True
+    assert response.sources["ollama"].stale is False
 
 ###############################################################################
 def test_ollama_refresh_returns_capability_metadata() -> None:

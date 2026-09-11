@@ -1142,6 +1142,7 @@ export const parseModelLibrarySources = (
     sources[key] = {
       ok: requireApiBoolean(source, 'ok', endpoint),
       reachable: optionalApiNullableBoolean(source, 'reachable', endpoint) ?? null,
+      stale: 'stale' in source ? requireApiBoolean(source, 'stale', endpoint) : false,
       message: optionalApiString(source, 'message', endpoint) ?? null,
       model_count: optionalApiNumber(source, 'model_count', endpoint) ?? null,
       structured_probe_status: probeStatus as StructuredProbeStatus,

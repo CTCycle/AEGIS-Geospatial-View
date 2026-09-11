@@ -1616,6 +1616,83 @@ class AgentToolCatalogService:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _default_manifest_argument_schema(
+        capability: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Build the canonical transport schema for validated catalog entries.
+
+        Most manifests predate the explicit ``metadata.argument_schema`` field,
+        but the native execution path still needs one stable schema before it
+        can resolve the manifest's typed execution contract.  Real entries are
+        identifiable by the loader-owned source metadata; synthetic or
+        hand-built entries remain fail-closed so tests cannot accidentally
+        bypass schema requirements.
+        """
+
+        if not capability.get("source_path") and not capability.get("source_filename"):
+            return None
+        string_value = {"type": "string", "minLength": 1}
+        properties: dict[str, Any] = {
+            "latitude": {"type": "number", "minimum": -90, "maximum": 90},
+            "longitude": {"type": "number", "minimum": -180, "maximum": 180},
+            "location": string_value,
+            "location_text": string_value,
+            "address": string_value,
+            "city": string_value,
+            "country": string_value,
+            "query": string_value,
+            "target_id": string_value,
+            "location_ref": string_value,
+            "location_refs": {
+                "type": "array",
+                "items": string_value,
+                "maxItems": 16,
+            },
+            "bbox": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 4,
+                "maxItems": 4,
+            },
+            "radius_m": {"type": "number", "exclusiveMinimum": 0},
+            "radius_km": {"type": "number", "exclusiveMinimum": 0},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 10000},
+            "requested_attributes": {
+                "type": "array",
+                "items": string_value,
+                "maxItems": 32,
+            },
+            "poi_categories": {
+                "type": "array",
+                "items": string_value,
+                "maxItems": 64,
+            },
+            "categories": {
+                "type": "array",
+                "items": string_value,
+                "maxItems": 64,
+            },
+            "temporal_mode": string_value,
+            "time": string_value,
+            "reference_time_iso": string_value,
+            "start_time_iso": string_value,
+            "end_time_iso": string_value,
+            "temporal_granularity": string_value,
+            "aggregation": string_value,
+            "viewport": {"type": "object"},
+            "basemap": string_value,
+            "scope": string_value,
+            "show_marker": {"type": "boolean"},
+            "show_label": {"type": "boolean"},
+        }
+        return {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": properties,
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _require_argument_schema(capability: dict[str, Any]) -> dict[str, Any]:
         metadata = json_object(capability.get("metadata"))
         schema = metadata.get("parameters_json_schema") or metadata.get(
@@ -1623,6 +1700,11 @@ class AgentToolCatalogService:
         )
         if is_json_object(schema):
             return schema
+        inferred_schema = AgentToolCatalogService._default_manifest_argument_schema(
+            capability
+        )
+        if inferred_schema is not None:
+            return inferred_schema
         capability_id = str(capability.get("id") or "unknown")
         raise CapabilityArgumentSchemaError(
             f"Capability '{capability_id}' does not declare an executable argument schema."

@@ -5619,6 +5619,11 @@
             ],
             "title": "Reachable"
           },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          },
           "message": {
             "anyOf": [
               {
