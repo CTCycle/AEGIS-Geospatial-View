@@ -11,11 +11,13 @@ from server.domain.geospatial.registry import (
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
-
 ###############################################################################
 class RuntimeEligibility(Protocol):
+
+    # -------------------------------------------------------------------------
     def is_enabled(self, capability_id: str) -> bool: ...
 
+    # -------------------------------------------------------------------------
     def access_available(self, capability_id: str) -> bool: ...
 
 ###############################################################################
@@ -325,7 +327,6 @@ class CapabilityRegistry:
         )
         return candidates[:bounded_limit]
 
-
 ###############################################################################
 def _declared_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:
     agentic_use = capability.get("agenticUse")
@@ -342,7 +343,6 @@ def _declared_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:
     if declared:
         return declared
     return _legacy_domains(capability)
-
 
 ###############################################################################
 def _legacy_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:
@@ -365,7 +365,6 @@ def _legacy_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:
     if kind == "metadata-only":
         return {CapabilityDomain.PROVIDER_DISCOVERY}
     return {CapabilityDomain.DATA_RETRIEVAL}
-
 
 ###############################################################################
 def _searchable_text(capability: dict[str, Any]) -> set[str]:
@@ -393,7 +392,6 @@ def _searchable_text(capability: dict[str, Any]) -> set[str]:
         for value in values
         for token in _query_tokens(value if isinstance(value, list) else [value])
     }
-
 
 ###############################################################################
 def _query_tokens(values: list[object]) -> set[str]:

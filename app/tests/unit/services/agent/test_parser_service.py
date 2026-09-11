@@ -13,7 +13,6 @@ from server.services.llm.errors import (
     LLMResponseParsingError,
 )
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     "query",
@@ -443,7 +442,6 @@ def test_parser_promotes_verbatim_typed_entity_when_location_signal_is_omitted()
         "Denver, Colorado, United States"
     ]
     assert "missing_location" not in result.ambiguities
-
 
 ###############################################################################
 def test_parser_domain_boundary_preserves_typed_fields_without_prose_inference() -> (

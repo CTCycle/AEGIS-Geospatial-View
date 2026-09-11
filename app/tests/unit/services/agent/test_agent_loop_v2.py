@@ -19,46 +19,64 @@ from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.errors import LLMProviderRequestError
 
 
+###############################################################################
 class FakeProvider:
+
+    # -------------------------------------------------------------------------
     def __init__(self, results: list[LLMResult]) -> None:
         self.results = deque(results)
         self.requests: list[dict[str, Any]] = []
 
+    # -------------------------------------------------------------------------
     async def achat(self, request: Any, **kwargs: Any) -> LLMResult:
         self.requests.append({"request": request, "kwargs": kwargs})
         return self.results.popleft()
 
 
+###############################################################################
 class FakeFactory:
+
+    # -------------------------------------------------------------------------
     def __init__(self, provider: FakeProvider) -> None:
         self.provider = provider
 
+    # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> FakeProvider:
         return self.provider
 
 
+###############################################################################
 class FakeCapabilityRegistry:
+
+    # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, object] | None:
         if capability_id == "places:hospitals":
             return {"id": capability_id, "provider": "overpass"}
         return None
 
+    # -------------------------------------------------------------------------
     def shortlist(self, **kwargs: Any) -> list[dict[str, object]]:
         return [{"id": "places:hospitals"}]
 
 
+###############################################################################
 class FakeRuntimeRegistry:
+
+    # -------------------------------------------------------------------------
     def is_enabled(self, capability_id: str) -> bool:
         return True
 
+    # -------------------------------------------------------------------------
     def access_available(self, capability_id: str) -> bool:
         return True
 
 
+###############################################################################
 class EmptyInput(BaseModel):
     pass
 
 
+###############################################################################
 async def _answer_handler(arguments: BaseModel, state: AgentState) -> ToolResult:
     return ToolResult(
         call_id="handler-call",
@@ -69,6 +87,7 @@ async def _answer_handler(arguments: BaseModel, state: AgentState) -> ToolResult
     )
 
 
+###############################################################################
 def _loop(provider: FakeProvider) -> AgentLoop:
     capability_registry = FakeCapabilityRegistry()
     registry = ToolRegistry(runtime_registry=FakeRuntimeRegistry())  # type: ignore[arg-type]
@@ -103,6 +122,7 @@ def _loop(provider: FakeProvider) -> AgentLoop:
     )
 
 
+###############################################################################
 def _state() -> AgentState:
     return AgentState(
         request_id="request-1",
@@ -112,6 +132,7 @@ def _state() -> AgentState:
     )
 
 
+###############################################################################
 def _route_call() -> LLMResult:
     return LLMResult(
         content="",
@@ -131,6 +152,7 @@ def _route_call() -> LLMResult:
     )
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_loop_routes_exposes_tools_and_finishes_from_final_model_text() -> None:
     provider = FakeProvider(
@@ -161,6 +183,7 @@ async def test_loop_routes_exposes_tools_and_finishes_from_final_model_text() ->
     assert state.transition_trace
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_opencode_go_native_calls_use_conversation_session_and_compatible_thinking_mode() -> None:
     provider = FakeProvider([LLMResult(content="ready")])
@@ -186,6 +209,7 @@ async def test_opencode_go_native_calls_use_conversation_session_and_compatible_
     assert captured.metadata["thinking_mode"] == "disabled"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_loop_preserves_malformed_tool_call_as_failure() -> None:
     provider = FakeProvider(
@@ -218,6 +242,7 @@ async def test_loop_preserves_malformed_tool_call_as_failure() -> None:
     assert outcome.tool_results[0].error.error_type == "malformed_call"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_successful_tool_is_followed_by_one_final_model_step() -> None:
     provider = FakeProvider(
@@ -254,6 +279,7 @@ async def test_successful_tool_is_followed_by_one_final_model_step() -> None:
     assert assistant_message["tool_calls"][0]["arguments"] == {}
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_successful_duplicate_call_replays_without_external_tool_execution() -> None:
     provider = FakeProvider(
@@ -288,10 +314,14 @@ async def test_successful_duplicate_call_replays_without_external_tool_execution
     assert len(outcome.tool_results) == 2
 
 
+###############################################################################
 class RetryThenUnexpectedProvider:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls = 0
 
+    # -------------------------------------------------------------------------
     async def achat(self, request: Any, **kwargs: Any) -> LLMResult:
         self.calls += 1
         if self.calls == 1:
@@ -305,6 +335,7 @@ class RetryThenUnexpectedProvider:
         raise AssertionError("The model retry exceeded the run deadline.")
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_model_retry_cannot_restart_after_run_deadline() -> None:
     provider = RetryThenUnexpectedProvider()
@@ -328,6 +359,7 @@ async def test_model_retry_cannot_restart_after_run_deadline() -> None:
     assert provider.calls == 1
 
 
+###############################################################################
 def test_shadow_preview_exposes_route_tools_without_provider_or_tool_execution() -> None:
     provider = FakeProvider([])
     state = _state()
@@ -353,6 +385,7 @@ def test_shadow_preview_exposes_route_tools_without_provider_or_tool_execution()
     assert state.tool_calls == 0
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_map_route_text_cannot_stop_before_a_map_candidate_exists() -> None:
     provider = FakeProvider(

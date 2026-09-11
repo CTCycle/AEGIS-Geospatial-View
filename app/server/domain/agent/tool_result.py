@@ -31,7 +31,6 @@ ToolRecovery = Literal[
     "terminal",
 ]
 
-
 ###############################################################################
 class ValidationIssue(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -39,7 +38,6 @@ class ValidationIssue(BaseModel):
     path: str
     code: str
     message: str
-
 
 ###############################################################################
 class ToolExecutionError(BaseModel):
@@ -54,7 +52,6 @@ class ToolExecutionError(BaseModel):
     upstream_status: int | None = Field(default=None, ge=100, le=599)
     timeout_origin: str | None = None
 
-
 ###############################################################################
 class ToolExecutionMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -66,7 +63,6 @@ class ToolExecutionMetadata(BaseModel):
     api_latency_ms: int | None = Field(default=None, ge=0)
     result_size_bytes: int | None = Field(default=None, ge=0)
     evidence_refs: list[str] = Field(default_factory=list)
-
 
 ###############################################################################
 class ToolResult(BaseModel):

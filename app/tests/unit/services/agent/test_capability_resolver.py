@@ -86,7 +86,6 @@ def test_preserves_enabled_exact_capability_id() -> None:
     assert resolved.requested_layers == ["IMERG_Precipitation_Rate"]
     assert resolved.clarification_plan is None
 
-
 ###############################################################################
 def test_temporal_capability_check_uses_canonical_request_over_stale_turn() -> None:
     turn = _turn("Show current weather", "openmeteo_weather_forecast", temporal_mode="current")
@@ -107,6 +106,7 @@ def test_temporal_capability_check_uses_canonical_request_over_stale_turn() -> N
     )
 
 
+###############################################################################
 def test_temporal_capability_check_uses_inferred_legacy_forecast_support() -> None:
     turn = _turn(
         "Show the weather forecast around Example City",
@@ -127,6 +127,7 @@ def test_temporal_capability_check_uses_inferred_legacy_forecast_support() -> No
     assert CapabilityResolver._supports_temporal_request(capability, turn) is True
 
 
+###############################################################################
 def test_explicit_empty_contract_does_not_infer_legacy_forecast_support() -> None:
     turn = _turn(
         "Show the weather forecast around Example City",
@@ -148,6 +149,7 @@ def test_explicit_empty_contract_does_not_infer_legacy_forecast_support() -> Non
     assert CapabilityResolver._supports_temporal_request(capability, turn) is False
 
 
+###############################################################################
 def test_keeps_point_metadata_capability_in_area_scoped_request() -> None:
     turn = _turn(
         "Show weather and earthquakes within 100 km of Denver",
@@ -172,7 +174,6 @@ def test_keeps_point_metadata_capability_in_area_scoped_request() -> None:
 
     assert resolved.requested_layers == ["openmeteo_weather_forecast"]
     assert resolved.clarification_plan is None
-
 
 ###############################################################################
 def test_resolves_legacy_point_analysis_capability_in_explicit_area_scope() -> None:
@@ -200,7 +201,6 @@ def test_resolves_legacy_point_analysis_capability_in_explicit_area_scope() -> N
     assert resolved.requested_layers == ["openmeteo_pressure_humidity_wind"]
     assert resolved.clarification_plan is None
 
-
 ###############################################################################
 def test_resolves_precipitation_radar_semantics() -> None:
     resolved = _resolver().resolve(
@@ -225,7 +225,6 @@ def test_resolves_forecast_semantics() -> None:
         )
     )
     assert resolved.requested_layers == ["openmeteo_weather_forecast"]
-
 
 ###############################################################################
 def test_resolves_related_semantic_terms_as_one_catalog_capability() -> None:
@@ -254,7 +253,6 @@ def test_resolves_related_semantic_terms_as_one_catalog_capability() -> None:
     ]
     assert resolved.clarification_plan is None
 
-
 ###############################################################################
 def test_preserves_capability_for_preserved_viewport_context() -> None:
     turn = _turn(
@@ -280,7 +278,6 @@ def test_preserves_capability_for_preserved_viewport_context() -> None:
 
     assert resolved.requested_layers == ["openmeteo_weather_forecast"]
     assert resolved.clarification_plan is None
-
 
 ###############################################################################
 def test_preserves_canonical_capability_ids_inside_overlay_commands() -> None:
@@ -323,6 +320,7 @@ def test_preserves_unmatched_capability_ids_for_focused_clarification() -> None:
     assert resolved.overlay_commands[0].selector.capability_ids == ["fictional_overlay"]
 
 
+###############################################################################
 def test_fetching_selector_prefers_scope_compatible_semantic_capability() -> None:
     turn = _turn("Show weather within 100 km of Denver", "").model_copy(
         update={
@@ -604,7 +602,6 @@ def test_ignores_presentation_action_tags_as_dataset_concepts() -> None:
     assert resolved.capability_limitations == []
     assert resolved.clarification_plan is None
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     "action_tag", ["show_map", "map_center", "navigate", "relocate"]
@@ -684,7 +681,6 @@ def test_retains_semantic_action_tags_for_catalog_resolution() -> None:
     assert resolved.requested_layers == ["openmeteo_weather_forecast"]
     assert resolved.clarification_plan is None
 
-
 ###############################################################################
 def test_explicit_boundary_concept_is_not_location_only() -> None:
     turn = _turn(
@@ -700,7 +696,6 @@ def test_explicit_boundary_concept_is_not_location_only() -> None:
     turn.normalized_action.action_id = "geospatial_data_retrieval"
     assert not CapabilityResolver.is_location_focus_only(turn, [])
 
-
 ###############################################################################
 def test_district_concept_remains_location_navigation() -> None:
     turn = _turn("Show EUR district in Rome", "district").model_copy(update={
@@ -711,6 +706,7 @@ def test_district_concept_remains_location_navigation() -> None:
     assert CapabilityResolver.is_location_focus_only(turn, [])
 
 
+###############################################################################
 def test_basemap_category_remains_location_navigation() -> None:
     turn = _turn("Show a street map of Bologna, Italy", "").model_copy(
         update={

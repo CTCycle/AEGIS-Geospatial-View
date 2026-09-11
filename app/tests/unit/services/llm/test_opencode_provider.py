@@ -303,7 +303,10 @@ def test_opencode_requires_session_context_for_inference() -> None:
 def test_opencode_routes_responses_models_to_responses_transport(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
+    ###############################################################################
     class _Responses:
+
+        # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             captured["request"] = request
             captured["schema"] = schema

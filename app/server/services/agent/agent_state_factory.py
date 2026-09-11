@@ -8,11 +8,11 @@ from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_route import AgentPhase, AgentState
 from server.domain.agent.decision import ResolvedLocation
 
-
 ###############################################################################
 class AgentStateFactory:
     """Create a typed state projection from request-scoped lifecycle data."""
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def create(
         *,

@@ -30,20 +30,17 @@ async def execute(plan: ExecutionPlan, location: ResolvedLocation) -> dict[str, 
         "result": result,
     }
 
-
 ###############################################################################
 def _string_list(value: object) -> list[str]:
     return list(
         dict.fromkeys(str(item).strip() for item in json_array(value) if str(item).strip())
     )
 
-
 ###############################################################################
 def _positive_float(value: object) -> float | None:
     if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
         return float(value)
     return None
-
 
 ###############################################################################
 def _positive_int(value: object) -> int | None:

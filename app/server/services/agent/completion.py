@@ -23,7 +23,6 @@ REQUIRED_COMPLETION_NAMES = (
     "final_response_ready",
 )
 
-
 ###############################################################################
 class CompletionEvaluator:
     """Keep task completion independent of provider or model wording."""

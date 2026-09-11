@@ -46,10 +46,14 @@ _COORDINATE_PAIR_RE = re.compile(
 )
 
 
+###############################################################################
 class LocationToolHandler:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, resolver: LocationResolver) -> None:
         self.resolver = resolver
 
+    # -------------------------------------------------------------------------
     async def resolve(
         self,
         request: ResolveLocationInput,
@@ -110,11 +114,13 @@ class LocationToolHandler:
         return _success(location=result, target_key=target_key, started=started)
 
 
+###############################################################################
 def _target_key(request: ResolveLocationInput) -> str:
     value = request.target_id or request.candidate_id or request.query or "location"
     return " ".join(value.casefold().split())
 
 
+###############################################################################
 def _parse_coordinate_pair(query: str) -> tuple[float, float] | None:
     match = _COORDINATE_PAIR_RE.fullmatch(query)
     if match is None:
@@ -125,6 +131,7 @@ def _parse_coordinate_pair(query: str) -> tuple[float, float] | None:
     return latitude, longitude
 
 
+###############################################################################
 def _memory_snapshot(state: AgentState) -> dict[str, object]:
     location: ResolvedLocation | None = None
     if state.active_map_session is not None:
@@ -136,6 +143,7 @@ def _memory_snapshot(state: AgentState) -> dict[str, object]:
     }
 
 
+###############################################################################
 def _success(
     *, location: ResolvedLocation, target_key: str, started: float
 ) -> ToolResult:
@@ -158,6 +166,7 @@ def _success(
     )
 
 
+###############################################################################
 def _failure(
     *, code: str, message: str, recovery: str, started: float
 ) -> ToolResult:

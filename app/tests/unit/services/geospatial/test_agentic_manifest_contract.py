@@ -6,17 +6,23 @@ from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
 
+###############################################################################
 class _RuntimeEligibility:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, disabled: set[str] | None = None) -> None:
         self.disabled = disabled or set()
 
+    # -------------------------------------------------------------------------
     def is_enabled(self, capability_id: str) -> bool:
         return capability_id not in self.disabled
 
+    # -------------------------------------------------------------------------
     def access_available(self, capability_id: str) -> bool:
         return capability_id not in self.disabled
 
 
+###############################################################################
 def _registry() -> CapabilityRegistry:
     snapshot = GeospatialManifestSnapshot(
         providers=(),
@@ -52,6 +58,7 @@ def _registry() -> CapabilityRegistry:
     return CapabilityRegistry.from_catalog_snapshot(snapshot)
 
 
+###############################################################################
 def test_shortlist_is_domain_aware_and_bounded() -> None:
     candidates = _registry().shortlist(
         domains={CapabilityDomain.DATA_RETRIEVAL},
@@ -66,6 +73,7 @@ def test_shortlist_is_domain_aware_and_bounded() -> None:
     assert candidates[0]["routing_domains"] == ["data_retrieval"]
 
 
+###############################################################################
 def test_explicit_shortlist_ids_are_ranked_and_disabled_ids_are_filtered() -> None:
     candidates = _registry().shortlist(
         domains={CapabilityDomain.DATA_RETRIEVAL},
@@ -78,6 +86,7 @@ def test_explicit_shortlist_ids_are_ranked_and_disabled_ids_are_filtered() -> No
     assert [item["id"] for item in candidates] == ["weather"]
 
 
+###############################################################################
 def test_route_contract_remains_independent_of_provider_arguments() -> None:
     route = CapabilityRoute(
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
@@ -90,6 +99,7 @@ def test_route_contract_remains_independent_of_provider_arguments() -> None:
     assert "radius_m" not in route.model_dump()
 
 
+###############################################################################
 def test_legacy_analysis_tool_is_shortlisted_for_data_retrieval() -> None:
     snapshot = GeospatialManifestSnapshot(
         providers=(),

@@ -22,7 +22,6 @@ from server.domain.agent.interpretation import (
 
 FLOOD_COMPARISON_AMBIGUITY = "flood_comparison_requires_comparable_semantics"
 
-
 ###############################################################################
 class RequestInterpreter:
     """Compile once; downstream services must consume this value verbatim."""

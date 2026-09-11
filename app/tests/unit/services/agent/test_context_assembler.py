@@ -83,7 +83,6 @@ def test_later_conflicting_instruction_supersedes_prior_directive() -> None:
     assert service.active(directives)[0].source_turn_index == 2
     assert any(item.status == "superseded" for item in directives)
 
-
 ###############################################################################
 def test_oversized_newest_history_is_compacted_without_losing_location_state() -> None:
     location = {"active_location": {"name": "Rome", "lat": 41.9, "lon": 12.5}}
@@ -100,7 +99,6 @@ def test_oversized_newest_history_is_compacted_without_losing_location_state() -
     assert package.omitted_message_ids == [1]
     assert package.map_memory == location
     assert estimate_json_tokens(package.model_dump(mode="json")) < 3072
-
 
 ###############################################################################
 def test_unknown_model_history_is_bounded_and_excludes_renderer_payloads() -> None:

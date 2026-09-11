@@ -28,9 +28,10 @@ from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.errors import LLMProviderRequestError, LLMStructuredOutputError
 
-
 ###############################################################################
 class AgentProvider(Protocol):
+
+    # -------------------------------------------------------------------------
     async def achat(
         self,
         request: LLMRequest,
@@ -41,9 +42,11 @@ class AgentProvider(Protocol):
     ) -> LLMResult: ...
 
 
+###############################################################################
 class AgentProviderFactory(Protocol):
-    def get_provider(self, provider: str) -> AgentProvider: ...
 
+    # -------------------------------------------------------------------------
+    def get_provider(self, provider: str) -> AgentProvider: ...
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -67,6 +70,7 @@ class AgentLoopRequest:
     max_tool_result_chars: int = 4096
 
 
+###############################################################################
 @dataclass(frozen=True)
 class AgentLoopOutcome:
     final_text: str
@@ -91,6 +95,7 @@ class AgentLoopOutcome:
     failure_detail: str | None = None
 
 
+###############################################################################
 @dataclass(frozen=True)
 class AgentLoopPreview:
     """Route/exposure result for shadow mode; it never calls a provider."""
@@ -100,7 +105,6 @@ class AgentLoopPreview:
     exposed_tool_names: list[str] = field(default_factory=list)
     stopped_reason: str = "shadow_preview"
     failure_detail: str | None = None
-
 
 ###############################################################################
 class AgentLoop:
@@ -112,6 +116,7 @@ class AgentLoop:
         parameters_json_schema=CapabilityRoute.model_json_schema(),
     )
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

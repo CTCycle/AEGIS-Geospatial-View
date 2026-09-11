@@ -24,10 +24,14 @@ from server.services.agent.map_plan_service import MapPlanService
 LOCATION = ResolvedLocation(label="Zurich HB", latitude=47.378, longitude=8.540)
 
 
+###############################################################################
 class FakeCapabilityRegistry:
+
+    # -------------------------------------------------------------------------
     def list_basemaps(self) -> list[dict[str, object]]:
         return [{"id": "basemap:osm"}]
 
+    # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, object] | None:
         values = {
             "basemap:osm": {
@@ -48,7 +52,10 @@ class FakeCapabilityRegistry:
         return values.get(capability_id)
 
 
+###############################################################################
 class FakeEvidenceRepository:
+
+    # -------------------------------------------------------------------------
     def get_summary(
         self,
         evidence_id: str,
@@ -67,6 +74,7 @@ class FakeEvidenceRepository:
         )
 
 
+###############################################################################
 def _state(
     *,
     active_map_session: MapSession | None = None,
@@ -83,6 +91,7 @@ def _state(
     )
 
 
+###############################################################################
 def _active_session() -> MapSession:
     return MapSession(
         session_id="active-map",
@@ -109,6 +118,7 @@ def _active_session() -> MapSession:
     )
 
 
+###############################################################################
 def _service() -> MapPlanService:
     return MapPlanService(
         capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
@@ -116,6 +126,7 @@ def _service() -> MapPlanService:
     )
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
     state = _state(active_map_session=_active_session())
@@ -158,6 +169,7 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
     assert "features" not in result.model_dump(mode="json")
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_location_only_plan_gets_catalog_default_basemap() -> None:
     state = _state()
@@ -179,6 +191,7 @@ async def test_location_only_plan_gets_catalog_default_basemap() -> None:
     assert state.prepared_map_session.overlay_collection.instances == []
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_stale_revision_is_rejected_without_candidate() -> None:
     state = _state(active_map_session=_active_session())
@@ -203,6 +216,7 @@ async def test_stale_revision_is_rejected_without_candidate() -> None:
     assert state.prepared_map_session is None
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_missing_evidence_is_rejected() -> None:
     state = _state(active_map_session=_active_session())
@@ -227,6 +241,7 @@ async def test_missing_evidence_is_rejected() -> None:
     assert result.error.code == "unknown_evidence"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_visibility_mutation_increments_candidate_revision() -> None:
     state = _state(active_map_session=_active_session())

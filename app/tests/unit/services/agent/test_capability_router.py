@@ -13,17 +13,23 @@ from server.services.agent.capability_router import CapabilityRouter
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
 
+###############################################################################
 class _Runtime:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, disabled: set[str] | None = None) -> None:
         self.disabled = disabled or set()
 
+    # -------------------------------------------------------------------------
     def is_enabled(self, capability_id: str) -> bool:
         return capability_id not in self.disabled
 
+    # -------------------------------------------------------------------------
     def access_available(self, capability_id: str) -> bool:
         return capability_id not in self.disabled
 
 
+###############################################################################
 def _router(runtime: _Runtime | None = None) -> CapabilityRouter:
     registry = CapabilityRegistry.from_catalog_snapshot(
         GeospatialManifestSnapshot(
@@ -60,6 +66,7 @@ def _router(runtime: _Runtime | None = None) -> CapabilityRouter:
     )
 
 
+###############################################################################
 def _state(*, active_map: bool = False) -> AgentState:
     state = AgentState(
         request_id="request-1",
@@ -72,6 +79,7 @@ def _state(*, active_map: bool = False) -> AgentState:
     return state
 
 
+###############################################################################
 def _route(**overrides: Any) -> CapabilityRoute:
     values: dict[str, Any] = {
         "primary_domain": CapabilityDomain.DATA_RETRIEVAL,
@@ -84,6 +92,7 @@ def _route(**overrides: Any) -> CapabilityRoute:
     return CapabilityRoute.model_validate(values)
 
 
+###############################################################################
 def test_router_shortlists_without_selecting_final_arguments() -> None:
     decision = _router().validate_route(
         _route(), user_message="Show traffic in Zurich.", active_state=_state()
@@ -94,6 +103,7 @@ def test_router_shortlists_without_selecting_final_arguments() -> None:
     assert "radius_m" not in decision.route.model_dump()
 
 
+###############################################################################
 def test_router_rejects_hallucinated_ids_and_reports_no_capability() -> None:
     decision = _router().validate_route(
         _route(explicit_capability_ids=["not-in-catalog"]),
@@ -106,6 +116,7 @@ def test_router_rejects_hallucinated_ids_and_reports_no_capability() -> None:
     assert "unknown_capability_id" in decision.reason_codes
 
 
+###############################################################################
 def test_router_requires_active_map_for_map_state_follow_up() -> None:
     decision = _router().validate_route(
         _route(primary_domain=CapabilityDomain.MAP_STATE, requires_location=False),
@@ -117,6 +128,7 @@ def test_router_requires_active_map_for_map_state_follow_up() -> None:
     assert "active_map_required" in decision.reason_codes
 
 
+###############################################################################
 def test_router_handles_runtime_disabled_explicit_candidate() -> None:
     decision = _router(_Runtime(disabled={"traffic"})).validate_route(
         _route(explicit_capability_ids=["traffic"]),
@@ -129,6 +141,7 @@ def test_router_handles_runtime_disabled_explicit_candidate() -> None:
     assert "capability_disabled" in decision.reason_codes
 
 
+###############################################################################
 def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools() -> None:
     decision = _router().validate_route(
         _route(requires_location=False),

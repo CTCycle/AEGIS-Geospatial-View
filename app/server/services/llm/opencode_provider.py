@@ -114,6 +114,7 @@ OPENCODE_BASE_URLS = {
 class _OpenCodeResponsesTransport(OpenAIProvider):
     """OpenAI Responses serialization with OpenCode identity and headers."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, parent: "OpenCodeProvider") -> None:
         super().__init__(api_key=parent.api_key, base_url=parent.base_url)
         self.provider_name = parent.provider_name

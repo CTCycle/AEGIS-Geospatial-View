@@ -47,7 +47,6 @@ from server.services.search.request_builder import RequestBuilder
 class CapabilityArgumentSchemaError(ValueError):
     """Raised when a catalog capability cannot be validated for execution."""
 
-
 ###############################################################################
 class AgentToolCatalogService:
 
@@ -1030,6 +1029,7 @@ class AgentToolCatalogService:
             return [payload]
         return [item for item in payload if is_json_object(item)] if is_json_array(payload) else []
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _inspect_payload(payload: Any, *, view: str, fields: list[str], cursor: Any, limit: int) -> dict[str, Any]:
         if view == "metadata":
@@ -1055,6 +1055,7 @@ class AgentToolCatalogService:
         page = records[start : start + max(1, min(limit, 100))]
         return {"records": page, "pagination": {"cursor": str(start + len(page)) if start + len(page) < len(records) else None, "total": len(records)}}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _apply_transform_operations(records: list[dict[str, Any]], operations: list[Any]) -> tuple[list[dict[str, Any]], str | None]:
         allowed = {"attribute_filter", "temporal_filter", "spatial_filter", "sort", "limit", "field_projection", "aggregate"}

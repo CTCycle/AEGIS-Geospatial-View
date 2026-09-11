@@ -21,10 +21,14 @@ from server.services.agent.tool_definitions import (
 )
 
 
+###############################################################################
 class EvidenceToolHandler:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, repository: AgentEvidenceRepository) -> None:
         self.repository = repository
 
+    # -------------------------------------------------------------------------
     async def inspect(
         self,
         request: InspectEvidenceInput,
@@ -86,6 +90,7 @@ class EvidenceToolHandler:
             ),
         )
 
+    # -------------------------------------------------------------------------
     async def transform(
         self,
         request: TransformEvidenceInput,
@@ -166,6 +171,7 @@ class EvidenceToolHandler:
         )
 
 
+###############################################################################
 def _decode_json(raw: bytes) -> Any:
     try:
         return json.loads(raw.decode("utf-8"))
@@ -173,6 +179,7 @@ def _decode_json(raw: bytes) -> Any:
         return {"byte_size": len(raw)}
 
 
+###############################################################################
 def _records_from_payload(payload: Any) -> list[dict[str, Any]]:
     if is_json_object(payload):
         for key in ("records", "features", "items", "data"):
@@ -183,6 +190,7 @@ def _records_from_payload(payload: Any) -> list[dict[str, Any]]:
     return [item for item in payload if is_json_object(item)] if is_json_array(payload) else []
 
 
+###############################################################################
 def _inspect_payload(
     payload: Any,
     *,
@@ -235,6 +243,7 @@ def _inspect_payload(
     }
 
 
+###############################################################################
 def _apply_operations(
     records: list[dict[str, Any]], operations: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], str | None]:
@@ -319,6 +328,7 @@ def _apply_operations(
     return result, None
 
 
+###############################################################################
 def _matches(actual: Any, operator: str, expected: Any) -> bool:
     if operator == "eq":
         return actual == expected
@@ -335,6 +345,7 @@ def _matches(actual: Any, operator: str, expected: Any) -> bool:
     return isinstance(actual, (int, float)) and isinstance(expected, (int, float)) and actual <= expected
 
 
+###############################################################################
 def _spatial_filter(
     records: list[dict[str, Any]], operation: dict[str, Any]
 ) -> tuple[list[dict[str, Any]], str | None]:
@@ -377,6 +388,7 @@ def _spatial_filter(
     return [item for item in records if within(item)], None
 
 
+###############################################################################
 def _failure(
     *, tool_name: str, code: str, message: str, recovery: str, started: float
 ) -> ToolResult:

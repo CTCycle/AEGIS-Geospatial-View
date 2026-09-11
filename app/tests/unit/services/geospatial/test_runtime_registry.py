@@ -81,7 +81,6 @@ def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
     assert registry.credentials_present("tomtom_traffic_flow")
     assert registry.provider_health("tomtom_traffic_flow") == "healthy"
 
-
 ###############################################################################
 def test_openchargemap_requires_saved_key_or_local_snapshot(monkeypatch, tmp_path) -> None:
     monkeypatch.delenv("AEGIS_OCM_SNAPSHOT_PATH", raising=False)
@@ -107,7 +106,6 @@ def test_openchargemap_requires_saved_key_or_local_snapshot(monkeypatch, tmp_pat
     assert local.access_available("openchargemap_ev_charging")
     assert local.provider_health("openchargemap_ev_charging") == "healthy"
 
-
 ###############################################################################
 def test_openchargemap_is_available_with_saved_access_credential(monkeypatch) -> None:
     monkeypatch.delenv("AEGIS_OCM_SNAPSHOT_PATH", raising=False)
@@ -119,7 +117,6 @@ def test_openchargemap_is_available_with_saved_access_credential(monkeypatch) ->
     assert registry.access_available("openchargemap_ev_charging")
     assert registry.provider_health("openchargemap_ev_charging") == "healthy"
 
-
 ###############################################################################
 def test_restricted_capability_is_disabled_without_explicit_opt_in(monkeypatch) -> None:
     monkeypatch.delenv("AEGIS_ALLOW_RESTRICTED_SOURCES", raising=False)
@@ -130,7 +127,6 @@ def test_restricted_capability_is_disabled_without_explicit_opt_in(monkeypatch) 
 
     assert not registry.is_enabled("openmeteo_elevation")
     assert registry.provider_health("openmeteo_elevation") == "disabled"
-
 
 ###############################################################################
 def test_restricted_capability_requires_explicit_opt_in(monkeypatch) -> None:

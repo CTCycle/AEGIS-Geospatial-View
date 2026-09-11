@@ -9,6 +9,7 @@ import pytest
 from server.services.chat.structured_probe import StructuredProbeService
 
 
+###############################################################################
 def _settings() -> SimpleNamespace:
     return SimpleNamespace(
         agent_model_provider="opencode-go",
@@ -22,20 +23,28 @@ def _settings() -> SimpleNamespace:
     )
 
 
+###############################################################################
 class _SettingsService:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.settings = _settings()
 
+    # -------------------------------------------------------------------------
     def get_settings(self) -> SimpleNamespace:
         return self.settings
 
 
+###############################################################################
 class _Parser:
+
+    # -------------------------------------------------------------------------
     def __init__(self, result: object | None = None, error: Exception | None = None) -> None:
         self.result = result
         self.error = error
         self.calls = 0
 
+    # -------------------------------------------------------------------------
     async def parse_turn_with_usage_async(self, **_: object) -> object:
         self.calls += 1
         if self.error is not None:
@@ -43,6 +52,7 @@ class _Parser:
         return self.result
 
 
+###############################################################################
 def _parser_result(
     *,
     parse_status: str = "complete",
@@ -54,6 +64,7 @@ def _parser_result(
     )
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_probe_is_not_tested_then_passed_and_cached() -> None:
     parser = _Parser(result=_parser_result())
@@ -74,6 +85,7 @@ async def test_probe_is_not_tested_then_passed_and_cached() -> None:
     assert parser.calls == 1
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_probe_sanitizes_provider_failures_and_expires() -> None:
     parser = _Parser(
@@ -110,6 +122,7 @@ async def test_probe_sanitizes_provider_failures_and_expires() -> None:
     assert service.latest().status == "not_tested"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_probe_timeout_does_not_retry_or_expose_provider_detail() -> None:
     parser = _Parser(error=asyncio.TimeoutError())
@@ -126,6 +139,7 @@ async def test_probe_timeout_does_not_retry_or_expose_provider_detail() -> None:
     assert parser.calls == 1
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_probe_marks_model_capability_failure_unsupported() -> None:
     parser = _Parser(

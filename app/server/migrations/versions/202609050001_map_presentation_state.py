@@ -12,7 +12,6 @@ down_revision: Union[str, None] = "202608310001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-
 ###############################################################################
 def upgrade() -> None:
     op.add_column(
@@ -28,7 +27,6 @@ def upgrade() -> None:
         "agent_runs",
         sa.Column("presentation_json", sa.JSON(), nullable=True),
     )
-
 
 ###############################################################################
 def downgrade() -> None:

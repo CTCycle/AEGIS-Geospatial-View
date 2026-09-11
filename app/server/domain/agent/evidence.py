@@ -24,6 +24,7 @@ EvidenceKind = Literal[
 ]
 
 
+###############################################################################
 class AgentEvidenceSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -39,6 +40,7 @@ class AgentEvidenceSummary(BaseModel):
     map_eligibility: Literal["renderable", "not_renderable", "unknown"] = "unknown"
 
 
+###############################################################################
 class AgentEvidenceEnvelope(BaseModel):
     """Normalized result shape returned to the model for every evidence call."""
 
@@ -57,6 +59,7 @@ class AgentEvidenceEnvelope(BaseModel):
     )
 
 
+###############################################################################
 class AgentContextAllocation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -77,6 +80,7 @@ class AgentContextAllocation(BaseModel):
     mandatory_overflow: bool = False
 
 
+###############################################################################
 class AgentWorkingState(BaseModel):
     """Typed state rebuilt before each native decision."""
 
@@ -114,6 +118,7 @@ class AgentWorkingState(BaseModel):
     context_budget: AgentContextAllocation | None = None
 
 
+###############################################################################
 class AgentIterationTrace(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -136,6 +141,7 @@ class AgentIterationTrace(BaseModel):
     stopping_evaluation: dict[str, Any] | None = None
 
 
+###############################################################################
 class AgentStopEvaluation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

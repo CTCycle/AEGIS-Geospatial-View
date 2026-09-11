@@ -552,7 +552,6 @@ class GroundedResponseSynthesizer:
             }
         return str(value)[:500]
 
-
 ###############################################################################
 async def synthesize_response_async(
     synthesizer: Any,

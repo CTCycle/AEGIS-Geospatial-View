@@ -11,6 +11,7 @@ from server.domain.agent.tool_result import (
 )
 
 
+###############################################################################
 def test_tool_result_has_one_strict_model_visible_shape() -> None:
     result = ToolResult(
         call_id="call-1",
@@ -43,6 +44,7 @@ def test_tool_result_has_one_strict_model_visible_shape() -> None:
         )
 
 
+###############################################################################
 def test_tool_execution_error_restricts_recovery_and_issue_shape() -> None:
     error = ToolExecutionError(
         error_type="schema_validation",

@@ -16,7 +16,6 @@ from server.services.agent.request_interpreter import (
     RequestInterpreter,
 )
 
-
 ###############################################################################
 def _location(label: str, latitude: float, longitude: float) -> ResolvedLocation:
     return ResolvedLocation(
@@ -27,7 +26,6 @@ def _location(label: str, latitude: float, longitude: float) -> ResolvedLocation
         confidence=0.99,
         bbox=[longitude - 0.1, latitude - 0.1, longitude + 0.1, latitude + 0.1],
     )
-
 
 ###############################################################################
 def _turn(**updates: object) -> TurnParseResult:
@@ -55,7 +53,6 @@ def _turn(**updates: object) -> TurnParseResult:
     }
     payload.update(updates)
     return TurnParseResult.model_validate(payload)
-
 
 ###############################################################################
 def test_hierarchy_relationship_is_canonical_and_resolved_once() -> None:
@@ -98,7 +95,6 @@ def test_hierarchy_relationship_is_canonical_and_resolved_once() -> None:
     assert canonical.spatial_constraints[0].analysis_scope == "administrative_geometry"
     assert canonical.map_required is True
 
-
 ###############################################################################
 def test_peer_targets_keep_distinct_locations_and_scopes() -> None:
     turn = _turn(
@@ -131,7 +127,6 @@ def test_peer_targets_keep_distinct_locations_and_scopes() -> None:
     assert canonical.operations == ["compare", "geospatial_data_retrieval"]
     assert FLOOD_COMPARISON_AMBIGUITY in canonical.ambiguities
 
-
 ###############################################################################
 def test_ordinary_flood_map_request_is_not_guarded_as_a_comparison() -> None:
     canonical = RequestInterpreter().compile(
@@ -145,7 +140,6 @@ def test_ordinary_flood_map_request_is_not_guarded_as_a_comparison() -> None:
     )
 
     assert FLOOD_COMPARISON_AMBIGUITY not in canonical.ambiguities
-
 
 ###############################################################################
 def test_non_flood_comparison_is_not_guarded() -> None:
@@ -162,7 +156,6 @@ def test_non_flood_comparison_is_not_guarded() -> None:
 
     assert FLOOD_COMPARISON_AMBIGUITY not in canonical.ambiguities
 
-
 ###############################################################################
 def test_water_level_catalog_comparison_is_guarded() -> None:
     canonical = RequestInterpreter().compile(
@@ -177,7 +170,6 @@ def test_water_level_catalog_comparison_is_guarded() -> None:
     )
 
     assert FLOOD_COMPARISON_AMBIGUITY in canonical.ambiguities
-
 
 ###############################################################################
 def test_explicit_new_location_is_not_replaced_by_stale_memory() -> None:
@@ -207,7 +199,6 @@ def test_explicit_new_location_is_not_replaced_by_stale_memory() -> None:
     assert canonical.primary_target.resolved_location.label == "Milan, Italy"
     assert "Rome" not in canonical.primary_target.original_text
 
-
 ###############################################################################
 def test_strongest_is_a_filter_and_does_not_change_domain_or_location() -> None:
     canonical = RequestInterpreter().compile(
@@ -222,7 +213,6 @@ def test_strongest_is_a_filter_and_does_not_change_domain_or_location() -> None:
     assert canonical.primary_target.resolved_location is not None
     assert canonical.primary_target.resolved_location.label == "Tokyo, Japan"
     assert "strongest_requires_threshold_or_top_n" in canonical.ambiguities
-
 
 ###############################################################################
 def test_resolved_location_lookup_uses_geocoder_accent_and_punctuation_folding() -> None:
@@ -249,7 +239,6 @@ def test_resolved_location_lookup_uses_geocoder_accent_and_punctuation_folding()
     assert canonical.primary_target.resolved_location is not None
     assert canonical.primary_target.resolved_location.label == "São Paulo, Brazil"
 
-
 ###############################################################################
 def test_proximity_and_recent_without_defined_defaults_are_ambiguous() -> None:
     canonical = RequestInterpreter().compile(
@@ -271,7 +260,6 @@ def test_proximity_and_recent_without_defined_defaults_are_ambiguous() -> None:
     assert "spatial_distance_required" in canonical.ambiguities
     assert "recent_requires_time_window" in canonical.ambiguities
 
-
 ###############################################################################
 def test_explicit_recent_qualifier_is_guarded_when_model_omits_temporal_signal() -> None:
     canonical = RequestInterpreter().compile(
@@ -284,7 +272,6 @@ def test_explicit_recent_qualifier_is_guarded_when_model_omits_temporal_signal()
     )
 
     assert "recent_requires_time_window" in canonical.ambiguities
-
 
 ###############################################################################
 def test_relative_temporal_bounds_resolve_once_in_client_timezone() -> None:
@@ -306,7 +293,6 @@ def test_relative_temporal_bounds_resolve_once_in_client_timezone() -> None:
     assert temporal.start_time_iso == "2026-09-05T00:00:00+02:00"
     assert temporal.end_time_iso == "2026-09-06T00:00:00+02:00"
 
-
 ###############################################################################
 def test_relative_hour_window_is_resolved_from_the_request_reference_time() -> None:
     bounds = RequestInterpreter._relative_bounds(
@@ -318,7 +304,6 @@ def test_relative_hour_window_is_resolved_from_the_request_reference_time() -> N
         "2026-09-05T10:30:00+00:00",
         "2026-09-05T12:30:00+00:00",
     )
-
 
 ###############################################################################
 def test_invalid_client_timezone_falls_back_to_application_then_utc() -> None:

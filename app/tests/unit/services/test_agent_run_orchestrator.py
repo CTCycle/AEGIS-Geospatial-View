@@ -380,7 +380,6 @@ def test_execute_run_includes_context_usage_in_clarification_event() -> None:
         "estimated_input_tokens"
     ] == 321
 
-
 ###############################################################################
 def test_execute_run_publishes_context_samples_before_terminal_event() -> None:
     response = _failed_response().model_copy(
@@ -423,7 +422,6 @@ def test_geospatial_auth_failure_points_to_access_without_exposing_provider_text
     assert "Access" in message
     assert "Model Settings" not in message
     assert "secret-token" not in message
-
 
 ###############################################################################
 def test_unacknowledged_map_candidate_does_not_replace_committed_task_state():

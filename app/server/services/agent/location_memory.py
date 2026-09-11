@@ -95,7 +95,6 @@ class LocationMemoryService:
             "active_location": location_payload,
         }
 
-
 ###############################################################################
 def _finite_number(
     value: object, *, minimum: float, maximum: float

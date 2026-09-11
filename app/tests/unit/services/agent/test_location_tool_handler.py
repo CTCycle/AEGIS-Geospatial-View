@@ -8,6 +8,7 @@ from server.services.agent.tool_definitions import ResolveLocationInput
 from server.services.agent.tool_handlers.location import LocationToolHandler
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_coordinate_query_is_resolved_without_geocoder_egress() -> None:
     state = AgentState(

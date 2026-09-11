@@ -49,6 +49,7 @@ _DATA = frozenset({CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.SPATIAL_ANA
 _MAP = frozenset({CapabilityDomain.MAP_RENDERING, CapabilityDomain.MAP_STATE})
 
 
+###############################################################################
 def register_native_v2_tools(
     registry: ToolRegistry,
     *,
@@ -172,6 +173,7 @@ def register_native_v2_tools(
         registry.register(tool)
 
 
+###############################################################################
 def _registration(
     *,
     name: str,
@@ -204,6 +206,7 @@ def _registration(
     )
 
 
+###############################################################################
 def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
     async def execute(request: ExecuteCapabilityInput, state: AgentState) -> ToolResult:
         location = _location_for_request(request, state)
@@ -219,6 +222,7 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
     return execute
 
 
+###############################################################################
 def _location_for_request(
     request: ExecuteCapabilityInput, state: AgentState
 ) -> ResolvedLocation | None:
@@ -234,6 +238,7 @@ def _location_for_request(
     return None
 
 
+###############################################################################
 def _apply_map_plan_handler(service: MapPlanService) -> Any:
     async def apply(request: ApplyMapPlanInput, state: AgentState) -> ToolResult:
         plan = MapPlan.model_validate(request.model_dump(mode="python"))
@@ -249,6 +254,7 @@ def _apply_map_plan_handler(service: MapPlanService) -> Any:
     return apply
 
 
+###############################################################################
 async def _route_handler(_request: RouteRequestInput, _state: AgentState) -> ToolResult:
     return ToolResult(
         call_id="handler-call",
@@ -266,12 +272,14 @@ async def _route_handler(_request: RouteRequestInput, _state: AgentState) -> Too
     )
 
 
+###############################################################################
 def _normalize_result(value: Any, call_id: str) -> ToolResult:
     if not isinstance(value, ToolResult):
         raise TypeError("Native-v2 handlers must return ToolResult.")
     return value.model_copy(update={"call_id": call_id})
 
 
+###############################################################################
 def _capability_semantic_validator(
     request: ExecuteCapabilityInput, state: AgentState
 ) -> list[str]:
@@ -280,6 +288,7 @@ def _capability_semantic_validator(
     return []
 
 
+###############################################################################
 def _evidence_semantic_validator(
     request: Any, state: AgentState
 ) -> list[str]:

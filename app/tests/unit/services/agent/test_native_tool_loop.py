@@ -450,7 +450,6 @@ def test_native_tool_loop_uses_the_latest_map_session_result() -> None:
     assert result is not None
     assert result.session_id == "second"
 
-
 ###############################################################################
 def test_textual_stop_waits_for_all_planned_native_capabilities() -> None:
     location = ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5)
@@ -501,7 +500,6 @@ def test_textual_stop_waits_for_all_planned_native_capabilities() -> None:
         )
         == []
     )
-
 
 ###############################################################################
 def test_native_geospatial_output_uses_the_canonical_scope_contract() -> None:

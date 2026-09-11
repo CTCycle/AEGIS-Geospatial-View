@@ -11,19 +11,16 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 ###############################################################################
 class MapActionBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     action: str
 
-
 ###############################################################################
 class SetBasemapAction(MapActionBase):
     action: Literal["set_basemap"]
     capability_id: str
-
 
 ###############################################################################
 class AddEvidenceLayerAction(MapActionBase):
@@ -33,13 +30,11 @@ class AddEvidenceLayerAction(MapActionBase):
     visible: bool = True
     opacity: float = Field(default=1.0, ge=0.0, le=1.0)
 
-
 ###############################################################################
 class SetLayerVisibilityAction(MapActionBase):
     action: Literal["set_layer_visibility"]
     instance_id: str
     visible: bool
-
 
 ###############################################################################
 class SetLayerOpacityAction(MapActionBase):
@@ -47,18 +42,15 @@ class SetLayerOpacityAction(MapActionBase):
     instance_id: str
     opacity: float = Field(ge=0.0, le=1.0)
 
-
 ###############################################################################
 class RemoveLayerAction(MapActionBase):
     action: Literal["remove_layer"]
     instance_id: str
 
-
 ###############################################################################
 class KeepOnlyLayersAction(MapActionBase):
     action: Literal["keep_only_layers"]
     instance_ids: list[str] = Field(min_length=1, max_length=32)
-
 
 ###############################################################################
 class SetViewportAction(MapActionBase):
@@ -78,7 +70,6 @@ MapAction = Annotated[
     | SetViewportAction,
     Field(discriminator="action"),
 ]
-
 
 ###############################################################################
 class MapPlan(BaseModel):

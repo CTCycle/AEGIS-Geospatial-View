@@ -25,7 +25,6 @@ from server.repositories.schemas.models import AgentRunRecord, ConversationRecor
 ###############################################################################
 JsonObject = dict[str, Any]
 
-
 ###############################################################################
 def _json_object(value: object) -> JsonObject:
     """Narrow a JSON value at a repository boundary."""
@@ -33,13 +32,11 @@ def _json_object(value: object) -> JsonObject:
         return cast(JsonObject, value)
     return {}
 
-
 ###############################################################################
 def _json_list(value: object) -> list[Any]:
     if isinstance(value, list):
         return cast(list[Any], value)
     return []
-
 
 ###############################################################################
 class AgentRunRepository:

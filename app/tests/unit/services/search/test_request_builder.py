@@ -192,7 +192,6 @@ def test_request_builder_recenters_when_follow_up_changes_location() -> None:
     assert viewport.center_longitude == 8.5417
     assert viewport.radius_m == 18000.0
 
-
 ###############################################################################
 def test_request_builder_preserves_temporal_mode_and_analysis_radius() -> None:
     builder = RequestBuilder()
@@ -234,7 +233,6 @@ def test_request_builder_preserves_temporal_mode_and_analysis_radius() -> None:
     assert request.end_time_iso == "2026-08-31T00:00:00+00:00"
     assert request.analysis_radius_m == 5000.0
     assert request.viewport.radius_m >= 5000.0
-
 
 ###############################################################################
 def test_request_builder_ignores_native_bbox_override_for_canonical_scope() -> None:
@@ -297,7 +295,6 @@ def test_request_builder_ignores_native_bbox_override_for_canonical_scope() -> N
     assert request.analysis_bbox == [8.3, 47.2, 8.7, 47.6]
     assert request.analysis_radius_m is None
     assert request.poi_categories == []
-
 
 ###############################################################################
 def test_request_builder_uses_canonical_scope_and_time_over_stale_turn_fields() -> None:

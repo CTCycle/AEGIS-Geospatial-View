@@ -6,7 +6,6 @@ from typing import Any
 
 E2E_CONVERSATION_ID = "conversation-e2e"
 
-
 ###############################################################################
 def map_overlay_instance(
     *,

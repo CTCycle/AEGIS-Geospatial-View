@@ -12,14 +12,12 @@ down_revision: Union[str, None] = "202609050001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-
 ###############################################################################
 def upgrade() -> None:
     op.add_column(
         "agent_runs",
         sa.Column("request_timezone", sa.String(length=64), nullable=True),
     )
-
 
 ###############################################################################
 def downgrade() -> None:

@@ -186,7 +186,11 @@ def test_find_model_can_skip_probe_status_for_context_profile_lookup(monkeypatch
 
 ###############################################################################
 def test_find_cached_model_never_refreshes_dynamic_provider(monkeypatch) -> None:
+
+    ###############################################################################
     class _ProviderThatMustNotBeCalled:
+
+        # -------------------------------------------------------------------------
         def list_models(self):  # noqa: ANN201
             raise AssertionError("context lookup must not refresh a provider catalog")
 

@@ -9,14 +9,12 @@ from pyproj import Geod, Transformer
 from shapely.geometry import Point, shape
 from shapely.ops import transform
 
-
 ###############################################################################
 class SpatialConstraintError(ValueError):
     """Raised when a requested scope or geometry cannot be trusted."""
 
 
 _GEOD = Geod(ellps="WGS84")
-
 
 ###############################################################################
 def normalize_bbox(value: Iterable[object]) -> list[float]:
@@ -42,7 +40,6 @@ def normalize_bbox(value: Iterable[object]) -> list[float]:
         raise SpatialConstraintError("A non-degenerate bbox cannot have equal longitudes.")
     return [west, south, east, north]
 
-
 ###############################################################################
 def validate_point(latitude: object, longitude: object) -> tuple[float, float]:
     """Validate a WGS84 point and return it as (latitude, longitude)."""
@@ -59,7 +56,6 @@ def validate_point(latitude: object, longitude: object) -> tuple[float, float]:
     if not -90 <= latitude_value <= 90 or not -180 <= longitude_value <= 180:
         raise SpatialConstraintError("Coordinates are outside EPSG:4326 bounds.")
     return latitude_value, longitude_value
-
 
 ###############################################################################
 def validate_geojson_geometry(geometry: object) -> dict[str, Any]:
@@ -78,7 +74,6 @@ def validate_geojson_geometry(geometry: object) -> dict[str, Any]:
         raise SpatialConstraintError("GeoJSON geometry is empty or invalid.")
     return geometry_object
 
-
 ###############################################################################
 def geodesic_distance_m(
     first_latitude: float,
@@ -92,7 +87,6 @@ def geodesic_distance_m(
     second = validate_point(second_latitude, second_longitude)
     _azimuth_a, _azimuth_b, distance = _GEOD.inv(first[1], first[0], second[1], second[0])
     return float(distance)
-
 
 ###############################################################################
 def feature_matches_constraint(

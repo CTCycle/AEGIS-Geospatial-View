@@ -28,19 +28,20 @@ from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
-
 ###############################################################################
 class MapPlanBuildError(ValueError):
+
+    # -------------------------------------------------------------------------
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
 
-
 ###############################################################################
 class MapSessionBuilder:
     """Turn catalog descriptors and evidence references into a MapSession."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, capability_registry: CapabilityRegistry) -> None:
         self.capability_registry = capability_registry
 
@@ -299,6 +300,7 @@ class MapSessionBuilder:
         return descriptor
 
 
+###############################################################################
 def _with_viewport(session: MapSession, viewport: ViewportPolicy) -> MapSession:
     return session.model_copy(
         update={
@@ -313,6 +315,7 @@ def _with_viewport(session: MapSession, viewport: ViewportPolicy) -> MapSession:
     )
 
 
+###############################################################################
 def _viewport_for_location(location: ResolvedLocation) -> ViewportPolicy:
     bbox = _valid_bbox(location.bbox)
     return ViewportPolicy(
@@ -322,6 +325,7 @@ def _viewport_for_location(location: ResolvedLocation) -> ViewportPolicy:
     )
 
 
+###############################################################################
 def _viewport_for_bbox(bbox: list[float], previous: ViewportPolicy) -> ViewportPolicy:
     min_lon, min_lat, max_lon, max_lat = bbox
     center_latitude = (min_lat + max_lat) / 2
@@ -342,6 +346,7 @@ def _viewport_for_bbox(bbox: list[float], previous: ViewportPolicy) -> ViewportP
     )
 
 
+###############################################################################
 def _valid_bbox(value: object) -> list[float] | None:
     if not isinstance(value, list | tuple) or len(value) != 4:
         return None
@@ -355,6 +360,7 @@ def _valid_bbox(value: object) -> list[float] | None:
     return result
 
 
+###############################################################################
 def _evidence_bbox(evidence: list[AgentEvidenceEnvelope]) -> list[float] | None:
     for item in evidence:
         for source in (item.summary, item.provenance):

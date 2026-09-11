@@ -9,12 +9,16 @@ from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.location_resolver import LocationResolver
 
 
+###############################################################################
 class _CountryGeocoder:
+
+    # -------------------------------------------------------------------------
     def __init__(self, target: str, code: str, *, subordinate: bool = False) -> None:
         self.target = target
         self.code = code
         self.subordinate = subordinate
 
+    # -------------------------------------------------------------------------
     async def extract_coordinates(self, **_: object) -> dict[str, object]:
         if self.subordinate:
             display = f"{self.target} Region, {self.target}"
@@ -35,6 +39,7 @@ class _CountryGeocoder:
         }
 
 
+###############################################################################
 @pytest.mark.parametrize(
     ("country", "code"),
     [
@@ -61,6 +66,7 @@ def test_country_administrative_boundary_requires_matching_country_identity(
     assert result.location_type == "country"
 
 
+###############################################################################
 def test_country_rejects_subordinate_administrative_region() -> None:
     resolver = LocationResolver(
         nominatim_service=_CountryGeocoder("France", "fr", subordinate=True)
@@ -76,6 +82,7 @@ def test_country_rejects_subordinate_administrative_region() -> None:
     assert result.missing_fields == ["location"]
 
 
+###############################################################################
 def test_country_rejects_mismatched_country_code() -> None:
     resolver = LocationResolver(nominatim_service=_CountryGeocoder("France", "de"))
 

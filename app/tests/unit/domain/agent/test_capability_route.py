@@ -11,6 +11,7 @@ from server.domain.agent.capability_route import (
 )
 
 
+###############################################################################
 def test_capability_route_is_bounded_and_strict() -> None:
     route = CapabilityRoute(
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
@@ -42,6 +43,7 @@ def test_capability_route_is_bounded_and_strict() -> None:
         )
 
 
+###############################################################################
 def test_agent_state_tracks_native_loop_counters() -> None:
     state = AgentState(
         request_id="req-1",

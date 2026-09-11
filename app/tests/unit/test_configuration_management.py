@@ -22,7 +22,6 @@ from server.configurations.startup import (
 def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
-
 ###############################################################################
 def _base_configuration() -> dict:
     return json.loads(CONFIGURATIONS_FILE.read_text(encoding="utf-8"))

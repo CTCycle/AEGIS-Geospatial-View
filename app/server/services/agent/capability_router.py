@@ -11,9 +11,10 @@ from server.domain.agent.capability_route import (
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 class CapabilityRouter:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -133,6 +134,7 @@ class CapabilityRouter:
         )
 
 
+###############################################################################
 def _is_executable_candidate(capability: dict[str, object]) -> bool:
     """Keep renderer-only descriptors out of the generic provider tool."""
 

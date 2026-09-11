@@ -22,10 +22,12 @@ from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.types import LLMToolDefinition
 
 
+###############################################################################
 async def _handler(_arguments: BaseModel, _state: AgentState) -> dict[str, Any]:
     return {"ok": True}
 
 
+###############################################################################
 def _result(_value: Any, call_id: str) -> ToolResult:
     return ToolResult(
         call_id=call_id,
@@ -36,6 +38,7 @@ def _result(_value: Any, call_id: str) -> ToolResult:
     )
 
 
+###############################################################################
 def _registered(
     name: str,
     input_model: type[BaseModel],
@@ -61,6 +64,7 @@ def _registered(
     )
 
 
+###############################################################################
 def _state(phase: AgentPhase, *, capability_ids: list[str] | None = None) -> AgentState:
     return AgentState(
         request_id="request-1",
@@ -71,6 +75,7 @@ def _state(phase: AgentPhase, *, capability_ids: list[str] | None = None) -> Age
     )
 
 
+###############################################################################
 def test_exposure_is_phase_and_prerequisite_bound() -> None:
     registry = ToolRegistry(runtime_registry=cast(Any, None))
     registry.register(
@@ -122,6 +127,7 @@ def test_exposure_is_phase_and_prerequisite_bound() -> None:
     ]
 
 
+###############################################################################
 def test_typed_tool_inputs_reject_unknown_fields() -> None:
     with pytest.raises(ValidationError):
         ResolveLocationInput.model_validate({"query": "Zurich", "extra": True})

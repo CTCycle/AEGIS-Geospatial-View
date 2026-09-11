@@ -59,6 +59,7 @@ class ChatRuntimeSettings:
     application_timezone: str = "UTC"
 
 
+###############################################################################
 @dataclass(frozen=True)
 class AgentExecutionSettings:
     interpretation_seconds: float = 90.0
@@ -200,6 +201,7 @@ class JsonChatRuntimeSettings(StrictJsonSettings):
     application_timezone: str = "UTC"
 
 
+###############################################################################
 class JsonAgentExecutionSettings(StrictJsonSettings):
     interpretation_seconds: float = Field(default=90.0, ge=1.0, le=300.0)
     simple_seconds: float = Field(default=150.0, ge=1.0, le=300.0)
