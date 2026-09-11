@@ -124,6 +124,34 @@ def test_model_lane_adapts_native_v2_map_evidence() -> None:
     assert evaluation["execution_evidence"] == 2
 
 ###############################################################################
+def test_model_lane_accepts_native_v2_location_clarification() -> None:
+    evaluation = evaluate_model_scenario(
+        {"assertions": ["clarification_or_context_resolution"]},
+        [
+            {
+                "status_code": 200,
+                "tool_calls": [],
+                "tool_results": [],
+                "provider_events": [],
+                "request_fingerprints": [],
+                "response": {
+                    "assistant_message": (
+                        "Which Springfield do you mean? Please specify the state or country."
+                    ),
+                    "operation": {
+                        "kind": "clarification",
+                        "status": "partial",
+                        "message": "Please specify the state or country.",
+                    },
+                    "execution_trace": {"execution_mode": "native_v2"},
+                },
+            }
+        ],
+    )
+
+    assert evaluation["passed"] is True
+
+###############################################################################
 def test_model_lane_scores_ambiguous_location_clarification() -> None:
     evaluation = evaluate_model_scenario(
         {"assertions": ["clarification_or_context_resolution"]},

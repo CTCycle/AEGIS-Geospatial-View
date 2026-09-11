@@ -868,7 +868,7 @@ _CAPABILITY_FAMILY_TOKENS: dict[str, tuple[str, ...]] = {
     "transit": ("transit", "gtfs", "station", "railway", "bus"),
     "elevation": ("elevation", "terrain", "topograph"),
     "boundaries": ("boundar", "admin", "protected"),
-    "land_cover": ("land_cover", "landcover", "land_use"),
+    "land_cover": ("land_cover", "landcover", "land_use", "worldcover"),
     "population": ("population", "census", "demograph"),
     "roads": ("road", "traffic"),
 }
@@ -1427,9 +1427,20 @@ def _evaluate_model_assertion(
             "city, region",
             "coordinates",
             "which city",
+            "state or country",
+            "country",
+            "place",
+            "area",
         )
-        passed = plan.get("state") == "clarify" and (
-            any(marker in answer_text for marker in location_markers)
+        operation = last_response.get("operation")
+        operation_message = (
+            operation.get("message", "")
+            if isinstance(operation, dict)
+            else ""
+        )
+        clarification_text = f"{answer_text} {operation_message.casefold()}"
+        passed = _has_structured_clarification(last_trace) and (
+            any(marker in clarification_text for marker in location_markers)
             or "location" in clarification_fields
         )
         return _assertion_result(
