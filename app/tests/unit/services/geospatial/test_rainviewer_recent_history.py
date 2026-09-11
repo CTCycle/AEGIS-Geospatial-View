@@ -44,7 +44,6 @@ def test_rainviewer_ignores_discontinued_nowcast_frames() -> None:
     assert "/v2/radar/200/256/" in result["tile_url_template"]
     assert "/v2/radar/999/" not in result["tile_url_template"]
 
-
 ###############################################################################
 def test_rainviewer_filters_malformed_past_timestamps() -> None:
     async def fetcher(_url: str, _headers: dict[str, str]) -> dict[str, Any]:
@@ -65,7 +64,6 @@ def test_rainviewer_filters_malformed_past_timestamps() -> None:
     assert result["latest_time"] == 300
     assert result["frame_count"] == 1
     assert result["history_start_time"] == 300
-
 
 ###############################################################################
 def test_rainviewer_rejects_when_no_past_frame_has_a_valid_timestamp() -> None:

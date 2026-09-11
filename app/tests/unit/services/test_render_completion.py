@@ -28,7 +28,6 @@ from server.services.agent.completion import CompletionEvaluator
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.render_completion import RenderCompletionService
 
-
 ###############################################################################
 class _EventPublisher:
 
@@ -46,7 +45,6 @@ class _EventPublisher:
     ) -> None:
         self.events.append((str(type), dict(payload)))
 
-
 ###############################################################################
 class _InMemoryBackend:
 
@@ -59,7 +57,6 @@ class _InMemoryBackend:
             future=True,
         )
         self.session = sessionmaker(bind=self.engine, future=True)
-
 
 ###############################################################################
 @pytest.fixture()
@@ -79,7 +76,6 @@ def render_context() -> tuple[AgentRunRepository, _EventPublisher, str, str]:
     )
     publisher = _EventPublisher()
     return repository, publisher, conversation_id, run.run_id
-
 
 ###############################################################################
 def _session(*instances: OverlayInstance, bounds: list[float] | None = None) -> MapSession:
@@ -108,7 +104,6 @@ def _session(*instances: OverlayInstance, bounds: list[float] | None = None) -> 
         ),
     )
 
-
 ###############################################################################
 def _canonical() -> CanonicalRequestInterpretation:
     return CanonicalRequestInterpretation(
@@ -117,7 +112,6 @@ def _canonical() -> CanonicalRequestInterpretation:
         map_required=True,
         completion_requirements=[],
     )
-
 
 ###############################################################################
 def test_metadata_only_overlay_cannot_satisfy_renderable_geometry() -> None:
@@ -138,11 +132,9 @@ def test_metadata_only_overlay_cannot_satisfy_renderable_geometry() -> None:
     assert renderable.status == "pending"
     assert RenderCompletionService.requires_browser_ack(_session(metadata)) is False
 
-
 ###############################################################################
 def test_location_only_map_still_requires_browser_ack() -> None:
     assert RenderCompletionService.requires_browser_ack(_session()) is True
-
 
 ###############################################################################
 def test_unavailable_provider_is_not_treated_as_metadata_only() -> None:
@@ -175,7 +167,6 @@ def test_unavailable_provider_is_not_treated_as_metadata_only() -> None:
         item for item in requirements if item.name == "required_data_retrieved"
     ).status == "failed"
 
-
 ###############################################################################
 def test_valid_empty_result_with_bounds_can_render_analysis_area() -> None:
     requirements = CompletionEvaluator.candidate_requirements(
@@ -184,7 +175,6 @@ def test_valid_empty_result_with_bounds_can_render_analysis_area() -> None:
 
     renderable = next(item for item in requirements if item.name == "renderable_geometry_created")
     assert renderable.status == "satisfied"
-
 
 ###############################################################################
 def test_explicit_scope_and_time_require_descriptor_evidence() -> None:
@@ -265,7 +255,6 @@ def test_explicit_scope_and_time_require_descriptor_evidence() -> None:
     requirements = CompletionEvaluator.candidate_requirements(canonical, candidate)
     assert next(item for item in requirements if item.name == "temporal_filter_applied").status == "failed"
 
-
 ###############################################################################
 def test_acknowledgment_payload_is_bounded_and_requires_valid_viewport() -> None:
     payload = RealtimeRenderAckPayload(
@@ -330,7 +319,6 @@ def test_acknowledgment_payload_is_bounded_and_requires_valid_viewport() -> None
                 "viewport_valid": True,
             },
         )
-
 
 ###############################################################################
 def test_matching_render_ack_promotes_once_and_replay_is_idempotent(
@@ -419,7 +407,6 @@ def test_matching_render_ack_promotes_once_and_replay_is_idempotent(
             )
         )
 
-
 ###############################################################################
 def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
     render_context,
@@ -490,7 +477,6 @@ def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
             )
         )
 
-
 ###############################################################################
 def test_render_ack_rejects_missing_required_data_even_with_analysis_bounds(
     render_context,
@@ -534,7 +520,6 @@ def test_render_ack_rejects_missing_required_data_even_with_analysis_bounds(
                 ),
             )
         )
-
 
 ###############################################################################
 def test_production_render_ack_persists_terminal_events_atomically() -> None:

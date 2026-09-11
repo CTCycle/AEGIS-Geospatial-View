@@ -219,7 +219,6 @@ def test_nested_provider_usage_is_preserved_from_stream_completion_payload() -> 
     assert updated.usage_source == "provider_reported"
     assert updated.usage_percent == round(700 / 4096 * 100, 1)
 
-
 ###############################################################################
 def test_context_usage_percent_uses_model_limit_and_can_show_overage() -> None:
     assert calculate_context_usage_percent(700, 4096) == round(700 / 4096 * 100, 1)
@@ -268,7 +267,6 @@ def test_prepare_request_does_not_invent_limit_for_unknown_model() -> None:
 
     assert prepared.messages == request.messages
 
-
 ###############################################################################
 def test_unknown_model_rejects_oversized_current_request_without_inventing_capacity() -> (
     None
@@ -279,7 +277,6 @@ def test_unknown_model_rejects_oversized_current_request_without_inventing_capac
     usage = compute_context_usage(request, provider="unknown")
     assert usage.model_context_limit is None
     assert usage.usage_percent is None
-
 
 ###############################################################################
 def test_unknown_model_compacts_history_to_application_input_ceiling() -> None:

@@ -51,6 +51,7 @@ def test_structural_coordinate_extraction_is_independent_of_execution_planning()
     assert extracted.longitude == 12.5
 
 
+###############################################################################
 def test_parser_normalizes_provider_distance_scope_alias() -> None:
     extracted = LLMParserExtraction(
         geographic_relationships=[
@@ -69,6 +70,7 @@ def test_parser_normalizes_provider_distance_scope_alias() -> None:
     assert relationships[0].analysis_scope == "radius"
 
 
+###############################################################################
 def test_parser_normalizes_nullable_provider_sentinels_at_the_schema_boundary() -> None:
     extracted = LLMParserExtractionProviderContract.model_validate(
         {
@@ -91,7 +93,6 @@ def test_parser_normalizes_nullable_provider_sentinels_at_the_schema_boundary() 
     assert extracted.viewport_intent is None
     assert extracted.temporal_signal.raw_text is None
     assert extracted.geographic_relationships[0].reference is None
-
 
 ###############################################################################
 class _PromptProvider:
@@ -411,7 +412,6 @@ def test_parser_prioritizes_actionable_data_over_context_query_label() -> None:
     assert result.relationship == "follow_up"
     assert result.requested_concepts == ["temperature"]
 
-
 ###############################################################################
 def test_parser_recovers_omitted_deictic_reference_for_memory_resolution() -> None:
 
@@ -461,7 +461,6 @@ def test_parser_recovers_omitted_deictic_reference_for_memory_resolution() -> No
     assert result.location_signals[0].signal_type == "deictic"
     assert result.location_signals[0].source == "text"
     assert result.ambiguities == []
-
 
 ###############################################################################
 @pytest.mark.parametrize(

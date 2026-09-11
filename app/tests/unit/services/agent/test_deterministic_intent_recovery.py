@@ -13,7 +13,6 @@ from server.services.agent.turn_support import AgentTurnSupport
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 def _recover(message: str):
     return DeterministicIntentRecoveryService.recover_explicit_request(
@@ -27,7 +26,6 @@ def _recover(message: str):
             "model": "test-model",
         },
     )
-
 
 ###############################################################################
 def test_recovers_direct_humidity_request_as_catalog_backed_value_lookup() -> None:
@@ -56,7 +54,6 @@ def test_recovers_direct_humidity_request_as_catalog_backed_value_lookup() -> No
     ).resolve(result)
     assert resolved.requested_layers == ["get_weather_forecast"]
 
-
 ###############################################################################
 def test_recovers_explicit_map_weather_request_as_map() -> None:
     result = _recover("Show humidity and pressure as a map around Sanremo.")
@@ -66,7 +63,6 @@ def test_recovers_explicit_map_weather_request_as_map() -> None:
     assert result.presentation_mode == "both"
     assert result.expected_frontend_update == "map_session"
 
-
 ###############################################################################
 def test_preserves_recent_temporal_qualifier_during_timeout_recovery() -> None:
     result = _recover("Show recent weather in Sanremo on the map.")
@@ -75,7 +71,6 @@ def test_preserves_recent_temporal_qualifier_during_timeout_recovery() -> None:
     assert result.temporal_signal.raw_text == "recent"
     assert result.temporal_signal.mode == "current"
     assert result.requested_concepts == ["weather"]
-
 
 ###############################################################################
 def test_recovers_explicit_request_after_structured_payload_failure() -> None:
@@ -95,7 +90,6 @@ def test_recovers_explicit_request_after_structured_payload_failure() -> None:
     assert result.provider_error["recovered"] is True
     assert result.provider_error["recovery"] == "explicit_catalog_request"
 
-
 ###############################################################################
 def test_recovers_coordinate_map_and_combined_weather_request() -> None:
     result = _recover("Display weather and air quality at 43.817, 7.777.")
@@ -105,7 +99,6 @@ def test_recovers_coordinate_map_and_combined_weather_request() -> None:
     assert result.location_signals[0].latitude == 43.817
     assert result.location_signals[0].longitude == 7.777
     assert result.requested_concepts == ["weather", "air quality"]
-
 
 ###############################################################################
 def test_recovers_catalog_backed_compound_request_after_application_deadline() -> None:
@@ -139,7 +132,6 @@ def test_recovers_catalog_backed_compound_request_after_application_deadline() -
     assert result.presentation_mode == "both"
     assert result.provider_error["recovered"] is True
 
-
 ###############################################################################
 def test_recovers_contextual_location_request_for_non_vector_capability() -> None:
     result = DeterministicIntentRecoveryService.recover_explicit_request(
@@ -169,7 +161,6 @@ def test_recovers_contextual_location_request_for_non_vector_capability() -> Non
     assert result.requested_concepts == ["measurement"]
     assert result.radius_m is None
     assert result.presentation_mode == "both"
-
 
 ###############################################################################
 def test_recovers_contextual_extent_when_capability_declares_bbox_support() -> None:
@@ -202,7 +193,6 @@ def test_recovers_contextual_extent_when_capability_declares_bbox_support() -> N
     assert result.requested_concepts == ["observation", "record"]
     assert result.radius_m is None
 
-
 ###############################################################################
 def test_keeps_distance_based_vector_search_ambiguous_without_radius() -> None:
     result = DeterministicIntentRecoveryService.recover_explicit_request(
@@ -231,7 +221,6 @@ def test_keeps_distance_based_vector_search_ambiguous_without_radius() -> None:
     )
 
     assert result is None
-
 
 ###############################################################################
 def test_recovers_clarification_answer_against_pending_request_contract() -> None:
@@ -314,7 +303,6 @@ def test_recovers_clarification_answer_against_pending_request_contract() -> Non
     assert result.clarification_plan is None
     assert result.provider_error["recovery"] == "clarification_follow_up"
 
-
 ###############################################################################
 def test_continues_valid_parser_answer_against_pending_location_contract() -> None:
     current_turn = TurnParseResult(
@@ -358,7 +346,6 @@ def test_continues_valid_parser_answer_against_pending_location_contract() -> No
     assert result.required_data_sources == ["gbif_species_occurrences"]
     assert result.expected_frontend_update == "map_session"
     assert result.clarification_plan is None
-
 
 ###############################################################################
 def test_continuation_preserves_parent_temporal_mode_for_window_answer() -> None:
@@ -409,6 +396,7 @@ def test_continuation_preserves_parent_temporal_mode_for_window_answer() -> None
     assert result.clarification_plan is None
 
 
+###############################################################################
 def test_continuation_recognizes_singular_window_and_preserves_parent_mode() -> None:
     current_turn = TurnParseResult(
         user_text="Use the last hour.",
@@ -456,7 +444,6 @@ def test_continuation_recognizes_singular_window_and_preserves_parent_mode() -> 
     assert result.temporal_signal.raw_text == "last hour"
     assert result.clarification_plan is None
 
-
 ###############################################################################
 def test_continuation_merges_current_quantitative_answer_with_parent_contract() -> None:
     current_turn = TurnParseResult(
@@ -503,13 +490,11 @@ def test_continuation_merges_current_quantitative_answer_with_parent_contract() 
     assert result.result_limit == 25
     assert result.requested_layers == ["earthquakes"]
 
-
 ###############################################################################
 def test_does_not_recover_vague_or_ambiguous_requests() -> None:
     assert _recover("What can you do?") is None
     assert _recover("Show humidity in Rome and Milan.") is None
     assert _recover("Show humidity around there.") is None
-
 
 ###############################################################################
 def test_only_provider_timeouts_are_recoverable() -> None:

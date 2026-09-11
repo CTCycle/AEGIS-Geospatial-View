@@ -411,7 +411,6 @@ def test_shutdown_cancels_in_flight_tasks_and_clears_task_registry(
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
     run_repositories,
@@ -505,7 +504,6 @@ def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
         conversation.conversation_id
     )["context_revision"] == revision_after_commit
 
-
 ###############################################################################
 def test_stale_render_ack_cannot_mutate_pending_candidate(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
@@ -540,7 +538,6 @@ def test_stale_render_ack_cannot_mutate_pending_candidate(run_repositories) -> N
             acknowledgment={"status": "ready"},
         )
     assert run_repositories["runs"].get_run(run.run_id).state.value == "awaiting_render"
-
 
 ###############################################################################
 def test_render_deadline_starts_when_candidate_enters_awaiting_render(

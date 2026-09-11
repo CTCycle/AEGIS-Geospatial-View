@@ -21,9 +21,11 @@ PROBE_TIMEOUT_SECONDS = 30.0
 PROBE_REQUEST = "Show a map of Italy"
 
 
+###############################################################################
 class StructuredProbeService:
     """Runs the real parser contract without creating a conversation side effect."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, parser_service: Any, settings_service: Any) -> None:
         self.parser_service = parser_service
         self.settings_service = settings_service

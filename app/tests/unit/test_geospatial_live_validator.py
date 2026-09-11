@@ -84,7 +84,6 @@ def test_live_validator_covers_the_factory_matrix_with_injected_registry() -> No
     assert {result.provider_id for result in report.results} == set(PROVIDER_FACTORIES)
     assert all(result.status in {"passed", "skipped"} for result in report.results)
 
-
 ###############################################################################
 def test_live_validator_matrix_has_one_case_per_factory_entry() -> None:
     provider_ids = [check.provider_id for check in PROVIDER_SMOKE_CHECKS]
@@ -131,7 +130,6 @@ def test_live_validator_rejects_error_payloads() -> None:
     assert result.status == "failed"
     assert "upstream unavailable" in (result.message or "")
 
-
 ###############################################################################
 def test_live_validator_rejects_malformed_feature_geometry() -> None:
 
@@ -162,7 +160,6 @@ def test_live_validator_rejects_malformed_feature_geometry() -> None:
 
     assert result.status == "failed"
     assert "geometry" in (result.message or "")
-
 
 ###############################################################################
 def test_live_validator_runs_configured_openchargemap_snapshot(monkeypatch, tmp_path) -> None:

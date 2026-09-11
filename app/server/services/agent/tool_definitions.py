@@ -9,11 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from server.domain.agent.capability_route import CapabilityRoute
 from server.domain.agent.map_plan import MapAction
 
-
 ###############################################################################
 class StrictToolInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
 
 ###############################################################################
 class ResolveLocationInput(StrictToolInput):
@@ -22,12 +20,12 @@ class ResolveLocationInput(StrictToolInput):
     expected_location_type: str | None = Field(default=None, max_length=80)
     candidate_id: str | None = Field(default=None, max_length=200)
 
+    # -------------------------------------------------------------------------
     @model_validator(mode="after")
     def require_query_or_target(self) -> "ResolveLocationInput":
         if not self.query and not self.target_id:
             raise ValueError("Either query or target_id is required.")
         return self
-
 
 ###############################################################################
 class CapabilityDiscoveryInput(StrictToolInput):
@@ -37,7 +35,6 @@ class CapabilityDiscoveryInput(StrictToolInput):
     include_provider_layers: bool = False
     cursor: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=12, ge=1, le=25)
-
 
 ###############################################################################
 class ExecuteCapabilityInput(StrictToolInput):
@@ -52,7 +49,6 @@ class ExecuteCapabilityInput(StrictToolInput):
     filters: dict[str, Any] = Field(default_factory=dict)
     arguments: dict[str, Any] = Field(default_factory=dict)
 
-
 ###############################################################################
 class InspectEvidenceInput(StrictToolInput):
     evidence_ref: str = Field(min_length=1, max_length=200)
@@ -61,18 +57,15 @@ class InspectEvidenceInput(StrictToolInput):
     cursor: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=20, ge=1, le=100)
 
-
 ###############################################################################
 class TransformEvidenceInput(StrictToolInput):
     evidence_refs: list[str] = Field(min_length=1, max_length=8)
     operations: list[dict[str, Any]] = Field(min_length=1, max_length=8)
 
-
 ###############################################################################
 class ApplyMapPlanInput(StrictToolInput):
     expected_collection_revision: int = Field(ge=0)
     actions: list[MapAction] = Field(min_length=1, max_length=32)
-
 
 ###############################################################################
 class RouteRequestInput(CapabilityRoute):

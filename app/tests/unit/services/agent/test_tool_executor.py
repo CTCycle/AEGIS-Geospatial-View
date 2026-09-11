@@ -16,20 +16,26 @@ from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 
 
+###############################################################################
 class _Input(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     value: int
 
 
+###############################################################################
 class _Policy:
+
+    # -------------------------------------------------------------------------
     def __init__(self, allowed: bool = True) -> None:
         self.allowed = allowed
 
+    # -------------------------------------------------------------------------
     def authorize(self, _tool: RegisteredTool, _arguments: BaseModel, _state: AgentState):
         return cast(Any, type("Authorization", (), {"allowed": self.allowed, "reason": "blocked"})())
 
 
+###############################################################################
 def _state() -> AgentState:
     return AgentState(
         request_id="request-1",
@@ -39,10 +45,12 @@ def _state() -> AgentState:
     )
 
 
+###############################################################################
 def _budget() -> AgentExecutionBudget:
     return AgentExecutionBudget(total_seconds=5.0)
 
 
+###############################################################################
 def _tool(
     handler: Any,
     *,
@@ -76,6 +84,7 @@ def _tool(
     )
 
 
+###############################################################################
 def test_executor_validates_once_and_normalizes_success() -> None:
     calls: list[int] = []
 
@@ -97,6 +106,7 @@ def test_executor_validates_once_and_normalizes_success() -> None:
     assert calls == [3]
 
 
+###############################################################################
 def test_malformed_call_never_reaches_the_handler() -> None:
     calls: list[int] = []
 
@@ -124,6 +134,7 @@ def test_malformed_call_never_reaches_the_handler() -> None:
     assert calls == []
 
 
+###############################################################################
 def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     async def handler(_arguments: _Input, _state: AgentState) -> dict[str, Any]:
         await asyncio.sleep(0.05)
@@ -171,6 +182,7 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     assert timeout_result.error.error_type == "timeout"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_semantic_failure_is_reported_before_policy_or_handler() -> None:
     called = False

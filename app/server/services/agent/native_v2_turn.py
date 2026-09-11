@@ -19,6 +19,7 @@ from server.services.agent.agent_loop import AgentLoop, AgentLoopOutcome, AgentL
 from server.services.agent.agent_state_factory import AgentStateFactory
 
 
+###############################################################################
 @dataclass(frozen=True)
 class NativeV2TurnRequest:
     request_id: str
@@ -36,13 +37,16 @@ class NativeV2TurnRequest:
     run_id: str | None = None
 
 
+###############################################################################
 class NativeV2TurnRunner:
     """Run one typed native turn and build a bounded public result."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, agent_loop: AgentLoop, execution_settings: Any = None) -> None:
         self.agent_loop = agent_loop
         self.execution_settings = execution_settings
 
+    # -------------------------------------------------------------------------
     async def run(self, request: NativeV2TurnRequest) -> NativeV2TurnResponse:
         state = AgentStateFactory.create(
             request_id=request.request_id,
@@ -102,7 +106,10 @@ class NativeV2TurnRunner:
         )
 
 
+###############################################################################
 class NativeV2ResponseBuilder:
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def build(
         *, request: NativeV2TurnRequest, outcome: AgentLoopOutcome
@@ -150,6 +157,7 @@ class NativeV2ResponseBuilder:
         )
 
 
+###############################################################################
 def _operation(
     outcome: AgentLoopOutcome,
     map_session: MapSession | None,
@@ -191,6 +199,7 @@ def _operation(
     )
 
 
+###############################################################################
 def _presentation_status(
     outcome: AgentLoopOutcome,
     map_session: MapSession | None,
@@ -205,6 +214,7 @@ def _presentation_status(
     return "failed"
 
 
+###############################################################################
 def _fallback_message(outcome: AgentLoopOutcome) -> str:
     if outcome.failure_detail:
         return outcome.failure_detail
@@ -215,6 +225,7 @@ def _fallback_message(outcome: AgentLoopOutcome) -> str:
     return "The agent completed without a final response."
 
 
+###############################################################################
 def _response_failure_category(value: str | None) -> str | None:
     if value == "provider_error":
         return "provider_api"
@@ -229,6 +240,7 @@ def _response_failure_category(value: str | None) -> str | None:
     return None
 
 
+###############################################################################
 def _setting(settings: Any, name: str, default: int | float) -> Any:
     value = getattr(settings, name, default) if settings is not None else default
     return value if isinstance(value, (int, float)) and not isinstance(value, bool) else default

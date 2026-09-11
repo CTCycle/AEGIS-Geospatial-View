@@ -249,7 +249,6 @@ def test_authorize_capability_execution_rejects_missing_credentials() -> None:
     assert result.allowed is False
     assert result.metadata["code"] == "missing_credentials"
 
-
 ###############################################################################
 def test_authorize_capability_execution_rejects_missing_openchargemap_access() -> None:
     turn = TurnParseResult(

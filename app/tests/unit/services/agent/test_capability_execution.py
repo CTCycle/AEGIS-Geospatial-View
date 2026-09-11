@@ -17,31 +17,44 @@ from server.services.geospatial.providers.base import (
 )
 
 
+###############################################################################
 class FakeCapabilityRegistry:
+
+    # -------------------------------------------------------------------------
     def __init__(self, manifest: dict[str, object] | None) -> None:
         self.manifest = manifest
 
+    # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, object] | None:
         return self.manifest if capability_id == "places:hospitals" else None
 
 
+###############################################################################
 class FakeRuntimeRegistry:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, enabled: bool = True, available: bool = True) -> None:
         self.enabled = enabled
         self.available = available
 
+    # -------------------------------------------------------------------------
     def is_enabled(self, capability_id: str) -> bool:
         return self.enabled
 
+    # -------------------------------------------------------------------------
     def access_available(self, capability_id: str) -> bool:
         return self.available
 
 
+###############################################################################
 class FakeProviderRegistry:
+
+    # -------------------------------------------------------------------------
     def __init__(self, response: ProviderResponse | Exception) -> None:
         self.response = response
         self.requests: list[tuple[str, object]] = []
 
+    # -------------------------------------------------------------------------
     async def fetch(self, provider_id: str, request: object) -> ProviderResponse:
         self.requests.append((provider_id, request))
         if isinstance(self.response, Exception):
@@ -49,11 +62,15 @@ class FakeProviderRegistry:
         return self.response
 
 
+###############################################################################
 class FakeEvidenceRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, error: Exception | None = None) -> None:
         self.calls: list[dict[str, object]] = []
         self.error = error
 
+    # -------------------------------------------------------------------------
     def create(self, **kwargs: object) -> SimpleNamespace:
         if self.error is not None:
             raise self.error
@@ -61,6 +78,7 @@ class FakeEvidenceRepository:
         return SimpleNamespace(evidence_id="evidence:provider-1")
 
 
+###############################################################################
 def _service(
     provider: FakeProviderRegistry,
     evidence: FakeEvidenceRepository | None = None,
@@ -76,6 +94,7 @@ def _service(
     )
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_execute_capability_persists_full_payload_and_returns_bounded_summary() -> None:
     response = ProviderResponse(
@@ -120,6 +139,7 @@ async def test_execute_capability_persists_full_payload_and_returns_bounded_summ
     assert request.params["radius_m"] == 5000  # type: ignore[attr-defined]
 
 
+###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("response_status", "partial", "expected_status"),
@@ -145,6 +165,7 @@ async def test_provider_statuses_are_normalized(
     assert result.status == expected_status
 
 
+###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("error", "error_type", "recovery"),
@@ -173,6 +194,7 @@ async def test_provider_failures_remain_typed(
     assert result.error.recovery == recovery
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_disabled_capability_is_rejected_before_provider_execution() -> None:
     provider = FakeProviderRegistry(
@@ -195,6 +217,7 @@ async def test_disabled_capability_is_rejected_before_provider_execution() -> No
     assert provider.requests == []
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_evidence_persistence_failure_is_a_typed_result() -> None:
     response = ProviderResponse(
@@ -216,6 +239,7 @@ async def test_evidence_persistence_failure_is_a_typed_result() -> None:
     assert result.error.error_type == "provider_malformed_response"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_resolved_location_is_forwarded_as_provider_coordinates() -> None:
     response = ProviderResponse(

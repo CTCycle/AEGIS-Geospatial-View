@@ -39,7 +39,6 @@ VISIBLE_TILE = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABbUlEQVR4nMWWsW7CMBCGD4vJ4hk6M0YMTJ36BEx9gCjqECGGioEpQ+aqQ4UYkMUD8BBMnRgsj8x9BuS5AivuxUkcOzbqP4AdxP/p7nwXjxabBVTKnqbs5wJRRbC7/oyosfrarj8BQBz3eh2u5cd7LQIthYklgjfJ61t0BjH2mvEogFasIEjzUdxEkdanURIlaSlp2ZkixRCDgkh313R3VetOgJbwYWBrAKCysAG8ipHWrQ/5hMrir5MtDIHct9O5WiwvZ2yN/3LIJ3jbAzCss9kMb/nqZLF2rUFSJUq7G2tl3eruGsF3wQxHxWBfLzhXreqPIFD/DUjvh4+vToxz4yfGeW9+bDUwDh/cHXUlmjwPQPu5zs+4D57LzHFe1QD2loGqv7yGx9jRuilx3LsEQdRQdWmZYTOKeFkPeGHcAFQW7ta+LwyihmqIhJUR1MmJQzFCR0XSV4xos0h0BDHCt+vB0lfm5uU8TgSWS/8v7kOV+6oVKA8AAAAASUVORK5CYII="
 )
 
-
 ###############################################################################
 def _envelope(
     *,
@@ -68,7 +67,6 @@ def _envelope(
             "payload": payload,
         }
     return json.dumps(envelope)
-
 
 ###############################################################################
 def _map_session() -> dict[str, Any]:
@@ -116,7 +114,6 @@ def _map_session() -> dict[str, Any]:
     }
     return session
 
-
 ###############################################################################
 def _prepared_presentation(map_session: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -141,7 +138,6 @@ def _prepared_presentation(map_session: dict[str, Any]) -> dict[str, Any]:
             "map_session": map_session,
         },
     }
-
 
 ###############################################################################
 def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> None:
@@ -272,7 +268,6 @@ def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> Non
         re.compile(r".*/api/conversations/[^/]+/realtime$"), handle_socket
     )
 
-
 ###############################################################################
 def _setup_controlled_routes(page: Page, acknowledgments: list[dict[str, Any]]) -> None:
     def fulfill(route: Route, payload: dict[str, Any]) -> None:
@@ -317,7 +312,6 @@ def _setup_controlled_routes(page: Page, acknowledgments: list[dict[str, Any]]) 
         "**/api/geospatial/tiles/osm_default/**",
         lambda route: route.fulfill(status=200, content_type="image/png", body=VISIBLE_TILE),
     )
-
 
 ###############################################################################
 def test_controlled_map_completion_requires_and_records_visible_rendering(

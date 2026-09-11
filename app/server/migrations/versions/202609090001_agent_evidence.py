@@ -12,7 +12,6 @@ down_revision: Union[str, None] = "202609050002"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-
 ###############################################################################
 def upgrade() -> None:
     op.create_table(
@@ -49,7 +48,6 @@ def upgrade() -> None:
         ["conversation_id", "created_at"],
     )
     op.create_index("ix_agent_evidence_run_id", "agent_evidence", ["run_id"])
-
 
 ###############################################################################
 def downgrade() -> None:

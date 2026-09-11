@@ -35,6 +35,7 @@ def test_all_manifest_entries_expose_source_traits() -> None:
     assert not missing
 
 
+###############################################################################
 def test_enabled_executable_manifests_declare_execution_contracts() -> None:
     payload = GeospatialManifestLoader().load_all()
     missing = [

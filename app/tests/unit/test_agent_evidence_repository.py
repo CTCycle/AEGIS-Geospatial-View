@@ -7,12 +7,14 @@ from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import Base
 
 
+###############################################################################
 def _database(tmp_path):  # noqa: ANN001
     database = SQLiteRepository(DatabaseSettings(database_path=str(tmp_path / "evidence.db")))
     Base.metadata.create_all(database.engine)
     return database
 
 
+###############################################################################
 def test_evidence_round_trip_checksum_and_parent_provenance(tmp_path) -> None:  # noqa: ANN001
     database = _database(tmp_path)
     conversation = ConversationRepository(database).create_conversation("Evidence")
@@ -53,6 +55,7 @@ def test_evidence_round_trip_checksum_and_parent_provenance(tmp_path) -> None:  
     assert "authorization" not in parent.provenance
 
 
+###############################################################################
 def test_evidence_metadata_cascade_deletes_with_conversation(tmp_path) -> None:  # noqa: ANN001
     database = _database(tmp_path)
     conversation = ConversationRepository(database).create_conversation("Cascade")

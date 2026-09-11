@@ -34,6 +34,7 @@ CAPABILITY_ROUTE_SYSTEM_PROMPT = (
 )
 
 
+###############################################################################
 def build_capability_route_prompt() -> str:
     return "\n\n".join(
         [

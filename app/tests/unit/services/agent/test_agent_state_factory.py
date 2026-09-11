@@ -5,6 +5,7 @@ import pytest
 from server.services.agent.agent_state_factory import AgentStateFactory
 
 
+###############################################################################
 def test_factory_creates_bounded_receive_state() -> None:
     state = AgentStateFactory.create(
         request_id="request-1",
@@ -18,6 +19,7 @@ def test_factory_creates_bounded_receive_state() -> None:
     assert state.evidence_refs == ["evidence:1"]
 
 
+###############################################################################
 @pytest.mark.parametrize(
     "kwargs",
     [

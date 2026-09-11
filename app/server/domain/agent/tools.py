@@ -94,7 +94,6 @@ ToolHandler = Callable[[BaseModel, "AgentState"], Awaitable[Any]]
 ToolResultNormalizer = Callable[[Any, str], ToolResult]
 ToolSemanticValidator = Callable[[BaseModel, "AgentState"], list[str]]
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class RegisteredTool:

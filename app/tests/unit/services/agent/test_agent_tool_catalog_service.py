@@ -560,7 +560,6 @@ def test_catalog_reuses_run_scoped_location_without_resolving_tool_argument() ->
     assert result is resolved
     assert resolver.calls == 0
 
-
 ###############################################################################
 def test_catalog_rejects_native_location_that_conflicts_with_canonical_target() -> None:
     paris = ResolvedLocation(

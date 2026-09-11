@@ -36,9 +36,10 @@ from server.services.geospatial.providers.base import (
 )
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 class EvidenceStore(Protocol):
+
+    # -------------------------------------------------------------------------
     def create(
         self,
         *,
@@ -53,7 +54,6 @@ class EvidenceStore(Protocol):
         parent_evidence_ids: list[str] | None = None,
     ) -> Any: ...
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ToolExecutionContext:
@@ -62,7 +62,6 @@ class ToolExecutionContext:
     conversation_id: str
     run_id: str | None = None
     call_id: str = field(default_factory=lambda: f"call_{uuid4().hex}")
-
 
 ###############################################################################
 class CapabilityExecutionService:
@@ -76,6 +75,7 @@ class CapabilityExecutionService:
 
     TOOL_NAME = "execute_geospatial_capability"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -411,16 +411,19 @@ class CapabilityExecutionService:
         )
 
 
+###############################################################################
 def _provider_id(manifest: dict[str, Any]) -> str:
     return str(manifest.get("provider") or manifest.get("provider_id") or "").strip()
 
 
+###############################################################################
 def _bbox(value: list[float] | None) -> tuple[float, float, float, float] | None:
     if value is None:
         return None
     return tuple(float(item) for item in value)  # type: ignore[return-value]
 
 
+###############################################################################
 def _provider_params(
     request: ExecuteCapabilityInput,
     *,
@@ -449,6 +452,7 @@ def _provider_params(
     return params
 
 
+###############################################################################
 def _parse_request_time(value: str | None) -> tuple[datetime | None, str | None]:
     if not value:
         return None, None
@@ -461,6 +465,7 @@ def _parse_request_time(value: str | None) -> tuple[datetime | None, str | None]
     return parsed, None
 
 
+###############################################################################
 def _tool_status(response: ProviderResponse) -> Any:
     if response.result_status == "valid_empty":
         return "valid_empty"
@@ -469,6 +474,7 @@ def _tool_status(response: ProviderResponse) -> Any:
     return "success"
 
 
+###############################################################################
 def _evidence_status(response: ProviderResponse) -> EvidenceStatus:
     if response.result_status == "valid_empty":
         return "valid_empty"
@@ -477,6 +483,7 @@ def _evidence_status(response: ProviderResponse) -> EvidenceStatus:
     return "available"
 
 
+###############################################################################
 def _evidence_kind(result_type: str) -> EvidenceKind:
     if result_type == "features":
         return "vector"
@@ -485,6 +492,7 @@ def _evidence_kind(result_type: str) -> EvidenceKind:
     return "capability_result"
 
 
+###############################################################################
 def _response_summary(response: ProviderResponse) -> dict[str, Any]:
     payload = response.payload
     features = payload.get("features")
@@ -509,6 +517,7 @@ def _response_summary(response: ProviderResponse) -> dict[str, Any]:
     return summary
 
 
+###############################################################################
 def _summary_text(response: ProviderResponse, summary: dict[str, Any]) -> str:
     count = summary.get("feature_count")
     if response.result_status == "valid_empty":
@@ -524,6 +533,7 @@ def _summary_text(response: ProviderResponse, summary: dict[str, Any]) -> str:
     )
 
 
+###############################################################################
 def _json_size(value: Any) -> int | None:
     try:
         return len(json.dumps(value, ensure_ascii=False, default=str).encode("utf-8"))
@@ -531,6 +541,7 @@ def _json_size(value: Any) -> int | None:
         return None
 
 
+###############################################################################
 def _duration_ms(started: float) -> int:
     return max(0, int((time.perf_counter() - started) * 1000))
 

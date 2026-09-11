@@ -17,6 +17,7 @@ from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import AgentEvidenceRecord, ConversationRecord
 
 
+###############################################################################
 class AgentEvidenceRepository:
     """Store bounded evidence and expose only verified payloads to services."""
 
@@ -24,9 +25,11 @@ class AgentEvidenceRepository:
     MAX_SUMMARY_BYTES = 32 * 1024
     MAX_PARENTS = 32
 
+    # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
 
+    # -------------------------------------------------------------------------
     def create(
         self,
         *,
@@ -89,6 +92,7 @@ class AgentEvidenceRepository:
             session.commit()
         return self._summary(record)
 
+    # -------------------------------------------------------------------------
     def get_summary(
         self,
         evidence_id: str,
@@ -105,6 +109,7 @@ class AgentEvidenceRepository:
                 record = None
             return self._summary(record) if record is not None else None
 
+    # -------------------------------------------------------------------------
     def get_payload(
         self,
         evidence_id: str,
@@ -125,6 +130,7 @@ class AgentEvidenceRepository:
                 raise ValueError("Evidence payload checksum verification failed.")
             return self._summary(record), raw
 
+    # -------------------------------------------------------------------------
     def list_summaries(self, conversation_id: str, *, limit: int = 100) -> list[AgentEvidenceSummary]:
         bounded_limit = max(1, min(int(limit), 500))
         with self._session_factory() as session:
@@ -136,10 +142,12 @@ class AgentEvidenceRepository:
             ).all()
             return [self._summary(record) for record in records]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _json_bytes(value: Any) -> bytes:
         return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _sanitize_payload(cls, value: Any, *, depth: int = 0) -> Any:
         """Remove credential-shaped fields without truncating data records."""
@@ -171,6 +179,7 @@ class AgentEvidenceRepository:
             return [cls._sanitize_payload(child, depth=depth + 1) for child in items]
         return value
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _sanitize_object(cls, value: Any, *, depth: int = 0) -> Any:
         if depth > 8:
@@ -190,6 +199,7 @@ class AgentEvidenceRepository:
             return value[:4096]
         return value
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _is_secret_key(key: str, secret_keys: set[str]) -> bool:
         normalized = key.casefold().replace("-", "_")
@@ -198,6 +208,7 @@ class AgentEvidenceRepository:
             for marker in ("authorization", "access_token", "api_key", "password", "secret", "cookie")
         ) or normalized.endswith("_token")
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _summary(record: AgentEvidenceRecord) -> AgentEvidenceSummary:
         raw_summary = record.summary_json or {}

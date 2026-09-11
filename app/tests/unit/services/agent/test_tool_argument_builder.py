@@ -109,7 +109,6 @@ def test_poi_constraints_reach_the_direct_tool_arguments() -> None:
     assert arguments["radius_m"] == 1500.0
     assert arguments["limit"] == 25
 
-
 ###############################################################################
 def test_canonical_radius_does_not_fall_back_to_geocoder_bbox() -> None:
     turn = _turn(TemporalSignal(mode="current")).model_copy(
@@ -146,6 +145,7 @@ def test_canonical_radius_does_not_fall_back_to_geocoder_bbox() -> None:
     assert "bbox" not in arguments
 
 
+###############################################################################
 def test_point_metadata_capability_uses_target_point_in_area_search() -> None:
     turn = _turn(TemporalSignal(mode="current")).model_copy(
         update={
@@ -200,7 +200,6 @@ def test_point_metadata_capability_uses_target_point_in_area_search() -> None:
     assert "radius_m" not in arguments
     assert "bbox" not in arguments
 
-
 ###############################################################################
 def test_canonical_iso_temporal_window_is_authoritative() -> None:
     turn = _turn(
@@ -227,7 +226,6 @@ def test_canonical_iso_temporal_window_is_authoritative() -> None:
     assert arguments["start_time_iso"] == "2026-08-24T00:00:00+00:00"
     assert arguments["end_time_iso"] == "2026-08-31T00:00:00+00:00"
     assert "time" not in arguments
-
 
 ###############################################################################
 def test_unresolved_canonical_target_does_not_fall_back_to_raw_or_memory() -> None:
@@ -262,7 +260,6 @@ def test_unresolved_canonical_target_does_not_fall_back_to_raw_or_memory() -> No
 
     assert arguments == {}
 
-
 ###############################################################################
 def test_canonical_viewport_radius_hint_is_not_an_analysis_radius() -> None:
     turn = _turn(TemporalSignal(mode="current")).model_copy(
@@ -294,7 +291,6 @@ def test_canonical_viewport_radius_hint_is_not_an_analysis_radius() -> None:
     )
 
     assert "radius_m" not in arguments
-
 
 ###############################################################################
 def test_canonical_point_scope_does_not_become_geocoder_bbox() -> None:
@@ -337,7 +333,6 @@ def test_canonical_point_scope_does_not_become_geocoder_bbox() -> None:
     assert arguments["latitude"] == location.latitude
     assert arguments["longitude"] == location.longitude
     assert "bbox" not in arguments
-
 
 ###############################################################################
 def test_canonical_viewport_scope_does_not_use_target_bbox_as_analysis_area() -> None:

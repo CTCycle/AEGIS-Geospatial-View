@@ -697,6 +697,7 @@ class NativeToolLoop:
                     observation[key] = data[key]
         return observation
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _record_iteration_trace(
         context: AgentExecutionContext,

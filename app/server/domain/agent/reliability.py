@@ -24,11 +24,9 @@ DEFAULT_STAGE_LIMITS: dict[str, float] = {
     "persistence": 5.0,
 }
 
-
 ###############################################################################
 def _new_stage_metadata() -> dict[str, Any]:
     return {}
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -55,12 +53,12 @@ class StageObservation:
             "metadata": dict(self.metadata),
         }
 
-
 ###############################################################################
 def _new_stage_observations() -> list[StageObservation]:
     return []
 
 
+###############################################################################
 def _new_pipeline_reach() -> dict[str, str]:
     return {
         "context_assembly": "not_reached",
@@ -74,7 +72,6 @@ def _new_pipeline_reach() -> dict[str, str]:
         "response_synthesis": "not_reached",
         "persistence": "not_reached",
     }
-
 
 ###############################################################################
 @dataclass

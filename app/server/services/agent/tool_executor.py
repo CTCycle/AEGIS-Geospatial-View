@@ -21,9 +21,10 @@ from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMToolCall
 from server.services.agent.tool_registry import ToolRegistry
 
-
 ###############################################################################
 class ToolExecutor:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

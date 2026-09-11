@@ -490,6 +490,7 @@ class AgentOrchestrator:
             tool_results=native_response.tool_results,
         )
 
+    # -------------------------------------------------------------------------
     def _native_memory_snapshot(
         self,
         latest_memory: dict[str, Any],
@@ -2493,6 +2494,7 @@ class AgentOrchestrator:
         )
 
 
+###############################################################################
 def _native_tool_payload(response: Any) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     for item in response.tool_results:
@@ -2525,6 +2527,7 @@ def _native_tool_payload(response: Any) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _resolved_location_from_memory(
     memory_snapshot: dict[str, Any],
 ) -> ResolvedLocation | None:

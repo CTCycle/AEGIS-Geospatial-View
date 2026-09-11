@@ -19,7 +19,6 @@ from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.domain.agent.tool_result import ToolResult
 
-
 ###############################################################################
 class CapabilityRoute(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -33,7 +32,6 @@ class CapabilityRoute(BaseModel):
     explicit_capability_ids: list[str] = Field(default_factory=list, max_length=8)
     clarification_question: str | None = Field(default=None, max_length=500)
 
-
 ###############################################################################
 class CapabilityRouteDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -44,7 +42,6 @@ class CapabilityRouteDecision(BaseModel):
     rejected_capability_ids: list[str] = Field(default_factory=list, max_length=8)
     reason_codes: list[str] = Field(default_factory=list, max_length=16)
     clarification_question: str | None = Field(default=None, max_length=500)
-
 
 ###############################################################################
 class AgentPhase(StrEnum):
@@ -60,7 +57,6 @@ class AgentPhase(StrEnum):
     AWAIT_RENDER = "await_render"
     FINALIZE = "finalize"
     FAILED = "failed"
-
 
 ###############################################################################
 class AgentState(BaseModel):

@@ -31,7 +31,6 @@ SpatialRelationship = Literal[
     "here",
 ]
 
-
 ###############################################################################
 def normalize_target_key(value: str) -> str:
     """Return the stable key shared by interpretation and location resolution.
@@ -60,7 +59,6 @@ AnalysisScopeKind = Literal[
 ResolutionStatus = Literal["resolved", "inherited", "ambiguous", "unresolved"]
 CompletionStatus = Literal["pending", "satisfied", "failed", "not_applicable"]
 
-
 ###############################################################################
 class CanonicalTarget(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -74,7 +72,6 @@ class CanonicalTarget(BaseModel):
     resolution_status: ResolutionStatus = "unresolved"
     peer: bool = False
 
-
 ###############################################################################
 class CanonicalSpatialConstraint(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -85,7 +82,6 @@ class CanonicalSpatialConstraint(BaseModel):
     analysis_scope: AnalysisScopeKind
     distance_m: float | None = Field(default=None, gt=0.0)
     provenance: Literal["explicit", "parser", "inherited", "viewport"] = "parser"
-
 
 ###############################################################################
 class CanonicalTemporalConstraints(BaseModel):
@@ -102,7 +98,6 @@ class CanonicalTemporalConstraints(BaseModel):
     timezone_source: Literal["client", "application", "utc"] = "utc"
     resolved_once: bool = False
 
-
 ###############################################################################
 class CanonicalPresentation(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -116,7 +111,6 @@ class CanonicalPresentation(BaseModel):
     viewport_reason: str | None = None
     show_legend: bool = True
 
-
 ###############################################################################
 class CompletionRequirement(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -127,7 +121,6 @@ class CompletionRequirement(BaseModel):
     target_id: str | None = None
     evidence_ref: str | None = None
     failure_code: str | None = None
-
 
 ###############################################################################
 class CanonicalRequestInterpretation(BaseModel):

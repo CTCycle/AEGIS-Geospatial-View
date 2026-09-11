@@ -9,7 +9,6 @@ def test_capability_registry_loads_tools() -> None:
     assert snapshot.tools
     assert registry.get_capability("get_weather_forecast") is not None
 
-
 ###############################################################################
 def test_execution_contract_inference_covers_legacy_point_analysis_capability() -> None:
     contract = CapabilityRegistry().execution_contract(

@@ -64,7 +64,6 @@ def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
     assert response.payload["features"][0]["category"] == "earthquake"
     assert response.payload["features"][0]["magnitude"] == 2.5
 
-
 ###############################################################################
 def test_usgs_bbox_filter_preserves_antimeridian_scope() -> None:
     async def fetcher(url: str, headers=None):  # noqa: ANN001

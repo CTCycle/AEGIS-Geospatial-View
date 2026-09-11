@@ -103,6 +103,7 @@ class ChatOperationResult(BaseModel):
     ) = None
 
 
+###############################################################################
 class NativeToolResultSummary(BaseModel):
     """Bounded model-independent summary of one native-v2 tool result."""
 
@@ -117,6 +118,7 @@ class NativeToolResultSummary(BaseModel):
     error: ToolExecutionError | None = None
 
 
+###############################################################################
 class NativeV2TurnResponse(BaseModel):
     """Temporary native-v2 response shape used during migration."""
 

@@ -16,7 +16,10 @@ from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.agent.tool_registry import ToolRegistry
 
 
+###############################################################################
 class FakeCapabilityRegistry:
+
+    # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, Any] | None:
         if capability_id == "places:hospitals":
             return {
@@ -27,34 +30,48 @@ class FakeCapabilityRegistry:
             }
         return None
 
+    # -------------------------------------------------------------------------
     def execution_contract(self, capability_id: str) -> dict[str, Any]:
         return {"capability_id": capability_id, "render_support": "vector"}
 
+    # -------------------------------------------------------------------------
     def shortlist(self, **_kwargs: Any) -> list[dict[str, Any]]:
         return [self.get_capability("places:hospitals")]  # type: ignore[list-item]
 
 
+###############################################################################
 class FakeRuntimeRegistry:
+
+    # -------------------------------------------------------------------------
     def is_enabled(self, _capability_id: str) -> bool:
         return True
 
+    # -------------------------------------------------------------------------
     def access_available(self, _capability_id: str) -> bool:
         return True
 
 
+###############################################################################
 class FakeResolver:
+
+    # -------------------------------------------------------------------------
     async def resolve_location_signals(self, _signals: Any, _memory: Any) -> Any:
         raise AssertionError("location resolution is not part of exposure tests")
 
 
+###############################################################################
 class FakeEvidenceRepository:
     pass
 
 
+###############################################################################
 class FakeCapabilityExecutionService:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.context: ToolExecutionContext | None = None
 
+    # -------------------------------------------------------------------------
     async def execute_capability(
         self,
         _request: ExecuteCapabilityInput,
@@ -72,6 +89,7 @@ class FakeCapabilityExecutionService:
         )
 
 
+###############################################################################
 def _registry() -> ToolRegistry:
     runtime = FakeRuntimeRegistry()
     registry = ToolRegistry(runtime_registry=runtime)  # type: ignore[arg-type]
@@ -86,6 +104,7 @@ def _registry() -> ToolRegistry:
     return registry
 
 
+###############################################################################
 def _state() -> AgentState:
     return AgentState(
         request_id="request-1",
@@ -95,6 +114,7 @@ def _state() -> AgentState:
     )
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_capability_handler_uses_persisted_run_id_not_request_id() -> None:
     service = FakeCapabilityExecutionService()
@@ -112,6 +132,7 @@ async def test_capability_handler_uses_persisted_run_id_not_request_id() -> None
     assert service.context.run_id != state.request_id
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_compatibility_state_has_no_foreign_run_id() -> None:
     service = FakeCapabilityExecutionService()
@@ -126,6 +147,7 @@ async def test_compatibility_state_has_no_foreign_run_id() -> None:
     assert service.context.run_id is None
 
 
+###############################################################################
 def _route() -> CapabilityRoute:
     return CapabilityRoute(
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
@@ -136,6 +158,7 @@ def _route() -> CapabilityRoute:
     )
 
 
+###############################################################################
 def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> None:
     registry = _registry()
     state = _state()
@@ -174,6 +197,7 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
     }
 
 
+###############################################################################
 def test_capability_schema_is_specialized_to_validated_shortlist() -> None:
     registry = _registry()
     state = _state()
@@ -197,6 +221,7 @@ def test_capability_schema_is_specialized_to_validated_shortlist() -> None:
     assert capability_schema["enum"] == ["places:hospitals"]
 
 
+###############################################################################
 def test_policy_authorizes_typed_capability_calls_once_against_route_and_runtime() -> None:
     registry = _registry()
     state = _state()

@@ -25,7 +25,6 @@ class _CapabilityRegistry:
     def get_capability(self, capability_id: str) -> dict | None:
         return self.capability if self.capability["id"] == capability_id else None
 
-
 ###############################################################################
 def test_openaq_auth_failure_cannot_be_a_deferred_success(monkeypatch) -> None:
     registry = ProviderRegistry()
@@ -58,7 +57,6 @@ def _request():
         ),
     )
 
-
 ###############################################################################
 def _sanremo_request():
     return RequestBuilder().build_location_search_request(
@@ -75,7 +73,6 @@ def _sanremo_request():
             confidence=1.0,
         ),
     )
-
 
 ###############################################################################
 class _SanremoWeatherProvider:

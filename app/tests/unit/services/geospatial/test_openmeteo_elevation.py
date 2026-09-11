@@ -79,7 +79,6 @@ def test_openmeteo_provider_routes_and_normalizes_elevation() -> None:
     assert feature["latitude"] == 46.0
     assert feature["longitude"] == 8.5
 
-
 ###############################################################################
 def _service_with_elevation_payload(
     monkeypatch: pytest.MonkeyPatch,
@@ -102,7 +101,6 @@ def _service_with_elevation_payload(
     monkeypatch.setattr(service, "_get_json", fake_get_json)
     return service, calls
 
-
 ###############################################################################
 def test_openmeteo_service_parses_numeric_elevation(
     monkeypatch: pytest.MonkeyPatch,
@@ -123,7 +121,6 @@ def test_openmeteo_service_parses_numeric_elevation(
         }
     ]
 
-
 ###############################################################################
 @pytest.mark.parametrize("payload", [{}, {"elevation": []}, {"elevation": [None]}])
 def test_openmeteo_service_marks_missing_or_empty_elevation_as_valid_empty(
@@ -136,7 +133,6 @@ def test_openmeteo_service_marks_missing_or_empty_elevation_as_valid_empty(
 
     assert result["result_status"] == "valid_empty"
     assert result["elevation"] is None
-
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -156,7 +152,6 @@ def test_openmeteo_service_rejects_malformed_elevation_payload(
     with pytest.raises(OpenMeteoRequestError, match=message):
         asyncio.run(service.get_elevation(latitude=46.0, longitude=8.5))
 
-
 ###############################################################################
 def test_openmeteo_service_preserves_negative_elevation(
     monkeypatch: pytest.MonkeyPatch,
@@ -169,7 +164,6 @@ def test_openmeteo_service_preserves_negative_elevation(
 
     assert result["result_status"] == "ok"
     assert result["elevation"] == -430.5
-
 
 ###############################################################################
 def test_openmeteo_service_propagates_provider_request_errors(
@@ -187,7 +181,6 @@ def test_openmeteo_service_propagates_provider_request_errors(
 
     with pytest.raises(OpenMeteoRequestError, match="HTTP 503"):
         asyncio.run(service.get_elevation(latitude=46.0, longitude=8.5))
-
 
 ###############################################################################
 def test_openmeteo_provider_translates_service_request_errors(

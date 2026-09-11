@@ -10,6 +10,7 @@ from server.domain.agent.actions import AgentAction
 _NULL_SENTINELS = frozenset({"null", "none", "nil"})
 
 
+###############################################################################
 class _ExtractionModel(BaseModel):
     """Shared provider-boundary normalization for typed parser payloads.
 
@@ -37,6 +38,7 @@ class _ExtractionModel(BaseModel):
         return normalized
 
 
+###############################################################################
 class LLMTemporalSignal(_ExtractionModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -297,7 +299,6 @@ class LLMParserExtraction(_ExtractionModel):
     )
     clarification_plan: LLMClarificationPlan | None = None
     viewport_intent: LLMViewportIntent | None = None
-
 
 ###############################################################################
 class LLMParserExtractionProviderContract(LLMParserExtraction):

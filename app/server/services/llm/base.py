@@ -16,7 +16,6 @@ from server.services.llm.types import (
 )
 from server.services.llm.errors import LLMRequestSchemaError, LLMStructuredOutputError
 
-
 ###############################################################################
 def parse_native_tool_arguments(
     value: object,
@@ -41,7 +40,6 @@ def parse_native_tool_arguments(
             return dict(loaded), None
         return None, "arguments_not_object"
     return None, "arguments_not_object"
-
 
 ###############################################################################
 def normalize_native_tool_name(

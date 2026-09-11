@@ -112,8 +112,10 @@ class _HistoryRepo:
         return self.latest_memory
 
 
+###############################################################################
 class _NativeHistoryRepo(_HistoryRepo):
 
+    # -------------------------------------------------------------------------
     def get_latest_memory_snapshot(self, conversation_id: str) -> dict[str, Any]:
         _ = conversation_id
         for message in reversed(self.messages):
@@ -167,6 +169,7 @@ class _Parser:
 
 ###############################################################################
 class _ParserMustNotRun(_Parser):
+
     # -------------------------------------------------------------------------
     def parse_turn(
         self,
@@ -835,12 +838,15 @@ class _NativeLoop:
         return self.result
 
 
+###############################################################################
 class _NativeStateRunner:
 
+    # -------------------------------------------------------------------------
     def __init__(self, location: ResolvedLocation) -> None:
         self.location = location
         self.requests: list[Any] = []
 
+    # -------------------------------------------------------------------------
     async def run(self, request: Any) -> NativeV2TurnResponse:
         self.requests.append(request)
         location_refs = dict(request.location_refs)

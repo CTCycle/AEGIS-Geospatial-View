@@ -142,6 +142,7 @@ def test_location_scoped_remove_does_not_remove_other_scope() -> None:
     assert result.removed_instance_ids == ["weather-zurich"]
 
 
+###############################################################################
 def test_location_scope_matches_partial_canonical_place_without_coordinates() -> None:
     bologna = _instance(
         "species-bologna",
@@ -172,7 +173,6 @@ def test_location_scope_matches_partial_canonical_place_without_coordinates() ->
 
     assert [item.instance_id for item in updated.instances] == ["species-bologna"]
     assert result.added_instance_ids == []
-
 
 ###############################################################################
 def test_current_view_remove_removes_only_visible_overlays_inside_view() -> None:
@@ -706,7 +706,6 @@ def test_merge_replaces_only_the_authoritative_collection() -> None:
     assert "overlays" not in serialized
     assert "failed_overlays" not in serialized
 
-
 ###############################################################################
 def test_tool_map_session_is_merged_into_active_map_without_refetch() -> None:
     location = ResolvedLocation(
@@ -789,7 +788,6 @@ def test_tool_map_session_is_merged_into_active_map_without_refetch() -> None:
     }
     assert merged.overlay_collection.revision == 1
 
-
 ###############################################################################
 def test_server_side_prepared_sessions_are_merged_without_reembedding_payload() -> None:
     location = ResolvedLocation(
@@ -858,7 +856,6 @@ def test_server_side_prepared_sessions_are_merged_without_reembedding_payload() 
     assert {
         item.capability_id for item in merged.overlay_collection.instances
     } == {"rainviewer_precipitation_radar", "openmeteo_weather_forecast"}
-
 
 ###############################################################################
 def test_multi_target_tool_sessions_preserve_scope_and_aggregate_bounds() -> None:
@@ -955,7 +952,6 @@ def test_multi_target_tool_sessions_preserve_scope_and_aggregate_bounds() -> Non
         for instance in merged.overlay_collection.instances
     }
     assert scoped == {"Paris": "Paris, France", "London": "London, United Kingdom"}
-
 
 ###############################################################################
 def test_new_task_replaces_same_location_search_layers() -> None:

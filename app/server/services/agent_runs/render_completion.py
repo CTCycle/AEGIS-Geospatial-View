@@ -14,21 +14,17 @@ from server.repositories.agent_runs import AgentRunRepository
 from server.services.agent.completion import CompletionEvaluator
 from server.services.agent_runs.events import RunEventPublisher
 
-
 ###############################################################################
 class RenderAcknowledgementError(ValueError):
     """Raised when browser evidence cannot be applied to the prepared run."""
-
 
 ###############################################################################
 def _json_object(value: object) -> dict[str, Any]:
     return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
-
 ###############################################################################
 def _json_list(value: object) -> list[Any]:
     return cast(list[Any], value) if isinstance(value, list) else []
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -38,7 +34,6 @@ class RenderAcknowledgementResult:
     state: str
     presentation_status: str
     duplicate: bool
-
 
 ###############################################################################
 class RenderCompletionService:

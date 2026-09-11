@@ -9,7 +9,6 @@ from server.domain.agent.interpretation import (
 from server.domain.agent.pipeline import ToolPlanStep
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 
-
 ###############################################################################
 def _step() -> ToolPlanStep:
     return ToolPlanStep(
@@ -20,7 +19,6 @@ def _step() -> ToolPlanStep:
         target_id="target-1",
         analysis_scope="bbox",
     )
-
 
 ###############################################################################
 def test_invalid_map_coordinates_are_rejected_before_commit() -> None:
@@ -40,7 +38,6 @@ def test_invalid_map_coordinates_are_rejected_before_commit() -> None:
         "Tool output contains invalid EPSG:4326 coordinates."
     )
 
-
 ###############################################################################
 def test_reversed_or_malformed_bbox_is_rejected() -> None:
     data = {
@@ -55,7 +52,6 @@ def test_reversed_or_malformed_bbox_is_rejected() -> None:
     assert ToolPlanExecutor._validate_result(_step(), data) == (
         "Tool output contains an invalid [west, south, east, north] bbox."
     )
-
 
 ###############################################################################
 def test_wrong_target_and_scope_are_rejected_when_declared() -> None:
@@ -74,7 +70,6 @@ def test_wrong_target_and_scope_are_rejected_when_declared() -> None:
 
     assert "target" in (ToolPlanExecutor._validate_result(_step(), wrong_target) or "")
     assert "scope" in (ToolPlanExecutor._validate_result(_step(), wrong_scope) or "")
-
 
 ###############################################################################
 def test_step_context_binds_each_multi_target_to_its_own_location() -> None:

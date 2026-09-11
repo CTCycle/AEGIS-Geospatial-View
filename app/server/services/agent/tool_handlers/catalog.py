@@ -13,7 +13,10 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
+###############################################################################
 class CatalogToolHandler:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -23,6 +26,7 @@ class CatalogToolHandler:
         self.capability_registry = capability_registry
         self.runtime_registry = runtime_registry
 
+    # -------------------------------------------------------------------------
     async def discover(
         self,
         request: CapabilityDiscoveryInput,
@@ -73,6 +77,7 @@ class CatalogToolHandler:
         )
 
 
+###############################################################################
 def _descriptor(
     registry: CapabilityRegistry, capability: dict[str, Any]
 ) -> dict[str, Any]:

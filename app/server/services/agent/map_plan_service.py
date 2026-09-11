@@ -26,18 +26,19 @@ from server.services.geospatial.map_session_builder import (
     MapSessionBuilder,
 )
 
-
 ###############################################################################
 class EvidenceReader(Protocol):
+
+    # -------------------------------------------------------------------------
     def get_summary(
         self, evidence_id: str, *, conversation_id: str | None = None
     ) -> Any: ...
-
 
 ###############################################################################
 class MapPlanService:
     TOOL_NAME = "apply_map_plan"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -177,6 +178,7 @@ class MapPlanService:
             *actions,
         ]
 
+    # -------------------------------------------------------------------------
     def _default_basemap_id(self) -> str:
         try:
             basemaps = self.capability_registry.list_basemaps()

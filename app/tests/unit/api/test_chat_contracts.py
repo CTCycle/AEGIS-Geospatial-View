@@ -60,6 +60,7 @@ def test_chat_turn_request_rejects_missing_conversation_id() -> None:
         raise AssertionError("conversation_id must be required")
 
 
+###############################################################################
 def test_chat_turn_does_not_expose_map_commit_switch_over_http() -> None:
     response = TestClient(_app()).post(
         f"/api/chat{CHAT_TURN_ROUTE}",
@@ -76,6 +77,7 @@ def test_chat_turn_does_not_expose_map_commit_switch_over_http() -> None:
     )
 
 
+###############################################################################
 def test_native_turn_response_does_not_require_legacy_parser_projections() -> None:
     response = ChatTurnResponse(
         request_id="native-1",
@@ -95,10 +97,14 @@ def test_native_turn_response_does_not_require_legacy_parser_projections() -> No
     )
 
 
+###############################################################################
 def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     orchestrator_called = False
 
+    ###############################################################################
     class _ConversationRepository:
+
+        # -------------------------------------------------------------------------
         def get_conversation(self, conversation_id: str) -> None:  # noqa: ARG002
             return None
 
@@ -123,6 +129,7 @@ def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     assert orchestrator_called is False
 
 
+###############################################################################
 def test_structured_probe_routes_return_latest_and_run_results() -> None:
     probe_result = StructuredProbeResponse(
         provider="opencode-go",
@@ -134,10 +141,14 @@ def test_structured_probe_routes_return_latest_and_run_results() -> None:
         message="Structured parser probe passed.",
     )
 
+    ###############################################################################
     class _Probe:
+
+        # -------------------------------------------------------------------------
         def latest(self) -> StructuredProbeResponse:
             return probe_result
 
+        # -------------------------------------------------------------------------
         async def run(self) -> StructuredProbeResponse:
             return probe_result
 

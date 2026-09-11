@@ -458,7 +458,6 @@ _PARENT_LOCATION_TYPES = frozenset(
     }
 )
 
-
 ###############################################################################
 def _context_usage_records(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
@@ -473,11 +472,9 @@ def _context_usage_records(traces: list[dict[str, Any]]) -> list[dict[str, Any]]
                     records.append(usage)
     return records
 
-
 ###############################################################################
 def _non_negative_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
-
 
 ###############################################################################
 def _usage_input_tokens(usage: dict[str, Any]) -> int | None:
@@ -486,7 +483,6 @@ def _usage_input_tokens(usage: dict[str, Any]) -> int | None:
         return reported
     estimated = usage.get("estimated_input_tokens")
     return estimated if _non_negative_int(estimated) else None
-
 
 ###############################################################################
 def _evaluate_context_usage_invariants(
@@ -619,7 +615,6 @@ def _evaluate_context_usage_invariants(
         "Usage sources, caps, phase totals, and peak semantics are consistent.",
     )
 
-
 ###############################################################################
 def _evaluate_location_target_consistency(
     scenario: dict[str, Any], traces: list[dict[str, Any]]
@@ -683,7 +678,6 @@ def _evaluate_location_target_consistency(
         "Resolved target, viewport center, and geographic specificity are consistent.",
     )
 
-
 ###############################################################################
 def _evaluate_failure_diagnostics(traces: list[dict[str, Any]]) -> dict[str, Any]:
     for trace in traces:
@@ -740,7 +734,6 @@ def _evaluate_failure_diagnostics(traces: list[dict[str, Any]]) -> dict[str, Any
         "Every observed failure or partial operation is categorized.",
     )
 
-
 ###############################################################################
 def _evaluate_no_false_success(traces: list[dict[str, Any]]) -> dict[str, Any]:
     for trace in traces:
@@ -771,7 +764,6 @@ def _evaluate_no_false_success(traces: list[dict[str, Any]]) -> dict[str, Any]:
         True,
         "No operation was reported successful without corresponding verified evidence.",
     )
-
 
 ###############################################################################
 def _evaluate_clarification_correctness(
@@ -821,7 +813,6 @@ def _evaluate_clarification_correctness(
         True,
         "The ambiguous request produced an explicit clarification without executing a new map operation.",
     )
-
 
 ###############################################################################
 def _evaluate_deadline_compliance(
@@ -873,7 +864,6 @@ _CAPABILITY_FAMILY_TOKENS: dict[str, tuple[str, ...]] = {
     "roads": ("road", "traffic"),
 }
 
-
 ###############################################################################
 def _observed_rendering_types(traces: list[dict[str, Any]]) -> set[str]:
     observed: set[str] = set()
@@ -915,7 +905,6 @@ def _observed_rendering_types(traces: list[dict[str, Any]]) -> set[str]:
         observed.add("none")
     return observed
 
-
 ###############################################################################
 def _has_structured_clarification(trace: dict[str, Any]) -> bool:
     response = _response(trace)
@@ -937,7 +926,6 @@ def _has_structured_clarification(trace: dict[str, Any]) -> bool:
         return True
     return isinstance(contract.get("clarification_plan"), dict)
 
-
 ###############################################################################
 def _has_allowed_clarification(
     scenario: dict[str, Any], traces: list[dict[str, Any]]
@@ -949,7 +937,6 @@ def _has_allowed_clarification(
         and bool(traces)
         and _has_structured_clarification(traces[-1])
     )
-
 
 ###############################################################################
 def _has_provider_provenance(result: dict[str, Any]) -> bool:
@@ -992,7 +979,6 @@ def _has_native_location_provenance(
         for trace in traces
     )
 
-
 ###############################################################################
 def _has_explicit_limitation(traces: list[dict[str, Any]]) -> bool:
     for trace in traces:
@@ -1018,7 +1004,6 @@ def _has_explicit_limitation(traces: list[dict[str, Any]]) -> bool:
         ):
             return True
     return False
-
 
 ###############################################################################
 def _evaluate_expected_properties(

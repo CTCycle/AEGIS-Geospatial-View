@@ -53,6 +53,7 @@ def test_location_only_map_does_not_invent_a_basemap_in_the_planner() -> None:
     assert plan.visualization_update == {}
 
 
+###############################################################################
 def test_native_location_only_map_has_catalog_owned_basemap_step() -> None:
     planner = DeterministicToolPlanner()
     turn = _turn("Show Rome")
@@ -193,7 +194,6 @@ def test_atomic_tasks_without_layer_refs_do_not_create_inferred_dependencies() -
 
     assert [step.depends_on for step in plan.steps] == [[], []]
 
-
 ###############################################################################
 def test_peer_targets_create_independent_capability_steps() -> None:
     turn = _turn(
@@ -242,7 +242,6 @@ def test_peer_targets_create_independent_capability_steps() -> None:
     assert [
         step.arguments["arguments"]["location"] for step in plan.steps
     ] == ["Paris, France", "London, United Kingdom"]
-
 
 ###############################################################################
 def test_peer_targets_create_independent_provider_layer_steps() -> None:
