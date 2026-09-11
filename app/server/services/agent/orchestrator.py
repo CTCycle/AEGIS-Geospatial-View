@@ -35,6 +35,7 @@ from server.domain.agent.decision import (
     PolicyDecision,
     ResolvedLocation,
 )
+from server.contracts.extraction import NormalizedAction
 from server.services.agent.direct_turn_response import DirectTurnResponseService
 from server.services.agent.deterministic_intent_recovery import (
     DeterministicIntentRecoveryService,
@@ -363,6 +364,9 @@ class AgentOrchestrator:
         location_refs = dict(resolved_locations)
         if resolved_location is not None and not location_refs:
             location_refs["primary"] = resolved_location
+        memory_location = _resolved_location_from_memory(latest_memory)
+        if memory_location is not None:
+            location_refs.setdefault("active_location", memory_location)
         evidence_refs = [
             str(item.evidence_id)
             for item in (
@@ -414,6 +418,16 @@ class AgentOrchestrator:
             if native_response.execution_trace
             else "native_v2"
         )
+        memory_snapshot = dict(latest_memory)
+        # A native map is still a render candidate at this point. Do not
+        # publish its location into conversation memory until the render
+        # acknowledgment promotes the candidate.
+        if map_session is None:
+            memory_snapshot = self._native_memory_snapshot(
+                latest_memory,
+                native_response.location_refs,
+                request_id=request_id,
+            )
         if task is not None:
             self.task_state_service.update_task(
                 conversation_key,
@@ -445,6 +459,7 @@ class AgentOrchestrator:
                 ),
                 "execution_trace": native_response.execution_trace,
                 "presentation_status": native_response.presentation_status,
+                "memory_snapshot": memory_snapshot,
                 "tool_results": [
                     item.model_dump(mode="json")
                     for item in native_response.tool_results
@@ -462,7 +477,7 @@ class AgentOrchestrator:
             operation=operation,
             tool_payload=tool_payload,
             map_session=map_session,
-            memory_snapshot=dict(latest_memory),
+            memory_snapshot=memory_snapshot,
             context_usage=context_usage,
             task_snapshot=self.task_state_service.snapshot(conversation_key),
             tool_plan=None,
@@ -474,6 +489,26 @@ class AgentOrchestrator:
             presentation_status=native_response.presentation_status,
             tool_results=native_response.tool_results,
         )
+
+    def _native_memory_snapshot(
+        self,
+        latest_memory: dict[str, Any],
+        location_refs: dict[str, ResolvedLocation],
+        *,
+        request_id: str,
+    ) -> dict[str, Any]:
+        snapshot = dict(latest_memory)
+        action = NormalizedAction(
+            action_id=request_id,
+            action_label="Native geospatial request",
+        )
+        for location in location_refs.values():
+            snapshot = self.location_memory_service.update_memory_snapshot(
+                snapshot,
+                location,
+                action,
+            )
+        return snapshot
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -2488,3 +2523,20 @@ def _native_tool_payload(response: Any) -> dict[str, Any]:
         ),
         "execution_trace": response.execution_trace,
     }
+
+
+def _resolved_location_from_memory(
+    memory_snapshot: dict[str, Any],
+) -> ResolvedLocation | None:
+    active = memory_snapshot.get("active_location")
+    if not is_json_object(active):
+        return None
+    payload = {
+        field_name: active[field_name]
+        for field_name in ResolvedLocation.model_fields
+        if field_name in active
+    }
+    try:
+        return ResolvedLocation.model_validate(payload)
+    except Exception:
+        return None

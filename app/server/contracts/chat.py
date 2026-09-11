@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from server.common.time import utc_now
-from server.domain.agent.decision import PolicyDecision
+from server.domain.agent.decision import PolicyDecision, ResolvedLocation
 from server.domain.agent.pipeline import (
     ConversationTaskSnapshot,
     TaskFailureDetail,
@@ -134,6 +134,9 @@ class NativeV2TurnResponse(BaseModel):
     tool_results: list[NativeToolResultSummary] = Field(default_factory=list)
     canonical_request: CanonicalRequestInterpretation | None = None
     execution_trace: dict[str, Any] | None = None
+    location_refs: dict[str, ResolvedLocation] = Field(
+        default_factory=lambda: dict[str, ResolvedLocation]()
+    )
 
 ###############################################################################
 class ChatTurnResponse(BaseModel):

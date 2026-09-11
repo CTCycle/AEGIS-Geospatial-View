@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentPhase
+from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.reliability import AgentExecutionBudget
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.domain.agent.tools import RegisteredTool
@@ -161,3 +162,31 @@ async def test_native_runner_marks_map_text_without_candidate_failed() -> None:
 
     assert response.operation.status == "failed"
     assert response.presentation_status == "failed"
+
+
+async def test_native_runner_preserves_location_refs_in_response() -> None:
+    location = ResolvedLocation(
+        label="Rome",
+        latitude=41.9028,
+        longitude=12.4964,
+        country="Italy",
+        city="Rome",
+        location_type="city",
+        source="test",
+        confidence=1.0,
+    )
+    response = await _runner(
+        _Provider([_route_call(), LLMResult(content="Found Rome.")])
+    ).run(
+        NativeV2TurnRequest(
+            request_id="request-location",
+            conversation_id="conversation-location",
+            user_message="find hospitals in Rome",
+            provider="fake",
+            model="fake-model",
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            location_refs={"rome": location},
+        )
+    )
+
+    assert response.location_refs["rome"] == location

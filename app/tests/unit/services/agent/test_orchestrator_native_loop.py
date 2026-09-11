@@ -12,7 +12,12 @@ from server.domain.agent.decision import (
     PolicyDecision,
     ResolvedLocation,
 )
-from server.contracts.chat import ChatOperationResult, ChatTurnRequest, ChatTurnResponse
+from server.contracts.chat import (
+    ChatOperationResult,
+    ChatTurnRequest,
+    ChatTurnResponse,
+    NativeV2TurnResponse,
+)
 from server.contracts.extraction import (
     ConversationContextSnapshot,
     LocationSignal,
@@ -105,6 +110,21 @@ class _HistoryRepo:
     def get_latest_memory_snapshot(self, conversation_id: str) -> dict[str, Any]:
         _ = conversation_id
         return self.latest_memory
+
+
+class _NativeHistoryRepo(_HistoryRepo):
+
+    def get_latest_memory_snapshot(self, conversation_id: str) -> dict[str, Any]:
+        _ = conversation_id
+        for message in reversed(self.messages):
+            if message.get("role") != "assistant":
+                continue
+            payload = message.get("structured_payload")
+            if isinstance(payload, dict) and isinstance(
+                payload.get("memory_snapshot"), dict
+            ):
+                return payload["memory_snapshot"]
+        return super().get_latest_memory_snapshot(conversation_id)
 
 ###############################################################################
 class _Parser:
@@ -814,6 +834,31 @@ class _NativeLoop:
             )
         return self.result
 
+
+class _NativeStateRunner:
+
+    def __init__(self, location: ResolvedLocation) -> None:
+        self.location = location
+        self.requests: list[Any] = []
+
+    async def run(self, request: Any) -> NativeV2TurnResponse:
+        self.requests.append(request)
+        location_refs = dict(request.location_refs)
+        if len(self.requests) == 1:
+            location_refs["rome"] = self.location
+        return NativeV2TurnResponse(
+            request_id=request.request_id,
+            conversation_id=request.conversation_id,
+            assistant_message="Native response",
+            operation=ChatOperationResult(
+                kind="direct_answer",
+                status="success",
+                message="Native response",
+            ),
+            presentation_status="not_requested",
+            location_refs=location_refs,
+        )
+
 ###############################################################################
 class _SettingsRepo:
 
@@ -1167,6 +1212,72 @@ def test_native_v2_mode_bypasses_legacy_direct_response_shortcut() -> None:
 
         assert native_calls == 1
         assert response.assistant_message == "Native response"
+
+    run_async_in_thread(_run())
+
+###############################################################################
+def test_native_v2_persists_resolved_location_for_follow_up() -> None:
+    async def _run() -> None:
+        history = _NativeHistoryRepo()
+        runner = _NativeStateRunner(
+            ResolvedLocation(
+                label="Rome",
+                latitude=41.9028,
+                longitude=12.4964,
+                country="Italy",
+                city="Rome",
+                location_type="city",
+                source="test",
+                confidence=1.0,
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=_SearchOrchestrator(),  # type: ignore[arg-type]
+            parser_service=_ParserMustNotRun(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=_Policy(),  # type: ignore[arg-type]
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
+            native_tool_loop=_NativeLoop(
+                AgentToolLoopResult(
+                    final_text="unused",
+                    tool_calls=[],
+                    tool_results=[],
+                    iterations=0,
+                    stopped_reason="final",
+                )
+            ),  # type: ignore[arg-type]
+            agent_tool_catalog_service=_NoOpCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_service=history,
+            conversation_repository=history,  # type: ignore[arg-type]
+            execution_settings=SimpleNamespace(agent_loop_mode="native_v2"),
+            native_v2_runner=runner,  # type: ignore[arg-type]
+        )
+
+        first = await orchestrator.run_turn(
+            ChatTurnRequest(
+                conversation_id="native-state-conversation",
+                message="Show the weather in Rome.",
+            )
+        )
+
+        assert first.memory_snapshot["active_location"]["label"] == "Rome"
+        assert (
+            history.messages[-1]["structured_payload"]["memory_snapshot"]
+            ["active_location"]["label"]
+            == "Rome"
+        )
+
+        second = await orchestrator.run_turn(
+            ChatTurnRequest(
+                conversation_id="native-state-conversation",
+                message="Which city is the map centered on?",
+            )
+        )
+
+        assert runner.requests[1].location_refs["active_location"].label == "Rome"
+        assert second.memory_snapshot["active_location"]["label"] == "Rome"
 
     run_async_in_thread(_run())
 
