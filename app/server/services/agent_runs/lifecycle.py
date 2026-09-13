@@ -40,6 +40,7 @@ class RunLifecycleService:
         self.event_publisher = event_publisher
         self.run_orchestrator = run_orchestrator
         self._tasks: set[asyncio.Task[None]] = set()
+        self._tasks_by_run: dict[str, asyncio.Task[None]] = {}
 
     # -------------------------------------------------------------------------
     def create_conversation(
@@ -95,7 +96,14 @@ class RunLifecycleService:
         if created:
             task = asyncio.create_task(self.run_orchestrator.execute_run(run.run_id))
             self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
+            self._tasks_by_run[run.run_id] = task
+
+            def discard_task(completed: asyncio.Task[None]) -> None:
+                self._tasks.discard(completed)
+                if self._tasks_by_run.get(run.run_id) is completed:
+                    self._tasks_by_run.pop(run.run_id, None)
+
+            task.add_done_callback(discard_task)
         return AgentRunCreateResult(
             conversation_id=conversation_id,
             run_id=run.run_id,
@@ -112,6 +120,7 @@ class RunLifecycleService:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._tasks.clear()
+        self._tasks_by_run.clear()
 
     # -------------------------------------------------------------------------
     async def cancel_run(
@@ -130,6 +139,9 @@ class RunLifecycleService:
         if snapshot is None or snapshot.conversation_id != conversation_id:
             raise RunNotFoundError("Run not found.")
         cancelled, transitioned = self.run_repository.request_cancel_once(run_id)
+        task = self._tasks_by_run.get(run_id)
+        if task is not None and not task.done():
+            task.cancel()
         if transitioned:
             await self.event_publisher.publish(
                 conversation_id=conversation_id,
