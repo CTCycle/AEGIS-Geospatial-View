@@ -33,10 +33,29 @@ class CapabilityRoute(BaseModel):
     clarification_question: str | None = Field(default=None, max_length=500)
 
 ###############################################################################
+class NativeGoalContract(BaseModel):
+    """Server-owned obligations derived from a validated native route."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    goal: str
+    task_mode: Literal["answer", "execute", "clarify"]
+    presentation: Literal["text", "map", "both"]
+    requires_location: bool
+    constraints: dict[str, object] = Field(default_factory=dict)
+    completion_requirements: list[str] = Field(default_factory=list)
+
+###############################################################################
 class CapabilityRouteDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal["accepted", "clarification", "no_capability", "rejected"]
+    status: Literal[
+        "accepted",
+        "clarification",
+        "no_capability",
+        "discovery_required",
+        "rejected",
+    ]
     route: CapabilityRoute
     capability_ids: list[str] = Field(default_factory=list, max_length=12)
     rejected_capability_ids: list[str] = Field(default_factory=list, max_length=8)
@@ -67,6 +86,16 @@ class AgentState(BaseModel):
     conversation_id: str
     phase: AgentPhase
     user_message: str
+    goal_contract: NativeGoalContract | None = None
+    completion_requirements: list[str] = Field(default_factory=list)
+    active_instructions: list[dict[str, object]] = Field(default_factory=list)
+    task_state: dict[str, object] = Field(default_factory=dict)
+    map_memory: dict[str, object] = Field(default_factory=dict)
+    conversation_summary: dict[str, object] | None = None
+    recent_messages: list[dict[str, object]] = Field(default_factory=list)
+    relevant_tool_outcomes: list[dict[str, object]] = Field(default_factory=list)
+    context_allocation: dict[str, object] = Field(default_factory=dict)
+    context_hydrated: bool = False
     route: CapabilityRoute | None = None
     capability_ids: list[str] = Field(default_factory=list)
     location_refs: dict[str, ResolvedLocation] = Field(default_factory=dict)
@@ -85,4 +114,5 @@ class AgentState(BaseModel):
     transitions: int = Field(default=0, ge=0)
     transition_trace: list[dict[str, str]] = Field(default_factory=list)
     exposure_trace: list[dict[str, str]] = Field(default_factory=list)
+    discovery_attempts: int = Field(default=0, ge=0)
     termination_reason: str | None = None

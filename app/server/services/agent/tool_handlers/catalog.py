@@ -36,12 +36,19 @@ class CatalogToolHandler:
         route_domains = {CapabilityDomain.MIXED}
         if state.route is not None:
             route_domains = {state.route.primary_domain, *state.route.secondary_domains}
+        query_values = [request.query] if request.query else (
+            list(state.route.capability_queries)
+            if state.route is not None
+            else []
+        )
         candidates = self.capability_registry.shortlist(
             domains=route_domains,
-            queries=[request.query] if request.query else [],
+            queries=query_values,
             explicit_ids=request.capability_ids,
             runtime_registry=self.runtime_registry,
-            limit=request.limit,
+            # Pagination is applied after deterministic ranking so a cursor
+            # always addresses the same catalog snapshot.
+            limit=50,
         )
         if request.provider_id:
             provider_id = request.provider_id.casefold()
@@ -50,7 +57,9 @@ class CatalogToolHandler:
                 for item in candidates
                 if str(item.get("provider") or "").casefold() == provider_id
             ]
-        descriptors = [_descriptor(self.capability_registry, item) for item in candidates]
+        offset = _cursor_offset(request.cursor)
+        page = candidates[offset : offset + request.limit]
+        descriptors = [_descriptor(self.capability_registry, item) for item in page]
         discovered_ids = [str(item["id"]) for item in descriptors if item.get("id")]
         state.capability_ids = list(
             dict.fromkeys([*state.capability_ids, *discovered_ids])
@@ -69,12 +78,26 @@ class CatalogToolHandler:
                 "capabilities": descriptors,
                 "provider_id": request.provider_id,
                 "include_provider_layers": request.include_provider_layers,
-                "next_cursor": None,
+                "next_cursor": (
+                    str(offset + len(descriptors))
+                    if offset + len(descriptors) < len(candidates)
+                    else None
+                ),
+                "total": len(candidates),
             },
             metadata=ToolExecutionMetadata(
                 duration_ms=max(0, int((time.perf_counter() - started) * 1000))
             ),
         )
+
+
+def _cursor_offset(cursor: str | None) -> int:
+    if cursor is None or not cursor.strip():
+        return 0
+    try:
+        return max(0, int(cursor))
+    except ValueError:
+        return 0
 
 
 ###############################################################################

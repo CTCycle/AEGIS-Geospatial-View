@@ -503,6 +503,7 @@ def _response_summary(response: ProviderResponse) -> dict[str, Any]:
         "result_type": response.result_type,
         "feature_count": len(features) if isinstance(features, list) else None,
         "stale": response.stale,
+        "fetched_at": response.fetched_at.isoformat(),
     }
     if response.attribution:
         summary["attribution"] = [str(item)[:200] for item in response.attribution[:8]]
@@ -514,6 +515,12 @@ def _response_summary(response: ProviderResponse) -> dict[str, Any]:
         summary["spatial_resolution"] = response.spatial_resolution
     if response.units:
         summary["units"] = dict(list(response.units.items())[:16])
+    if response.coverage:
+        summary["coverage"] = dict(list(response.coverage.items())[:16])
+    if response.source_url:
+        summary["source_url"] = response.source_url[:500]
+    if response.partial:
+        summary["partial"] = True
     return summary
 
 

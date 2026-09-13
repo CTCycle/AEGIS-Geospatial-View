@@ -40,6 +40,7 @@ from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.agent.location_resolver import LocationResolver
 from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.interpretation import normalize_target_key
 
 
 _MODEL_PHASE = frozenset({AgentPhase.BUILD_TOOL_CONTEXT})
@@ -226,11 +227,14 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
 def _location_for_request(
     request: ExecuteCapabilityInput, state: AgentState
 ) -> ResolvedLocation | None:
-    requested = " ".join(str(request.location_ref or "").casefold().split())
+    requested = normalize_target_key(str(request.location_ref or ""))
     if requested:
         for key, location in state.location_refs.items():
-            if " ".join(str(key).casefold().split()) == requested:
+            if normalize_target_key(str(key)) == requested:
                 return location
+        return None
+    if len(state.location_refs) > 1:
+        return None
     if state.location_refs:
         return next(iter(state.location_refs.values()))
     if state.active_map_session is not None:
@@ -285,6 +289,17 @@ def _capability_semantic_validator(
 ) -> list[str]:
     if state.capability_ids and request.capability_id not in state.capability_ids:
         return ["capability_id is outside the validated route shortlist."]
+    if request.location_ref:
+        if _location_for_request(request, state) is None:
+            return [
+                "location_ref must match one exact resolved location reference; "
+                "another location will not be substituted."
+            ]
+    elif len(state.location_refs) > 1:
+        return [
+            "location_ref is required when more than one resolved location is "
+            "available."
+        ]
     return []
 
 

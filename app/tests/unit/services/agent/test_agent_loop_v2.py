@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
+import json
 from typing import Any
 
 import pytest
@@ -277,6 +278,64 @@ async def test_successful_tool_is_followed_by_one_final_model_step() -> None:
     assistant_message = provider.requests[2]["request"].messages[1]
     assert assistant_message["tool_calls"][0]["name"] == "test_tool"
     assert assistant_message["tool_calls"][0]["arguments"] == {}
+
+
+###############################################################################
+def test_tool_observation_preserves_bounded_result_data() -> None:
+    result = ToolResult(
+        call_id="call-1",
+        tool_name="discover_geospatial_capabilities",
+        status="success",
+        summary="Found 1 eligible capability.",
+        data={
+            "capabilities": [
+                {
+                    "id": "rainfall",
+                    "name": "Rainfall",
+                    "description": "Current rainfall observations.",
+                    "provider": "weather",
+                }
+            ],
+            "next_cursor": "1",
+        },
+        metadata=ToolExecutionMetadata(duration_ms=3),
+    )
+
+    message = AgentLoop._tool_result_messages(  # pyright: ignore[reportPrivateUsage]
+        [LLMToolCall(id="call-1", name=result.tool_name, arguments={})],
+        [result],
+    )[0]
+    observation = json.loads(message["content"])
+
+    assert observation["status"] == "success"
+    assert observation["result"]["capabilities"][0]["id"] == "rainfall"
+    assert observation["pagination"]["next_cursor"] == "1"
+
+
+###############################################################################
+def test_working_state_remains_valid_json_when_compacted() -> None:
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        requires_location=False,
+    )
+    state.tool_results = [
+        ToolResult(
+            call_id="call-1",
+            tool_name="test_tool",
+            status="success",
+            summary="x" * 10_000,
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    ]
+
+    working = AgentLoop._working_state_message(  # pyright: ignore[reportPrivateUsage]
+        state, 256
+    )
+
+    assert json.loads(working)["phase"] == state.phase.value
 
 
 ###############################################################################

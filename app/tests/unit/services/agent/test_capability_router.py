@@ -142,6 +142,21 @@ def test_router_handles_runtime_disabled_explicit_candidate() -> None:
 
 
 ###############################################################################
+def test_router_opens_discovery_when_semantic_shortlist_is_empty() -> None:
+    router = _router()
+    router.capability_registry.shortlist = lambda **kwargs: []  # type: ignore[method-assign]
+
+    decision = router.validate_route(
+        _route(capability_queries=["obscure atmospheric index"]),
+        user_message="Show an obscure atmospheric index.",
+        active_state=_state(),
+    )
+
+    assert decision.status == "discovery_required"
+    assert "discovery_required" in decision.reason_codes
+
+
+###############################################################################
 def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools() -> None:
     decision = _router().validate_route(
         _route(requires_location=False),

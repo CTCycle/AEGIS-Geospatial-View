@@ -12,6 +12,7 @@ from server.contracts.chat import (
     NativeV2TurnResponse,
 )
 from server.contracts.geospatial import MapSession
+from server.domain.agent.context import AgentContextPackage
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.domain.agent.reliability import AgentExecutionBudget
@@ -29,6 +30,7 @@ class NativeV2TurnRequest:
     model: str
     budget: AgentExecutionBudget
     messages: list[dict[str, Any]] = field(default_factory=list)
+    context_package: AgentContextPackage | None = None
     active_map_session: MapSession | None = None
     location_refs: Mapping[str, ResolvedLocation] = field(default_factory=dict)
     evidence_refs: list[str] = field(default_factory=list)
@@ -56,6 +58,7 @@ class NativeV2TurnRunner:
             active_map_session=request.active_map_session,
             location_refs=request.location_refs,
             evidence_refs=request.evidence_refs,
+            context_package=request.context_package,
         )
         state.canonical_request = request.canonical_request
         outcome = await self.agent_loop.run(
@@ -94,6 +97,9 @@ class NativeV2TurnRunner:
                 ),
                 max_validation_corrections=_setting(
                     self.execution_settings, "max_validation_corrections", 2
+                ),
+                max_discovery_attempts=_setting(
+                    self.execution_settings, "max_discovery_attempts", 2
                 ),
                 max_tool_result_chars=_setting(
                     self.execution_settings, "max_tool_result_chars", 4096

@@ -117,11 +117,27 @@ class CapabilityRouter:
         ]
 
         if proposed.task_mode == "execute" and not capability_ids:
+            status = (
+                "discovery_required"
+                if not proposed.explicit_capability_ids and proposed.capability_queries
+                else "no_capability"
+            )
             return CapabilityRouteDecision(
-                status="no_capability",
+                status=status,  # type: ignore[arg-type]
                 route=proposed,
                 rejected_capability_ids=rejected,
-                reason_codes=[*dict.fromkeys([*reasons, "no_eligible_capability"])],
+                reason_codes=[
+                    *dict.fromkeys(
+                        [
+                            *reasons,
+                            (
+                                "discovery_required"
+                                if status == "discovery_required"
+                                else "no_eligible_capability"
+                            ),
+                        ]
+                    )
+                ],
             )
 
         status = "rejected" if reasons and "clarification_question_not_allowed" in reasons else "accepted"
