@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from server.contracts.chat import (
     ChatOperationResult,
@@ -37,6 +37,7 @@ class NativeV2TurnRequest:
     canonical_request: CanonicalRequestInterpretation | None = None
     defer_map_commit: bool = False
     run_id: str | None = None
+    context_usage_callback: Callable[[dict[str, Any]], None] | None = None
 
 
 ###############################################################################
@@ -104,6 +105,7 @@ class NativeV2TurnRunner:
                 max_tool_result_chars=_setting(
                     self.execution_settings, "max_tool_result_chars", 4096
                 ),
+                context_usage_callback=request.context_usage_callback,
             )
         )
         return NativeV2ResponseBuilder.build(
