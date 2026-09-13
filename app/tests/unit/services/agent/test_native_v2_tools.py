@@ -233,6 +233,22 @@ def test_capability_schema_is_specialized_to_validated_shortlist() -> None:
 
 
 ###############################################################################
+def test_map_plan_is_not_exposed_for_text_only_routes() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = _route().model_copy(update={"presentation": "text"})
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["places:hospitals"]
+    state.location_refs["zurich"] = ResolvedLocation(
+        label="Zurich", latitude=47.3769, longitude=8.5417
+    )
+
+    assert "apply_map_plan" not in {
+        tool.name for tool in registry.expose(state)
+    }
+
+
+###############################################################################
 def test_policy_authorizes_typed_capability_calls_once_against_route_and_runtime() -> None:
     registry = _registry()
     state = _state()

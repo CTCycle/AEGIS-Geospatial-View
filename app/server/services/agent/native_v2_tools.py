@@ -204,7 +204,7 @@ def register_native_v2_tools(
             visibility="model",
             # A location-only map is a valid candidate: it can contain a
             # validated basemap and viewport without fabricating a data layer.
-            prerequisites=frozenset({"route", "location"}),
+            prerequisites=frozenset({"route", "location", "map_presentation"}),
             idempotent=False,
         ),
     )
