@@ -13,14 +13,18 @@ from server.domain.agent.capability_route import (
     AgentPhase,
     AgentState,
     CapabilityRoute,
+    NativeGoalContract,
 )
+from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.reliability import AgentExecutionBudget
 from server.domain.agent.tool_result import (
+    ModelObservation,
     ToolExecutionError,
     ToolExecutionMetadata,
     ToolResult,
 )
 from server.domain.llm.types import LLMRequest, LLMResult, LLMToolCall, LLMToolDefinition
+from server.prompts.agent import build_native_context_messages
 from server.prompts.capability_route import build_capability_route_prompt
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.completion import CompletionEvaluator
@@ -67,6 +71,7 @@ class AgentLoopRequest:
     max_same_failed_fingerprint: int = 2
     max_route_corrections: int = 1
     max_validation_corrections: int = 2
+    max_discovery_attempts: int = 2
     max_tool_result_chars: int = 4096
 
 
@@ -134,9 +139,7 @@ class AgentLoop:
     async def run(self, request: AgentLoopRequest) -> AgentLoopOutcome:
         state = request.state
         provider = self.provider_factory.get_provider(request.provider)
-        messages = list(request.messages) or [
-            {"role": "user", "content": state.user_message}
-        ]
+        messages = self._initial_messages(request)
         final_text = ""
         try:
             self._transition(state, AgentPhase.ROUTE_REQUEST)
@@ -154,6 +157,7 @@ class AgentLoop:
                     category="response_parsing",
                 )
             state.route = route
+            self._compile_native_goal(state, route)
 
             for iteration in range(max(1, request.max_iterations)):
                 if state.model_calls >= request.max_model_calls:
@@ -182,7 +186,11 @@ class AgentLoop:
                         state,
                     )
                     messages.extend(
-                        self._tool_result_messages(result.tool_calls, tool_results)
+                        self._tool_result_messages(
+                            result.tool_calls,
+                            tool_results,
+                            max_chars=request.max_tool_result_chars,
+                        )
                     )
                     self._transition(state, AgentPhase.UPDATE_STATE)
                     self._transition(state, AgentPhase.EVALUATE_STOP)
@@ -192,6 +200,7 @@ class AgentLoop:
                         tool_results,
                         max_consecutive_tool_failures=request.max_consecutive_tool_failures,
                         max_validation_corrections=request.max_validation_corrections,
+                        max_discovery_attempts=request.max_discovery_attempts,
                     )
                     if stop is not None:
                         state.termination_reason = stop[0]
@@ -200,7 +209,12 @@ class AgentLoop:
 
                 final_text = result.content.strip()
                 self._transition(state, AgentPhase.EVALUATE_STOP)
-                stop = self._evaluate_text_stop(state, route, final_text)
+                stop = self._evaluate_text_stop(
+                    state,
+                    route,
+                    final_text,
+                    available_tools=[item.name for item in tools],
+                )
                 if stop is not None:
                     state.termination_reason = stop[0]
                     return self._outcome(state, final_text, stop[0], request)
@@ -280,7 +294,7 @@ class AgentLoop:
                         user_message=request.state.user_message,
                         active_state=request.state,
                     )
-                    if decision.status == "accepted":
+                    if decision.status in {"accepted", "discovery_required"}:
                         request.state.capability_ids = list(decision.capability_ids)
                         return None, "", decision.route
                     if decision.status == "clarification":
@@ -418,6 +432,8 @@ class AgentLoop:
                     recovery="replan",
                 )
             async with semaphore:
+                if call.name == "discover_geospatial_capabilities":
+                    state.discovery_attempts += 1
                 self._transition(state, AgentPhase.VALIDATE_ACTION)
                 result = await self.tool_executor.execute_tool(
                     call,
@@ -458,6 +474,15 @@ class AgentLoop:
             state.tool_results.append(result)
         if result.status == "failed":
             state.consecutive_tool_failures += 1
+            if (
+                result.error is not None
+                and result.error.recovery in {"choose_alternate_tool", "replan"}
+                and result.tool_name == "execute_geospatial_capability"
+            ):
+                # Re-open the discovery boundary after a provider/capability
+                # failure.  Keeping only the failed ID would prevent the
+                # model from selecting an equivalent source.
+                state.capability_ids = []
             return
         state.consecutive_tool_failures = 0
         for evidence_ref in result.evidence_refs:
@@ -484,39 +509,81 @@ class AgentLoop:
         *,
         max_consecutive_tool_failures: int,
         max_validation_corrections: int,
+        max_discovery_attempts: int,
     ) -> tuple[str, str] | None:
         if state.prepared_map_session is not None:
             return "awaiting_render", "The map candidate is awaiting render acknowledgment."
-        if state.consecutive_tool_failures >= max_consecutive_tool_failures:
-            return "failed", "The agent stopped after repeated tool failures."
         if state.validation_corrections >= max_validation_corrections:
             return "failed", "The agent stopped after repeated invalid tool calls."
+        actionable_recovery = any(
+            result.error is not None
+            and result.error.recovery
+            in {
+                "correct_arguments",
+                "retry_transport",
+                "choose_alternate_tool",
+                "replan",
+            }
+            for result in results
+        )
+        if any(
+            result.error is not None
+            and result.error.recovery == "request_user_input"
+            for result in results
+        ):
+            question = next(
+                result.error.message
+                for result in results
+                if result.error is not None
+                and result.error.recovery == "request_user_input"
+            )
+            return "clarification_required", question
         if any(result.status != "failed" for result in results):
+            if (
+                all(result.status == "valid_empty" for result in results)
+                and not state.capability_ids
+                and state.discovery_attempts >= max_discovery_attempts
+            ):
+                return (
+                    "insufficient_evidence",
+                    "No supported capability matched the request after discovery.",
+                )
             return None
         if results and all(result.status == "failed" for result in results):
-            if any(result.error and result.error.retryable for result in results):
+            if actionable_recovery:
                 return None
             return "failed", "The requested tool could not complete successfully."
+        if state.consecutive_tool_failures >= max_consecutive_tool_failures:
+            return "failed", "The agent stopped after repeated tool failures."
         return None
 
     # -------------------------------------------------------------------------
-    @staticmethod
     def _evaluate_text_stop(
+        self,
         state: AgentState,
         route: CapabilityRoute,
         text: str,
+        *,
+        available_tools: list[str] | None = None,
     ) -> tuple[str, str] | None:
         if route.task_mode == "clarify":
             return "clarification_required", text
         if state.prepared_map_session is not None:
             return "awaiting_render", text
         if text:
+            tools = list(available_tools or [])
+            pending = self._pending_native_requirements(state)
+            if pending:
+                return (
+                    "no_progress" if tools else "insufficient_evidence",
+                    text,
+                )
             evaluation = CompletionEvaluator.evaluate_proposed_stop(
                 canonical_request=state.canonical_request,
                 presentation_required=route.presentation in {"map", "both"},
                 map_prepared=False,
                 evidence_refs=state.evidence_refs,
-                available_tools=[],
+                available_tools=tools if state.context_hydrated else [],
                 clarification_required=False,
                 provider_error=False,
             )
@@ -537,9 +604,95 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _initial_messages(request: AgentLoopRequest) -> list[dict[str, Any]]:
+        state = request.state
+        if state.context_hydrated:
+            return build_native_context_messages(
+                current_user_message=state.user_message,
+                recent_messages=state.recent_messages,
+                active_instructions=state.active_instructions,
+                task_state=state.task_state,
+                map_memory=state.map_memory,
+                conversation_summary=state.conversation_summary,
+                relevant_tool_outcomes=state.relevant_tool_outcomes,
+            )
+        return list(request.messages) or [
+            {"role": "user", "content": state.user_message}
+        ]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _compile_native_goal(state: AgentState, route: CapabilityRoute) -> None:
+        canonical_payload = (
+            state.canonical_request.model_dump(mode="json")
+            if state.canonical_request is not None
+            else {}
+        )
+        requirements: list[str] = []
+        if route.requires_location:
+            requirements.append("location_resolved")
+        data_route = route.primary_domain not in {
+            CapabilityDomain.MAP_RENDERING,
+            CapabilityDomain.MAP_STATE,
+        }
+        if route.task_mode == "execute" and data_route:
+            requirements.append("required_data_retrieved")
+        if route.presentation in {"map", "both"}:
+            requirements.append("map_candidate_prepared")
+        constraints: dict[str, object] = {
+            "presentation": route.presentation,
+            "requires_location": route.requires_location,
+            "canonical_request": canonical_payload,
+            "active_directives": state.active_instructions,
+            "map_memory": state.map_memory,
+        }
+        state.completion_requirements = list(dict.fromkeys(requirements))
+        state.goal_contract = NativeGoalContract(
+            goal=state.user_message,
+            task_mode=route.task_mode,
+            presentation=route.presentation,
+            requires_location=route.requires_location,
+            constraints=constraints,
+            completion_requirements=list(state.completion_requirements),
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _pending_native_requirements(state: AgentState) -> list[str]:
+        if not state.context_hydrated or state.goal_contract is None:
+            return []
+        completed_data = any(
+            result.status in {"success", "valid_empty", "partial"}
+            and result.tool_name
+            in {
+                "execute_geospatial_capability",
+                "inspect_evidence",
+                "transform_evidence",
+            }
+            for result in state.tool_results
+        )
+        checks = {
+            "location_resolved": bool(state.location_refs)
+            or state.active_map_session is not None,
+            "required_data_retrieved": completed_data,
+            "map_candidate_prepared": state.prepared_map_session is not None,
+        }
+        return [
+            name
+            for name in state.goal_contract.completion_requirements
+            if not checks.get(name, False)
+        ]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _working_state_message(state: AgentState, limit: int) -> str:
         payload = {
             "phase": state.phase.value,
+            "goal_contract": (
+                state.goal_contract.model_dump(mode="json")
+                if state.goal_contract is not None
+                else None
+            ),
             "route": state.route.model_dump(mode="json") if state.route else None,
             "capability_ids": list(state.capability_ids),
             "location_refs": sorted(state.location_refs),
@@ -558,7 +711,38 @@ class AgentLoop:
             ],
         }
         serialized = json.dumps(payload, separators=(",", ":"), default=str)
-        return serialized[: max(256, limit)]
+        if len(serialized) <= max(256, limit):
+            return serialized
+        compact = dict(payload)
+        compact["tool_results"] = [
+            {
+                "tool_name": item["tool_name"],
+                "status": item["status"],
+                "summary": str(item["summary"])[:240],
+                "error_code": item["error_code"],
+            }
+            for item in payload["tool_results"][-3:]
+        ]
+        compact["evidence_refs"] = list(state.evidence_refs[-8:])
+        serialized = json.dumps(compact, separators=(",", ":"), default=str)
+        if len(serialized) <= max(256, limit):
+            return serialized
+        minimal = {
+            "phase": state.phase.value,
+            "route": (
+                {
+                    "task_mode": state.route.task_mode,
+                    "presentation": state.route.presentation,
+                }
+                if state.route is not None
+                else None
+            ),
+            "capability_ids": list(state.capability_ids[:12]),
+            "location_refs": sorted(state.location_refs)[:12],
+            "evidence_refs": list(state.evidence_refs[-8:]),
+            "prepared_map": bool(state.prepared_map_session),
+        }
+        return json.dumps(minimal, separators=(",", ":"), default=str)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -581,14 +765,19 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     @staticmethod
     def _tool_result_messages(
-        calls: list[LLMToolCall], results: list[ToolResult]
+        calls: list[LLMToolCall],
+        results: list[ToolResult],
+        *,
+        max_chars: int = 4096,
     ) -> list[dict[str, Any]]:
         return [
             {
                 "role": "tool",
                 "tool_call_id": call.id,
                 "name": call.name,
-                "content": result.model_dump_json(exclude={"data"}),
+                "content": ModelObservation.from_tool_result(
+                    result, max_chars=max_chars
+                ).model_dump_json(exclude_none=True),
             }
             for call, result in zip(calls, results, strict=False)
         ]

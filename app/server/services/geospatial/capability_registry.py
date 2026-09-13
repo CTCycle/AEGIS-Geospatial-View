@@ -269,7 +269,7 @@ class CapabilityRegistry:
         execution arguments to the model/tool boundary.
         """
 
-        bounded_limit = max(1, min(int(limit), 12))
+        bounded_limit = max(1, min(int(limit), 50))
         normalized_queries = _query_tokens(queries)
         normalized_explicit = [
             str(value).strip() for value in explicit_ids if str(value).strip()

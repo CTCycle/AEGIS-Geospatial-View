@@ -86,6 +86,41 @@ def build_native_agent_messages(
         {"role": "user", "content": context},
     ]
 
+
+###############################################################################
+def build_native_context_messages(
+    *,
+    current_user_message: str,
+    recent_messages: list[dict[str, Any]],
+    active_instructions: list[dict[str, Any]],
+    task_state: dict[str, Any],
+    map_memory: dict[str, Any],
+    conversation_summary: dict[str, Any] | None,
+    relevant_tool_outcomes: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Build the model-visible projection from the hydrated native state."""
+
+    state_view = {
+        "active_instructions": active_instructions,
+        "task_state": task_state,
+        "map_memory": map_memory,
+        "conversation_summary": conversation_summary,
+        "relevant_tool_outcomes": relevant_tool_outcomes,
+    }
+    return [
+        {"role": "system", "content": build_native_agent_system_prompt()},
+        *recent_messages,
+        {
+            "role": "system",
+            "content": (
+                "CANONICAL_NATIVE_CONTEXT (authoritative state; do not infer "
+                "missing invariants from omitted history): "
+                + json.dumps(state_view, default=str, separators=(",", ":"))
+            ),
+        },
+        {"role": "user", "content": current_user_message},
+    ]
+
 ###############################################################################
 def build_working_state_message(
     *,
