@@ -134,6 +134,9 @@ class ToolRegistry:
                 }
                 if CapabilityDomain.PROVIDER_DISCOVERY not in route_domains:
                     return False
+            if prerequisite == "map_presentation":
+                if state.route is None or state.route.presentation not in {"map", "both"}:
+                    return False
         return True
 
     # -------------------------------------------------------------------------
