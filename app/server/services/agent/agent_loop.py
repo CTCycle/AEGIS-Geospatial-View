@@ -7,7 +7,7 @@ import hashlib
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol
+from typing import Any, Callable, Literal, Protocol
 
 from server.domain.agent.capability_route import (
     AgentPhase,
@@ -76,6 +76,7 @@ class AgentLoopRequest:
     max_validation_corrections: int = 2
     max_discovery_attempts: int = 2
     max_tool_result_chars: int = 4096
+    context_usage_callback: Callable[[dict[str, Any]], None] | None = None
 
 
 ###############################################################################
@@ -439,7 +440,7 @@ class AgentLoop:
             request.budget.record_model_call()
             request.state.model_calls += 1
             try:
-                return await asyncio.wait_for(
+                result = await asyncio.wait_for(
                     provider.achat(
                         llm_request,
                         tools=tools or None,
@@ -447,7 +448,10 @@ class AgentLoop:
                     ),
                     timeout=timeout,
                 )
+                self._record_context_usage(request, result.context_usage, attempts)
+                return result
             except LLMProviderRequestError as exc:
+                self._record_context_usage(request, exc.context_usage, attempts)
                 if not exc.retryable or attempts >= 2:
                     raise
                 request.budget.record_retry()
@@ -456,6 +460,32 @@ class AgentLoop:
                     min(0.25, request.budget.remaining_seconds())
                 )
                 request.budget.ensure_available("model_retry")
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _record_context_usage(
+        request: AgentLoopRequest,
+        usage: dict[str, Any] | None,
+        attempt: int,
+    ) -> None:
+        if not isinstance(usage, dict):
+            return
+        trace_usage = {
+            "phase": "native_loop",
+            "model": request.model,
+            "attempt": attempt,
+            "model_call": request.state.model_calls,
+            **dict(usage),
+        }
+        request.budget.record_context_allocation(trace_usage)
+        callback = request.context_usage_callback
+        if callback is None:
+            return
+        try:
+            callback(dict(usage))
+        except Exception:
+            # Telemetry must not change the model/tool execution semantics.
+            return
 
     # -------------------------------------------------------------------------
     async def _execute_calls(

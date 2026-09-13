@@ -342,6 +342,7 @@ class AgentOrchestrator:
         self,
         *,
         payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None] | None,
         request_id: str,
         run_id: str | None,
         conversation_id: str,
@@ -399,6 +400,15 @@ class AgentOrchestrator:
                 evidence_refs=evidence_refs,
                 canonical_request=canonical_request,
                 defer_map_commit=defer_map_commit,
+                context_usage_callback=(
+                    lambda usage: self._emit_context_usage(
+                        progress_callback,
+                        request_id=request_id,
+                        conversation_id=conversation_id,
+                        phase="native_loop",
+                        usage=usage,
+                    )
+                ),
             )
         )
         tool_payload = _native_tool_payload(native_response)
@@ -1158,6 +1168,7 @@ class AgentOrchestrator:
             ] = "skipped_native_v2"
             return await self._run_native_v2_compat_turn(
                 payload=payload,
+                progress_callback=progress_callback,
                 request_id=request_id,
                 run_id=agent_run_id,
                 conversation_id=conversation_id,

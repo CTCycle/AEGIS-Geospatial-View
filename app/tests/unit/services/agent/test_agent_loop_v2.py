@@ -252,6 +252,47 @@ async def test_opencode_go_native_calls_use_conversation_session_and_compatible_
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_native_model_context_usage_is_recorded_and_emitted() -> None:
+    usage = {
+        "estimated_input_tokens": 120,
+        "reported_input_tokens": 110,
+        "reported_output_tokens": 18,
+        "model_context_limit": 4096,
+        "compaction_applied": True,
+    }
+    provider = FakeProvider([LLMResult(content="ready", context_usage=usage)])
+    budget = AgentExecutionBudget(total_seconds=10, hard_max_seconds=10)
+    emitted: list[dict[str, Any]] = []
+    request = AgentLoopRequest(
+        provider="fake",
+        model="fake-model",
+        state=_state(),
+        budget=budget,
+        context_usage_callback=emitted.append,
+    )
+
+    await _loop(provider)._model_call(  # pyright: ignore[reportPrivateUsage]
+        request,
+        provider,  # type: ignore[arg-type]
+        [],
+        [],
+        tool_choice="none",
+    )
+
+    assert emitted == [usage]
+    assert budget.context_allocations == [
+        {
+            "phase": "native_loop",
+            "model": "fake-model",
+            "attempt": 1,
+            "model_call": 1,
+            **usage,
+        }
+    ]
+
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_loop_preserves_malformed_tool_call_as_failure() -> None:
     provider = FakeProvider(
         [
