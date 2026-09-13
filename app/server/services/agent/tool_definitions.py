@@ -32,9 +32,8 @@ class CapabilityDiscoveryInput(StrictToolInput):
     query: str | None = Field(default=None, max_length=300)
     capability_ids: list[str] = Field(default_factory=list, max_length=8)
     provider_id: str | None = Field(default=None, max_length=100)
-    include_provider_layers: bool = False
     cursor: str | None = Field(default=None, max_length=200)
-    limit: int = Field(default=12, ge=1, le=25)
+    limit: int = Field(default=12, ge=1, le=50)
 
 ###############################################################################
 class ExecuteCapabilityInput(StrictToolInput):
