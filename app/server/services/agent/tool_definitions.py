@@ -43,6 +43,10 @@ class ProviderLayerDiscoveryInput(StrictToolInput):
     limit: int = Field(default=20, ge=1, le=50)
     refresh: bool = False
 
+
+class DescribeCapabilityInput(StrictToolInput):
+    capability_id: str = Field(min_length=1, max_length=200)
+
 ###############################################################################
 class ExecuteCapabilityInput(StrictToolInput):
     capability_id: str = Field(min_length=1, max_length=200)
@@ -82,6 +86,7 @@ class RouteRequestInput(CapabilityRoute):
 __all__ = [
     "ApplyMapPlanInput",
     "CapabilityDiscoveryInput",
+    "DescribeCapabilityInput",
     "ExecuteCapabilityInput",
     "InspectEvidenceInput",
     "ProviderLayerDiscoveryInput",

@@ -166,6 +166,47 @@ def _project_result_data(
     if data is None:
         return None, False
 
+    if tool_name == "describe_geospatial_capability" and isinstance(data, dict):
+        manifest = data.get("manifest")
+        compact_manifest = (
+            {
+                key: manifest[key]
+                for key in (
+                    "id",
+                    "name",
+                    "description",
+                    "provider",
+                    "type",
+                    "capabilityKind",
+                    "renderingMode",
+                    "coverage",
+                    "capabilities",
+                    "agenticUse",
+                    "reliability",
+                )
+                if isinstance(manifest, dict) and key in manifest
+            }
+            if isinstance(manifest, dict)
+            else None
+        )
+        projected = {
+            "capability_id": data.get("capability_id"),
+            "manifest": _bounded_json_value(
+                compact_manifest, depth=0, max_depth=4, list_limit=16
+            ),
+            "argument_schema": _bounded_json_value(
+                data.get("argument_schema"), depth=0, max_depth=5, list_limit=32
+            ),
+            "execution_contract": _bounded_json_value(
+                data.get("execution_contract"), depth=0, max_depth=4, list_limit=24
+            ),
+        }
+        return _fit_projection(
+            projected,
+            max_chars=max_chars,
+            preserve_keys=("argument_schema", "execution_contract"),
+        )
+
     # Provider-native layer descriptors and catalog discovery are the result
     # types where removing ``data`` would remove the useful observation
     # entirely. Keep their semantic fields explicit and cap records/contracts

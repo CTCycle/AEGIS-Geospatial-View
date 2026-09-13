@@ -25,6 +25,7 @@ from server.services.agent.map_plan_service import MapPlanService
 from server.services.agent.tool_definitions import (
     ApplyMapPlanInput,
     CapabilityDiscoveryInput,
+    DescribeCapabilityInput,
     ExecuteCapabilityInput,
     InspectEvidenceInput,
     ProviderLayerDiscoveryInput,
@@ -136,6 +137,21 @@ def register_native_v2_tools(
             prerequisites=frozenset({"route", "provider_discovery_route"}),
             idempotent=True,
             semantic_validator=_provider_layer_semantic_validator,
+        ),
+        _registration(
+            name="describe_geospatial_capability",
+            description=(
+                "Describe one shortlisted capability, including its execution "
+                "contract and bounded argument schema."
+            ),
+            input_model=DescribeCapabilityInput,
+            handler=catalog.describe,
+            domains=_MIXED,
+            phases=_MODEL_PHASE,
+            visibility="model",
+            prerequisites=frozenset({"route", "capability_shortlist"}),
+            idempotent=True,
+            semantic_validator=_describe_semantic_validator,
         ),
         _registration(
             name="execute_geospatial_capability",
@@ -345,6 +361,17 @@ def _provider_layer_semantic_validator(
         permitted = {str(item).casefold() for item in allowed}
         if normalized not in permitted:
             return ["provider_id is outside the validated provider allowlist."]
+    return []
+
+
+###############################################################################
+def _describe_semantic_validator(
+    request: DescribeCapabilityInput, state: AgentState
+) -> list[str]:
+    if not state.capability_ids:
+        return ["capability_id must be selected by the validated route first."]
+    if request.capability_id not in state.capability_ids:
+        return ["capability_id is outside the validated route shortlist."]
     return []
 
 
