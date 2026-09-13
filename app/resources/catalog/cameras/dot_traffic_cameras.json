@@ -45,6 +45,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": false,
+    "domains": ["place_search", "data_retrieval"],
     "plannerHints": ["traffic camera", "road condition", "DOT camera"],
     "requiredUserAction": ["traffic_monitoring", "travel_condition"],
     "avoidWhen": ["general chat", "no geographic context", "source not configured"]

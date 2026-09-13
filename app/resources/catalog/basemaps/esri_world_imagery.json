@@ -102,6 +102,8 @@
   "agenticUse": {
     "defaultEnabled": true,
     "manualToggle": true,
+    "domains": ["map_rendering"],
+    "domains": ["map_rendering"],
     "plannerHints": [
       "realistic_view",
       "context_imagery",

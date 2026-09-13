@@ -87,6 +87,7 @@
   "agenticUse": {
     "defaultEnabled": true,
     "manualToggle": true,
+    "domains": ["map_rendering"],
     "plannerHints": [
       "routing",
       "address_lookup",

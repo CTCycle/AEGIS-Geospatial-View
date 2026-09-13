@@ -85,6 +85,7 @@
   "agenticUse": {
     "defaultEnabled": true,
     "manualToggle": true,
+    "domains": ["map_rendering"],
     "plannerHints": [
       "night_mode",
       "traffic_focus",

@@ -86,6 +86,7 @@
   "agenticUse": {
     "defaultEnabled": true,
     "manualToggle": true,
+    "domains": ["map_rendering"],
     "plannerHints": [
       "elevation_analysis",
       "outdoor_planning",

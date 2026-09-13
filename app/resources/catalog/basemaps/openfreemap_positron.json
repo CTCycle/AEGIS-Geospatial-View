@@ -50,6 +50,7 @@
   "agenticUse": {
     "defaultEnabled": true,
     "manualToggle": true,
+    "domains": ["map_rendering"],
     "plannerHints": ["presentation", "clean_layout", "places", "urban", "light"],
     "requiredUserAction": [],
     "avoidWhen": ["general chat", "no geographic context"]
