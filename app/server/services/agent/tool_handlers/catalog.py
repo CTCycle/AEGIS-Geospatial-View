@@ -77,7 +77,6 @@ class CatalogToolHandler:
             data={
                 "capabilities": descriptors,
                 "provider_id": request.provider_id,
-                "include_provider_layers": request.include_provider_layers,
                 "next_cursor": (
                     str(offset + len(descriptors))
                     if offset + len(descriptors) < len(candidates)

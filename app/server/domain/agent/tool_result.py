@@ -198,8 +198,6 @@ def _project_result_data(
         }
         if isinstance(data, dict) and "items" in data:
             projected["items"] = items
-        if isinstance(data, dict) and "include_provider_layers" in data:
-            projected["include_provider_layers"] = bool(data["include_provider_layers"])
         return _fit_projection(projected, max_chars=max_chars, preserve_keys=("capabilities", "items"))
 
     if tool_name in {"inspect_evidence", "inspect_geospatial_evidence"} and isinstance(data, dict):
