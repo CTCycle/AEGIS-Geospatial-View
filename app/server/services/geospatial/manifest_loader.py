@@ -126,7 +126,12 @@ class GeospatialManifestLoader:
 
     # -------------------------------------------------------------------------
     def _validate_entry(
-        self, entry: JsonDict, *, source: str, source_path: str | Path | None = None
+        self,
+        entry: JsonDict,
+        *,
+        source: str,
+        source_path: str | Path | None = None,
+        require_agentic_domains: bool = False,
     ) -> JsonDict:
         missing = [
             field
@@ -143,6 +148,17 @@ class GeospatialManifestLoader:
             raise ManifestValidationError(
                 f"Manifest '{source}' entry '{entry.get('id')}' failed schema v2 validation: {exc}"
             ) from exc
+        if require_agentic_domains:
+            agentic_use = entry.get("agenticUse")
+            domains = (
+                agentic_use.get("domains")
+                if isinstance(agentic_use, dict)
+                else None
+            )
+            if not isinstance(domains, list) or not domains:
+                raise ManifestValidationError(
+                    f"Manifest '{source}' entry '{entry.get('id')}' must declare at least one agenticUse domain."
+                )
         normalized = dict(entry)
         normalized["capabilities"] = list(entry.get("capabilities") or [])
         normalized["metadata"] = dict(entry.get("metadata") or {})
@@ -152,7 +168,9 @@ class GeospatialManifestLoader:
         return normalized
 
     # -------------------------------------------------------------------------
-    def _load_directory_entries(self, relative_dir: str) -> list[JsonDict]:
+    def _load_directory_entries(
+        self, relative_dir: str, *, require_agentic_domains: bool = False
+    ) -> list[JsonDict]:
         folder = Path(self.root_path) / relative_dir
         if not folder.is_dir():
             raise ManifestValidationError(
@@ -168,7 +186,12 @@ class GeospatialManifestLoader:
                     f"Manifest document '{path}' must be an object."
                 )
             entries.append(
-                self._validate_entry(payload, source=path.name, source_path=path)
+                self._validate_entry(
+                    payload,
+                    source=path.name,
+                    source_path=path,
+                    require_agentic_domains=require_agentic_domains,
+                )
             )
         return entries
 
@@ -232,11 +255,21 @@ class GeospatialManifestLoader:
     def load_all(self) -> JsonDict:
         index = self.load_index()
         providers = self._load_directory_entries(index["providers_dir"])
-        basemaps = self._load_directory_entries(index["basemaps_dir"])
-        overlays = self._load_directory_entries(index["overlays_dir"])
-        tools = self._load_directory_entries(index["tools_dir"])
-        cameras = self._load_directory_entries(index["cameras_dir"])
-        transit = self._load_directory_entries(index["transit_dir"])
+        basemaps = self._load_directory_entries(
+            index["basemaps_dir"], require_agentic_domains=True
+        )
+        overlays = self._load_directory_entries(
+            index["overlays_dir"], require_agentic_domains=True
+        )
+        tools = self._load_directory_entries(
+            index["tools_dir"], require_agentic_domains=True
+        )
+        cameras = self._load_directory_entries(
+            index["cameras_dir"], require_agentic_domains=True
+        )
+        transit = self._load_directory_entries(
+            index["transit_dir"], require_agentic_domains=True
+        )
         runtime_profiles = self._load_runtime_profiles(index["runtime_profiles_file"])
         return {
             "providers": providers,

@@ -3,9 +3,14 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import pytest
+
 from server.contracts.geospatial import CapabilityKind, CapabilityManifestV2
 from server.services.geospatial.layer_auditor import audit_all_manifests
-from server.services.geospatial.manifest_loader import GeospatialManifestLoader
+from server.services.geospatial.manifest_loader import (
+    GeospatialManifestLoader,
+    ManifestValidationError,
+)
 
 ###############################################################################
 def test_all_geospatial_manifests_pass_schema_v2_audit() -> None:
@@ -86,6 +91,26 @@ def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
             raise AssertionError("Invalid schema v2 manifest unexpectedly loaded.")
     finally:
         shutil.rmtree(manifests, ignore_errors=True)
+
+
+###############################################################################
+def test_manifest_loader_rejects_empty_agentic_domains() -> None:
+    loader = GeospatialManifestLoader()
+    entry = dict(loader.load_all()["overlays"][0])
+    entry.pop("source_filename", None)
+    entry.pop("source_path", None)
+    entry["agenticUse"] = {
+        **dict(entry["agenticUse"]),
+        "domains": [],
+    }
+
+    with pytest.raises(ManifestValidationError, match="agenticUse domain"):
+        loader._validate_entry(
+            entry,
+            source="missing_domains.json",
+            require_agentic_domains=True,
+        )
+
 
 ###############################################################################
 def test_loaded_manifests_expose_v2_capability_kinds() -> None:
