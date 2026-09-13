@@ -82,6 +82,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": false,
+    "domains": ["provider_discovery"],
     "plannerHints": [
       "housing market",
       "rent trends",

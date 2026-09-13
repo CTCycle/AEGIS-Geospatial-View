@@ -80,6 +80,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
+    "domains": ["data_retrieval", "map_rendering"],
     "plannerHints": [
       "demographics",
       "population density",

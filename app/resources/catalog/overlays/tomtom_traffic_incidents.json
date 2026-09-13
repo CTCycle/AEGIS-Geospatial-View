@@ -63,6 +63,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
+    "domains": ["data_retrieval", "map_rendering"],
     "plannerHints": [
       "traffic incident",
       "road closure",

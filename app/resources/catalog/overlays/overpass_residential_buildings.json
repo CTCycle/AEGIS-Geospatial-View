@@ -80,6 +80,7 @@
   "agenticUse": {
     "defaultEnabled": true,
     "manualToggle": true,
+    "domains": ["data_retrieval", "map_rendering"],
     "plannerHints": ["houses", "housing", "residential", "apartments", "building footprints"],
     "requiredUserAction": [],
     "avoidWhen": ["amenity requests", "general chat", "no geographic context"]

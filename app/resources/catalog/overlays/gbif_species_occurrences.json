@@ -91,6 +91,7 @@
   "agenticUse": {
     "defaultEnabled": true,
     "manualToggle": true,
+    "domains": ["data_retrieval", "map_rendering"],
     "plannerHints": [
       "biodiversity",
       "species occurrence",

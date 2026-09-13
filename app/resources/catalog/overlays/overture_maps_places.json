@@ -61,6 +61,7 @@
   "agenticUse": {
     "defaultEnabled": true,
     "manualToggle": false,
+    "domains": ["data_retrieval", "map_rendering"],
     "plannerHints": [
       "overture",
       "places",
