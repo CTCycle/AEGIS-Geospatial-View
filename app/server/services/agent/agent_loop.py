@@ -168,6 +168,7 @@ class AgentLoop:
                     category="response_parsing",
                 )
             state.route = route
+            request.budget.promote(self._budget_profile(route))
             self._compile_native_goal(state, route)
 
             for iteration in range(max(1, request.max_iterations)):
@@ -724,6 +725,18 @@ class AgentLoop:
         return list(request.messages) or [
             {"role": "user", "content": state.user_message}
         ]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _budget_profile(route: CapabilityRoute) -> str:
+        if (
+            route.presentation in {"map", "both"}
+            or route.secondary_domains
+            or len(route.capability_queries) > 1
+            or route.primary_domain is CapabilityDomain.SPATIAL_ANALYSIS
+        ):
+            return "complex"
+        return "simple"
 
     # -------------------------------------------------------------------------
     @staticmethod

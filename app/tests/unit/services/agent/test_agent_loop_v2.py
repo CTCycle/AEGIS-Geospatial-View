@@ -186,6 +186,38 @@ async def test_loop_routes_exposes_tools_and_finishes_from_final_model_text() ->
 
 
 ###############################################################################
+def test_native_route_promotes_the_execution_profile_once() -> None:
+    simple_budget = AgentExecutionBudget(
+        total_seconds=90,
+        hard_max_seconds=300,
+        simple_run_seconds=150,
+    )
+    complex_budget = AgentExecutionBudget(
+        total_seconds=90,
+        hard_max_seconds=300,
+        simple_run_seconds=150,
+    )
+    simple_route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        requires_location=False,
+        capability_queries=["weather"],
+    )
+    complex_route = simple_route.model_copy(
+        update={"presentation": "map", "requires_location": True}
+    )
+
+    assert AgentLoop._budget_profile(simple_route) == "simple"  # pyright: ignore[reportPrivateUsage]
+    assert AgentLoop._budget_profile(complex_route) == "complex"  # pyright: ignore[reportPrivateUsage]
+    simple_budget.promote(AgentLoop._budget_profile(simple_route))  # pyright: ignore[reportPrivateUsage]
+    complex_budget.promote(AgentLoop._budget_profile(complex_route))  # pyright: ignore[reportPrivateUsage]
+
+    assert simple_budget.total_seconds == 150
+    assert complex_budget.total_seconds == 300
+
+
+###############################################################################
 @pytest.mark.asyncio
 async def test_model_budget_exhaustion_has_a_distinct_terminal_reason() -> None:
     provider = FakeProvider([_route_call()])
