@@ -760,6 +760,21 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     @staticmethod
     def _assistant_and_tool_messages(result: LLMResult) -> list[dict[str, Any]]:
+        raw_output = result.raw.get("output") if isinstance(result.raw, dict) else None
+        if isinstance(raw_output, list):
+            protocol_items = [
+                item
+                for item in raw_output
+                if isinstance(item, dict)
+                and str(item.get("type") or "")
+                in {"message", "reasoning", "function_call"}
+            ]
+            if protocol_items:
+                # Responses-compatible providers require the returned
+                # reasoning/function-call items to remain in the next input.
+                # Keep them opaque to the native state and let the provider
+                # adapter normalize them for its protocol.
+                return protocol_items
         return [
             {
                 "role": "assistant",
