@@ -97,6 +97,7 @@ def build_native_context_messages(
     map_memory: dict[str, Any],
     conversation_summary: dict[str, Any] | None,
     relevant_tool_outcomes: list[dict[str, Any]],
+    recent_observations: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Build the model-visible projection from the hydrated native state."""
 
@@ -106,6 +107,7 @@ def build_native_context_messages(
         "map_memory": map_memory,
         "conversation_summary": conversation_summary,
         "relevant_tool_outcomes": relevant_tool_outcomes,
+        "recent_observations": list(recent_observations or []),
     }
     return [
         {"role": "system", "content": build_native_agent_system_prompt()},

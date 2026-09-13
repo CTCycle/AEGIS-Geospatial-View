@@ -340,7 +340,10 @@ class AgentLoop:
         tools: list[LLMToolDefinition],
     ) -> LLMResult:
         working = self._working_state_message(request.state, request.max_tool_result_chars)
-        model_messages = [*messages, {"role": "system", "content": working}]
+        model_messages = [
+            *self._model_context_messages(request, messages),
+            {"role": "system", "content": working},
+        ]
         return await self._model_call(
             request,
             provider,
@@ -348,6 +351,53 @@ class AgentLoop:
             tools,
             tool_choice="auto" if tools else "none",
         )
+
+    # -------------------------------------------------------------------------
+    def _model_context_messages(
+        self,
+        request: AgentLoopRequest,
+        messages: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Rebuild semantic context while retaining provider protocol state."""
+
+        state = request.state
+        if not state.context_hydrated:
+            return list(messages)
+        observations = [
+            ModelObservation.from_tool_result(
+                result,
+                max_chars=min(request.max_tool_result_chars, 2048),
+            ).model_dump(mode="json", exclude_none=True)
+            for result in state.tool_results[-8:]
+        ]
+        context = build_native_context_messages(
+            current_user_message=state.user_message,
+            recent_messages=state.recent_messages,
+            active_instructions=state.active_instructions,
+            task_state=state.task_state,
+            map_memory=state.map_memory,
+            conversation_summary=state.conversation_summary,
+            relevant_tool_outcomes=state.relevant_tool_outcomes,
+            recent_observations=observations,
+        )
+        return [*context, *self._protocol_messages(messages)]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _protocol_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            message
+            for message in messages
+            if (
+                str(message.get("type") or "")
+                in {"message", "reasoning", "function_call", "function_call_output"}
+                or (
+                    message.get("role") == "assistant"
+                    and message.get("tool_calls")
+                )
+                or message.get("role") == "tool"
+            )
+        ]
 
     # -------------------------------------------------------------------------
     async def _model_call(

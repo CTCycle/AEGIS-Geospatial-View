@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
+from server.domain.agent.context import AgentContextPackage
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentPhase, AgentState, CapabilityRoute
 from server.domain.agent.reliability import AgentExecutionBudget
@@ -317,6 +318,76 @@ async def test_successful_tool_is_followed_by_one_final_model_step() -> None:
     assistant_message = provider.requests[2]["request"].messages[1]
     assert assistant_message["tool_calls"][0]["name"] == "test_tool"
     assert assistant_message["tool_calls"][0]["arguments"] == {}
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_hydrated_context_is_rebuilt_with_the_latest_observation() -> None:
+    provider = FakeProvider(
+        [
+            LLMResult(
+                content="",
+                tool_calls=[
+                    LLMToolCall(
+                        id="route-1",
+                        name="route_request",
+                        arguments={
+                            "primary_domain": "data_retrieval",
+                            "task_mode": "answer",
+                            "presentation": "text",
+                            "requires_location": False,
+                            "capability_queries": ["hospitals"],
+                        },
+                    )
+                ],
+            ),
+            LLMResult(
+                content="",
+                tool_calls=[
+                    LLMToolCall(id="call-1", name="test_tool", arguments={})
+                ],
+            ),
+            LLMResult(content="The tool result is complete."),
+        ]
+    )
+    state = _state()
+    state.context_hydrated = True
+    state.recent_messages = [
+        {"role": "assistant", "content": "Earlier context."}
+    ]
+    state.task_state = {"task": "find hospitals"}
+    package = AgentContextPackage(
+        current_user_message=state.user_message,
+        recent_messages=state.recent_messages,
+        task_state=state.task_state,
+    )
+    state.active_instructions = [
+        {"directive_id": "d1", "normalized_text": "Use verified sources."}
+    ]
+    state.conversation_summary = {"turn_facts": [{"content": "Lugano"}]}
+
+    outcome = await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            messages=package.recent_messages,
+        )
+    )
+
+    assert outcome.stopped_reason == "goal_satisfied"
+    latest_request = provider.requests[2]["request"]
+    canonical_context = next(
+        message["content"]
+        for message in latest_request.messages
+        if "CANONICAL_NATIVE_CONTEXT" in message.get("content", "")
+    )
+    assert "tool completed" in canonical_context
+    assert any(
+        message.get("content") == "Earlier context."
+        for message in latest_request.messages
+    )
 
 
 ###############################################################################
