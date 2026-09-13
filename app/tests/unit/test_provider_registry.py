@@ -270,8 +270,20 @@ def test_provider_registry_does_not_retry_after_deadline_expires() -> None:
         pass
     else:
         raise AssertionError("Slow provider unexpectedly succeeded.")
-
     assert provider.calls == 1
+
+###############################################################################
+def test_provider_registry_preserves_provider_specific_timeout_floor() -> None:
+    registry = ProviderRegistry(
+        providers=[_TimeoutProvider()],
+        execution_policy=ProviderExecutionPolicy(
+            timeout_seconds=0.01,
+            provider_timeout_seconds={"slow": 0.05},
+        ),
+    )
+
+    assert registry._timeout_seconds("slow") == 0.05  # pyright: ignore[reportPrivateUsage]
+    assert registry._timeout_seconds("other") == 0.01  # pyright: ignore[reportPrivateUsage]
 
 ###############################################################################
 def test_provider_registry_retries_bounded_rate_limit_after_retry_after() -> None:

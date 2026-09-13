@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from server.repositories.credential_material import (
     CredentialEncryptionMaterialRepository,
 )
 from server.repositories.credentials import CredentialRepository
 from server.repositories.database.sqlite import SQLiteRepository
+from server.domain.geospatial.providers import ProviderExecutionPolicy
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.api_service import GeospatialApiService
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -31,7 +33,58 @@ class GeospatialRuntime:
     crypto_service: CredentialEncryptionService
 
 ###############################################################################
-def build_geospatial_runtime(database: SQLiteRepository) -> GeospatialRuntime:
+def build_provider_execution_policy(
+    settings: Any | None = None,
+) -> ProviderExecutionPolicy:
+    """Build the sole provider transport policy from application settings."""
+
+    agent_settings = getattr(settings, "agent_execution", None)
+    source_timeout_names = {
+        "nominatim": "nominatim",
+        "openmeteo": "openmeteo",
+        "overpass": "overpass",
+        "rainviewer": "rainviewer",
+    }
+    provider_timeouts: dict[str, float] = {}
+    for provider_id, settings_name in source_timeout_names.items():
+        source_settings = getattr(settings, settings_name, None)
+        timeout = getattr(source_settings, "timeout", None)
+        if isinstance(timeout, (int, float)) and timeout > 0:
+            provider_timeouts[provider_id] = float(timeout)
+    gibs_settings = getattr(settings, "gibs", None)
+    gibs_timeouts = [
+        getattr(gibs_settings, "timeout", None),
+        getattr(gibs_settings, "layer_sync_timeout", None),
+    ]
+    valid_gibs_timeouts = [
+        float(value)
+        for value in gibs_timeouts
+        if isinstance(value, (int, float)) and value > 0
+    ]
+    if valid_gibs_timeouts:
+        provider_timeouts["gibs"] = max(valid_gibs_timeouts)
+
+    return ProviderExecutionPolicy(
+        timeout_seconds=float(
+            getattr(agent_settings, "provider_request_seconds", 10.0)
+        ),
+        provider_timeout_seconds=provider_timeouts,
+        max_attempts=int(getattr(agent_settings, "provider_max_attempts", 2)),
+        retry_backoff_base_seconds=float(
+            getattr(agent_settings, "retry_backoff_base_seconds", 0.25)
+        ),
+        retry_backoff_max_seconds=float(
+            getattr(agent_settings, "retry_backoff_max_seconds", 2.0)
+        ),
+    )
+
+
+###############################################################################
+def build_geospatial_runtime(
+    database: SQLiteRepository,
+    *,
+    settings: Any | None = None,
+) -> GeospatialRuntime:
     manifest_loader = GeospatialManifestLoader()
     catalog_snapshot = GeospatialManifestSnapshot.from_payload(
         manifest_loader.load_all()
@@ -57,6 +110,7 @@ def build_geospatial_runtime(database: SQLiteRepository) -> GeospatialRuntime:
     provider_registry = ProviderRegistry(
         catalog_snapshot=catalog_snapshot,
         credential_resolver=credential_resolver,
+        execution_policy=build_provider_execution_policy(settings),
     )
     api_service = GeospatialApiService(
         catalog_service=catalog_service,
