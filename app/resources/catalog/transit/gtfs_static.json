@@ -65,6 +65,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": false,
+    "domains": ["data_retrieval", "map_rendering"],
     "plannerHints": [
       "transit",
       "bus stop",

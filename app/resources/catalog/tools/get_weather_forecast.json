@@ -84,6 +84,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": false,
+    "domains": ["data_retrieval", "spatial_analysis"],
     "plannerHints": [
       "weather",
       "forecast",
