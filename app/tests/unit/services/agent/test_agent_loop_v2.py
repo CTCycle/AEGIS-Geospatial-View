@@ -378,6 +378,31 @@ def test_working_state_remains_valid_json_when_compacted() -> None:
 
 
 ###############################################################################
+def test_responses_protocol_items_are_retained_for_the_next_model_turn() -> None:
+    result = LLMResult(
+        content="",
+        raw={
+            "output": [
+                {"type": "reasoning", "id": "reasoning-1"},
+                {
+                    "type": "function_call",
+                    "call_id": "call-1",
+                    "name": "test_tool",
+                    "arguments": "{}",
+                },
+            ]
+        },
+        tool_calls=[LLMToolCall(id="call-1", name="test_tool", arguments={})],
+    )
+
+    messages = AgentLoop._assistant_and_tool_messages(  # pyright: ignore[reportPrivateUsage]
+        result
+    )
+
+    assert [item["type"] for item in messages] == ["reasoning", "function_call"]
+
+
+###############################################################################
 @pytest.mark.asyncio
 async def test_successful_duplicate_call_replays_without_external_tool_execution() -> None:
     provider = FakeProvider(
