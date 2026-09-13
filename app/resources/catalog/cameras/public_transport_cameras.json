@@ -40,6 +40,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": false,
+    "domains": ["place_search", "data_retrieval"],
     "plannerHints": ["transit camera", "station camera", "public transport"],
     "requiredUserAction": ["transit_monitoring", "travel_condition"],
     "avoidWhen": ["general chat", "no geographic context", "source not configured"]

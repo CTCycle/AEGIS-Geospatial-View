@@ -40,6 +40,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": false,
+    "domains": ["place_search", "data_retrieval"],
     "plannerHints": ["tourism webcam", "destination view", "live view"],
     "requiredUserAction": ["visual_status", "tourism"],
     "avoidWhen": ["general chat", "no geographic context", "source not configured"]
