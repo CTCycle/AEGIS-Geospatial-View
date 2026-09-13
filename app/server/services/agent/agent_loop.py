@@ -16,7 +16,10 @@ from server.domain.agent.capability_route import (
     NativeGoalContract,
 )
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.reliability import AgentExecutionBudget
+from server.domain.agent.reliability import (
+    AgentExecutionBudget,
+    ExecutionBudgetExceeded,
+)
 from server.domain.agent.tool_result import (
     ModelObservation,
     ToolExecutionError,
@@ -87,7 +90,9 @@ class AgentLoopOutcome:
         "insufficient_evidence",
         "provider_error",
         "context_limit",
+        "model_budget_exhausted",
         "tool_budget_exhausted",
+        "transition_budget_exhausted",
         "run_deadline_exhausted",
         "no_progress",
         "cancelled",
@@ -141,8 +146,13 @@ class AgentLoop:
         provider = self.provider_factory.get_provider(request.provider)
         messages = self._initial_messages(request)
         final_text = ""
+        request.budget.configure_limits(
+            max_model_calls=request.max_model_calls,
+            max_tool_calls=request.max_tool_calls,
+            max_state_transitions=request.max_state_transitions,
+        )
         try:
-            self._transition(state, AgentPhase.ROUTE_REQUEST)
+            self._transition(state, AgentPhase.ROUTE_REQUEST, request.budget)
             route_result = await self._route(request, provider, messages)
             if route_result[0] is not None:
                 final_text, reason = route_result[0], route_result[1]
@@ -162,7 +172,7 @@ class AgentLoop:
             for iteration in range(max(1, request.max_iterations)):
                 if state.model_calls >= request.max_model_calls:
                     return self._budget_outcome(state, request, "model_budget_exhausted")
-                self._transition(state, AgentPhase.BUILD_TOOL_CONTEXT)
+                self._transition(state, AgentPhase.BUILD_TOOL_CONTEXT, request.budget)
                 tools = self.tool_registry.expose(state)
                 if not tools and route.task_mode == "execute" and not state.tool_results:
                     return self._failed(
@@ -171,7 +181,7 @@ class AgentLoop:
                         "No actionable tool is available for this route.",
                         category="model_capability",
                     )
-                self._transition(state, AgentPhase.MODEL_STEP)
+                self._transition(state, AgentPhase.MODEL_STEP, request.budget)
                 result = await self._model_step(
                     request,
                     provider,
@@ -192,8 +202,8 @@ class AgentLoop:
                             max_chars=request.max_tool_result_chars,
                         )
                     )
-                    self._transition(state, AgentPhase.UPDATE_STATE)
-                    self._transition(state, AgentPhase.EVALUATE_STOP)
+                    self._transition(state, AgentPhase.UPDATE_STATE, request.budget)
+                    self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
                     stop = self._evaluate_stop(
                         state,
                         route,
@@ -208,7 +218,7 @@ class AgentLoop:
                     continue
 
                 final_text = result.content.strip()
-                self._transition(state, AgentPhase.EVALUATE_STOP)
+                self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
                 stop = self._evaluate_text_stop(
                     state,
                     route,
@@ -225,6 +235,8 @@ class AgentLoop:
         except asyncio.CancelledError:
             state.termination_reason = "cancelled"
             return self._outcome(state, final_text, "cancelled", request)
+        except ExecutionBudgetExceeded as exc:
+            return self._budget_outcome(state, request, exc.reason)
         except TimeoutError:
             state.termination_reason = "run_deadline_exhausted"
             return self._outcome(state, final_text, "run_deadline_exhausted", request)
@@ -374,8 +386,8 @@ class AgentLoop:
                 remaining,
                 max(0.01, request.max_model_call_seconds),
             )
-            request.state.model_calls += 1
             request.budget.record_model_call()
+            request.state.model_calls += 1
             try:
                 return await asyncio.wait_for(
                     provider.achat(
@@ -404,15 +416,7 @@ class AgentLoop:
     ) -> list[ToolResult]:
         remaining_tool_calls = request.max_tool_calls - state.tool_calls
         if remaining_tool_calls <= 0:
-            return [
-                self._failure_result(
-                    call,
-                    "tool_budget_exhausted",
-                    "The configured tool-call limit was reached.",
-                    recovery="replan",
-                )
-                for call in calls
-            ]
+            raise ExecutionBudgetExceeded("tool_budget_exhausted", "tool_call")
         bounded_calls = calls[: min(request.max_parallel_tool_calls, remaining_tool_calls)]
         semaphore = asyncio.Semaphore(max(1, request.max_parallel_tool_calls))
 
@@ -434,13 +438,13 @@ class AgentLoop:
             async with semaphore:
                 if call.name == "discover_geospatial_capabilities":
                     state.discovery_attempts += 1
-                self._transition(state, AgentPhase.VALIDATE_ACTION)
+                self._transition(state, AgentPhase.VALIDATE_ACTION, request.budget)
                 result = await self.tool_executor.execute_tool(
                     call,
                     state,
                     request.budget,
                 )
-                self._transition(state, AgentPhase.NORMALIZE_RESULT)
+                self._transition(state, AgentPhase.NORMALIZE_RESULT, request.budget)
                 return result
 
         if any(call.name == "apply_map_plan" for call in bounded_calls):
@@ -594,12 +598,21 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _transition(state: AgentState, phase: AgentPhase) -> None:
+    def _transition(
+        state: AgentState,
+        phase: AgentPhase,
+        budget: AgentExecutionBudget | None = None,
+        *,
+        count: bool = True,
+    ) -> None:
         previous = state.phase.value
         if state.phase is phase:
             return
+        if count and budget is not None:
+            budget.record_transition()
         state.phase = phase
-        state.transitions += 1
+        if count:
+            state.transitions += 1
         state.transition_trace.append({"from": previous, "to": phase.value})
 
     # -------------------------------------------------------------------------
@@ -828,7 +841,12 @@ class AgentLoop:
             if reason in {"failed", "provider_error", "run_deadline_exhausted"}
             else AgentPhase.FINALIZE
         )
-        self._transition(state, target_phase)
+        try:
+            self._transition(state, target_phase, request.budget)
+        except ExecutionBudgetExceeded:
+            # The terminal record itself must remain writable when the last
+            # permitted transition was consumed by the failed operation.
+            self._transition(state, target_phase, count=False)
         return AgentLoopOutcome(
             final_text=final_text,
             state=state,
@@ -847,7 +865,10 @@ class AgentLoop:
         category: str,
     ) -> AgentLoopOutcome:
         state.termination_reason = "failed"
-        self._transition(state, AgentPhase.FAILED)
+        try:
+            self._transition(state, AgentPhase.FAILED, request.budget)
+        except ExecutionBudgetExceeded:
+            self._transition(state, AgentPhase.FAILED, count=False)
         return AgentLoopOutcome(
             final_text=detail,
             state=state,
@@ -865,17 +886,14 @@ class AgentLoop:
         request: AgentLoopRequest,
         reason: str,
     ) -> AgentLoopOutcome:
-        stable_reason = (
-            "tool_budget_exhausted"
-            if reason == "model_budget_exhausted"
-            else reason
-        )
-        state.termination_reason = stable_reason
-        self._transition(state, AgentPhase.FAILED)
+        state.termination_reason = reason
+        request.budget.terminal_reason = reason
+        request.budget.stopping_reason = reason
+        self._transition(state, AgentPhase.FAILED, count=False)
         return AgentLoopOutcome(
             final_text="The agent reached its configured execution limit.",
             state=state,
-            stopped_reason=stable_reason,  # type: ignore[arg-type]
+            stopped_reason=reason,  # type: ignore[arg-type]
             model_calls=state.model_calls,
             tool_results=list(state.tool_results),
             failure_category="context_limit" if reason == "no_progress" else None,

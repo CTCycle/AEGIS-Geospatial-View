@@ -11,6 +11,7 @@ from pydantic import BaseModel, ValidationError
 
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentState
+from server.domain.agent.reliability import ExecutionBudgetExceeded
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -48,6 +49,10 @@ class ToolExecutor:
         # Count every model-issued attempt, including malformed and rejected
         # calls.  The loop budget is an attempt budget, not only a successful
         # provider-execution budget.
+        budget.ensure_available("tool_call")
+        record_tool_call = getattr(budget, "record_tool_call", None)
+        if callable(record_tool_call):
+            record_tool_call()
         state.tool_calls += 1
         if tool_call.parse_error is not None or tool_call.arguments is None:
             return self._failure(
@@ -142,10 +147,10 @@ class ToolExecutor:
                 ),
             )
 
+        budget.ensure_available("tool_execution")
+        remaining = float(budget.remaining_seconds())
+        timeout = min(self.timeout_seconds, max(0.01, remaining))
         try:
-            budget.ensure_available("tool_execution")
-            remaining = float(budget.remaining_seconds())
-            timeout = min(self.timeout_seconds, max(0.01, remaining))
             raw_result = await asyncio.wait_for(
                 registered.handler(arguments, state), timeout=timeout
             )
@@ -163,6 +168,8 @@ class ToolExecutor:
                     timeout_origin="tool_executor",
                 ),
             )
+        except ExecutionBudgetExceeded:
+            raise
         except Exception:
             # Provider-specific failures are normalized by the capability
             # handler.  The outer boundary never exposes exception details.

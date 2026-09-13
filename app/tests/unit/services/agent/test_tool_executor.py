@@ -8,7 +8,10 @@ from pydantic import BaseModel, ConfigDict
 
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentPhase, AgentState
-from server.domain.agent.reliability import AgentExecutionBudget
+from server.domain.agent.reliability import (
+    AgentExecutionBudget,
+    ExecutionBudgetExceeded,
+)
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMToolCall, LLMToolDefinition
@@ -132,6 +135,38 @@ def test_malformed_call_never_reaches_the_handler() -> None:
     assert result.error is not None
     assert result.error.error_type == "malformed_call"
     assert calls == []
+
+
+###############################################################################
+def test_tool_budget_is_enforced_by_the_execution_boundary() -> None:
+    async def handler(_arguments: _Input, _state: AgentState) -> dict[str, Any]:
+        return {"ok": True}
+
+    registry = ToolRegistry(runtime_registry=cast(Any, None))
+    registry.register(_tool(handler))
+    budget = _budget()
+    budget.configure_limits(max_tool_calls=1)
+    executor = ToolExecutor(tool_registry=registry)
+
+    first = asyncio.run(
+        executor.execute_tool(
+            LLMToolCall(id="first", name="test_tool", arguments={"value": 1}),
+            _state(),
+            budget,
+        )
+    )
+
+    assert first.status == "success"
+    with pytest.raises(ExecutionBudgetExceeded) as error:
+        asyncio.run(
+            executor.execute_tool(
+                LLMToolCall(id="second", name="test_tool", arguments={"value": 2}),
+                _state(),
+                budget,
+            )
+        )
+    assert error.value.reason == "tool_budget_exhausted"
+    assert budget.tool_calls == 1
 
 
 ###############################################################################
