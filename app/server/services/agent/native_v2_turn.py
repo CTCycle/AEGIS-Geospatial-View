@@ -189,14 +189,18 @@ def _operation(
     if outcome.failure_category is not None or outcome.stopped_reason in {
         "failed",
         "insufficient_evidence",
+        "model_budget_exhausted",
         "tool_budget_exhausted",
+        "transition_budget_exhausted",
         "run_deadline_exhausted",
     }:
         return ChatOperationResult(
             kind="error",
             status="failed",
             message=message,
-            failure_category=_response_failure_category(outcome.failure_category),
+            failure_category=_response_failure_category(
+                outcome.failure_category or outcome.stopped_reason
+            ),
         )
     return ChatOperationResult(
         kind="direct_answer",
@@ -241,8 +245,11 @@ def _response_failure_category(value: str | None) -> str | None:
         "schema_definition",
         "response_parsing",
         "context_limit",
+        "model_budget_exhausted",
+        "tool_budget_exhausted",
+        "transition_budget_exhausted",
     }:
-        return value
+        return "context_limit" if value.endswith("_budget_exhausted") else value
     return None
 
 

@@ -186,6 +186,45 @@ async def test_loop_routes_exposes_tools_and_finishes_from_final_model_text() ->
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_model_budget_exhaustion_has_a_distinct_terminal_reason() -> None:
+    provider = FakeProvider([_route_call()])
+    outcome = await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            max_model_calls=1,
+        )
+    )
+
+    assert outcome.stopped_reason == "model_budget_exhausted"
+    assert outcome.state.termination_reason == "model_budget_exhausted"
+    assert outcome.state.model_calls == 1
+    assert outcome.state.transitions == 1
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_transition_budget_exhaustion_has_a_distinct_terminal_reason() -> None:
+    provider = FakeProvider([_route_call()])
+    outcome = await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            max_state_transitions=1,
+        )
+    )
+
+    assert outcome.stopped_reason == "transition_budget_exhausted"
+    assert outcome.state.termination_reason == "transition_budget_exhausted"
+    assert outcome.state.transitions == 1
+
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_opencode_go_native_calls_use_conversation_session_and_compatible_thinking_mode() -> None:
     provider = FakeProvider([LLMResult(content="ready")])
     loop = _loop(provider)

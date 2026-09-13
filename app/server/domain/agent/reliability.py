@@ -25,6 +25,16 @@ DEFAULT_STAGE_LIMITS: dict[str, float] = {
 }
 
 ###############################################################################
+class ExecutionBudgetExceeded(RuntimeError):
+    """Raised when a bounded run cannot start another counted operation."""
+
+    def __init__(self, reason: str, stage: str) -> None:
+        self.reason = reason
+        self.stage = stage
+        super().__init__(f"The {stage} budget was exhausted.")
+
+
+###############################################################################
 def _new_stage_metadata() -> dict[str, Any]:
     return {}
 
@@ -90,6 +100,10 @@ class AgentExecutionBudget:
     )
     model_calls: int = 0
     tool_calls: int = 0
+    state_transitions: int = 0
+    max_model_calls: int | None = None
+    max_tool_calls: int | None = None
+    max_state_transitions: int | None = None
     retry_count: int = 0
     terminal_reason: str | None = None
     terminal_stage: str | None = None
@@ -135,6 +149,27 @@ class AgentExecutionBudget:
         return max(0.0, self.deadline_monotonic - time.monotonic())
 
     # -------------------------------------------------------------------------
+    def configure_limits(
+        self,
+        *,
+        max_model_calls: int | None = None,
+        max_tool_calls: int | None = None,
+        max_state_transitions: int | None = None,
+    ) -> None:
+        """Attach the run's operation limits to this shared budget object."""
+
+        for name, value in (
+            ("max_model_calls", max_model_calls),
+            ("max_tool_calls", max_tool_calls),
+            ("max_state_transitions", max_state_transitions),
+        ):
+            if value is not None and value < 1:
+                raise ValueError(f"{name} must be positive when configured")
+        self.max_model_calls = max_model_calls
+        self.max_tool_calls = max_tool_calls
+        self.max_state_transitions = max_state_transitions
+
+    # -------------------------------------------------------------------------
     def stage_deadline(
         self, stage: str, *, requested_seconds: float | None = None
     ) -> float:
@@ -154,11 +189,46 @@ class AgentExecutionBudget:
 
     # -------------------------------------------------------------------------
     def record_model_call(self) -> None:
+        self._ensure_counter_available(
+            current=self.model_calls,
+            limit=self.max_model_calls,
+            reason="model_budget_exhausted",
+            stage="model_call",
+        )
         self.model_calls += 1
 
     # -------------------------------------------------------------------------
     def record_tool_call(self) -> None:
+        self._ensure_counter_available(
+            current=self.tool_calls,
+            limit=self.max_tool_calls,
+            reason="tool_budget_exhausted",
+            stage="tool_call",
+        )
         self.tool_calls += 1
+
+    # -------------------------------------------------------------------------
+    def record_transition(self) -> None:
+        self._ensure_counter_available(
+            current=self.state_transitions,
+            limit=self.max_state_transitions,
+            reason="transition_budget_exhausted",
+            stage="state_transition",
+        )
+        self.state_transitions += 1
+
+    # -------------------------------------------------------------------------
+    def _ensure_counter_available(
+        self,
+        *,
+        current: int,
+        limit: int | None,
+        reason: str,
+        stage: str,
+    ) -> None:
+        if limit is not None and current >= limit:
+            self.terminal_reason = reason
+            raise ExecutionBudgetExceeded(reason, stage)
 
     # -------------------------------------------------------------------------
     def record_retry(self) -> None:
@@ -267,6 +337,10 @@ class AgentExecutionBudget:
             "remaining_ms": max(0, int(self.remaining_seconds() * 1000)),
             "model_calls": self.model_calls,
             "tool_calls": self.tool_calls,
+            "state_transitions": self.state_transitions,
+            "max_model_calls": self.max_model_calls,
+            "max_tool_calls": self.max_tool_calls,
+            "max_state_transitions": self.max_state_transitions,
             "retry_count": self.retry_count,
             "terminal_reason": self.terminal_reason,
             "terminal_stage": self.terminal_stage,
