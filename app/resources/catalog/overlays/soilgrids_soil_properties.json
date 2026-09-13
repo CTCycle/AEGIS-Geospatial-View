@@ -57,6 +57,7 @@
   "agenticUse": {
     "defaultEnabled": true,
     "manualToggle": true,
+    "domains": ["data_retrieval", "spatial_analysis"],
     "plannerHints": ["soil", "soil properties", "soilgrids", "soil ph", "clay", "sand", "silt", "organic carbon", "nitrogen", "bulk density", "soil water content"],
     "requiredUserAction": [],
     "avoidWhen": ["general chat", "no geographic context", "parcel-scale measurement requested"]

@@ -98,6 +98,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
+    "domains": ["data_retrieval", "spatial_analysis"],
     "plannerHints": [
       "elevation",
       "altitude",

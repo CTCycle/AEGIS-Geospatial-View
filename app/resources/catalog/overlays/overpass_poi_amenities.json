@@ -114,6 +114,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
+    "domains": ["place_search", "data_retrieval"],
     "plannerHints": [
       "poi search",
       "amenity lookup",
