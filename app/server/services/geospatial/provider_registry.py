@@ -225,9 +225,7 @@ class ProviderRegistry:
         provider = self.get(normalized)
         self._ensure_circuit_closed(normalized)
         await self._wait_for_rate_limit(normalized)
-        deadline = monotonic() + max(
-            0.01, float(self.execution_policy.timeout_seconds)
-        )
+        deadline = monotonic() + self._timeout_seconds(normalized)
         # Provider transport is the only retry owner below the tool boundary.
         # Keep the external attempt count bounded even if a stale configuration
         # requests a larger value.
@@ -363,9 +361,7 @@ class ProviderRegistry:
             )
         self._ensure_circuit_closed(normalized)
         await self._wait_for_rate_limit(normalized)
-        remaining = max(
-            0.01, float(self.execution_policy.timeout_seconds)
-        )
+        remaining = self._timeout_seconds(normalized)
         try:
             with request_timeout_scope(remaining):
                 return await asyncio.wait_for(
@@ -395,9 +391,7 @@ class ProviderRegistry:
             )
         self._ensure_circuit_closed(normalized)
         await self._wait_for_rate_limit(normalized)
-        remaining = max(
-            0.01, float(self.execution_policy.timeout_seconds)
-        )
+        remaining = self._timeout_seconds(normalized)
         try:
             with request_timeout_scope(remaining):
                 return await asyncio.wait_for(
@@ -420,6 +414,19 @@ class ProviderRegistry:
             if isinstance(response, ProviderResponse):
                 return response
         return await provider.fetch(request)
+
+    # -------------------------------------------------------------------------
+    def _timeout_seconds(self, provider_id: str) -> float:
+        """Resolve one transport deadline from the canonical runtime policy."""
+
+        provider_timeout = self.execution_policy.provider_timeout_seconds.get(
+            provider_id
+        )
+        return max(
+            0.01,
+            float(self.execution_policy.timeout_seconds),
+            float(provider_timeout or 0.0),
+        )
 
     # -------------------------------------------------------------------------
     def _provider_for_manifest(
