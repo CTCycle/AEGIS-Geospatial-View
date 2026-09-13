@@ -1,25 +1,27 @@
 # Agentic Search
 
-Last updated: 2026-09-10
+Last updated: 2026-09-14
 
 ## Summary
 
-The chat workflow supports a temporary legacy-to-native rollout:
+The chat workflow is being consolidated into the native iterative harness. The
+native implementation is now the configured default, and the shadow-preview
+implementation has been removed. Legacy execution remains only as temporary
+code until the native goal/state/tool contracts cover its remaining semantics.
 
-1. `legacy` keeps the existing parser, deterministic recovery/planning path, and
-   compatibility response projections.
-2. `shadow` computes native route/tool exposure from the legacy interpretation
-   without model, provider, evidence, or map execution.
-3. `native_v2` assembles context once, starts with the model-owned
+1. `native_v2` assembles context once, starts with the model-owned
    `route_request` tool, validates the route and progressively constrained
    registry exposure, then runs the bounded native state machine.
-4. The native loop executes through one typed validation/execution boundary;
+2. The native loop executes through one typed validation/execution boundary;
    normalized results are persisted as bounded conversation-scoped evidence and
    model messages receive references and summaries, never raw datasets.
-5. The typed response builder emits one operation, route, tool summaries, trace,
+3. The typed response builder emits one operation, route, tool summaries, trace,
    and optional map candidate. Direct native map responses are
    `prepared_unverified`; realtime candidates remain pending until matching
    browser `map.render_ack` evidence.
+
+The remaining migration work and exact deletion order are tracked in
+`assets/docs/geospatial/native_harness_bootstrap.md`.
 
 Location resolution is hierarchical and deterministic where evidence permits:
 coordinates take precedence, followed by address/POI/street, district or
