@@ -94,7 +94,7 @@ class AgentExecutionSettings:
     retry_backoff_base_seconds: float = 0.25
     retry_backoff_max_seconds: float = 2.0
     provider_request_seconds: float = 10.0
-    agent_loop_mode: Literal["legacy", "shadow", "native_v2"] = "legacy"
+    agent_loop_mode: Literal["legacy", "shadow", "native_v2"] = "native_v2"
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -235,7 +235,7 @@ class JsonAgentExecutionSettings(StrictJsonSettings):
     retry_backoff_base_seconds: float = Field(default=0.25, ge=0.0, le=60.0)
     retry_backoff_max_seconds: float = Field(default=2.0, ge=0.0, le=120.0)
     provider_request_seconds: float = Field(default=10.0, ge=0.1, le=120.0)
-    agent_loop_mode: Literal["legacy", "shadow", "native_v2"] = "legacy"
+    agent_loop_mode: Literal["legacy", "shadow", "native_v2"] = "native_v2"
 
 ###############################################################################
 class JsonOpenMeteoSettings(StrictJsonSettings):
