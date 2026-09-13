@@ -411,6 +411,55 @@ def test_shutdown_cancels_in_flight_tasks_and_clears_task_registry(
 
     run_async_in_thread(_run())
 
+
+###############################################################################
+def test_cancel_run_cancels_the_matching_in_flight_task(run_repositories) -> None:
+    class _BlockingOrchestrator:
+
+        # ---------------------------------------------------------------------
+        def __init__(self) -> None:
+            self.started = asyncio.Event()
+            self.cancelled = False
+            self.release = asyncio.Event()
+
+        # ---------------------------------------------------------------------
+        async def execute_run(self, _run_id: str) -> None:
+            self.started.set()
+            try:
+                await self.release.wait()
+            except asyncio.CancelledError:
+                self.cancelled = True
+                raise
+
+    async def _run() -> None:
+        publisher = RunEventPublisher(run_repositories["events"])
+        orchestrator = _BlockingOrchestrator()
+        lifecycle = RunLifecycleService(
+            conversation_repository=run_repositories["conversations"],
+            run_repository=run_repositories["runs"],
+            aggregation_service=AggregatedRequestService(),
+            event_publisher=publisher,
+            run_orchestrator=orchestrator,  # type: ignore[arg-type]
+        )
+        conversation = lifecycle.create_conversation(title="Cancel in flight")
+        run = await lifecycle.create_run(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Wait for provider"),
+        )
+        await orchestrator.started.wait()
+
+        response = await lifecycle.cancel_run(
+            conversation.conversation_id,
+            run.run_id,
+        )
+        await asyncio.sleep(0)
+
+        assert response.state == "cancelled"
+        assert orchestrator.cancelled is True
+        await lifecycle.shutdown()
+
+    run_async_in_thread(_run())
+
 ###############################################################################
 def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
     run_repositories,
