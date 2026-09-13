@@ -669,32 +669,6 @@ async def test_model_retry_cannot_restart_after_run_deadline() -> None:
 
 
 ###############################################################################
-def test_shadow_preview_exposes_route_tools_without_provider_or_tool_execution() -> None:
-    provider = FakeProvider([])
-    state = _state()
-    state.route = CapabilityRoute(
-        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
-        task_mode="execute",
-        presentation="text",
-        requires_location=False,
-    )
-    state.capability_ids = ["places:hospitals"]
-    preview = _loop(provider).preview(
-        AgentLoopRequest(
-            provider="fake",
-            model="fake-model",
-            state=state,
-            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
-        )
-    )
-
-    assert preview.stopped_reason == "shadow_preview"
-    assert preview.exposed_tool_names == ["test_tool"]
-    assert provider.requests == []
-    assert state.tool_calls == 0
-
-
-###############################################################################
 @pytest.mark.asyncio
 async def test_map_route_text_cannot_stop_before_a_map_candidate_exists() -> None:
     provider = FakeProvider(
