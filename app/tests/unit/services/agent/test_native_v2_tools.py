@@ -11,6 +11,7 @@ from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.services.agent.capability_execution import ToolExecutionContext
 from server.services.agent.native_v2_tools import register_native_v2_tools
 from server.services.agent.native_v2_tools import _execute_capability_handler
+from server.services.agent.native_v2_tools import _location_for_request
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.agent.tool_registry import ToolRegistry
@@ -250,3 +251,29 @@ def test_policy_authorizes_typed_capability_calls_once_against_route_and_runtime
     assert allowed.allowed is True
     assert rejected.allowed is False
     assert rejected.metadata["code"] == "capability_not_shortlisted"
+
+
+###############################################################################
+def test_location_reference_never_falls_back_to_another_resolved_location() -> None:
+    state = _state()
+    state.location_refs = {
+        "rome": ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5),
+        "zurich": ResolvedLocation(
+            label="Zurich", latitude=47.3769, longitude=8.5417
+        ),
+    }
+
+    missing = ExecuteCapabilityInput(
+        capability_id="places:hospitals",
+        location_ref="lugano",
+    )
+    explicit = ExecuteCapabilityInput(
+        capability_id="places:hospitals",
+        location_ref="zurich",
+    )
+
+    assert _location_for_request(missing, state) is None
+    assert _location_for_request(explicit, state) == state.location_refs["zurich"]
+    assert _location_for_request(
+        ExecuteCapabilityInput(capability_id="places:hospitals"), state
+    ) is None
