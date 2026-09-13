@@ -124,6 +124,7 @@ def build_chat_runtime(
         provider_registry=geospatial_runtime.provider_registry,
         evidence_repository=evidence_repository,
         location_resolver=location_resolver,
+        geospatial_api_service=geospatial_api_service,
     )
     agent_loop = AgentLoop(
         provider_factory=llm_factory,
