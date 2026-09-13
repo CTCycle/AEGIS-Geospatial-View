@@ -94,6 +94,10 @@ class AgentState(BaseModel):
     conversation_summary: dict[str, object] | None = None
     recent_messages: list[dict[str, object]] = Field(default_factory=list)
     relevant_tool_outcomes: list[dict[str, object]] = Field(default_factory=list)
+    policy_constraints: dict[str, object] = Field(default_factory=dict)
+    included_message_ids: list[int] = Field(default_factory=list)
+    omitted_message_ids: list[int] = Field(default_factory=list)
+    summarized_through_turn_index: int = 0
     context_allocation: dict[str, object] = Field(default_factory=dict)
     context_hydrated: bool = False
     route: CapabilityRoute | None = None

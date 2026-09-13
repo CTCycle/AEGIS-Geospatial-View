@@ -380,6 +380,12 @@ class AgentLoop:
             conversation_summary=state.conversation_summary,
             relevant_tool_outcomes=state.relevant_tool_outcomes,
             recent_observations=observations,
+            policy_constraints=state.policy_constraints,
+            context_selection={
+                "included_message_ids": state.included_message_ids,
+                "omitted_message_ids": state.omitted_message_ids,
+                "summarized_through_turn_index": state.summarized_through_turn_index,
+            },
         )
         return [*context, *self._protocol_messages(messages)]
 
@@ -708,6 +714,12 @@ class AgentLoop:
                 map_memory=state.map_memory,
                 conversation_summary=state.conversation_summary,
                 relevant_tool_outcomes=state.relevant_tool_outcomes,
+                policy_constraints=state.policy_constraints,
+                context_selection={
+                    "included_message_ids": state.included_message_ids,
+                    "omitted_message_ids": state.omitted_message_ids,
+                    "summarized_through_turn_index": state.summarized_through_turn_index,
+                },
             )
         return list(request.messages) or [
             {"role": "user", "content": state.user_message}

@@ -52,6 +52,12 @@ class AgentStateFactory:
                 "relevant_tool_outcomes": [
                     dict(item) for item in context_package.relevant_tool_outcomes
                 ],
+                "policy_constraints": dict(context_package.policy_constraints),
+                "included_message_ids": list(context_package.included_message_ids),
+                "omitted_message_ids": list(context_package.omitted_message_ids),
+                "summarized_through_turn_index": (
+                    context_package.summarized_through_turn_index
+                ),
                 "context_allocation": dict(context_package.context_allocation),
                 "context_hydrated": True,
             }

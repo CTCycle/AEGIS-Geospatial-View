@@ -98,6 +98,8 @@ def build_native_context_messages(
     conversation_summary: dict[str, Any] | None,
     relevant_tool_outcomes: list[dict[str, Any]],
     recent_observations: list[dict[str, Any]] | None = None,
+    policy_constraints: dict[str, Any] | None = None,
+    context_selection: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Build the model-visible projection from the hydrated native state."""
 
@@ -108,6 +110,8 @@ def build_native_context_messages(
         "conversation_summary": conversation_summary,
         "relevant_tool_outcomes": relevant_tool_outcomes,
         "recent_observations": list(recent_observations or []),
+        "policy_constraints": dict(policy_constraints or {}),
+        "context_selection": dict(context_selection or {}),
     }
     return [
         {"role": "system", "content": build_native_agent_system_prompt()},
