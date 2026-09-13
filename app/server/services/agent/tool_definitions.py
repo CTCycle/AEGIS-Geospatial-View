@@ -35,6 +35,14 @@ class CapabilityDiscoveryInput(StrictToolInput):
     cursor: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=12, ge=1, le=50)
 
+
+class ProviderLayerDiscoveryInput(StrictToolInput):
+    provider_id: str = Field(min_length=1, max_length=100)
+    query: str | None = Field(default=None, max_length=300)
+    cursor: str | None = Field(default=None, max_length=200)
+    limit: int = Field(default=20, ge=1, le=50)
+    refresh: bool = False
+
 ###############################################################################
 class ExecuteCapabilityInput(StrictToolInput):
     capability_id: str = Field(min_length=1, max_length=200)
@@ -76,6 +84,7 @@ __all__ = [
     "CapabilityDiscoveryInput",
     "ExecuteCapabilityInput",
     "InspectEvidenceInput",
+    "ProviderLayerDiscoveryInput",
     "ResolveLocationInput",
     "RouteRequestInput",
     "TransformEvidenceInput",

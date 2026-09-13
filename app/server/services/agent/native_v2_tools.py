@@ -27,6 +27,7 @@ from server.services.agent.tool_definitions import (
     CapabilityDiscoveryInput,
     ExecuteCapabilityInput,
     InspectEvidenceInput,
+    ProviderLayerDiscoveryInput,
     ResolveLocationInput,
     RouteRequestInput,
     TransformEvidenceInput,
@@ -34,6 +35,7 @@ from server.services.agent.tool_definitions import (
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
 from server.services.agent.tool_handlers.evidence import EvidenceToolHandler
 from server.services.agent.tool_handlers.location import LocationToolHandler
+from server.services.agent.tool_handlers.provider_layers import ProviderLayerToolHandler
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.provider_registry import ProviderRegistry
@@ -59,6 +61,7 @@ def register_native_v2_tools(
     provider_registry: ProviderRegistry,
     evidence_repository: AgentEvidenceRepository,
     location_resolver: LocationResolver,
+    geospatial_api_service: Any,
 ) -> None:
     """Register the permanent model-facing native-v2 tool surface once."""
 
@@ -78,6 +81,10 @@ def register_native_v2_tools(
     )
     evidence = EvidenceToolHandler(repository=evidence_repository)
     location = LocationToolHandler(resolver=location_resolver)
+    provider_layers = ProviderLayerToolHandler(
+        geospatial_api_service=geospatial_api_service,
+        evidence_repository=evidence_repository,
+    )
 
     registrations = (
         _registration(
@@ -114,6 +121,21 @@ def register_native_v2_tools(
             visibility="model",
             prerequisites=frozenset({"route", "capability_shortlist_missing"}),
             idempotent=True,
+        ),
+        _registration(
+            name="discover_geospatial_provider_layers",
+            description=(
+                "Discover bounded provider-native layer metadata for an explicitly "
+                "routed provider when the manifest catalog is insufficient."
+            ),
+            input_model=ProviderLayerDiscoveryInput,
+            handler=provider_layers.discover,
+            domains=frozenset({CapabilityDomain.PROVIDER_DISCOVERY}),
+            phases=_MODEL_PHASE,
+            visibility="model",
+            prerequisites=frozenset({"route", "provider_discovery_route"}),
+            idempotent=True,
+            semantic_validator=_provider_layer_semantic_validator,
         ),
         _registration(
             name="execute_geospatial_capability",
@@ -311,6 +333,19 @@ def _evidence_semantic_validator(
     refs.extend(getattr(request, "evidence_refs", []) or [])
     missing = [str(ref) for ref in refs if str(ref) not in state.evidence_refs]
     return [f"Unknown evidence reference: {ref}." for ref in missing[:8]]
+
+
+###############################################################################
+def _provider_layer_semantic_validator(
+    request: ProviderLayerDiscoveryInput, state: AgentState
+) -> list[str]:
+    allowed = state.policy_constraints.get("allowed_provider_ids")
+    if isinstance(allowed, list) and allowed:
+        normalized = request.provider_id.casefold()
+        permitted = {str(item).casefold() for item in allowed}
+        if normalized not in permitted:
+            return ["provider_id is outside the validated provider allowlist."]
+    return []
 
 
 __all__ = ["register_native_v2_tools"]

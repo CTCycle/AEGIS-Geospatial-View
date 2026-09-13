@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
+from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentState
 from server.domain.agent.tools import (
     RegisteredTool,
@@ -124,6 +125,15 @@ class ToolRegistry:
                 return False
             if prerequisite == "active_map" and state.active_map_session is None:
                 return False
+            if prerequisite == "provider_discovery_route":
+                if state.route is None:
+                    return False
+                route_domains = {
+                    state.route.primary_domain,
+                    *state.route.secondary_domains,
+                }
+                if CapabilityDomain.PROVIDER_DISCOVERY not in route_domains:
+                    return False
         return True
 
     # -------------------------------------------------------------------------

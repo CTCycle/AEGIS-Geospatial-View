@@ -166,9 +166,53 @@ def _project_result_data(
     if data is None:
         return None, False
 
-    # Discovery descriptors and evidence inspection are the two result types
-    # where removing ``data`` would remove the useful observation entirely.
-    # Keep their semantic fields explicit and cap records/contracts before the
+    # Provider-native layer descriptors and catalog discovery are the result
+    # types where removing ``data`` would remove the useful observation
+    # entirely. Keep their semantic fields explicit and cap records/contracts
+    # before the generic bounded projection runs.
+    if tool_name == "discover_geospatial_provider_layers" and isinstance(data, dict):
+        raw_layers = data.get("layers", [])
+        layers = []
+        if isinstance(raw_layers, list):
+            for raw_layer in raw_layers[:20]:
+                if not isinstance(raw_layer, dict):
+                    continue
+                layer = {
+                    key: raw_layer[key]
+                    for key in (
+                        "provider",
+                        "layer_id",
+                        "title",
+                        "abstract",
+                        "rendering_mode",
+                        "source_protocol",
+                        "data_format",
+                        "geometry_type",
+                        "queryable",
+                        "crs",
+                        "formats",
+                        "styles",
+                        "time_extent",
+                        "default_time",
+                    )
+                    if key in raw_layer
+                }
+                layers.append(_bounded_json_value(layer, depth=0, max_depth=3))
+        projected = {
+            "provider": data.get("provider"),
+            "layers": layers,
+            "next_cursor": data.get("next_cursor"),
+            "total": data.get("total"),
+            "warnings": _bounded_json_value(
+                data.get("warnings", []), depth=0, max_depth=2, list_limit=8
+            ),
+            "evidence_ref": data.get("evidence_ref"),
+        }
+        return _fit_projection(projected, max_chars=max_chars, preserve_keys=("layers",))
+
+    # Catalog discovery and evidence inspection are the result types where
+    # removing ``data`` would remove the useful observation entirely. Keep
+    # their semantic fields explicit and cap records/contracts before the
     # generic bounded projection runs.
     if tool_name in {"discover_geospatial_capabilities", "list_geospatial_capabilities"}:
         raw_items = data.get("capabilities", data.get("items", [])) if isinstance(data, dict) else []

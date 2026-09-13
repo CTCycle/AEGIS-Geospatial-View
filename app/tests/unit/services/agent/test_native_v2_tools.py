@@ -8,12 +8,18 @@ from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentPhase, AgentState, CapabilityRoute
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
+from server.contracts.geospatial import (
+    GeospatialProviderLayerDescriptor,
+    GeospatialProviderLayersResponse,
+)
 from server.services.agent.capability_execution import ToolExecutionContext
 from server.services.agent.native_v2_tools import register_native_v2_tools
 from server.services.agent.native_v2_tools import _execute_capability_handler
 from server.services.agent.native_v2_tools import _location_for_request
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_definitions import ExecuteCapabilityInput
+from server.services.agent.tool_definitions import ProviderLayerDiscoveryInput
+from server.services.agent.tool_handlers.provider_layers import ProviderLayerToolHandler
 from server.services.agent.tool_registry import ToolRegistry
 
 
@@ -101,6 +107,7 @@ def _registry() -> ToolRegistry:
         provider_registry=object(),  # type: ignore[arg-type]
         evidence_repository=FakeEvidenceRepository(),  # type: ignore[arg-type]
         location_resolver=FakeResolver(),  # type: ignore[arg-type]
+        geospatial_api_service=object(),  # type: ignore[arg-type]
     )
     return registry
 
@@ -277,3 +284,87 @@ def test_location_reference_never_falls_back_to_another_resolved_location() -> N
     assert _location_for_request(
         ExecuteCapabilityInput(capability_id="places:hospitals"), state
     ) is None
+
+
+###############################################################################
+class _FakeProviderLayerService:
+
+    def __init__(self) -> None:
+        self.limit: int | None = None
+
+    async def list_provider_layers(self, provider_id: str, **kwargs: Any) -> GeospatialProviderLayersResponse:
+        self.limit = int(kwargs["limit"])
+        return GeospatialProviderLayersResponse(
+            provider=provider_id,
+            layers=[
+                GeospatialProviderLayerDescriptor(
+                    provider=provider_id,
+                    layer_id=f"layer-{index}",
+                    title=f"Layer {index}",
+                    rendering_mode="raster",
+                    source_protocol="wms",
+                    data_format="image/png",
+                    geometry_type="raster",
+                )
+                for index in range(3)
+            ],
+        )
+
+
+class _FakeEvidenceStore:
+
+    def __init__(self) -> None:
+        self.payload: Any = None
+
+    def create(self, **kwargs: Any) -> Any:
+        self.payload = kwargs
+        return type("Evidence", (), {"evidence_id": "evidence-provider-layers"})()
+
+
+def test_provider_layer_discovery_is_only_exposed_for_provider_route() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
+        task_mode="execute",
+        presentation="text",
+        requires_location=False,
+        capability_queries=["obscure layer"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+
+    assert {
+        tool.name for tool in registry.expose(state)
+    } == {
+        "discover_geospatial_capabilities",
+        "discover_geospatial_provider_layers",
+    }
+
+
+@pytest.mark.asyncio
+async def test_provider_layer_discovery_uses_bounded_pagination_and_evidence() -> None:
+    provider_service = _FakeProviderLayerService()
+    evidence_store = _FakeEvidenceStore()
+    handler = ProviderLayerToolHandler(
+        geospatial_api_service=provider_service,  # type: ignore[arg-type]
+        evidence_repository=evidence_store,  # type: ignore[arg-type]
+    )
+    state = _state()
+    state.run_id = "run-1"
+
+    result = await handler.discover(
+        ProviderLayerDiscoveryInput(
+            provider_id="gibs",
+            cursor="1",
+            limit=1,
+        ),
+        state,
+    )
+
+    assert result.status == "success"
+    assert result.data["layers"][0]["layer_id"] == "layer-1"  # type: ignore[index]
+    assert result.data["next_cursor"] == "2"  # type: ignore[index]
+    assert result.evidence_refs == ["evidence-provider-layers"]
+    assert state.evidence_refs == ["evidence-provider-layers"]
+    assert provider_service.limit == 250
+    assert evidence_store.payload["run_id"] == "run-1"
