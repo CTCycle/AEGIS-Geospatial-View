@@ -95,14 +95,15 @@ class AgentContextAssembler:
         evidence_budget = working_budget * 50 // 100
         raw_budget = working_budget * 35 // 100
         summary_budget = working_budget - evidence_budget - raw_budget
-        selected_outcomes: list[dict[str, Any]] = []
+        selected_outcomes_reversed: list[dict[str, Any]] = []
         outcome_tokens = 0
-        for outcome in outcomes:
+        for outcome in reversed(outcomes):
             cost = estimate_json_tokens(outcome)
             if outcome_tokens + cost > evidence_budget:
-                break
-            selected_outcomes.append(outcome)
+                continue
+            selected_outcomes_reversed.append(outcome)
             outcome_tokens += cost
+        selected_outcomes = list(reversed(selected_outcomes_reversed))
         raw_capacity = raw_budget + max(0, evidence_budget - outcome_tokens)
         projected = [
             {
@@ -112,19 +113,28 @@ class AgentContextAssembler:
             }
             for item in messages
         ]
-        included: list[dict[str, Any]] = []
+        included_reversed: list[dict[str, Any]] = []
+        included_indices: list[int] = []
         included_tokens = 0
-        for message in reversed(projected):
+        for index in range(len(projected) - 1, -1, -1):
+            message = projected[index]
             cost = estimate_json_tokens(message)
             if included_tokens + cost > raw_capacity:
-                break
-            included.append(message)
+                # An oversized item should not prevent later inspection of
+                # smaller, relevant history entries.
+                continue
+            included_reversed.append(message)
+            included_indices.append(index)
             included_tokens += cost
-        included.reverse()
+        included = list(reversed(included_reversed))
+        included_indices.sort()
         included_ids = [
             int(item["id"]) for item in included if isinstance(item.get("id"), int)
         ]
-        omitted = projected[: len(projected) - len(included)]
+        included_index_set = set(included_indices)
+        omitted = [
+            item for index, item in enumerate(projected) if index not in included_index_set
+        ]
         omitted_ids = [
             int(item["id"]) for item in omitted if isinstance(item.get("id"), int)
         ]

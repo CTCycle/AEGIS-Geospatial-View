@@ -100,6 +100,36 @@ def test_oversized_newest_history_is_compacted_without_losing_location_state() -
     assert package.map_memory == location
     assert estimate_json_tokens(package.model_dump(mode="json")) < 3072
 
+
+###############################################################################
+def test_oversized_history_item_does_not_hide_smaller_relevant_messages() -> None:
+    package = AgentContextAssembler(_ExplicitProfileResolver()).assemble(
+        provider="ollama",
+        model="4k-local",
+        current_user_message="Use the earlier location.",
+        messages=[
+            {"id": 1, "turn_index": 1, "role": "user", "content": "Rome"},
+            {
+                "id": 2,
+                "turn_index": 2,
+                "role": "assistant",
+                "content": "x" * 100_000,
+            },
+            {
+                "id": 3,
+                "turn_index": 3,
+                "role": "user",
+                "content": "Keep the previous scope.",
+            },
+        ],
+        directives=[],
+        task_state={},
+        map_memory={},
+    )
+
+    assert package.included_message_ids == [1, 3]
+    assert package.omitted_message_ids == [2]
+
 ###############################################################################
 def test_unknown_model_history_is_bounded_and_excludes_renderer_payloads() -> None:
     for turns in (10, 25, 50):
