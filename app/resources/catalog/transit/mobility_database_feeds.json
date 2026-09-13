@@ -46,6 +46,7 @@
   "agenticUse": {
     "defaultEnabled": true,
     "manualToggle": false,
+    "domains": ["place_search", "data_retrieval"],
     "plannerHints": ["transit feed", "agency feed", "GTFS discovery"],
     "requiredUserAction": [],
     "avoidWhen": ["live vehicle positions", "live service alerts"]

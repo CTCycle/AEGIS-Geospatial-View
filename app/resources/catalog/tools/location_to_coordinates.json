@@ -69,6 +69,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": false,
+    "domains": ["place_search", "data_retrieval"],
     "plannerHints": [
       "coordinates",
       "geocode",
