@@ -37,6 +37,10 @@ def test_factory_hydrates_the_complete_native_context_package() -> None:
         conversation_summary={"through_turn_index": 2},
         recent_messages=[{"role": "assistant", "content": "Previous result."}],
         relevant_tool_outcomes=[{"evidence_id": "evidence:1"}],
+        policy_constraints={"allowed_tool_names": ["discover"]},
+        included_message_ids=[1, 3],
+        omitted_message_ids=[2],
+        summarized_through_turn_index=2,
         context_allocation={"usable_input_tokens": 1000},
     )
 
@@ -53,6 +57,10 @@ def test_factory_hydrates_the_complete_native_context_package() -> None:
     assert state.map_memory == {"revision": 4}
     assert state.recent_messages[0]["role"] == "assistant"
     assert state.relevant_tool_outcomes[0]["evidence_id"] == "evidence:1"
+    assert state.policy_constraints == {"allowed_tool_names": ["discover"]}
+    assert state.included_message_ids == [1, 3]
+    assert state.omitted_message_ids == [2]
+    assert state.summarized_through_turn_index == 2
 
 
 ###############################################################################
