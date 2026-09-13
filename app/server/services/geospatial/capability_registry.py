@@ -262,11 +262,9 @@ class CapabilityRegistry:
     ) -> list[dict[str, Any]]:
         """Return eligible routing candidates without selecting final tools.
 
-        The current catalog is being migrated to explicit ``agenticUse``
-        domains.  Until that migration is complete, the fallback domain map is
-        derived only from the manifest's typed capability kind.  It keeps the
-        new shortlist useful while leaving final capability choice and all
-        execution arguments to the model/tool boundary.
+        ``agenticUse.domains`` is the authoritative routing contract.  The
+        shortlist leaves final capability choice and all execution arguments
+        to the model/tool boundary.
         """
 
         bounded_limit = max(1, min(int(limit), 50))
@@ -340,31 +338,7 @@ def _declared_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:
                 declared.add(CapabilityDomain(str(value)))
             except ValueError:
                 continue
-    if declared:
-        return declared
-    return _legacy_domains(capability)
-
-###############################################################################
-def _legacy_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:
-    kind = str(
-        capability.get("capabilityKind")
-        or capability.get("capability_kind")
-        or ""
-    ).strip().casefold()
-    if kind == "basemap":
-        return {CapabilityDomain.MAP_RENDERING}
-    if kind in {"search-index", "camera-network"}:
-        return {CapabilityDomain.PLACE_SEARCH, CapabilityDomain.DATA_RETRIEVAL}
-    if kind in {"analysis-tool"}:
-        # Direct point insights (weather, air quality, elevation, etc.) are
-        # executable data retrieval even when their legacy kind predates the
-        # explicit agenticUse domain declaration.
-        return {CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.SPATIAL_ANALYSIS}
-    if kind in {"vector-overlay", "raster-overlay", "dataset-ingestion"}:
-        return {CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING}
-    if kind == "metadata-only":
-        return {CapabilityDomain.PROVIDER_DISCOVERY}
-    return {CapabilityDomain.DATA_RETRIEVAL}
+    return declared
 
 ###############################################################################
 def _searchable_text(capability: dict[str, Any]) -> set[str]:

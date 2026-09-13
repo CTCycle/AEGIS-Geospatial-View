@@ -100,7 +100,7 @@ def test_route_contract_remains_independent_of_provider_arguments() -> None:
 
 
 ###############################################################################
-def test_legacy_analysis_tool_is_shortlisted_for_data_retrieval() -> None:
+def test_missing_agentic_domains_are_not_inferred_from_capability_kind() -> None:
     snapshot = GeospatialManifestSnapshot(
         providers=(),
         basemaps=[],
@@ -115,6 +115,13 @@ def test_legacy_analysis_tool_is_shortlisted_for_data_retrieval() -> None:
                 "capabilityKind": "analysis-tool",
                 "description": "Current weather and forecast measurements.",
                 "capabilities": ["weather", "forecast"],
+                "agenticUse": {
+                    "defaultEnabled": False,
+                    "manualToggle": True,
+                    "plannerHints": ["weather", "forecast"],
+                    "requiredUserAction": [],
+                    "avoidWhen": [],
+                },
             }
         ],
         runtime_profiles=(),
@@ -126,4 +133,4 @@ def test_legacy_analysis_tool_is_shortlisted_for_data_retrieval() -> None:
         runtime_registry=_RuntimeEligibility(),
     )
 
-    assert [item["id"] for item in candidates] == ["weather_direct"]
+    assert candidates == []
