@@ -496,6 +496,48 @@ def test_tool_observation_preserves_bounded_result_data() -> None:
 
 
 ###############################################################################
+def test_capability_description_observation_preserves_contract_and_schema() -> None:
+    result = ToolResult(
+        call_id="call-1",
+        tool_name="describe_geospatial_capability",
+        status="success",
+        summary="Described rainfall.",
+        data={
+            "capability_id": "rainfall",
+            "manifest": {
+                "id": "rainfall",
+                "name": "Rainfall",
+                "provider": "weather",
+                "description": "Rainfall observations.",
+            },
+            "argument_schema": {
+                "type": "object",
+                "required": ["location"],
+                "properties": {"location": {"type": "string"}},
+            },
+            "execution_contract": {
+                "supported_operations": ["show", "forecast"],
+                "required_inputs": ["location"],
+            },
+        },
+        metadata=ToolExecutionMetadata(duration_ms=3),
+    )
+
+    message = AgentLoop._tool_result_messages(  # pyright: ignore[reportPrivateUsage]
+        [LLMToolCall(id="call-1", name=result.tool_name, arguments={})],
+        [result],
+    )[0]
+    observation = json.loads(message["content"])
+
+    assert observation["result"]["capability_id"] == "rainfall"
+    assert observation["result"]["argument_schema"]["required"] == ["location"]
+    assert observation["result"]["execution_contract"]["supported_operations"] == [
+        "show",
+        "forecast",
+    ]
+
+
+###############################################################################
 def test_working_state_remains_valid_json_when_compacted() -> None:
     state = _state()
     state.route = CapabilityRoute(

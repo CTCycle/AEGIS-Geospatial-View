@@ -7,9 +7,19 @@ from typing import Any
 
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentState
-from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
-from server.services.agent.tool_definitions import CapabilityDiscoveryInput
-from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.domain.agent.tool_result import (
+    ToolExecutionError,
+    ToolExecutionMetadata,
+    ToolResult,
+)
+from server.services.agent.tool_definitions import (
+    CapabilityDiscoveryInput,
+    DescribeCapabilityInput,
+)
+from server.services.geospatial.capability_registry import (
+    CapabilityArgumentSchemaError,
+    CapabilityRegistry,
+)
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
@@ -89,6 +99,59 @@ class CatalogToolHandler:
             ),
         )
 
+    # -------------------------------------------------------------------------
+    async def describe(
+        self,
+        request: DescribeCapabilityInput,
+        state: AgentState,
+    ) -> ToolResult:
+        started = time.perf_counter()
+        capability_id = request.capability_id
+        if state.capability_ids and capability_id not in state.capability_ids:
+            return _failure(
+                code="capability_not_shortlisted",
+                message="The capability was not returned by the validated route.",
+                recovery="choose_alternate_tool",
+                started=started,
+            )
+        capability = self.capability_registry.get_capability(capability_id)
+        if capability is None:
+            return _failure(
+                code="unknown_capability",
+                message=f"Unknown geospatial capability '{capability_id}'.",
+                recovery="choose_alternate_tool",
+                started=started,
+            )
+        try:
+            argument_schema = self.capability_registry.argument_schema(capability_id)
+        except CapabilityArgumentSchemaError as exc:
+            return _failure(
+                code="missing_argument_schema",
+                message=str(exc),
+                recovery="terminal",
+                started=started,
+            )
+        provider_id = str(capability.get("provider") or "") or None
+        return ToolResult(
+            call_id="handler-call",
+            tool_name="describe_geospatial_capability",
+            status="success",
+            summary=f"Described geospatial capability {capability_id}.",
+            data={
+                "capability_id": capability_id,
+                "manifest": capability,
+                "argument_schema": argument_schema,
+                "execution_contract": self.capability_registry.execution_contract(
+                    capability_id
+                ),
+            },
+            metadata=ToolExecutionMetadata(
+                capability_id=capability_id,
+                provider_id=provider_id,
+                duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
+            ),
+        )
+
 
 def _cursor_offset(cursor: str | None) -> int:
     if cursor is None or not cursor.strip():
@@ -120,6 +183,36 @@ def _descriptor(
         ),
         "execution_contract": registry.execution_contract(capability_id),
     }
+
+
+###############################################################################
+def _failure(
+    *,
+    code: str,
+    message: str,
+    recovery: str,
+    started: float,
+) -> ToolResult:
+    return ToolResult(
+        call_id="handler-call",
+        tool_name="describe_geospatial_capability",
+        status="failed",
+        summary=message,
+        error=ToolExecutionError(
+            error_type=(
+                "state_conflict"
+                if code in {"unknown_capability", "capability_not_shortlisted"}
+                else "semantic_validation"
+            ),
+            code=code,
+            message=message,
+            retryable=False,
+            recovery=recovery,  # type: ignore[arg-type]
+        ),
+        metadata=ToolExecutionMetadata(
+            duration_ms=max(0, int((time.perf_counter() - started) * 1000))
+        ),
+    )
 
 
 __all__ = ["CatalogToolHandler"]

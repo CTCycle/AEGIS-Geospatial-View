@@ -181,7 +181,8 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
 
     state.capability_ids = ["places:hospitals"]
     assert [tool.name for tool in registry.expose(state)] == [
-        "resolve_geospatial_location"
+        "resolve_geospatial_location",
+        "describe_geospatial_capability",
     ]
 
     state.location_refs["zurich"] = ResolvedLocation(
@@ -190,6 +191,7 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
         longitude=8.5417,
     )
     assert [tool.name for tool in registry.expose(state)] == [
+        "describe_geospatial_capability",
         "execute_geospatial_capability",
         "apply_map_plan",
     ]
@@ -198,6 +200,7 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
     assert {
         tool.name for tool in registry.expose(state)
     } == {
+        "describe_geospatial_capability",
         "execute_geospatial_capability",
         "inspect_evidence",
         "transform_evidence",
