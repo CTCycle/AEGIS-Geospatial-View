@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from server.common.typing import json_array
 
 from server.domain.agent.context import AgentContextPackage, ConversationDirective
@@ -42,6 +42,8 @@ class AgentContextAssembler:
         map_memory: dict[str, Any],
         prior_summary: dict[str, Any] | None = None,
         relevant_tool_outcomes: list[dict[str, Any]] | None = None,
+        policy_constraints: dict[str, Any] | None = None,
+        phase: Literal["parser", "native_loop", "synthesis"] = "parser",
     ) -> AgentContextPackage:
         profile = (
             self.context_profile_resolver.resolve(provider, model)
@@ -55,6 +57,7 @@ class AgentContextAssembler:
             else None
         )
         outcomes = list(relevant_tool_outcomes or [])
+        constraints = dict(policy_constraints or {})
         mandatory = {
             "current_user_message": current_user_message,
             "active_instructions": [
@@ -62,6 +65,7 @@ class AgentContextAssembler:
             ],
             "task_state": compact_task_context(task_state),
             "map_memory": map_memory,
+            "policy_constraints": constraints,
         }
         mandatory_tokens = estimate_json_tokens(mandatory)
         application_ceiling = (
@@ -180,7 +184,7 @@ class AgentContextAssembler:
             summarized_through_turn_index=summary_through,
             omitted_message_ids=omitted_ids,
             context_allocation={
-                "phase": "parser",
+                "phase": phase,
                 "model": model,
                 "estimator_source": "model_profile" if profile is not None else "conservative_chars_per_token",
                 "usable_input_tokens": usable,

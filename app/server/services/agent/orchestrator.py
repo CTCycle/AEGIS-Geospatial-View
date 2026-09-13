@@ -1156,6 +1156,11 @@ class AgentOrchestrator:
                     if self.evidence_repository is not None
                     else []
                 ),
+                phase=(
+                    "native_loop"
+                    if self._agent_loop_mode() == "native_v2"
+                    else "parser"
+                ),
             )
         self._context_packages[conversation_key] = context_package
         execution_budget.record_context_allocation(context_package.context_allocation)
