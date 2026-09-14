@@ -108,6 +108,13 @@ class LocationToolHandler:
                 code="clarification_required",
                 message=result.question,
                 recovery="request_user_input",
+                semantic_outcome="ambiguous",
+                data={
+                    "resolution_status": "ambiguous",
+                    "question": result.question,
+                    "reason": result.reason,
+                    "missing_fields": list(result.missing_fields),
+                },
                 started=started,
             )
         state.location_refs[target_key] = result
@@ -160,6 +167,7 @@ def _success(
             "bbox": location.bbox,
             "confidence": location.confidence,
         },
+        semantic_outcome="resolved",
         metadata=ToolExecutionMetadata(
             duration_ms=max(0, int((time.perf_counter() - started) * 1000))
         ),
@@ -168,13 +176,21 @@ def _success(
 
 ###############################################################################
 def _failure(
-    *, code: str, message: str, recovery: str, started: float
+    *,
+    code: str,
+    message: str,
+    recovery: str,
+    started: float,
+    semantic_outcome: str = "not_found",
+    data: dict[str, object] | None = None,
 ) -> ToolResult:
     return ToolResult(
         call_id="handler-call",
         tool_name="resolve_geospatial_location",
         status="failed",
         summary=message,
+        semantic_outcome=semantic_outcome,  # type: ignore[arg-type]
+        data=data,
         error=ToolExecutionError(
             error_type="state_conflict",
             code=code,

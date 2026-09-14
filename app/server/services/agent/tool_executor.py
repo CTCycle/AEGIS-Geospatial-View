@@ -44,6 +44,34 @@ class ToolExecutor:
         state: AgentState,
         budget: Any,
     ) -> ToolResult:
+        result = await self._execute_tool(tool_call, state, budget)
+        if not any(item.call_id == result.call_id for item in state.tool_results):
+            # The executor is the only application boundary that may publish a
+            # normalized result.  The loop can still merge it idempotently when
+            # it applies the observation to its state.
+            state.tool_results.append(result)
+        if len(state.tool_trace) < 128:
+            state.tool_trace.append(
+                {
+                    "call_id": result.call_id,
+                    "tool": result.tool_name,
+                    "status": result.status,
+                    "duration_ms": result.metadata.duration_ms,
+                    "error_code": result.error.code if result.error else None,
+                    "recovery": result.error.recovery if result.error else None,
+                    "semantic_outcome": result.semantic_outcome,
+                    "boundary": "tool_executor",
+                }
+            )
+        return result
+
+    # -------------------------------------------------------------------------
+    async def _execute_tool(
+        self,
+        tool_call: LLMToolCall,
+        state: AgentState,
+        budget: Any,
+    ) -> ToolResult:
         started = time.perf_counter()
         call_id = tool_call.id or f"call_{uuid4().hex}"
         # Count every model-issued attempt, including malformed and rejected
@@ -201,7 +229,6 @@ class ToolExecutor:
                     recovery="terminal",
                 ),
             )
-        state.tool_results.append(result)
         return result
 
     # -------------------------------------------------------------------------

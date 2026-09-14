@@ -9,7 +9,13 @@ from pydantic import BaseModel
 
 from server.domain.agent.context import AgentContextPackage
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentPhase, AgentState, CapabilityRoute
+from server.domain.agent.capability_route import (
+    AgentGoal,
+    AgentPhase,
+    AgentState,
+    CapabilityRoute,
+    CompletionContract,
+)
 from server.domain.agent.interpretation import (
     CanonicalRequestInterpretation,
     CanonicalSpatialConstraint,
@@ -662,7 +668,49 @@ def test_working_state_remains_valid_json_when_compacted() -> None:
         state, 256
     )
 
-    assert json.loads(working)["phase"] == state.phase.value
+    payload = json.loads(working)
+    assert payload["phase"] == state.phase.value
+    assert payload["goal"] is None
+    assert payload["completion_contract"] is None
+
+
+###############################################################################
+def test_compacted_working_state_retains_goal_and_completion_invariants() -> None:
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        requires_location=True,
+        capability_queries=["rainfall"],
+    )
+    state.goal = AgentGoal(
+        goal="Find rainfall around Lugano",
+        task_mode="execute",
+        presentation="text",
+        operation="show",
+        requires_location=True,
+        target_ids=["lugano"],
+    )
+    state.completion_contract = CompletionContract(
+        operation="show",
+        requirements=["location_resolved", "required_data_retrieved"],
+        location_required=True,
+        evidence_required=True,
+    )
+
+    payload = json.loads(
+        AgentLoop._working_state_message(  # pyright: ignore[reportPrivateUsage]
+            state, 256
+        )
+    )
+
+    assert payload["goal"]["operation"] == "show"
+    assert payload["completion_contract"]["requirements"] == [
+        "location_resolved",
+        "required_data_retrieved",
+    ]
+    assert payload["route"]["primary_domain"] == "data_retrieval"
 
 
 ###############################################################################

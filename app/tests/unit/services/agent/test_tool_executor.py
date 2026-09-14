@@ -97,16 +97,19 @@ def test_executor_validates_once_and_normalizes_success() -> None:
 
     registry = ToolRegistry(runtime_registry=cast(Any, None))
     registry.register(_tool(handler))
+    state = _state()
     result = asyncio.run(
         ToolExecutor(tool_registry=registry).execute_tool(
             LLMToolCall(id="call-1", name="test_tool", arguments={"value": 3}),
-            _state(),
+            state,
             _budget(),
         )
     )
 
     assert result.status == "success"
     assert calls == [3]
+    assert state.tool_results == [result]
+    assert state.tool_trace[0]["boundary"] == "tool_executor"
 
 
 ###############################################################################
