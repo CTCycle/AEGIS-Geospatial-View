@@ -10,6 +10,11 @@ from pydantic import BaseModel
 from server.domain.agent.context import AgentContextPackage
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentPhase, AgentState, CapabilityRoute
+from server.domain.agent.interpretation import (
+    CanonicalRequestInterpretation,
+    CanonicalSpatialConstraint,
+    CanonicalTemporalConstraints,
+)
 from server.domain.agent.reliability import AgentExecutionBudget
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.domain.agent.tools import RegisteredTool
@@ -215,6 +220,54 @@ def test_native_route_promotes_the_execution_profile_once() -> None:
 
     assert simple_budget.total_seconds == 150
     assert complex_budget.total_seconds == 300
+
+
+###############################################################################
+def test_native_goal_compiles_deterministic_completion_contract() -> None:
+    state = _state()
+    state.canonical_request = CanonicalRequestInterpretation(
+        request_id="request-1",
+        primary_intent="data_layer_query",
+        operations=["filter"],
+        temporal_constraints=CanonicalTemporalConstraints(
+            mode="historical",
+            start_time_iso="2026-09-01T00:00:00+00:00",
+            end_time_iso="2026-09-02T00:00:00+00:00",
+        ),
+        spatial_constraints=[
+            CanonicalSpatialConstraint(
+                relationship="in",
+                target_id="target-1",
+                analysis_scope="bbox",
+            )
+        ],
+        filters={"category": "hospital"},
+    )
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="both",
+        requires_location=True,
+        capability_queries=["hospitals"],
+    )
+
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+
+    assert state.goal is not None
+    assert state.goal.operation == "filter"
+    assert state.goal.temporal_scope["mode"] == "historical"
+    assert state.goal.spatial_scope[0]["analysis_scope"] == "bbox"
+    assert state.goal.filters == {"category": "hospital"}
+    assert state.completion_contract is not None
+    assert state.completion_contract.requirements == [
+        "location_resolved",
+        "required_data_retrieved",
+        "map_candidate_prepared",
+    ]
+    assert state.completion_contract.evidence_required is True
+    assert state.completion_contract.map_preparation_required is True
+    assert state.completion_contract.temporal_scope_required is True
+    assert state.completion_contract.spatial_scope_required is True
 
 
 ###############################################################################

@@ -33,17 +33,34 @@ class CapabilityRoute(BaseModel):
     clarification_question: str | None = Field(default=None, max_length=500)
 
 ###############################################################################
-class NativeGoalContract(BaseModel):
-    """Server-owned obligations derived from a validated native route."""
+class AgentGoal(BaseModel):
+    """Server-owned goal details derived from a validated native route."""
 
     model_config = ConfigDict(extra="forbid")
 
     goal: str
     task_mode: Literal["answer", "execute", "clarify"]
     presentation: Literal["text", "map", "both"]
+    operation: str
     requires_location: bool
-    constraints: dict[str, object] = Field(default_factory=dict)
-    completion_requirements: list[str] = Field(default_factory=list)
+    target_ids: list[str] = Field(default_factory=list, max_length=16)
+    temporal_scope: dict[str, object] = Field(default_factory=dict)
+    spatial_scope: list[dict[str, object]] = Field(default_factory=list, max_length=16)
+    filters: dict[str, object] = Field(default_factory=dict)
+
+
+class CompletionContract(BaseModel):
+    """Deterministic obligations the native loop must satisfy."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation: str
+    requirements: list[str] = Field(default_factory=list, max_length=16)
+    location_required: bool = False
+    evidence_required: bool = False
+    map_preparation_required: bool = False
+    temporal_scope_required: bool = False
+    spatial_scope_required: bool = False
 
 ###############################################################################
 class CapabilityRouteDecision(BaseModel):
@@ -86,7 +103,8 @@ class AgentState(BaseModel):
     conversation_id: str
     phase: AgentPhase
     user_message: str
-    goal_contract: NativeGoalContract | None = None
+    goal: AgentGoal | None = None
+    completion_contract: CompletionContract | None = None
     completion_requirements: list[str] = Field(default_factory=list)
     active_instructions: list[dict[str, object]] = Field(default_factory=list)
     task_state: dict[str, object] = Field(default_factory=dict)

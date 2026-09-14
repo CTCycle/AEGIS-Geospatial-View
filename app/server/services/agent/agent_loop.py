@@ -10,10 +10,11 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Protocol
 
 from server.domain.agent.capability_route import (
+    AgentGoal,
     AgentPhase,
     AgentState,
     CapabilityRoute,
-    NativeGoalContract,
+    CompletionContract,
 )
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.reliability import (
@@ -704,11 +705,31 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     @staticmethod
     def _compile_native_goal(state: AgentState, route: CapabilityRoute) -> None:
-        canonical_payload = (
-            state.canonical_request.model_dump(mode="json")
-            if state.canonical_request is not None
+        canonical = state.canonical_request
+        operation = next(
+            (
+                str(item).strip()
+                for item in (canonical.operations if canonical else [])
+                if str(item).strip()
+            ),
+            route.primary_domain.value,
+        )
+        target_ids = (
+            [str(item.target_id) for item in canonical.targets]
+            if canonical is not None
+            else []
+        )
+        temporal_scope = (
+            canonical.temporal_constraints.model_dump(mode="json")
+            if canonical is not None
             else {}
         )
+        spatial_scope = (
+            [item.model_dump(mode="json") for item in canonical.spatial_constraints]
+            if canonical is not None
+            else []
+        )
+        filters = dict(canonical.filters) if canonical is not None else {}
         requirements: list[str] = []
         if route.requires_location:
             requirements.append("location_resolved")
@@ -720,27 +741,40 @@ class AgentLoop:
             requirements.append("required_data_retrieved")
         if route.presentation in {"map", "both"}:
             requirements.append("map_candidate_prepared")
-        constraints: dict[str, object] = {
-            "presentation": route.presentation,
-            "requires_location": route.requires_location,
-            "canonical_request": canonical_payload,
-            "active_directives": state.active_instructions,
-            "map_memory": state.map_memory,
-        }
         state.completion_requirements = list(dict.fromkeys(requirements))
-        state.goal_contract = NativeGoalContract(
+        state.goal = AgentGoal(
             goal=state.user_message,
             task_mode=route.task_mode,
             presentation=route.presentation,
+            operation=operation,
             requires_location=route.requires_location,
-            constraints=constraints,
-            completion_requirements=list(state.completion_requirements),
+            target_ids=target_ids,
+            temporal_scope=temporal_scope,
+            spatial_scope=spatial_scope,
+            filters=filters,
+        )
+        state.completion_contract = CompletionContract(
+            operation=operation,
+            requirements=list(state.completion_requirements),
+            location_required=route.requires_location,
+            evidence_required="required_data_retrieved" in state.completion_requirements,
+            map_preparation_required="map_candidate_prepared"
+            in state.completion_requirements,
+            temporal_scope_required=bool(
+                temporal_scope
+                and (
+                    temporal_scope.get("mode") != "none"
+                    or temporal_scope.get("start_time_iso") is not None
+                    or temporal_scope.get("end_time_iso") is not None
+                )
+            ),
+            spatial_scope_required=bool(spatial_scope),
         )
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _pending_native_requirements(state: AgentState) -> list[str]:
-        if not state.context_hydrated or state.goal_contract is None:
+        if not state.context_hydrated or state.completion_contract is None:
             return []
         completed_data = any(
             result.status in {"success", "valid_empty", "partial"}
@@ -760,7 +794,7 @@ class AgentLoop:
         }
         return [
             name
-            for name in state.goal_contract.completion_requirements
+            for name in state.completion_contract.requirements
             if not checks.get(name, False)
         ]
 
@@ -769,9 +803,14 @@ class AgentLoop:
     def _working_state_message(state: AgentState, limit: int) -> str:
         payload = {
             "phase": state.phase.value,
-            "goal_contract": (
-                state.goal_contract.model_dump(mode="json")
-                if state.goal_contract is not None
+            "goal": (
+                state.goal.model_dump(mode="json")
+                if state.goal is not None
+                else None
+            ),
+            "completion_contract": (
+                state.completion_contract.model_dump(mode="json")
+                if state.completion_contract is not None
                 else None
             ),
             "route": state.route.model_dump(mode="json") if state.route else None,
