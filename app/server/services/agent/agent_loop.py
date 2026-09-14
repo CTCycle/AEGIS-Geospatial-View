@@ -529,11 +529,32 @@ class AgentLoop:
             fingerprint = self._fingerprint(call)
             cached = state.successful_fingerprints.get(fingerprint)
             if cached is not None:
+                if len(state.tool_trace) < 128:
+                    state.tool_trace.append(
+                        {
+                            "call_id": call.id or cached.call_id,
+                            "tool": call.name,
+                            "status": cached.status,
+                            "replayed": True,
+                            "boundary": "loop_deduplication",
+                        }
+                    )
                 return cached.model_copy(
                     update={"call_id": call.id or cached.call_id}, deep=True
                 )
             failed_count = state.failed_fingerprints.get(fingerprint, 0)
             if failed_count >= request.max_same_failed_fingerprint:
+                if len(state.tool_trace) < 128:
+                    state.tool_trace.append(
+                        {
+                            "call_id": call.id or "repeated-call",
+                            "tool": call.name,
+                            "status": "failed",
+                            "error_code": "repeated_failed_fingerprint",
+                            "recovery": "replan",
+                            "boundary": "loop_deduplication",
+                        }
+                    )
                 return self._failure_result(
                     call,
                     "repeated_failed_fingerprint",
@@ -575,15 +596,6 @@ class AgentLoop:
                     state.validation_corrections += 1
             else:
                 state.successful_fingerprints[fingerprint] = result
-            state.tool_trace.append(
-                {
-                    "call_id": result.call_id,
-                    "tool": result.tool_name,
-                    "status": result.status,
-                    "error_code": result.error.code if result.error else None,
-                    "recovery": result.error.recovery if result.error else None,
-                }
-            )
             self._ensure_run_control(request)
             self._apply_result(state, result)
         return results
@@ -970,20 +982,66 @@ class AgentLoop:
             return serialized
         minimal = {
             "phase": state.phase.value,
-            "route": (
-                {
-                    "task_mode": state.route.task_mode,
-                    "presentation": state.route.presentation,
-                }
-                if state.route is not None
-                else None
-            ),
+            "goal": AgentLoop._compact_goal(state),
+            "completion_contract": AgentLoop._compact_completion_contract(state),
+            "route": AgentLoop._compact_route(state),
             "capability_ids": list(state.capability_ids[:12]),
             "location_refs": sorted(state.location_refs)[:12],
             "evidence_refs": list(state.evidence_refs[-8:]),
             "prepared_map": bool(state.prepared_map_session),
         }
         return json.dumps(minimal, separators=(",", ":"), default=str)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _compact_goal(state: AgentState) -> dict[str, Any] | None:
+        if state.goal is None:
+            return None
+        return {
+            "goal": state.goal.goal[:500],
+            "task_mode": state.goal.task_mode,
+            "presentation": state.goal.presentation,
+            "operation": state.goal.operation,
+            "requires_location": state.goal.requires_location,
+            "target_ids": list(state.goal.target_ids[:16]),
+            "temporal_scope": state.goal.temporal_scope,
+            "spatial_scope": list(state.goal.spatial_scope[:16]),
+            "filters": {
+                str(key): value
+                for key, value in list(state.goal.filters.items())[:16]
+            },
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _compact_completion_contract(state: AgentState) -> dict[str, Any] | None:
+        if state.completion_contract is None:
+            return None
+        return {
+            "operation": state.completion_contract.operation,
+            "requirements": list(state.completion_contract.requirements[:16]),
+            "location_required": state.completion_contract.location_required,
+            "evidence_required": state.completion_contract.evidence_required,
+            "map_preparation_required": state.completion_contract.map_preparation_required,
+            "temporal_scope_required": state.completion_contract.temporal_scope_required,
+            "spatial_scope_required": state.completion_contract.spatial_scope_required,
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _compact_route(state: AgentState) -> dict[str, Any] | None:
+        if state.route is None:
+            return None
+        return {
+            "primary_domain": state.route.primary_domain.value,
+            "secondary_domains": [item.value for item in state.route.secondary_domains[:3]],
+            "task_mode": state.route.task_mode,
+            "presentation": state.route.presentation,
+            "requires_location": state.route.requires_location,
+            "capability_queries": list(state.route.capability_queries[:4]),
+            "explicit_capability_ids": list(state.route.explicit_capability_ids[:8]),
+            "operation": state.route.operation,
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod

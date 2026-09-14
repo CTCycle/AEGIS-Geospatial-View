@@ -31,6 +31,7 @@ ToolRecovery = Literal[
     "request_user_input",
     "terminal",
 ]
+ToolSemanticOutcome = Literal["resolved", "ambiguous", "not_found", "failed"]
 
 ###############################################################################
 class ValidationIssue(BaseModel):
@@ -73,6 +74,7 @@ class ToolResult(BaseModel):
     tool_name: str
     status: Literal["success", "valid_empty", "partial", "failed"]
     summary: str
+    semantic_outcome: ToolSemanticOutcome | None = None
     data: dict[str, Any] | list[Any] | None = None
     evidence_refs: list[str] = Field(default_factory=list)
     map_candidate_id: str | None = None
@@ -99,6 +101,7 @@ class ModelObservation(BaseModel):
     tool_name: str
     status: Literal["success", "valid_empty", "partial", "failed"]
     summary: str
+    semantic_outcome: ToolSemanticOutcome | None = None
     result: dict[str, Any] | list[Any] | None = None
     evidence_refs: list[str] = Field(default_factory=list)
     provenance: dict[str, Any] = Field(default_factory=dict)
@@ -143,6 +146,7 @@ class ModelObservation(BaseModel):
             tool_name=value.tool_name,
             status=value.status,
             summary=value.summary[:1000],
+            semantic_outcome=value.semantic_outcome,
             result=projected,
             evidence_refs=list(dict.fromkeys(value.evidence_refs))[:16],
             provenance=provenance if isinstance(provenance, dict) else {},
@@ -411,6 +415,7 @@ __all__ = [
     "ToolExecutionMetadata",
     "ToolResult",
     "ToolRecovery",
+    "ToolSemanticOutcome",
     "ToolErrorType",
     "ValidationIssue",
 ]

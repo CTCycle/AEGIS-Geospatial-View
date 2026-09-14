@@ -206,7 +206,7 @@ class CapabilityExecutionService:
             )
 
         status = _tool_status(response)
-        summary = _response_summary(response)
+        summary = _response_summary(response, request=request, location=location)
         try:
             evidence_ref = self._persist_evidence(
                 context=context,
@@ -493,7 +493,12 @@ def _evidence_kind(result_type: str) -> EvidenceKind:
 
 
 ###############################################################################
-def _response_summary(response: ProviderResponse) -> dict[str, Any]:
+def _response_summary(
+    response: ProviderResponse,
+    *,
+    request: ExecuteCapabilityInput | None = None,
+    location: ResolvedLocation | None = None,
+) -> dict[str, Any]:
     payload = response.payload
     features = payload.get("features")
     summary: dict[str, Any] = {
@@ -521,6 +526,19 @@ def _response_summary(response: ProviderResponse) -> dict[str, Any]:
         summary["source_url"] = response.source_url[:500]
     if response.partial:
         summary["partial"] = True
+    if request is not None:
+        # Keep the semantic query visible to the model without exposing the
+        # provider payload or trusting model-owned geometry/time fields.
+        summary["query"] = {
+            "operation": request.operation,
+            "location_ref": request.location_ref,
+            "resolved_location": location.label if location is not None else None,
+            "bbox": list(request.bbox) if request.bbox is not None else None,
+            "radius_m": request.radius_m,
+            "start_time_iso": request.start_time_iso,
+            "end_time_iso": request.end_time_iso,
+            "filter_keys": sorted(str(key) for key in request.filters)[:32],
+        }
     return summary
 
 

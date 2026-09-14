@@ -125,13 +125,24 @@ async def test_execute_capability_persists_full_payload_and_returns_bounded_summ
     assert result.status == "success"
     assert result.call_id == "call-1"
     assert result.evidence_refs == ["evidence:provider-1"]
-    assert result.data == {
+    assert isinstance(result.data, dict)
+    assert result.data.items() >= {
         "capability_id": "places:hospitals",
         "provider_id": "overpass",
         "result_status": "ok",
         "result_type": "features",
         "feature_count": 1,
         "stale": False,
+    }.items()
+    assert result.data["query"] == {
+        "operation": "within_distance",
+        "location_ref": "location:zurich-hb",
+        "resolved_location": None,
+        "bbox": None,
+        "radius_m": 5000.0,
+        "start_time_iso": None,
+        "end_time_iso": None,
+        "filter_keys": ["category"],
     }
     assert evidence.calls[0]["payload"] == response.payload
     request = provider.requests[0][1]
