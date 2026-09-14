@@ -118,6 +118,14 @@ class AgentRunOrchestrator:
                     )
                 )
 
+        def run_state_check() -> str | None:
+            latest = self.run_repository.get_run(run_id)
+            if latest is None or latest.cancel_requested_at is not None:
+                return "cancelled"
+            if latest.active_run_version != snapshot.active_run_version:
+                return "superseded"
+            return None
+
         context_event_task = asyncio.create_task(publish_context_events())
         try:
             response = await self.agent_orchestrator.run_turn(
@@ -132,6 +140,7 @@ class AgentRunOrchestrator:
                 progress_callback=on_agent_progress,
                 defer_map_commit=True,
                 agent_run_id=run_id,
+                run_state_check=run_state_check,
             )
         except Exception as exc:
             latest = self.run_repository.get_run(run_id) or snapshot

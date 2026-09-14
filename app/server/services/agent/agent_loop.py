@@ -33,7 +33,9 @@ from server.prompts.capability_route import build_capability_route_prompt
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.llm.context_budget import compute_context_usage
 from server.services.llm.errors import LLMProviderRequestError, LLMStructuredOutputError
+from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
 
 ###############################################################################
 class AgentProvider(Protocol):
@@ -54,6 +56,15 @@ class AgentProviderFactory(Protocol):
 
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> AgentProvider: ...
+
+
+class AgentRunControlSignal(RuntimeError):
+    """Internal stop signal for cancellation or version supersession."""
+
+    def __init__(self, reason: Literal["cancelled", "superseded"]) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -76,7 +87,9 @@ class AgentLoopRequest:
     max_validation_corrections: int = 2
     max_discovery_attempts: int = 2
     max_tool_result_chars: int = 4096
+    model_max_attempts: int = 2
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
+    run_state_check: Callable[[], str | None] | None = None
 
 
 ###############################################################################
@@ -141,6 +154,7 @@ class AgentLoop:
             max_state_transitions=request.max_state_transitions,
         )
         try:
+            self._ensure_run_control(request)
             self._transition(state, AgentPhase.ROUTE_REQUEST, request.budget)
             route_result = await self._route(request, provider, messages)
             if route_result[0] is not None:
@@ -160,6 +174,7 @@ class AgentLoop:
             self._compile_native_goal(state, route)
 
             for iteration in range(max(1, request.max_iterations)):
+                self._ensure_run_control(request)
                 if state.model_calls >= request.max_model_calls:
                     return self._budget_outcome(state, request, "model_budget_exhausted")
                 self._transition(state, AgentPhase.BUILD_TOOL_CONTEXT, request.budget)
@@ -185,6 +200,7 @@ class AgentLoop:
                         result.tool_calls,
                         state,
                     )
+                    self._ensure_run_control(request)
                     messages.extend(
                         self._tool_result_messages(
                             result.tool_calls,
@@ -222,6 +238,9 @@ class AgentLoop:
                 if iteration + 1 >= request.max_iterations:
                     return self._budget_outcome(state, request, "no_progress")
             return self._budget_outcome(state, request, "no_progress")
+        except AgentRunControlSignal as exc:
+            state.termination_reason = exc.reason
+            return self._outcome(state, final_text, exc.reason, request)
         except asyncio.CancelledError:
             state.termination_reason = "cancelled"
             return self._outcome(state, final_text, "cancelled", request)
@@ -380,8 +399,12 @@ class AgentLoop:
         *,
         tool_choice: str,
     ) -> LLMResult:
+        self._ensure_run_control(request)
         request.budget.ensure_available("model_step")
-        metadata = {"supports_tools": True}
+        metadata = {
+            "supports_tools": True,
+            REQUEST_DEADLINE_METADATA_KEY: request.budget.deadline_monotonic,
+        }
         if request.provider.strip().lower() == "opencode-go":
             # OpenCode Go's thinking-mode models reject explicit tool_choice
             # values while tools are enabled.  Disabling thinking selects the
@@ -401,6 +424,7 @@ class AgentLoop:
         attempts = 0
         while True:
             attempts += 1
+            self._ensure_run_control(request)
             request.budget.ensure_available("model_step")
             remaining = request.budget.remaining_seconds()
             timeout = min(
@@ -418,17 +442,33 @@ class AgentLoop:
                     ),
                     timeout=timeout,
                 )
-                self._record_context_usage(request, result.context_usage, attempts)
+                self._ensure_run_control(request)
+                self._record_context_usage(
+                    request,
+                    result.context_usage
+                    or compute_context_usage(
+                        llm_request, provider=request.provider
+                    ).to_dict(),
+                    attempts,
+                )
                 return result
             except LLMProviderRequestError as exc:
-                self._record_context_usage(request, exc.context_usage, attempts)
-                if not exc.retryable or attempts >= 2:
+                self._record_context_usage(
+                    request,
+                    exc.context_usage
+                    or compute_context_usage(
+                        llm_request, provider=request.provider
+                    ).to_dict(),
+                    attempts,
+                )
+                if not exc.retryable or attempts >= max(1, request.model_max_attempts):
                     raise
                 request.budget.record_retry()
                 request.budget.ensure_available("model_retry")
                 await asyncio.sleep(
                     min(0.25, request.budget.remaining_seconds())
                 )
+                self._ensure_run_control(request)
                 request.budget.ensure_available("model_retry")
 
     # -------------------------------------------------------------------------
@@ -448,6 +488,20 @@ class AgentLoop:
             **dict(usage),
         }
         request.budget.record_context_allocation(trace_usage)
+        request.state.context_usage_trace.append(dict(trace_usage))
+        request.state.model_trace.append(
+            {
+                "attempt": attempt,
+                "model_call": request.state.model_calls,
+                "status": "observed",
+                "estimated_input_tokens": trace_usage.get(
+                    "estimated_input_tokens"
+                ),
+                "reported_input_tokens": trace_usage.get("reported_input_tokens"),
+                "reported_output_tokens": trace_usage.get("reported_output_tokens"),
+                "usage_source": trace_usage.get("usage_source"),
+            }
+        )
         callback = request.context_usage_callback
         if callback is None:
             return
@@ -471,6 +525,7 @@ class AgentLoop:
         semaphore = asyncio.Semaphore(max(1, request.max_parallel_tool_calls))
 
         async def execute(call: LLMToolCall) -> ToolResult:
+            self._ensure_run_control(request)
             fingerprint = self._fingerprint(call)
             cached = state.successful_fingerprints.get(fingerprint)
             if cached is not None:
@@ -494,6 +549,7 @@ class AgentLoop:
                     state,
                     request.budget,
                 )
+                self._ensure_run_control(request)
                 self._transition(state, AgentPhase.NORMALIZE_RESULT, request.budget)
                 return result
 
@@ -504,6 +560,7 @@ class AgentLoop:
         else:
             results = await asyncio.gather(*(execute(call) for call in bounded_calls))
         for call, result in zip(bounded_calls, results, strict=False):
+            self._ensure_run_control(request)
             fingerprint = self._fingerprint(call)
             if result.status == "failed":
                 state.failed_fingerprints[fingerprint] = (
@@ -518,6 +575,16 @@ class AgentLoop:
                     state.validation_corrections += 1
             else:
                 state.successful_fingerprints[fingerprint] = result
+            state.tool_trace.append(
+                {
+                    "call_id": result.call_id,
+                    "tool": result.tool_name,
+                    "status": result.status,
+                    "error_code": result.error.code if result.error else None,
+                    "recovery": result.error.recovery if result.error else None,
+                }
+            )
+            self._ensure_run_control(request)
             self._apply_result(state, result)
         return results
 
@@ -641,6 +708,18 @@ class AgentLoop:
                 )
             return "goal_satisfied", text
         return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _ensure_run_control(request: AgentLoopRequest) -> None:
+        check = request.run_state_check
+        if check is None:
+            return
+        signal = str(check() or "").strip().casefold()
+        if signal in {"cancelled", "canceled", "cancel_requested"}:
+            raise AgentRunControlSignal("cancelled")
+        if signal in {"superseded", "superseded_by_steering", "stale"}:
+            raise AgentRunControlSignal("superseded")
 
     # -------------------------------------------------------------------------
     @staticmethod
