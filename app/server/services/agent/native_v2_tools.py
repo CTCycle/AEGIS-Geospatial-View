@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from pydantic import BaseModel
@@ -248,9 +249,10 @@ def _registration(
 ###############################################################################
 def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
     async def execute(request: ExecuteCapabilityInput, state: AgentState) -> ToolResult:
-        location = _location_for_request(request, state)
+        bound_request = _bind_execute_request(request, state)
+        location = _location_for_request(bound_request, state)
         return await service.execute_capability(
-            request,
+            bound_request,
             ToolExecutionContext(
                 conversation_id=state.conversation_id,
                 run_id=state.run_id,
@@ -261,11 +263,126 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
     return execute
 
 
+def _bind_execute_request(
+    request: ExecuteCapabilityInput, state: AgentState
+) -> ExecuteCapabilityInput:
+    """Bind model intent to server-owned route, scope, and location values.
+
+    The model may select a capability and provide user-semantic filters, but
+    it must not be able to move an execution to a different resolved target or
+    smuggle provider geometry/time arguments through the generic arguments
+    object. The route compiler is the source of truth once it exists.
+    """
+
+    goal = state.goal
+    if goal is None:
+        return request
+
+    updates: dict[str, Any] = {
+        "operation": goal.operation or request.operation,
+        "arguments": _user_arguments(request.arguments),
+        "filters": {**goal.filters, **request.filters},
+        "bbox": None,
+    }
+    temporal = goal.temporal_scope
+    if temporal:
+        updates["start_time_iso"] = _optional_string(temporal.get("start_time_iso"))
+        updates["end_time_iso"] = _optional_string(temporal.get("end_time_iso"))
+        reference_time = _optional_string(temporal.get("reference_time_iso"))
+        if reference_time:
+            updates["arguments"] = {
+                **updates["arguments"],
+                "reference_time_iso": reference_time,
+            }
+
+    if not request.location_ref and len(goal.target_ids) == 1:
+        updates["location_ref"] = goal.target_ids[0]
+
+    bound = request.model_copy(update=updates)
+    location = _location_for_request(bound, state)
+    spatial = goal.spatial_scope[0] if goal.spatial_scope else {}
+    distance_m = _positive_float(spatial.get("distance_m"))
+    if distance_m is not None:
+        bound = bound.model_copy(update={"radius_m": distance_m})
+    if location is not None:
+        radius = distance_m or bound.radius_m
+        if radius is not None:
+            bound = bound.model_copy(
+                update={"bbox": _bbox_for_radius(location, radius)}
+            )
+        elif location.bbox:
+            bound = bound.model_copy(update={"bbox": list(location.bbox)})
+    return bound
+
+
+def _user_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Keep semantic provider arguments while removing invariant aliases."""
+
+    owned = {
+        "bbox",
+        "end",
+        "end_time",
+        "end_time_iso",
+        "latitude",
+        "location_ref",
+        "location_refs",
+        "longitude",
+        "radius",
+        "radius_m",
+        "start",
+        "start_time",
+        "start_time_iso",
+        "temporal_scope",
+        "time",
+    }
+    return {
+        key: value
+        for key, value in arguments.items()
+        if str(key).strip().casefold() not in owned
+    }
+
+
+def _optional_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _positive_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) and number > 0 else None
+
+
+def _bbox_for_radius(location: ResolvedLocation, radius_m: float) -> list[float]:
+    """Create a bounded approximate bbox from a resolved point and radius."""
+
+    latitude_delta = radius_m / 111_320.0
+    longitude_scale = max(0.01, math.cos(math.radians(location.latitude)))
+    longitude_delta = radius_m / (111_320.0 * longitude_scale)
+    return [
+        max(-180.0, location.longitude - longitude_delta),
+        max(-90.0, location.latitude - latitude_delta),
+        min(180.0, location.longitude + longitude_delta),
+        min(90.0, location.latitude + latitude_delta),
+    ]
+
+
 ###############################################################################
 def _location_for_request(
     request: ExecuteCapabilityInput, state: AgentState
 ) -> ResolvedLocation | None:
     requested = normalize_target_key(str(request.location_ref or ""))
+    goal_targets = {
+        normalize_target_key(str(item))
+        for item in (state.goal.target_ids if state.goal is not None else [])
+        if normalize_target_key(str(item))
+    }
+    if goal_targets and requested not in goal_targets:
+        return None
     if requested:
         for key, location in state.location_refs.items():
             if normalize_target_key(str(key)) == requested:
@@ -327,6 +444,17 @@ def _capability_semantic_validator(
 ) -> list[str]:
     if state.capability_ids and request.capability_id not in state.capability_ids:
         return ["capability_id is outside the validated route shortlist."]
+    goal_targets = {
+        normalize_target_key(str(item))
+        for item in (state.goal.target_ids if state.goal is not None else [])
+        if normalize_target_key(str(item))
+    }
+    requested_target = normalize_target_key(str(request.location_ref or ""))
+    if goal_targets and requested_target not in goal_targets:
+        return [
+            "location_ref must match an exact target in the validated goal; "
+            "another geography will not be substituted."
+        ]
     if request.location_ref:
         if _location_for_request(request, state) is None:
             return [

@@ -604,11 +604,11 @@ class AgentLoop:
                 )
             return None
         if results and all(result.status == "failed" for result in results):
+            if state.consecutive_tool_failures >= max_consecutive_tool_failures:
+                return "failed", "The agent stopped after repeated tool failures."
             if actionable_recovery:
                 return None
             return "failed", "The requested tool could not complete successfully."
-        if state.consecutive_tool_failures >= max_consecutive_tool_failures:
-            return "failed", "The agent stopped after repeated tool failures."
         return None
 
     # -------------------------------------------------------------------------
@@ -701,7 +701,19 @@ class AgentLoop:
     @staticmethod
     def _compile_native_goal(state: AgentState, route: CapabilityRoute) -> None:
         canonical = state.canonical_request
-        operation = next(
+        route_temporal_scope = route.temporal_scope.model_dump(mode="json")
+        route_has_temporal_scope = any(
+            route_temporal_scope.get(key)
+            for key in (
+                "reference_time_iso",
+                "start_time_iso",
+                "end_time_iso",
+            )
+        ) or route_temporal_scope.get("mode") != "none" or any(
+            route_temporal_scope.get(key) not in {None, "none", ""}
+            for key in ("granularity", "aggregation")
+        )
+        operation = route.operation or next(
             (
                 str(item).strip()
                 for item in (canonical.operations if canonical else [])
@@ -709,22 +721,30 @@ class AgentLoop:
             ),
             route.primary_domain.value,
         )
-        target_ids = (
-            [str(item.target_id) for item in canonical.targets]
-            if canonical is not None
-            else []
-        )
+        target_ids = list(dict.fromkeys(str(item).strip() for item in route.target_refs if str(item).strip()))
+        if not target_ids and canonical is not None:
+            target_ids = [str(item.target_id) for item in canonical.targets]
         temporal_scope = (
-            canonical.temporal_constraints.model_dump(mode="json")
-            if canonical is not None
-            else {}
+            route_temporal_scope
+            if route_has_temporal_scope
+            else (
+                canonical.temporal_constraints.model_dump(mode="json")
+                if canonical is not None
+                else {}
+            )
         )
         spatial_scope = (
-            [item.model_dump(mode="json") for item in canonical.spatial_constraints]
-            if canonical is not None
-            else []
+            [route.spatial_scope.model_dump(mode="json")]
+            if route.spatial_scope is not None
+            else (
+                [item.model_dump(mode="json") for item in canonical.spatial_constraints]
+                if canonical is not None
+                else []
+            )
         )
-        filters = dict(canonical.filters) if canonical is not None else {}
+        filters = dict(route.filters)
+        if not filters and canonical is not None:
+            filters = dict(canonical.filters)
         requirements: list[str] = []
         if route.requires_location:
             requirements.append("location_resolved")
@@ -734,6 +754,15 @@ class AgentLoop:
         }
         if route.task_mode == "execute" and data_route:
             requirements.append("required_data_retrieved")
+        if route.task_mode == "execute" and route_has_temporal_scope and temporal_scope and (
+            temporal_scope.get("mode") != "none"
+            or temporal_scope.get("start_time_iso") is not None
+            or temporal_scope.get("end_time_iso") is not None
+            or temporal_scope.get("reference_time_iso") is not None
+        ):
+            requirements.append("temporal_scope_applied")
+        if route.task_mode == "execute" and route.spatial_scope is not None:
+            requirements.append("spatial_scope_applied")
         if route.presentation in {"map", "both"}:
             requirements.append("map_candidate_prepared")
         state.completion_requirements = list(dict.fromkeys(requirements))
@@ -761,6 +790,7 @@ class AgentLoop:
                     temporal_scope.get("mode") != "none"
                     or temporal_scope.get("start_time_iso") is not None
                     or temporal_scope.get("end_time_iso") is not None
+                    or temporal_scope.get("reference_time_iso") is not None
                 )
             ),
             spatial_scope_required=bool(spatial_scope),
@@ -785,11 +815,28 @@ class AgentLoop:
             "location_resolved": bool(state.location_refs)
             or state.active_map_session is not None,
             "required_data_retrieved": completed_data,
+            # Scope is bound by the server-owned execution adapter.  A
+            # successful/empty/partial capability observation therefore proves
+            # that the selected temporal and spatial contract was applied to
+            # the provider request, without trusting model-supplied geometry.
+            "temporal_scope_applied": completed_data,
+            "spatial_scope_applied": completed_data,
             "map_candidate_prepared": state.prepared_map_session is not None,
         }
+        required_names = list(state.completion_contract.requirements)
+        if (
+            state.completion_contract.temporal_scope_required
+            and "temporal_scope_applied" not in required_names
+        ):
+            required_names.append("temporal_scope_applied")
+        if (
+            state.completion_contract.spatial_scope_required
+            and "spatial_scope_applied" not in required_names
+        ):
+            required_names.append("spatial_scope_applied")
         return [
             name
-            for name in state.completion_contract.requirements
+            for name in required_names
             if not checks.get(name, False)
         ]
 
@@ -1013,7 +1060,14 @@ class AgentLoop:
             stopped_reason=reason,  # type: ignore[arg-type]
             model_calls=state.model_calls,
             tool_results=list(state.tool_results),
-            failure_category="context_limit" if reason == "no_progress" else None,
+            # Keep the stop reason intact.  Context pressure, a transition
+            # limit, and a no-progress guard have different remediation paths.
+            failure_category=reason,
+            failure_detail=(
+                "The agent made no progress toward its completion contract."
+                if reason == "no_progress"
+                else "The agent reached its configured execution limit."
+            ),
         )
 
 
