@@ -31,7 +31,6 @@ from server.domain.llm.types import LLMRequest, LLMResult, LLMToolCall, LLMToolD
 from server.prompts.agent import build_native_context_messages
 from server.prompts.capability_route import build_capability_route_prompt
 from server.services.agent.capability_router import CapabilityRouter
-from server.services.agent.completion import CompletionEvaluator
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.errors import LLMProviderRequestError, LLMStructuredOutputError
@@ -633,17 +632,13 @@ class AgentLoop:
                     "no_progress" if tools else "insufficient_evidence",
                     text,
                 )
-            evaluation = CompletionEvaluator.evaluate_proposed_stop(
-                canonical_request=state.canonical_request,
-                presentation_required=route.presentation in {"map", "both"},
-                map_prepared=False,
-                evidence_refs=state.evidence_refs,
-                available_tools=tools if state.context_hydrated else [],
-                clarification_required=False,
-                provider_error=False,
-            )
-            if not evaluation.satisfied:
-                return evaluation.reason, text
+            if route.presentation in {"map", "both"}:
+                return (
+                    "no_progress"
+                    if tools and state.context_hydrated
+                    else "insufficient_evidence",
+                    text,
+                )
             return "goal_satisfied", text
         return None
 
