@@ -86,6 +86,25 @@ from server.services.search.request_builder import RequestBuilder
 from server.contracts.geospatial import MapSession
 
 ###############################################################################
+class _RunControlAbort(RuntimeError):
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
+def _ensure_run_state_current(
+    check: Callable[[], str | None] | None,
+) -> None:
+    if check is None:
+        return
+    signal = str(check() or "").strip().casefold()
+    if signal in {"cancelled", "canceled", "cancel_requested"}:
+        raise _RunControlAbort("cancelled")
+    if signal in {"superseded", "superseded_by_steering", "stale"}:
+        raise _RunControlAbort("superseded")
+
+
+###############################################################################
 class AgentOrchestrator:
     RUN_TIMEOUT_SECONDS = INTERPRETATION_RUN_SECONDS
     _compose_map_session_message = staticmethod(
@@ -245,6 +264,7 @@ class AgentOrchestrator:
         settings: Any,
         execution_budget: AgentExecutionBudget,
         defer_map_commit: bool,
+        run_state_check: Callable[[], str | None] | None = None,
     ) -> ChatTurnResponse:
         if self.native_v2_runner is None:
             raise RuntimeError("Native-v2 mode requires a composed native runner.")
@@ -294,8 +314,10 @@ class AgentOrchestrator:
                         usage=usage,
                     )
                 ),
+                run_state_check=run_state_check,
             )
         )
+        _ensure_run_state_current(run_state_check)
         tool_payload = _native_tool_payload(native_response)
         map_session = native_response.map_session
         operation = native_response.operation
@@ -450,6 +472,7 @@ class AgentOrchestrator:
         *,
         defer_map_commit: bool = False,
         agent_run_id: str | None = None,
+        run_state_check: Callable[[], str | None] | None = None,
     ) -> ChatTurnResponse:
         # Conversation state, task state, and persistence revisions are
         # mutable by design. Serialize turns for one conversation so a stale
@@ -463,6 +486,7 @@ class AgentOrchestrator:
                 progress_callback,
                 defer_map_commit=defer_map_commit,
                 agent_run_id=agent_run_id,
+                run_state_check=run_state_check,
             )
 
     # -------------------------------------------------------------------------
@@ -550,7 +574,9 @@ class AgentOrchestrator:
         *,
         defer_map_commit: bool = False,
         agent_run_id: str | None = None,
+        run_state_check: Callable[[], str | None] | None = None,
     ) -> ChatTurnResponse:
+        _ensure_run_state_current(run_state_check)
         execution_budget = self._new_execution_budget()
         conversation_id = payload.conversation_id
         if hasattr(self.response_synthesizer, "last_context_usage"):
@@ -583,7 +609,9 @@ class AgentOrchestrator:
             execution_budget=execution_budget,
             defer_map_commit=defer_map_commit,
             agent_run_id=agent_run_id,
+            run_state_check=run_state_check,
         )
+        _ensure_run_state_current(run_state_check)
         synthesis_usage = getattr(self.response_synthesizer, "last_context_usage", None)
         self._emit_context_usage(
             progress_callback,
@@ -957,7 +985,9 @@ class AgentOrchestrator:
         execution_budget: AgentExecutionBudget | None = None,
         defer_map_commit: bool = False,
         agent_run_id: str | None = None,
+        run_state_check: Callable[[], str | None] | None = None,
     ) -> ChatTurnResponse:
+        _ensure_run_state_current(run_state_check)
         execution_budget = execution_budget or self._new_execution_budget()
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
         LOGGER.info(
@@ -1050,6 +1080,7 @@ class AgentOrchestrator:
         self._context_packages[conversation_key] = context_package
         execution_budget.record_context_allocation(context_package.context_allocation)
         recent_messages = context_package.recent_messages
+        _ensure_run_state_current(run_state_check)
 
         if self._agent_loop_mode() == "native_v2":
             execution_budget.execution_mode = "native_v2"
@@ -1076,6 +1107,7 @@ class AgentOrchestrator:
                 settings=settings,
                 execution_budget=execution_budget,
                 defer_map_commit=defer_map_commit,
+                run_state_check=run_state_check,
             )
 
         parser_kwargs: dict[str, Any] = {

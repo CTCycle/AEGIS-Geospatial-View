@@ -38,6 +38,7 @@ class NativeV2TurnRequest:
     defer_map_commit: bool = False
     run_id: str | None = None
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
+    run_state_check: Callable[[], str | None] | None = None
 
 
 ###############################################################################
@@ -105,7 +106,11 @@ class NativeV2TurnRunner:
                 max_tool_result_chars=_setting(
                     self.execution_settings, "max_tool_result_chars", 4096
                 ),
+                model_max_attempts=_setting(
+                    self.execution_settings, "model_max_attempts", 2
+                ),
                 context_usage_callback=request.context_usage_callback,
+                run_state_check=request.run_state_check,
             )
         )
         return NativeV2ResponseBuilder.build(

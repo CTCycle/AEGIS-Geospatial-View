@@ -371,9 +371,58 @@ async def test_native_model_context_usage_is_recorded_and_emitted() -> None:
             "model": "fake-model",
             "attempt": 1,
             "model_call": 1,
-            **usage,
+        **usage,
         }
     ]
+    assert request.state.context_usage_trace[0]["reported_input_tokens"] == 110
+    assert request.state.model_trace[0]["status"] == "observed"
+
+
+@pytest.mark.asyncio
+async def test_run_control_stops_before_a_superseded_model_result_is_applied() -> None:
+    provider = FakeProvider(
+        [
+            _route_call(),
+            LLMResult(
+                content="",
+                tool_calls=[LLMToolCall(id="call-1", name="test_tool", arguments={})],
+            ),
+        ]
+    )
+
+    def check() -> str | None:
+        return "superseded" if len(provider.requests) >= 2 else None
+
+    outcome = await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            run_state_check=check,
+        )
+    )
+
+    assert outcome.stopped_reason == "superseded"
+    assert outcome.state.tool_calls == 0
+    assert outcome.state.termination_reason == "superseded"
+
+
+@pytest.mark.asyncio
+async def test_run_control_stops_cancelled_request_before_provider_call() -> None:
+    provider = FakeProvider([_route_call()])
+    outcome = await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            run_state_check=lambda: "cancelled",
+        )
+    )
+
+    assert outcome.stopped_reason == "cancelled"
+    assert provider.requests == []
 
 
 ###############################################################################

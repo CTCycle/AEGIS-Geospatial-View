@@ -168,6 +168,9 @@ class AgentState(BaseModel):
     omitted_message_ids: list[int] = Field(default_factory=list)
     summarized_through_turn_index: int = 0
     context_allocation: dict[str, object] = Field(default_factory=dict)
+    context_usage_trace: list[dict[str, object]] = Field(default_factory=list)
+    model_trace: list[dict[str, object]] = Field(default_factory=list)
+    tool_trace: list[dict[str, object]] = Field(default_factory=list)
     context_hydrated: bool = False
     route: CapabilityRoute | None = None
     capability_ids: list[str] = Field(default_factory=list)
