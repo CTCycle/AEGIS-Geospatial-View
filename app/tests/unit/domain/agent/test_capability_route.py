@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from server.domain.agent.capability_route import (
     AgentPhase,
+    AgentRunState,
     AgentState,
     CapabilityDomain,
     CapabilityRoute,
@@ -62,3 +63,23 @@ def test_agent_state_tracks_native_loop_counters() -> None:
             user_message="Find Zurich.",
             unexpected=True,
         )
+
+
+###############################################################################
+def test_agent_run_state_is_the_single_checkpointable_native_state() -> None:
+    state = AgentRunState(
+        request_id="req-1",
+        run_id="run-1",
+        run_version=3,
+        conversation_revision=7,
+        conversation_id="conversation-1",
+        phase=AgentPhase.ROUTE_REQUEST,
+        user_message="Find Zurich.",
+    )
+
+    restored = AgentRunState.from_checkpoint(state.checkpoint())
+
+    assert AgentState is AgentRunState
+    assert restored.run_version == 3
+    assert restored.conversation_revision == 7
+    assert restored.request_id == state.request_id

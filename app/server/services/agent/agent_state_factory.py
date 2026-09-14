@@ -26,6 +26,8 @@ class AgentStateFactory:
         location_refs: Mapping[str, ResolvedLocation] | None = None,
         evidence_refs: list[str] | None = None,
         context_package: AgentContextPackage | None = None,
+        run_version: int = 1,
+        conversation_revision: int = 0,
     ) -> AgentState:
         normalized_message = str(user_message).strip()
         if not normalized_message:
@@ -64,6 +66,8 @@ class AgentStateFactory:
         return AgentState(
             request_id=str(request_id),
             run_id=str(run_id) if run_id is not None else None,
+            run_version=run_version,
+            conversation_revision=conversation_revision,
             conversation_id=str(conversation_id),
             phase=AgentPhase.RECEIVE_REQUEST,
             user_message=normalized_message,

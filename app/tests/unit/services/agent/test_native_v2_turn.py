@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import deque
 from typing import Any
 
+import pytest
 from pydantic import BaseModel
 
 from server.domain.agent.capability_domains import CapabilityDomain
@@ -157,6 +158,7 @@ async def _run(provider: _Provider):
 
 
 ###############################################################################
+@pytest.mark.asyncio
 async def test_native_runner_returns_bounded_response_contract() -> None:
     response = await _run(_Provider([_route_call(), LLMResult(content="Found them.")]))
 
@@ -169,6 +171,7 @@ async def test_native_runner_returns_bounded_response_contract() -> None:
 
 
 ###############################################################################
+@pytest.mark.asyncio
 async def test_native_runner_marks_map_text_without_candidate_failed() -> None:
     route = _route_call()
     route.tool_calls[0] = LLMToolCall(
@@ -188,6 +191,7 @@ async def test_native_runner_marks_map_text_without_candidate_failed() -> None:
 
 
 ###############################################################################
+@pytest.mark.asyncio
 async def test_native_runner_preserves_location_refs_in_response() -> None:
     location = ResolvedLocation(
         label="Rome",

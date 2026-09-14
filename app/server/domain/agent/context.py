@@ -40,3 +40,56 @@ class AgentContextPackage(BaseModel):
     summarized_through_turn_index: int = 0
     omitted_message_ids: list[int] = Field(default_factory=lambda: list[int]())
     context_allocation: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+
+
+###############################################################################
+class AgentContextView(BaseModel):
+    """Ephemeral, bounded semantic projection for one model decision.
+
+    Conversation state and the checkpointable run state remain authoritative;
+    this view is rebuilt before every model call and is never used as a durable
+    source of truth.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    active_instructions: list[dict[str, Any]] = Field(default_factory=list)
+    task_state: dict[str, Any] = Field(default_factory=dict)
+    map_memory: dict[str, Any] = Field(default_factory=dict)
+    conversation_summary: dict[str, Any] | None = None
+    relevant_tool_outcomes: list[dict[str, Any]] = Field(default_factory=list)
+    recent_observations: list[dict[str, Any]] = Field(default_factory=list)
+    policy_constraints: dict[str, Any] = Field(default_factory=dict)
+    context_selection: dict[str, Any] = Field(default_factory=dict)
+
+    @classmethod
+    def from_state(
+        cls,
+        state: Any,
+        *,
+        recent_observations: list[dict[str, Any]] | None = None,
+    ) -> "AgentContextView":
+        """Build a model view without persisting or mutating state."""
+
+        return cls(
+            active_instructions=[dict(item) for item in state.active_instructions],
+            task_state=dict(state.task_state),
+            map_memory=dict(state.map_memory),
+            conversation_summary=(
+                dict(state.conversation_summary)
+                if state.conversation_summary is not None
+                else None
+            ),
+            relevant_tool_outcomes=[
+                dict(item) for item in state.relevant_tool_outcomes
+            ],
+            recent_observations=[
+                dict(item) for item in (recent_observations or [])
+            ],
+            policy_constraints=dict(state.policy_constraints),
+            context_selection={
+                "included_message_ids": list(state.included_message_ids),
+                "omitted_message_ids": list(state.omitted_message_ids),
+                "summarized_through_turn_index": state.summarized_through_turn_index,
+            },
+        )

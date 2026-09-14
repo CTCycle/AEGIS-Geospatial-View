@@ -16,6 +16,7 @@ from server.domain.agent.capability_route import (
     CapabilityRoute,
     CompletionContract,
 )
+from server.domain.agent.context import AgentContextView
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.reliability import (
     AgentExecutionBudget,
@@ -156,7 +157,11 @@ class AgentLoop:
         try:
             self._ensure_run_control(request)
             self._transition(state, AgentPhase.ROUTE_REQUEST, request.budget)
-            route_result = await self._route(request, provider, messages)
+            route_result = (
+                (None, "", state.route)
+                if state.route is not None
+                else await self._route(request, provider, messages)
+            )
             if route_result[0] is not None:
                 final_text, reason = route_result[0], route_result[1]
                 state.termination_reason = reason
@@ -208,6 +213,10 @@ class AgentLoop:
                             max_chars=request.max_tool_result_chars,
                         )
                     )
+                    state.provider_continuation = [
+                        dict(item)
+                        for item in self._protocol_messages(messages)[-64:]
+                    ]
                     self._transition(state, AgentPhase.UPDATE_STATE, request.budget)
                     self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
                     stop = self._evaluate_stop(
@@ -354,23 +363,26 @@ class AgentLoop:
             ).model_dump(mode="json", exclude_none=True)
             for result in state.tool_results[-8:]
         ]
+        view = AgentContextView.from_state(
+            state,
+            recent_observations=observations,
+        )
         context = build_native_context_messages(
             current_user_message=state.user_message,
             recent_messages=state.recent_messages,
-            active_instructions=state.active_instructions,
-            task_state=state.task_state,
-            map_memory=state.map_memory,
-            conversation_summary=state.conversation_summary,
-            relevant_tool_outcomes=state.relevant_tool_outcomes,
-            recent_observations=observations,
-            policy_constraints=state.policy_constraints,
-            context_selection={
-                "included_message_ids": state.included_message_ids,
-                "omitted_message_ids": state.omitted_message_ids,
-                "summarized_through_turn_index": state.summarized_through_turn_index,
-            },
+            active_instructions=view.active_instructions,
+            task_state=view.task_state,
+            map_memory=view.map_memory,
+            conversation_summary=view.conversation_summary,
+            relevant_tool_outcomes=view.relevant_tool_outcomes,
+            recent_observations=view.recent_observations,
+            policy_constraints=view.policy_constraints,
+            context_selection=view.context_selection,
         )
-        return [*context, *self._protocol_messages(messages)]
+        protocol_messages = self._protocol_messages(messages)
+        if not protocol_messages and state.provider_continuation:
+            protocol_messages = [dict(item) for item in state.provider_continuation]
+        return [*context, *protocol_messages]
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1135,6 +1147,7 @@ class AgentLoop:
         reason: str,
         request: AgentLoopRequest,
     ) -> AgentLoopOutcome:
+        state.budget_snapshot = request.budget.snapshot()
         target_phase = (
             AgentPhase.AWAIT_RENDER
             if reason == "awaiting_render"
@@ -1148,6 +1161,7 @@ class AgentLoop:
             # The terminal record itself must remain writable when the last
             # permitted transition was consumed by the failed operation.
             self._transition(state, target_phase, count=False)
+        state.budget_snapshot = request.budget.snapshot()
         return AgentLoopOutcome(
             final_text=final_text,
             state=state,
@@ -1166,6 +1180,7 @@ class AgentLoop:
         category: str,
     ) -> AgentLoopOutcome:
         state.termination_reason = "failed"
+        state.budget_snapshot = request.budget.snapshot()
         try:
             self._transition(state, AgentPhase.FAILED, request.budget)
         except ExecutionBudgetExceeded:
@@ -1190,6 +1205,7 @@ class AgentLoop:
         state.termination_reason = reason
         request.budget.terminal_reason = reason
         request.budget.stopping_reason = reason
+        state.budget_snapshot = request.budget.snapshot()
         self._transition(state, AgentPhase.FAILED, count=False)
         return AgentLoopOutcome(
             final_text="The agent reached its configured execution limit.",

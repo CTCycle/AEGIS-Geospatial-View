@@ -13,6 +13,7 @@ from server.contracts.chat import (
 )
 from server.contracts.geospatial import MapSession
 from server.domain.agent.context import AgentContextPackage
+from server.domain.agent.capability_route import AgentState
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.domain.agent.reliability import AgentExecutionBudget
@@ -35,6 +36,9 @@ class NativeV2TurnRequest:
     location_refs: Mapping[str, ResolvedLocation] = field(default_factory=dict)
     evidence_refs: list[str] = field(default_factory=list)
     canonical_request: CanonicalRequestInterpretation | None = None
+    run_version: int = 1
+    conversation_revision: int = 0
+    checkpoint: Mapping[str, Any] | None = None
     defer_map_commit: bool = False
     run_id: str | None = None
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
@@ -52,17 +56,32 @@ class NativeV2TurnRunner:
 
     # -------------------------------------------------------------------------
     async def run(self, request: NativeV2TurnRequest) -> NativeV2TurnResponse:
-        state = AgentStateFactory.create(
-            request_id=request.request_id,
-            run_id=request.run_id,
-            conversation_id=request.conversation_id,
-            user_message=request.user_message,
-            active_map_session=request.active_map_session,
-            location_refs=request.location_refs,
-            evidence_refs=request.evidence_refs,
-            context_package=request.context_package,
-        )
-        state.canonical_request = request.canonical_request
+        if request.checkpoint is not None:
+            state = AgentState.from_checkpoint(dict(request.checkpoint))
+            if (
+                state.request_id != request.request_id
+                or state.conversation_id != request.conversation_id
+            ):
+                raise ValueError("Native run checkpoint belongs to another request.")
+            state.user_message = request.user_message.strip()
+            state.run_id = request.run_id
+            state.run_version = request.run_version
+            state.conversation_revision = request.conversation_revision
+            state.termination_reason = None
+        else:
+            state = AgentStateFactory.create(
+                request_id=request.request_id,
+                run_id=request.run_id,
+                conversation_id=request.conversation_id,
+                user_message=request.user_message,
+                active_map_session=request.active_map_session,
+                location_refs=request.location_refs,
+                evidence_refs=request.evidence_refs,
+                context_package=request.context_package,
+                run_version=request.run_version,
+                conversation_revision=request.conversation_revision,
+            )
+            state.canonical_request = request.canonical_request
         outcome = await self.agent_loop.run(
             AgentLoopRequest(
                 provider=request.provider,
@@ -165,6 +184,11 @@ class NativeV2ResponseBuilder:
                 "transition_trace": list(state.transition_trace[-64:]),
                 "exposure_trace": list(state.exposure_trace[-64:]),
                 "termination_reason": state.termination_reason,
+                "budget": dict(state.budget_snapshot),
+                "context_usage_trace": list(state.context_usage_trace[-16:]),
+                "model_trace": list(state.model_trace[-16:]),
+                "tool_trace": list(state.tool_trace[-32:]),
+                "checkpoint": state.checkpoint(),
             },
             location_refs=dict(state.location_refs),
         )

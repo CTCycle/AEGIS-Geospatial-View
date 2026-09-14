@@ -146,11 +146,16 @@ class AgentPhase(StrEnum):
     FAILED = "failed"
 
 ###############################################################################
-class AgentState(BaseModel):
+class AgentRunState(BaseModel):
+    """Canonical mutable/checkpointable state for one native agent run."""
+
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
+    schema_version: Literal[1] = 1
     request_id: str
     run_id: str | None = None
+    run_version: int = Field(default=1, ge=1)
+    conversation_revision: int = Field(default=0, ge=0)
     conversation_id: str
     phase: AgentPhase
     user_message: str
@@ -171,6 +176,9 @@ class AgentState(BaseModel):
     context_usage_trace: list[dict[str, object]] = Field(default_factory=list)
     model_trace: list[dict[str, object]] = Field(default_factory=list)
     tool_trace: list[dict[str, object]] = Field(default_factory=list)
+    # Provider protocol items are retained only for continuation/resume. They
+    # are never used as the semantic state view.
+    provider_continuation: list[dict[str, object]] = Field(default_factory=list)
     context_hydrated: bool = False
     route: CapabilityRoute | None = None
     capability_ids: list[str] = Field(default_factory=list)
@@ -191,4 +199,21 @@ class AgentState(BaseModel):
     transition_trace: list[dict[str, str]] = Field(default_factory=list)
     exposure_trace: list[dict[str, str]] = Field(default_factory=list)
     discovery_attempts: int = Field(default=0, ge=0)
+    budget_snapshot: dict[str, object] = Field(default_factory=dict)
     termination_reason: str | None = None
+
+    def checkpoint(self) -> dict[str, Any]:
+        """Return a JSON-safe checkpoint excluding no semantic run state."""
+
+        return self.model_dump(mode="json")
+
+    @classmethod
+    def from_checkpoint(cls, payload: dict[str, Any]) -> "AgentRunState":
+        """Restore one validated native run checkpoint."""
+
+        return cls.model_validate(payload)
+
+
+# Short-lived source compatibility for callers being migrated to the canonical
+# name.  This is an alias, not a second model or state representation.
+AgentState = AgentRunState
