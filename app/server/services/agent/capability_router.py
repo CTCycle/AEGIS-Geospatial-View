@@ -8,6 +8,7 @@ from server.domain.agent.capability_route import (
     CapabilityRoute,
     CapabilityRouteDecision,
 )
+from server.domain.agent.decision import ResolvedLocation
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
@@ -65,6 +66,13 @@ class CapabilityRouter:
         ):
             proposed = proposed.model_copy(update={"requires_location": True})
             reasons.append("location_required_for_new_map")
+        if (
+            proposed.task_mode == "execute"
+            and (proposed.target_refs or proposed.spatial_scope is not None)
+            and not proposed.requires_location
+        ):
+            proposed = proposed.model_copy(update={"requires_location": True})
+            reasons.append("location_required_for_semantic_scope")
 
         route_domains = {proposed.primary_domain, *proposed.secondary_domains}
         if proposed.primary_domain is CapabilityDomain.MAP_STATE:
@@ -108,6 +116,19 @@ class CapabilityRouter:
                 explicit_ids=valid_explicit_ids,
                 runtime_registry=self.runtime_registry,
                 limit=12,
+                operation=proposed.operation,
+                scope_kind=(
+                    proposed.spatial_scope.kind
+                    if proposed.spatial_scope is not None
+                    else None
+                ),
+                temporal_mode=(
+                    proposed.temporal_scope.mode
+                    if proposed.temporal_scope.mode != "none"
+                    else None
+                ),
+                requires_render=proposed.presentation in {"map", "both"},
+                location=_single_known_location(active_state),
             )
         )
         capability_ids = [
@@ -160,3 +181,11 @@ def _is_executable_candidate(capability: dict[str, object]) -> bool:
         or ""
     ).strip().casefold()
     return kind != "basemap"
+
+
+def _single_known_location(state: AgentState) -> ResolvedLocation | None:
+    if len(state.location_refs) == 1:
+        return next(iter(state.location_refs.values()))
+    if state.active_map_session is not None:
+        return state.active_map_session.resolved_location
+    return None

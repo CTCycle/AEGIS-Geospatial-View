@@ -5,7 +5,12 @@ from typing import Any
 import pytest
 
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentPhase, AgentState, CapabilityRoute
+from server.domain.agent.capability_route import (
+    AgentGoal,
+    AgentPhase,
+    AgentState,
+    CapabilityRoute,
+)
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.contracts.geospatial import (
@@ -15,7 +20,9 @@ from server.contracts.geospatial import (
 from server.services.agent.capability_execution import ToolExecutionContext
 from server.services.agent.native_v2_tools import register_native_v2_tools
 from server.services.agent.native_v2_tools import _execute_capability_handler
+from server.services.agent.native_v2_tools import _bind_execute_request
 from server.services.agent.native_v2_tools import _location_for_request
+from server.services.agent.native_v2_tools import _capability_semantic_validator
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.agent.tool_definitions import ProviderLayerDiscoveryInput
@@ -77,6 +84,7 @@ class FakeCapabilityExecutionService:
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.context: ToolExecutionContext | None = None
+        self.request: ExecuteCapabilityInput | None = None
 
     # -------------------------------------------------------------------------
     async def execute_capability(
@@ -87,6 +95,7 @@ class FakeCapabilityExecutionService:
         location: ResolvedLocation | None = None,
     ) -> ToolResult:
         self.context = context
+        self.request = _request
         return ToolResult(
             call_id=context.call_id,
             tool_name="execute_geospatial_capability",
@@ -153,6 +162,85 @@ async def test_compatibility_state_has_no_foreign_run_id() -> None:
 
     assert service.context is not None
     assert service.context.run_id is None
+
+
+def test_execute_binding_preserves_semantics_but_owns_scope_and_coordinates() -> None:
+    state = _state()
+    state.location_refs["zurich"] = ResolvedLocation(
+        label="Zurich", latitude=47.3769, longitude=8.5417
+    )
+    state.goal = AgentGoal(
+        goal="Show hospitals around Zurich tomorrow",
+        task_mode="execute",
+        presentation="map",
+        operation="search",
+        requires_location=True,
+        target_ids=["zurich"],
+        temporal_scope={
+            "mode": "forecast",
+            "start_time_iso": "2026-09-15T00:00:00Z",
+            "end_time_iso": "2026-09-16T00:00:00Z",
+        },
+        spatial_scope=[
+            {"kind": "radius", "relationship": "around", "distance_m": 5000}
+        ],
+        filters={"amenity": "hospital"},
+    )
+    bound = _bind_execute_request(
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals",
+            operation="provider_internal_operation",
+            location_ref="zurich",
+            bbox=[0, 0, 1, 1],
+            radius_m=1,
+            start_time_iso="1900-01-01T00:00:00Z",
+            arguments={
+                "latitude": 0,
+                "longitude": 0,
+                "bbox": [0, 0, 1, 1],
+                "start_time_iso": "1900-01-01T00:00:00Z",
+                "category": "hospital",
+            },
+            filters={"emergency": True},
+        ),
+        state,
+    )
+
+    assert bound.operation == "search"
+    assert bound.location_ref == "zurich"
+    assert bound.radius_m == 5000
+    assert bound.start_time_iso == "2026-09-15T00:00:00Z"
+    assert bound.end_time_iso == "2026-09-16T00:00:00Z"
+    assert bound.bbox is not None
+    assert bound.bbox[0] < 8.5417 < bound.bbox[2]
+    assert bound.bbox[1] < 47.3769 < bound.bbox[3]
+    assert bound.arguments == {"category": "hospital"}
+    assert bound.filters == {"amenity": "hospital", "emergency": True}
+
+
+def test_goal_target_reference_is_required_and_cannot_be_replaced() -> None:
+    state = _state()
+    state.goal = AgentGoal(
+        goal="Show hospitals around Zurich",
+        task_mode="execute",
+        presentation="text",
+        operation="search",
+        requires_location=True,
+        target_ids=["zurich"],
+    )
+
+    errors = _capability_semantic_validator(
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals",
+            location_ref="rome",
+        ),
+        state,
+    )
+
+    assert errors == [
+        "location_ref must match an exact target in the validated goal; "
+        "another geography will not be substituted."
+    ]
 
 
 ###############################################################################

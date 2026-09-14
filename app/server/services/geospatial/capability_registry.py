@@ -9,6 +9,7 @@ from server.domain.geospatial.registry import (
     GeospatialManifestSnapshot,
 )
 from server.domain.agent.capability_domains import CapabilityDomain
+from server.domain.agent.decision import ResolvedLocation
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
 ###############################################################################
@@ -348,6 +349,11 @@ class CapabilityRegistry:
         explicit_ids: list[str],
         runtime_registry: RuntimeEligibility,
         limit: int = 12,
+        operation: str | None = None,
+        scope_kind: str | None = None,
+        temporal_mode: str | None = None,
+        requires_render: bool = False,
+        location: ResolvedLocation | None = None,
     ) -> list[dict[str, Any]]:
         """Return eligible routing candidates without selecting final tools.
 
@@ -382,6 +388,21 @@ class CapabilityRegistry:
             if requested_domains and CapabilityDomain.MIXED not in requested_domains:
                 if not declared_domains.intersection(requested_domains):
                     continue
+            contract = normalized_execution_contract(item)
+            if not _contract_supports(
+                contract,
+                operation=operation,
+                scope_kind=scope_kind,
+                temporal_mode=temporal_mode,
+                requires_render=requires_render
+                and _has_explicit_execution_contract(item),
+            ):
+                continue
+            if location is not None and not _coverage_matches(
+                str(contract.get("coverage") or item.get("coverage") or ""),
+                location,
+            ):
+                continue
             searchable = _searchable_text(item)
             query_score = sum(1 for token in normalized_queries if token in searchable)
             explicit_index = (
@@ -403,6 +424,7 @@ class CapabilityRegistry:
             candidate = dict(item)
             candidate["routing_score"] = score
             candidate["routing_domains"] = sorted(domain.value for domain in declared_domains)
+            candidate["routing_contract"] = contract
             candidate["runtime_eligible"] = True
             candidates.append(candidate)
 
@@ -413,6 +435,122 @@ class CapabilityRegistry:
             )
         )
         return candidates[:bounded_limit]
+
+
+def _contract_supports(
+    contract: dict[str, Any],
+    *,
+    operation: str | None,
+    scope_kind: str | None,
+    temporal_mode: str | None,
+    requires_render: bool,
+) -> bool:
+    """Apply deterministic execution compatibility before relevance scoring."""
+
+    normalized_operation = str(operation or "").strip().casefold()
+    operations = {
+        str(item).strip().casefold()
+        for item in contract.get("supported_operations", [])
+        if str(item).strip()
+    }
+    if normalized_operation and operations and normalized_operation not in operations:
+        return False
+
+    normalized_scope = str(scope_kind or "").strip().casefold()
+    scopes = {
+        str(item).strip().casefold()
+        for item in contract.get("supported_scope_kinds", [])
+        if str(item).strip()
+    }
+    if normalized_scope and scopes and normalized_scope not in scopes:
+        return False
+
+    normalized_temporal = str(temporal_mode or "").strip().casefold()
+    temporal_modes = {
+        str(item).strip().casefold()
+        for item in contract.get("temporal_modes", [])
+        if str(item).strip()
+    }
+    if (
+        normalized_temporal
+        and temporal_modes
+        and normalized_temporal not in temporal_modes
+    ):
+        return False
+
+    if requires_render and str(contract.get("render_support") or "none") in {
+        "none",
+        "metadata_only",
+    }:
+        return False
+    return True
+
+
+def _has_explicit_execution_contract(capability: dict[str, Any]) -> bool:
+    if isinstance(capability.get("executionContract"), dict):
+        return True
+    if isinstance(capability.get("execution_contract"), dict):
+        return True
+    metadata = capability.get("metadata")
+    return isinstance(metadata, dict) and isinstance(
+        metadata.get("execution_contract"), dict
+    )
+
+
+def _coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
+    """Reject a known incompatible jurisdiction, but preserve unknown coverage."""
+
+    normalized = re.sub(r"[^a-z0-9]+", " ", coverage.casefold()).strip()
+    if not normalized or any(
+        marker in normalized
+        for marker in (
+            "global",
+            "world",
+            "source defined",
+            "jurisdiction defined",
+            "facility defined",
+            "regional",
+            "local jurisdiction",
+        )
+    ):
+        return True
+    country = re.sub(
+        r"[^a-z0-9]+", " ",
+        " ".join(
+            value
+            for value in (location.country, location.location_class)
+            if value
+        ).casefold(),
+    ).strip()
+    if not country:
+        return True
+    if any(token in normalized for token in ("united states", " usa ", " us ")):
+        return any(token in country for token in ("united states", "usa", " us "))
+    if any(token in normalized for token in ("europe", " eu ", "eea")):
+        return any(
+            token in country
+            for token in (
+                "austria",
+                "belgium",
+                "croatia",
+                "denmark",
+                "finland",
+                "france",
+                "germany",
+                "greece",
+                "ireland",
+                "italy",
+                "netherlands",
+                "norway",
+                "poland",
+                "portugal",
+                "spain",
+                "sweden",
+                "switzerland",
+                "united kingdom",
+            )
+        )
+    return True
 
 ###############################################################################
 def _declared_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:

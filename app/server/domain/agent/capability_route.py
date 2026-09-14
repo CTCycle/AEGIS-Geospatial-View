@@ -9,7 +9,7 @@ MapLibre implementation details.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -31,6 +31,57 @@ class CapabilityRoute(BaseModel):
     capability_queries: list[str] = Field(default_factory=list, max_length=4)
     explicit_capability_ids: list[str] = Field(default_factory=list, max_length=8)
     clarification_question: str | None = Field(default=None, max_length=500)
+    # These are user-semantic constraints, not provider arguments.  Keeping
+    # them on the validated route gives the native harness a deterministic
+    # request contract even when the legacy parser is not involved.
+    operation: str | None = Field(default=None, min_length=1, max_length=80)
+    target_refs: list[str] = Field(default_factory=list, max_length=16)
+    temporal_scope: "AgentTemporalScope" = Field(default_factory=lambda: AgentTemporalScope())
+    spatial_scope: "AgentSpatialScope | None" = None
+    filters: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentTemporalScope(BaseModel):
+    """Provider-neutral temporal intent selected during route bootstrap."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["current", "historical", "forecast", "none"] = "none"
+    reference_time_iso: str | None = Field(default=None, max_length=80)
+    start_time_iso: str | None = Field(default=None, max_length=80)
+    end_time_iso: str | None = Field(default=None, max_length=80)
+    granularity: str = Field(default="none", max_length=40)
+    aggregation: str = Field(default="none", max_length=40)
+
+
+class AgentSpatialScope(BaseModel):
+    """Provider-neutral spatial intent; coordinates remain server-owned."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal[
+        "point",
+        "bbox",
+        "radius",
+        "administrative_geometry",
+        "feature_geometry",
+        "viewport",
+    ]
+    relationship: Literal[
+        "at",
+        "in",
+        "near",
+        "around",
+        "within_distance",
+        "along",
+        "visible_area",
+        "here",
+    ] = "at"
+    target_refs: list[str] = Field(default_factory=list, max_length=16)
+    distance_m: float | None = Field(default=None, gt=0.0, le=1_000_000)
+
+
+CapabilityRoute.model_rebuild()
 
 ###############################################################################
 class AgentGoal(BaseModel):
