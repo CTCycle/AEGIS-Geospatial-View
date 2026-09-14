@@ -16,7 +16,7 @@ SDK, or another external agent runtime.
 ## Starting point
 
 - Branch: `develop`
-- Resume commit: `84b6da26` (`chore(agent): remove native shadow preview path`)
+- Resume commit: `11b66212` (`feat(agent): compile native goal contract`)
 - Audit baseline: `c6809755e1ea2dafdc09e45f0f4c574d5327f04f`
 - No push, PR, merge, or release was performed.
 - The only known pre-existing untracked worktree content is `app/assets/`.
@@ -38,6 +38,11 @@ The `agent_loop_mode` setting and native/legacy switch still exist, so
 - Native state is hydrated from assembled conversation context, including
   directives, task state, map memory, summaries, messages, evidence outcomes,
   and context allocation telemetry.
+- Context policy constraints are retained in the assembled package and
+  hydrated into native state.
+- Accepted native routes compile into a typed `AgentGoal` and deterministic
+  `CompletionContract`, including operation, target, temporal/spatial scope,
+  filters, evidence, location, and map-preparation metadata.
 - Model, tool, transition, and run-deadline budgets are enforced; history
   selection continues past oversized items; Responses continuation items are
   retained; matching in-flight runs can be cancelled.
@@ -55,6 +60,8 @@ The `agent_loop_mode` setting and native/legacy switch still exist, so
 Useful commits, newest first:
 
 ```text
+11b66212 feat(agent): compile native goal contract
+a4c97c8d fix(agent): hydrate native policy constraints
 84b6da26 chore(agent): remove native shadow preview path
 b074be4d fix(agent): gate map tools by presentation route
 b30e0cb4 refactor(agent): label context allocations by execution phase
@@ -102,29 +109,34 @@ contain migration-era projections.
 Treat the remaining work as deletion-oriented consolidation, not as a reason
 to add another execution mode.
 
-## First resume task
+## Completed resume task
 
-Fix context hydration before deleting parser or task models:
+Context hydration was fixed before deleting parser or task models:
 
 1. In `app/server/services/agent/context_assembler.py`, include the calculated
    `constraints` as `policy_constraints=constraints` in the returned
    `AgentContextPackage`.
-2. Add a focused assertion that `AgentStateFactory.create_from_context(...)`
-   receives those constraints.
-3. Run the context/state and native-loop tests, then commit this slice.
+2. The current `AgentStateFactory.create(...)` path is covered by a focused
+   assertion proving it receives those constraints.
+3. The slice is committed as `a4c97c8d`.
 
 The assembler currently uses policy constraints in the mandatory context
 budget, but the returned package omits them, so the native state factory cannot
 hydrate them.
 
+The first native goal/completion slice is committed as `11b66212`. The native
+state now carries a typed `AgentGoal` and separate `CompletionContract`; the
+next slice must bind the compiled scope to validated tool arguments and stop
+checks.
+
 ## Remaining implementation order
 
 ### P0: complete native semantics
 
-1. Replace the compatibility route input with one native `AgentGoal` and a
-   deterministic `CompletionContract`. Required obligations such as resolved
-   location, temporal scope, operation, evidence retrieval, and map preparation
-   must be compiled into state rather than inferred by the model.
+1. Complete the native `AgentGoal`/`CompletionContract` boundary by replacing
+   the remaining compatibility inputs. Bind required obligations such as
+   resolved location, temporal scope, operation, evidence retrieval, and map
+   preparation into executable state rather than leaving them model-inferred.
 2. Keep recovery observations in the loop long enough for correction,
    alternate-source selection, or replanning.
 3. Bind exact location references, geographic scope, temporal boundaries,
