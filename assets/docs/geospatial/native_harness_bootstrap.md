@@ -16,7 +16,7 @@ SDK, or another external agent runtime.
 ## Starting point
 
 - Branch: `develop`
-- Resume commit: `11b66212` (`feat(agent): compile native goal contract`)
+- Resume commit: `7f54328e` (`fix(agent): use native completion contract for stops`)
 - Audit baseline: `c6809755e1ea2dafdc09e45f0f4c574d5327f04f`
 - No push, PR, merge, or release was performed.
 - The only known pre-existing untracked worktree content is `app/assets/`.
@@ -43,6 +43,8 @@ The `agent_loop_mode` setting and native/legacy switch still exist, so
 - Accepted native routes compile into a typed `AgentGoal` and deterministic
   `CompletionContract`, including operation, target, temporal/spatial scope,
   filters, evidence, location, and map-preparation metadata.
+- Native stop decisions use the compiled completion contract; the legacy
+  `CompletionEvaluator` is no longer consulted by the native loop.
 - Model, tool, transition, and run-deadline budgets are enforced; history
   selection continues past oversized items; Responses continuation items are
   retained; matching in-flight runs can be cancelled.
@@ -60,6 +62,7 @@ The `agent_loop_mode` setting and native/legacy switch still exist, so
 Useful commits, newest first:
 
 ```text
+7f54328e fix(agent): use native completion contract for stops
 11b66212 feat(agent): compile native goal contract
 a4c97c8d fix(agent): hydrate native policy constraints
 84b6da26 chore(agent): remove native shadow preview path
@@ -124,10 +127,13 @@ The assembler currently uses policy constraints in the mandatory context
 budget, but the returned package omits them, so the native state factory cannot
 hydrate them.
 
-The first native goal/completion slice is committed as `11b66212`. The native
-state now carries a typed `AgentGoal` and separate `CompletionContract`; the
-next slice must bind the compiled scope to validated tool arguments and stop
-checks.
+The first native goal/completion slice is committed as `11b66212`, and the
+native stop follow-up is committed as `7f54328e`. The native state now carries
+a typed `AgentGoal` and separate `CompletionContract`; the next slice must bind
+the compiled scope to validated tool arguments and stop checks. The route
+schema intentionally does not accept coordinates, radii, filters, time windows,
+or provider arguments, so that binding needs an explicit typed route/goal input,
+not text-specific inference.
 
 ## Remaining implementation order
 
