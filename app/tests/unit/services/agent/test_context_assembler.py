@@ -1,4 +1,5 @@
 from server.services.agent.context_assembler import AgentContextAssembler
+from server.services.agent.agent_state_factory import AgentStateFactory
 from server.services.agent.instruction_state import ConversationInstructionService
 from server.services.llm.types import ModelContextProfile
 from server.services.llm.context_budget import estimate_json_tokens
@@ -69,6 +70,33 @@ def test_durable_instruction_is_scoped_and_deduplicated() -> None:
     assert len(service.active(repeated)) == 1
     assert service.active(repeated)[0].source_turn_index == 1
     assert service.active([]) == []
+
+###############################################################################
+def test_policy_constraints_are_hydrated_into_native_state() -> None:
+    constraints = {
+        "allowed_tool_names": ["discover_geospatial_capabilities"],
+        "completion_requirements": ["resolved_location"],
+    }
+    package = AgentContextAssembler(_ExplicitProfileResolver()).assemble(
+        provider="ollama",
+        model="4k-local",
+        current_user_message="Show traffic in Rome.",
+        messages=[],
+        directives=[],
+        task_state={},
+        map_memory={},
+        policy_constraints=constraints,
+    )
+
+    state = AgentStateFactory.create(
+        request_id="request-1",
+        conversation_id="conversation-1",
+        user_message="Show traffic in Rome.",
+        context_package=package,
+    )
+
+    assert package.policy_constraints == constraints
+    assert state.policy_constraints == constraints
 
 ###############################################################################
 def test_later_conflicting_instruction_supersedes_prior_directive() -> None:
