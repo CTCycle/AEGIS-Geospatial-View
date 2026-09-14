@@ -17,6 +17,10 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from server.domain.agent.capability_route import (
+    AgentRunState as _CanonicalAgentRunState,
+)
+
 AgentTaskStatus = Literal[
     "pending",
     "in_progress",
@@ -120,22 +124,6 @@ class AgentBudgets(BaseModel):
     wall_clock_seconds: float
 
 ###############################################################################
-class AgentRunState(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    run_id: str
-    run_version: int = Field(default=1, ge=1)
-    phase: str = "planning"
-    active_task_id: str | None = None
-    plan_revision: int = Field(default=0, ge=0)
-    budgets: AgentBudgets
-    model_calls: int = Field(default=0, ge=0)
-    tool_calls: int = Field(default=0, ge=0)
-    state_transitions: int = Field(default=0, ge=0)
-    completed_call_fingerprints: list[str] = Field(default_factory=list)
-    consecutive_no_progress_steps: int = Field(default=0, ge=0)
-    completion_reason: CompletionReason | None = None
-
 ###############################################################################
 class ToolCapabilityProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -306,6 +294,11 @@ def compact_task_context(
     compact["tasks"] = [*active, *completed[-completed_limit:]]
     compact["completed_tasks_omitted"] = max(0, len(completed) - completed_limit)
     return compact
+
+
+# The native harness owns the canonical run state; this re-export lets older
+# domain imports migrate without creating a second model.
+AgentRunState = _CanonicalAgentRunState
 
 ###############################################################################
 def evaluate_completion(state: AgentThreadState) -> CompletionReason | None:
