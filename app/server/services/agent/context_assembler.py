@@ -180,6 +180,7 @@ class AgentContextAssembler:
             conversation_summary=summary,
             recent_messages=included,
             relevant_tool_outcomes=selected_outcomes,
+            policy_constraints=constraints,
             included_message_ids=included_ids,
             summarized_through_turn_index=summary_through,
             omitted_message_ids=omitted_ids,
