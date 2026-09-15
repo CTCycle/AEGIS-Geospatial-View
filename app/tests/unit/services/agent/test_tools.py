@@ -214,7 +214,7 @@ def test_execute_binding_preserves_semantics_but_owns_scope_and_coordinates() ->
     assert bound.bbox is not None
     assert bound.bbox[0] < 8.5417 < bound.bbox[2]
     assert bound.bbox[1] < 47.3769 < bound.bbox[3]
-    assert bound.arguments == {"category": "hospital"}
+    assert bound.arguments == {"category": "hospital", "live": True}
     assert bound.filters == {"amenity": "hospital", "emergency": True}
 
 

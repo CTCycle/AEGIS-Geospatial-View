@@ -45,6 +45,9 @@ class AgentEvidenceEnvelope(BaseModel):
     summary: dict[str, Any] = Field(default_factory=dict)
     provenance: dict[str, Any] = Field(default_factory=dict)
     map_eligibility: Literal["renderable", "not_renderable", "unknown"] = "unknown"
+    # Server-only bounded payload used to build a renderable evidence layer.
+    # It never enters model-facing observation messages.
+    payload: Any = None
     error: dict[str, Any] | None = None
     pagination: dict[str, Any] | None = None
     state_changes: list[dict[str, Any]] = Field(

@@ -77,7 +77,7 @@ class AgentExecutionSettings:
     simple_max_tool_calls: int = 6
     complex_max_tool_calls: int = 20
     simple_max_state_transitions: int = 32
-    complex_max_state_transitions: int = 32
+    complex_max_state_transitions: int = 64
     max_parallel_tool_calls: int = 8
     max_consecutive_tool_failures: int = 3
     max_same_failed_fingerprint: int = 2
@@ -211,7 +211,7 @@ class JsonAgentExecutionSettings(StrictJsonSettings):
     simple_max_tool_calls: int = Field(default=6, ge=1, le=200)
     complex_max_tool_calls: int = Field(default=20, ge=1, le=500)
     simple_max_state_transitions: int = Field(default=32, ge=1, le=500)
-    complex_max_state_transitions: int = Field(default=32, ge=1, le=1000)
+    complex_max_state_transitions: int = Field(default=64, ge=1, le=1000)
     max_parallel_tool_calls: int = Field(default=8, ge=1, le=32)
     max_consecutive_tool_failures: int = Field(default=3, ge=1, le=20)
     max_same_failed_fingerprint: int = Field(default=2, ge=1, le=20)

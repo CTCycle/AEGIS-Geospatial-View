@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Protocol
 
+from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.capability_route import (
     AgentGoal,
     AgentPhase,
@@ -74,13 +75,15 @@ class AgentLoopRequest:
     model: str
     state: AgentRunState
     budget: AgentExecutionBudget
-    messages: list[dict[str, Any]] = field(default_factory=list)
+    messages: list[dict[str, Any]] = field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     temperature: float = 0.2
     max_model_call_seconds: float = 60.0
     max_iterations: int = 12
     max_model_calls: int = 10
     max_tool_calls: int = 20
-    max_state_transitions: int = 32
+    max_state_transitions: int = 64
     simple_max_model_calls: int = 4
     simple_max_tool_calls: int = 6
     simple_max_state_transitions: int = 32
@@ -119,7 +122,7 @@ class AgentLoopOutcome:
         "failed",
     ]
     model_calls: int
-    tool_results: list[ToolResult] = field(default_factory=list)
+    tool_results: list[ToolResult] = field(default_factory=lambda: list[ToolResult]())
     failure_category: str | None = None
     failure_detail: str | None = None
 
@@ -464,7 +467,7 @@ class AgentLoop:
     ) -> LLMResult:
         self._ensure_run_control(request)
         request.budget.ensure_available(budget_stage)
-        metadata = {
+        metadata: dict[str, Any] = {
             "supports_tools": True,
             REQUEST_DEADLINE_METADATA_KEY: request.budget.deadline_monotonic,
         }
@@ -910,7 +913,16 @@ class AgentLoop:
             for key in ("granularity", "aggregation")
         )
         operation = route.operation or route.primary_domain.value
-        target_ids = list(dict.fromkeys(str(item).strip() for item in route.target_refs if str(item).strip()))
+        spatial_target_refs = (
+            route.spatial_scope.target_refs if route.spatial_scope is not None else []
+        )
+        target_ids = list(
+            dict.fromkeys(
+                str(item).strip()
+                for item in [*route.target_refs, *spatial_target_refs]
+                if str(item).strip()
+            )
+        )
         temporal_scope = route_temporal_scope if route_has_temporal_scope else {}
         spatial_scope = (
             [route.spatial_scope.model_dump(mode="json")]
@@ -1016,7 +1028,18 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     @staticmethod
     def _working_state_message(state: AgentRunState, limit: int) -> str:
-        payload = {
+        tool_result_summaries: list[dict[str, Any]] = [
+            {
+                "call_id": item.call_id,
+                "tool_name": item.tool_name,
+                "status": item.status,
+                "summary": item.summary,
+                "evidence_refs": list(item.evidence_refs),
+                "error_code": item.error.code if item.error else None,
+            }
+            for item in state.tool_results[-8:]
+        ]
+        payload: dict[str, Any] = {
             "phase": state.phase.value,
             "goal": (
                 state.goal.model_dump(mode="json")
@@ -1034,17 +1057,12 @@ class AgentLoop:
             "location_refs": sorted(state.location_refs),
             "evidence_refs": list(state.evidence_refs),
             "prepared_map": bool(state.prepared_map_session),
-            "tool_results": [
-                {
-                    "call_id": item.call_id,
-                    "tool_name": item.tool_name,
-                    "status": item.status,
-                    "summary": item.summary,
-                    "evidence_refs": list(item.evidence_refs),
-                    "error_code": item.error.code if item.error else None,
-                }
-                for item in state.tool_results[-8:]
-            ],
+            "active_map_collection_revision": (
+                state.active_map_session.overlay_collection.revision
+                if state.active_map_session is not None
+                else 0
+            ),
+            "tool_results": tool_result_summaries,
         }
         serialized = json.dumps(payload, separators=(",", ":"), default=str)
         if len(serialized) <= max(256, limit):
@@ -1057,7 +1075,7 @@ class AgentLoop:
                 "summary": str(item["summary"])[:240],
                 "error_code": item["error_code"],
             }
-            for item in payload["tool_results"][-3:]
+            for item in tool_result_summaries[-3:]
         ]
         compact["evidence_refs"] = list(state.evidence_refs[-8:])
         serialized = json.dumps(compact, separators=(",", ":"), default=str)
@@ -1129,15 +1147,18 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     @staticmethod
     def _assistant_and_tool_messages(result: LLMResult) -> list[dict[str, Any]]:
-        raw_output = result.raw.get("output") if isinstance(result.raw, dict) else None
-        if isinstance(raw_output, list):
-            protocol_items = [
-                item
-                for item in raw_output
-                if isinstance(item, dict)
-                and str(item.get("type") or "")
-                in {"message", "reasoning", "function_call"}
-            ]
+        raw_output = result.raw.get("output")
+        if is_json_array(raw_output):
+            protocol_items: list[dict[str, Any]] = []
+            for item in raw_output:
+                if not is_json_object(item):
+                    continue
+                if str(item.get("type") or "") in {
+                    "message",
+                    "reasoning",
+                    "function_call",
+                }:
+                    protocol_items.append(item)
             if protocol_items:
                 # Responses-compatible providers require the returned
                 # reasoning/function-call items to remain in the next input.
