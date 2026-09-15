@@ -102,6 +102,40 @@ def test_explicit_shortlist_ids_are_ranked_and_disabled_ids_are_filtered() -> No
 
 
 ###############################################################################
+def test_compound_retrieval_and_undated_recent_intent_match_current_feed() -> None:
+    candidates = _registry().shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        queries=["recent traffic"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+        operation="retrieve_and_map",
+        scope_kind="bbox",
+        temporal_mode="historical",
+        temporal_granularity="recent",
+        has_explicit_time_range=False,
+        requires_render=True,
+    )
+
+    assert candidates[0]["id"] == "traffic"
+
+
+def test_dated_historical_intent_does_not_match_current_only_feed() -> None:
+    candidates = _registry().shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL},
+        queries=["traffic in 2020"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+        operation="retrieve",
+        scope_kind="bbox",
+        temporal_mode="historical",
+        temporal_granularity="year",
+        has_explicit_time_range=True,
+    )
+
+    assert candidates == []
+
+
+###############################################################################
 def test_route_contract_remains_independent_of_provider_arguments() -> None:
     route = CapabilityRoute(
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
