@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from server.common.typing import is_json_array
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentPhase, AgentRunState
 from server.domain.agent.map_plan import MapPlan
@@ -280,7 +281,11 @@ def _bind_execute_request(
 
     updates: dict[str, Any] = {
         "operation": goal.operation or request.operation,
-        "arguments": _user_arguments(request.arguments),
+        # Execute requests are evidence-producing operations.  Provider
+        # adapters may expose a descriptor-only mode for catalog/UI calls,
+        # but the native agent must obtain the bounded payload needed for
+        # completion, inspection, and map rendering.
+        "arguments": {**_user_arguments(request.arguments), "live": True},
         "filters": {**goal.filters, **request.filters},
         "bbox": None,
     }
@@ -400,6 +405,11 @@ def _location_for_request(
 ###############################################################################
 def _apply_map_plan_handler(service: MapPlanService) -> Any:
     async def apply(request: ApplyMapPlanInput, state: AgentRunState) -> ToolResult:
+        # A new map has no prior collection revision.  Bind this invariant on
+        # the server so a model's speculative revision cannot reject a valid
+        # first candidate; active-map updates still use the exact CAS revision.
+        if state.active_map_session is None:
+            request = request.model_copy(update={"expected_collection_revision": 0})
         plan = MapPlan.model_validate(request.model_dump(mode="python"))
         return await service.apply(
             plan,
@@ -484,7 +494,7 @@ def _provider_layer_semantic_validator(
     request: ProviderLayerDiscoveryInput, state: AgentRunState
 ) -> list[str]:
     allowed = state.policy_constraints.get("allowed_provider_ids")
-    if isinstance(allowed, list) and allowed:
+    if is_json_array(allowed) and allowed:
         normalized = request.provider_id.casefold()
         permitted = {str(item).casefold() for item in allowed}
         if normalized not in permitted:

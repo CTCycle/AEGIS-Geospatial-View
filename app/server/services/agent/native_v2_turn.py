@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Literal, cast
 
 from server.contracts.chat import (
     ChatOperationResult,
@@ -19,6 +19,26 @@ from server.domain.agent.reliability import AgentExecutionBudget
 from server.services.agent.agent_loop import AgentLoop, AgentLoopOutcome, AgentLoopRequest
 from server.services.agent.agent_state_factory import AgentStateFactory
 
+type PresentationStatus = Literal[
+    "not_requested", "prepared", "prepared_unverified", "ready", "failed"
+]
+type FailureCategory = Literal[
+    "model_capability",
+    "provider_api",
+    "provider_failure",
+    "schema_definition",
+    "response_parsing",
+    "context_limit",
+    "insufficient_evidence",
+    "model_budget_exhausted",
+    "tool_budget_exhausted",
+    "transition_budget_exhausted",
+    "run_deadline_exhausted",
+    "no_progress",
+    "cancelled",
+    "superseded",
+]
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -29,11 +49,15 @@ class AgentTurnRequest:
     provider: str
     model: str
     budget: AgentExecutionBudget
-    messages: list[dict[str, Any]] = field(default_factory=list)
+    messages: list[dict[str, Any]] = field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     context_package: AgentContextPackage | None = None
     active_map_session: MapSession | None = None
-    location_refs: Mapping[str, ResolvedLocation] = field(default_factory=dict)
-    evidence_refs: list[str] = field(default_factory=list)
+    location_refs: Mapping[str, ResolvedLocation] = field(
+        default_factory=lambda: dict[str, ResolvedLocation]()
+    )
+    evidence_refs: list[str] = field(default_factory=lambda: list[str]())
     run_version: int = 1
     conversation_revision: int = 0
     checkpoint: Mapping[str, Any] | None = None
@@ -101,7 +125,7 @@ class AgentTurnRunner:
                     self.execution_settings, "complex_max_tool_calls", 20
                 ),
                 max_state_transitions=_setting(
-                    self.execution_settings, "complex_max_state_transitions", 32
+                    self.execution_settings, "complex_max_state_transitions", 64
                 ),
                 simple_max_model_calls=_setting(
                     self.execution_settings, "simple_max_model_calls", 4
@@ -261,7 +285,7 @@ def _presentation_status(
     map_session: MapSession | None,
     *,
     defer_map_commit: bool,
-) -> str:
+) -> PresentationStatus:
     route = outcome.state.route
     if route is None or route.presentation == "text":
         return "not_requested"
@@ -282,7 +306,7 @@ def _fallback_message(outcome: AgentLoopOutcome) -> str:
 
 
 ###############################################################################
-def _response_failure_category(value: str | None) -> str | None:
+def _response_failure_category(value: str | None) -> FailureCategory | None:
     if value == "provider_error":
         return "provider_failure"
     if value in {
@@ -301,7 +325,7 @@ def _response_failure_category(value: str | None) -> str | None:
         "cancelled",
         "superseded",
     }:
-        return value
+        return cast(FailureCategory, value)
     return None
 
 
