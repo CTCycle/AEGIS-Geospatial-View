@@ -5,6 +5,7 @@ from server.domain.agent.capability_route import CapabilityRoute
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.capability_registry import _operation_candidates
 
 
 ###############################################################################
@@ -117,6 +118,10 @@ def test_compound_retrieval_and_undated_recent_intent_match_current_feed() -> No
     )
 
     assert candidates[0]["id"] == "traffic"
+
+
+def test_basemap_switch_operations_include_the_manifest_render_primitive() -> None:
+    assert "show" in _operation_candidates("switch_basemap_to_satellite")
 
 
 def test_dated_historical_intent_does_not_match_current_only_feed() -> None:

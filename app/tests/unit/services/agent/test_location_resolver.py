@@ -79,6 +79,47 @@ def test_location_resolver_uses_coordinates_without_geocoder() -> None:
 
     run_async_in_thread(_run())
 
+
+###############################################################################
+def test_location_resolver_accepts_native_administrative_geometry_target() -> None:
+    calls: list[dict[str, object]] = []
+
+    class Geocoder:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003
+            calls.append(kwargs)
+            return {
+                "display_name": "Vermont, United States",
+                "lat": 44.0,
+                "lon": -72.7,
+                "confidence": 0.95,
+                "selected_result_type": "administrative",
+                "selected_result_class": "boundary",
+                "selected_address_type": "state",
+                "address": {
+                    "state": "Vermont",
+                    "country": "United States",
+                    "country_code": "us",
+                },
+            }
+
+    result = run_async_in_thread(
+        LocationResolver(nominatim_service=Geocoder()).resolve_location_signals(
+            [
+                LocationSignal(
+                    signal_type="administrative_geometry",
+                    raw_value="Vermont, United States",
+                    confidence=1.0,
+                )
+            ],
+            {},
+        )
+    )
+
+    assert isinstance(result, ResolvedLocation)
+    assert result.latitude == 44.0
+    assert result.longitude == -72.7
+    assert calls[0]["expected_location_type"] == "administrative_geometry"
+
 ###############################################################################
 def test_location_resolver_resolves_same_level_peer_targets_independently() -> None:
     calls: list[str] = []

@@ -52,6 +52,14 @@ class FakeCapabilityRegistry:
     def shortlist(self, **_kwargs: Any) -> list[dict[str, Any]]:
         return [self.get_capability("places:hospitals")]  # type: ignore[list-item]
 
+    # -------------------------------------------------------------------------
+    def list_basemaps(self) -> list[dict[str, Any]]:
+        return [
+            {"id": "osm_default"},
+            {"id": "esri_world_imagery"},
+            {"id": "osm_dark"},
+        ]
+
 
 ###############################################################################
 class FakeRuntimeRegistry:
@@ -129,6 +137,62 @@ def _state() -> AgentRunState:
         phase=AgentPhase.ROUTE_REQUEST,
         user_message="show hospitals",
     )
+
+
+def test_apply_map_plan_describes_only_canonical_basemap_ids() -> None:
+    registry = _registry()
+    tool = registry.get("apply_map_plan")
+
+    assert tool is not None
+    assert "esri_world_imagery, osm_dark, osm_default" in tool.definition.description
+    assert "Never invent, translate, or alias a basemap ID" in tool.definition.description
+
+
+def test_map_only_routes_expose_map_preparation_without_data_execution() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        capability_queries=["Vermont state map"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["places:hospitals"]
+    state.location_refs["vermont, united states"] = ResolvedLocation(
+        label="Vermont, United States",
+        latitude=44.0,
+        longitude=-72.7,
+    )
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    assert "apply_map_plan" in exposed
+    assert "execute_geospatial_capability" not in exposed
+
+
+def test_new_route_target_requires_location_resolution_even_with_active_map() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_STATE,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        target_refs=["Salta, Argentina"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.active_map_session = object()  # type: ignore[assignment]
+    state.location_refs = {
+        "vermont, united states": ResolvedLocation(
+            label="Vermont, United States", latitude=44.0, longitude=-72.7
+        )
+    }
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    assert "resolve_geospatial_location" in exposed
 
 
 ###############################################################################
@@ -365,6 +429,35 @@ def test_policy_authorizes_typed_capability_calls_once_against_route_and_runtime
     assert allowed.allowed is True
     assert rejected.allowed is False
     assert rejected.metadata["code"] == "capability_not_shortlisted"
+
+
+def test_policy_rejects_capability_execution_on_map_only_routes() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["places:hospitals"]
+    tool = registry.get("execute_geospatial_capability")
+    assert tool is not None
+    policy = PolicyEngine(
+        location_resolver=FakeResolver(),  # type: ignore[arg-type]
+        capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
+        runtime_registry=FakeRuntimeRegistry(),  # type: ignore[arg-type]
+    )
+
+    rejected = policy.authorize(
+        tool,
+        ExecuteCapabilityInput(capability_id="places:hospitals"),
+        state,
+    )
+
+    assert rejected.allowed is False
+    assert rejected.metadata["code"] == "route_domain_mismatch"
 
 
 ###############################################################################

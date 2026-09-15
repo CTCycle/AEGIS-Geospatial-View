@@ -29,7 +29,11 @@
               (change)="onBasemapSelection($any($event.target).value)"
             >
               @for (basemap of availableBasemaps; track basemap.id) {
-                <option [value]="basemap.id" [disabled]="basemap.render?.status === 'unavailable'">
+                <option
+                  [value]="basemap.id"
+                  [selected]="basemap.id === mapSession?.basemap_id"
+                  [disabled]="basemap.render?.status === 'unavailable'"
+                >
                   {{ basemap.name }}
                 </option>
               }

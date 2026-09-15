@@ -294,6 +294,38 @@ def test_nominatim_deduplicates_city_boundary_and_centroid() -> None:
     assert len(ranked) == 2
     assert "ambiguous_candidates" not in ranked[0]
 
+
+###############################################################################
+def test_nominatim_deduplicates_city_boundary_without_parent_fields() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    ranked = [
+        {
+            "display_name": "Ljubljana, Upravna Enota Ljubljana, Slovenia",
+            "lat": 46.06005,
+            "lon": 14.5911883,
+            "selected_result_type": "administrative",
+            "selected_address_type": "municipality",
+            "address": {"municipality": "Ljubljana", "country": "Slovenia"},
+            "confidence": 0.7898,
+        },
+        {
+            "display_name": "Ljubljana, Upravna Enota Ljubljana, 1000, Slovenia",
+            "lat": 46.0500268,
+            "lon": 14.5069289,
+            "selected_result_type": "city",
+            "selected_address_type": "city",
+            "address": {"city": "Ljubljana", "country": "Slovenia"},
+            "confidence": 0.8074,
+        },
+    ]
+
+    assert service._find_ambiguous_candidates(
+        ranked,
+        expected_location_type="city",
+        query="Ljubljana, Slovenia",
+        has_parent_context=True,
+    ) == []
+
 ###############################################################################
 def test_nominatim_prepares_language_and_name_metadata_for_validation() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)

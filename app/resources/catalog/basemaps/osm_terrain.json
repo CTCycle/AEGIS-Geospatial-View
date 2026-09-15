@@ -1,17 +1,17 @@
 {
   "id": "osm_terrain",
-  "name": "Terrain Context",
-  "provider": "terrain_tiles",
+  "name": "OpenTopoMap Terrain",
+  "provider": "opentopomap",
   "type": "tile",
-  "description": "Terrain-focused OpenStreetMap basemap highlighting elevation and landform context.",
+  "description": "OpenTopoMap topographic basemap highlighting elevation, contours, and landform context.",
   "capabilities": [
     "tile"
   ],
   "coverage": "global",
   "metadata": {
-    "label": "Terrain Context",
-    "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    "attribution": "© OpenStreetMap contributors",
+    "label": "OpenTopoMap Terrain",
+    "tile_url": "https://tile.opentopomap.org/{z}/{x}/{y}.png",
+    "attribution": "OpenTopoMap (CC-BY-SA) | © OpenStreetMap contributors",
     "requires_key": false,
     "keywords": [
       "terrain",
@@ -32,7 +32,7 @@
     ],
     "coverage_scope": "global",
     "temporal_behavior": "static tiles",
-    "constraints": "optimized for terrain and landform interpretation",
+    "constraints": "topographic tiles and attribution are governed by the upstream OpenTopoMap provider",
     "content_hash": "78436aa4ec76d2188f3525ec7ac3559e45e9e9300e9c5ec21c97844cd5be120b",
     "human_summary": "Terrain basemap that helps interpret relief, slopes, and natural landform structure.",
     "primary_use_cases": [
@@ -51,7 +51,7 @@
     "integration_requirements": [
       "No API key required"
     ],
-    "official_docs_url": "https://wiki.openstreetmap.org/wiki/Tile_servers",
+    "official_docs_url": "https://opentopomap.org/about",
     "source_protocol": "raster-tile",
     "data_format": "image tiles",
     "geometry_type": "raster-grid",
@@ -68,11 +68,11 @@
   "capabilityKind": "basemap",
   "renderingMode": "xyz",
   "sourceOfficialDocs": [
-    "https://wiki.openstreetmap.org/wiki/Tile_servers"
+    "https://opentopomap.org/about"
   ],
   "license": {
-    "name": "© OpenStreetMap contributors",
-    "url": "https://wiki.openstreetmap.org/wiki/Tile_servers",
+    "name": "OpenTopoMap (CC-BY-SA) and OpenStreetMap contributors",
+    "url": "https://opentopomap.org/about",
     "attributionRequired": true,
     "commercialUse": "unknown",
     "embeddingAllowed": "unknown"

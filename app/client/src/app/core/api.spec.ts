@@ -287,6 +287,7 @@ describe('core/api', () => {
     };
 
     expect(normalizeMapSession(validSession)?.basemap?.id).toBe('osm_default');
+    expect(normalizeMapSession({ ...validSession, bounds: null })?.center).toEqual({ latitude: 41.9, longitude: 12.5 });
     expect(normalizeMapSession({ ...validSession, basemap: undefined })).toBeNull();
     expect(normalizeMapSession({
       ...validSession,

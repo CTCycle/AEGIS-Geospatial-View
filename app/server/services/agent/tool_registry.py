@@ -95,7 +95,7 @@ class ToolRegistry:
     def _prerequisites_satisfied(
         prerequisites: frozenset[str], state: "AgentRunState"
     ) -> bool:
-        has_location = bool(state.location_refs) or state.active_map_session is not None
+        has_location = ToolRegistry._route_target_location_available(state)
         for prerequisite in prerequisites:
             if prerequisite == "route" and state.route is None:
                 return False
@@ -103,7 +103,7 @@ class ToolRegistry:
                 return False
             if prerequisite == "capability_shortlist_missing" and state.capability_ids:
                 return False
-            if prerequisite == "location" and not state.location_refs:
+            if prerequisite == "location" and not has_location:
                 return False
             if prerequisite == "location_required" and (
                 state.route is None or not state.route.requires_location
@@ -130,10 +130,33 @@ class ToolRegistry:
                 }
                 if CapabilityDomain.PROVIDER_DISCOVERY not in route_domains:
                     return False
+            if prerequisite == "data_route":
+                if state.route is None or state.route.primary_domain in {
+                    CapabilityDomain.MAP_RENDERING,
+                    CapabilityDomain.MAP_STATE,
+                }:
+                    return False
             if prerequisite == "map_presentation":
                 if state.route is None or state.route.presentation not in {"map", "both"}:
                     return False
         return True
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _route_target_location_available(state: "AgentRunState") -> bool:
+        """Check the validated route targets, not merely any prior map state."""
+
+        route = state.route
+        target_refs = list(route.target_refs) if route is not None else []
+        if not target_refs:
+            return bool(state.location_refs) or state.active_map_session is not None
+        resolved_keys = {
+            " ".join(str(key).casefold().split()) for key in state.location_refs
+        }
+        return all(
+            " ".join(str(target).casefold().split()) in resolved_keys
+            for target in target_refs
+        )
 
 
 __all__ = ["ToolRegistry"]

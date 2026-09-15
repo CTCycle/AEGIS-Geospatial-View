@@ -56,6 +56,19 @@ _MAP = frozenset({CapabilityDomain.MAP_RENDERING, CapabilityDomain.MAP_STATE})
 
 
 ###############################################################################
+def _validated_basemap_ids(capability_registry: CapabilityRegistry) -> list[str]:
+    """Return the exact canonical basemap IDs exposed by the active catalog."""
+
+    return sorted(
+        {
+            str(item.get("id") or "").strip()
+            for item in capability_registry.list_basemaps()
+            if str(item.get("id") or "").strip()
+        }
+    )
+
+
+###############################################################################
 def register_agent_tools(
     registry: ToolRegistry,
     *,
@@ -88,6 +101,8 @@ def register_agent_tools(
         geospatial_api_service=geospatial_api_service,
         evidence_repository=evidence_repository,
     )
+    basemap_ids = _validated_basemap_ids(capability_registry)
+    basemap_catalog = ", ".join(basemap_ids) or "no basemap IDs"
 
     registrations = (
         _registration(
@@ -164,7 +179,12 @@ def register_agent_tools(
             phases=_MODEL_PHASE,
             visibility="model",
             prerequisites=frozenset(
-                {"route", "capability_shortlist", "location_if_required"}
+                {
+                    "route",
+                    "capability_shortlist",
+                    "location_if_required",
+                    "data_route",
+                }
             ),
             idempotent=False,
             semantic_validator=_capability_semantic_validator,
@@ -197,7 +217,10 @@ def register_agent_tools(
             description=(
                 "Prepare a typed map candidate from validated location and evidence; "
                 "the server supplies the catalog default basemap when a new map "
-                "omits one."
+                "omits one. If setting a basemap, use only one of these exact "
+                f"canonical catalog IDs: {basemap_catalog}. Never invent, "
+                "translate, or alias a basemap ID; if the requested style is "
+                "unsupported, leave the current map unchanged and report that."
             ),
             input_model=ApplyMapPlanInput,
             handler=_apply_map_plan_handler(map_plan),
