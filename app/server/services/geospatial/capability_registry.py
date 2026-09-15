@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from typing import Any, Protocol
 
-from server.common.typing import json_object
+from server.common.typing import is_json_array, is_json_object, json_object
 from server.domain.geospatial.registry import (
     CapabilityRegistrySnapshot,
     GeospatialManifestSnapshot,
@@ -89,7 +90,7 @@ def capability_argument_schema(capability: dict[str, Any]) -> dict[str, Any]:
     schema = metadata.get("parameters_json_schema") or metadata.get(
         "argument_schema"
     )
-    if isinstance(schema, dict):
+    if is_json_object(schema):
         return dict(schema)
     if capability.get("source_path") or capability.get("source_filename"):
         string_value = {"type": "string", "minLength": 1}
@@ -271,6 +272,8 @@ class CapabilityRegistry:
         operation: str | None = None,
         scope_kind: str | None = None,
         temporal_mode: str | None = None,
+        temporal_granularity: str | None = None,
+        has_explicit_time_range: bool = False,
         requires_render: bool = False,
         location: ResolvedLocation | None = None,
     ) -> list[dict[str, Any]]:
@@ -315,6 +318,8 @@ class CapabilityRegistry:
                 operation=operation,
                 scope_kind=scope_kind,
                 temporal_mode=temporal_mode,
+                temporal_granularity=temporal_granularity,
+                has_explicit_time_range=has_explicit_time_range,
                 requires_render=requires_render
                 and _has_explicit_execution_contract(item),
             ):
@@ -366,6 +371,8 @@ def _contract_supports(
     operation: str | None,
     scope_kind: str | None,
     temporal_mode: str | None,
+    temporal_granularity: str | None,
+    has_explicit_time_range: bool,
     requires_render: bool,
 ) -> bool:
     """Apply deterministic execution compatibility before relevance scoring."""
@@ -376,7 +383,12 @@ def _contract_supports(
         for item in contract.get("supported_operations", [])
         if str(item).strip()
     }
-    if normalized_operation and operations and normalized_operation not in operations:
+    operation_candidates = _operation_candidates(normalized_operation)
+    if (
+        operation_candidates
+        and operations
+        and not operation_candidates.intersection(operations)
+    ):
         return False
 
     normalized_scope = str(scope_kind or "").strip().casefold()
@@ -389,6 +401,18 @@ def _contract_supports(
         return False
 
     normalized_temporal = str(temporal_mode or "").strip().casefold()
+    normalized_granularity = str(temporal_granularity or "").strip().casefold()
+    # Models commonly describe a live/recent observation feed as "historical"
+    # because its events happened in the immediate past.  Without an explicit
+    # date boundary, recent/latest intent is compatible with a current feed;
+    # dated historical requests remain strict.
+    if (
+        normalized_temporal == "historical"
+        and not has_explicit_time_range
+        and normalized_granularity
+        in {"current", "latest", "live", "near_real_time", "recent"}
+    ):
+        normalized_temporal = "current"
     temporal_modes = {
         str(item).strip().casefold()
         for item in contract.get("temporal_modes", [])
@@ -409,15 +433,36 @@ def _contract_supports(
     return True
 
 
+def _operation_candidates(operation: str) -> set[str]:
+    """Map compound user-semantic operations to manifest primitives."""
+
+    if not operation:
+        return set()
+    aliases = {
+        "display": "show",
+        "find": "search",
+        "get": "search",
+        "locate": "search",
+        "map": "show",
+        "render": "show",
+        "retrieve": "search",
+        "visualize": "show",
+    }
+    tokens = {
+        token
+        for token in re.findall(r"[a-z0-9]+", operation)
+        if token not in {"and", "data", "then"}
+    }
+    return {operation, *tokens, *(aliases[token] for token in tokens if token in aliases)}
+
+
 def _has_explicit_execution_contract(capability: dict[str, Any]) -> bool:
-    if isinstance(capability.get("executionContract"), dict):
+    if is_json_object(capability.get("executionContract")):
         return True
-    if isinstance(capability.get("execution_contract"), dict):
+    if is_json_object(capability.get("execution_contract")):
         return True
-    metadata = capability.get("metadata")
-    return isinstance(metadata, dict) and isinstance(
-        metadata.get("execution_contract"), dict
-    )
+    metadata = json_object(capability.get("metadata"))
+    return is_json_object(metadata.get("execution_contract"))
 
 
 def _coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
@@ -491,11 +536,11 @@ def _avoid_when_conflicts(
 ) -> bool:
     """Reject explicit manifest avoid-conditions before relevance ranking."""
 
-    agentic_use = capability.get("agenticUse")
-    if not isinstance(agentic_use, dict):
-        agentic_use = capability.get("agentic_use")
-    raw_avoid = agentic_use.get("avoidWhen") if isinstance(agentic_use, dict) else None
-    if not isinstance(raw_avoid, list):
+    agentic_use = json_object(capability.get("agenticUse"))
+    if not agentic_use:
+        agentic_use = json_object(capability.get("agentic_use"))
+    raw_avoid = agentic_use.get("avoidWhen")
+    if not is_json_array(raw_avoid):
         return False
 
     ignored = {
@@ -535,12 +580,12 @@ def _avoid_when_conflicts(
 
 ###############################################################################
 def _declared_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:
-    agentic_use = capability.get("agenticUse")
-    if not isinstance(agentic_use, dict):
-        agentic_use = capability.get("agentic_use")
-    raw_domains = agentic_use.get("domains") if isinstance(agentic_use, dict) else None
+    agentic_use = json_object(capability.get("agenticUse"))
+    if not agentic_use:
+        agentic_use = json_object(capability.get("agentic_use"))
+    raw_domains = agentic_use.get("domains")
     declared: set[CapabilityDomain] = set()
-    if isinstance(raw_domains, list):
+    if is_json_array(raw_domains):
         for value in raw_domains:
             try:
                 declared.add(CapabilityDomain(str(value)))
@@ -550,33 +595,33 @@ def _declared_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:
 
 ###############################################################################
 def _searchable_text(capability: dict[str, Any]) -> set[str]:
-    agentic_use = capability.get("agenticUse")
-    if not isinstance(agentic_use, dict):
-        agentic_use = capability.get("agentic_use")
-    metadata = capability.get("metadata")
+    agentic_use = json_object(capability.get("agenticUse"))
+    if not agentic_use:
+        agentic_use = json_object(capability.get("agentic_use"))
+    metadata = json_object(capability.get("metadata"))
     values: list[object] = [
         capability.get("id"),
         capability.get("name"),
         capability.get("description"),
         capability.get("capabilities"),
-        agentic_use.get("plannerHints") if isinstance(agentic_use, dict) else None,
-        agentic_use.get("intentTags") if isinstance(agentic_use, dict) else None,
-        metadata.get("keywords") if isinstance(metadata, dict) else None,
-        metadata.get("action_tags") if isinstance(metadata, dict) else None,
-        metadata.get("supported_categories") if isinstance(metadata, dict) else None,
-        metadata.get("task_tags") if isinstance(metadata, dict) else None,
-        metadata.get("primary_use_cases") if isinstance(metadata, dict) else None,
-        metadata.get("search_examples") if isinstance(metadata, dict) else None,
-        metadata.get("human_summary") if isinstance(metadata, dict) else None,
+        agentic_use.get("plannerHints"),
+        agentic_use.get("intentTags"),
+        metadata.get("keywords"),
+        metadata.get("action_tags"),
+        metadata.get("supported_categories"),
+        metadata.get("task_tags"),
+        metadata.get("primary_use_cases"),
+        metadata.get("search_examples"),
+        metadata.get("human_summary"),
     ]
     return {
         token
         for value in values
-        for token in _query_tokens(value if isinstance(value, list) else [value])
+        for token in _query_tokens(value if is_json_array(value) else [value])
     }
 
 ###############################################################################
-def _query_tokens(values: list[object]) -> set[str]:
+def _query_tokens(values: Sequence[object]) -> set[str]:
     return {
         token
         for value in values

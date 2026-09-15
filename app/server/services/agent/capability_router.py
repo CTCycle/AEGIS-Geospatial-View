@@ -127,6 +127,15 @@ class CapabilityRouter:
                     if proposed.temporal_scope.mode != "none"
                     else None
                 ),
+                temporal_granularity=proposed.temporal_scope.granularity,
+                has_explicit_time_range=any(
+                    value is not None
+                    for value in (
+                        proposed.temporal_scope.reference_time_iso,
+                        proposed.temporal_scope.start_time_iso,
+                        proposed.temporal_scope.end_time_iso,
+                    )
+                ),
                 requires_render=proposed.presentation in {"map", "both"},
                 location=_single_known_location(active_state),
             )

@@ -78,6 +78,20 @@ class CatalogToolHandler:
                 if route is not None and route.temporal_scope.mode != "none"
                 else None
             ),
+            temporal_granularity=(
+                route.temporal_scope.granularity if route is not None else None
+            ),
+            has_explicit_time_range=(
+                route is not None
+                and any(
+                    value is not None
+                    for value in (
+                        route.temporal_scope.reference_time_iso,
+                        route.temporal_scope.start_time_iso,
+                        route.temporal_scope.end_time_iso,
+                    )
+                )
+            ),
             requires_render=(
                 route is not None and route.presentation in {"map", "both"}
             ),

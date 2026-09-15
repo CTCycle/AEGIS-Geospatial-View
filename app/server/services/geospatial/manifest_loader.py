@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_object
+from server.common.typing import is_json_array, is_json_object, json_object
 
 import json
 from pathlib import Path
@@ -149,13 +149,9 @@ class GeospatialManifestLoader:
                 f"Manifest '{source}' entry '{entry.get('id')}' failed schema v2 validation: {exc}"
             ) from exc
         if require_agentic_domains:
-            agentic_use = entry.get("agenticUse")
-            domains = (
-                agentic_use.get("domains")
-                if isinstance(agentic_use, dict)
-                else None
-            )
-            if not isinstance(domains, list) or not domains:
+            agentic_use = json_object(entry.get("agenticUse"))
+            domains = agentic_use.get("domains")
+            if not is_json_array(domains) or not domains:
                 raise ManifestValidationError(
                     f"Manifest '{source}' entry '{entry.get('id')}' must declare at least one agenticUse domain."
                 )
