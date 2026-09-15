@@ -18,7 +18,12 @@ from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
-from server.repositories.schemas.models import AgentRunRecord, Base, ConversationRecord
+from server.repositories.schemas.models import (
+    AgentRunRecord,
+    Base,
+    ChatMessageRecord,
+    ConversationRecord,
+)
 from server.domain.agent.conversation import ConversationState
 from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
@@ -564,6 +569,17 @@ def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
             AgentRunCreateRequest(message="Show earthquakes in Rome"),
         )
     )
+    with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
+        session.add(
+            ChatMessageRecord(
+                conversation_id=conversation.conversation_id,
+                turn_index=1,
+                request_id=run.run_id,
+                role="assistant",
+                content="Data prepared; the map is loading.",
+            )
+        )
+        session.commit()
     candidate_map = {
         "session_id": "map-session-1",
         "resolved_location": {
@@ -649,6 +665,18 @@ def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
     assert completed.state.value == "completed"
     assert completed.presentation_status == "ready"
     assert duplicate is False
+    with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
+        message = session.scalar(
+            sqlalchemy.select(ChatMessageRecord).where(
+                ChatMessageRecord.conversation_id == conversation.conversation_id,
+                ChatMessageRecord.request_id == run.run_id,
+            )
+        )
+        assert message is not None
+        assert message.content == (
+            "The map is ready. No results were found in the requested area or time window."
+        )
+        assert message.map_session == candidate_map
     revision_after_commit = run_repositories["conversations"].read_state(
         conversation.conversation_id
     )["context_revision"]
