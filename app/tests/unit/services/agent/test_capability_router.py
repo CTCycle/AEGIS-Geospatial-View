@@ -175,3 +175,38 @@ def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools
     assert decision.route.requires_location is True
     assert "location_required_for_new_map" in decision.reason_codes
     assert "osm_default" not in decision.capability_ids
+
+
+###############################################################################
+def test_router_normalizes_undated_recent_historical_scope_to_current() -> None:
+    decision = _router().validate_route(
+        _route(
+            temporal_scope={"mode": "historical", "granularity": "recent"}
+        ),
+        user_message="Show recent traffic in Zurich.",
+        active_state=_state(),
+    )
+
+    assert decision.status == "accepted"
+    assert decision.route.temporal_scope.mode == "current"
+    assert "recent_scope_normalized_to_current" in decision.reason_codes
+
+
+###############################################################################
+def test_router_preserves_dated_historical_scope() -> None:
+    decision = _router().validate_route(
+        _route(
+            temporal_scope={
+                "mode": "historical",
+                "granularity": "day",
+                "start_time_iso": "2026-09-01T00:00:00Z",
+                "end_time_iso": "2026-09-02T00:00:00Z",
+            }
+        ),
+        user_message="Show traffic from September 1.",
+        active_state=_state(),
+    )
+
+    assert decision.status == "discovery_required"
+    assert decision.route.temporal_scope.mode == "historical"
+    assert "recent_scope_normalized_to_current" not in decision.reason_codes
