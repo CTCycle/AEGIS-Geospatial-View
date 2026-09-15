@@ -849,7 +849,7 @@ export const normalizeMapSession = (value: unknown): MapSession | null => {
     || basemap.id !== value.basemap_id
     || center === undefined
     || (center !== null && (!isValidLatitude(center.latitude) || !isValidLongitude(center.longitude)))
-    || (value.bounds !== undefined && !bounds)
+    || (value.bounds !== undefined && value.bounds !== null && !bounds)
     || supersededFields.some((field) => field in value)
   ) {
     return null;

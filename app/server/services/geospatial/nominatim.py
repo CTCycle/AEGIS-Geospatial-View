@@ -381,9 +381,9 @@ class NominatimService:
 
         A boundary result and a point result can describe the same city while
         differing by a postcode or centroid.  Treating those as competing
-        places creates false clarification prompts.  Require the locality,
-        country, and at least one administrative parent to agree so separate
-        same-named cities remain ambiguous.
+        places creates false clarification prompts.  Require the locality and
+        country to agree, plus either a shared administrative parent or a
+        typed boundary/centroid pairing when the provider omits parents.
         """
 
         locality_keys = ("city", "town", "village", "municipality")
@@ -422,14 +422,35 @@ class NominatimService:
 
         left_locality, left_country, left_parent = components(left)
         right_locality, right_country, right_parent = components(right)
-        return bool(
+        if not (
             left_locality
-            and left_parent
             and left_locality == right_locality
             and left_country
             and left_country == right_country
-            and left_parent == right_parent
-        )
+        ):
+            return False
+        if left_parent and right_parent:
+            return left_parent == right_parent
+
+        # Some providers omit parent fields for a municipality boundary and
+        # its city centroid. Treat that pair as one locality only when the
+        # typed result itself proves the relationship; two same-named cities
+        # without parent evidence must remain ambiguous.
+        boundary_types = {"administrative", "boundary"}
+        city_types = {"city", "town", "village", "municipality"}
+        result_types = {
+            self.normalize_component(str(left.get("selected_result_type") or "")),
+            self.normalize_component(str(right.get("selected_result_type") or "")),
+        }
+        if not result_types.intersection(boundary_types) or not result_types.intersection(
+            city_types
+        ):
+            return False
+        address_types = {
+            self.normalize_component(str(left.get("selected_address_type") or "")),
+            self.normalize_component(str(right.get("selected_address_type") or "")),
+        }
+        return bool(address_types.intersection(city_types))
 
     # -------------------------------------------------------------------------
     async def extract_bbox_from_coordinates(
@@ -721,7 +742,11 @@ class NominatimService:
             "village",
             "municipality",
         }:
-            return 3.0
+            # Prefer the point locality when Nominatim returns both a city
+            # centroid and its enclosing municipality boundary. The latter
+            # is still a valid city target, but its centroid can be several
+            # kilometres away from the requested urban centre.
+            return 3.1
         if expected in {"city", "municipality"} and type_name in {
             "administrative",
             "boundary",
@@ -773,6 +798,23 @@ class NominatimService:
             "province",
         }:
             # A parent result must never outrank a more specific city result.
+            return 0.0
+        if expected == "administrative_geometry":
+            if type_name in {
+                "country",
+                "state",
+                "region",
+                "county",
+                "province",
+                "administrative",
+            } or address_type in {
+                "country",
+                "state",
+                "region",
+                "county",
+                "province",
+            }:
+                return 3.0
             return 0.0
         if expected == "region" and type_name in {"state", "region", "county"}:
             return 3.0

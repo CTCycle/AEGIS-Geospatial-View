@@ -10,7 +10,13 @@ from server.contracts.geospatial import (
     OverlayInstance,
     ViewportPolicy,
 )
-from server.domain.agent.capability_route import AgentGoal, AgentPhase, AgentRunState
+from server.domain.agent.capability_domains import CapabilityDomain
+from server.domain.agent.capability_route import (
+    AgentGoal,
+    AgentPhase,
+    AgentRunState,
+    CapabilityRoute,
+)
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.evidence import AgentEvidenceSummary
 from server.domain.agent.map_plan import (
@@ -262,6 +268,77 @@ async def test_stale_revision_is_rejected_without_candidate() -> None:
     assert result.status == "failed"
     assert result.error is not None
     assert result.error.code == "stale_map_revision"
+    assert state.prepared_map_session is None
+
+
+@pytest.mark.asyncio
+async def test_active_map_move_uses_the_validated_new_route_target() -> None:
+    salta = ResolvedLocation(
+        label="Salta, Argentina", latitude=-24.7821, longitude=-65.4232
+    )
+    state = _state(active_map_session=_active_session())
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_STATE,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        target_refs=["Salta, Argentina"],
+    )
+    state.location_refs = {"salta, argentina": salta}
+
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                SetViewportAction(
+                    action="set_viewport",
+                    strategy="fit_location",
+                    location_ref="Salta, Argentina",
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert state.prepared_map_session.resolved_location == salta
+    assert state.prepared_map_session.center == {
+        "latitude": salta.latitude,
+        "longitude": salta.longitude,
+    }
+
+
+@pytest.mark.asyncio
+async def test_active_map_move_does_not_fall_back_to_prior_location() -> None:
+    state = _state(active_map_session=_active_session())
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_STATE,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        target_refs=["Salta, Argentina"],
+    )
+
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                SetViewportAction(
+                    action="set_viewport",
+                    strategy="fit_location",
+                    location_ref="Salta, Argentina",
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "missing_location"
     assert state.prepared_map_session is None
 
 

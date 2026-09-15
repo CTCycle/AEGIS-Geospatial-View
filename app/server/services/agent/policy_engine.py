@@ -160,6 +160,11 @@ class PolicyEngine:
 
     @staticmethod
     def _route_allows_tool(tool: RegisteredTool, route: Any) -> bool:
+        if tool.definition.name == "execute_geospatial_capability" and route.primary_domain in {
+            CapabilityDomain.MAP_RENDERING,
+            CapabilityDomain.MAP_STATE,
+        }:
+            return False
         if not tool.domains or CapabilityDomain.MIXED in tool.domains:
             return True
         route_domains = {route.primary_domain, *route.secondary_domains}

@@ -453,7 +453,17 @@ def _operation_candidates(operation: str) -> set[str]:
         for token in re.findall(r"[a-z0-9]+", operation)
         if token not in {"and", "data", "then"}
     }
-    return {operation, *tokens, *(aliases[token] for token in tokens if token in aliases)}
+    candidates = {
+        operation,
+        *tokens,
+        *(aliases[token] for token in tokens if token in aliases),
+    }
+    # Basemap manifests expose the canonical render primitive ``show``.  A
+    # basemap switch is still a map render, even though the route operation is
+    # intentionally more specific than the manifest operation.
+    if "basemap" in tokens:
+        candidates.add("show")
+    return candidates
 
 
 def _has_explicit_execution_contract(capability: dict[str, Any]) -> bool:

@@ -23,6 +23,7 @@ _LOCATION_TYPES = frozenset(
         "airport",
         "city",
         "country",
+        "administrative_geometry",
         "feature",
         "landmark",
         "poi",
@@ -43,6 +44,29 @@ _LOCATION_TYPES = frozenset(
 _COORDINATE_PAIR_RE = re.compile(
     r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[,;\s]\s*"
     r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*$"
+)
+_COORDINATE_PAIR_SEARCH_RE = re.compile(
+    r"(?<![\d.])"
+    r"(?P<latitude>[+-]?(?:\d+(?:\.\d*)?|\.\d+))"
+    r"\s*(?:\xB0\s*|degrees?\s*)?(?P<latitude_hemisphere>[NS])?\s*[,;]\s*"
+    r"(?P<longitude>[+-]?(?:\d+(?:\.\d*)?|\.\d+))"
+    r"\s*(?:\xB0\s*|degrees?\s*)?(?P<longitude_hemisphere>[EW])?"
+    r"(?![\d])",
+    re.IGNORECASE,
+)
+_COORDINATE_INTENT_TERMS = frozenset(
+    {
+        "approximate",
+        "approximately",
+        "around",
+        "center",
+        "centered",
+        "centred",
+        "coordinate",
+        "coordinates",
+        "latitude",
+        "longitude",
+    }
 )
 
 
@@ -77,21 +101,35 @@ class LocationToolHandler:
                 started=started,
             )
 
+        expected_type = str(request.expected_location_type or "city").casefold()
+        if expected_type not in _LOCATION_TYPES:
+            return _failure(
+                code="invalid_location_type",
+                message=(
+                    f"Unsupported canonical location type: {expected_type}."
+                ),
+                recovery="retry_request",
+                started=started,
+            )
+
         coordinates = _parse_coordinate_pair(query)
+        coordinate_source = "model"
+        if coordinates is None and _has_coordinate_intent(state.user_message):
+            coordinates = _parse_coordinate_pair_from_text(state.user_message)
+            coordinate_source = "text"
         if coordinates is not None:
             latitude, longitude = coordinates
             signal = LocationSignal(
                 signal_type="coordinates",
-                raw_value=query,
-                normalized_value=query,
+                raw_value=f"{latitude:g}, {longitude:g}",
+                normalized_value=f"{latitude:g}, {longitude:g}",
                 latitude=latitude,
                 longitude=longitude,
                 confidence=1.0,
-                source="model",
+                source=coordinate_source,  # type: ignore[arg-type]
             )
         else:
-            expected_type = str(request.expected_location_type or "city").casefold()
-            signal_type = expected_type if expected_type in _LOCATION_TYPES else "city"
+            signal_type = expected_type
             signal = LocationSignal(
                 signal_type=signal_type,  # type: ignore[arg-type]
                 raw_value=query,
@@ -136,6 +174,32 @@ def _parse_coordinate_pair(query: str) -> tuple[float, float] | None:
     if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
         return None
     return latitude, longitude
+
+
+def _parse_coordinate_pair_from_text(text: str) -> tuple[float, float] | None:
+    match = _COORDINATE_PAIR_SEARCH_RE.search(text)
+    if match is None:
+        return None
+    latitude = float(match.group("latitude"))
+    longitude = float(match.group("longitude"))
+    latitude_hemisphere = (match.group("latitude_hemisphere") or "").casefold()
+    longitude_hemisphere = (match.group("longitude_hemisphere") or "").casefold()
+    if latitude_hemisphere == "s":
+        latitude = -abs(latitude)
+    elif latitude_hemisphere == "n":
+        latitude = abs(latitude)
+    if longitude_hemisphere == "w":
+        longitude = -abs(longitude)
+    elif longitude_hemisphere == "e":
+        longitude = abs(longitude)
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        return None
+    return latitude, longitude
+
+
+def _has_coordinate_intent(text: str) -> bool:
+    terms = set(re.findall(r"[a-z]+", text.casefold()))
+    return bool(terms.intersection(_COORDINATE_INTENT_TERMS))
 
 
 ###############################################################################

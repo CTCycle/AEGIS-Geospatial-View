@@ -14,6 +14,7 @@ from server.domain.agent.map_plan import (
     AddEvidenceLayerAction,
     MapPlan,
     SetBasemapAction,
+    SetViewportAction,
 )
 from server.domain.agent.tool_result import (
     ToolExecutionError,
@@ -81,7 +82,7 @@ class MapPlanService:
                 recovery="replan",
             )
 
-        location = active_session.resolved_location if active_session else self._location(state)
+        location = self._location_for_plan(plan, state, active_session)
         if location is None:
             return self._failure(
                 context=context,
@@ -252,6 +253,13 @@ class MapPlanService:
             basemaps = self.capability_registry.list_basemaps()
         except AttributeError:
             basemaps = []
+        basemap_ids = {
+            str(item.get("id") or "").strip()
+            for item in basemaps
+            if str(item.get("id") or "").strip()
+        }
+        if "osm_default" in basemap_ids:
+            return "osm_default"
         candidates = [
             (
                 not bool(json_object(item.get("agenticUse")).get("defaultEnabled")),
@@ -334,7 +342,35 @@ class MapPlanService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _location(state: AgentRunState) -> Any | None:
+    def _location_for_plan(
+        plan: MapPlan,
+        state: AgentRunState,
+        active_session: MapSession | None,
+    ) -> Any | None:
+        explicit_refs = [
+            str(action.location_ref).strip()
+            for action in plan.actions
+            if isinstance(action, SetViewportAction)
+            and action.location_ref
+            and action.location_ref.strip()
+        ]
+        if explicit_refs:
+            target = " ".join(explicit_refs[0].casefold().split())
+            for key, location in state.location_refs.items():
+                if " ".join(str(key).casefold().split()) == target:
+                    return location
+            return None
+
+        route = state.route
+        if route is not None and route.target_refs:
+            for target_ref in route.target_refs:
+                target = " ".join(str(target_ref).casefold().split())
+                for key, location in state.location_refs.items():
+                    if " ".join(str(key).casefold().split()) == target:
+                        return location
+            return None
+        if active_session is not None:
+            return active_session.resolved_location
         return next(iter(state.location_refs.values()), None)
 
     # -------------------------------------------------------------------------

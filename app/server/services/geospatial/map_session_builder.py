@@ -78,7 +78,22 @@ class MapSessionBuilder:
         actions: list[MapAction],
     ) -> MapSession:
         if active_session is not None:
-            return active_session.model_copy(deep=True)
+            candidate = active_session.model_copy(deep=True)
+            if candidate.resolved_location != location:
+                viewport = _viewport_for_location(location)
+                return candidate.model_copy(
+                    update={
+                        "resolved_location": location,
+                        "viewport": viewport,
+                        "center": {
+                            "latitude": viewport.center_latitude,
+                            "longitude": viewport.center_longitude,
+                        },
+                        "bounds": viewport.bbox,
+                    },
+                    deep=True,
+                )
+            return candidate
         basemap_action = next(
             (action for action in actions if isinstance(action, SetBasemapAction)),
             None,

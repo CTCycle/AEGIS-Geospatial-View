@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -17,7 +17,38 @@ class StrictToolInput(BaseModel):
 class ResolveLocationInput(StrictToolInput):
     query: str | None = Field(default=None, min_length=1, max_length=300)
     target_id: str | None = Field(default=None, min_length=1, max_length=200)
-    expected_location_type: str | None = Field(default=None, max_length=80)
+    expected_location_type: (
+        Literal[
+            "address",
+            "airport",
+            "city",
+            "country",
+            "coordinates",
+            "feature",
+            "landmark",
+            "poi",
+            "region",
+            "river",
+            "road",
+            "street",
+            "station",
+            "neighborhood",
+            "district",
+            "municipality",
+            "county",
+            "province",
+            "state",
+            "administrative_geometry",
+        ]
+        | None
+    ) = Field(
+        default=None,
+        description=(
+            "Optional canonical target type. Use administrative_geometry for "
+            "a state, province, region, county, or other administrative boundary. "
+            "Use only the exact listed enum values; do not invent aliases."
+        ),
+    )
     candidate_id: str | None = Field(default=None, max_length=200)
 
     # -------------------------------------------------------------------------

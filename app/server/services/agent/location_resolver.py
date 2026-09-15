@@ -41,6 +41,7 @@ class LocationResolver:
         "province": 2,
         "state": 2,
         "region": 2,
+        "administrative_geometry": 2,
         "country": 1,
         "deictic": 0,
     }
@@ -810,7 +811,13 @@ class LocationResolver:
                 return False
             if result_class in {"administrative", "boundary"}:
                 return False
-        elif signal.signal_type in {"region", "state", "province", "county"}:
+        elif signal.signal_type in {
+            "region",
+            "state",
+            "province",
+            "county",
+            "administrative_geometry",
+        }:
             if result_type and result_type not in {
                 "region",
                 "state",

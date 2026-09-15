@@ -12,6 +12,7 @@ LocationSignalType = Literal[
     "airport",
     "city",
     "country",
+    "administrative_geometry",
     "coordinates",
     "deictic",
     "poi",
