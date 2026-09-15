@@ -21,7 +21,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
-from server.repositories.schemas.models import AgentRunRecord, ConversationRecord
+from server.repositories.schemas.models import (
+    AgentRunRecord,
+    ChatMessageRecord,
+    ConversationRecord,
+)
 
 
 ###############################################################################
@@ -575,6 +579,25 @@ class AgentRunRepository:
                     )
                 conversation.conversation_state = state.model_dump(mode="json")
                 pending_response["context_revision"] = conversation.context_revision
+                final_assistant_message = _final_render_message(pending_response)
+                pending_response["assistant_message"] = final_assistant_message
+                assistant_message = session.scalar(
+                    select(ChatMessageRecord).where(
+                        ChatMessageRecord.conversation_id == conversation_id,
+                        ChatMessageRecord.role == "assistant",
+                        ChatMessageRecord.request_id == run_id,
+                    )
+                )
+                if assistant_message is not None:
+                    assistant_message.content = final_assistant_message
+                    assistant_message.map_session = candidate_map
+                    stored_payload = _json_object(assistant_message.structured_payload)
+                    if stored_payload:
+                        assistant_message.structured_payload = {
+                            **stored_payload,
+                            "map_session": candidate_map,
+                            "presentation_status": "ready",
+                        }
                 run.state = AgentRunState.COMPLETED.value
                 run.completed_at = datetime.now(UTC)
                 run.presentation_status = "ready"
@@ -1008,3 +1031,50 @@ class AgentRunRepository:
             ),
             presentation=record.presentation_json,
         )
+
+
+###############################################################################
+def _final_render_message(pending_response: JsonObject) -> str:
+    """Replace the transient render-wait text with a durable terminal result."""
+
+    current = str(pending_response.get("assistant_message") or "").strip()
+    if current not in {
+        "",
+        "Data prepared; the map is loading.",
+        "A map candidate is prepared and awaiting render acknowledgment.",
+        "The map candidate is awaiting render acknowledgment.",
+    }:
+        return current
+
+    map_session = _json_object(pending_response.get("map_session"))
+    collection = _json_object(map_session.get("overlay_collection"))
+    instances = [
+        cast(JsonObject, item)
+        for item in _json_list(collection.get("instances"))
+        if isinstance(item, dict)
+    ]
+    statuses = [
+        str(_json_object(instance.get("descriptor")).get("result_status") or "")
+        .strip()
+        .casefold()
+        for instance in instances
+    ]
+    top_level_status = (
+        str(_json_object(map_session.get("payload")).get("result_status") or "")
+        .strip()
+        .casefold()
+    )
+    if top_level_status == "valid_empty" or (
+        statuses and all(status == "valid_empty" for status in statuses)
+    ):
+        return "The map is ready. No results were found in the requested area or time window."
+
+    feature_count = 0
+    for instance in instances:
+        data = _json_object(_json_object(instance.get("descriptor")).get("data"))
+        features = _json_list(data.get("features"))
+        feature_count += len(features)
+    if feature_count:
+        noun = "result" if feature_count == 1 else "results"
+        return f"The map is ready with {feature_count} {noun}."
+    return "The map is ready."
