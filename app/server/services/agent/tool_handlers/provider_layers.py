@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
+from server.common.typing import json_array
 from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.tool_result import (
     ToolExecutionError,
@@ -69,17 +71,16 @@ class ProviderLayerToolHandler:
             )
 
         payload = response.model_dump(mode="json")
-        layers = payload.get("layers")
-        all_layers = layers if isinstance(layers, list) else []
+        all_layers = json_array(payload.get("layers"))
         page = all_layers[offset : offset + request.limit]
         next_offset = offset + len(page)
         next_cursor = str(next_offset) if next_offset < len(all_layers) else None
-        page_payload = {
+        page_payload: dict[str, Any] = {
             "provider": payload.get("provider", request.provider_id),
             "layers": page,
             "next_cursor": next_cursor,
             "total": len(all_layers),
-            "warnings": payload.get("warnings", []),
+            "warnings": payload.get("warnings", list[str]()),
         }
         evidence = self.evidence_repository.create(
             conversation_id=state.conversation_id,

@@ -106,11 +106,8 @@ class RunLifecycleService:
     def resume_active_runs(self) -> int:
         """Requeue non-terminal runs after application startup."""
 
-        list_resumable_runs = getattr(self.run_repository, "list_resumable_runs", None)
-        if not callable(list_resumable_runs):
-            return 0
         scheduled = 0
-        for snapshot in list_resumable_runs():
+        for snapshot in self.run_repository.list_resumable_runs():
             if snapshot.run_id in self._tasks_by_run:
                 continue
             self._schedule_run(snapshot.run_id)

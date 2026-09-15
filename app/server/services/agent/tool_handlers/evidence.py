@@ -218,12 +218,13 @@ def _inspect_payload(
     if view == "statistics":
         statistics: dict[str, Any] = {}
         for key in sorted({key for item in records for key in item}):
-            values = [
-                float(item[key])
-                for item in records
-                if isinstance(item.get(key), (int, float))
-                and not isinstance(item.get(key), bool)
-            ]
+            values: list[float] = []
+            for item in records:
+                raw_value = item.get(key)
+                if isinstance(raw_value, (int, float)) and not isinstance(
+                    raw_value, bool
+                ):
+                    values.append(float(raw_value))
             if values:
                 statistics[key] = {
                     "min": min(values),
@@ -278,13 +279,16 @@ def _apply_operations(
             end = str(operation.get("end") or "")
             if not start and not end:
                 return result, "temporal_filter requires a start or end bound."
-            result = [
-                item
-                for item in result
-                if isinstance(item.get(field), str)
-                and (not start or item[field] >= start)
-                and (not end or item[field] <= end)
-            ]
+            filtered: list[dict[str, Any]] = []
+            for item in result:
+                value = item.get(field)
+                if (
+                    isinstance(value, str)
+                    and (not start or value >= start)
+                    and (not end or value <= end)
+                ):
+                    filtered.append(item)
+            result = filtered
         elif op == "sort":
             field = str(operation.get("field") or "")
             if not field:

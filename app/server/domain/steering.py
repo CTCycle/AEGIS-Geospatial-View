@@ -26,7 +26,7 @@ class SteeringDelta(BaseModel):
 
     kind: SteeringDeltaKind
     text: str
-    parameters: dict[str, Any] = Field(default_factory=dict)
+    parameters: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     preserve_evidence: bool = True
     invalidates_scope_dependent_evidence: bool = False
 

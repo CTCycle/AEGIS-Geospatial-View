@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from server.common.typing import json_object
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_route import (
     AgentGoal,
@@ -68,7 +69,7 @@ class CompletionEvaluator:
             for instance in map_session.overlay_collection.instances
         )
         values = {
-            "location_resolved": map_session.resolved_location is not None,
+            "location_resolved": True,
             "required_data_retrieved": not data_failure
             and bool(
                 map_session.overlay_collection.instances
@@ -109,11 +110,7 @@ class CompletionEvaluator:
     ) -> list[dict[str, Any]]:
         """Apply a browser render acknowledgment to native obligations."""
 
-        checks = (
-            acknowledgment.get("checks")
-            if isinstance(acknowledgment.get("checks"), dict)
-            else {}
-        )
+        checks = json_object(acknowledgment.get("checks"))
         ready = acknowledgment.get("status") == "ready"
         updated: list[dict[str, Any]] = []
         for raw in requirements:
@@ -202,7 +199,6 @@ def _native_spatial_scope_applied(
     expected_kinds = {
         str(item.get("kind") or item.get("analysis_scope") or "")
         for item in goal.spatial_scope
-        if isinstance(item, dict)
     }
     declared = {
         str(

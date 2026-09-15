@@ -17,21 +17,27 @@ class CapabilityRoute(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     primary_domain: CapabilityDomain
-    secondary_domains: list[CapabilityDomain] = Field(default_factory=list, max_length=3)
+    secondary_domains: list[CapabilityDomain] = Field(
+        default_factory=lambda: list[CapabilityDomain](), max_length=3
+    )
     task_mode: Literal["answer", "execute", "clarify"]
     presentation: Literal["text", "map", "both"]
     requires_location: bool
-    capability_queries: list[str] = Field(default_factory=list, max_length=4)
-    explicit_capability_ids: list[str] = Field(default_factory=list, max_length=8)
+    capability_queries: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=4
+    )
+    explicit_capability_ids: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=8
+    )
     clarification_question: str | None = Field(default=None, max_length=500)
     # These are user-semantic constraints, not provider arguments.  Keeping
     # them on the validated route gives the native harness a deterministic
     # request contract without a separate interpretation stage.
     operation: str | None = Field(default=None, min_length=1, max_length=80)
-    target_refs: list[str] = Field(default_factory=list, max_length=16)
+    target_refs: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     temporal_scope: "AgentTemporalScope" = Field(default_factory=lambda: AgentTemporalScope())
     spatial_scope: "AgentSpatialScope | None" = None
-    filters: dict[str, Any] = Field(default_factory=dict)
+    filters: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 
 class AgentTemporalScope(BaseModel):
@@ -70,7 +76,7 @@ class AgentSpatialScope(BaseModel):
         "visible_area",
         "here",
     ] = "at"
-    target_refs: list[str] = Field(default_factory=list, max_length=16)
+    target_refs: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     distance_m: float | None = Field(default=None, gt=0.0, le=1_000_000)
 
 
@@ -87,10 +93,16 @@ class AgentGoal(BaseModel):
     presentation: Literal["text", "map", "both"]
     operation: str
     requires_location: bool
-    target_ids: list[str] = Field(default_factory=list, max_length=16)
-    temporal_scope: dict[str, object] = Field(default_factory=dict)
-    spatial_scope: list[dict[str, object]] = Field(default_factory=list, max_length=16)
-    filters: dict[str, object] = Field(default_factory=dict)
+    target_ids: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
+    temporal_scope: dict[str, object] = Field(
+        default_factory=lambda: dict[str, object]()
+    )
+    spatial_scope: list[dict[str, object]] = Field(
+        default_factory=lambda: list[dict[str, object]](), max_length=16
+    )
+    filters: dict[str, object] = Field(
+        default_factory=lambda: dict[str, object]()
+    )
 
 
 class CompletionContract(BaseModel):
@@ -99,7 +111,9 @@ class CompletionContract(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     operation: str
-    requirements: list[str] = Field(default_factory=list, max_length=16)
+    requirements: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=16
+    )
     location_required: bool = False
     evidence_required: bool = False
     map_preparation_required: bool = False
@@ -134,9 +148,15 @@ class CapabilityRouteDecision(BaseModel):
         "rejected",
     ]
     route: CapabilityRoute
-    capability_ids: list[str] = Field(default_factory=list, max_length=12)
-    rejected_capability_ids: list[str] = Field(default_factory=list, max_length=8)
-    reason_codes: list[str] = Field(default_factory=list, max_length=16)
+    capability_ids: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=12
+    )
+    rejected_capability_ids: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=8
+    )
+    reason_codes: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=16
+    )
     clarification_question: str | None = Field(default=None, max_length=500)
 
 ###############################################################################
@@ -170,45 +190,81 @@ class AgentRunState(BaseModel):
     user_message: str
     goal: AgentGoal | None = None
     completion_contract: CompletionContract | None = None
-    completion_requirements: list[str] = Field(default_factory=list)
-    active_directives: list[dict[str, object]] = Field(default_factory=list)
-    task_state: dict[str, object] = Field(default_factory=dict)
-    map_memory: dict[str, object] = Field(default_factory=dict)
+    completion_requirements: list[str] = Field(default_factory=lambda: list[str]())
+    active_directives: list[dict[str, object]] = Field(
+        default_factory=lambda: list[dict[str, object]]()
+    )
+    task_state: dict[str, object] = Field(
+        default_factory=lambda: dict[str, object]()
+    )
+    map_memory: dict[str, object] = Field(
+        default_factory=lambda: dict[str, object]()
+    )
     summary: dict[str, object] | None = None
-    recent_messages: list[dict[str, object]] = Field(default_factory=list)
-    relevant_tool_outcomes: list[dict[str, object]] = Field(default_factory=list)
-    policy_constraints: dict[str, object] = Field(default_factory=dict)
-    included_message_ids: list[int] = Field(default_factory=list)
-    omitted_message_ids: list[int] = Field(default_factory=list)
+    recent_messages: list[dict[str, object]] = Field(
+        default_factory=lambda: list[dict[str, object]]()
+    )
+    relevant_tool_outcomes: list[dict[str, object]] = Field(
+        default_factory=lambda: list[dict[str, object]]()
+    )
+    policy_constraints: dict[str, object] = Field(
+        default_factory=lambda: dict[str, object]()
+    )
+    included_message_ids: list[int] = Field(default_factory=lambda: list[int]())
+    omitted_message_ids: list[int] = Field(default_factory=lambda: list[int]())
     summarized_through_turn_index: int = 0
-    context_allocation: dict[str, object] = Field(default_factory=dict)
-    context_usage_trace: list[dict[str, object]] = Field(default_factory=list)
-    model_trace: list[dict[str, object]] = Field(default_factory=list)
-    tool_trace: list[dict[str, object]] = Field(default_factory=list)
+    context_allocation: dict[str, object] = Field(
+        default_factory=lambda: dict[str, object]()
+    )
+    context_usage_trace: list[dict[str, object]] = Field(
+        default_factory=lambda: list[dict[str, object]]()
+    )
+    model_trace: list[dict[str, object]] = Field(
+        default_factory=lambda: list[dict[str, object]]()
+    )
+    tool_trace: list[dict[str, object]] = Field(
+        default_factory=lambda: list[dict[str, object]]()
+    )
     # Provider protocol items are retained only for continuation/resume. They
     # are never used as the semantic state view.
-    provider_continuation: list[dict[str, object]] = Field(default_factory=list)
+    provider_continuation: list[dict[str, object]] = Field(
+        default_factory=lambda: list[dict[str, object]]()
+    )
     context_hydrated: bool = False
     route: CapabilityRoute | None = None
-    capability_ids: list[str] = Field(default_factory=list)
-    excluded_capability_ids: list[str] = Field(default_factory=list, max_length=32)
-    location_refs: dict[str, ResolvedLocation] = Field(default_factory=dict)
-    evidence_refs: list[str] = Field(default_factory=list)
+    capability_ids: list[str] = Field(default_factory=lambda: list[str]())
+    excluded_capability_ids: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=32
+    )
+    location_refs: dict[str, ResolvedLocation] = Field(
+        default_factory=lambda: dict[str, ResolvedLocation]()
+    )
+    evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
     active_map_session: MapSession | None = None
     prepared_map_session: MapSession | None = None
-    tool_results: list[ToolResult] = Field(default_factory=list)
-    successful_fingerprints: dict[str, ToolResult] = Field(default_factory=dict)
-    failed_fingerprints: dict[str, int] = Field(default_factory=dict)
+    tool_results: list[ToolResult] = Field(default_factory=lambda: list[ToolResult]())
+    successful_fingerprints: dict[str, ToolResult] = Field(
+        default_factory=lambda: dict[str, ToolResult]()
+    )
+    failed_fingerprints: dict[str, int] = Field(
+        default_factory=lambda: dict[str, int]()
+    )
     consecutive_tool_failures: int = Field(default=0, ge=0)
     route_corrections: int = Field(default=0, ge=0)
     validation_corrections: int = Field(default=0, ge=0)
     model_calls: int = Field(default=0, ge=0)
     tool_calls: int = Field(default=0, ge=0)
     transitions: int = Field(default=0, ge=0)
-    transition_trace: list[dict[str, str]] = Field(default_factory=list)
-    exposure_trace: list[dict[str, str]] = Field(default_factory=list)
+    transition_trace: list[dict[str, str]] = Field(
+        default_factory=lambda: list[dict[str, str]]()
+    )
+    exposure_trace: list[dict[str, str]] = Field(
+        default_factory=lambda: list[dict[str, str]]()
+    )
     discovery_attempts: int = Field(default=0, ge=0)
-    budget_snapshot: dict[str, object] = Field(default_factory=dict)
+    budget_snapshot: dict[str, object] = Field(
+        default_factory=lambda: dict[str, object]()
+    )
     termination_reason: str | None = None
 
     def checkpoint(self) -> dict[str, Any]:

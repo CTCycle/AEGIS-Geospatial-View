@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from contextlib import nullcontext
 from typing import Any
 from uuid import uuid4
 
@@ -12,7 +11,10 @@ from pydantic import BaseModel, ValidationError
 
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentRunState
-from server.domain.agent.reliability import ExecutionBudgetExceeded
+from server.domain.agent.reliability import (
+    AgentExecutionBudget,
+    ExecutionBudgetExceeded,
+)
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -43,7 +45,7 @@ class ToolExecutor:
         self,
         tool_call: LLMToolCall,
         state: AgentRunState,
-        budget: Any,
+        budget: AgentExecutionBudget,
     ) -> ToolResult:
         result = await self._execute_tool(tool_call, state, budget)
         if not any(item.call_id == result.call_id for item in state.tool_results):
@@ -71,7 +73,7 @@ class ToolExecutor:
         self,
         tool_call: LLMToolCall,
         state: AgentRunState,
-        budget: Any,
+        budget: AgentExecutionBudget,
     ) -> ToolResult:
         started = time.perf_counter()
         call_id = tool_call.id or f"call_{uuid4().hex}"
@@ -182,28 +184,15 @@ class ToolExecutor:
             else "tool_execution"
         )
         budget.ensure_available(execution_stage)
-        remaining = float(budget.remaining_seconds())
-        operation_timeout = getattr(budget, "operation_timeout", None)
-        if callable(operation_timeout):
-            timeout = float(
-                operation_timeout(
-                    execution_stage,
-                    requested_seconds=self.timeout_seconds,
-                )
-            )
-        else:
-            timeout = min(self.timeout_seconds, max(0.01, remaining))
-        observe = getattr(budget, "observe", None)
-        observation_scope = (
-            observe(
-                execution_stage,
-                metadata={"tool": tool_call.name, "call_id": call_id},
-            )
-            if callable(observe)
-            else nullcontext()
+        timeout = budget.operation_timeout(
+            execution_stage,
+            requested_seconds=self.timeout_seconds,
         )
         try:
-            with observation_scope:
+            with budget.observe(
+                execution_stage,
+                metadata={"tool": tool_call.name, "call_id": call_id},
+            ):
                 raw_result = await asyncio.wait_for(
                     registered.handler(arguments, state), timeout=timeout
                 )
