@@ -6,6 +6,7 @@ import json
 from contextlib import suppress
 from typing import Any
 
+from server.common.typing import is_json_object
 from server.contracts.runs import AgentRunSnapshot
 from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
 from server.domain.agent.capability_route import AgentRunState as NativeRunState
@@ -252,7 +253,6 @@ class AgentRunOrchestrator:
             self.defer_map_completion
             and self.render_completion_service is not None
             and response.map_session is not None
-            and response.operation is not None
             and response.operation.kind == "map_session"
             and response.operation.status in {"success", "partial", "pending"}
         ):
@@ -310,7 +310,6 @@ class AgentRunOrchestrator:
             self.defer_map_completion
             and self.render_completion_service is not None
             and response.map_session is not None
-            and response.operation is not None
             and response.operation.kind == "map_session"
             and response.operation.status in {"success", "partial", "pending"}
         ):
@@ -410,18 +409,14 @@ class AgentRunOrchestrator:
                     ).hexdigest(),
                     completion_reason=(
                         "clarification_required"
-                        if response.operation is not None
-                        and response.operation.kind == "clarification"
+                        if response.operation.kind == "clarification"
                         else None
                     ),
                 ).model_dump(mode="json"),
             ),
         )
         await self._publish_response(latest, response)
-        if (
-            response.operation is not None
-            and response.operation.kind == "clarification"
-        ):
+        if response.operation.kind == "clarification":
             clarified, transitioned = self.run_repository.mark_completed_if_current(
                 run_id, snapshot.active_run_version
             )
@@ -450,9 +445,7 @@ class AgentRunOrchestrator:
                 run_id,
                 snapshot.active_run_version,
                 "agent_operation_failed",
-                response.operation.message
-                if response.operation is not None
-                else "Failed",
+                response.operation.message,
             )
             if not transitioned:
                 if failed.cancel_requested_at is not None:
@@ -468,9 +461,7 @@ class AgentRunOrchestrator:
                 type=RunEventType.ERROR,
                 payload={
                     "code": "agent_operation_failed",
-                    "message": response.operation.message
-                    if response.operation is not None
-                    else "Failed",
+                    "message": response.operation.message,
                     **self._response_payload(response),
                 },
             )
@@ -505,9 +496,7 @@ class AgentRunOrchestrator:
                 sequence=2,
                 payload={
                     "completion_reason": "completed",
-                    "operation_status": response.operation.status
-                    if response.operation is not None
-                    else None,
+                    "operation_status": response.operation.status,
                     "model_calls": self._model_call_count(response),
                     "tool_calls": len(
                         (response.tool_payload or {}).get("tool_calls", [])
@@ -528,9 +517,7 @@ class AgentRunOrchestrator:
             type=RunEventType.ASSISTANT_TEXT_COMPLETED,
             payload={
                 "content": response.assistant_message,
-                "operation": response.operation.model_dump(mode="json")
-                if response.operation is not None
-                else None,
+                "operation": response.operation.model_dump(mode="json"),
             },
         )
 
@@ -624,7 +611,7 @@ class AgentRunOrchestrator:
             value = loader(run_id, run_version=run_version)
         except Exception:
             return None
-        return value if isinstance(value, dict) else None
+        return value if is_json_object(value) else None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -650,10 +637,10 @@ class AgentRunOrchestrator:
     # -------------------------------------------------------------------------
     @staticmethod
     def _response_failed(response: ChatTurnResponse) -> bool:
-        operation = response.operation
-        if operation is None:
-            return False
-        return operation.status == "failed" or operation.kind == "error"
+        return (
+            response.operation.status == "failed"
+            or response.operation.kind == "error"
+        )
 
     # -------------------------------------------------------------------------
     def _request_message(self, snapshot: AgentRunSnapshot) -> str:

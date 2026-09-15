@@ -26,16 +26,20 @@ class ConversationState(BaseModel):
     schema_version: Literal[1] = 1
     conversation_id: str
     revision: int = Field(default=0, ge=0)
-    active_directives: list[dict[str, Any]] = Field(default_factory=list)
+    active_directives: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     summary: dict[str, Any] | None = None
     summary_through_turn_index: int = Field(default=0, ge=0)
     goal: AgentGoal | None = None
     route: CapabilityRoute | None = None
-    constraints: dict[str, Any] = Field(default_factory=dict)
-    resolved_locations: dict[str, ResolvedLocation] = Field(default_factory=dict)
-    evidence_refs: list[str] = Field(default_factory=list)
+    constraints: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    resolved_locations: dict[str, ResolvedLocation] = Field(
+        default_factory=lambda: dict[str, ResolvedLocation]()
+    )
+    evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
     committed_map_session: MapSession | None = None
-    unresolved_questions: list[str] = Field(default_factory=list)
+    unresolved_questions: list[str] = Field(default_factory=lambda: list[str]())
 
     @classmethod
     def empty(cls, conversation_id: str, *, revision: int = 0) -> "ConversationState":

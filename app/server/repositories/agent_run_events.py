@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
-from server.common.typing import json_object
+from server.common.typing import is_json_object, json_object
 
 from uuid import uuid4
 
@@ -138,10 +138,10 @@ class AgentRunEventRepository:
             return None
         payload = json_object(record.payload_json)
         checkpoint = payload.get("payload")
-        if not isinstance(checkpoint, dict):
+        if not is_json_object(checkpoint):
             return None
         run_state = checkpoint.get("run_state")
-        return cast(dict[str, Any], run_state) if isinstance(run_state, dict) else None
+        return dict(run_state) if is_json_object(run_state) else None
 
     # -------------------------------------------------------------------------
     @staticmethod

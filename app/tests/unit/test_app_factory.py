@@ -154,7 +154,9 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         app_module, "AgentRunEventRepository", lambda database: object()
     )
     monkeypatch.setattr(
-        app_module, "AgentRunRepository", lambda database, **_kwargs: object()
+        app_module,
+        "AgentRunRepository",
+        lambda database, **_kwargs: SimpleNamespace(list_resumable_runs=lambda: []),
     )
     monkeypatch.setattr(
         app_module, "AgentSteeringRepository", lambda database: object()

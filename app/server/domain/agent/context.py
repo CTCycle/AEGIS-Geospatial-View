@@ -53,14 +53,24 @@ class AgentContextView(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    active_directives: list[dict[str, Any]] = Field(default_factory=list)
-    task_state: dict[str, Any] = Field(default_factory=dict)
-    map_memory: dict[str, Any] = Field(default_factory=dict)
+    active_directives: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
+    task_state: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    map_memory: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     summary: dict[str, Any] | None = None
-    relevant_tool_outcomes: list[dict[str, Any]] = Field(default_factory=list)
-    recent_observations: list[dict[str, Any]] = Field(default_factory=list)
-    policy_constraints: dict[str, Any] = Field(default_factory=dict)
-    context_selection: dict[str, Any] = Field(default_factory=dict)
+    relevant_tool_outcomes: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
+    recent_observations: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
+    policy_constraints: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]()
+    )
+    context_selection: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]()
+    )
 
     @classmethod
     def from_state(

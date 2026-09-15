@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Generator
 
+from server.common.typing import is_json_array, is_json_object
 
 INITIAL_RUN_SECONDS = 90.0
 SIMPLE_RUN_SECONDS = 150.0
@@ -353,14 +354,14 @@ class AgentExecutionBudget:
             stopping_reason if isinstance(stopping_reason, str) else None
         )
         allocations = snapshot.get("context_allocations")
-        if isinstance(allocations, list):
+        if is_json_array(allocations):
             self.context_allocations = [
-                dict(item) for item in allocations if isinstance(item, dict)
+                dict(item) for item in allocations if is_json_object(item)
             ][-16:]
         iterations = snapshot.get("iteration_traces")
-        if isinstance(iterations, list):
+        if is_json_array(iterations):
             self.iteration_traces = [
-                dict(item) for item in iterations if isinstance(item, dict)
+                dict(item) for item in iterations if is_json_object(item)
             ][-12:]
 
         deadline_epoch_ms = snapshot.get("deadline_epoch_ms")

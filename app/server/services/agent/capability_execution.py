@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import uuid4
 
+from server.common.typing import is_json_array
 from server.domain.agent.evidence import EvidenceKind, EvidenceStatus
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.tool_result import (
@@ -192,10 +193,6 @@ class CapabilityExecutionService:
                 provider_id,
                 provider_request,
             )
-            if not isinstance(response, ProviderResponse):
-                raise ProviderMalformedPayloadError(
-                    "Provider returned an invalid normalized response."
-                )
         except Exception as exc:
             return self._provider_failure(
                 context=context,
@@ -520,7 +517,7 @@ def _response_summary(
         "provider_id": response.provider_id,
         "result_status": response.result_status,
         "result_type": response.result_type,
-        "feature_count": len(features) if isinstance(features, list) else None,
+        "feature_count": len(features) if is_json_array(features) else None,
         "stale": response.stale,
         "fetched_at": response.fetched_at.isoformat(),
     }

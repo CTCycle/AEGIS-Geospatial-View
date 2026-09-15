@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TYPE_CHECKING, Any, Literal
-from server.common.typing import json_array
+from typing import TYPE_CHECKING, Any, Literal, cast
+
+from server.common.typing import is_json_array, is_json_object, json_array
 
 from server.domain.agent.context import AgentContextPackage, ConversationDirective
 from server.services.llm.context_budget import (
@@ -19,6 +20,15 @@ if TYPE_CHECKING:
 # in their authoritative stores. This cap is independent of model capacity.
 KNOWN_MODEL_WORKING_SET_CEILING = 64_000
 UNKNOWN_MODEL_WORKING_SET_CEILING = 32_768
+type BoundedJson = (
+    None
+    | bool
+    | int
+    | float
+    | str
+    | dict[str, "BoundedJson"]
+    | list["BoundedJson"]
+)
 
 ###############################################################################
 class AgentContextAssembler:
@@ -57,11 +67,11 @@ class AgentContextAssembler:
             if profile
             else None
         )
-        raw_outcomes = [
-            _bounded_json_value(item, depth=0)
-            for item in (relevant_tool_outcomes or [])
-            if isinstance(item, dict)
-        ]
+        raw_outcomes: list[dict[str, Any]] = []
+        for item in relevant_tool_outcomes or []:
+            bounded_outcome = _bounded_json_value(item, depth=0)
+            if is_json_object(bounded_outcome):
+                raw_outcomes.append(bounded_outcome)
         constraints = _bounded_object(policy_constraints or {})
         bounded_task_state = _bounded_object(task_state)
         bounded_map_memory = _bounded_object(map_memory)
@@ -130,8 +140,6 @@ class AgentContextAssembler:
         projected: list[dict[str, Any]] = []
         source_costs: list[int] = []
         for item in messages:
-            if not isinstance(item, dict):
-                continue
             projected_item = {
                 key: (
                     str(item[key])[:4_000]
@@ -245,7 +253,7 @@ class AgentContextAssembler:
 
 def _bounded_object(value: object) -> dict[str, Any]:
     bounded = _bounded_json_value(value, depth=0)
-    return bounded if isinstance(bounded, dict) else {}
+    return bounded if is_json_object(bounded) else {}
 
 
 _RELEVANCE_STOP_WORDS = frozenset(
@@ -322,15 +330,15 @@ def json_text(value: object) -> str:
 
 def _walk_values(value: object, *, keys: set[str]) -> list[object]:
     found: list[object] = []
-    if isinstance(value, dict):
+    if is_json_object(value):
         for key, child in value.items():
-            if str(key) in keys:
-                if isinstance(child, list):
-                    found.extend(child)
+            if key in keys:
+                if is_json_array(child):
+                    found.extend(cast(list[object], child))
                 else:
                     found.append(child)
             found.extend(_walk_values(child, keys=keys))
-    elif isinstance(value, list):
+    elif is_json_array(value):
         for child in value:
             found.extend(_walk_values(child, keys=keys))
     return found
@@ -344,7 +352,7 @@ def _bounded_json_value(
     list_limit: int = 24,
     key_limit: int = 32,
     string_limit: int = 800,
-) -> Any:
+) -> BoundedJson:
     """Bound structured context without ever producing partial JSON."""
 
     if value is None or isinstance(value, (bool, int, float)):
@@ -353,9 +361,9 @@ def _bounded_json_value(
         return value[:string_limit]
     if depth >= max_depth:
         return "[truncated]"
-    if isinstance(value, dict):
+    if is_json_object(value):
         return {
-            str(key): _bounded_json_value(
+            key: _bounded_json_value(
                 child,
                 depth=depth + 1,
                 max_depth=max_depth,
@@ -365,7 +373,7 @@ def _bounded_json_value(
             )
             for key, child in list(value.items())[:key_limit]
         }
-    if isinstance(value, (list, tuple)):
+    if is_json_array(value):
         return [
             _bounded_json_value(
                 child,
@@ -376,5 +384,18 @@ def _bounded_json_value(
                 string_limit=string_limit,
             )
             for child in list(value)[:list_limit]
+        ]
+    if isinstance(value, tuple):
+        items = list(cast(tuple[object, ...], value))
+        return [
+            _bounded_json_value(
+                child,
+                depth=depth + 1,
+                max_depth=max_depth,
+                list_limit=list_limit,
+                key_limit=key_limit,
+                string_limit=string_limit,
+            )
+            for child in items[:list_limit]
         ]
     return str(value)[:string_limit]

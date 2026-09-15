@@ -20,6 +20,7 @@ from server.contracts.geospatial import MapSession
 ChatRole = Literal["user", "assistant", "system", "tool"]
 ModelProviderMode = Literal["local", "cloud"]
 
+
 ###############################################################################
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -27,6 +28,7 @@ class ChatMessage(BaseModel):
     role: ChatRole
     content: str
     created_at: datetime = Field(default_factory=utc_now)
+
 
 ###############################################################################
 class ChatTurnRequest(BaseModel):
@@ -38,6 +40,7 @@ class ChatTurnRequest(BaseModel):
     timezone: str | None = Field(default=None, max_length=64)
     request_id: str | None = None
     conversation_id: str
+
 
 ###############################################################################
 class ContextUsageResponse(BaseModel):
@@ -69,6 +72,7 @@ class ContextUsageResponse(BaseModel):
     peak_request_tokens: int | None = None
     total_input_tokens: int | None = None
     total_output_tokens: int | None = None
+
 
 ###############################################################################
 class ChatOperationResult(BaseModel):
@@ -118,7 +122,7 @@ class AgentToolResultSummary(BaseModel):
     tool_name: str
     status: Literal["success", "valid_empty", "partial", "failed"]
     summary: str
-    evidence_refs: list[str] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
     map_candidate_id: str | None = None
     error: ToolExecutionError | None = None
 
@@ -138,7 +142,9 @@ class AgentTurnResponse(BaseModel):
     presentation_status: Literal[
         "not_requested", "prepared", "prepared_unverified", "ready", "failed"
     ]
-    tool_results: list[AgentToolResultSummary] = Field(default_factory=list)
+    tool_results: list[AgentToolResultSummary] = Field(
+        default_factory=lambda: list[AgentToolResultSummary]()
+    )
     conversation_state: ConversationState | None = None
     goal: AgentGoal | None = None
     completion_contract: CompletionContract | None = None
@@ -146,6 +152,7 @@ class AgentTurnResponse(BaseModel):
     location_refs: dict[str, ResolvedLocation] = Field(
         default_factory=lambda: dict[str, ResolvedLocation]()
     )
+
 
 ###############################################################################
 class ChatTurnResponse(BaseModel):
@@ -169,8 +176,11 @@ class ChatTurnResponse(BaseModel):
     presentation_status: Literal[
         "not_requested", "prepared", "prepared_unverified", "ready", "failed"
     ] = "not_requested"
-    tool_results: list[AgentToolResultSummary] = Field(default_factory=list)
+    tool_results: list[AgentToolResultSummary] = Field(
+        default_factory=lambda: list[AgentToolResultSummary]()
+    )
     conversation_state: ConversationState | None = None
+
 
 ###############################################################################
 class ChatStreamEvent(BaseModel):
@@ -187,6 +197,7 @@ class ChatStreamEvent(BaseModel):
         "error",
     ]
     data: dict[str, Any]
+
 
 ###############################################################################
 class ModelCardDescriptor(BaseModel):
@@ -209,6 +220,7 @@ class ModelCardDescriptor(BaseModel):
     context_profile_source: str = "unknown"
     metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
+
 ###############################################################################
 class ModelLibrarySourceStatus(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -224,6 +236,7 @@ class ModelLibrarySourceStatus(BaseModel):
     structured_probe_checked_at: datetime | None = None
     structured_probe_expires_at: datetime | None = None
 
+
 ###############################################################################
 class StructuredProbeResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -238,6 +251,7 @@ class StructuredProbeResponse(BaseModel):
     expires_at: datetime | None = None
     message: str | None = None
 
+
 ###############################################################################
 class SelectedModelContextResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -247,6 +261,7 @@ class SelectedModelContextResponse(BaseModel):
     context_window_tokens: int | None = None
     maximum_output_tokens: int | None = None
     context_profile_source: str = "unknown"
+
 
 ###############################################################################
 class ModelSettingsResponse(BaseModel):
@@ -265,6 +280,7 @@ class ModelSettingsResponse(BaseModel):
     )
     selected_model_context: SelectedModelContextResponse
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ModelSettingsSnapshot:
@@ -278,6 +294,7 @@ class ModelSettingsSnapshot:
     openai_base_url: str | None
     google_base_url: str | None
     deepseek_base_url: str | None
+
 
 ###############################################################################
 class ModelSettingsUpdateRequest(BaseModel):
@@ -321,6 +338,7 @@ class ModelSettingsUpdateRequest(BaseModel):
             raise ValueError("Base URL must start with http:// or https://")
         return normalized
 
+
 ###############################################################################
 class ModelLibraryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -335,6 +353,7 @@ class ModelLibraryResponse(BaseModel):
         default_factory=lambda: dict[str, ModelLibrarySourceStatus]()
     )
 
+
 ###############################################################################
 class OllamaRefreshResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -346,15 +365,18 @@ class OllamaRefreshResponse(BaseModel):
         default_factory=lambda: list[ModelCardDescriptor]()
     )
 
+
 ###############################################################################
 class OllamaPullRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model: str
 
+
 ###############################################################################
 class OllamaPullResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
+
 
 ###############################################################################
 class OllamaHealthResponse(BaseModel):

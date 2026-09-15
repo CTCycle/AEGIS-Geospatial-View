@@ -7,7 +7,7 @@ from contextvars import ContextVar
 from email.utils import parsedate_to_datetime
 from datetime import UTC, datetime
 from collections.abc import Awaitable, Callable
-from typing import Any, Iterator
+from typing import Any, Generator
 
 import httpx
 
@@ -38,7 +38,7 @@ _REQUEST_TIMEOUT_SECONDS: ContextVar[float | None] = ContextVar(
 
 ###############################################################################
 @contextmanager
-def request_timeout_scope(timeout_seconds: float | None) -> Iterator[None]:
+def request_timeout_scope(timeout_seconds: float | None) -> Generator[None, None, None]:
     """Apply one provider request's remaining timeout to shared HTTP helpers."""
 
     token = _REQUEST_TIMEOUT_SECONDS.set(

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_object
+from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
@@ -30,7 +30,7 @@ def run_startup_validations(credentials_repo: CredentialRepository) -> None:
             agentic_use = item.get("agenticUse")
             if capability_id and is_json_object(agentic_use):
                 domains = agentic_use.get("domains")
-                if not isinstance(domains, list) or not domains:
+                if not is_json_array(domains) or not domains:
                     invalid_agent_domains.append(capability_id)
                 else:
                     for domain in domains:

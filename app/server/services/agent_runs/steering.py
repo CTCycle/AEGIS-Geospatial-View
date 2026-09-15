@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from server.common.typing import is_json_array, is_json_object
 from server.contracts.runs import TERMINAL_RUN_STATES
 from server.contracts.events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage
 from server.domain.steering import (
+    SteeringDelta,
     SteeringMessageRequest,
     SteeringMessageResponse,
     classify_steering_delta,
@@ -136,12 +138,17 @@ class RunSteeringService:
         )
 
     # -------------------------------------------------------------------------
-    def _apply_state_delta(self, conversation_id: str, delta: object) -> bool:
+    def _apply_state_delta(
+        self, conversation_id: str, delta: SteeringDelta
+    ) -> bool:
         """Persist only mutations that can be applied without model interpretation."""
 
-        if self.conversation_repository is None or getattr(
-            delta, "kind", "instruction"
-        ) not in {"scope_change", "exclusion", "add_dataset", "comparison"}:
+        if self.conversation_repository is None or delta.kind not in {
+            "scope_change",
+            "exclusion",
+            "add_dataset",
+            "comparison",
+        }:
             return False
         try:
             persisted: dict[str, Any] = self.conversation_repository.read_state(
@@ -153,7 +160,11 @@ class RunSteeringService:
                 revision=int(persisted.get("context_revision") or 0),
             )
             history = state.constraints.get("steering_history")
-            steering_history = list(history) if isinstance(history, list) else []
+            steering_history: list[dict[str, Any]] = []
+            if is_json_array(history):
+                steering_history.extend(
+                    dict(item) for item in history if is_json_object(item)
+                )
             steering_history.append(
                 {
                     "kind": delta.kind,

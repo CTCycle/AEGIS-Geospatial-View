@@ -29,14 +29,14 @@ def parse_native_tool_arguments(
 
     if value is None:
         return None, "arguments_missing"
-    if isinstance(value, dict):
+    if is_json_object(value):
         return dict(value), None
     if isinstance(value, str):
         try:
             loaded = json.loads(value)
         except json.JSONDecodeError:
             return None, "invalid_json"
-        if isinstance(loaded, dict):
+        if is_json_object(loaded):
             return dict(loaded), None
         return None, "arguments_not_object"
     return None, "arguments_not_object"
