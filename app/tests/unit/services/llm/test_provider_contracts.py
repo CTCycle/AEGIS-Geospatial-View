@@ -59,7 +59,7 @@ class _Completions:
         )
         return SimpleNamespace(
             choices=[SimpleNamespace(message=message, finish_reason="tool_calls")],
-            model_dump=lambda mode="json": {"choices": []},
+            model_dump=lambda *, mode="json", warnings=False: {"choices": []},
         )
 
 ###############################################################################
@@ -104,7 +104,7 @@ def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(
         monkeypatch.setattr(
             provider,
             "_client",
-            lambda _request=None, client=client: client,
+            lambda _request=None, *, stage="chat", client=client: client,
         )
         result = provider.chat(_request(provider.provider_name, model))
         call = client.completions.calls[0]

@@ -186,6 +186,27 @@ describe('core/api', () => {
     expect(() => parseModelSettingsResponse({ credential_health: {} })).toThrowError(/Invalid model settings API response/);
   });
 
+  it('parseModelSettingsResponse rejects noncanonical provider IDs', () => {
+    expect(() => parseModelSettingsResponse({
+      active_provider_mode: 'cloud',
+      agent_model_provider: 'OpenAI',
+      agent_model_name: 'gpt-4.1-mini',
+      ollama_url: 'http://127.0.0.1:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      deepseek_base_url: null,
+      credentials: {},
+      credential_health: {},
+      selected_model_context: {
+        provider: 'OpenAI',
+        model: 'gpt-4.1-mini',
+        context_window_tokens: null,
+        maximum_output_tokens: null,
+        context_profile_source: 'unknown',
+      },
+    })).toThrowError(/canonical registered provider ID/);
+  });
+
   it('parseChatTurnResponse accepts valid backend response', () => {
     const parsed = parseChatTurnResponse({
       conversation_id: 'conv-abc',

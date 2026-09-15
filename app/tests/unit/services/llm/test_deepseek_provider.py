@@ -94,7 +94,11 @@ class _AsyncClient:
 def test_structured_output_uses_deepseek_json_object_mode(monkeypatch) -> None:
     client = _Client()
     provider = DeepSeekProvider(api_key="test")
-    monkeypatch.setattr(provider, "_client", lambda: client)
+    monkeypatch.setattr(
+        provider,
+        "_client",
+        lambda _request=None, **_kwargs: client,
+    )
     request = LLMRequest(
         model="deepseek-v4-flash",
         messages=[
@@ -145,14 +149,12 @@ def test_async_chat_uses_native_transport_and_closes_client(monkeypatch) -> None
     result = run_async_in_thread(provider.achat(request))
 
     assert result.content == '{"answer": "async"}'
-    assert constructor_calls == [
-        {
-            "api_key": "test",
-            "base_url": "https://provider.test",
-            "timeout": 30.0,
-            "max_retries": 0,
-        }
-    ]
+    assert len(constructor_calls) == 1
+    assert constructor_calls[0]["api_key"] == "test"
+    assert constructor_calls[0]["base_url"] == "https://provider.test"
+    assert constructor_calls[0]["timeout"] == 30.0
+    assert constructor_calls[0]["max_retries"] == 0
+    assert constructor_calls[0]["http_client"].trust_env is False
     assert completions.calls[0]["stream"] is False
     assert completions.calls[0]["max_tokens"] == 7
     assert client.closed is True

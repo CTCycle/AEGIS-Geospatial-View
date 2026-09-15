@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
+import asyncio
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
@@ -28,6 +29,10 @@ from server.services.llm.errors import (
 )
 from server.services.llm.response_serialization import dump_response_payload
 from server.services.llm.request_deadline import remaining_request_seconds
+from server.services.llm.transport import (
+    LLMTransportPolicy,
+    close_sync_client,
+)
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
@@ -45,43 +50,75 @@ class GoogleProvider(LLMProvider):
     provider_name = "google"
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, api_key: str, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str | None = None,
+        transport_policy: LLMTransportPolicy | None = None,
+    ) -> None:
         self.api_key = api_key
-        self.base_url = base_url.rstrip("/") if base_url else None
+        self.base_url = (base_url or DEFAULT_GOOGLE_BASE_URL).rstrip("/")
+        self.transport_policy = transport_policy or LLMTransportPolicy()
 
     # -------------------------------------------------------------------------
-    def _client(self) -> Any:
-        if self.base_url and self.base_url != DEFAULT_GOOGLE_BASE_URL:
-            http_options_constructor: Any = genai_types.HttpOptions
-            return genai.Client(
-                api_key=self.api_key,
-                http_options=http_options_constructor(
-                    baseUrl=self.base_url,
-                    apiVersion="v1beta",
-                ),
-            )
-        return genai.Client(api_key=self.api_key)
-
-    # -------------------------------------------------------------------------
-    def _client_for_request(self, request: LLMRequest) -> Any:
-        remaining = remaining_request_seconds(request)
-        if remaining is None:
-            return self._client()
-        if remaining <= 0:
-            raise TimeoutError("The bounded LLM request deadline has expired.")
-        timeout_ms = max(1, int(remaining * 1000))
+    def _client(
+        self,
+        *,
+        timeout_seconds: float | None = None,
+        stage: str = "chat",
+    ) -> Any:
         http_options_constructor: Any = genai_types.HttpOptions
-        kwargs: dict[str, Any] = {
-            "api_key": self.api_key,
-            "http_options": http_options_constructor(timeout=timeout_ms),
+        timeout = (
+            self.transport_policy.timeout_for(stage)
+            if timeout_seconds is None
+            else timeout_seconds
+        )
+        options: dict[str, Any] = {
+            "timeout": max(1, int(timeout * 1000)),
+            "retryOptions": genai_types.HttpRetryOptions(attempts=1),
+            "clientArgs": self.transport_policy.client_args(),
         }
         if self.base_url and self.base_url != DEFAULT_GOOGLE_BASE_URL:
-            kwargs["http_options"] = http_options_constructor(
-                baseUrl=self.base_url,
-                apiVersion="v1beta",
-                timeout=timeout_ms,
-            )
-        return genai.Client(**kwargs)
+            options.update({"baseUrl": self.base_url, "apiVersion": "v1beta"})
+        return genai.Client(
+            api_key=self.api_key,
+            http_options=http_options_constructor(**options),
+        )
+
+    # -------------------------------------------------------------------------
+    def _client_for_request(
+        self, request: LLMRequest, *, stage: str = "chat"
+    ) -> Any:
+        remaining = remaining_request_seconds(request)
+        if remaining is None:
+            return self._client(stage=stage)
+        if remaining <= 0:
+            raise TimeoutError("The bounded LLM request deadline has expired.")
+        return self._client(timeout_seconds=remaining, stage=stage)
+
+    # -------------------------------------------------------------------------
+    async def achat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
+        return await asyncio.to_thread(
+            self.chat,
+            request,
+            tools=tools,
+            tool_choice=tool_choice,
+            response_json_schema=response_json_schema,
+        )
+
+    # -------------------------------------------------------------------------
+    async def astructured_output(
+        self, request: LLMRequest, schema: type[Any]
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(self.structured_output, request, schema)
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
@@ -203,8 +240,10 @@ class GoogleProvider(LLMProvider):
         if schema and not native_tools:
             config["response_mime_type"] = "application/json"
             config["response_json_schema"] = schema
+        client: Any | None = None
         try:
-            response = self._client_for_request(effective_request).models.generate_content(
+            client = self._client_for_request(effective_request, stage="chat")
+            response = client.models.generate_content(
                 model=effective_request.model,
                 contents=self._contents_from_messages(effective_request.messages),
                 config=config,
@@ -219,6 +258,9 @@ class GoogleProvider(LLMProvider):
                 stage="chat",
                 context_usage=usage.to_dict(),
             ) from exc
+        finally:
+            if client is not None:
+                close_sync_client(client)
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
         return LLMResult(
@@ -237,10 +279,10 @@ class GoogleProvider(LLMProvider):
 
         def iterate() -> Iterable[str]:
             nonlocal usage
+            client: Any | None = None
             try:
-                response_stream = self._client_for_request(
-                    request
-                ).models.generate_content_stream(
+                client = self._client_for_request(request, stage="stream")
+                response_stream = client.models.generate_content_stream(
                     model=request.model,
                     contents=self._contents_from_messages(request.messages),
                     config=self._config_from_request(request),
@@ -269,6 +311,9 @@ class GoogleProvider(LLMProvider):
                     stage="stream",
                     context_usage=usage.to_dict(),
                 ) from exc
+            finally:
+                if client is not None:
+                    close_sync_client(client)
 
         stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
         return stream
@@ -293,8 +338,10 @@ class GoogleProvider(LLMProvider):
         except LLMStructuredOutputError as exc:
             exc.context_usage = usage.to_dict()
             raise
+        client: Any | None = None
         try:
-            response = self._client_for_request(request).models.generate_content(
+            client = self._client_for_request(request, stage="structured_output")
+            response = client.models.generate_content(
                 model=request.model,
                 contents=self._contents_from_messages(request.messages),
                 config={
@@ -313,6 +360,9 @@ class GoogleProvider(LLMProvider):
                 stage="structured_output",
                 context_usage=usage.to_dict(),
             ) from exc
+        finally:
+            if client is not None:
+                close_sync_client(client)
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
         try:
@@ -341,7 +391,22 @@ class GoogleProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
-        response = self._client().models.embed_content(model=model, contents=input_text)
+        client: Any | None = None
+        try:
+            client = self._client(stage="embeddings")
+            response = client.models.embed_content(model=model, contents=input_text)
+        except LLMProviderRequestError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=model,
+                stage="embeddings",
+            ) from exc
+        finally:
+            if client is not None:
+                close_sync_client(client)
         embeddings = getattr(response, "embeddings", None)
         if embeddings:
             values = getattr(embeddings[0], "values", None)
@@ -353,7 +418,13 @@ class GoogleProvider(LLMProvider):
         values = getattr(embedding, "values", None)
         if is_json_array(values):
             return [float(value) for value in values if isinstance(value, (int, float))]
-        return []
+        raise LLMProviderRequestError(
+            provider=self.provider_name,
+            model=model,
+            stage="embeddings",
+            code="provider_invalid_response",
+            retryable=False,
+        )
 
     # -------------------------------------------------------------------------
     def health_check(self) -> dict[str, Any]:

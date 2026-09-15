@@ -16,6 +16,9 @@ from server.services.llm.opencode_provider import (
     OPENCODE_PROVIDER,
 )
 from server.services.llm.context_budget import resolve_model_context_profile
+from server.services.llm.errors import safe_failure_detail
+from server.services.llm.provider_contract import require_canonical_provider
+from server.services.llm.transport import LLMTransportPolicy
 from server.services.llm.types import ModelDescriptor
 
 ###############################################################################
@@ -47,6 +50,7 @@ class ChatModelLibraryService:
         *,
         ollama_tool_capability_cache: OllamaToolCapabilityCache | None = None,
         provider_factory: LLMFactory,
+        transport_policy: LLMTransportPolicy | None = None,
         ollama_unavailable_ttl_s: float = 20.0,
         dynamic_catalog_ttl_s: float = 900.0,
         dynamic_catalog_failure_ttl_s: float = 60.0,
@@ -55,6 +59,11 @@ class ChatModelLibraryService:
             ollama_tool_capability_cache or OllamaToolCapabilityCache()
         )
         self.provider_factory = provider_factory
+        self.transport_policy = (
+            transport_policy
+            or getattr(provider_factory, "transport_policy", None)
+            or LLMTransportPolicy()
+        )
         self.ollama_unavailable_ttl_s = ollama_unavailable_ttl_s
         self.dynamic_catalog_ttl_s = dynamic_catalog_ttl_s
         self.dynamic_catalog_failure_ttl_s = dynamic_catalog_failure_ttl_s
@@ -230,6 +239,12 @@ class ChatModelLibraryService:
         include_probe_status: bool = True,
     ) -> dict[str, object]:
         normalized_ollama_url = self.normalize_ollama_url(ollama_url)
+        if cloud_provider is not None:
+            require_canonical_provider(cloud_provider)
+            if cloud_provider not in DYNAMIC_CLOUD_PROVIDERS:
+                raise ValueError(
+                    f"Provider '{cloud_provider}' does not expose a dynamic catalog."
+                )
         cloud: list[dict[str, object]] = [
             self.model_payload(item) for item in get_cloud_model_catalog()
         ]
@@ -275,7 +290,7 @@ class ChatModelLibraryService:
         never refreshed recursively while building a chat request.
         """
 
-        normalized_provider = provider.strip()
+        normalized_provider = require_canonical_provider(provider)
         normalized_model = model_name.strip()
         if not normalized_provider or not normalized_model:
             return None
@@ -331,21 +346,9 @@ class ChatModelLibraryService:
                 )
                 return models, source
             except Exception as exc:
-                message = str(exc) or f"Could not load {provider_name} models."
-                if cached is not None and cached.models:
-                    source: dict[str, object] = {
-                        **cached.source,
-                        "ok": False,
-                        "reachable": False,
-                        "message": message,
-                        "stale": True,
-                    }
-                    self._dynamic_catalog_cache[provider_name] = _CachedModelDescriptors(
-                        expires_at=now + self.dynamic_catalog_failure_ttl_s,
-                        models=list(cached.models),
-                        source=source,
-                    )
-                    return list(cached.models), source
+                message = safe_failure_detail(
+                    exc, f"Could not load {provider_name} models."
+                )
                 source: dict[str, object] = {
                     "ok": False,
                     "reachable": False,
@@ -370,6 +373,7 @@ class ChatModelLibraryService:
         require_provider_availability: bool = False,
         include_probe_status: bool = True,
     ) -> dict[str, object] | None:
+        require_canonical_provider(provider)
         dynamic_cloud_provider = (
             provider if provider in DYNAMIC_CLOUD_PROVIDERS else None
         )
@@ -425,6 +429,7 @@ class ChatModelLibraryService:
         ollama = OllamaProvider(
             base_url=self.normalize_ollama_url(ollama_url),
             tool_capability_cache=self.ollama_tool_capability_cache,
+            transport_policy=self.transport_policy,
         )
         get_metadata = getattr(ollama, "get_model_context_metadata", None)
         if not callable(get_metadata):
@@ -495,6 +500,7 @@ class ChatModelLibraryService:
         ollama = OllamaProvider(
             base_url=ollama_url,
             tool_capability_cache=self.ollama_tool_capability_cache,
+            transport_policy=self.transport_policy,
         )
         local_models = ollama.list_models()
         if not local_models and ollama.last_list_models_error:

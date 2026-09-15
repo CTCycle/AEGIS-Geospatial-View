@@ -65,19 +65,6 @@ def calculate_context_usage_percent(
     return round((effective_input / model_context_limit) * 100, 1)
 
 ###############################################################################
-def resolve_model_context_limit(model: str) -> int | None:
-    """Return no limit without an exact catalog or provider metadata record.
-
-    Model names are not a reliable context contract.  Callers that have
-    provider metadata should pass it to :func:`resolve_model_context_profile`.
-    This compatibility-shaped helper intentionally refuses family and suffix
-    heuristics so an unknown model cannot receive a fabricated percentage.
-    """
-
-    _ = model
-    return None
-
-###############################################################################
 def _request_metadata(request: LLMRequest) -> dict[str, Any]:
     return request.metadata
 
@@ -85,7 +72,7 @@ def _request_metadata(request: LLMRequest) -> dict[str, Any]:
 def _profile_for_request(
     provider: str, request: LLMRequest
 ) -> ModelContextProfile | None:
-    normalized_provider = provider.strip().lower()
+    normalized_provider = provider
     metadata = _request_metadata(request)
     static_profile = get_model_context_profile(normalized_provider, request.model)
     context_limit = _positive_int(
@@ -229,7 +216,7 @@ def _context_components(
 
 ###############################################################################
 def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage:
-    normalized = provider.strip().lower()
+    normalized = provider
     profile = _profile_for_request(normalized, request)
     message_tokens = estimate_message_tokens(request.messages)
     expected_output, tool_tokens, schema_tokens, safety_margin, usable = (

@@ -92,7 +92,7 @@ Defined in `app/server/api/chat.py`:
   Runs the selected model through the native route/tool contract using the
   fixed `Show a map of Italy` request. It stops before location resolution,
   provider execution, map assembly, and conversation persistence. A probe never
-  changes model selection or activates a fallback.
+  changes model selection and never substitutes another provider or model.
 - `GET /api/chat/settings`
   Reads persisted settings.
 - `PATCH /api/chat/settings`

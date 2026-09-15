@@ -5,7 +5,7 @@ from typing import TextIO
 
 ###############################################################################
 class SafeStreamHandler(logging.StreamHandler[TextIO]):
-    """Write console diagnostics without failing on a legacy code page."""
+    """Write console diagnostics without failing on a non-UTF-8 code page."""
 
     # -------------------------------------------------------------------------
     def emit(self, record: logging.LogRecord) -> None:

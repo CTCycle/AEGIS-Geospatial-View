@@ -3,7 +3,7 @@
 The conversation is the long-lived source of truth.  A model context is a
 short-lived projection of this state and an ``AgentRunState`` is the
 checkpointable state for one execution.  Keeping this contract independent of
-the legacy task/planner models makes follow-up turns resumable without
+prior task/planner projections makes follow-up turns resumable without
 reconstructing semantic state from a recent-message suffix.
 """
 

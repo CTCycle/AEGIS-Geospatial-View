@@ -149,7 +149,7 @@
               <p class="workspace-alerts__empty">No active alerts. Search results and map warnings will appear here.</p>
             } @else {
               <ul class="workspace-alerts__list">
-                @for (alert of activeAlertItems; track alert) {
+                @for (alert of activeAlertItems; track $index) {
                   <li>{{ alert }}</li>
                 }
               </ul>

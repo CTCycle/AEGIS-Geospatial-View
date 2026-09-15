@@ -157,9 +157,6 @@ class AgentTurnRunner:
                 max_tool_result_chars=_setting(
                     self.execution_settings, "max_tool_result_chars", 4096
                 ),
-                model_max_attempts=_setting(
-                    self.execution_settings, "model_max_attempts", 2
-                ),
                 context_usage_callback=request.context_usage_callback,
                 checkpoint_callback=request.checkpoint_callback,
                 run_state_check=request.run_state_check,

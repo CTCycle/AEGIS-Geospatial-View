@@ -21,6 +21,15 @@ from server.services.cryptography import CredentialEncryptionService
 from server.services.llm.context_budget import resolve_model_context_profile
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 from server.services.llm.deepseek_provider import RETIRED_DEEPSEEK_MODELS
+from server.services.geospatial.provider_registry import PROVIDER_FACTORIES
+from server.services.llm.provider_contract import (
+    SUPPORTED_LLM_PROVIDERS,
+    require_canonical_provider,
+)
+
+CANONICAL_CREDENTIAL_PROVIDERS = frozenset(
+    {*SUPPORTED_LLM_PROVIDERS, *PROVIDER_FACTORIES}
+)
 
 ###############################################################################
 class ChatSettingsValidationError(ValueError):
@@ -53,6 +62,17 @@ class ChatSettingsService:
             raise ChatSettingsValidationError(
                 "Stored model settings contain an invalid provider mode."
             )
+        stored_provider = record.agent_model_provider
+        stored_model = record.agent_model_name
+        if bool(stored_provider) != bool(stored_model):
+            raise ChatSettingsValidationError(
+                "Stored model settings contain an incomplete agent assignment."
+            )
+        if stored_provider and stored_model:
+            try:
+                require_canonical_provider(stored_provider)
+            except ValueError as exc:
+                raise ChatSettingsValidationError(str(exc)) from exc
         active_provider_mode: ModelProviderMode = cast(
             ModelProviderMode, record.active_provider_mode
         )
@@ -60,6 +80,11 @@ class ChatSettingsService:
         credential_presence: dict[str, dict[str, bool]] = {}
         credential_health: dict[str, dict[str, str]] = {}
         for item in active_credentials:
+            self._require_canonical_credential_provider(item.provider)
+            if item.label != "api_key":
+                raise ChatSettingsValidationError(
+                    f"Stored credentials for '{item.provider}' use unsupported label '{item.label}'."
+                )
             provider_bucket = credential_presence.setdefault(item.provider, {})
             provider_bucket[item.label] = True
             health_bucket = credential_health.setdefault(item.provider, {})
@@ -190,7 +215,12 @@ class ChatSettingsService:
                 ollama_url=next_ollama_url,
             )
         for provider, labels in payload.credentials.items():
+            self._require_canonical_credential_provider(provider)
             for label, raw_value in labels.items():
+                if label != "api_key":
+                    raise ChatSettingsValidationError(
+                        f"Unsupported credential label '{label}' for '{provider}'."
+                    )
                 if not raw_value.strip():
                     self.credentials_repo.deactivate(provider=provider, label=label)
                     continue
@@ -222,6 +252,15 @@ class ChatSettingsService:
         if callable(clear_probe):
             clear_probe()
         return self.get_settings()
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _require_canonical_credential_provider(provider: object) -> str:
+        if not isinstance(provider, str) or provider not in CANONICAL_CREDENTIAL_PROVIDERS:
+            raise ChatSettingsValidationError(
+                f"Unsupported credential provider '{provider}'. Expected a registered provider ID."
+            )
+        return provider
 
     # -------------------------------------------------------------------------
     def _validate_local_model_selection(
@@ -262,11 +301,8 @@ class ChatSettingsService:
                 ollama_url=ollama_url,
                 require_provider_availability=True,
             )
-        except ModelLibrarySourceError:
-            # A provider catalog outage must not turn missing capability
-            # metadata into an explicit capability rejection.  The selected
-            # model remains executable; the first request is authoritative.
-            return
+        except ModelLibrarySourceError as exc:
+            raise ChatSettingsValidationError(str(exc)) from exc
         if agent_model is not None and agent_model.get("supports_tools") is False:
             raise ChatSettingsValidationError(
                 str(
@@ -311,3 +347,7 @@ class ChatSettingsService:
             raise ChatSettingsValidationError(
                 "Agent model provider and model name must both be configured."
             )
+        try:
+            require_canonical_provider(agent_model_provider)
+        except ValueError as exc:
+            raise ChatSettingsValidationError(str(exc)) from exc

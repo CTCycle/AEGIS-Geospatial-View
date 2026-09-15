@@ -38,9 +38,16 @@ class _OllamaProviderUnavailableStub:
     calls = 0
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, base_url: str, tool_capability_cache=None) -> None:  # noqa: ANN001
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        tool_capability_cache=None,  # noqa: ANN001
+        transport_policy=None,  # noqa: ANN001
+    ) -> None:
         self.base_url = base_url
         self.tool_capability_cache = tool_capability_cache
+        self.transport_policy = transport_policy
         self.last_list_models_error = "Unable to reach Ollama."
 
     # -------------------------------------------------------------------------
@@ -231,6 +238,33 @@ def test_find_cached_model_returns_none_without_catalog_refresh() -> None:
         )
         is None
     )
+
+
+def test_expired_dynamic_catalog_failure_does_not_reuse_stale_model() -> None:
+    service = ChatModelLibraryService(
+        provider_factory=_ProviderFactoryStub(
+            LLMConfigurationError("DeepSeek credentials are not configured.")
+        )
+    )
+    service._dynamic_catalog_cache["deepseek"] = model_library_module._CachedModelDescriptors(  # pyright: ignore[reportPrivateUsage]
+        expires_at=0,
+        models=[
+            ModelDescriptor(
+                name="stale-model",
+                description="Stale model",
+                provider="deepseek",
+            )
+        ],
+        source={"ok": True, "stale": False},
+    )
+
+    response = service.list_models(
+        ollama_url="http://127.0.0.1:11434",
+        cloud_provider="deepseek",
+    )
+
+    assert all(item["id"] != "stale-model" for item in response["cloud"])
+    assert response["sources"]["deepseek"]["ok"] is False
 
 ###############################################################################
 def test_normalize_ollama_url_rewrites_localhost() -> None:

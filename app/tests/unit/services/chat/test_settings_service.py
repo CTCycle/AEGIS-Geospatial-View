@@ -207,6 +207,44 @@ def test_update_settings_rejects_blank_agent_selection() -> None:
             ModelSettingsUpdateRequest(agent_model_provider="", agent_model_name="")
         )
 
+
+@pytest.mark.parametrize(
+    "provider",
+    ["OpenAI", " openai", "openai ", "openai-compatible", "opencode_go"],
+)
+def test_update_settings_rejects_noncanonical_provider_ids(provider: str) -> None:
+    service = build_service()
+
+    with pytest.raises(ChatSettingsValidationError, match="Unsupported model provider"):
+        service.update_settings(
+            ModelSettingsUpdateRequest(
+                agent_model_provider=provider,
+                agent_model_name="gpt-4.1",
+            )
+        )
+
+###############################################################################
+@pytest.mark.parametrize(
+    "provider",
+    ["OpenAI", "openai-compatible", "opencode_go", "not-registered"],
+)
+def test_update_settings_rejects_noncanonical_credential_provider_ids(provider: str) -> None:
+    service = build_service()
+
+    with pytest.raises(ChatSettingsValidationError, match="Unsupported credential provider"):
+        service.update_settings(
+            ModelSettingsUpdateRequest(credentials={provider: {"api_key": "secret"}})
+        )
+
+###############################################################################
+def test_update_settings_rejects_noncanonical_credential_labels() -> None:
+    service = build_service()
+
+    with pytest.raises(ChatSettingsValidationError, match="Unsupported credential label"):
+        service.update_settings(
+            ModelSettingsUpdateRequest(credentials={"openai": {"token": "secret"}})
+        )
+
 ###############################################################################
 def test_get_settings_preserves_blank_agent_when_no_models_are_available() -> None:
     settings_repo = FakeSettingsRepository(

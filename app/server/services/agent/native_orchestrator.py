@@ -36,6 +36,8 @@ from server.services.agent.native_v2_turn import (
 )
 from server.services.chat.history_service import ChatHistoryService
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
+from server.services.llm.errors import LLMConfigurationError
+from server.services.llm.provider_contract import require_canonical_provider
 
 
 ###############################################################################
@@ -123,6 +125,20 @@ class NativeAgentOrchestrator:
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
         conversation_id = payload.conversation_id
         settings = self.settings_repo.get_required()
+        stored_provider = settings.agent_model_provider
+        stored_model = settings.agent_model_name
+        if bool(stored_provider) != bool(stored_model):
+            raise LLMConfigurationError(
+                "Stored model settings contain an incomplete agent assignment."
+            )
+        if not stored_provider or not stored_model:
+            raise LLMConfigurationError(
+                "No agent model is selected. Choose a canonical provider and model in Settings."
+            )
+        try:
+            require_canonical_provider(stored_provider)
+        except ValueError as exc:
+            raise LLMConfigurationError(str(exc)) from exc
         budget = self._new_execution_budget()
         persisted = self.conversation_repository.read_state(conversation_id)
         conversation_state = ConversationState.from_persisted(
@@ -220,11 +236,18 @@ class NativeAgentOrchestrator:
                 context_package=context_package,
                 active_map_session=active_map,
                 location_refs=dict(conversation_state.resolved_locations),
-                evidence_refs=[
-                    str(item.get("evidence_id") or "")
-                    for item in relevant_outcomes
-                    if str(item.get("evidence_id") or "").strip()
-                ],
+                evidence_refs=list(
+                    dict.fromkeys(
+                        [
+                            *conversation_state.evidence_refs,
+                            *[
+                                str(item.get("evidence_id") or "")
+                                for item in relevant_outcomes
+                                if str(item.get("evidence_id") or "").strip()
+                            ],
+                        ]
+                    )
+                ),
                 defer_map_commit=defer_map_commit,
                 checkpoint=checkpoint,
                 checkpoint_callback=checkpoint_callback,

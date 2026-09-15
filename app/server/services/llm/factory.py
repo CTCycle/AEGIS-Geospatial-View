@@ -15,6 +15,8 @@ from server.services.llm.opencode_provider import (
     OpenCodeProvider,
 )
 from server.services.llm.openai_provider import OpenAIProvider
+from server.services.llm.provider_contract import require_canonical_provider
+from server.services.llm.transport import LLMTransportPolicy
 
 ###############################################################################
 class LLMFactory:
@@ -27,6 +29,7 @@ class LLMFactory:
         credentials_repo: CredentialRepository,
         crypto_service: CredentialEncryptionService,
         ollama_tool_capability_cache: OllamaToolCapabilityCache | None = None,
+        transport_policy: LLMTransportPolicy | None = None,
     ) -> None:
         self.settings_repo = settings_repo
         self.credentials_repo = credentials_repo
@@ -34,6 +37,7 @@ class LLMFactory:
         self.ollama_tool_capability_cache = (
             ollama_tool_capability_cache or OllamaToolCapabilityCache()
         )
+        self.transport_policy = transport_policy or LLMTransportPolicy()
 
     # -------------------------------------------------------------------------
     def _get_crypto_service(self) -> CredentialEncryptionService:
@@ -76,28 +80,39 @@ class LLMFactory:
 
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> LLMProvider:
-        normalized = provider.strip().lower()
+        canonical_provider = require_canonical_provider(provider)
         settings = self.settings_repo.get_required()
-        if normalized == "ollama":
+        if canonical_provider == "ollama":
             return OllamaProvider(
                 base_url=settings.ollama_url,
                 tool_capability_cache=self.ollama_tool_capability_cache,
+                transport_policy=self.transport_policy,
             )
-        if normalized == "openai":
+        if canonical_provider == "openai":
             api_key = self._resolve_provider_api_key("openai")
-            return OpenAIProvider(api_key=api_key, base_url=settings.openai_base_url)
-        if normalized == "google":
+            return OpenAIProvider(
+                api_key=api_key,
+                base_url=settings.openai_base_url,
+                transport_policy=self.transport_policy,
+            )
+        if canonical_provider == "google":
             api_key = self._resolve_provider_api_key("google")
-            return GoogleProvider(api_key=api_key, base_url=settings.google_base_url)
-        if normalized == "deepseek":
+            return GoogleProvider(
+                api_key=api_key,
+                base_url=settings.google_base_url,
+                transport_policy=self.transport_policy,
+            )
+        if canonical_provider == "deepseek":
             api_key = self._resolve_provider_api_key("deepseek")
             return DeepSeekProvider(
                 api_key=api_key,
                 base_url=settings.deepseek_base_url,
+                transport_policy=self.transport_policy,
             )
-        if normalized in {OPENCODE_PROVIDER, OPENCODE_GO_PROVIDER}:
+        if canonical_provider in {OPENCODE_PROVIDER, OPENCODE_GO_PROVIDER}:
             return OpenCodeProvider(
-                api_key=self._resolve_provider_api_key(normalized),
-                provider_name=normalized,
+                api_key=self._resolve_provider_api_key(canonical_provider),
+                provider_name=canonical_provider,
+                transport_policy=self.transport_policy,
             )
         raise ValueError(f"Unsupported model provider '{provider}'.")

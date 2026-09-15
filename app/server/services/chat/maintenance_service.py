@@ -12,6 +12,8 @@ from server.contracts.chat import (
 from server.services.chat.model_library import ChatModelLibraryService
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
+from server.services.llm.errors import LLMProviderRequestError
+from server.services.llm.transport import LLMTransportPolicy
 
 OllamaProviderFactory = Callable[[str, OllamaToolCapabilityCache], OllamaProvider]
 
@@ -19,10 +21,13 @@ OllamaProviderFactory = Callable[[str, OllamaToolCapabilityCache], OllamaProvide
 def create_ollama_provider(
     base_url: str,
     tool_capability_cache: OllamaToolCapabilityCache,
+    *,
+    transport_policy: LLMTransportPolicy | None = None,
 ) -> OllamaProvider:
     return OllamaProvider(
         base_url=base_url,
         tool_capability_cache=tool_capability_cache,
+        transport_policy=transport_policy,
     )
 
 ###############################################################################
@@ -46,7 +51,9 @@ class ChatMaintenanceService:
     def refresh_ollama_models(self) -> OllamaRefreshResponse:
         provider = self._ollama_provider()
         library_models = provider.list_library_models()
+        self._raise_if_provider_catalog_failed(provider, "library catalog")
         local_models = provider.list_models()
+        self._raise_if_provider_catalog_failed(provider, "local catalog")
         return OllamaRefreshResponse(
             status="ok",
             library_models=[model.name for model in library_models],
@@ -78,3 +85,27 @@ class ChatMaintenanceService:
             self.get_ollama_url(),
             self.ollama_tool_capability_cache,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _raise_if_provider_catalog_failed(
+        provider: OllamaProvider,
+        catalog_name: str,
+    ) -> None:
+        error_detail = getattr(provider, "last_list_library_models_error", None)
+        diagnostics = getattr(
+            provider, "last_list_library_models_diagnostics", {}
+        )
+        if catalog_name == "local catalog":
+            error_detail = getattr(provider, "last_list_models_error", None)
+            diagnostics = getattr(provider, "last_list_models_diagnostics", {})
+        if not error_detail:
+            return
+        raise LLMProviderRequestError(
+            provider="ollama",
+            model="*",
+            stage="catalog",
+            code="provider_catalog_unavailable",
+            retryable=False,
+            diagnostics=diagnostics if isinstance(diagnostics, dict) else {},
+        ) from RuntimeError(str(error_detail))

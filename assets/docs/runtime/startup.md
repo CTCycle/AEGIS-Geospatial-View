@@ -40,9 +40,11 @@ that operation fails.
 
 Launch option 1 stops listeners on the configured backend/UI ports, starts the
 backend, waits for `/api/health`, starts the frontend preview, waits for the UI
-port, and only then opens the browser. It uses `app.server.app:app` from the
-repository root when importable and falls back to `server.app:app` from
-`app/server`.
+port, and only then opens the browser. It launches the venv Python directly
+with `server.app:app` from the `app` directory and does not support an
+alternate import root, stale launcher arguments, or compatibility fallback.
+The native route rejects provider aliases and never substitutes a different
+provider or model after a configured provider failure.
 
 When option 1 detects missing or unusable application environments, it restores
 dependencies and rebuilds the frontend. A ready environment is reused without a

@@ -16,6 +16,7 @@ from server.services.llm.errors import (
     LLMProviderRequestError,
     LLMStructuredOutputError,
 )
+from server.services.llm.provider_contract import require_canonical_provider
 
 ProbeStatus = Literal["not_tested", "passed", "failed", "timeout", "unsupported"]
 PROBE_TTL_SECONDS = 15 * 60
@@ -44,16 +45,17 @@ class StructuredProbeService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _protocol(provider: str, model: str, provider_factory: Any) -> str:
-        normalized_provider = provider.strip().lower()
-        if normalized_provider == "ollama":
+        if provider == "ollama":
             return "ollama-chat"
-        if normalized_provider == "openai":
+        if provider == "openai":
             return "openai-responses"
-        if normalized_provider == "google":
+        if provider == "google":
             return "google-model"
+        if provider == "deepseek":
+            return "openai-chat-completions"
         if provider_factory is not None:
             try:
-                selected_provider = provider_factory.get_provider(normalized_provider)
+                selected_provider = provider_factory.get_provider(provider)
                 protocol_for_model = getattr(selected_provider, "protocol_for_model", None)
                 if callable(protocol_for_model):
                     protocol = protocol_for_model(model)
@@ -61,10 +63,6 @@ class StructuredProbeService:
                         return protocol.strip()
             except Exception:
                 pass
-        if normalized_provider == "deepseek":
-            return "openai-chat-completions"
-        if normalized_provider in {"opencode", "opencode-go"}:
-            return "openai-compatible"
         return "unknown"
 
     # -------------------------------------------------------------------------
@@ -85,7 +83,7 @@ class StructuredProbeService:
 
     # -------------------------------------------------------------------------
     def _cache_key(self, settings: Any, protocol: str) -> str:
-        provider = str(getattr(settings, "agent_model_provider", "")).strip()
+        provider = str(getattr(settings, "agent_model_provider", ""))
         model = str(getattr(settings, "agent_model_name", "")).strip()
         return "|".join((provider, model, protocol, self._credential_fingerprint(settings)))
 
@@ -107,7 +105,7 @@ class StructuredProbeService:
     # -------------------------------------------------------------------------
     def latest(self) -> StructuredProbeResponse:
         settings = self._settings()
-        provider = str(getattr(settings, "agent_model_provider", "")).strip()
+        provider = str(getattr(settings, "agent_model_provider", ""))
         model = str(getattr(settings, "agent_model_name", "")).strip()
         protocol = self._protocol(provider, model, self.provider_factory)
         cached = self._cache.get(self._cache_key(settings, protocol))
@@ -141,8 +139,27 @@ class StructuredProbeService:
     # -------------------------------------------------------------------------
     async def run(self) -> StructuredProbeResponse:
         settings = self._settings()
-        provider_id = str(getattr(settings, "agent_model_provider", "")).strip()
+        provider_id = str(getattr(settings, "agent_model_provider", ""))
         model = str(getattr(settings, "agent_model_name", "")).strip()
+        try:
+            require_canonical_provider(provider_id)
+        except ValueError:
+            protocol = "unknown"
+            key = self._cache_key(settings, protocol)
+            checked_at = datetime.now(timezone.utc)
+            result = StructuredProbeResponse(
+                provider=provider_id,
+                model=model,
+                protocol=protocol,
+                status="failed",
+                parse_status="failed",
+                duration_ms=0,
+                checked_at=checked_at,
+                expires_at=checked_at + timedelta(seconds=PROBE_TTL_SECONDS),
+                message="The selected provider ID is not canonical and cannot be probed.",
+            )
+            self._cache[key] = result
+            return result
         protocol = self._protocol(provider_id, model, self.provider_factory)
         key = self._cache_key(settings, protocol)
         checked_at = datetime.now(timezone.utc)

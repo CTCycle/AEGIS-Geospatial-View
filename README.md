@@ -180,8 +180,8 @@ The shortest path on Windows is:
 
 On first application launch, `settings/.env` is created from
 `settings/.env.example` only when it is missing. The launcher reads the
-example as a temporary first-run fallback until the application creates the
-local file. The technical documentation under `assets/docs` covers manual
+example to provide first-run process settings until the application creates
+the local file. The technical documentation under `assets/docs` covers manual
 setup and deeper runtime behavior.
 
 Database schema changes are managed by Alembic. Startup and launcher option 4

@@ -39,7 +39,11 @@ from server.services.chat.model_library import DYNAMIC_CLOUD_PROVIDERS
 from server.services.chat.settings_service import ChatSettingsValidationError
 from server.services.chat.streaming import ChatStreamingService
 from server.services.jobs import BackgroundJobService
-from server.services.llm.errors import LLMConfigurationError
+from server.services.llm.errors import (
+    LLMConfigurationError,
+    LLMProviderRequestError,
+    safe_failure_detail,
+)
 
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
 LOGGER = logging.getLogger(__name__)
@@ -149,7 +153,11 @@ def get_models(
             detail=str(exc),
         ) from exc
     except Exception as exc:
-        LOGGER.exception("Failed to load cloud model catalog")
+        LOGGER.warning(
+            "Failed to load cloud model catalog provider=%s error=%s",
+            cloud_provider or "*",
+            safe_failure_detail(exc, "Cloud model catalog unavailable."),
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=(
@@ -168,7 +176,13 @@ def get_models(
 def get_settings(
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ModelSettingsResponse:
-    return runtime.settings_service.get_settings()
+    try:
+        return runtime.settings_service.get_settings()
+    except ChatSettingsValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
 ###############################################################################
 @router.get(
@@ -233,7 +247,13 @@ def update_settings(
 def refresh_ollama_models(
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> OllamaRefreshResponse:
-    return runtime.maintenance_service.refresh_ollama_models()
+    try:
+        return runtime.maintenance_service.refresh_ollama_models()
+    except LLMProviderRequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
 
 ###############################################################################
 @router.post(
@@ -257,7 +277,10 @@ def pull_ollama_model(
             detail=str(exc),
         ) from exc
     except Exception as exc:
-        LOGGER.exception("Ollama model pull failed")
+        LOGGER.warning(
+            "Ollama model pull failed error=%s",
+            safe_failure_detail(exc, "Ollama pull failed."),
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Ollama pull failed.",

@@ -140,7 +140,11 @@ def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
 def test_structured_output_uses_single_function_mode(monkeypatch) -> None:
     client = _Client()
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
-    monkeypatch.setattr(provider, "_client", lambda: client)
+    monkeypatch.setattr(
+        provider,
+        "_client",
+        lambda _request=None, **_kwargs: client,
+    )
     request = LLMRequest(
         model="deepseek-v4-flash",
         provider_session_id="conversation-1",
@@ -167,7 +171,11 @@ def test_structured_output_uses_single_function_mode(monkeypatch) -> None:
 def test_structured_output_forwards_explicit_thinking_mode(monkeypatch) -> None:
     client = _Client()
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
-    monkeypatch.setattr(provider, "_client", lambda: client)
+    monkeypatch.setattr(
+        provider,
+        "_client",
+        lambda _request=None, **_kwargs: client,
+    )
     request = LLMRequest(
         model="deepseek-v4-flash",
         provider_session_id="conversation-1",
@@ -185,7 +193,11 @@ def test_structured_output_forwards_explicit_thinking_mode(monkeypatch) -> None:
 def test_chat_forwards_bounded_output_tokens(monkeypatch) -> None:
     client = _Client()
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
-    monkeypatch.setattr(provider, "_client", lambda: client)
+    monkeypatch.setattr(
+        provider,
+        "_client",
+        lambda _request=None, **_kwargs: client,
+    )
     request = LLMRequest(
         model="deepseek-v4-flash",
         provider_session_id="conversation-1",
@@ -201,7 +213,11 @@ def test_chat_forwards_bounded_output_tokens(monkeypatch) -> None:
 def test_stream_forwards_bounded_output_tokens(monkeypatch) -> None:
     client = _Client()
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
-    monkeypatch.setattr(provider, "_client", lambda: client)
+    monkeypatch.setattr(
+        provider,
+        "_client",
+        lambda _request=None, **_kwargs: client,
+    )
     request = LLMRequest(
         model="deepseek-v4-flash",
         provider_session_id="conversation-1",
@@ -218,7 +234,11 @@ def test_bounded_deadline_is_forwarded_without_the_old_thirty_second_cap(
 ) -> None:
     client = _Client()
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
-    monkeypatch.setattr(provider, "_client", lambda: client)
+    monkeypatch.setattr(
+        provider,
+        "_client",
+        lambda _request=None, **_kwargs: client,
+    )
     monkeypatch.setattr(
         "server.services.llm.deepseek_provider.remaining_request_seconds",
         lambda request: 47.5,
@@ -238,7 +258,11 @@ def test_bounded_deadline_is_forwarded_without_the_old_thirty_second_cap(
 def test_timeout_failure_keeps_preflight_context_usage(monkeypatch) -> None:
     client = _Client(TimeoutError("completion timed out"))
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
-    monkeypatch.setattr(provider, "_client", lambda: client)
+    monkeypatch.setattr(
+        provider,
+        "_client",
+        lambda _request=None, **_kwargs: client,
+    )
     request = LLMRequest(
         model="deepseek-v4-flash",
         provider_session_id="conversation-1",

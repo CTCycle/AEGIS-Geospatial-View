@@ -113,4 +113,25 @@ describe('AgentReadinessService', () => {
       message: 'Could not verify selected agent readiness.',
     });
   });
+
+  it('rejects a noncanonical provider instead of normalizing it', async () => {
+    apiClient.fetchChatSettings.and.resolveTo(settings({
+      agent_model_provider: 'OpenAI',
+      selected_model_context: {
+        provider: 'OpenAI',
+        model: 'gpt-4.1-mini',
+        context_window_tokens: 1047576,
+        maximum_output_tokens: 32768,
+        context_profile_source: 'openai_model_catalog',
+      },
+    }));
+
+    const readiness = await service.loadReadiness();
+
+    expect(readiness.status).toBe('needs_attention');
+    expect(readiness.message).toBe(
+      'Selected provider ID is not supported: OpenAI. Choose a canonical provider in Model Settings.',
+    );
+    expect(apiClient.fetchStructuredProbe).not.toHaveBeenCalled();
+  });
 });

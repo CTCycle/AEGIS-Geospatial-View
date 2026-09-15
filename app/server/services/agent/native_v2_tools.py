@@ -220,7 +220,12 @@ def register_agent_tools(
                 "omits one. If setting a basemap, use only one of these exact "
                 f"canonical catalog IDs: {basemap_catalog}. Never invent, "
                 "translate, or alias a basemap ID; if the requested style is "
-                "unsupported, leave the current map unchanged and report that."
+                "unsupported, leave the current map unchanged and report that. "
+                "For add_evidence_layer, evidence_ref must be copied exactly "
+                "from a prior successful evidence-producing tool result; never "
+                "use a location_ref, place name, or capability ID as evidence. "
+                "A location-only map uses set_viewport with fit_location and no "
+                "evidence layer."
             ),
             input_model=ApplyMapPlanInput,
             handler=_apply_map_plan_handler(map_plan),
