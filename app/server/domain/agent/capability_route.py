@@ -1,10 +1,4 @@
-"""Typed routing and working-state contracts for the native agent loop.
-
-The legacy agent keeps its parser and planner contracts for now.  These models
-are deliberately independent of those services so the native-v2 path can be
-introduced and tested without making the model responsible for provider or
-MapLibre implementation details.
-"""
+"""Typed routing, goal, and run-state contracts for the native agent."""
 
 from __future__ import annotations
 
@@ -16,8 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.decision import ResolvedLocation
-from server.domain.agent.interpretation import CanonicalRequestInterpretation
-from server.domain.agent.tool_result import ToolResult
+from server.domain.agent.tool_result import ModelObservation, ToolResult
 
 ###############################################################################
 class CapabilityRoute(BaseModel):
@@ -33,7 +26,7 @@ class CapabilityRoute(BaseModel):
     clarification_question: str | None = Field(default=None, max_length=500)
     # These are user-semantic constraints, not provider arguments.  Keeping
     # them on the validated route gives the native harness a deterministic
-    # request contract even when the legacy parser is not involved.
+    # request contract without a separate interpretation stage.
     operation: str | None = Field(default=None, min_length=1, max_length=80)
     target_refs: list[str] = Field(default_factory=list, max_length=16)
     temporal_scope: "AgentTemporalScope" = Field(default_factory=lambda: AgentTemporalScope())
@@ -113,6 +106,22 @@ class CompletionContract(BaseModel):
     temporal_scope_required: bool = False
     spatial_scope_required: bool = False
 
+
+CompletionStatus = Literal["pending", "satisfied", "failed", "not_applicable"]
+
+
+class CompletionRequirement(BaseModel):
+    """One server-owned obligation in a native run or render handshake."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    required: bool = True
+    status: CompletionStatus = "pending"
+    target_id: str | None = None
+    evidence_ref: str | None = None
+    failure_code: str | None = None
+
 ###############################################################################
 class CapabilityRouteDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -162,10 +171,10 @@ class AgentRunState(BaseModel):
     goal: AgentGoal | None = None
     completion_contract: CompletionContract | None = None
     completion_requirements: list[str] = Field(default_factory=list)
-    active_instructions: list[dict[str, object]] = Field(default_factory=list)
+    active_directives: list[dict[str, object]] = Field(default_factory=list)
     task_state: dict[str, object] = Field(default_factory=dict)
     map_memory: dict[str, object] = Field(default_factory=dict)
-    conversation_summary: dict[str, object] | None = None
+    summary: dict[str, object] | None = None
     recent_messages: list[dict[str, object]] = Field(default_factory=list)
     relevant_tool_outcomes: list[dict[str, object]] = Field(default_factory=list)
     policy_constraints: dict[str, object] = Field(default_factory=dict)
@@ -182,11 +191,11 @@ class AgentRunState(BaseModel):
     context_hydrated: bool = False
     route: CapabilityRoute | None = None
     capability_ids: list[str] = Field(default_factory=list)
+    excluded_capability_ids: list[str] = Field(default_factory=list, max_length=32)
     location_refs: dict[str, ResolvedLocation] = Field(default_factory=dict)
     evidence_refs: list[str] = Field(default_factory=list)
     active_map_session: MapSession | None = None
     prepared_map_session: MapSession | None = None
-    canonical_request: CanonicalRequestInterpretation | None = None
     tool_results: list[ToolResult] = Field(default_factory=list)
     successful_fingerprints: dict[str, ToolResult] = Field(default_factory=dict)
     failed_fingerprints: dict[str, int] = Field(default_factory=dict)
@@ -203,9 +212,25 @@ class AgentRunState(BaseModel):
     termination_reason: str | None = None
 
     def checkpoint(self) -> dict[str, Any]:
-        """Return a JSON-safe checkpoint excluding no semantic run state."""
+        """Return a bounded JSON-safe checkpoint for durable resume."""
 
-        return self.model_dump(mode="json")
+        payload = self.model_dump(mode="json")
+        payload["tool_results"] = [
+            _checkpoint_tool_result(item) for item in self.tool_results[-16:]
+        ]
+        payload["successful_fingerprints"] = {
+            key: _checkpoint_tool_result(value)
+            for key, value in list(self.successful_fingerprints.items())[-32:]
+        }
+        payload["recent_messages"] = list(self.recent_messages[-64:])
+        payload["relevant_tool_outcomes"] = list(self.relevant_tool_outcomes[-32:])
+        payload["context_usage_trace"] = list(self.context_usage_trace[-16:])
+        payload["model_trace"] = list(self.model_trace[-16:])
+        payload["tool_trace"] = list(self.tool_trace[-32:])
+        payload["transition_trace"] = list(self.transition_trace[-64:])
+        payload["exposure_trace"] = list(self.exposure_trace[-64:])
+        payload["provider_continuation"] = list(self.provider_continuation[-16:])
+        return payload
 
     @classmethod
     def from_checkpoint(cls, payload: dict[str, Any]) -> "AgentRunState":
@@ -214,6 +239,10 @@ class AgentRunState(BaseModel):
         return cls.model_validate(payload)
 
 
-# Short-lived source compatibility for callers being migrated to the canonical
-# name.  This is an alias, not a second model or state representation.
-AgentState = AgentRunState
+def _checkpoint_tool_result(value: ToolResult) -> dict[str, Any]:
+    """Keep model-facing result data without embedding raw provider payloads."""
+
+    observation = ModelObservation.from_tool_result(value, max_chars=4096)
+    return value.model_copy(update={"data": observation.result}, deep=True).model_dump(
+        mode="json"
+    )

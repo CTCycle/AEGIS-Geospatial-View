@@ -6,7 +6,7 @@ import time
 from typing import Any, Protocol
 
 from server.common.typing import json_object
-from server.domain.agent.capability_route import AgentState
+from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.evidence import AgentEvidenceEnvelope
 from server.domain.agent.map_plan import (
     AddEvidenceLayerAction,
@@ -56,7 +56,7 @@ class MapPlanService:
     async def apply(
         self,
         plan: MapPlan,
-        state: AgentState,
+        state: AgentRunState,
         context: ToolExecutionContext,
     ) -> ToolResult:
         started = time.perf_counter()
@@ -200,7 +200,7 @@ class MapPlanService:
     def _evidence_for_plan(
         self,
         plan: MapPlan,
-        state: AgentState,
+        state: AgentRunState,
         context: ToolExecutionContext,
     ) -> list[AgentEvidenceEnvelope]:
         refs = [
@@ -248,7 +248,7 @@ class MapPlanService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _location(state: AgentState) -> Any | None:
+    def _location(state: AgentRunState) -> Any | None:
         return next(iter(state.location_refs.values()), None)
 
     # -------------------------------------------------------------------------

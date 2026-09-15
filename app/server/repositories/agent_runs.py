@@ -12,6 +12,8 @@ from server.contracts.events import (
     RunEventVisibility,
 )
 from server.contracts.runs import AgentRunSnapshot, AgentRunState
+from server.contracts.geospatial import MapSession
+from server.domain.agent.conversation import ConversationState
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from sqlalchemy import or_, select, text, update
@@ -37,6 +39,7 @@ def _json_list(value: object) -> list[Any]:
     if isinstance(value, list):
         return cast(list[Any], value)
     return []
+
 
 ###############################################################################
 class AgentRunRepository:
@@ -184,6 +187,32 @@ class AgentRunRepository:
                 )
             )
             return self._to_snapshot(record) if record is not None else None
+
+    # -------------------------------------------------------------------------
+    def list_resumable_runs(self) -> list[AgentRunSnapshot]:
+        """Return active native runs that survived a process interruption."""
+
+        with self._session_factory() as session:
+            records = (
+                session.execute(
+                    select(AgentRunRecord)
+                    .where(
+                        AgentRunRecord.active_slot == 1,
+                        AgentRunRecord.cancel_requested_at.is_(None),
+                        AgentRunRecord.state.in_(
+                            [
+                                AgentRunState.PENDING.value,
+                                AgentRunState.RUNNING.value,
+                                AgentRunState.UPDATING.value,
+                            ]
+                        ),
+                    )
+                    .order_by(AgentRunRecord.created_at.asc())
+                )
+                .scalars()
+                .all()
+            )
+        return [self._to_snapshot(record) for record in records]
 
     # -------------------------------------------------------------------------
     def set_state(self, run_id: str, state: AgentRunState) -> AgentRunSnapshot:
@@ -518,28 +547,33 @@ class AgentRunRepository:
             if status not in {"ready", "failed"}:
                 raise ValueError("Unsupported render acknowledgment status.")
             if status == "ready":
-                response_memory = _json_object(pending_response.get("memory_snapshot"))
-                task_snapshot = _json_object(pending_response.get("task_snapshot"))
                 conversation = session.get(ConversationRecord, conversation_id)
                 if conversation is None:
                     raise ValueError("Conversation not found.")
                 candidate_map = pending_response.get("map_session")
-                promoted_task_snapshot = dict(
-                    task_snapshot
-                    if task_snapshot
-                    else _json_object(conversation.task_snapshot)
+                state = ConversationState.from_persisted(
+                    conversation_id,
+                    pending_response.get("conversation_state")
+                    or conversation.conversation_state,
+                    revision=int(conversation.context_revision),
                 )
-                promoted_memory = dict(
-                    response_memory
-                    if response_memory
-                    else _json_object(conversation.memory_snapshot)
-                )
-                if isinstance(candidate_map, dict):
-                    promoted_task_snapshot["active_map_session"] = candidate_map
-                    promoted_memory["active_visualization"] = candidate_map
-                conversation.task_snapshot = promoted_task_snapshot
-                conversation.memory_snapshot = promoted_memory
                 conversation.context_revision += 1
+                if isinstance(candidate_map, dict):
+                    try:
+                        committed_map = MapSession.model_validate(candidate_map)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError("Prepared map does not match the current contract.") from exc
+                    state = state.model_copy(
+                        update={
+                            "revision": conversation.context_revision,
+                            "committed_map_session": committed_map,
+                        }
+                    )
+                else:
+                    state = state.model_copy(
+                        update={"revision": conversation.context_revision}
+                    )
+                conversation.conversation_state = state.model_dump(mode="json")
                 pending_response["context_revision"] = conversation.context_revision
                 run.state = AgentRunState.COMPLETED.value
                 run.completed_at = datetime.now(UTC)

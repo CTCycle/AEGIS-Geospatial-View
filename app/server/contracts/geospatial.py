@@ -7,7 +7,6 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.common.time import utc_now
-from server.contracts.extraction import ViewportIntent
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.decision import ResolvedLocation
 
@@ -18,6 +17,27 @@ InspectionAssociation = Literal[
     "overlay",
     "non_spatial",
 ]
+
+
+class ViewportIntent(BaseModel):
+    """Presentation hint for the map viewport selected by the harness."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope: Literal[
+        "preserve_current",
+        "building",
+        "street",
+        "neighborhood",
+        "district",
+        "city",
+        "region",
+        "country",
+        "auto",
+    ] = "auto"
+    tighten_relative_to_active: bool = False
+    radius_hint_m: float | None = Field(default=None, gt=0.0)
+    reason: str | None = None
 
 
 GeospatialProviderAutomationSupport = Literal[

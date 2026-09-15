@@ -85,7 +85,10 @@ def test_create_conversation_returns_persisted_conversation(
     assert snapshot_payload["title"] == "Rome map"
     assert snapshot_payload["context_revision"] == 1
     assert snapshot_payload["messages"] == []
-    assert snapshot_payload["task_snapshot"] is None
+    assert snapshot_payload["conversation_state"]["conversation_id"] == payload[
+        "conversation_id"
+    ]
+    assert snapshot_payload["memory_snapshot"] == {}
     assert snapshot_payload["map_session"] is None
     assert snapshot_payload["active_run"] is None
 

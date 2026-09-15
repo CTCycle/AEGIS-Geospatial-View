@@ -261,13 +261,7 @@ class ConversationRecord(Base):
     owner_user_id: Mapped[str | None] = mapped_column(String(120))
     title: Mapped[str | None] = mapped_column(String(200))
     context_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    active_instructions: Mapped[object | None] = mapped_column(JSON)
-    task_snapshot: Mapped[object | None] = mapped_column(JSON)
-    memory_snapshot: Mapped[object | None] = mapped_column(JSON)
-    conversation_summary: Mapped[object | None] = mapped_column(JSON)
-    summary_through_turn_index: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
+    conversation_state: Mapped[object | None] = mapped_column(JSON)
     next_message_sequence: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0
     )

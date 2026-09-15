@@ -1,184 +1,65 @@
-from __future__ import annotations
+"""Native policy boundary for typed tool execution."""
 
-from server.common.typing import is_json_array, is_json_object, json_object
+from __future__ import annotations
 
 from typing import Any
 
 from pydantic import BaseModel
 
-from server.domain.agent.decision import (
-    ClarificationRequest,
-    DecisionTrace,
-    ExecutionPlan,
-    PolicyDecision,
-)
+from server.common.typing import is_json_array
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentState
+from server.domain.agent.capability_route import AgentRunState
+from server.domain.agent.policies import ToolAuthorizationResult
 from server.domain.agent.tools import RegisteredTool
-from server.domain.agent.policies import (
-    AgentPolicyConstraints,
-    ToolAuthorizationResult,
-    ToolValidationResult,
-)
-from server.contracts.extraction import TurnParseResult
-from server.services.agent.location_resolver import LocationResolver
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-###############################################################################
-class PolicyEngine:
-    LOCATION_AMBIGUITY_CODES = frozenset(
-        {
-            "ambiguous_place_name",
-            "alternate_location",
-            "multiple_possible_locations",
-            "potential_alternate_location",
-        }
-    )
-    LOCATION_MISSING_CODES = frozenset(
-        {
-            "deictic_without_memory",
-            "missing_location",
-        }
-    )
 
-    # -------------------------------------------------------------------------
+class PolicyEngine:
+    """Authorize model actions after route and schema validation.
+
+    The model may select a semantic action, but this boundary owns catalog
+    membership, runtime access, route domains, provider allowlists, and
+    geography coverage checks.
+    """
+
     def __init__(
         self,
         *,
-        location_resolver: LocationResolver,
         capability_registry: CapabilityRegistry | None = None,
         runtime_registry: RuntimeRegistry | None = None,
+        location_resolver: Any | None = None,
         **_: Any,
     ) -> None:
-        self.location_resolver = location_resolver
         self.capability_registry = capability_registry
         self.runtime_registry = runtime_registry
+        self.location_resolver = location_resolver
 
-    # -------------------------------------------------------------------------
-    def evaluate_preflight(self, turn: TurnParseResult) -> PolicyDecision | None:
-        trace = DecisionTrace(steps=["1.validate_task_class"])
-        task_validation = self._validate_task_class(turn)
-        if task_validation is not None:
-            return PolicyDecision(
-                plan=ExecutionPlan(
-                    state="reject",
-                    action_id=turn.normalized_action.action_id,
-                ),
-                clarification=task_validation,
-                trace=trace,
-            )
-        trace.steps.append("2.enforce_location_requirement")
-        location_policy = self._enforce_location_policy(turn)
-        if location_policy is not None:
-            return PolicyDecision(
-                plan=ExecutionPlan(
-                    state="clarify",
-                    action_id=turn.normalized_action.action_id,
-                ),
-                clarification=location_policy,
-                trace=trace,
-            )
-        trace.steps.append("3.enforce_safety_policy")
-        safety_policy = self._enforce_safety_policy(turn)
-        if safety_policy is not None:
-            return PolicyDecision(
-                plan=ExecutionPlan(
-                    state="reject",
-                    action_id=turn.normalized_action.action_id,
-                ),
-                clarification=safety_policy,
-                trace=trace,
-            )
-        return None
-
-    # -------------------------------------------------------------------------
-    def build_agent_constraints(
-        self,
-        parsed_request: TurnParseResult,
-        map_state: dict[str, Any] | None = None,
-    ) -> AgentPolicyConstraints:
-        actionable_patterns = self._actionable_disallowed_patterns(parsed_request)
-        provider_ids = [
-            item.strip().lower()
-            for item in parsed_request.required_data_sources
-            if item.strip()
-        ]
-        allowed_tools = [
-            "list_geospatial_capabilities",
-            "describe_geospatial_capability",
-            "execute_geospatial_capability",
-        ]
-        if (
-            parsed_request.required_tool_category == "provider_native_discovery"
-            and provider_ids
-        ):
-            allowed_tools.append("fetch_geospatial_provider_layers")
-            allowed_tools.append("prepare_geospatial_map")
-        if any(":" in layer for layer in parsed_request.requested_layers):
-            allowed_tools.append("prepare_geospatial_map")
-        # Location resolution is completed by the canonical resolver before
-        # native tools are exposed.  Internal target IDs are never model-owned.
-        if parsed_request.requested_layers or parsed_request.required_data_sources:
-            allowed_tools.extend(
-                ["inspect_geospatial_evidence", "transform_geospatial_evidence"]
-            )
-        if any(
-            phrase in parsed_request.user_text.casefold()
-            for phrase in ("show", "display", "visualize", "plot", "where are", "map")
-        ):
-            allowed_tools.append("prepare_geospatial_map")
-        return AgentPolicyConstraints(
-            requires_location=parsed_request.normalized_action.requires_location,
-            blocked_patterns=[item.pattern_id for item in actionable_patterns],
-            allowed_tool_names=allowed_tools,
-            metadata={
-                "map_state": map_state or {},
-                "allowed_provider_ids": provider_ids,
-            },
-        )
-
-    # -------------------------------------------------------------------------
-    def authorize_tool_call(
-        self,
-        tool_name: str,
-        arguments: dict[str, Any],
-        context: Any,
-    ) -> ToolAuthorizationResult:
-        _ = arguments
-        constraints = getattr(context, "policy_constraints", {}) or {}
-        blocked_patterns = constraints.get("blocked_patterns")
-        if blocked_patterns:
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason="Request contains blocked policy patterns.",
-            )
-        allowed = constraints.get("allowed_tool_names")
-        if (
-            is_json_array(allowed)
-            and allowed
-            and tool_name not in set(map(str, allowed))
-        ):
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason=f"Tool '{tool_name}' is not allowed by policy constraints.",
-            )
-        return ToolAuthorizationResult(allowed=True)
-
-    # -------------------------------------------------------------------------
     def authorize(
         self,
         tool: RegisteredTool,
         arguments: BaseModel,
-        state: AgentState,
+        state: AgentRunState,
     ) -> ToolAuthorizationResult:
-        """Authorize one typed native-v2 call after schema validation.
+        constraints = state.policy_constraints
+        if constraints.get("blocked_patterns"):
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="Request contains blocked policy patterns.",
+                metadata={"code": "policy_rejection"},
+            )
 
-        The legacy ``authorize_tool_call`` method operates on an execution
-        context and remains available for the old native loop.  Native-v2
-        passes the typed registration and state directly so policy is applied
-        exactly once at the canonical executor boundary.
-        """
+        allowed_tools = constraints.get("allowed_tool_names")
+        if (
+            is_json_array(allowed_tools)
+            and allowed_tools
+            and tool.definition.name not in {str(item) for item in allowed_tools}
+        ):
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason=f"Tool '{tool.definition.name}' is not allowed by the run policy.",
+                metadata={"code": "tool_not_allowed"},
+            )
 
         route = state.route
         if route is None:
@@ -187,90 +68,27 @@ class PolicyEngine:
                 reason="A validated capability route is required.",
                 metadata={"code": "route_required"},
             )
-        if tool.domains and CapabilityDomain.MIXED not in tool.domains:
-            route_domains = {route.primary_domain, *route.secondary_domains}
-            route_allows_tool = bool(tool.domains.intersection(route_domains))
-            special_route_tools = {
-                "resolve_geospatial_location",
-                "inspect_evidence",
-                "transform_evidence",
-            }
-            if tool.definition.name == "apply_map_plan":
-                route_allows_tool = route.presentation in {"map", "both"}
-            elif tool.definition.name in special_route_tools:
-                route_allows_tool = True
-            if not route_allows_tool:
-                return ToolAuthorizationResult(
-                    allowed=False,
-                    reason="Tool is outside the validated capability route.",
-                    metadata={"code": "route_domain_mismatch"},
-                )
 
-        capability_id = str(
-            getattr(arguments, "capability_id", None) or ""
-        ).strip()
-        if capability_id:
-            if state.capability_ids and capability_id not in state.capability_ids:
-                return ToolAuthorizationResult(
-                    allowed=False,
-                    reason="Capability is outside the validated shortlist.",
-                    metadata={"code": "capability_not_shortlisted"},
-                )
-            capability = (
-                self.capability_registry.get_capability(capability_id)
-                if self.capability_registry is not None
-                else None
-            )
-            if capability is None:
-                return ToolAuthorizationResult(
-                    allowed=False,
-                    reason="Capability is not present in the catalog.",
-                    metadata={"code": "unknown_capability"},
-                )
-            if self.runtime_registry is not None:
-                if not self.runtime_registry.is_enabled(capability_id):
-                    return ToolAuthorizationResult(
-                        allowed=False,
-                        reason="Capability is disabled.",
-                        metadata={"code": "capability_disabled"},
-                    )
-                if not self.runtime_registry.access_available(capability_id):
-                    return ToolAuthorizationResult(
-                        allowed=False,
-                        reason="Capability access is unavailable.",
-                        metadata={"code": "capability_unavailable"},
-                    )
-        return ToolAuthorizationResult(allowed=True)
-
-    # -------------------------------------------------------------------------
-    def validate_tool_result(
-        self,
-        tool_name: str,
-        result: Any,
-        context: Any,
-    ) -> ToolValidationResult:
-        _ = tool_name, context
-        if is_json_object(result) and result.get("ok") is False:
-            error = result.get("error")
-            reason = error.get("message") if is_json_object(error) else "Tool failed."
-            return ToolValidationResult(valid=False, reason=str(reason))
-        return ToolValidationResult(valid=True)
-
-    # -------------------------------------------------------------------------
-    def authorize_capability_execution(
-        self,
-        capability_id: str,
-        arguments: dict[str, Any],
-        parsed_request: TurnParseResult,
-        context: Any,
-    ) -> ToolAuthorizationResult:
-        constraints = getattr(context, "policy_constraints", {}) or {}
-        blocked_patterns = constraints.get("blocked_patterns")
-        if blocked_patterns:
+        if not self._route_allows_tool(tool, route):
             return ToolAuthorizationResult(
                 allowed=False,
-                reason="Request contains blocked policy patterns.",
-                metadata={"code": "tool_rejected"},
+                reason="Tool is outside the validated capability route.",
+                metadata={"code": "route_domain_mismatch"},
+            )
+
+        capability_id = str(getattr(arguments, "capability_id", "") or "").strip()
+        if not capability_id:
+            return ToolAuthorizationResult(allowed=True)
+
+        if (
+            state.capability_ids
+            and capability_id not in state.capability_ids
+            and capability_id not in state.excluded_capability_ids
+        ):
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="Capability is outside the validated shortlist.",
+                metadata={"code": "capability_not_shortlisted"},
             )
 
         capability = (
@@ -281,442 +99,94 @@ class PolicyEngine:
         if capability is None:
             return ToolAuthorizationResult(
                 allowed=False,
-                reason=f"Unknown geospatial capability '{capability_id}'.",
-                metadata={"code": "unsupported_capability"},
+                reason="Capability is not present in the catalog.",
+                metadata={"code": "unknown_capability"},
             )
 
-        coverage = str(capability.get("coverage") or "").strip().lower()
-        if coverage == "united-states":
-            resolved = getattr(context, "resolved_location", None)
-            canonical_request = getattr(context, "canonical_request", None)
-            target_id = str(
-                getattr(context, "metadata", {}).get("target_id") or ""
-            ).strip()
-            if canonical_request is not None and target_id:
-                target = canonical_request.target(target_id)
-                if target is not None:
-                    resolved = target.resolved_location
-            country = str(getattr(resolved, "country", None) or "").strip().lower()
-            if country and country not in {"us", "usa", "united states", "united states of america"}:
+        if self.runtime_registry is not None:
+            if not self.runtime_registry.is_enabled(capability_id):
                 return ToolAuthorizationResult(
                     allowed=False,
-                    reason=(
-                        f"Capability '{capability_id}' is unavailable outside its "
-                        "catalog coverage (United States)."
-                    ),
-                    metadata={
-                        "code": "unavailable_coverage",
-                        "coverage": "united-states",
-                        "country": country,
-                    },
+                    reason="Capability is disabled.",
+                    metadata={"code": "capability_disabled"},
+                )
+            if not self.runtime_registry.access_available(capability_id):
+                reason = (
+                    self.runtime_registry.access_reason(capability_id)
+                    if callable(getattr(self.runtime_registry, "access_reason", None))
+                    else None
+                )
+                return ToolAuthorizationResult(
+                    allowed=False,
+                    reason=reason or "Capability access is unavailable.",
+                    metadata={"code": "capability_unavailable"},
                 )
 
-        allowed_capability_ids = constraints.get("allowed_capability_ids")
+        coverage = str(capability.get("coverage") or "").strip().casefold()
+        location = self._location_for_arguments(arguments, state)
+        country = str(getattr(location, "country", "") or "").strip().casefold()
+        if coverage == "united-states" and country and country not in {
+            "us",
+            "usa",
+            "united states",
+            "united states of america",
+        }:
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="Capability is outside its declared geographic coverage.",
+                metadata={
+                    "code": "unavailable_coverage",
+                    "coverage": coverage,
+                    "country": country,
+                },
+            )
+
+        allowed_provider_ids = constraints.get("allowed_provider_ids")
+        provider_id = str(capability.get("providerId") or capability.get("provider_id") or "")
         if (
-            is_json_array(allowed_capability_ids)
-            and allowed_capability_ids
-            and capability_id not in set(map(str, allowed_capability_ids))
+            is_json_array(allowed_provider_ids)
+            and allowed_provider_ids
+            and provider_id
+            and provider_id.casefold()
+            not in {str(item).casefold() for item in allowed_provider_ids}
         ):
             return ToolAuthorizationResult(
                 allowed=False,
-                reason=f"Capability '{capability_id}' is outside the routed specialist scope.",
-                metadata={"code": "tool_rejected"},
-            )
-
-        runtime_registry = self.runtime_registry
-        if runtime_registry is None:
-            return ToolAuthorizationResult(allowed=True)
-
-        provider_health = runtime_registry.provider_health(capability_id)
-        if provider_health == "disabled":
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason=f"Capability '{capability_id}' is disabled.",
-                metadata={
-                    "code": "unsupported_capability",
-                    "provider_health": provider_health,
-                },
-            )
-        if provider_health in {"missing_credentials", "missing_access"}:
-            reason = (
-                runtime_registry.access_reason(capability_id)
-                if callable(getattr(runtime_registry, "access_reason", None))
-                else None
-            )
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason=reason
-                or (
-                    f"Capability '{capability_id}' requires provider credentials."
-                    if provider_health == "missing_credentials"
-                    else f"Capability '{capability_id}' is not configured for use."
-                ),
-                metadata={
-                    "code": provider_health,
-                    "provider_health": provider_health,
-                },
-            )
-
-        requested_mode = self._requested_capability_mode(parsed_request)
-        if requested_mode is not None and not runtime_registry.supports_mode(
-            capability_id, requested_mode
-        ):
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason=(
-                    f"Capability '{capability_id}' does not support the requested "
-                    f"{'map' if requested_mode == 'map' else 'direct text'} mode."
-                ),
-                metadata={
-                    "code": "unsupported_capability",
-                    "requested_mode": requested_mode,
-                },
-            )
-
-        if self._requires_location_for_capability(
-            parsed_request, capability
-        ) and not self._has_location_context(
-            arguments=arguments,
-            parsed_request=parsed_request,
-        ):
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason="Location is required for this capability execution.",
-                metadata={"code": "invalid_arguments", "missing_fields": ["location"]},
-            )
-
-        bbox = arguments.get("bbox")
-        if bbox is not None and not self._is_sane_bbox(bbox):
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason="Bounding box must contain four numeric values in valid longitude/latitude ranges.",
-                metadata={"code": "invalid_arguments", "field": "bbox"},
+                reason="Capability provider is outside the validated provider allowlist.",
+                metadata={"code": "provider_not_allowed"},
             )
 
         return ToolAuthorizationResult(allowed=True)
 
-    # -------------------------------------------------------------------------
-    def _validate_task_class(
-        self, turn: TurnParseResult
-    ) -> ClarificationRequest | None:
-        if turn.task_class in {"map_search", "direct_query", "general_question"}:
+    @staticmethod
+    def _route_allows_tool(tool: RegisteredTool, route: Any) -> bool:
+        if not tool.domains or CapabilityDomain.MIXED in tool.domains:
+            return True
+        route_domains = {route.primary_domain, *route.secondary_domains}
+        special_tools = {
+            "resolve_geospatial_location",
+            "inspect_evidence",
+            "transform_evidence",
+        }
+        if tool.definition.name in special_tools:
+            return True
+        if tool.definition.name == "apply_map_plan":
+            return route.presentation in {"map", "both"}
+        return bool(tool.domains.intersection(route_domains))
+
+    @staticmethod
+    def _location_for_arguments(arguments: BaseModel, state: AgentRunState) -> Any | None:
+        location_ref = str(getattr(arguments, "location_ref", "") or "").strip()
+        if location_ref:
+            for key, location in state.location_refs.items():
+                if str(key).casefold() == location_ref.casefold():
+                    return location
             return None
-        clarification_plan = turn.clarification_plan
-        if is_json_object(clarification_plan):
-            blocking_fields = {
-                str(item).strip().casefold()
-                for item in clarification_plan.get("blocking_fields", [])
-                if str(item).strip()
-            }
-            if blocking_fields:
-                return self._clarification_for_fields(turn, blocking_fields)
-        return self._clarification_for_fields(turn, {"task"})
-
-    # -------------------------------------------------------------------------
-    def _clarification_for_fields(
-        self, turn: TurnParseResult, blocking_fields: set[str]
-    ) -> ClarificationRequest:
-        location = next(
-            (
-                str(signal.raw_value).strip()
-                for signal in turn.location_signals
-                if str(signal.raw_value).strip()
-            ),
-            "this location",
-        )
-        if blocking_fields & {"location", "anchor", "location_anchor"}:
-            question = "Which location should I use? Please provide a city, region, country, or coordinates."
-        elif blocking_fields & {
-            "operation",
-            "requested_operation",
-            "requested_action",
-            "action",
-            "task",
-        }:
-            question = f"What would you like me to show or find for {location}?"
-        elif "presentation" in blocking_fields or "presentation_mode" in blocking_fields:
-            question = f"Would you like {location} shown on the map, described in text, or both?"
-        elif blocking_fields & {"time_window", "temporal_window", "recent_window"}:
-            question = "Please specify the time window to use for the requested data."
-        elif blocking_fields & {
-            "magnitude_threshold_or_top_n",
-            "magnitude_threshold",
-            "threshold",
-            "top_n",
-        }:
-            question = "Please specify a magnitude threshold or a top-N count for the strongest results."
-        elif "analysis_radius" in blocking_fields:
-            question = "Please specify the distance to use for the geographic search."
-        else:
-            question = "Please specify the missing detail needed to complete this request."
-        missing_fields = (
-            ["location"]
-            if blocking_fields & {"location", "anchor", "location_anchor"}
-            else sorted(blocking_fields)
-        )
-        return ClarificationRequest(
-            question=question,
-            reason="The request is missing a required semantic field.",
-            missing_fields=missing_fields,
-        )
-
-    # -------------------------------------------------------------------------
-    def _enforce_location_policy(
-        self, turn: TurnParseResult
-    ) -> ClarificationRequest | None:
-        location_ambiguity = self._build_location_ambiguity_clarification(turn)
-        if location_ambiguity is not None:
-            return location_ambiguity
-        if "deictic_without_memory" in turn.ambiguities:
-            return ClarificationRequest(
-                question="Which location should I use?",
-                reason="The request refers to a previous location, but no active location is available.",
-                missing_fields=["location"],
-            )
-        if any(
-            signal.signal_type == "deictic" for signal in turn.location_signals
-        ) and not turn.conversation_context.memory_snapshot.get("active_location"):
-            return ClarificationRequest(
-                question="Which location should I use?",
-                reason="The request refers to a previous location, but no active location is available.",
-                missing_fields=["location"],
-            )
-        if (
-            turn.normalized_action.requires_location
-            and not turn.location_signals
-            and not turn.conversation_context.memory_snapshot.get("active_location")
-        ):
-            return ClarificationRequest(
-                question="Which location should I use?",
-                reason="Location is required for this action.",
-                missing_fields=["location"],
-            )
+        if len(state.location_refs) == 1:
+            return next(iter(state.location_refs.values()))
+        if state.active_map_session is not None:
+            return state.active_map_session.resolved_location
         return None
 
-    # -------------------------------------------------------------------------
-    def _build_location_ambiguity_clarification(
-        self,
-        turn: TurnParseResult,
-    ) -> ClarificationRequest | None:
-        clarification_plan = turn.clarification_plan
-        if is_json_object(clarification_plan):
-            blocking_fields = {
-                str(item).strip().casefold()
-                for item in clarification_plan.get("blocking_fields", [])
-            }
-            question = str(clarification_plan.get("question") or "").strip()
-            if (
-                "location" in blocking_fields
-                and question
-                and not self._has_model_location_signal(turn.location_signals)
-            ):
-                return ClarificationRequest(
-                    question=question,
-                    reason=str(
-                        clarification_plan.get("reason")
-                        or "The request needs a more specific location."
-                    ).strip(),
-                    missing_fields=["location"],
-                )
 
-        if not self._contains_location_ambiguity(turn.ambiguities):
-            return None
-
-        if self._has_model_location_signal(turn.location_signals) or self._signals_form_hierarchy(
-            turn.location_signals
-        ):
-            # A district/neighborhood plus its city, or a city plus its
-            # country, is contextual hierarchy rather than two competing
-            # targets.  Same-level model signals are also deferred so the
-            # resolver can test a bounded parent/child relationship before
-            # asking the user to clarify.
-            return None
-
-        if len(turn.location_signals) > 1:
-            return self.location_resolver.build_ambiguity_question(
-                turn.location_signals
-            )
-
-        location_reference = self._location_reference(turn)
-        if location_reference:
-            question = (
-                f"Which specific location do you mean by {location_reference!r}? "
-                "Please provide a city, region, country, or coordinates."
-            )
-        else:
-            question = (
-                "Which specific location do you mean? Please provide a city, "
-                "region, country, or coordinates."
-            )
-        return ClarificationRequest(
-            question=question,
-            reason="The request has multiple plausible location interpretations.",
-            missing_fields=["location"],
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _signals_form_hierarchy(signals: list[Any]) -> bool:
-        explicit = [
-            signal
-            for signal in signals
-            if getattr(signal, "signal_type", None) != "deictic"
-            and str(getattr(signal, "raw_value", "") or "").strip()
-        ]
-        if len(explicit) < 2:
-            return False
-        if any(getattr(signal, "source", None) == "model" for signal in explicit):
-            return True
-        ranks = [
-            LocationResolver.SPECIFICITY_BY_SIGNAL_TYPE.get(
-                getattr(signal, "signal_type", ""), 0
-            )
-            for signal in explicit
-        ]
-        return len(set(ranks)) > 1
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _has_model_location_signal(signals: list[Any]) -> bool:
-        return any(
-            getattr(signal, "source", None) == "model"
-            and getattr(signal, "signal_type", None) != "deictic"
-            and str(getattr(signal, "raw_value", "") or "").strip()
-            for signal in signals
-        )
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _contains_location_ambiguity(cls, ambiguities: list[str]) -> bool:
-        for ambiguity in ambiguities:
-            normalized = " ".join(str(ambiguity or "").casefold().split())
-            if not normalized or normalized in cls.LOCATION_MISSING_CODES:
-                continue
-            if normalized in cls.LOCATION_AMBIGUITY_CODES:
-                return True
-            has_ambiguity_marker = any(
-                marker in normalized
-                for marker in (
-                    "ambig",
-                    "multiple",
-                    "more than one",
-                    "could refer",
-                    "alternate",
-                    "not unique",
-                    "defaulting to",
-                    "cities",
-                    "towns",
-                    "municipalities",
-                )
-            )
-            has_location_reference = any(
-                marker in normalized
-                for marker in (
-                    "location",
-                    "place",
-                    "city",
-                    "region",
-                    "country",
-                    "address",
-                    "area",
-                    "destination",
-                )
-            )
-            if has_ambiguity_marker and has_location_reference:
-                return True
-        return False
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _location_reference(turn: TurnParseResult) -> str:
-        for signal in turn.location_signals:
-            value = str(signal.raw_value or signal.normalized_value or "").strip()
-            if value:
-                return value
-        return ""
-
-    # -------------------------------------------------------------------------
-    def _enforce_safety_policy(
-        self, turn: TurnParseResult
-    ) -> ClarificationRequest | None:
-        actionable_patterns = self._actionable_disallowed_patterns(turn)
-        if not actionable_patterns:
-            return None
-        return ClarificationRequest(
-            question="I cannot execute this request with the current policy constraints.",
-            reason="; ".join(
-                item.reason for item in actionable_patterns if item.reason
-            ),
-            missing_fields=[],
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _requested_capability_mode(parsed_request: TurnParseResult) -> str | None:
-        if parsed_request.task_class == "map_search":
-            return "map"
-        if parsed_request.task_class == "direct_query":
-            return "direct_text"
-        return None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _requires_location_for_capability(
-        parsed_request: TurnParseResult, capability: dict[str, Any]
-    ) -> bool:
-        if parsed_request.normalized_action.requires_location:
-            return True
-        metadata = json_object(capability.get("metadata"))
-        geometry_type = str(metadata.get("geometry_type") or "").strip().lower()
-        return geometry_type not in {"", "not-applicable", "global"}
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _has_location_context(
-        *,
-        arguments: dict[str, Any],
-        parsed_request: TurnParseResult,
-    ) -> bool:
-        if any(
-            key in arguments for key in ("location", "latitude", "longitude", "bbox")
-        ):
-            return True
-        if parsed_request.location_signals:
-            return True
-        active_location = parsed_request.conversation_context.memory_snapshot.get(
-            "active_location"
-        )
-        return is_json_object(active_location) and bool(active_location.get("label"))
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _is_sane_bbox(value: Any) -> bool:
-        if not is_json_array(value) or len(value) != 4:
-            return False
-        if not all(isinstance(item, (int, float)) for item in value):
-            return False
-        min_lon, min_lat, max_lon, max_lat = [float(item) for item in value]
-        return (
-            -180.0 <= min_lon <= 180.0
-            and -180.0 <= max_lon <= 180.0
-            and -90.0 <= min_lat <= 90.0
-            and -90.0 <= max_lat <= 90.0
-            and min_lon < max_lon
-            and min_lat < max_lat
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _actionable_disallowed_patterns(turn: TurnParseResult):
-        return [
-            item
-            for item in turn.disallowed_patterns
-            if item.pattern_id.strip().lower()
-            not in {
-                "overlay_exclusion",
-                "overlay_prohibition",
-                "overlay_restriction",
-                "no_overlay",
-                "no_overlays",
-            }
-        ]
+__all__ = ["PolicyEngine"]

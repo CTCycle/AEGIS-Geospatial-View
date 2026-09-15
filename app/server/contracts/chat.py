@@ -7,17 +7,14 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from server.common.time import utc_now
-from server.domain.agent.decision import PolicyDecision, ResolvedLocation
-from server.domain.agent.pipeline import (
-    ConversationTaskSnapshot,
-    TaskFailureDetail,
-    ToolPlan,
-    VisualizationUpdate,
+from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.capability_route import (
+    AgentGoal,
+    CapabilityRoute,
+    CompletionContract,
 )
-from server.domain.agent.interpretation import CanonicalRequestInterpretation
-from server.domain.agent.capability_route import CapabilityRoute
+from server.domain.agent.conversation import ConversationState
 from server.domain.agent.tool_result import ToolExecutionError
-from server.contracts.extraction import TurnParseResult
 from server.contracts.geospatial import MapSession
 
 ChatRole = Literal["user", "assistant", "system", "tool"]
@@ -84,7 +81,6 @@ class ChatOperationResult(BaseModel):
         "clarification",
         "rejection",
         "error",
-        "failure_diagnostic",
     ]
     status: Literal["success", "partial", "pending", "failed"]
     message: str
@@ -95,17 +91,26 @@ class ChatOperationResult(BaseModel):
         Literal[
             "model_capability",
             "provider_api",
+            "provider_failure",
             "schema_definition",
             "response_parsing",
             "context_limit",
+            "insufficient_evidence",
+            "model_budget_exhausted",
+            "tool_budget_exhausted",
+            "transition_budget_exhausted",
+            "run_deadline_exhausted",
+            "no_progress",
+            "cancelled",
+            "superseded",
         ]
         | None
     ) = None
 
 
 ###############################################################################
-class NativeToolResultSummary(BaseModel):
-    """Bounded model-independent summary of one native-v2 tool result."""
+class AgentToolResultSummary(BaseModel):
+    """Bounded model-independent summary of one native tool result."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -119,8 +124,8 @@ class NativeToolResultSummary(BaseModel):
 
 
 ###############################################################################
-class NativeV2TurnResponse(BaseModel):
-    """Temporary native-v2 response shape used during migration."""
+class AgentTurnResponse(BaseModel):
+    """Canonical response emitted by one native agent turn."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -133,8 +138,10 @@ class NativeV2TurnResponse(BaseModel):
     presentation_status: Literal[
         "not_requested", "prepared", "prepared_unverified", "ready", "failed"
     ]
-    tool_results: list[NativeToolResultSummary] = Field(default_factory=list)
-    canonical_request: CanonicalRequestInterpretation | None = None
+    tool_results: list[AgentToolResultSummary] = Field(default_factory=list)
+    conversation_state: ConversationState | None = None
+    goal: AgentGoal | None = None
+    completion_contract: CompletionContract | None = None
     execution_trace: dict[str, Any] | None = None
     location_refs: dict[str, ResolvedLocation] = Field(
         default_factory=lambda: dict[str, ResolvedLocation]()
@@ -142,34 +149,28 @@ class NativeV2TurnResponse(BaseModel):
 
 ###############################################################################
 class ChatTurnResponse(BaseModel):
+    """Canonical public response for one native agent turn."""
+
     model_config = ConfigDict(extra="forbid")
 
     request_id: str
     conversation_id: str
     assistant_message: str
-    # Legacy parser/policy projections remain readable for legacy mode but are
-    # optional for the native-v2 response contract.
-    turn_contract: TurnParseResult | None = None
-    decision: PolicyDecision | None = None
-    operation: ChatOperationResult | None = None
+    operation: ChatOperationResult
     tool_payload: dict[str, Any] | None = None
     map_session: MapSession | None = None
     memory_snapshot: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     context_usage: ContextUsageResponse | None = None
-    task_snapshot: ConversationTaskSnapshot | None = None
-    tool_plan: ToolPlan | None = None
-    failure_diagnostic: TaskFailureDetail | None = None
-    visualization_update: VisualizationUpdate | None = None
     context_revision: int | None = None
     execution_trace: dict[str, Any] | None = None
-    canonical_request: CanonicalRequestInterpretation | None = None
-    # Native-v2 fields are additive while the legacy response envelope remains
-    # the public compatibility shape during migration.
     route: CapabilityRoute | None = None
+    goal: AgentGoal | None = None
+    completion_contract: CompletionContract | None = None
     presentation_status: Literal[
         "not_requested", "prepared", "prepared_unverified", "ready", "failed"
     ] = "not_requested"
-    tool_results: list[NativeToolResultSummary] = Field(default_factory=list)
+    tool_results: list[AgentToolResultSummary] = Field(default_factory=list)
+    conversation_state: ConversationState | None = None
 
 ###############################################################################
 class ChatStreamEvent(BaseModel):
@@ -178,8 +179,6 @@ class ChatStreamEvent(BaseModel):
     event: Literal[
         "status",
         "context_usage",
-        "parsed",
-        "policy",
         "tool_call_started",
         "tool_call_completed",
         "map_session_created",

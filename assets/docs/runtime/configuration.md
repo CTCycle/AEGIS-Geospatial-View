@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-09-10
+Last updated: 2026-09-15
 
 ## Environment file
 
@@ -42,18 +42,16 @@ RainViewer, and NASA GIBS request tuning. It intentionally contains no
 database block. Database location and migration-lock settings come from the
 environment only.
 
-The `agent_execution` JSON block owns the complete agent deadline policy. Its
-defaults are 90 seconds for interpretation, 150 seconds for simple runs, and
-300 seconds for the complex hard ceiling; stage defaults are 5 seconds for
-context assembly, 60 seconds for structured extraction, 30 seconds for
-location resolution, 60 seconds per native model decision, 45 seconds of tool
-idle time, 90 seconds of tool absolute time, 20 seconds for map assembly, 30
-seconds for synthesis, 5 seconds for persistence, and 90 seconds for browser
-render acknowledgement. Smaller provider/model limits still win. These
-values are one typed policy block rather than independent environment knobs.
-The same block exposes `agent_loop_mode`: `legacy` is the default,
-`shadow` computes native exposure without external execution, and `native_v2`
-enables the route-first typed loop for controlled validation.
+The `agent_execution` JSON block owns the complete native-agent deadline
+policy. Its defaults are 90 seconds for the initial run, 150 seconds for
+simple runs, and 300 seconds for the complex hard ceiling; stage defaults are
+5 seconds for context assembly, 60 seconds per native model decision, 45
+seconds of tool execution, 90 seconds of tool absolute time, 20 seconds for
+map assembly, 5 seconds for persistence, and 90 seconds for browser render
+acknowledgement. Smaller provider/model limits still win. These values are one
+typed policy block rather than independent environment knobs. Provider
+request settings are injected into the same runtime provider policy, and
+there is no legacy/shadow execution-mode setting.
 
 Model provider API keys are entered through Settings and stored as encrypted
 database records. They are not database connection settings.

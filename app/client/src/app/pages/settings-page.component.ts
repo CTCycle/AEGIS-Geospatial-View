@@ -121,7 +121,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     duration_ms: null,
     checked_at: null,
     expires_at: null,
-    message: 'This model has not been verified against the parser contract.',
+    message: 'This model has not been verified against the native route/tool contract.',
   };
   isTestingStructuredProbe = false;
 
@@ -249,15 +249,15 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     this.isTestingStructuredProbe = true;
-    this.statusText = `Testing ${this.settings.agent_model_name} against the parser contract...`;
+    this.statusText = `Testing ${this.settings.agent_model_name} against the native route/tool contract...`;
     this.changeDetectorRef.detectChanges();
     try {
       this.structuredProbe = await this.apiClient.runStructuredProbe();
-      this.statusText = this.structuredProbe.message ?? 'Structured parser probe completed.';
+      this.statusText = this.structuredProbe.message ?? 'Native structured-response probe completed.';
     } catch (error: unknown) {
       this.statusText = this.userFacingErrorService.toUserFacingError(
         error,
-        'Could not run the structured parser probe.',
+        'Could not run the native structured-response probe.',
       );
     } finally {
       this.isTestingStructuredProbe = false;
@@ -588,7 +588,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       duration_ms: null,
       checked_at: null,
       expires_at: null,
-      message: 'This model has not been verified against the parser contract.',
+      message: 'This model has not been verified against the native route/tool contract.',
     };
   }
 

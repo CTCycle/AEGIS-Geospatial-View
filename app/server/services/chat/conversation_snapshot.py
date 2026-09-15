@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_object
 from pydantic import ValidationError
 
-from server.contracts.geospatial import MapSession
 from server.contracts.runs import (
     ActiveConversationRunSnapshot,
     ConversationMessageSnapshot,
     ConversationSnapshotResponse,
 )
-from server.domain.agent.pipeline import ConversationTaskSnapshot
+from server.domain.agent.conversation import ConversationState
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.chat.history_service import ChatHistoryService
@@ -42,8 +40,12 @@ class ConversationSnapshotService:
         )
         persisted = self.conversation_repository.read_state(conversation_id)
         try:
-            task_snapshot = self._task_snapshot(persisted.get("task_snapshot"))
-            map_session = self._map_session(task_snapshot)
+            conversation_state = ConversationState.from_persisted(
+                conversation_id,
+                persisted.get("conversation_state"),
+                revision=int(persisted.get("context_revision") or 0),
+            )
+            map_session = conversation_state.committed_map_session
             messages = [
                 ConversationMessageSnapshot(
                     role=row["role"],
@@ -54,10 +56,7 @@ class ConversationSnapshotService:
                     conversation_id=conversation_id
                 )
             ]
-            raw_memory_snapshot: object = persisted.get("memory_snapshot") or {}
-            if not is_json_object(raw_memory_snapshot):
-                raise ValueError("memory_snapshot must be an object")
-            memory_snapshot = raw_memory_snapshot
+            memory_snapshot = conversation_state.memory_projection()
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
             raise ConversationSnapshotContractError(
                 "Stored conversation state does not match the current contract."
@@ -71,7 +70,7 @@ class ConversationSnapshotService:
             title=record.title,
             context_revision=int(persisted["context_revision"]),
             messages=messages,
-            task_snapshot=task_snapshot,
+            conversation_state=conversation_state,
             memory_snapshot=memory_snapshot,
             map_session=map_session,
             active_run=(
@@ -86,21 +85,3 @@ class ConversationSnapshotService:
                 else None
             ),
         )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _task_snapshot(value: object) -> ConversationTaskSnapshot | None:
-        if value is None:
-            return None
-        if not isinstance(value, dict):
-            raise ValueError("task_snapshot must be an object or null")
-        return ConversationTaskSnapshot.model_validate(value)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _map_session(
-        task_snapshot: ConversationTaskSnapshot | None,
-    ) -> MapSession | None:
-        if task_snapshot is None or task_snapshot.active_map_session is None:
-            return None
-        return MapSession.model_validate(task_snapshot.active_map_session)

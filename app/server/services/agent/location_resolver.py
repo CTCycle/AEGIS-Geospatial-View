@@ -16,8 +16,8 @@ from server.domain.agent.decision import (
     LocationResolutionProvenance,
     ResolvedLocation,
 )
-from server.domain.agent.interpretation import normalize_target_key
-from server.contracts.extraction import LocationSignal
+from server.common.identifiers import normalize_target_key
+from server.contracts.location import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
 
 ###############################################################################
@@ -241,9 +241,9 @@ class LocationResolver:
     ) -> dict[str, ResolvedLocation] | ClarificationRequest:
         """Resolve independent same-level targets without collapsing them.
 
-        The legacy single-location API intentionally returns a clarification for
-        two same-level places.  Comparisons and combined map requests need a
-        bounded multi-target form instead: the most specific level is treated
+        A single-target request returns a clarification for two same-level
+        places. Comparisons and combined map requests use a bounded multi-target
+        form instead: the most specific level is treated
         as the target level, each target is geocoded once, and lower-specificity
         signals remain parent context.  A hierarchical request such as
         ``EUR in Rome`` therefore still returns one target, while ``Paris and
@@ -332,8 +332,9 @@ class LocationResolver:
         Correctly typed signals never reach this method for normal hierarchy
         requests.  It exists for model output such as ``EUR, Rome`` where both
         entities were labelled as cities.  Text-authored/unit-test conflicts
-        remain ambiguous without evidence; a production parser signal is
-        probed at most three times and only one surviving candidate is accepted.
+        remain ambiguous without evidence; a model-provided relationship signal
+        is probed at most three times and only one surviving candidate is
+        accepted.
         """
 
         candidates = list(signals)[: self.MAX_RELATIONSHIP_PROBES]
@@ -508,8 +509,8 @@ class LocationResolver:
     ) -> ResolvedLocation | ClarificationRequest | None:
         signal_latitude = signal.latitude
         signal_longitude = signal.longitude
-        # Coordinates attached to a named entity by the parser are only a
-        # model hint. The explicit ``coordinates`` signal is the only form
+        # Coordinates attached to a named entity are only a model hint. The
+        # explicit ``coordinates`` signal is the only form
         # that can bypass geocoding; otherwise we would accept an unverified
         # point and lose the entity's parent hierarchy (for example, EUR in
         # Rome).

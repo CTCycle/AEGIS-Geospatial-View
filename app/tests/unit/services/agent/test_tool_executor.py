@@ -7,7 +7,7 @@ import pytest
 from pydantic import BaseModel, ConfigDict
 
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentPhase, AgentState
+from server.domain.agent.capability_route import AgentPhase, AgentRunState
 from server.domain.agent.reliability import (
     AgentExecutionBudget,
     ExecutionBudgetExceeded,
@@ -34,13 +34,13 @@ class _Policy:
         self.allowed = allowed
 
     # -------------------------------------------------------------------------
-    def authorize(self, _tool: RegisteredTool, _arguments: BaseModel, _state: AgentState):
+    def authorize(self, _tool: RegisteredTool, _arguments: BaseModel, _state: AgentRunState):
         return cast(Any, type("Authorization", (), {"allowed": self.allowed, "reason": "blocked"})())
 
 
 ###############################################################################
-def _state() -> AgentState:
-    return AgentState(
+def _state() -> AgentRunState:
+    return AgentRunState(
         request_id="request-1",
         conversation_id="conversation-1",
         phase=AgentPhase.MODEL_STEP,
@@ -57,12 +57,13 @@ def _budget() -> AgentExecutionBudget:
 def _tool(
     handler: Any,
     *,
+    name: str = "test_tool",
     semantic_validator: Any | None = None,
 ) -> RegisteredTool:
     def normalize(value: Any, call_id: str) -> ToolResult:
         return ToolResult(
             call_id=call_id,
-            tool_name="test_tool",
+            tool_name=name,
             status="success",
             summary=str(value),
             metadata=ToolExecutionMetadata(duration_ms=0),
@@ -70,7 +71,7 @@ def _tool(
 
     return RegisteredTool(
         definition=LLMToolDefinition(
-            name="test_tool",
+            name=name,
             description="Test tool",
             parameters_json_schema=_Input.model_json_schema(),
         ),
@@ -91,7 +92,7 @@ def _tool(
 def test_executor_validates_once_and_normalizes_success() -> None:
     calls: list[int] = []
 
-    async def handler(arguments: _Input, _state: AgentState) -> dict[str, Any]:
+    async def handler(arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
         calls.append(arguments.value)
         return {"value": arguments.value}
 
@@ -116,7 +117,7 @@ def test_executor_validates_once_and_normalizes_success() -> None:
 def test_malformed_call_never_reaches_the_handler() -> None:
     calls: list[int] = []
 
-    async def handler(_arguments: _Input, _state: AgentState) -> dict[str, Any]:
+    async def handler(_arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
         calls.append(1)
         return {}
 
@@ -142,7 +143,7 @@ def test_malformed_call_never_reaches_the_handler() -> None:
 
 ###############################################################################
 def test_tool_budget_is_enforced_by_the_execution_boundary() -> None:
-    async def handler(_arguments: _Input, _state: AgentState) -> dict[str, Any]:
+    async def handler(_arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
         return {"ok": True}
 
     registry = ToolRegistry(runtime_registry=cast(Any, None))
@@ -174,11 +175,11 @@ def test_tool_budget_is_enforced_by_the_execution_boundary() -> None:
 
 ###############################################################################
 def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
-    async def handler(_arguments: _Input, _state: AgentState) -> dict[str, Any]:
+    async def handler(_arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
         await asyncio.sleep(0.05)
         return {}
 
-    def reject(_arguments: BaseModel, _state: AgentState) -> list[str]:
+    def reject(_arguments: BaseModel, _state: AgentRunState) -> list[str]:
         return ["value is not allowed"]
 
     registry = ToolRegistry(runtime_registry=cast(Any, None))
@@ -209,15 +210,32 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
 
     timeout_registry = ToolRegistry(runtime_registry=cast(Any, None))
     timeout_registry.register(_tool(handler))
+    timeout_budget = _budget()
     timeout_result = asyncio.run(
         ToolExecutor(tool_registry=timeout_registry, timeout_seconds=0.01).execute_tool(
             LLMToolCall(id="timeout", name="test_tool", arguments={"value": 1}),
             _state(),
-            _budget(),
+            timeout_budget,
         )
     )
     assert timeout_result.error is not None
     assert timeout_result.error.error_type == "timeout"
+    assert [item.stage for item in timeout_budget.observations] == ["tool_execution"]
+
+    map_registry = ToolRegistry(runtime_registry=cast(Any, None))
+    map_registry.register(_tool(handler, name="apply_map_plan"))
+    map_budget = _budget()
+    map_budget.stage_limits["map_assembly"] = 0.01
+    map_result = asyncio.run(
+        ToolExecutor(tool_registry=map_registry, timeout_seconds=0.05).execute_tool(
+            LLMToolCall(id="map-timeout", name="apply_map_plan", arguments={"value": 1}),
+            _state(),
+            map_budget,
+        )
+    )
+    assert map_result.error is not None
+    assert map_result.error.error_type == "timeout"
+    assert [item.stage for item in map_budget.observations] == ["map_assembly"]
 
 
 ###############################################################################
@@ -225,12 +243,12 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
 async def test_semantic_failure_is_reported_before_policy_or_handler() -> None:
     called = False
 
-    async def handler(_arguments: _Input, _state: AgentState) -> dict[str, Any]:
+    async def handler(_arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
         nonlocal called
         called = True
         return {}
 
-    def reject(_arguments: BaseModel, _state: AgentState) -> list[str]:
+    def reject(_arguments: BaseModel, _state: AgentRunState) -> list[str]:
         return ["bad value"]
 
     registry = ToolRegistry(runtime_registry=cast(Any, None))

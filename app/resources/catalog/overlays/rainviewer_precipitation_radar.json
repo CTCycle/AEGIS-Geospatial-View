@@ -135,5 +135,38 @@
     "timestampPath": null,
     "fieldMap": {},
     "expectedGeometry": "raster-grid"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "overlay",
+      "inspect",
+      "forecast"
+    ],
+    "supported_scope_kinds": [
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current",
+      "forecast"
+    ],
+    "temporal_windows": [
+      "provider_forecast_window"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location",
+      "temporal_mode"
+    ],
+    "output_geometry_type": "Raster",
+    "render_support": "raster",
+    "coverage": "global-partial",
+    "limitations": [
+      "Free public API provides recent past radar only, not future nowcast.",
+      "Public tile zoom is capped at 7.",
+      "Best-effort public service has no SLA."
+    ],
+    "fallback_ids": []
   }
 }

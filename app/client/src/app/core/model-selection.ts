@@ -197,7 +197,7 @@ export const modelDisplayDescription = (model: ModelCardDescriptor): string => {
     return description;
   }
   if (model.provider === 'ollama') {
-    return `Installed Ollama model available for agent duties, structured extraction, tool calling, and chat. ${modelDetails(model)}`;
+    return `Installed Ollama model available for native routing, tool calling, and chat. ${modelDetails(model)}`;
   }
   return description || 'Model available for agent selection.';
 };

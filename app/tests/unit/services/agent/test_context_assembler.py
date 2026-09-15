@@ -54,7 +54,7 @@ def test_known_model_profiles_drive_compaction_without_unknown_fallback() -> Non
     large = assembler.assemble(provider="google", model="gemini-2.5-flash", **kwargs)
     assert len(small.recent_messages) < len(large.recent_messages)
     assert small.current_user_message == "Current request"
-    assert small.conversation_summary is not None
+    assert small.summary is not None
     assert small.omitted_message_ids
 
 ###############################################################################

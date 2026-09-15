@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from server.contracts.extraction import LocationSignal
+from server.contracts.location import LocationSignal
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.location_resolver import LocationResolver
 

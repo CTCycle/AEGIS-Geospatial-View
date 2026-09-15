@@ -61,7 +61,7 @@ describe('AgentReadinessService', () => {
       duration_ms: null,
       checked_at: null,
       expires_at: null,
-      message: 'This model has not been verified against the parser contract.',
+      message: 'This model has not been verified against the native route/tool contract.',
     });
 
     const readiness = await service.loadReadiness();
@@ -69,7 +69,7 @@ describe('AgentReadinessService', () => {
     expect(readiness).toEqual({
       status: 'unknown',
       label: 'Not verified',
-      message: 'This model has not been verified against the parser contract.',
+      message: 'This model has not been verified against the native route/tool contract.',
     });
   });
 

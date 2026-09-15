@@ -1,6 +1,6 @@
 # Settings And Access
 
-Last updated: 2026-09-08
+Last updated: 2026-09-15
 
 ## Access Configuration
 
@@ -19,7 +19,7 @@ The Access page is for optional geospatial provider keys such as TomTom and Open
 9. OpenCode catalogs expose the live intersection of the published model table and the provider account. AEGIS supports OpenAI-compatible Chat Completions and Responses models; Anthropic Messages, provider-specific Gemini transports, and unknown protocols remain visible as disabled selections with an explanation.
 10. If a dynamic cloud catalog cannot be loaded, Settings keeps its provider filter active and shows the provider-specific error instead of a generic empty-state message.
 11. Use `Test selected model` in the selected-model panel to run the real
-    structured parser probe. A selected model remains selectable before it is
+    native structured-response probe. A selected model remains selectable before it is
     probed and is labeled `Not verified`; failed, timed-out, or unsupported
     probes show `Needs attention`. Probe results expire after 15 minutes and
     never switch the selected model or provider automatically.
@@ -37,7 +37,7 @@ saved selection is retired, absent from the live catalog, or uses an
 unsupported transport; select a replacement deliberately.
 
 Catalogue reachability and inference readiness are separate signals. A model
-catalogue can be reachable while its structured parser probe has not been run
+catalogue can be reachable while its native structured-response probe has not been run
 or has failed. Settings reports the probe independently of catalogue loading
 and credential presence.
 

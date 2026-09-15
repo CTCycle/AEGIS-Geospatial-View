@@ -159,6 +159,10 @@ class GeospatialManifestLoader:
                 raise ManifestValidationError(
                     f"Manifest '{source}' entry '{entry.get('id')}' must declare at least one agenticUse domain."
                 )
+            if not is_json_object(entry.get("executionContract")):
+                raise ManifestValidationError(
+                    f"Manifest '{source}' entry '{entry.get('id')}' must declare executionContract."
+                )
         normalized = dict(entry)
         normalized["capabilities"] = list(entry.get("capabilities") or [])
         normalized["metadata"] = dict(entry.get("metadata") or {})

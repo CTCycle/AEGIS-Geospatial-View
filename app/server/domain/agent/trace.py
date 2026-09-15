@@ -47,7 +47,8 @@ class AgentCheckpoint(BaseModel):
     run_id: str
     conversation_id: str
     run_version: int = Field(ge=1)
-    task_snapshot: dict[str, Any]
+    conversation_state: dict[str, Any]
+    run_state: dict[str, Any] | None = None
     state_hash: str
     completed_call_fingerprints: list[str] = Field(default_factory=list)
     completion_reason: str | None = None

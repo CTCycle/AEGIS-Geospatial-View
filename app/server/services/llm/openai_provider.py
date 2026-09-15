@@ -466,7 +466,7 @@ class OpenAIProvider(LLMProvider):
                     provider=self.provider_name,
                     model=request.model,
                     stage="structured_output",
-                    detail="The provider returned invalid JSON for structured extraction.",
+                    detail="The provider returned invalid JSON for the structured native response.",
                     context_usage=usage.to_dict(),
                 ) from exc
             if not is_json_object(loaded):

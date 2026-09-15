@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 from server.contracts.runs import TERMINAL_RUN_STATES
 from server.contracts.events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage
@@ -13,7 +13,7 @@ from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent_runs.aggregation import AggregatedRequestService
-from server.services.agent.conversation_state import ConversationTaskStateService
+from server.domain.agent.conversation import ConversationState
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.exceptions import RunConflictError, RunNotFoundError
 
@@ -29,14 +29,12 @@ class RunSteeringService:
         aggregation_service: AggregatedRequestService,
         event_publisher: RunEventPublisher,
         conversation_repository: ConversationRepository | None = None,
-        task_state_service: ConversationTaskStateService | None = None,
     ) -> None:
         self.run_repository = run_repository
         self.steering_repository = steering_repository
         self.aggregation_service = aggregation_service
         self.event_publisher = event_publisher
         self.conversation_repository = conversation_repository
-        self.task_state_service = task_state_service
 
     # -------------------------------------------------------------------------
     async def steer(
@@ -141,31 +139,47 @@ class RunSteeringService:
     def _apply_state_delta(self, conversation_id: str, delta: object) -> bool:
         """Persist only mutations that can be applied without model interpretation."""
 
-        if (
-            self.conversation_repository is None
-            or self.task_state_service is None
-            or getattr(delta, "kind", "instruction")
-            not in {"scope_change", "exclusion", "add_dataset", "comparison"}
-        ):
+        if self.conversation_repository is None or getattr(
+            delta, "kind", "instruction"
+        ) not in {"scope_change", "exclusion", "add_dataset", "comparison"}:
             return False
         try:
             persisted: dict[str, Any] = self.conversation_repository.read_state(
                 conversation_id
             )
-            task_snapshot_value: Any = persisted.get("task_snapshot")
-            if not isinstance(task_snapshot_value, dict):
-                return False
-            task_snapshot = cast(dict[str, Any], task_snapshot_value)
-            if not task_snapshot.get("tasks"):
-                return False
-            if not self.task_state_service.has_state(conversation_id):
-                self.task_state_service.hydrate(conversation_id, task_snapshot)
-            self.task_state_service.apply_steering_delta(conversation_id, delta)
+            state = ConversationState.from_persisted(
+                conversation_id,
+                persisted.get("conversation_state"),
+                revision=int(persisted.get("context_revision") or 0),
+            )
+            history = state.constraints.get("steering_history")
+            steering_history = list(history) if isinstance(history, list) else []
+            steering_history.append(
+                {
+                    "kind": delta.kind,
+                    "text": delta.text[:1000],
+                    "parameters": dict(delta.parameters),
+                    "preserve_evidence": delta.preserve_evidence,
+                    "invalidates_scope_dependent_evidence": (
+                        delta.invalidates_scope_dependent_evidence
+                    ),
+                }
+            )
+            state = state.model_copy(
+                update={
+                    "revision": int(persisted.get("context_revision") or 0) + 1,
+                    "constraints": {
+                        **state.constraints,
+                        "latest_steering": steering_history[-1],
+                        "steering_history": steering_history[-16:],
+                    },
+                }
+            )
             self.conversation_repository.write_state(
                 conversation_id,
                 expected_revision=int(persisted["context_revision"]),
-                task_snapshot=self.task_state_service.serialize(conversation_id),
+                conversation_state=state.model_dump(mode="json"),
             )
             return True
-        except KeyError, TypeError, ValueError:
+        except (KeyError, TypeError, ValueError):
             return False

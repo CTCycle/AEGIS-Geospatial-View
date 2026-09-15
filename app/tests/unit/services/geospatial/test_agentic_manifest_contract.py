@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import CapabilityRoute
+from server.domain.agent.decision import ResolvedLocation
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
@@ -39,6 +40,13 @@ def _registry() -> CapabilityRegistry:
                     "domains": ["data_retrieval", "map_rendering"],
                     "intentTags": ["traffic"],
                 },
+                "executionContract": {
+                    "supported_operations": ["show", "inspect"],
+                    "supported_scope_kinds": ["bbox"],
+                    "temporal_modes": ["current"],
+                    "render_support": "vector",
+                    "coverage": "global",
+                },
             },
             {
                 "id": "weather",
@@ -48,6 +56,13 @@ def _registry() -> CapabilityRegistry:
                 "description": "Forecast weather tiles.",
                 "capabilities": ["weather", "forecast"],
                 "agenticUse": {"domains": ["data_retrieval"]},
+                "executionContract": {
+                    "supported_operations": ["show", "forecast"],
+                    "supported_scope_kinds": ["bbox"],
+                    "temporal_modes": ["current", "forecast"],
+                    "render_support": "raster",
+                    "coverage": "global",
+                },
             },
         ],
         cameras=[],
@@ -134,3 +149,77 @@ def test_missing_agentic_domains_are_not_inferred_from_capability_kind() -> None
     )
 
     assert candidates == []
+
+
+def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
+    snapshot = GeospatialManifestSnapshot(
+        providers=(),
+        basemaps=[],
+        overlays=[
+            {
+                "id": "us-parcels",
+                "name": "US parcel analysis",
+                "provider": "test",
+                "capabilityKind": "vector-overlay",
+                "description": "High precision parcel data.",
+                "agenticUse": {
+                    "domains": ["spatial_analysis"],
+                    "avoidWhen": ["outside United States", "high precision parcel analysis"],
+                },
+                "executionContract": {
+                    "supported_operations": ["show", "analyze"],
+                    "supported_scope_kinds": ["bbox"],
+                    "temporal_modes": ["current"],
+                    "render_support": "vector",
+                    "coverage": "United States",
+                },
+            }
+        ],
+        cameras=[],
+        transit=[],
+        tools=[],
+        runtime_profiles=(),
+    )
+    registry = CapabilityRegistry.from_catalog_snapshot(snapshot)
+
+    zurich = ResolvedLocation(
+        label="Zurich",
+        latitude=47.3769,
+        longitude=8.5417,
+        country="Switzerland",
+    )
+    assert registry.shortlist(
+        domains={CapabilityDomain.SPATIAL_ANALYSIS},
+        queries=["parcel analysis"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+        location=zurich,
+    ) == []
+
+    rome = zurich.model_copy(update={"label": "Rome", "country": "Italy"})
+    assert registry.shortlist(
+        domains={CapabilityDomain.SPATIAL_ANALYSIS},
+        queries=["parcel analysis"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+        location=rome,
+    ) == []
+
+    us_location = zurich.model_copy(
+        update={"label": "New York", "country": "United States"}
+    )
+    assert registry.shortlist(
+        domains={CapabilityDomain.SPATIAL_ANALYSIS},
+        queries=["parcel analysis"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+        location=us_location,
+    ) == []
+    candidate = registry.shortlist(
+        domains={CapabilityDomain.SPATIAL_ANALYSIS},
+        queries=["registry"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+        location=us_location,
+    )
+    assert [item["id"] for item in candidate] == ["us-parcels"]

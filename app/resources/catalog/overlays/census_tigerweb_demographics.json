@@ -118,5 +118,35 @@
     "timestampPath": null,
     "fieldMap": {},
     "expectedGeometry": "polygon"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "search",
+      "filter",
+      "inspect"
+    ],
+    "supported_scope_kinds": [
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Polygon",
+    "render_support": "vector",
+    "coverage": "us",
+    "limitations": [
+      "Boundary layer and vintage selection are discovered from live TIGERweb metadata.",
+      "This capability supplies geometry only; ACS values require the demographic-join capability."
+    ],
+    "fallback_ids": []
   }
 }

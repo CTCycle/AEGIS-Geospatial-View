@@ -97,5 +97,33 @@
     "timestampPath": null,
     "fieldMap": {},
     "expectedGeometry": "Raster"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "overlay",
+      "inspect"
+    ],
+    "supported_scope_kinds": [
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Raster",
+    "render_support": "raster",
+    "coverage": "united-states",
+    "limitations": [
+      "Coverage is limited to the CONUS radar mosaic exposed by the public NOAA service."
+    ],
+    "fallback_ids": []
   }
 }

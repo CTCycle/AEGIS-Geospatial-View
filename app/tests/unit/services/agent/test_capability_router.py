@@ -5,7 +5,7 @@ from typing import Any, cast
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
     AgentPhase,
-    AgentState,
+    AgentRunState,
     CapabilityRoute,
 )
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
@@ -52,6 +52,13 @@ def _router(runtime: _Runtime | None = None) -> CapabilityRouter:
                     "description": "Traffic incidents",
                     "capabilities": ["traffic"],
                     "agenticUse": {"domains": ["data_retrieval"]},
+                    "executionContract": {
+                        "supported_operations": ["show", "inspect"],
+                        "supported_scope_kinds": ["bbox"],
+                        "temporal_modes": ["current"],
+                        "render_support": "vector",
+                        "coverage": "global",
+                    },
                 }
             ],
             cameras=[],
@@ -67,8 +74,8 @@ def _router(runtime: _Runtime | None = None) -> CapabilityRouter:
 
 
 ###############################################################################
-def _state(*, active_map: bool = False) -> AgentState:
-    state = AgentState(
+def _state(*, active_map: bool = False) -> AgentRunState:
+    state = AgentRunState(
         request_id="request-1",
         conversation_id="conversation-1",
         phase=AgentPhase.ROUTE_REQUEST,

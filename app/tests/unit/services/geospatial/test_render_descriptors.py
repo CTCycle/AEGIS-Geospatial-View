@@ -6,12 +6,12 @@ from tests.conftest import run_async_in_thread
 
 import pytest
 
-from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
+from server.contracts.geospatial import LocationSearchRequest, ViewportPolicy
+from server.domain.agent.decision import ResolvedLocation
 from server.domain.geospatial.providers import ProviderResponse
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
-from server.services.search.request_builder import RequestBuilder
 from server.services.geospatial.providers.base import ProviderAuthError
 
 ###############################################################################
@@ -42,35 +42,35 @@ def test_openaq_auth_failure_cannot_be_a_deferred_success(monkeypatch) -> None:
 
 ###############################################################################
 def _request():
-    return RequestBuilder().build_location_search_request(
-        ExecutionPlan(
-            state="map_search",
-            action_id="map_search",
-            basemap_id="osm_default",
-            overlay_ids=["test-layer"],
-        ),
-        ResolvedLocation(
-            label="Rome",
-            latitude=41.9,
-            longitude=12.5,
-            confidence=1.0,
+    location = ResolvedLocation(
+        label="Rome", latitude=41.9, longitude=12.5, confidence=1.0
+    )
+    return LocationSearchRequest(
+        resolved_location=location,
+        action_id="map_search",
+        basemap_id="osm_default",
+        overlay_ids=["test-layer"],
+        viewport=ViewportPolicy(
+            center_latitude=location.latitude,
+            center_longitude=location.longitude,
+            radius_m=25_000,
         ),
     )
 
 ###############################################################################
 def _sanremo_request():
-    return RequestBuilder().build_location_search_request(
-        ExecutionPlan(
-            state="map_search",
-            action_id="map_search",
-            basemap_id="osm_default",
-            overlay_ids=["openmeteo_pressure_humidity_wind"],
-        ),
-        ResolvedLocation(
-            label="Sanremo",
-            latitude=43.817,
-            longitude=7.777,
-            confidence=1.0,
+    location = ResolvedLocation(
+        label="Sanremo", latitude=43.817, longitude=7.777, confidence=1.0
+    )
+    return LocationSearchRequest(
+        resolved_location=location,
+        action_id="map_search",
+        basemap_id="osm_default",
+        overlay_ids=["openmeteo_pressure_humidity_wind"],
+        viewport=ViewportPolicy(
+            center_latitude=location.latitude,
+            center_longitude=location.longitude,
+            radius_m=25_000,
         ),
     )
 

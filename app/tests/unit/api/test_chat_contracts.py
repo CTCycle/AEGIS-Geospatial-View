@@ -34,7 +34,7 @@ def test_chat_turn_requires_conversation_id_over_http() -> None:
     )
 
 ###############################################################################
-def test_chat_turn_contract_openapi_marks_conversation_id_required() -> None:
+def test_chat_response_openapi_marks_conversation_id_required() -> None:
     schema = _app().openapi()
     request_schema = schema["components"]["schemas"]["ChatTurnRequest"]
 
@@ -90,11 +90,9 @@ def test_native_turn_response_does_not_require_legacy_parser_projections() -> No
         ),
     )
 
-    assert response.turn_contract is None
-    assert response.decision is None
-    assert "turn_contract" not in response.model_dump(
-        mode="json", exclude_none=True
-    )
+    assert response.route is None
+    assert response.goal is None
+    assert "turn_contract" not in response.model_dump(mode="json")
 
 
 ###############################################################################
@@ -138,7 +136,7 @@ def test_structured_probe_routes_return_latest_and_run_results() -> None:
         status="passed",
         parse_status="complete",
         duration_ms=42,
-        message="Structured parser probe passed.",
+        message="Native structured-response probe passed.",
     )
 
     ###############################################################################

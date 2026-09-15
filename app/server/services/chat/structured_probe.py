@@ -5,10 +5,12 @@ import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from time import monotonic, perf_counter
-from typing import Any, Awaitable, Callable, Literal, cast
+from typing import Any, Literal
 
-from server.common.typing import is_json_object
 from server.contracts.chat import StructuredProbeResponse
+from server.domain.agent.capability_route import CapabilityRoute
+from server.domain.llm.types import LLMRequest, LLMToolDefinition
+from server.prompts.capability_route import build_capability_route_prompt
 from server.services.llm.errors import (
     LLMConfigurationError,
     LLMProviderRequestError,
@@ -23,11 +25,11 @@ PROBE_REQUEST = "Show a map of Italy"
 
 ###############################################################################
 class StructuredProbeService:
-    """Runs the real parser contract without creating a conversation side effect."""
+    """Probe the native route/tool contract without creating conversation state."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, parser_service: Any, settings_service: Any) -> None:
-        self.parser_service = parser_service
+    def __init__(self, *, provider_factory: Any, settings_service: Any) -> None:
+        self.provider_factory = provider_factory
         self.settings_service = settings_service
         self._cache: dict[str, StructuredProbeResponse] = {}
 
@@ -41,7 +43,7 @@ class StructuredProbeService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _protocol(provider: str, model: str, parser_service: Any) -> str:
+    def _protocol(provider: str, model: str, provider_factory: Any) -> str:
         normalized_provider = provider.strip().lower()
         if normalized_provider == "ollama":
             return "ollama-chat"
@@ -49,10 +51,9 @@ class StructuredProbeService:
             return "openai-responses"
         if normalized_provider == "google":
             return "google-model"
-        factory = getattr(parser_service, "llm_factory", None)
-        if factory is not None:
+        if provider_factory is not None:
             try:
-                selected_provider = factory.get_provider(normalized_provider)
+                selected_provider = provider_factory.get_provider(normalized_provider)
                 protocol_for_model = getattr(selected_provider, "protocol_for_model", None)
                 if callable(protocol_for_model):
                     protocol = protocol_for_model(model)
@@ -100,7 +101,7 @@ class StructuredProbeService:
             duration_ms=None,
             checked_at=None,
             expires_at=None,
-            message="This model has not been verified against the parser contract.",
+            message="This model has not been verified against the native tool contract.",
         )
 
     # -------------------------------------------------------------------------
@@ -108,7 +109,7 @@ class StructuredProbeService:
         settings = self._settings()
         provider = str(getattr(settings, "agent_model_provider", "")).strip()
         model = str(getattr(settings, "agent_model_name", "")).strip()
-        protocol = self._protocol(provider, model, self.parser_service)
+        protocol = self._protocol(provider, model, self.provider_factory)
         cached = self._cache.get(self._cache_key(settings, protocol))
         if cached is None:
             return self._not_tested(provider, model, protocol)
@@ -130,19 +131,19 @@ class StructuredProbeService:
     @staticmethod
     def _safe_message(status: ProbeStatus) -> str:
         return {
-            "not_tested": "This model has not been verified against the parser contract.",
-            "passed": "Structured parser probe passed.",
-            "failed": "Structured parser probe failed.",
-            "timeout": "Structured parser probe timed out.",
-            "unsupported": "The selected model does not support the structured parser contract.",
+            "not_tested": "This model has not been verified against the native tool contract.",
+            "passed": "Native tool probe passed.",
+            "failed": "Native tool probe failed.",
+            "timeout": "Native tool probe timed out.",
+            "unsupported": "The selected model does not support the native tool contract.",
         }[status]
 
     # -------------------------------------------------------------------------
     async def run(self) -> StructuredProbeResponse:
         settings = self._settings()
-        provider = str(getattr(settings, "agent_model_provider", "")).strip()
+        provider_id = str(getattr(settings, "agent_model_provider", "")).strip()
         model = str(getattr(settings, "agent_model_name", "")).strip()
-        protocol = self._protocol(provider, model, self.parser_service)
+        protocol = self._protocol(provider_id, model, self.provider_factory)
         key = self._cache_key(settings, protocol)
         checked_at = datetime.now(timezone.utc)
         started = perf_counter()
@@ -150,50 +151,46 @@ class StructuredProbeService:
         parse_status = "failed"
         try:
             deadline = monotonic() + PROBE_TIMEOUT_SECONDS
-            parser_candidate = getattr(
-                self.parser_service, "parse_turn_with_usage_async", None
+            provider = self.provider_factory.get_provider(provider_id)
+            request = LLMRequest(
+                model=model,
+                provider=provider_id,
+                provider_session_id=f"structured-probe-{self._credential_fingerprint(settings)}",
+                messages=[
+                    {"role": "system", "content": build_capability_route_prompt()},
+                    {"role": "user", "content": PROBE_REQUEST},
+                ],
+                tools=[
+                    LLMToolDefinition(
+                        name="route_request",
+                        description="Select one bounded high-level AEGIS capability route.",
+                        parameters_json_schema=CapabilityRoute.model_json_schema(),
+                    )
+                ],
+                tool_choice="required",
+                metadata={"supports_tools": True, "deadline_monotonic": deadline},
             )
-            if not callable(parser_candidate):
-                raise LLMConfigurationError("The selected parser does not expose an async probe path.")
-            parser = cast(Callable[..., Awaitable[Any]], parser_candidate)
             result = await asyncio.wait_for(
-                parser(
-                    user_message=PROBE_REQUEST,
-                    memory_snapshot={},
-                    conversation_messages=[],
-                    deadline_monotonic=deadline,
-                    provider_session_id=f"structured-probe-{self._credential_fingerprint(settings)}",
+                provider.achat(
+                    request,
+                    tools=request.tools,
+                    tool_choice="required",
                 ),
                 timeout=PROBE_TIMEOUT_SECONDS + 0.5,
             )
-            contract = getattr(result, "parser_contract", None)
-            if is_json_object(contract):
-                parse_status = str(contract.get("response_parse_status") or "failed")
-            turn_contract = getattr(result, "turn_contract", None)
-            provider_error = getattr(turn_contract, "provider_error", None)
-            if is_json_object(provider_error):
-                code = str(provider_error.get("code") or "")
-                category = str(provider_error.get("category") or "")
-                if (
-                    category == "model_capability"
-                    or "unsupported" in code
-                    or "incompatible" in code
-                    or code
-                    in {
-                        "model_structured_output_unsupported",
-                        "structured_schema_unsupported",
-                    }
-                ):
-                    status = "unsupported"
-                elif "timeout" in code or "deadline" in code:
-                    status = "timeout"
-                else:
-                    status = "failed"
-                parse_status = status
-            elif parse_status in {"complete", "intentional_ambiguity"}:
+            call = result.tool_calls[0] if result.tool_calls else None
+            if (
+                call is not None
+                and call.name == "route_request"
+                and call.parse_error is None
+                and call.arguments is not None
+            ):
+                CapabilityRoute.model_validate(call.arguments)
+                parse_status = "complete"
                 status = "passed"
             else:
                 status = "failed"
+                parse_status = "failed"
         except (asyncio.TimeoutError, TimeoutError):
             status = "timeout"
             parse_status = "timeout"
@@ -225,7 +222,7 @@ class StructuredProbeService:
         duration_ms = max(0, int((perf_counter() - started) * 1000))
         expires_at = checked_at + timedelta(seconds=PROBE_TTL_SECONDS)
         result = StructuredProbeResponse(
-            provider=provider,
+            provider=provider_id,
             model=model,
             protocol=protocol,
             status=status,

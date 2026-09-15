@@ -8,6 +8,7 @@ from typing import Any
 
 from server.contracts.runs import AgentRunSnapshot
 from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
+from server.domain.agent.capability_route import AgentRunState as NativeRunState
 from server.contracts.chat import ChatTurnRequest, ChatTurnResponse
 from server.contracts.events import (
     RUN_PROGRESS_LABELS,
@@ -18,7 +19,7 @@ from server.contracts.events import (
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
-from server.services.agent.orchestrator import AgentOrchestrator
+from server.services.agent.native_orchestrator import NativeAgentOrchestrator
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.render_completion import (
     RenderAcknowledgementError,
@@ -33,7 +34,7 @@ class AgentRunOrchestrator:
     def __init__(
         self,
         *,
-        agent_orchestrator: AgentOrchestrator,
+        agent_orchestrator: NativeAgentOrchestrator,
         run_repository: AgentRunRepository,
         event_publisher: RunEventPublisher,
         conversation_repository: ConversationRepository,
@@ -58,6 +59,7 @@ class AgentRunOrchestrator:
             await self._publish_cancelled(snapshot)
             return
         expected_version = snapshot.active_run_version
+        checkpoint = self._latest_checkpoint(run_id, expected_version)
         snapshot, transitioned = self.run_repository.mark_started_if_current(
             run_id, expected_version
         )
@@ -126,6 +128,39 @@ class AgentRunOrchestrator:
                 return "superseded"
             return None
 
+        async def on_checkpoint(state: NativeRunState) -> None:
+            """Persist each safe native boundary in the internal run log."""
+
+            current = self.run_repository.get_run(run_id)
+            if (
+                current is None
+                or current.active_run_version != snapshot.active_run_version
+                or current.cancel_requested_at is not None
+            ):
+                return
+            run_state = state.checkpoint()
+            await self._publish_trace(
+                current,
+                AgentTraceEvent(
+                    kind="checkpoint",
+                    run_id=current.run_id,
+                    run_version=current.active_run_version,
+                    sequence=max(1, state.transitions),
+                    payload=AgentCheckpoint(
+                        run_id=current.run_id,
+                        conversation_id=current.conversation_id,
+                        run_version=current.active_run_version,
+                        conversation_state={},
+                        run_state=run_state,
+                        state_hash=_hash_json(run_state),
+                        completed_call_fingerprints=list(
+                            state.successful_fingerprints
+                        )[-32:],
+                        completion_reason=state.termination_reason,
+                    ).model_dump(mode="json"),
+                ),
+            )
+
         context_event_task = asyncio.create_task(publish_context_events())
         try:
             response = await self.agent_orchestrator.run_turn(
@@ -140,6 +175,9 @@ class AgentRunOrchestrator:
                 progress_callback=on_agent_progress,
                 defer_map_commit=True,
                 agent_run_id=run_id,
+                agent_run_version=snapshot.active_run_version,
+                checkpoint=checkpoint,
+                checkpoint_callback=on_checkpoint,
                 run_state_check=run_state_check,
             )
         except Exception as exc:
@@ -244,31 +282,6 @@ class AgentRunOrchestrator:
                 # acknowledge. Keep their explanatory response and finalize it
                 # through the ordinary path instead of leaving the run pending
                 # forever with an impossible render requirement.
-                metadata_requirements = None
-                if response.canonical_request is not None:
-                    metadata_requirements = [
-                        item.model_copy(
-                            update=(
-                                {
-                                    "status": "failed",
-                                    "failure_code": "metadata_only",
-                                }
-                                if item.name == "renderable_geometry_created"
-                                else {
-                                    "status": "not_applicable"
-                                }
-                                if item.name
-                                in {
-                                    "map_state_committed",
-                                    "viewport_contains_results",
-                                }
-                                else {"status": "satisfied"}
-                                if item.name == "final_response_ready"
-                                else {}
-                            )
-                        )
-                        for item in response.canonical_request.completion_requirements
-                    ]
                 metadata_operation = response.operation.model_copy(
                     update={
                         "status": "partial",
@@ -278,24 +291,18 @@ class AgentRunOrchestrator:
                         ),
                     }
                 )
-                metadata_task_snapshot = (
-                    response.task_snapshot.model_copy(update={"active_map_session": None})
-                    if response.task_snapshot is not None
+                metadata_state = (
+                    response.conversation_state.model_copy(
+                        update={"committed_map_session": None}
+                    )
+                    if response.conversation_state is not None
                     else None
                 )
                 response = response.model_copy(
                     update={
                         "map_session": None,
                         "operation": metadata_operation,
-                        "task_snapshot": metadata_task_snapshot,
-                        "canonical_request": (
-                            response.canonical_request.model_copy(
-                                update={"completion_requirements": metadata_requirements}
-                            )
-                            if response.canonical_request is not None
-                            and metadata_requirements is not None
-                            else response.canonical_request
-                        ),
+                        "conversation_state": metadata_state,
                     }
                 )
 
@@ -308,12 +315,6 @@ class AgentRunOrchestrator:
             and response.operation.status in {"success", "partial", "pending"}
         ):
             final_response_payload = response.model_dump(mode="json")
-            if response.canonical_request is not None:
-                final_response_payload["render_requirements"] = [
-                    item.model_dump(mode="json")
-                    for item in response.canonical_request.completion_requirements
-                    if item.required
-                ]
             try:
                 presentation, prepared = self.render_completion_service.prepare(
                     run_id=run_id,
@@ -384,15 +385,23 @@ class AgentRunOrchestrator:
                     run_id=latest.run_id,
                     conversation_id=latest.conversation_id,
                     run_version=latest.active_run_version,
-                    task_snapshot=(
-                        response.task_snapshot.model_dump(mode="json")
-                        if response.task_snapshot is not None
-                        else {"schema_version": 3, "tasks": []}
+                    conversation_state=(
+                        response.conversation_state.model_dump(mode="json")
+                        if response.conversation_state is not None
+                        else {}
+                    ),
+                    run_state=(
+                        response.execution_trace.get("checkpoint")
+                        if isinstance(response.execution_trace, dict)
+                        and isinstance(
+                            response.execution_trace.get("checkpoint"), dict
+                        )
+                        else None
                     ),
                     state_hash=hashlib.sha256(
                         json.dumps(
-                            response.task_snapshot.model_dump(mode="json")
-                            if response.task_snapshot is not None
+                            response.conversation_state.model_dump(mode="json")
+                            if response.conversation_state is not None
                             else {},
                             sort_keys=True,
                             separators=(",", ":"),
@@ -432,34 +441,7 @@ class AgentRunOrchestrator:
                 run_version=clarified.active_run_version,
                 type=RunEventType.CLARIFICATION_NEEDED,
                 payload={
-                    "content": response.assistant_message,
-                    "map_session": response.map_session.model_dump(mode="json")
-                    if response.map_session is not None
-                    else None,
-                    "operation": response.operation.model_dump(mode="json"),
-                    "decision": response.decision.model_dump(mode="json")
-                    if response.decision is not None
-                    else None,
-                    "task_snapshot": response.task_snapshot.model_dump(mode="json")
-                    if response.task_snapshot is not None
-                    else None,
-                    "visualization_update": response.visualization_update.model_dump(
-                        mode="json"
-                    )
-                    if response.visualization_update is not None
-                    else None,
-                    "context_usage": response.context_usage.model_dump(mode="json")
-                    if response.context_usage is not None
-                    else None,
-                    "execution_trace": response.execution_trace,
-                    "route": response.route.model_dump(mode="json")
-                    if response.route is not None
-                    else None,
-                    "presentation_status": response.presentation_status,
-                    "tool_results": [
-                        item.model_dump(mode="json")
-                        for item in response.tool_results
-                    ],
+                    **self._response_payload(response),
                 },
             )
             return
@@ -489,21 +471,7 @@ class AgentRunOrchestrator:
                     "message": response.operation.message
                     if response.operation is not None
                     else "Failed",
-                    "operation": response.operation.model_dump(mode="json")
-                    if response.operation is not None
-                    else None,
-                    "context_usage": response.context_usage.model_dump(mode="json")
-                    if response.context_usage is not None
-                    else None,
-                    "execution_trace": response.execution_trace,
-                    "route": response.route.model_dump(mode="json")
-                    if response.route is not None
-                    else None,
-                    "presentation_status": response.presentation_status,
-                    "tool_results": [
-                        item.model_dump(mode="json")
-                        for item in response.tool_results
-                    ],
+                    **self._response_payload(response),
                 },
             )
             return
@@ -524,42 +492,7 @@ class AgentRunOrchestrator:
             type=RunEventType.COMPLETED,
             payload={
                 "state": completed.state.value,
-                "map_session": response.map_session.model_dump(mode="json")
-                if response.map_session is not None
-                else None,
-                "operation": response.operation.model_dump(mode="json")
-                if response.operation is not None
-                else None,
-                "decision": response.decision.model_dump(mode="json")
-                if response.decision is not None
-                else None,
-                "memory_snapshot": response.memory_snapshot,
-                "context_usage": response.context_usage.model_dump(mode="json")
-                if response.context_usage is not None
-                else None,
-                "task_snapshot": response.task_snapshot.model_dump(mode="json")
-                if response.task_snapshot is not None
-                else None,
-                "failure_diagnostic": response.failure_diagnostic.model_dump(
-                    mode="json"
-                )
-                if response.failure_diagnostic is not None
-                else None,
-                "visualization_update": response.visualization_update.model_dump(
-                    mode="json"
-                )
-                    if response.visualization_update is not None
-                    else None,
-                "context_revision": response.context_revision,
-                "execution_trace": response.execution_trace,
-                "route": response.route.model_dump(mode="json")
-                if response.route is not None
-                else None,
-                "presentation_status": response.presentation_status,
-                "tool_results": [
-                    item.model_dump(mode="json")
-                    for item in response.tool_results
-                ],
+                **self._response_payload(response),
             },
         )
 
@@ -600,6 +533,7 @@ class AgentRunOrchestrator:
                 else None,
             },
         )
+
         await self._publish_trace(
             snapshot,
             AgentTraceEvent(
@@ -614,6 +548,15 @@ class AgentRunOrchestrator:
                 },
             ),
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _response_payload(response: ChatTurnResponse) -> dict[str, Any]:
+        """Return the canonical native response shape for run events."""
+
+        payload = response.model_dump(mode="json", exclude_none=True)
+        payload["content"] = response.assistant_message
+        return payload
 
     # -------------------------------------------------------------------------
     async def _publish_progress(
@@ -670,6 +613,20 @@ class AgentRunOrchestrator:
             return
 
     # -------------------------------------------------------------------------
+    def _latest_checkpoint(
+        self, run_id: str, run_version: int
+    ) -> dict[str, Any] | None:
+        repository = getattr(self.event_publisher, "event_repository", None)
+        loader = getattr(repository, "get_latest_checkpoint_state", None)
+        if not callable(loader):
+            return None
+        try:
+            value = loader(run_id, run_version=run_version)
+        except Exception:
+            return None
+        return value if isinstance(value, dict) else None
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _model_call_count(response: ChatTurnResponse) -> int:
         payload = response.tool_payload or {}
@@ -709,3 +666,11 @@ class AgentRunOrchestrator:
         if latest is not None and latest.state_delta_applied:
             return latest.content
         return snapshot.aggregated_request
+
+
+def _hash_json(value: dict[str, Any]) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode(
+            "utf-8"
+        )
+    ).hexdigest()

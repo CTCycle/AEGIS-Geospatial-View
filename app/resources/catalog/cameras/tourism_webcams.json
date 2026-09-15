@@ -47,5 +47,34 @@
   },
   "reliability": {"status": "disabled", "lastAudited": "2026-05-14", "knownLimitations": ["Template only until official source configuration is added."]},
   "cachePolicy": {"mode": "memory", "ttlSeconds": 300, "staleWhileRevalidateSeconds": 3600},
-  "normalization": {"geometryPath": "cameras[].location", "idPath": "cameras[].id", "timestampPath": "cameras[].last_update_time", "fieldMap": {}, "expectedGeometry": "Point"}
+  "normalization": {"geometryPath": "cameras[].location", "idPath": "cameras[].id", "timestampPath": "cameras[].last_update_time", "fieldMap": {}, "expectedGeometry": "Point"},
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "inspect",
+      "search"
+    ],
+    "supported_scope_kinds": [
+      "point",
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "source-defined",
+    "limitations": [
+      "Template only until official source configuration is added."
+    ],
+    "fallback_ids": []
+  }
 }

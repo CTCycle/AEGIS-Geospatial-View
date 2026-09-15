@@ -36,7 +36,9 @@ import {
   ChatRole,
   ChatTurnResponse,
   ContextUsage,
-  ConversationTaskSnapshot,
+  ConversationState,
+  AgentGoal,
+  CompletionContract,
   CapabilityDescriptor,
   CatalogResponse,
   RealtimeServerMessage,
@@ -70,7 +72,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   conversationId?: string;
   contextRevision?: number;
-  taskSnapshot?: ConversationTaskSnapshot;
+  conversationState?: ConversationState;
   activeRunId?: string;
   activeRunVersion?: number;
   streamState: RealtimeConnectionState = 'idle';
@@ -78,7 +80,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   progressLabel?: string;
   conversationNonce = 1;
   messages: ChatMessage[] = [];
-  lastDecision?: ChatTurnResponse['decision'];
+  lastRoute?: ChatTurnResponse['route'];
+  lastGoal?: AgentGoal | null;
+  completionContract?: CompletionContract | null;
   lastOperation?: ChatOperationResult | null;
   memorySnapshot: Record<string, unknown> = {};
   contextUsage?: ContextUsage;
@@ -370,7 +374,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.realtimeService.disconnect({ discardPending: true });
     this.conversationId = undefined;
     this.contextRevision = undefined;
-    this.taskSnapshot = undefined;
+    this.conversationState = undefined;
     this.activeRunId = undefined;
     this.activeRunVersion = undefined;
     this.lastHandledRunId = undefined;
@@ -382,7 +386,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.seenEventIds.clear();
     this.conversationNonce += 1;
     this.messages = [];
-    this.lastDecision = undefined;
+    this.lastRoute = undefined;
+    this.lastGoal = undefined;
+    this.completionContract = undefined;
     this.lastOperation = undefined;
     this.memorySnapshot = {};
     this.contextUsage = undefined;
@@ -472,7 +478,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
       this.realtimeService.disconnect({ discardPending: true });
       this.contextRevision = snapshot.context_revision;
-      this.taskSnapshot = snapshot.task_snapshot ?? undefined;
+      this.conversationState = snapshot.conversation_state;
       this.messages = snapshot.messages.map((message) => ({
         role: message.role,
         content: message.content,
@@ -481,7 +487,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       }));
       this.memorySnapshot = snapshot.memory_snapshot;
       this.contextUsage = undefined;
-      this.lastDecision = undefined;
+      this.lastRoute = undefined;
+      this.lastGoal = undefined;
+      this.completionContract = undefined;
       this.lastOperation = undefined;
       this.assistantDraft = '';
       this.progressStage = undefined;
@@ -575,7 +583,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.conversationId = undefined;
     this.conversationNonce += 1;
     this.contextRevision = undefined;
-    this.taskSnapshot = undefined;
+    this.conversationState = undefined;
     this.activeRunId = undefined;
     this.activeRunVersion = undefined;
     this.pendingRun = undefined;
@@ -585,7 +593,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.progressLabel = undefined;
     this.seenEventIds.clear();
     this.messages = [];
-    this.lastDecision = undefined;
+    this.lastRoute = undefined;
+    this.lastGoal = undefined;
+    this.completionContract = undefined;
     this.lastOperation = undefined;
     this.memorySnapshot = {};
     this.contextUsage = undefined;
@@ -1070,11 +1080,17 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (parsed.contextRevision !== undefined) {
       this.contextRevision = parsed.contextRevision;
     }
-    if (parsed.taskSnapshot !== undefined) {
-      this.taskSnapshot = parsed.taskSnapshot;
+    if (parsed.conversationState !== undefined) {
+      this.conversationState = parsed.conversationState ?? undefined;
     }
-    if (parsed.decision !== undefined) {
-      this.lastDecision = parsed.decision;
+    if (parsed.route !== undefined) {
+      this.lastRoute = parsed.route;
+    }
+    if (parsed.goal !== undefined) {
+      this.lastGoal = parsed.goal;
+    }
+    if (parsed.completionContract !== undefined) {
+      this.completionContract = parsed.completionContract;
     }
     if (parsed.mapSession) {
       if (this.pendingRenderContext) {
@@ -1132,8 +1148,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (requestNonce !== this.conversationNonce) {
       return;
     }
-    this.contextRevision = result.context_revision ?? this.contextRevision;
-    this.taskSnapshot = result.task_snapshot ?? this.taskSnapshot;
+    this.contextRevision = result.context_revision;
+    this.conversationState = result.conversation_state ?? this.conversationState;
     this.messages = [...this.messages, { role: 'assistant', content: result.assistant_message }];
 
     const operation = result.operation;
@@ -1141,7 +1157,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (mapSession) {
       this.handleMapSession(mapSession);
     }
-    this.lastDecision = result.decision;
+    this.lastRoute = result.route;
+    this.lastGoal = result.goal;
+    this.completionContract = result.completion_contract;
     this.lastOperation = operation;
     this.presentationStatus = result.presentation_status;
     this.memorySnapshot = result.memory_snapshot ?? {};

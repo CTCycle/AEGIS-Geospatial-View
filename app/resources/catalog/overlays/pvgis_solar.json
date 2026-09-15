@@ -116,5 +116,30 @@
     "timestampPath": null,
     "fieldMap": {},
     "expectedGeometry": "point"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "inspect"
+    ],
+    "supported_scope_kinds": [
+      "point",
+      "bbox"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Point",
+    "render_support": "metadata_only",
+    "coverage": "global-except-poles",
+    "limitations": [],
+    "fallback_ids": []
   }
 }

@@ -6,7 +6,7 @@ from server.services.geospatial.providers.base import ProviderAuthError
 from tests.conftest import run_async_in_thread
 from datetime import UTC, datetime
 
-from server.domain.agent.decision import PolicyDecision, ResolvedLocation
+from server.domain.agent.decision import ResolvedLocation
 from server.contracts.runs import AgentRunSnapshot, AgentRunState
 from server.contracts.chat import (
     ChatOperationResult,
@@ -20,7 +20,6 @@ from server.contracts.geospatial import (
 )
 from server.contracts.events import RunEventType
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
-from server.services.agent.orchestrator import AgentOrchestrator as ChatAgentOrchestrator
 
 ###############################################################################
 class _FakeAgentOrchestrator:
@@ -38,7 +37,7 @@ class _FakeAgentOrchestrator:
                 {
                     "request_id": self.response.request_id,
                     "conversation_id": self.response.conversation_id,
-                    "phase": "parser",
+                    "phase": "native_loop",
                     "context_usage": self.response.context_usage.model_dump(
                         mode="json"
                     ),
@@ -211,41 +210,11 @@ def _failed_response() -> ChatTurnResponse:
     return ChatTurnResponse(
         request_id="run_1",
         conversation_id="conv_1",
-        assistant_message="Parser unavailable.",
-        turn_contract={
-            "task_class": "general_question",
-            "user_text": "Map Rome",
-            "conversation_context": {
-                "recent_messages": [],
-                "memory_snapshot": {},
-            },
-            "normalized_action": {
-                "action_id": "ask",
-                "action_label": "Ask",
-                "requires_location": False,
-                "task_tags": [],
-                "action_tags": [],
-            },
-            "location_signals": [],
-            "temporal_signal": {"mode": "none"},
-            "ambiguities": ["parser_unavailable"],
-            "disallowed_patterns": [],
-            "parser_confidence": 0.0,
-        },
-        decision=PolicyDecision.model_validate(
-            {
-                "plan": {
-                    "state": "direct_response",
-                    "action_id": "ask",
-                    "mode": "direct_text",
-                },
-                "trace": {"steps": ["parser_failed"]},
-            }
-        ),
+        assistant_message="The configured agent provider is unavailable.",
         operation=ChatOperationResult(
             kind="error",
             status="failed",
-            message="Configured parser model is unavailable.",
+            message="Configured native agent model is unavailable.",
         ),
         context_usage=ContextUsageResponse(
             estimated_input_tokens=321,
@@ -303,7 +272,7 @@ def test_execute_run_marks_failed_operation_as_failed_run() -> None:
     assert repository.completed is False
     assert repository.failed == (
         "agent_operation_failed",
-        "Configured parser model is unavailable.",
+        "Configured native agent model is unavailable.",
     )
     event_types = [event["type"] for event in publisher.events]
     assert RunEventType.ERROR in event_types
@@ -312,7 +281,7 @@ def test_execute_run_marks_failed_operation_as_failed_run() -> None:
         event for event in publisher.events if event["type"] == RunEventType.ERROR
     )
     assert error_event["payload"]["context_usage"]["estimated_input_tokens"] == 321
-    assert error_event["payload"]["route"] is None
+    assert "route" not in error_event["payload"]
     assert error_event["payload"]["presentation_status"] == "not_requested"
     assert error_event["payload"]["tool_results"] == []
     context_event = next(
@@ -320,7 +289,7 @@ def test_execute_run_marks_failed_operation_as_failed_run() -> None:
         for event in publisher.events
         if event["type"] == RunEventType.CONTEXT_USAGE
     )
-    assert context_event["payload"]["phase"] == "parser"
+    assert context_event["payload"]["phase"] == "native_loop"
 
 ###############################################################################
 def test_execute_run_defers_pending_native_map_until_render_ack() -> None:
@@ -424,28 +393,12 @@ def test_geospatial_auth_failure_points_to_access_without_exposing_provider_text
     assert "secret-token" not in message
 
 ###############################################################################
-def test_unacknowledged_map_candidate_does_not_replace_committed_task_state():
-    candidate = {
-        "schema_version": 3,
-        "active_map_session": {"session_id": "candidate"},
-        "geospatial_state": {"geographic_scope": {"bbox": [10, 40, 11, 41]}},
-        "tasks": [{"id": "run_1"}],
-    }
-    committed = {
-        "schema_version": 3,
-        "active_map_session": {"session_id": "committed"},
-        "geospatial_state": {"geographic_scope": {"bbox": [12, 41, 13, 42]}},
-    }
+def test_native_response_payload_has_no_legacy_projections() -> None:
+    payload = AgentRunOrchestrator._response_payload(_pending_map_response())
 
-    persisted = ChatAgentOrchestrator._task_snapshot_for_persistence(
-        candidate,
-        committed,
-        defer_map_commit=True,
-        has_map_candidate=True,
-    )
-
-    assert persisted["active_map_session"] == committed["active_map_session"]
-    assert persisted["geospatial_state"] == committed["geospatial_state"]
-    assert persisted["tasks"] == candidate["tasks"]
+    assert "task_snapshot" not in payload
+    assert "turn_contract" not in payload
+    assert "decision" not in payload
+    assert payload["operation"]["kind"] == "map_session"
 
 

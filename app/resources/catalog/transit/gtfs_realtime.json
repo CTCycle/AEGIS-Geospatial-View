@@ -102,5 +102,35 @@
     "timestampPath": "header.timestamp",
     "fieldMap": {},
     "expectedGeometry": "Point"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "search",
+      "filter",
+      "inspect"
+    ],
+    "supported_scope_kinds": [
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "point, metadata",
+    "render_support": "vector",
+    "coverage": "agency-defined",
+    "limitations": [
+      "Agency feed URLs must be configured before live fetches.",
+      "Some feeds omit vehicle positions or require agency-specific credentials."
+    ],
+    "fallback_ids": []
   }
 }

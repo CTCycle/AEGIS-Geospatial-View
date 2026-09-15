@@ -514,7 +514,7 @@ export interface ConversationSnapshotResponse {
   title?: string | null;
   context_revision: number;
   messages: ChatMessage[];
-  task_snapshot?: ConversationTaskSnapshot | null;
+  conversation_state: ConversationState;
   memory_snapshot: Record<string, JsonValue>;
   map_session?: MapSession | null;
   active_run?: ActiveConversationRunSnapshot | null;
@@ -554,183 +554,75 @@ export interface ContextUsage {
   compaction_applied?: boolean;
 }
 
-export interface NormalizedAction {
-  action_id: string;
-  action_label: string;
-  task_tags: string[];
-  action_tags: string[];
-  requested_visualizations?: string[];
-  requires_location: boolean;
-}
-
-export type AgentAction =
-  | 'map_search'
-  | 'location_render'
-  | 'geospatial_data_retrieval'
-  | 'data_layer_query'
-  | 'overlay_control'
-  | 'dataset_display'
-  | 'visible_layer_interrogation'
-  | 'map_external_source_combination'
-  | 'chat_response'
-  | 'unknown';
-
-export interface AgentToolCall {
-  id?: string;
-  name: string;
-  arguments: Record<string, unknown>;
-}
-
-export interface AgentMapOperation {
-  type:
-    | 'set_viewport'
-    | 'load_overlay'
-    | 'toggle_overlay'
-    | 'display_dataset'
-    | 'highlight_layer'
-    | 'show_layer_summary';
-  payload: Record<string, unknown>;
-}
-
-export interface TemporalSignal {
+export interface AgentTemporalScope {
   mode: 'current' | 'historical' | 'forecast' | 'none';
-  raw_text?: string | null;
   reference_time_iso?: string | null;
+  start_time_iso?: string | null;
+  end_time_iso?: string | null;
+  granularity: string;
+  aggregation: string;
 }
 
-export interface LocationSignal {
-  signal_type:
-    | 'address'
-    | 'airport'
-    | 'city'
-    | 'country'
-    | 'coordinates'
-    | 'deictic'
-    | 'feature'
-    | 'landmark'
-    | 'poi'
-    | 'region'
-    | 'river'
-    | 'road'
-    | 'station'
-    | 'street';
-  raw_value: string;
-  normalized_value?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  confidence: number;
-  source: 'text' | 'memory' | 'model';
+export interface AgentSpatialScope {
+  kind: 'point' | 'bbox' | 'radius' | 'administrative_geometry' | 'feature_geometry' | 'viewport';
+  relationship: 'at' | 'in' | 'near' | 'around' | 'within_distance' | 'along' | 'visible_area' | 'here';
+  target_refs: string[];
+  distance_m?: number | null;
 }
 
-export interface TurnParseResult {
-  user_text: string;
-  task_class: 'map_search' | 'direct_query' | 'general_question' | 'unclear';
-  location_signals: LocationSignal[];
-  normalized_action: NormalizedAction;
-  temporal_signal: TemporalSignal;
-  ambiguities: string[];
-  parser_confidence: number;
-  relationship?: 'new_task' | 'follow_up' | 'correction' | 'clarification' | 'qa' | 'simple_chat' | 'failure_inquiry';
-  map_target?: string | null;
-  entity_target?: string | null;
-  requested_layers?: string[];
-  overlay_commands?: Array<{
-    action: 'add' | 'remove' | 'keep_only' | 'show' | 'hide' | 'update';
-    selector: {
-      instance_ids: string[];
-      capability_ids: string[];
-      concepts: string[];
-      labels: string[];
-      providers: string[];
-      overlay_types: string[];
-      rendering_modes: string[];
-      tags: string[];
-      visibility: 'any' | 'visible' | 'hidden';
-    };
-    scope: {
-      kind: 'global' | 'current_view' | 'location';
-      location?: Record<string, JsonValue> | null;
-      label?: string | null;
-    };
-    patch: { opacity?: number | null; time?: string | null; style?: string | null; format?: string | null };
-    state_reference: { collection_id: string; revision: number };
-  }>;
-  requested_basemap?: string | null;
-  requested_attributes?: string[];
-  required_data_sources?: string[];
-  required_tool_category?: string | null;
-  tools_needed?: boolean;
-  direct_response_sufficient?: boolean;
-  requires_reparse?: boolean;
-  capability_limitations?: string[];
-  expected_frontend_update?: string;
-  atomic_tasks?: Array<Record<string, JsonValue>>;
-  clarification_plan?: {
-    question: string;
-    reason: string;
-    blocking_fields: string[];
-    options: Array<{ option_id: string; label: string; description?: string | null }>;
-    preserve_valid_results: boolean;
-    apply_visualization_changes: boolean;
-  } | null;
-  provider_error?: Record<string, JsonValue> | null;
-  failure_category?: 'model_capability' | 'provider_api' | 'schema_definition' | 'response_parsing' | 'context_limit' | null;
+export interface AgentGoal {
+  goal: string;
+  task_mode: 'answer' | 'execute' | 'clarify';
+  presentation: 'text' | 'map' | 'both';
+  operation: string;
+  requires_location: boolean;
+  target_ids: string[];
+  temporal_scope: Record<string, JsonValue>;
+  spatial_scope: Array<Record<string, JsonValue>>;
+  filters: Record<string, JsonValue>;
 }
 
-export interface ClarificationRequest {
-  question: string;
-  reason: string;
-  missing_fields: string[];
+export interface CompletionContract {
+  operation: string;
+  requirements: string[];
+  location_required: boolean;
+  evidence_required: boolean;
+  map_preparation_required: boolean;
+  temporal_scope_required: boolean;
+  spatial_scope_required: boolean;
 }
 
-export interface PolicyDecision {
-  plan: {
-    state: 'clarify' | 'direct_tool' | 'map_search' | 'reject';
-    mode?: 'direct_text' | 'map' | null;
-    action_id: string;
-    basemap_id?: string | null;
-    overlay_ids: string[];
-    tool_id?: string | null;
-  };
-  clarification?: ClarificationRequest | null;
-  resolved_location?: ResolvedLocation | null;
-  trace?: { steps: string[] };
+export interface ConversationDirective {
+  directive: string;
+  value?: JsonValue;
+  source?: string;
+  active?: boolean;
+  created_at_turn?: number;
 }
 
-export interface ToolPayload {
-  tool_id?: string;
-  plan_state?: string;
-  location?: {
-    label: string;
-    latitude: number;
-    longitude: number;
-  };
-  result?: Record<string, JsonValue>;
-  error?: string;
+export interface ConversationState {
+  schema_version: 1;
+  conversation_id: string;
+  revision: number;
+  active_directives: Array<Record<string, JsonValue>>;
+  summary?: Record<string, JsonValue> | null;
+  goal?: AgentGoal | null;
+  route?: NativeCapabilityRoute | null;
+  constraints: Record<string, JsonValue>;
+  resolved_locations: Record<string, ResolvedLocation>;
+  evidence_refs: string[];
+  committed_map_session?: MapSession | null;
+  unresolved_questions: string[];
 }
 
 export interface ChatOperationResult {
-  kind: 'map_session' | 'direct_answer' | 'capability_catalog' | 'clarification' | 'rejection' | 'error' | 'failure_diagnostic';
+  kind: 'map_session' | 'direct_answer' | 'capability_catalog' | 'clarification' | 'rejection' | 'error';
   status: 'success' | 'partial' | 'pending' | 'failed';
   message: string;
   warnings?: string[];
   direct_result?: Record<string, JsonValue> | null;
   provider_error?: Record<string, JsonValue> | null;
-  failure_category?: 'model_capability' | 'provider_api' | 'schema_definition' | 'response_parsing' | 'context_limit' | null;
-}
-
-export interface TaskFailureDetail {
-  stage: string;
-  component?: string | null;
-  tool_name?: string | null;
-  sanitized_error: string;
-  missing_input: string[];
-  unsupported_capability?: string | null;
-  partial_results_available: boolean;
-  recovery_suggestion?: string | null;
-  user_explanation: string;
-  provider_error?: ChatOperationResult['provider_error'];
-  failure_category?: ChatOperationResult['failure_category'];
+  failure_category?: 'model_capability' | 'provider_api' | 'provider_failure' | 'schema_definition' | 'response_parsing' | 'context_limit' | 'insufficient_evidence' | 'model_budget_exhausted' | 'tool_budget_exhausted' | 'transition_budget_exhausted' | 'run_deadline_exhausted' | 'no_progress' | 'cancelled' | 'superseded' | null;
 }
 
 export type RealtimeConnectionState =
@@ -748,70 +640,6 @@ export interface RealtimeServerMessage {
   correlation_id?: string | null;
   conversation_id: string;
   payload: JsonObject;
-}
-
-export interface ToolPlanStep {
-  step_id: string;
-  tool_name: string;
-  capability_id?: string | null;
-  reason: string;
-  arguments: Record<string, JsonValue>;
-  depends_on: string[];
-  parallel_group?: string | null;
-  timeout_seconds: number;
-  required: boolean;
-}
-
-export interface ToolPlan {
-  tool_group: string;
-  candidate_tools: string[];
-  selected_tools: string[];
-  steps: ToolPlanStep[];
-  frontend_derivation: string;
-  partial_failure_policy: string;
-}
-
-export interface AgentTask {
-  id: string;
-  description: string;
-  kind: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'skipped' | 'superseded';
-  depends_on: string[];
-  required: boolean;
-  input_refs: string[];
-  output_refs: string[];
-  attempt_count: number;
-  last_failure?: Record<string, JsonValue> | null;
-  scope_revision: number;
-}
-
-export interface ConversationTaskSnapshot {
-  schema_version: 3;
-  conversation_key: string;
-  current_task_id?: string | null;
-  goal?: { id: string; text: string; status: string; revision: number } | null;
-  tasks: AgentTask[];
-  geospatial_state: Record<string, JsonValue>;
-  evidence_refs: string[];
-  active_map_session?: MapSession | null;
-  assumptions: string[];
-  unresolved_questions: string[];
-  conversation_summary?: Record<string, JsonValue> | null;
-}
-
-export interface VisualizationUpdate {
-  basemap_replacement?: string | null;
-  add_layer_ids: string[];
-  remove_layer_ids: string[];
-  replace_layer_ids: Record<string, string>;
-  collection_id?: string;
-  collection_revision?: number | null;
-  added_instance_ids?: string[];
-  removed_instance_ids?: string[];
-  updated_instance_ids?: string[];
-  unmatched_selectors?: string[];
-  ambiguous_selectors?: string[];
-  clarification?: string | null;
 }
 
 export interface NativeToolResultSummary {
@@ -833,39 +661,39 @@ export interface NativeCapabilityRoute {
   capability_queries: string[];
   explicit_capability_ids: string[];
   clarification_question?: string | null;
+  operation?: string | null;
+  target_refs: string[];
+  temporal_scope: AgentTemporalScope;
+  spatial_scope?: AgentSpatialScope | null;
+  filters: Record<string, JsonValue>;
 }
 
 export interface ChatTurnResponse {
   conversation_id: string;
   request_id: string;
   assistant_message: string;
-  turn_contract?: TurnParseResult | null;
-  decision?: PolicyDecision | null;
-  operation?: ChatOperationResult | null;
-  tool_payload?: ToolPayload | null;
+  operation: ChatOperationResult;
+  tool_payload?: Record<string, unknown> | null;
   map_session?: MapSession | null;
   memory_snapshot: Record<string, JsonValue>;
   context_usage?: ContextUsage | null;
-  task_snapshot?: ConversationTaskSnapshot | null;
-  tool_plan?: ToolPlan | null;
-  failure_diagnostic?: TaskFailureDetail | null;
-  visualization_update?: VisualizationUpdate | null;
-  context_revision?: number | null;
-  canonical_request?: Record<string, JsonValue> | null;
+  context_revision: number;
   execution_trace?: Record<string, JsonValue> | null;
   route?: NativeCapabilityRoute | null;
-  presentation_status?: PresentationStatus;
-  tool_results?: NativeToolResultSummary[];
+  goal?: AgentGoal | null;
+  completion_contract?: CompletionContract | null;
+  presentation_status: PresentationStatus;
+  tool_results: NativeToolResultSummary[];
+  conversation_state?: ConversationState | null;
 }
 
 export type ChatStreamEventType =
   | 'status'
   | 'context_usage'
-  | 'parsed'
-  | 'policy'
   | 'tool_call_started'
   | 'tool_call_completed'
   | 'map_session_created'
+  | 'stage'
   | 'final'
   | 'error';
 

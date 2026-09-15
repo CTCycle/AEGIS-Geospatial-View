@@ -31,14 +31,14 @@ def _require_provider_or_skip(response) -> None:  # noqa: ANN001
         pytest.skip(f"Providers unavailable for this check ({response.status}).")
 
 ###############################################################################
-def _require_agent_extraction_or_skip(body: dict) -> None:
+def _require_agent_or_skip(body: dict) -> None:
     assistant_text = str(body.get("assistant_message") or "").lower()
     if (
         "configured agent model" in assistant_text
-        and "structured extraction" in assistant_text
+        and ("tool" in assistant_text or "agent" in assistant_text)
     ):
         pytest.skip(
-            "Configured agent model cannot perform structured extraction for this check."
+            "Configured agent model cannot run the native agent for this check."
         )
 
 ###############################################################################
@@ -115,8 +115,9 @@ def test_chat_turn_stream_event_order_and_contract_parity(
     turn_body = turn_response.json()
     assert "assistant_message" in turn_body
     assert turn_body["conversation_id"] == conversation_id
-    assert "turn_contract" in turn_body
-    assert "decision" in turn_body
+    assert "operation" in turn_body
+    assert "route" in turn_body
+    assert "completion_contract" in turn_body
 
     prefixed_turn = _post(api_context, "/api/chat/turn", turn_payload)
     _require_provider_or_skip(prefixed_turn)
@@ -140,11 +141,6 @@ def test_chat_turn_stream_event_order_and_contract_parity(
     assert event_names[0] == "status"
     assert event_names[-1] in {"final", "error"}
     if event_names[-1] == "final":
-        assert "parsed" in event_names
-        # Direct-answer/map-coordinate requests may complete before the
-        # planner stage; planned requests include the policy event.
-        if "policy" in event_names:
-            assert event_names.index("parsed") < event_names.index("policy")
         if "tool_call_started" in event_names:
             assert "tool_call_completed" in event_names
             assert event_names.index("tool_call_started") < event_names.index(
@@ -180,7 +176,7 @@ def test_chat_turn_coordinate_lookup_and_follow_up(
     _require_provider_or_skip(geocode_response)
     assert geocode_response.ok
     geocode_body = geocode_response.json()
-    _require_agent_extraction_or_skip(geocode_body)
+    _require_agent_or_skip(geocode_body)
     assert geocode_body.get("map_session") is None
     assistant_text = str(geocode_body.get("assistant_message") or "").lower()
     assert (
@@ -201,8 +197,8 @@ def test_chat_turn_coordinate_lookup_and_follow_up(
     _require_provider_or_skip(unsupported)
     assert unsupported.ok
     unsupported_body = unsupported.json()
-    _require_agent_extraction_or_skip(unsupported_body)
-    if unsupported_body.get("decision", {}).get("plan", {}).get("state") == "clarify":
+    _require_agent_or_skip(unsupported_body)
+    if unsupported_body.get("operation", {}).get("kind") == "clarification":
         return
     assistant = str(unsupported_body.get("assistant_message") or "").lower()
     assert "weather" in assistant or "forecast" in assistant or "clarify" in assistant

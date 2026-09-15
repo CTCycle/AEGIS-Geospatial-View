@@ -1,4 +1,4 @@
-"""Typed native-v2 tool registrations used by the composed runtime."""
+"""Typed native tool registrations used by the composed runtime."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentPhase, AgentState
+from server.domain.agent.capability_route import AgentPhase, AgentRunState
 from server.domain.agent.map_plan import MapPlan
 from server.domain.agent.tool_result import (
     ToolExecutionError,
@@ -44,7 +44,7 @@ from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.agent.location_resolver import LocationResolver
 from server.domain.agent.decision import ResolvedLocation
-from server.domain.agent.interpretation import normalize_target_key
+from server.common.identifiers import normalize_target_key
 
 
 _MODEL_PHASE = frozenset({AgentPhase.BUILD_TOOL_CONTEXT})
@@ -55,7 +55,7 @@ _MAP = frozenset({CapabilityDomain.MAP_RENDERING, CapabilityDomain.MAP_STATE})
 
 
 ###############################################################################
-def register_native_v2_tools(
+def register_agent_tools(
     registry: ToolRegistry,
     *,
     capability_registry: CapabilityRegistry,
@@ -65,7 +65,7 @@ def register_native_v2_tools(
     location_resolver: LocationResolver,
     geospatial_api_service: Any,
 ) -> None:
-    """Register the permanent model-facing native-v2 tool surface once."""
+    """Register the permanent model-facing native tool surface once."""
 
     capability_execution = CapabilityExecutionService(
         capability_registry=capability_registry,
@@ -248,7 +248,7 @@ def _registration(
 
 ###############################################################################
 def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
-    async def execute(request: ExecuteCapabilityInput, state: AgentState) -> ToolResult:
+    async def execute(request: ExecuteCapabilityInput, state: AgentRunState) -> ToolResult:
         bound_request = _bind_execute_request(request, state)
         location = _location_for_request(bound_request, state)
         return await service.execute_capability(
@@ -264,7 +264,7 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
 
 
 def _bind_execute_request(
-    request: ExecuteCapabilityInput, state: AgentState
+    request: ExecuteCapabilityInput, state: AgentRunState
 ) -> ExecuteCapabilityInput:
     """Bind model intent to server-owned route, scope, and location values.
 
@@ -373,7 +373,7 @@ def _bbox_for_radius(location: ResolvedLocation, radius_m: float) -> list[float]
 
 ###############################################################################
 def _location_for_request(
-    request: ExecuteCapabilityInput, state: AgentState
+    request: ExecuteCapabilityInput, state: AgentRunState
 ) -> ResolvedLocation | None:
     requested = normalize_target_key(str(request.location_ref or ""))
     goal_targets = {
@@ -399,7 +399,7 @@ def _location_for_request(
 
 ###############################################################################
 def _apply_map_plan_handler(service: MapPlanService) -> Any:
-    async def apply(request: ApplyMapPlanInput, state: AgentState) -> ToolResult:
+    async def apply(request: ApplyMapPlanInput, state: AgentRunState) -> ToolResult:
         plan = MapPlan.model_validate(request.model_dump(mode="python"))
         return await service.apply(
             plan,
@@ -414,7 +414,7 @@ def _apply_map_plan_handler(service: MapPlanService) -> Any:
 
 
 ###############################################################################
-async def _route_handler(_request: RouteRequestInput, _state: AgentState) -> ToolResult:
+async def _route_handler(_request: RouteRequestInput, _state: AgentRunState) -> ToolResult:
     return ToolResult(
         call_id="handler-call",
         tool_name="route_request",
@@ -434,13 +434,13 @@ async def _route_handler(_request: RouteRequestInput, _state: AgentState) -> Too
 ###############################################################################
 def _normalize_result(value: Any, call_id: str) -> ToolResult:
     if not isinstance(value, ToolResult):
-        raise TypeError("Native-v2 handlers must return ToolResult.")
+        raise TypeError("Native handlers must return ToolResult.")
     return value.model_copy(update={"call_id": call_id})
 
 
 ###############################################################################
 def _capability_semantic_validator(
-    request: ExecuteCapabilityInput, state: AgentState
+    request: ExecuteCapabilityInput, state: AgentRunState
 ) -> list[str]:
     if state.capability_ids and request.capability_id not in state.capability_ids:
         return ["capability_id is outside the validated route shortlist."]
@@ -450,7 +450,7 @@ def _capability_semantic_validator(
         if normalize_target_key(str(item))
     }
     requested_target = normalize_target_key(str(request.location_ref or ""))
-    if goal_targets and requested_target not in goal_targets:
+    if requested_target and goal_targets and requested_target not in goal_targets:
         return [
             "location_ref must match an exact target in the validated goal; "
             "another geography will not be substituted."
@@ -471,7 +471,7 @@ def _capability_semantic_validator(
 
 ###############################################################################
 def _evidence_semantic_validator(
-    request: Any, state: AgentState
+    request: Any, state: AgentRunState
 ) -> list[str]:
     refs = list(getattr(request, "evidence_ref", None) and [request.evidence_ref] or [])
     refs.extend(getattr(request, "evidence_refs", []) or [])
@@ -481,7 +481,7 @@ def _evidence_semantic_validator(
 
 ###############################################################################
 def _provider_layer_semantic_validator(
-    request: ProviderLayerDiscoveryInput, state: AgentState
+    request: ProviderLayerDiscoveryInput, state: AgentRunState
 ) -> list[str]:
     allowed = state.policy_constraints.get("allowed_provider_ids")
     if isinstance(allowed, list) and allowed:
@@ -494,7 +494,7 @@ def _provider_layer_semantic_validator(
 
 ###############################################################################
 def _describe_semantic_validator(
-    request: DescribeCapabilityInput, state: AgentState
+    request: DescribeCapabilityInput, state: AgentRunState
 ) -> list[str]:
     if not state.capability_ids:
         return ["capability_id must be selected by the validated route first."]
@@ -503,4 +503,4 @@ def _describe_semantic_validator(
     return []
 
 
-__all__ = ["register_native_v2_tools"]
+__all__ = ["register_agent_tools"]

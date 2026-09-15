@@ -6,6 +6,7 @@ import {
 import {
   ApiRequestError,
   buildApiError,
+  executeApiRequest,
   fetchConversationSnapshot,
   fetchGeospatialCameras,
   fetchGeospatialLayerFeatures,
@@ -58,6 +59,37 @@ const catalogEntry = (overrides: Record<string, unknown> = {}): Record<string, u
   },
   metadata: {},
   ...overrides,
+});
+
+const nativeRoute = {
+  primary_domain: 'data_retrieval',
+  secondary_domains: [],
+  task_mode: 'execute',
+  presentation: 'text',
+  requires_location: false,
+  capability_queries: ['evidence'],
+  explicit_capability_ids: [],
+  clarification_question: null,
+  operation: 'retrieve',
+  target_refs: [],
+  temporal_scope: { mode: 'none', granularity: 'none', aggregation: 'none' },
+  spatial_scope: null,
+  filters: {},
+};
+
+const nativeConversationState = (conversationId: string) => ({
+  schema_version: 1,
+  conversation_id: conversationId,
+  revision: 1,
+  active_directives: [],
+  summary: null,
+  goal: null,
+  route: null,
+  constraints: {},
+  resolved_locations: {},
+  evidence_refs: [],
+  committed_map_session: null,
+  unresolved_questions: [],
 });
 
 describe('core/api', () => {
@@ -159,24 +191,6 @@ describe('core/api', () => {
       conversation_id: 'conv-abc',
       request_id: 'chat-abc',
       assistant_message: 'done',
-      turn_contract: {
-        user_text: 'show weather',
-        task_class: 'direct_query',
-        location_signals: [],
-        normalized_action: {
-          action_id: 'weather',
-          action_label: 'Weather',
-          task_tags: [],
-          action_tags: [],
-          requires_location: false,
-        },
-        temporal_signal: { mode: 'none' },
-        ambiguities: [],
-        parser_confidence: 0.9,
-      },
-      decision: {
-        plan: { state: 'direct_tool', mode: 'direct_text', action_id: 'weather', overlay_ids: [] },
-      },
       memory_snapshot: {},
       operation: {
         kind: 'direct_answer',
@@ -193,16 +207,8 @@ describe('core/api', () => {
         model: 'llama3.2',
         usage_source: 'provider_reported',
       },
-      route: {
-        primary_domain: 'weather',
-        secondary_domains: [],
-        task_mode: 'answer',
-        presentation: 'text',
-        requires_location: false,
-        capability_queries: ['weather'],
-        explicit_capability_ids: [],
-        clarification_question: null,
-      },
+      context_revision: 1,
+      route: { ...nativeRoute, primary_domain: 'weather', capability_queries: ['weather'] },
       presentation_status: 'prepared_unverified',
       tool_results: [{
         call_id: 'call-1',
@@ -228,13 +234,11 @@ describe('core/api', () => {
     expect(executionTrace?.phases).toEqual(['route_request', 'execute_tool']);
   });
 
-  it('rejects malformed native-v2 presentation metadata', () => {
+  it('rejects malformed native presentation metadata', () => {
     expect(() => parseChatTurnResponse({
       conversation_id: 'conv-abc',
       request_id: 'chat-abc',
       assistant_message: 'done',
-      turn_contract: {},
-      decision: {},
       memory_snapshot: {},
       presentation_status: 'pending',
     })).toThrowError(/Invalid chat turn API response/);
@@ -315,7 +319,7 @@ describe('core/api', () => {
         { role: 'assistant', content: 'Done', created_at: '2026-08-31T10:00:01Z' },
       ],
       memory_snapshot: { location_slots: [] },
-      task_snapshot: null,
+      conversation_state: nativeConversationState('conv-abc'),
       map_session: null,
       active_run: {
         run_id: 'run-1',
@@ -342,15 +346,7 @@ describe('core/api', () => {
       context_revision: 1,
       messages: [],
       memory_snapshot: {},
-      task_snapshot: {
-        schema_version: 2,
-        conversation_key: 'conv-abc',
-        tasks: [],
-        geospatial_state: {},
-        evidence_refs: [],
-        assumptions: [],
-        unresolved_questions: [],
-      },
+      conversation_state: { schema_version: 2 },
     })).toThrow();
   });
 
@@ -362,7 +358,7 @@ describe('core/api', () => {
         context_revision: 0,
         messages: [],
         memory_snapshot: {},
-        task_snapshot: null,
+        conversation_state: nativeConversationState('conv/abc'),
         map_session: null,
         active_run: null,
       }), {
@@ -393,35 +389,25 @@ describe('core/api', () => {
     });
   });
 
-  it('accepts native-v2 responses without legacy parser and policy projections', () => {
+  it('accepts canonical native responses without parser or policy projections', () => {
     const parsed = parseChatTurnResponse({
       conversation_id: 'conv-native',
       request_id: 'chat-native',
       assistant_message: 'The evidence is ready.',
       memory_snapshot: {},
+      context_revision: 0,
       operation: {
         kind: 'direct_answer',
         status: 'success',
         message: 'The evidence is ready.',
         warnings: [],
       },
-      route: {
-        primary_domain: 'data_retrieval',
-        secondary_domains: [],
-        task_mode: 'execute',
-        presentation: 'text',
-        requires_location: false,
-        capability_queries: ['evidence'],
-        explicit_capability_ids: [],
-        clarification_question: null,
-      },
+      route: nativeRoute,
       presentation_status: 'not_requested',
       tool_results: [],
       execution_trace: { stopped_reason: 'goal_satisfied' },
     });
 
-    expect(parsed.turn_contract).toBeUndefined();
-    expect(parsed.decision).toBeUndefined();
     expect(parsed.route?.task_mode).toBe('execute');
   });
 
@@ -437,16 +423,33 @@ describe('core/api', () => {
     expect(err.status).toBe(400);
   });
 
+  it('aborts a request at the endpoint timeout boundary', async () => {
+    const fetchSpy = jasmine.createSpy('fetch').and.callFake(
+      (_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        }, { once: true });
+      }),
+    );
+    (window.fetch as unknown) = fetchSpy;
+
+    await expectAsync(executeApiRequest('/api/chat/turn', { method: 'POST' }, 1))
+      .toBeRejectedWithError(ApiRequestError, 'Request timed out before completion.');
+  });
+
   it('base URL route construction uses API_BASE_URL', async () => {
     const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
       new Response(JSON.stringify({
         request_id: 'chat-1',
         conversation_id: 'conv-1',
         assistant_message: 'ok',
-        turn_contract: {},
-        decision: {},
         operation: { kind: 'direct_answer', status: 'success', message: 'ok' },
         memory_snapshot: {},
+        context_revision: 0,
+        presentation_status: 'not_requested',
+        tool_results: [],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },

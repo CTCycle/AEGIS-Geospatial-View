@@ -16,7 +16,7 @@ def test_ecosystem_inventory_covers_catalog_runtime_and_native_tools() -> None:
         "manifests": 86,
         "providers": 38,
         "direct_tools": 4,
-        "llm_native_tools": 8,
+        "llm_native_tools": 9,
         "runtime_profiles": 68,
     }
     providers = {item["id"]: item for item in report["providers"]}
@@ -27,6 +27,6 @@ def test_ecosystem_inventory_covers_catalog_runtime_and_native_tools() -> None:
     )
 
     tool_ids = {item["id"] for item in report["tools"]}
-    assert "prepare_geospatial_map" in tool_ids
+    assert "apply_map_plan" in tool_ids
     assert "execute_geospatial_capability" in tool_ids
     assert report["replacements"][0]["new"] == ["mobility_database_feeds"]

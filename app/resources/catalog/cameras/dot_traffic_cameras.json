@@ -66,5 +66,34 @@
     "timestampPath": "cameras[].last_update_time",
     "fieldMap": {},
     "expectedGeometry": "Point"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "inspect",
+      "search"
+    ],
+    "supported_scope_kinds": [
+      "point",
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "jurisdiction-defined",
+    "limitations": [
+      "Template only until a jurisdiction-specific official feed is configured."
+    ],
+    "fallback_ids": []
   }
 }

@@ -52,6 +52,28 @@ import { ApiRequestError } from './api-errors';
 
 export { ApiContractError, ApiRequestError } from './api-errors';
 
+const API_REQUEST_TIMEOUTS = {
+  metadata: 30_000,
+  ordinary: 60_000,
+  long_operation: 180_000,
+} as const;
+
+const requestTimeoutMs = (url: string, init: RequestInit): number => {
+  const normalizedUrl = url.toLowerCase();
+  if (
+    normalizedUrl.includes('/chat/turn')
+    || normalizedUrl.includes('/chat/structured-probe')
+    || normalizedUrl.includes('/ollama/pull')
+    || normalizedUrl.includes('/geospatial/layers/') && normalizedUrl.includes('/features')
+  ) {
+    return API_REQUEST_TIMEOUTS.long_operation;
+  }
+  if (init.method?.toUpperCase() === 'GET') {
+    return API_REQUEST_TIMEOUTS.metadata;
+  }
+  return API_REQUEST_TIMEOUTS.ordinary;
+};
+
 const buildQuerySuffix = (params: Record<string, string | number | boolean | undefined>): string => {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -64,15 +86,38 @@ const buildQuerySuffix = (params: Record<string, string | number | boolean | und
   return serialized ? `?${serialized}` : '';
 };
 
-export const executeApiRequest = async (url: string, init: RequestInit): Promise<unknown> => {
+export const executeApiRequest = async (
+  url: string,
+  init: RequestInit,
+  timeoutMs = requestTimeoutMs(url, init),
+): Promise<unknown> => {
+  const controller = new AbortController();
+  const callerSignal = init.signal;
+  let timedOut = false;
+  const forwardAbort = (): void => controller.abort();
+  if (callerSignal?.aborted) {
+    controller.abort();
+  } else {
+    callerSignal?.addEventListener('abort', forwardAbort, { once: true });
+  }
+  const timeoutHandle = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, Math.max(1, timeoutMs));
+
   let response: Response;
   try {
-    response = await fetch(url, init);
+    response = await fetch(url, { ...init, signal: controller.signal });
   } catch (error: unknown) {
     const message = (error as { name?: string })?.name === 'AbortError'
-      ? 'Request interrupted before completion.'
+      ? timedOut
+        ? 'Request timed out before completion.'
+        : 'Request interrupted before completion.'
       : 'Network request failed.';
     throw new ApiRequestError(message, { detail: error, raw: error });
+  } finally {
+    clearTimeout(timeoutHandle);
+    callerSignal?.removeEventListener('abort', forwardAbort);
   }
   if (!response.ok) {
     throw await buildApiError(response);

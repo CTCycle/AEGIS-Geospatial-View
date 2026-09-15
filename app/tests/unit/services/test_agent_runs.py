@@ -9,20 +9,22 @@ import sqlalchemy
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from server.contracts.runs import AgentRunCreateRequest
+from server.contracts.runs import AgentRunCreateRequest, AgentRunState
 from server.contracts.events import RunEventCreate, RunEventType, RunEventVisibility
+from server.domain.agent.capability_route import AgentPhase, AgentRunState as NativeRunState
+from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
 from server.domain.steering import SteeringMessageRequest
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
 from server.repositories.schemas.models import AgentRunRecord, Base, ConversationRecord
+from server.domain.agent.conversation import ConversationState
 from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.exceptions import RunConflictError
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.steering import RunSteeringService
-from server.services.agent.conversation_state import ConversationTaskStateService
 
 ###############################################################################
 class _InMemoryBackend:
@@ -136,6 +138,87 @@ def test_event_repository_replay_orders_and_filters_visibility(
     assert [event.event_id for event in replay] == [second.event_id]
     assert all(event.visibility == RunEventVisibility.USER for event in replay)
 
+
+def test_event_repository_loads_latest_native_checkpoint_for_run_version(
+    run_repositories,
+) -> None:
+    repo = run_repositories["events"]
+    with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
+        session.add(ConversationRecord(id="conv_checkpoint", title="Checkpoints"))
+        session.add(
+            AgentRunRecord(
+                id="run_checkpoint",
+                conversation_id="conv_checkpoint",
+                original_request="find hospitals",
+                aggregated_request="find hospitals",
+                active_slot=1,
+            )
+        )
+        session.commit()
+
+    state = NativeRunState(
+        request_id="request_checkpoint",
+        conversation_id="conv_checkpoint",
+        phase=AgentPhase.MODEL_STEP,
+        user_message="find hospitals",
+    ).checkpoint()
+    first = AgentCheckpoint(
+        run_id="run_checkpoint",
+        conversation_id="conv_checkpoint",
+        run_version=1,
+        conversation_state={},
+        run_state=state,
+        state_hash="first",
+    )
+    second_state = dict(state)
+    second_state["request_id"] = "request_checkpoint_2"
+    second = first.model_copy(
+        update={"run_state": second_state, "state_hash": "second"}
+    )
+    repo.append_event(
+        RunEventCreate(
+            conversation_id="conv_checkpoint",
+            run_id="run_checkpoint",
+            run_version=1,
+            type=RunEventType.CHECKPOINT,
+            visibility=RunEventVisibility.INTERNAL,
+            payload=AgentTraceEvent(
+                kind="checkpoint",
+                run_id="run_checkpoint",
+                run_version=1,
+                sequence=1,
+                payload=first.model_dump(mode="json"),
+            ).model_dump(mode="json"),
+        )
+    )
+    repo.append_event(
+        RunEventCreate(
+            conversation_id="conv_checkpoint",
+            run_id="run_checkpoint",
+            run_version=1,
+            type=RunEventType.CHECKPOINT,
+            visibility=RunEventVisibility.INTERNAL,
+            payload=AgentTraceEvent(
+                kind="checkpoint",
+                run_id="run_checkpoint",
+                run_version=1,
+                sequence=2,
+                payload=second.model_dump(mode="json"),
+            ).model_dump(mode="json"),
+        )
+    )
+
+    loaded = repo.get_latest_checkpoint_state(
+        "run_checkpoint", run_version=1
+    )
+
+    assert loaded is not None
+    assert loaded["request_id"] == "request_checkpoint_2"
+    assert (
+        repo.get_latest_checkpoint_state("run_checkpoint", run_version=2)
+        is None
+    )
+
 ###############################################################################
 def test_event_repository_rejects_run_and_conversation_mismatch(
     run_repositories,
@@ -188,6 +271,30 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
         )
     assert first.state == "pending"
 
+
+@pytest.mark.asyncio
+async def test_lifecycle_resumes_persisted_active_native_run(run_repositories) -> None:
+    lifecycle, _, _, fake_orchestrator = _services(run_repositories)
+    conversation = lifecycle.create_conversation(title="Resume")
+    with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
+        session.add(
+            AgentRunRecord(
+                id="run_restart",
+                conversation_id=conversation.conversation_id,
+                original_request="Find hospitals",
+                aggregated_request="Find hospitals",
+                state=AgentRunState.RUNNING.value,
+                active_slot=1,
+            )
+        )
+        session.commit()
+
+    assert lifecycle.resume_active_runs() == 1
+    await asyncio.sleep(0)
+    await lifecycle.shutdown()
+
+    assert fake_orchestrator.started == ["run_restart"]
+
 ###############################################################################
 def test_duplicate_run_start_is_idempotent_while_active(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
@@ -218,22 +325,33 @@ def test_conversation_context_state_survives_repository_restart(
     conversation = run_repositories["conversations"].create_conversation("Persistent")
     conversations = run_repositories["conversations"]
     initial = conversations.read_state(conversation.id)
+    state = ConversationState(
+        conversation_id=conversation.id,
+        active_directives=[{"directive_id": "dir_1", "status": "active"}],
+        constraints={"source": "test"},
+        resolved_locations={
+            "active_location": {
+                "label": "Rome",
+                "latitude": 41.9,
+                "longitude": 12.5,
+            }
+        },
+    )
     revision = conversations.write_state(
         conversation.id,
         expected_revision=initial["context_revision"],
-        active_instructions=[{"directive_id": "dir_1", "status": "active"}],
-        task_snapshot={"conversation_key": conversation.id, "tasks": []},
-        memory_snapshot={"active_location": {"label": "Rome"}},
+        conversation_state=state.model_dump(mode="json"),
     )
     hydrated = conversations.read_state(conversation.id)
     assert hydrated["context_revision"] == revision
-    assert hydrated["active_instructions"][0]["directive_id"] == "dir_1"
-    assert hydrated["memory_snapshot"]["active_location"]["label"] == "Rome"
+    assert hydrated["conversation_state"]["active_directives"][0]["directive_id"] == "dir_1"
+    hydrated_state = ConversationState.model_validate(hydrated["conversation_state"])
+    assert hydrated_state.memory_projection()["active_location"]["label"] == "Rome"
     with pytest.raises(ValueError, match="revision conflict"):
         conversations.write_state(
             conversation.id,
             expected_revision=initial["context_revision"],
-            task_snapshot={"conversation_key": conversation.id, "tasks": []},
+            conversation_state=state.model_dump(mode="json"),
         )
 
 ###############################################################################
@@ -285,39 +403,15 @@ def test_safe_steering_persists_a_v2_state_delta(run_repositories) -> None:
     )
     conversations = run_repositories["conversations"]
     initial = conversations.read_state(conversation.conversation_id)
+    state = ConversationState(
+        conversation_id=conversation.conversation_id,
+        evidence_refs=["weather-layer"],
+        constraints={"geographic_scope": {"radius_m": 10_000}},
+    )
     conversations.write_state(
         conversation.conversation_id,
         expected_revision=initial["context_revision"],
-        task_snapshot={
-            "schema_version": 3,
-            "conversation_key": conversation.conversation_id,
-            "current_task_id": "task-1",
-            "goal": {"id": "task-1", "text": "Find Zurich"},
-            "tasks": [
-                {
-                    "id": "task-1",
-                    "description": "Find Zurich and show weather",
-                    "kind": "weather",
-                    "status": "completed",
-                    "depends_on": [],
-                    "required": True,
-                    "input_refs": [],
-                    "output_refs": ["weather-layer"],
-                    "attempt_count": 1,
-                    "last_failure": None,
-                    "scope_revision": 0,
-                }
-            ],
-            "geospatial_state": {
-                "layer_refs": ["weather-layer"],
-                "renderable_refs": ["weather-layer"],
-            },
-            "evidence_refs": ["weather-layer"],
-            "active_map_session": None,
-            "assumptions": [],
-            "unresolved_questions": [],
-            "conversation_summary": None,
-        },
+        conversation_state=state.model_dump(mode="json"),
     )
     steering = RunSteeringService(
         run_repository=run_repositories["runs"],
@@ -325,7 +419,6 @@ def test_safe_steering_persists_a_v2_state_delta(run_repositories) -> None:
         aggregation_service=AggregatedRequestService(),
         event_publisher=publisher,
         conversation_repository=conversations,
-        task_state_service=ConversationTaskStateService(),
     )
 
     response = run_async_in_thread(
@@ -337,12 +430,11 @@ def test_safe_steering_persists_a_v2_state_delta(run_repositories) -> None:
     )
 
     persisted = conversations.read_state(conversation.conversation_id)
-    snapshot = persisted["task_snapshot"]
+    snapshot = persisted["conversation_state"]
     assert response.state_delta_applied is True
-    assert snapshot["geospatial_state"]["geographic_scope"]["radius_m"] == 50_000
-    assert snapshot["tasks"][0]["status"] == "superseded"
-    assert snapshot["evidence_refs"] == []
-    assert snapshot["geospatial_state"]["renderable_refs"] == []
+    assert snapshot["constraints"]["latest_steering"]["kind"] == "scope_change"
+    assert snapshot["constraints"]["latest_steering"]["parameters"]["radius_text"] == "50 km"
+    assert snapshot["evidence_refs"] == ["weather-layer"]
     assert (
         run_repositories["steering"]
         .list_steering_messages(run.run_id)[0]
@@ -474,7 +566,27 @@ def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
     )
     candidate_map = {
         "session_id": "map-session-1",
-        "overlay_collection": {"collection_id": "active-map", "revision": 4, "instances": []},
+        "resolved_location": {
+            "label": "Rome, Italy",
+            "latitude": 41.9028,
+            "longitude": 12.4964,
+            "location_type": "city",
+            "bbox": [12.3, 41.7, 12.7, 42.1],
+        },
+        "basemap_id": "osm_standard",
+        "viewport": {
+            "center_latitude": 41.9028,
+            "center_longitude": 12.4964,
+            "radius_m": 25_000,
+            "bbox": [12.3, 41.7, 12.7, 42.1],
+        },
+        "bounds": [12.3, 41.7, 12.7, 42.1],
+        "payload": {"result_status": "valid_empty"},
+        "overlay_collection": {
+            "collection_id": "active-map",
+            "revision": 4,
+            "instances": [],
+        },
     }
     presentation = {
         "status": "pending",
@@ -484,7 +596,10 @@ def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
             "assistant_message": "Data prepared; the map is loading.",
             "map_session": candidate_map,
             "memory_snapshot": {"active_location": {"label": "Rome"}},
-            "task_snapshot": {"active_map_session": candidate_map},
+            "conversation_state": {
+                "conversation_id": conversation.conversation_id,
+                "revision": 0,
+            },
         },
         "required_render_checks": {
             "required_sources_loaded": True,
@@ -493,7 +608,7 @@ def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
         },
         "completion_requirements": [
             {
-                "name": "renderable_geometry_created",
+                "name": "map_candidate_prepared",
                 "required": True,
                 "status": "satisfied",
             }

@@ -88,7 +88,7 @@ class _OllamaLibraryParser(HTMLParser):
 class OllamaProvider(LLMProvider):
     provider_name = "ollama"
 
-    # Local structured extraction can include the full orchestration schema and
+    # Local structured native responses can include the full agent schema and
     # needs more time than lightweight health, capability, and chat probes.
     _DEFAULT_REQUEST_TIMEOUT_SECONDS = 30
     _STRUCTURED_REQUEST_TIMEOUT_SECONDS = 90
@@ -712,7 +712,7 @@ class OllamaProvider(LLMProvider):
                 provider=self.provider_name,
                 model=effective_request.model,
                 stage="structured_output",
-                detail="The provider returned invalid JSON for structured extraction.",
+                detail="The provider returned invalid JSON for the structured native response.",
                 context_usage=usage.to_dict(),
             ) from exc
         if not is_json_object(loaded):

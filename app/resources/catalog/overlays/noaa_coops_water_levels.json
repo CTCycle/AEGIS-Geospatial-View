@@ -99,5 +99,35 @@
     "timestampPath": "features[].properties.timestamp",
     "fieldMap": {},
     "expectedGeometry": "Point"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "inspect",
+      "search"
+    ],
+    "supported_scope_kinds": [
+      "point",
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "united-states-coastal",
+    "limitations": [
+      "Station discovery is paired with a station-specific observation request for full rendering.",
+      "Observation availability depends on the selected station, product, datum, and provider coverage."
+    ],
+    "fallback_ids": []
   }
 }

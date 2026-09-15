@@ -6,14 +6,14 @@ from http import HTTPStatus
 from typing import Any, Literal, cast
 
 from server.contracts.chat import ChatStreamEvent, ChatTurnRequest, ChatTurnResponse
-from server.services.agent.orchestrator import AgentOrchestrator
+from server.services.agent.native_orchestrator import NativeAgentOrchestrator
 from server.services.llm.errors import LLMConfigurationError
 
 ###############################################################################
 class ChatStreamingService:
 
     # -------------------------------------------------------------------------
-    def __init__(self, agent_orchestrator: AgentOrchestrator) -> None:
+    def __init__(self, agent_orchestrator: NativeAgentOrchestrator) -> None:
         self.agent_orchestrator = agent_orchestrator
 
     # -------------------------------------------------------------------------
@@ -29,8 +29,6 @@ class ChatStreamingService:
                     Literal[
                         "status",
                         "context_usage",
-                        "parsed",
-                        "policy",
                         "tool_call_started",
                         "tool_call_completed",
                         "map_session_created",

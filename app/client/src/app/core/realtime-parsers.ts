@@ -1,22 +1,26 @@
 import { REALTIME_PROTOCOL_VERSION } from './constants';
 import {
-  normalizeConversationTaskSnapshot,
   normalizeMapSession,
+  parseChatOperation,
+  parseCompletionContract,
   parseContextUsage,
+  parseConversationState,
+  parseNativeGoal,
   parseNativeRoute,
   parseNativeToolResult,
 } from './api-parsers';
-import { isFiniteNumber, isJsonObject, isRecord, isStringArray } from './type-guards';
+import { isFiniteNumber, isJsonObject } from './type-guards';
 import type {
   ChatOperationResult,
+  AgentGoal,
+  CompletionContract,
   ContextUsage,
-  ConversationTaskSnapshot,
+  ConversationState,
   JsonObject,
   JsonValue,
   MapSession,
   NativeCapabilityRoute,
   NativeToolResultSummary,
-  PolicyDecision,
   PresentationStatus,
   RealtimeServerMessage,
   RunEvent,
@@ -42,36 +46,15 @@ const RUN_EVENT_TYPES: readonly RunEventType[] = [
 ];
 
 const RUN_EVENT_VISIBILITIES: readonly RunEventVisibility[] = ['user', 'internal'];
-const OPERATION_KINDS: readonly ChatOperationResult['kind'][] = [
-  'map_session',
-  'direct_answer',
-  'capability_catalog',
-  'clarification',
-  'rejection',
-  'error',
-  'failure_diagnostic',
-];
-const OPERATION_STATUSES: readonly ChatOperationResult['status'][] = [
-  'success',
-  'partial',
-  'pending',
-  'failed',
-];
-const POLICY_PLAN_STATES: readonly PolicyDecision['plan']['state'][] = [
-  'clarify',
-  'direct_tool',
-  'map_search',
-  'reject',
-];
-
 export interface ParsedRunCompletionPayload {
   contextRevision?: number;
   mapSession?: MapSession | null;
   operation?: ChatOperationResult | null;
-  decision?: PolicyDecision;
+  goal?: AgentGoal | null;
+  completionContract?: CompletionContract | null;
+  conversationState?: ConversationState | null;
   memorySnapshot?: Record<string, JsonValue>;
   contextUsage?: ContextUsage | null;
-  taskSnapshot?: ConversationTaskSnapshot;
   route?: NativeCapabilityRoute | null;
   presentationStatus?: PresentationStatus;
   toolResults?: NativeToolResultSummary[];
@@ -100,154 +83,6 @@ const NATIVE_PRESENTATION_STATUSES: readonly PresentationStatus[] = [
   'ready',
   'failed',
 ];
-
-const isOperationKind = (value: unknown): value is ChatOperationResult['kind'] =>
-  typeof value === 'string' && OPERATION_KINDS.includes(value as ChatOperationResult['kind']);
-
-const isOperationStatus = (value: unknown): value is ChatOperationResult['status'] =>
-  typeof value === 'string' && OPERATION_STATUSES.includes(value as ChatOperationResult['status']);
-
-const isPolicyPlanState = (value: unknown): value is PolicyDecision['plan']['state'] =>
-  typeof value === 'string' && POLICY_PLAN_STATES.includes(value as PolicyDecision['plan']['state']);
-
-const parseProviderError = (
-  value: unknown,
-): NonNullable<ChatOperationResult['provider_error']> | undefined => {
-  if (!isJsonObject(value)) {
-    return undefined;
-  }
-
-  const code = value['code'];
-  if (!isNonEmptyString(code) && !isNonEmptyString(String(value['category'] ?? ''))) {
-    return undefined;
-  }
-  return value as NonNullable<ChatOperationResult['provider_error']>;
-};
-
-const parseOperation = (value: unknown): ChatOperationResult | undefined => {
-  if (!isJsonObject(value)) {
-    return undefined;
-  }
-
-  const kind = value['kind'];
-  const status = value['status'];
-  const message = value['message'];
-  const warnings = value['warnings'];
-
-  if (
-    !isOperationKind(kind) ||
-    !isOperationStatus(status) ||
-    !isNonEmptyString(message) ||
-    (warnings !== undefined && !isStringArray(warnings))
-  ) {
-    return undefined;
-  }
-
-  const result: ChatOperationResult = {
-    kind,
-    status,
-    message,
-    direct_result: null,
-    provider_error: null,
-  };
-
-  if (warnings !== undefined) {
-    result.warnings = warnings;
-  }
-
-  if (hasOwn(value, 'direct_result')) {
-    result.direct_result = value['direct_result'] === null || isJsonObject(value['direct_result'])
-      ? value['direct_result']
-      : null;
-  }
-
-  if (hasOwn(value, 'provider_error')) {
-    result.provider_error = value['provider_error'] === null
-      ? null
-      : parseProviderError(value['provider_error']) ?? null;
-  }
-
-  const category = value['failure_category'];
-  if (category === 'model_capability' || category === 'provider_api' || category === 'schema_definition'
-    || category === 'response_parsing' || category === 'context_limit') {
-    result.failure_category = category;
-  }
-
-  return result;
-};
-
-const parseResolvedLocation = (value: unknown): NonNullable<PolicyDecision['resolved_location']> | undefined => {
-  if (!isJsonObject(value)) {
-    return undefined;
-  }
-
-  const label = value['label'];
-  const latitude = value['latitude'];
-  const longitude = value['longitude'];
-  if (!isNonEmptyString(label) || !isFiniteNumber(latitude) || !isFiniteNumber(longitude)) {
-    return undefined;
-  }
-
-  return { label, latitude, longitude };
-};
-
-const parsePolicyDecision = (value: unknown): PolicyDecision | undefined => {
-  if (!isJsonObject(value) || !isJsonObject(value['plan'])) {
-    return undefined;
-  }
-
-  const planValue = value['plan'];
-  const state = planValue['state'];
-  const actionId = planValue['action_id'];
-  const overlayIds = planValue['overlay_ids'];
-  if (!isPolicyPlanState(state) || !isNonEmptyString(actionId) || !isStringArray(overlayIds)) {
-    return undefined;
-  }
-
-  const plan: PolicyDecision['plan'] = {
-    state,
-    action_id: actionId,
-    overlay_ids: overlayIds,
-  };
-
-  if (planValue['mode'] === null || planValue['mode'] === 'direct_text' || planValue['mode'] === 'map') {
-    plan.mode = planValue['mode'];
-  }
-  if (planValue['basemap_id'] === null || isNonEmptyString(planValue['basemap_id'])) {
-    plan.basemap_id = planValue['basemap_id'];
-  }
-  if (planValue['tool_id'] === null || isNonEmptyString(planValue['tool_id'])) {
-    plan.tool_id = planValue['tool_id'];
-  }
-
-  const decision: PolicyDecision = { plan };
-
-  if (value['clarification'] === null) {
-    decision.clarification = null;
-  } else if (isJsonObject(value['clarification'])) {
-    const question = value['clarification']['question'];
-    const reason = value['clarification']['reason'];
-    const missingFields = value['clarification']['missing_fields'];
-    if (isNonEmptyString(question) && isNonEmptyString(reason) && isStringArray(missingFields)) {
-      decision.clarification = { question, reason, missing_fields: missingFields };
-    }
-  }
-
-  if (value['resolved_location'] === null) {
-    decision.resolved_location = null;
-  } else if (hasOwn(value, 'resolved_location')) {
-    const resolvedLocation = parseResolvedLocation(value['resolved_location']);
-    if (resolvedLocation) {
-      decision.resolved_location = resolvedLocation;
-    }
-  }
-
-  if (isStringArray(value['trace'])) {
-    decision.trace = { steps: value['trace'] };
-  }
-
-  return decision;
-};
 
 export const parseRealtimeServerMessage = (
   data: unknown,
@@ -340,11 +175,27 @@ export const parseRunCompletionPayload = (value: unknown): ParsedRunCompletionPa
   }
 
   if (hasOwn(value, 'operation')) {
-    parsed.operation = value['operation'] === null ? null : parseOperation(value['operation']);
+    parsed.operation = value['operation'] === null
+      ? null
+      : parseChatOperation(value['operation'], 'realtime completion');
   }
 
-  if (hasOwn(value, 'decision')) {
-    parsed.decision = parsePolicyDecision(value['decision']);
+  if (hasOwn(value, 'goal')) {
+    parsed.goal = value['goal'] === null
+      ? null
+      : parseNativeGoal(value['goal'], 'realtime completion');
+  }
+
+  if (hasOwn(value, 'completion_contract')) {
+    parsed.completionContract = value['completion_contract'] === null
+      ? null
+      : parseCompletionContract(value['completion_contract'], 'realtime completion');
+  }
+
+  if (hasOwn(value, 'conversation_state')) {
+    parsed.conversationState = value['conversation_state'] === null
+      ? null
+      : parseConversationState(value['conversation_state'], 'realtime completion');
   }
 
   if (hasOwn(value, 'memory_snapshot') && isJsonObject(value['memory_snapshot'])) {
@@ -355,10 +206,6 @@ export const parseRunCompletionPayload = (value: unknown): ParsedRunCompletionPa
     parsed.contextUsage = value['context_usage'] === null
       ? null
       : parseContextUsage(value['context_usage']) ?? undefined;
-  }
-
-  if (hasOwn(value, 'task_snapshot')) {
-    parsed.taskSnapshot = normalizeConversationTaskSnapshot(value['task_snapshot']);
   }
 
   if (hasOwn(value, 'route')) {

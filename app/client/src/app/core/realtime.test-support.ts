@@ -112,8 +112,14 @@ export class FakeRealtimeService {
       operation: response.operation ?? null,
       memory_snapshot: response.memory_snapshot ?? {},
       context_usage: response.context_usage ?? null,
-      task_snapshot: response.task_snapshot ?? null,
-      context_revision: response.context_revision ?? null,
+      context_revision: response.context_revision,
+      route: response.route ?? null,
+      goal: response.goal ?? null,
+      completion_contract: response.completion_contract ?? null,
+      conversation_state: response.conversation_state ?? null,
+      presentation_status: response.presentation_status,
+      tool_results: response.tool_results,
+      execution_trace: response.execution_trace ?? null,
     } as unknown as JsonObject;
   }
 

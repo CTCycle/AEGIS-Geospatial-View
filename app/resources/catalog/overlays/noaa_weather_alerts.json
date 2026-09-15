@@ -97,5 +97,34 @@
     "timestampPath": "features[].properties.sent",
     "fieldMap": {},
     "expectedGeometry": "Polygon"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "search",
+      "filter",
+      "inspect"
+    ],
+    "supported_scope_kinds": [
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Polygon",
+    "render_support": "vector",
+    "coverage": "united-states",
+    "limitations": [
+      "Coverage is U.S.-focused and depends on active alert availability."
+    ],
+    "fallback_ids": []
   }
 }

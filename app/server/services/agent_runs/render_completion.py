@@ -9,7 +9,7 @@ from typing import Any, cast
 from server.contracts.events import RunEventType, RunProgressStage
 from server.domain.realtime import RealtimeRenderAckPayload
 from server.contracts.geospatial import MapSession
-from server.domain.agent.interpretation import CanonicalRequestInterpretation
+from server.domain.agent.capability_route import AgentGoal, CompletionContract
 from server.repositories.agent_runs import AgentRunRepository
 from server.services.agent.completion import CompletionEvaluator
 from server.services.agent_runs.events import RunEventPublisher
@@ -71,14 +71,20 @@ class RenderCompletionService:
         if not isinstance(revision, int) or revision < 0:
             raise RenderAcknowledgementError("Prepared map has no valid collection revision.")
         candidate_model = MapSession.model_validate(map_session)
-        canonical_raw = response_payload.get("canonical_request")
-        canonical_request = (
-            CanonicalRequestInterpretation.model_validate(canonical_raw)
-            if isinstance(canonical_raw, dict)
-            else None
-        )
-        render_requirements = CompletionEvaluator.candidate_requirements(
-            canonical_request, candidate_model
+        completion_contract = response_payload.get("completion_contract")
+        native_goal = response_payload.get("goal")
+        render_requirements = CompletionEvaluator.native_candidate_requirements(
+            completion_contract=(
+                CompletionContract.model_validate(completion_contract)
+                if isinstance(completion_contract, dict)
+                else None
+            ),
+            goal=(
+                AgentGoal.model_validate(native_goal)
+                if isinstance(native_goal, dict)
+                else None
+            ),
+            map_session=candidate_model,
         )
         render_requirements_payload = [
             item.model_dump(mode="json") for item in render_requirements

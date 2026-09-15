@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from server.domain.agent.capability_route import AgentState
+from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -37,7 +37,7 @@ class ProviderLayerToolHandler:
     async def discover(
         self,
         request: ProviderLayerDiscoveryInput,
-        state: AgentState,
+        state: AgentRunState,
     ) -> ToolResult:
         started = time.perf_counter()
         offset = _cursor_offset(request.cursor)

@@ -100,5 +100,35 @@
     "timestampPath": "features[].properties.timestamp",
     "fieldMap": {},
     "expectedGeometry": "Point"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "inspect",
+      "search"
+    ],
+    "supported_scope_kinds": [
+      "point",
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "united-states",
+    "limitations": [
+      "Measurements and station density vary by parameter and region.",
+      "The provider uses the current latest-continuous OGC API during the Water Services migration."
+    ],
+    "fallback_ids": []
   }
 }

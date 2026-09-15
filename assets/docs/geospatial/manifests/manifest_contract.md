@@ -1,6 +1,6 @@
 # Manifest Contract
 
-Last updated: 2026-09-08
+Last updated: 2026-09-15
 
 ## Loader Contract
 
@@ -42,8 +42,8 @@ Executable capabilities also declare the provider-neutral execution contract:
 - render support (`vector`, `raster`, `metadata_only`, or `none`)
 - coverage, limitations, and semantically equivalent fallback IDs
 
-Unknown metadata is treated as unknown support. The planner selects a manifest
-by the canonical capability requirement and target scope; a provider name or
+Unknown metadata is treated as unknown support. The native route selects a
+manifest by the canonical capability requirement and target scope; a provider name or
 the existence of an upstream endpoint cannot expand the declared semantics.
 
 ## Behavior Rules

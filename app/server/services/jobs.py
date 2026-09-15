@@ -217,10 +217,15 @@ class BackgroundJobService:
                 self._cancel_running_job(job.job_id)
                 return
             self._record_stream_event(job.job_id, event.event, dict(event.data or {}))
-            if event.event == "parsed":
-                self._heartbeat(job.job_id, 20, "Parsed request")
-            elif event.event == "policy":
-                self._heartbeat(job.job_id, 35, "Planned execution")
+            if event.event == "status":
+                self._heartbeat(job.job_id, 5, "Agent received request")
+            elif event.event == "stage":
+                stage = str(event.data.get("stage") or "native execution")
+                progress = {
+                    "context_assembly": 15,
+                    "persistence": 90,
+                }.get(stage, 35)
+                self._heartbeat(job.job_id, progress, f"Agent stage: {stage}")
             elif event.event == "tool_call_started":
                 self._heartbeat(job.job_id, 55, "Running tools")
             elif event.event == "map_session_created":

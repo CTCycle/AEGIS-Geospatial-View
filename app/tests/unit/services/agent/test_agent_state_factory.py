@@ -24,7 +24,7 @@ def test_factory_creates_bounded_receive_state() -> None:
 def test_factory_hydrates_the_complete_native_context_package() -> None:
     package = AgentContextPackage(
         current_user_message="show traffic",
-        active_instructions=[
+        active_directives=[
             ConversationDirective(
                 directive_id="directive-1",
                 normalized_text="exclude motorways",
@@ -34,7 +34,7 @@ def test_factory_hydrates_the_complete_native_context_package() -> None:
         ],
         task_state={"active_task_id": "task-1"},
         map_memory={"revision": 4},
-        conversation_summary={"through_turn_index": 2},
+        summary={"through_turn_index": 2},
         recent_messages=[{"role": "assistant", "content": "Previous result."}],
         relevant_tool_outcomes=[{"evidence_id": "evidence:1"}],
         policy_constraints={"allowed_tool_names": ["discover"]},
@@ -52,7 +52,7 @@ def test_factory_hydrates_the_complete_native_context_package() -> None:
     )
 
     assert state.context_hydrated is True
-    assert state.active_instructions[0]["normalized_text"] == "exclude motorways"
+    assert state.active_directives[0]["normalized_text"] == "exclude motorways"
     assert state.task_state == {"active_task_id": "task-1"}
     assert state.map_memory == {"revision": 4}
     assert state.recent_messages[0]["role"] == "assistant"

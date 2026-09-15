@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from server.domain.agent.capability_route import AgentPhase, AgentState
+from server.domain.agent.capability_route import AgentPhase, AgentRunState
 from server.services.agent.tool_definitions import CapabilityDiscoveryInput
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
 
@@ -41,7 +41,7 @@ def test_discovery_cursor_returns_a_stable_bounded_page() -> None:
         capability_registry=_CapabilityRegistry(),  # type: ignore[arg-type]
         runtime_registry=_RuntimeRegistry(),  # type: ignore[arg-type]
     )
-    state = AgentState(
+    state = AgentRunState(
         request_id="request-1",
         conversation_id="conversation-1",
         phase=AgentPhase.BUILD_TOOL_CONTEXT,
