@@ -102,5 +102,35 @@
     "timestampPath": "feed_info.txt.feed_version",
     "fieldMap": {},
     "expectedGeometry": "Point,LineString"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "search",
+      "filter",
+      "inspect"
+    ],
+    "supported_scope_kinds": [
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "point, linestring",
+    "render_support": "vector",
+    "coverage": "agency-defined",
+    "limitations": [
+      "Agency feed discovery and scheduled ingestion must be configured before map rendering.",
+      "Feed licensing is agency-specific and must be preserved in generated layers."
+    ],
+    "fallback_ids": []
   }
 }

@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-09-08
+Last updated: 2026-09-15
 
 ## Mounting
 
@@ -85,14 +85,14 @@ Defined in `app/server/api/chat.py`:
   it is not inference or structured-output proof. Source statuses also expose
   the separate process-local structured-probe status and expiry timestamps.
 - `GET /api/chat/models/structured-probe`
-  Returns the latest selected-provider/model parser probe, or `not_tested` when
+  Returns the latest selected-provider/model native structured-response probe, or `not_tested` when
   no unexpired result exists. Results are keyed by provider, model, protocol,
   base URL, and credential fingerprint and expire after 15 minutes.
 - `POST /api/chat/models/structured-probe`
-  Runs the selected model through the real structured parser contract using the
-  fixed `Show a map of Italy` request. It stops before geocoding, tools, map
-  assembly, and conversation persistence. A probe never changes model
-  selection or activates a fallback.
+  Runs the selected model through the native route/tool contract using the
+  fixed `Show a map of Italy` request. It stops before location resolution,
+  provider execution, map assembly, and conversation persistence. A probe never
+  changes model selection or activates a fallback.
 - `GET /api/chat/settings`
   Reads persisted settings.
 - `PATCH /api/chat/settings`
@@ -113,24 +113,26 @@ High-level fields:
 - `request_id`
 - `conversation_id`
 - `assistant_message`
-- `turn_contract`
-- `decision`
 - `operation`
 - `tool_payload`
 - `map_session`
 - `memory_snapshot`
 - `context_usage`
-- `visualization_update`
+- `execution_trace`
+- `route`
+- `goal`
+- `completion_contract`
+- `conversation_state`
 
 `map_session.overlay_collection` is the required, revisioned authoritative
 overlay collection. Its `instances` contain the render descriptor, stable
 capability/scope/variant identity, visibility, opacity, and bounded
 inspections. Render-entry arrays and separate overlay-ID projections are not
 part of the map-session wire contract; clients derive those views from the
-collection. `turn_contract.overlay_commands` describes deterministic
-add/remove/keep-only/show/hide/update operations; `visualization_update`
-returns the resulting revision and stable added, removed, updated, unmatched,
-and ambiguous instance IDs/selectors.
+collection. The native `apply_map_plan` tool describes deterministic
+add/remove/keep-only/show/hide/update operations against the revisioned
+collection and returns the resulting map candidate. Browser render
+acknowledgement is the only promotion path for a realtime map run.
 
 Map-session inspections are carried by their owning overlay instance and may
 represent feature, location, overlay, or non-spatial associations. Clients
@@ -143,18 +145,9 @@ Supported `operation.kind` values:
 
 - `map_session`
 - `direct_answer`
-- `capability_catalog`
 - `clarification`
 - `rejection`
 - `error`
-- `failure_diagnostic`
-
-Additional optional response fields:
-
-- `task_snapshot`
-- `tool_plan`
-- `failure_diagnostic`
-- `visualization_update`
 
 Supported `operation.status` values:
 
@@ -171,11 +164,8 @@ Current event sequence is lifecycle-oriented rather than token-oriented.
 Supported event names:
 
 - `status`
-- `parsed`
-- `policy`
-- `tool_call_started`
-- `tool_call_completed`
-- `map_session_created`
+- `context_usage`
+- `stage`
 - `final`
 - `error`
 
@@ -190,11 +180,11 @@ bodies or credentials.
 
 `POST /api/chat/turn` first checks that the conversation exists and returns
 `404 Conversation not found.` without invoking the orchestrator when it does
-not. Agent runs use a 75-second absolute budget and a 30-second structured
-extraction stage. Extraction traces expose sanitized `parser_contract` and
-`pipeline_reach` state, including normalized intent, field presence/default
-counts, provider error category, timeout origin, terminal stage, and stage
-states; prompts, user text, credentials, and provider payloads are excluded.
+not. Native runs start at the configured initial deadline and promote once to
+the simple or complex profile after route validation. Traces contain bounded
+stage observations, model/tool/transition counters, context usage, recovery,
+and terminal reasons; prompts, credentials, and provider payloads are
+excluded.
 
 ### Intentional limitation contract
 
@@ -210,8 +200,9 @@ states; prompts, user text, credentials, and provider payloads are excluded.
 - Browser acknowledgment is client-reported rendering evidence; backend
   semantic validation remains authoritative.
 
-Planned tool execution, aggregation, synthesis, persistence, progress events,
-and final response construction are owned by `PlannedTurnExecutionService`.
+Native tool execution, evidence persistence, progress events, and final
+response construction are owned by `NativeAgentOrchestrator`, `AgentLoop`,
+and the typed tool registry/executor.
 
 ## Conversation Run Routes
 

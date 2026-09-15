@@ -138,5 +138,35 @@
       180,
       90
     ]
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "search",
+      "filter",
+      "inspect"
+    ],
+    "supported_scope_kinds": [
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Polygon",
+    "render_support": "vector",
+    "coverage": "United States",
+    "limitations": [
+      "Rendering requires live TIGERweb boundary metadata and Census ACS availability.",
+      "The default variable is total population; geography, vintage, and variable selection shape the joined result."
+    ],
+    "fallback_ids": []
   }
 }

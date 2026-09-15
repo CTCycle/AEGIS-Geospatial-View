@@ -1,13 +1,13 @@
-"""Native-v2 location resolution handler."""
+"""Native location resolution handler."""
 
 from __future__ import annotations
 
 import time
 import re
 
-from server.contracts.extraction import LocationSignal
+from server.contracts.location import LocationSignal
 from server.domain.agent.decision import ClarificationRequest, ResolvedLocation
-from server.domain.agent.capability_route import AgentState
+from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -57,7 +57,7 @@ class LocationToolHandler:
     async def resolve(
         self,
         request: ResolveLocationInput,
-        state: AgentState,
+        state: AgentRunState,
     ) -> ToolResult:
         started = time.perf_counter()
         target_key = _target_key(request)
@@ -139,7 +139,7 @@ def _parse_coordinate_pair(query: str) -> tuple[float, float] | None:
 
 
 ###############################################################################
-def _memory_snapshot(state: AgentState) -> dict[str, object]:
+def _memory_snapshot(state: AgentRunState) -> dict[str, object]:
     location: ResolvedLocation | None = None
     if state.active_map_session is not None:
         location = state.active_map_session.resolved_location

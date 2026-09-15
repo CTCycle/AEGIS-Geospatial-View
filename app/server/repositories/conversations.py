@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from sqlalchemy import select, update
 
+from server.domain.agent.conversation import ConversationState
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ConversationRecord
 
@@ -21,12 +22,16 @@ class ConversationRepository:
         self, title: str | None, owner_user_id: str | None = None
     ) -> ConversationRecord:
         with self._session_factory() as session:
+            conversation_id = f"conv_{uuid4().hex}"
             record = ConversationRecord(
-                id=f"conv_{uuid4().hex}",
+                id=conversation_id,
                 owner_user_id=owner_user_id,
                 title=title.strip()
                 if isinstance(title, str) and title.strip()
                 else None,
+                conversation_state=ConversationState.empty(
+                    conversation_id, revision=1
+                ).model_dump(mode="json"),
             )
             session.add(record)
             session.commit()
@@ -43,11 +48,7 @@ class ConversationRepository:
         record = self._require(conversation_id)
         return {
             "context_revision": record.context_revision,
-            "active_instructions": record.active_instructions or [],
-            "task_snapshot": record.task_snapshot,
-            "memory_snapshot": record.memory_snapshot or {},
-            "conversation_summary": record.conversation_summary,
-            "summary_through_turn_index": record.summary_through_turn_index,
+            "conversation_state": record.conversation_state,
         }
 
     # -------------------------------------------------------------------------
@@ -56,25 +57,13 @@ class ConversationRepository:
         conversation_id: str,
         *,
         expected_revision: int,
-        active_instructions: list[dict[str, Any]] | None = None,
-        task_snapshot: dict[str, Any] | None = None,
-        memory_snapshot: dict[str, Any] | None = None,
-        conversation_summary: dict[str, Any] | None = None,
-        summary_through_turn_index: int | None = None,
+        conversation_state: dict[str, Any],
     ) -> int:
         values: dict[str, Any] = {
             "context_revision": ConversationRecord.context_revision + 1,
             "updated_at": datetime.now(UTC),
+            "conversation_state": conversation_state,
         }
-        for name, value in (
-            ("active_instructions", active_instructions),
-            ("task_snapshot", task_snapshot),
-            ("memory_snapshot", memory_snapshot),
-            ("conversation_summary", conversation_summary),
-            ("summary_through_turn_index", summary_through_turn_index),
-        ):
-            if value is not None:
-                values[name] = value
         with self._session_factory() as session:
             revision = session.scalar(
                 update(ConversationRecord)

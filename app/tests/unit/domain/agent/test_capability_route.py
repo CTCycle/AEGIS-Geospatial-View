@@ -6,7 +6,6 @@ from pydantic import ValidationError
 from server.domain.agent.capability_route import (
     AgentPhase,
     AgentRunState,
-    AgentState,
     CapabilityDomain,
     CapabilityRoute,
 )
@@ -46,7 +45,7 @@ def test_capability_route_is_bounded_and_strict() -> None:
 
 ###############################################################################
 def test_agent_state_tracks_native_loop_counters() -> None:
-    state = AgentState(
+    state = AgentRunState(
         request_id="req-1",
         conversation_id="conversation-1",
         phase=AgentPhase.ROUTE_REQUEST,
@@ -56,7 +55,7 @@ def test_agent_state_tracks_native_loop_counters() -> None:
     assert state.phase is AgentPhase.ROUTE_REQUEST
     assert state.tool_results == []
     with pytest.raises(ValidationError):
-        AgentState(
+        AgentRunState(
             request_id="req-1",
             conversation_id="conversation-1",
             phase=AgentPhase.ROUTE_REQUEST,
@@ -79,7 +78,6 @@ def test_agent_run_state_is_the_single_checkpointable_native_state() -> None:
 
     restored = AgentRunState.from_checkpoint(state.checkpoint())
 
-    assert AgentState is AgentRunState
     assert restored.run_version == 3
     assert restored.conversation_revision == 7
     assert restored.request_id == state.request_id

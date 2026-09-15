@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -54,26 +54,20 @@ class JobsSettings:
 @dataclass(frozen=True)
 class ChatRuntimeSettings:
     max_history_messages: int
-    parser_certainty_threshold: float
-    parser_max_retries: int
     application_timezone: str = "UTC"
 
 
 ###############################################################################
 @dataclass(frozen=True)
 class AgentExecutionSettings:
-    interpretation_seconds: float = 90.0
+    initial_run_seconds: float = 90.0
     simple_seconds: float = 150.0
     complex_seconds: float = 300.0
     context_assembly_seconds: float = 5.0
-    structured_extraction_seconds: float = 60.0
-    location_resolution_seconds: float = 30.0
     native_model_call_seconds: float = 60.0
-    tool_idle_seconds: float = 45.0
     tool_execution_seconds: float = 45.0
     tool_absolute_seconds: float = 90.0
     map_assembly_seconds: float = 20.0
-    synthesis_seconds: float = 30.0
     persistence_seconds: float = 5.0
     render_ack_seconds: float = 90.0
     max_tool_result_chars: int = 4096
@@ -82,7 +76,7 @@ class AgentExecutionSettings:
     complex_max_model_calls: int = 10
     simple_max_tool_calls: int = 6
     complex_max_tool_calls: int = 20
-    simple_max_state_transitions: int = 10
+    simple_max_state_transitions: int = 32
     complex_max_state_transitions: int = 32
     max_parallel_tool_calls: int = 8
     max_consecutive_tool_failures: int = 3
@@ -94,7 +88,6 @@ class AgentExecutionSettings:
     retry_backoff_base_seconds: float = 0.25
     retry_backoff_max_seconds: float = 2.0
     provider_request_seconds: float = 10.0
-    agent_loop_mode: Literal["legacy", "shadow", "native_v2"] = "native_v2"
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -196,25 +189,19 @@ class JsonJobsSettings(StrictJsonSettings):
 ###############################################################################
 class JsonChatRuntimeSettings(StrictJsonSettings):
     max_history_messages: int = Field(ge=1, le=100)
-    parser_certainty_threshold: float = Field(ge=0.0, le=1.0)
-    parser_max_retries: int = Field(ge=0, le=5)
     application_timezone: str = "UTC"
 
 
 ###############################################################################
 class JsonAgentExecutionSettings(StrictJsonSettings):
-    interpretation_seconds: float = Field(default=90.0, ge=1.0, le=300.0)
+    initial_run_seconds: float = Field(default=90.0, ge=1.0, le=300.0)
     simple_seconds: float = Field(default=150.0, ge=1.0, le=300.0)
     complex_seconds: float = Field(default=300.0, ge=1.0, le=300.0)
     context_assembly_seconds: float = Field(default=5.0, ge=0.1)
-    structured_extraction_seconds: float = Field(default=60.0, ge=0.1)
-    location_resolution_seconds: float = Field(default=30.0, ge=0.1)
     native_model_call_seconds: float = Field(default=60.0, ge=0.1)
-    tool_idle_seconds: float = Field(default=45.0, ge=0.1, le=45.0)
     tool_execution_seconds: float = Field(default=45.0, ge=0.1, le=90.0)
     tool_absolute_seconds: float = Field(default=90.0, ge=0.1, le=90.0)
     map_assembly_seconds: float = Field(default=20.0, ge=0.1)
-    synthesis_seconds: float = Field(default=30.0, ge=0.1)
     persistence_seconds: float = Field(default=5.0, ge=0.1)
     render_ack_seconds: float = Field(default=90.0, ge=0.1, le=90.0)
     max_tool_result_chars: int = Field(default=4096, ge=128, le=100000)
@@ -223,7 +210,7 @@ class JsonAgentExecutionSettings(StrictJsonSettings):
     complex_max_model_calls: int = Field(default=10, ge=1, le=100)
     simple_max_tool_calls: int = Field(default=6, ge=1, le=200)
     complex_max_tool_calls: int = Field(default=20, ge=1, le=500)
-    simple_max_state_transitions: int = Field(default=10, ge=1, le=500)
+    simple_max_state_transitions: int = Field(default=32, ge=1, le=500)
     complex_max_state_transitions: int = Field(default=32, ge=1, le=1000)
     max_parallel_tool_calls: int = Field(default=8, ge=1, le=32)
     max_consecutive_tool_failures: int = Field(default=3, ge=1, le=20)
@@ -235,7 +222,6 @@ class JsonAgentExecutionSettings(StrictJsonSettings):
     retry_backoff_base_seconds: float = Field(default=0.25, ge=0.0, le=60.0)
     retry_backoff_max_seconds: float = Field(default=2.0, ge=0.0, le=120.0)
     provider_request_seconds: float = Field(default=10.0, ge=0.1, le=120.0)
-    agent_loop_mode: Literal["legacy", "shadow", "native_v2"] = "native_v2"
 
 ###############################################################################
 class JsonOpenMeteoSettings(StrictJsonSettings):
@@ -393,23 +379,17 @@ class AppSettings(BaseSettings):
             ),
             chat=ChatRuntimeSettings(
                 max_history_messages=self.chat.max_history_messages,
-                parser_certainty_threshold=self.chat.parser_certainty_threshold,
-                parser_max_retries=self.chat.parser_max_retries,
                 application_timezone=self.chat.application_timezone,
             ),
             agent_execution=AgentExecutionSettings(
-                interpretation_seconds=self.agent_execution.interpretation_seconds,
+                initial_run_seconds=self.agent_execution.initial_run_seconds,
                 simple_seconds=self.agent_execution.simple_seconds,
                 complex_seconds=self.agent_execution.complex_seconds,
                 context_assembly_seconds=self.agent_execution.context_assembly_seconds,
-                structured_extraction_seconds=self.agent_execution.structured_extraction_seconds,
-                location_resolution_seconds=self.agent_execution.location_resolution_seconds,
                 native_model_call_seconds=self.agent_execution.native_model_call_seconds,
-                tool_idle_seconds=self.agent_execution.tool_idle_seconds,
                 tool_execution_seconds=self.agent_execution.tool_execution_seconds,
                 tool_absolute_seconds=self.agent_execution.tool_absolute_seconds,
                 map_assembly_seconds=self.agent_execution.map_assembly_seconds,
-                synthesis_seconds=self.agent_execution.synthesis_seconds,
                 persistence_seconds=self.agent_execution.persistence_seconds,
                 render_ack_seconds=self.agent_execution.render_ack_seconds,
                 max_tool_result_chars=self.agent_execution.max_tool_result_chars,
@@ -430,7 +410,6 @@ class AppSettings(BaseSettings):
                 retry_backoff_base_seconds=self.agent_execution.retry_backoff_base_seconds,
                 retry_backoff_max_seconds=self.agent_execution.retry_backoff_max_seconds,
                 provider_request_seconds=self.agent_execution.provider_request_seconds,
-                agent_loop_mode=self.agent_execution.agent_loop_mode,
             ),
             openmeteo=OpenMeteoSettings(
                 weather_base_url=self.openmeteo.weather_base_url,

@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError
 
 from server.domain.agent.capability_route import (
     AgentPhase,
-    AgentState,
+    AgentRunState,
     CapabilityRoute,
 )
 from server.domain.agent.capability_domains import CapabilityDomain
@@ -23,7 +23,7 @@ from server.services.llm.types import LLMToolDefinition
 
 
 ###############################################################################
-async def _handler(_arguments: BaseModel, _state: AgentState) -> dict[str, Any]:
+async def _handler(_arguments: BaseModel, _state: AgentRunState) -> dict[str, Any]:
     return {"ok": True}
 
 
@@ -65,8 +65,8 @@ def _registered(
 
 
 ###############################################################################
-def _state(phase: AgentPhase, *, capability_ids: list[str] | None = None) -> AgentState:
-    return AgentState(
+def _state(phase: AgentPhase, *, capability_ids: list[str] | None = None) -> AgentRunState:
+    return AgentRunState(
         request_id="request-1",
         conversation_id="conversation-1",
         phase=phase,

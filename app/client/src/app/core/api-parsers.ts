@@ -1,13 +1,18 @@
 import {
   ActiveConversationRunSnapshot,
+  AgentGoal,
+  AgentSpatialScope,
+  AgentTemporalScope,
   AgentRunState,
   CatalogResponse,
+  ChatOperationResult,
   ChatMessage,
   ChatRole,
   ChatTurnResponse,
   ConversationCreateResponse,
+  ConversationState,
   ConversationSnapshotResponse,
-  ConversationTaskSnapshot,
+  CompletionContract,
   GenericObjectResponse,
   GeospatialCredentialStatus,
   GeospatialLayerRenderDescriptor,
@@ -26,6 +31,7 @@ import {
   NativeCapabilityRoute,
   NativeToolResultSummary,
   PresentationStatus,
+  ResolvedLocation,
   SelectedModelContext,
   StructuredProbeResponse,
   StructuredProbeStatus,
@@ -868,10 +874,6 @@ export const normalizeMapSession = (value: unknown): MapSession | null => {
   };
 };
 
-const TASK_STATUSES: readonly ConversationTaskSnapshot['tasks'][number]['status'][] = [
-  'pending', 'in_progress', 'completed', 'failed', 'blocked', 'skipped', 'superseded',
-];
-
 const RUN_STATES: readonly AgentRunState[] = [
   'pending',
   'running',
@@ -889,132 +891,161 @@ const isNonEmptyString = (value: unknown): value is string =>
 const isNonNegativeInteger = (value: unknown): value is number =>
   isFiniteNumber(value) && Number.isInteger(value) && value >= 0;
 
-const isTaskStatus = (
-  value: unknown,
-): value is ConversationTaskSnapshot['tasks'][number]['status'] =>
-  typeof value === 'string' && TASK_STATUSES.includes(value as ConversationTaskSnapshot['tasks'][number]['status']);
-
-const normalizeTaskGoal = (
-  value: unknown,
-): NonNullable<ConversationTaskSnapshot['goal']> | null | undefined => {
-  if (value === null) {
-    return null;
-  }
-  if (!isRecord(value)
-    || !isNonEmptyString(value.id)
-    || !isNonEmptyString(value.text)
-    || !['active', 'completed', 'partial', 'superseded'].includes(String(value.status))
-    || !isNonNegativeInteger(value.revision)) {
-    return undefined;
-  }
+const parseResolvedLocation = (value: unknown, endpoint: string, field: string): ResolvedLocation => {
+  const record = requireApiRecord(value, endpoint, field);
   return {
-    id: value.id,
-    text: value.text,
-    status: value.status as NonNullable<ConversationTaskSnapshot['goal']>['status'],
-    revision: value.revision,
+    label: requireApiString(record, 'label', endpoint),
+    latitude: requireApiNumber(record, 'latitude', endpoint),
+    longitude: requireApiNumber(record, 'longitude', endpoint),
+    country: optionalApiString(record, 'country', endpoint),
+    city: optionalApiString(record, 'city', endpoint),
+    address: optionalApiString(record, 'address', endpoint),
+    source: optionalApiString(record, 'source', endpoint) ?? undefined,
+    confidence: optionalApiNumber(record, 'confidence', endpoint) ?? undefined,
   };
 };
 
-export const normalizeConversationTaskSnapshot = (
-  value: unknown,
-): ConversationTaskSnapshot | undefined => {
-  if (
-    !isJsonObject(value)
-    || value.schema_version !== 3
-    || !isNonEmptyString(value.conversation_key)
-    || !Array.isArray(value.tasks)
-    || !isRecord(value.geospatial_state)
-    || !isStringArray(value.evidence_refs)
-    || !isStringArray(value.assumptions)
-    || !isStringArray(value.unresolved_questions)
-  ) {
+const requireApiNumber = (
+  record: Record<string, unknown>,
+  field: string,
+  endpoint: string,
+): number => {
+  if (!isFiniteNumber(record[field])) {
+    return apiContract(endpoint, `${field} must be a finite number`, record[field]);
+  }
+  return record[field] as number;
+};
+
+const parseTemporalScope = (value: unknown, endpoint: string): AgentTemporalScope => {
+  const record = requireApiRecord(value, endpoint, 'temporal_scope');
+  const mode = requireApiString(record, 'mode', endpoint);
+  if (!['current', 'historical', 'forecast', 'none'].includes(mode)) {
+    return apiContract(endpoint, 'temporal_scope.mode is unsupported', mode);
+  }
+  return {
+    mode: mode as AgentTemporalScope['mode'],
+    reference_time_iso: optionalApiString(record, 'reference_time_iso', endpoint),
+    start_time_iso: optionalApiString(record, 'start_time_iso', endpoint),
+    end_time_iso: optionalApiString(record, 'end_time_iso', endpoint),
+    granularity: requireApiString(record, 'granularity', endpoint),
+    aggregation: requireApiString(record, 'aggregation', endpoint),
+  };
+};
+
+const parseSpatialScope = (value: unknown, endpoint: string): AgentSpatialScope | null | undefined => {
+  if (value === undefined) {
     return undefined;
   }
-
-  const tasks: ConversationTaskSnapshot['tasks'] = [];
-  for (const item of value.tasks) {
-    if (!isJsonObject(item)
-      || !isNonEmptyString(item.id)
-      || !isNonEmptyString(item.description)
-      || !isNonEmptyString(item.kind)
-      || !isTaskStatus(item.status)
-      || !isStringArray(item.depends_on)
-      || typeof item.required !== 'boolean'
-      || !isStringArray(item.input_refs)
-      || !isStringArray(item.output_refs)
-      || !isNonNegativeInteger(item.attempt_count)
-      || !isNonNegativeInteger(item.scope_revision)) {
-      return undefined;
-    }
-
-    const task: ConversationTaskSnapshot['tasks'][number] = {
-      id: item.id,
-      description: item.description,
-      kind: item.kind,
-      status: item.status,
-      depends_on: item.depends_on,
-      required: item.required,
-      input_refs: item.input_refs,
-      output_refs: item.output_refs,
-      attempt_count: item.attempt_count,
-      scope_revision: item.scope_revision,
-    };
-    if (item.last_failure === null) {
-      task.last_failure = null;
-    } else if (Object.prototype.hasOwnProperty.call(item, 'last_failure')) {
-      if (!isJsonObject(item.last_failure)) {
-        return undefined;
-      }
-      task.last_failure = item.last_failure;
-    }
-    tasks.push(task);
+  if (value === null) {
+    return null;
   }
-
-  const snapshot: ConversationTaskSnapshot = {
-    schema_version: 3,
-    conversation_key: value.conversation_key,
-    tasks,
-    geospatial_state: value.geospatial_state,
-    evidence_refs: value.evidence_refs,
-    assumptions: value.assumptions,
-    unresolved_questions: value.unresolved_questions,
+  const record = requireApiRecord(value, endpoint, 'spatial_scope');
+  const kind = requireApiString(record, 'kind', endpoint);
+  const relationship = requireApiString(record, 'relationship', endpoint);
+  const kinds: AgentSpatialScope['kind'][] = [
+    'point', 'bbox', 'radius', 'administrative_geometry', 'feature_geometry', 'viewport',
+  ];
+  const relationships: AgentSpatialScope['relationship'][] = [
+    'at', 'in', 'near', 'around', 'within_distance', 'along', 'visible_area', 'here',
+  ];
+  if (!kinds.includes(kind as AgentSpatialScope['kind'])) {
+    return apiContract(endpoint, 'spatial_scope.kind is unsupported', kind);
+  }
+  if (!relationships.includes(relationship as AgentSpatialScope['relationship'])) {
+    return apiContract(endpoint, 'spatial_scope.relationship is unsupported', relationship);
+  }
+  return {
+    kind: kind as AgentSpatialScope['kind'],
+    relationship: relationship as AgentSpatialScope['relationship'],
+    target_refs: requireApiStringArray(record, 'target_refs', endpoint),
+    distance_m: optionalApiNumber(record, 'distance_m', endpoint),
   };
+};
 
-  if (Object.prototype.hasOwnProperty.call(value, 'current_task_id')) {
-    if (value.current_task_id !== null && !isNonEmptyString(value.current_task_id)) {
-      return undefined;
-    }
-    snapshot.current_task_id = value.current_task_id as string | null;
+export const parseNativeGoal = (value: unknown, endpoint = 'native agent'): AgentGoal => {
+  const record = requireApiRecord(value, endpoint, 'goal');
+  const taskMode = requireApiString(record, 'task_mode', endpoint);
+  const presentation = requireApiString(record, 'presentation', endpoint);
+  if (!['answer', 'execute', 'clarify'].includes(taskMode)) {
+    return apiContract(endpoint, 'goal.task_mode is unsupported', taskMode);
   }
-
-  if (Object.prototype.hasOwnProperty.call(value, 'active_map_session')) {
-    if (value.active_map_session === null) {
-      snapshot.active_map_session = null;
-    } else {
-      const mapSession = normalizeMapSession(value.active_map_session);
-      if (!mapSession) {
-        return undefined;
-      }
-      snapshot.active_map_session = mapSession;
-    }
+  if (!['text', 'map', 'both'].includes(presentation)) {
+    return apiContract(endpoint, 'goal.presentation is unsupported', presentation);
   }
+  return {
+    goal: requireApiString(record, 'goal', endpoint),
+    task_mode: taskMode as AgentGoal['task_mode'],
+    presentation: presentation as AgentGoal['presentation'],
+    operation: requireApiString(record, 'operation', endpoint),
+    requires_location: requireApiBoolean(record, 'requires_location', endpoint),
+    target_ids: requireApiStringArray(record, 'target_ids', endpoint),
+    temporal_scope: requireApiJsonObject(record.temporal_scope, endpoint, 'temporal_scope'),
+    spatial_scope: requireApiArray(record.spatial_scope, endpoint, 'spatial_scope')
+      .map((item) => requireApiJsonObject(item, endpoint, 'spatial_scope[]')),
+    filters: requireApiJsonObject(record.filters, endpoint, 'filters'),
+  };
+};
 
-  if (Object.prototype.hasOwnProperty.call(value, 'goal')) {
-    const goal = normalizeTaskGoal(value.goal);
-    if (goal === undefined) {
-      return undefined;
-    }
-    snapshot.goal = goal;
+export const parseCompletionContract = (
+  value: unknown,
+  endpoint = 'native agent',
+): CompletionContract => {
+  const record = requireApiRecord(value, endpoint, 'completion_contract');
+  return {
+    operation: requireApiString(record, 'operation', endpoint),
+    requirements: requireApiStringArray(record, 'requirements', endpoint),
+    location_required: requireApiBoolean(record, 'location_required', endpoint),
+    evidence_required: requireApiBoolean(record, 'evidence_required', endpoint),
+    map_preparation_required: requireApiBoolean(record, 'map_preparation_required', endpoint),
+    temporal_scope_required: requireApiBoolean(record, 'temporal_scope_required', endpoint),
+    spatial_scope_required: requireApiBoolean(record, 'spatial_scope_required', endpoint),
+  };
+};
+
+export const parseConversationState = (
+  value: unknown,
+  endpoint = 'conversation snapshot',
+): ConversationState => {
+  const record = requireApiRecord(value, endpoint, 'conversation_state');
+  if (record.schema_version !== 1) {
+    return apiContract(endpoint, 'conversation_state.schema_version is unsupported', record.schema_version);
   }
-
-  if (Object.prototype.hasOwnProperty.call(value, 'conversation_summary')) {
-    if (value.conversation_summary !== null && !isJsonObject(value.conversation_summary)) {
-      return undefined;
-    }
-    snapshot.conversation_summary = value.conversation_summary;
+  const resolvedLocations = requireApiRecord(record.resolved_locations, endpoint, 'resolved_locations');
+  const parsedLocations: Record<string, ResolvedLocation> = {};
+  Object.entries(resolvedLocations).forEach(([key, location]) => {
+    parsedLocations[key] = parseResolvedLocation(location, endpoint, `resolved_locations.${key}`);
+  });
+  const route = record.route === undefined || record.route === null
+    ? record.route ?? undefined
+    : parseNativeRoute(record.route, endpoint);
+  const goal = record.goal === undefined || record.goal === null
+    ? record.goal ?? undefined
+    : parseNativeGoal(record.goal, endpoint);
+  const committedMap = record.committed_map_session === undefined || record.committed_map_session === null
+    ? record.committed_map_session ?? undefined
+    : normalizeMapSession(record.committed_map_session);
+  if (record.committed_map_session !== undefined
+    && record.committed_map_session !== null
+    && !committedMap) {
+    return apiContract(endpoint, 'conversation_state.committed_map_session is malformed', record.committed_map_session);
   }
-
-  return snapshot;
+  return {
+    schema_version: 1,
+    conversation_id: requireApiString(record, 'conversation_id', endpoint),
+    revision: requireApiNumber(record, 'revision', endpoint),
+    active_directives: requireApiArray(record.active_directives, endpoint, 'active_directives')
+      .map((item) => requireApiJsonObject(item, endpoint, 'active_directives[]')),
+    summary: record.summary === undefined || record.summary === null
+      ? record.summary ?? undefined
+      : requireApiJsonObject(record.summary, endpoint, 'summary'),
+    goal: goal as AgentGoal | null | undefined,
+    route: route as NativeCapabilityRoute | null | undefined,
+    constraints: requireApiJsonObject(record.constraints, endpoint, 'constraints'),
+    resolved_locations: parsedLocations,
+    evidence_refs: requireApiStringArray(record, 'evidence_refs', endpoint),
+    committed_map_session: committedMap as MapSession | null | undefined,
+    unresolved_questions: requireApiStringArray(record, 'unresolved_questions', endpoint),
+  };
 };
 
 const parseProviderLayerDescriptor = (value: unknown): GeospatialProviderLayerDescriptor | null => {
@@ -1312,6 +1343,8 @@ export const parseNativeRoute = (value: unknown, endpoint: string): NativeCapabi
   if (!['text', 'map', 'both'].includes(presentation)) {
     return apiContract(endpoint, 'route.presentation is unsupported', presentation);
   }
+  const temporalScope = parseTemporalScope(route.temporal_scope, endpoint);
+  const spatialScope = parseSpatialScope(route.spatial_scope, endpoint);
   return {
     primary_domain: requireApiString(route, 'primary_domain', endpoint),
     secondary_domains: requireApiStringArray(route, 'secondary_domains', endpoint),
@@ -1321,14 +1354,61 @@ export const parseNativeRoute = (value: unknown, endpoint: string): NativeCapabi
     capability_queries: requireApiStringArray(route, 'capability_queries', endpoint),
     explicit_capability_ids: requireApiStringArray(route, 'explicit_capability_ids', endpoint),
     clarification_question: optionalApiString(route, 'clarification_question', endpoint),
+    operation: optionalApiString(route, 'operation', endpoint),
+    target_refs: requireApiStringArray(route, 'target_refs', endpoint),
+    temporal_scope: temporalScope,
+    spatial_scope: spatialScope,
+    filters: requireApiJsonObject(route.filters, endpoint, 'filters'),
+  };
+};
+
+export const parseChatOperation = (value: unknown, endpoint: string): ChatOperationResult => {
+  const record = requireApiRecord(value, endpoint, 'operation');
+  const kind = requireApiString(record, 'kind', endpoint);
+  const status = requireApiString(record, 'status', endpoint);
+  const kinds: ChatOperationResult['kind'][] = [
+    'map_session', 'direct_answer', 'capability_catalog', 'clarification', 'rejection', 'error',
+  ];
+  const statuses: ChatOperationResult['status'][] = ['success', 'partial', 'pending', 'failed'];
+  if (!kinds.includes(kind as ChatOperationResult['kind'])) {
+    return apiContract(endpoint, 'operation.kind is unsupported', kind);
+  }
+  if (!statuses.includes(status as ChatOperationResult['status'])) {
+    return apiContract(endpoint, 'operation.status is unsupported', status);
+  }
+  const directResult = record.direct_result === undefined || record.direct_result === null
+    ? record.direct_result ?? null
+    : requireApiJsonObject(record.direct_result, endpoint, 'direct_result');
+  const providerError = record.provider_error === undefined || record.provider_error === null
+    ? record.provider_error ?? null
+    : requireApiJsonObject(record.provider_error, endpoint, 'provider_error');
+  const failureCategory = record.failure_category === undefined || record.failure_category === null
+    ? record.failure_category ?? null
+    : requireApiString(record, 'failure_category', endpoint);
+  if (failureCategory !== null
+    && !['model_capability', 'provider_api', 'provider_failure', 'schema_definition', 'response_parsing', 'context_limit', 'insufficient_evidence', 'model_budget_exhausted', 'tool_budget_exhausted', 'transition_budget_exhausted', 'run_deadline_exhausted', 'no_progress', 'cancelled', 'superseded'].includes(failureCategory)) {
+    return apiContract(endpoint, 'operation.failure_category is unsupported', failureCategory);
+  }
+  return {
+    kind: kind as ChatOperationResult['kind'],
+    status: status as ChatOperationResult['status'],
+    message: requireApiString(record, 'message', endpoint),
+    warnings: record.warnings === undefined
+      ? []
+      : requireApiStringArray(record, 'warnings', endpoint),
+    direct_result: directResult as Record<string, JsonValue> | null,
+    provider_error: providerError as Record<string, JsonValue> | null,
+    failure_category: failureCategory as ChatOperationResult['failure_category'],
   };
 };
 
 export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   const endpoint = 'chat turn';
   const record = requireApiRecord(value, endpoint);
-  const operation = optionalApiRecord(record, 'operation', endpoint);
-  const toolPayload = optionalApiRecord(record, 'tool_payload', endpoint);
+  const operation = parseChatOperation(record.operation, endpoint);
+  const toolPayload = record.tool_payload === undefined || record.tool_payload === null
+    ? record.tool_payload ?? null
+    : requireApiRecord(record.tool_payload, endpoint, 'tool_payload');
   if (toolPayload && 'map_session' in toolPayload) {
     if (toolPayload.map_session === null) {
       toolPayload.map_session = null;
@@ -1362,66 +1442,46 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     return apiContract(endpoint, 'context_usage is malformed', record.context_usage);
   }
 
-  const taskSnapshot = record.task_snapshot === undefined
-    ? undefined
-    : record.task_snapshot === null
-      ? null
-      : normalizeConversationTaskSnapshot(record.task_snapshot);
-  if (record.task_snapshot !== undefined && record.task_snapshot !== null && !taskSnapshot) {
-    return apiContract(endpoint, 'task_snapshot is malformed', record.task_snapshot);
-  }
-
-  const toolPlan = optionalApiRecord(record, 'tool_plan', endpoint);
-  const failureDiagnostic = optionalApiRecord(record, 'failure_diagnostic', endpoint);
-  const visualizationUpdate = optionalApiRecord(record, 'visualization_update', endpoint);
-  const contextRevision = optionalApiNumber(record, 'context_revision', endpoint);
-  const canonicalRequest = record.canonical_request === undefined || record.canonical_request === null
-    ? record.canonical_request ?? undefined
-    : optionalApiRecord(record, 'canonical_request', endpoint);
+  const contextRevision = requireApiNumber(record, 'context_revision', endpoint);
   const route = record.route === undefined || record.route === null
     ? record.route ?? undefined
     : parseNativeRoute(record.route, endpoint);
+  const goal = record.goal === undefined || record.goal === null
+    ? record.goal ?? undefined
+    : parseNativeGoal(record.goal, endpoint);
+  const completionContract = record.completion_contract === undefined || record.completion_contract === null
+    ? record.completion_contract ?? undefined
+    : parseCompletionContract(record.completion_contract, endpoint);
+  const conversationState = record.conversation_state === undefined || record.conversation_state === null
+    ? record.conversation_state ?? undefined
+    : parseConversationState(record.conversation_state, endpoint);
   const executionTrace = record.execution_trace === undefined || record.execution_trace === null
     ? record.execution_trace ?? undefined
     : requireApiJsonObject(record.execution_trace, endpoint, 'execution_trace');
-  const presentationStatus = record.presentation_status === undefined
-    ? undefined
-    : typeof record.presentation_status === 'string'
-      && NATIVE_PRESENTATION_STATUSES.includes(record.presentation_status as PresentationStatus)
-      ? record.presentation_status as PresentationStatus
-      : apiContract(endpoint, 'presentation_status is unsupported', record.presentation_status);
-  const toolResults = record.tool_results === undefined
-    ? undefined
-    : requireApiArray(record.tool_results, endpoint, 'tool_results')
-      .map((item, index) => parseNativeToolResult(item, endpoint, index));
-  const turnContract = record.turn_contract === undefined || record.turn_contract === null
-    ? record.turn_contract ?? undefined
-    : requireRecord(record.turn_contract, 'turn_contract') as unknown as ChatTurnResponse['turn_contract'];
-  const decision = record.decision === undefined || record.decision === null
-    ? record.decision ?? undefined
-    : requireRecord(record.decision, 'decision') as unknown as ChatTurnResponse['decision'];
+  const presentationStatus = requireApiString(record, 'presentation_status', endpoint);
+  if (!NATIVE_PRESENTATION_STATUSES.includes(presentationStatus as PresentationStatus)) {
+    return apiContract(endpoint, 'presentation_status is unsupported', presentationStatus);
+  }
+  const toolResults = requireApiArray(record.tool_results, endpoint, 'tool_results')
+    .map((item, index) => parseNativeToolResult(item, endpoint, index));
 
   return {
     conversation_id: requireString(record.conversation_id, 'conversation_id'),
     request_id: requireString(record.request_id, 'request_id'),
     assistant_message: requireString(record.assistant_message, 'assistant_message'),
-    turn_contract: turnContract,
-    decision,
-    operation: operation as unknown as ChatTurnResponse['operation'],
+    operation,
     tool_payload: toolPayload as ChatTurnResponse['tool_payload'],
     map_session: mapSession,
     memory_snapshot: requireApiJsonObject(record.memory_snapshot, endpoint, 'memory_snapshot'),
     context_usage: contextUsage,
-    task_snapshot: taskSnapshot as unknown as ChatTurnResponse['task_snapshot'],
-    tool_plan: toolPlan as unknown as ChatTurnResponse['tool_plan'],
-    failure_diagnostic: failureDiagnostic as unknown as ChatTurnResponse['failure_diagnostic'],
-    visualization_update: visualizationUpdate as unknown as ChatTurnResponse['visualization_update'],
     context_revision: contextRevision,
-    canonical_request: canonicalRequest as ChatTurnResponse['canonical_request'],
     execution_trace: executionTrace as ChatTurnResponse['execution_trace'],
     route: route as ChatTurnResponse['route'],
-    presentation_status: presentationStatus,
+    goal: goal as ChatTurnResponse['goal'],
+    completion_contract: completionContract as ChatTurnResponse['completion_contract'],
+    presentation_status: presentationStatus as PresentationStatus,
     tool_results: toolResults,
+    conversation_state: conversationState as ChatTurnResponse['conversation_state'],
   };
 };
 
@@ -1473,7 +1533,7 @@ const normalizeActiveConversationRun = (
 };
 
 export const parseStructuredProbeResponse = (value: unknown): StructuredProbeResponse => {
-  const endpoint = 'structured parser probe';
+  const endpoint = 'native structured-response probe';
   const record = requireApiRecord(value, endpoint);
   const status = requireApiString(record, 'status', endpoint);
   if (!['not_tested', 'passed', 'failed', 'timeout', 'unsupported'].includes(status)) {
@@ -1509,14 +1569,7 @@ export const parseConversationSnapshotResponse = (
   }
   const messages = parsedMessages.filter((message): message is ChatMessage => message !== undefined);
 
-  const taskSnapshot = value.task_snapshot === undefined || value.task_snapshot === null
-    ? value.task_snapshot ?? undefined
-    : normalizeConversationTaskSnapshot(value.task_snapshot);
-  if (value.task_snapshot !== undefined
-    && value.task_snapshot !== null
-    && !taskSnapshot) {
-    throw new Error('Unexpected conversation snapshot task format');
-  }
+  const conversationState = parseConversationState(value.conversation_state);
 
   const mapSession = value.map_session === undefined || value.map_session === null
     ? value.map_session ?? undefined
@@ -1545,7 +1598,7 @@ export const parseConversationSnapshotResponse = (
     title: value.title as string | null | undefined,
     context_revision: value.context_revision,
     messages,
-    task_snapshot: taskSnapshot,
+    conversation_state: conversationState,
     memory_snapshot: value.memory_snapshot,
     map_session: mapSession,
     active_run: activeRun,

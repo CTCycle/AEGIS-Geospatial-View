@@ -75,7 +75,7 @@ describe('realtime parsers', () => {
       timestamp: '2026-08-17T08:00:00Z',
       visibility: 'user',
       payload: {
-        phase: 'parser',
+        phase: 'native_loop',
         context_usage: {
           estimated_input_tokens: 700,
           model_context_limit: 4096,
@@ -88,7 +88,7 @@ describe('realtime parsers', () => {
 
     expect(event?.type).toBe('context_usage');
     const phase: unknown = event?.payload['phase'];
-    expect(phase).toBe('parser');
+    expect(phase).toBe('native_loop');
   });
 
   it('normalizes valid terminal fields and ignores malformed optional fields', () => {
@@ -106,15 +106,7 @@ describe('realtime parsers', () => {
         provider: 'ollama',
         model: 'llama3.2',
       },
-      decision: {
-        plan: {
-          state: 'direct_tool',
-          action_id: 'location_lookup',
-          overlay_ids: [],
-        },
-      },
       map_session: { session_id: 42 },
-      task_snapshot: { conversation_key: 'conversation-1', tasks: [{ malformed: true }] },
       route: {
         primary_domain: 'data_retrieval',
         secondary_domains: [],
@@ -124,6 +116,11 @@ describe('realtime parsers', () => {
         capability_queries: ['evidence'],
         explicit_capability_ids: [],
         clarification_question: null,
+        operation: 'retrieve',
+        target_refs: [],
+        temporal_scope: { mode: 'none', granularity: 'none', aggregation: 'none' },
+        spatial_scope: null,
+        filters: {},
       },
       presentation_status: 'not_requested',
       tool_results: [{
@@ -143,9 +140,7 @@ describe('realtime parsers', () => {
     const memorySnapshot: unknown = parsed.memorySnapshot;
     expect(memorySnapshot).toEqual({ topic: 'maps' });
     expect(parsed.contextUsage?.estimated_input_tokens).toBe(120);
-    expect(parsed.decision?.plan.action_id).toBe('location_lookup');
     expect(parsed.mapSession).toBeUndefined();
-    expect(parsed.taskSnapshot).toBeUndefined();
     expect(parsed.route?.primary_domain).toBe('data_retrieval');
     expect(parsed.presentationStatus).toBe('not_requested');
     expect(parsed.toolResults?.[0].evidence_refs).toEqual(['evidence-1']);

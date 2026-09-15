@@ -49,7 +49,6 @@ from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.credentials import CredentialRepository
-from server.services.search.composition import build_search_runtime
 from server.services.catalog.startup import seed_reference_catalog
 from server.services.startup_validation import run_startup_validations
 
@@ -113,13 +112,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         raise
 
     geospatial_runtime = build_geospatial_runtime(database, settings=settings)
-    search_runtime = build_search_runtime(
-        capability_registry=geospatial_runtime.capability_registry,
-        provider_registry=geospatial_runtime.provider_registry,
-        credential_resolver=geospatial_runtime.credential_resolver,
-    )
     chat_runtime = build_chat_runtime(
-        search_runtime.search_orchestrator,
         database,
         geospatial_runtime=geospatial_runtime,
         application_timezone=getattr(
@@ -170,7 +163,6 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         aggregation_service=aggregation_service,
         event_publisher=run_event_publisher,
         conversation_repository=conversation_repository,
-        task_state_service=chat_runtime.task_state_service,
     )
     realtime_connections = RealtimeConnectionRegistry()
     realtime_metrics = RealtimeMetrics()
@@ -178,7 +170,6 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         chat_streaming_service=chat_streaming_service,
         polling_interval=settings.jobs.polling_interval,
     )
-    application.state.search_runtime = search_runtime
     application.state.chat_runtime = chat_runtime
     application.state.geospatial_runtime = geospatial_runtime
     application.state.chat_streaming_service = chat_streaming_service
@@ -197,6 +188,9 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         job_service.start()
         chat_runtime.settings_service.get_settings()
         run_startup_validations(CredentialRepository(database))
+        resume_active_runs = getattr(run_lifecycle_service, "resume_active_runs", None)
+        if callable(resume_active_runs):
+            resume_active_runs()
         yield
     finally:
         await realtime_connections.close_all()

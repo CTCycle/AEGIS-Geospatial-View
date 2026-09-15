@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from server.common.typing import json_object
 
 from uuid import uuid4
@@ -110,6 +112,36 @@ class AgentRunEventRepository:
                 )
                 or 0
             )
+
+    # -------------------------------------------------------------------------
+    def get_latest_checkpoint_state(
+        self,
+        run_id: str,
+        *,
+        run_version: int,
+    ) -> dict[str, Any] | None:
+        """Load the last durable native run checkpoint for one version."""
+
+        with self._session_factory() as session:
+            record = session.scalar(
+                select(AgentRunEventRecord)
+                .where(
+                    AgentRunEventRecord.run_id == run_id,
+                    AgentRunEventRecord.run_version == run_version,
+                    AgentRunEventRecord.type == RunEventType.CHECKPOINT.value,
+                    AgentRunEventRecord.visibility == RunEventVisibility.INTERNAL.value,
+                )
+                .order_by(AgentRunEventRecord.sequence.desc())
+                .limit(1)
+            )
+        if record is None:
+            return None
+        payload = json_object(record.payload_json)
+        checkpoint = payload.get("payload")
+        if not isinstance(checkpoint, dict):
+            return None
+        run_state = checkpoint.get("run_state")
+        return cast(dict[str, Any], run_state) if isinstance(run_state, dict) else None
 
     # -------------------------------------------------------------------------
     @staticmethod

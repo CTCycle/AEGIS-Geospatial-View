@@ -1,6 +1,6 @@
 # Runtime Modes
 
-Last updated: 2026-09-10
+Last updated: 2026-09-15
 
 ## Supported Modes
 
@@ -16,15 +16,17 @@ Last updated: 2026-09-10
 - Orchestrator: `app/tests/run_tests.bat`
 - Starts backend and frontend, then runs pytest and browser validation
 
-### Agent Loop Rollout
+### Native Agent Harness
 
-`agent_execution.agent_loop_mode` controls the temporary migration boundary:
+Chat and agent runs use one typed route-first native loop. Each run hydrates
+the revisioned conversation state, compiles a goal/completion contract,
+progressively exposes the small native tool surface, and iterates through
+model decisions and bounded observations. Direct map responses remain
+`prepared_unverified` until the realtime browser acknowledgment path is used;
+realtime runs promote only after `map.render_ack` succeeds.
 
-- `legacy` (default) retains the parser/planner compatibility path.
-- `shadow` computes native exposure without external model, provider, evidence,
-  or map execution.
-- `native_v2` runs the typed route-first native loop. Direct map responses remain
-  `prepared_unverified` until a realtime browser acknowledgment path is used.
+There is no runtime legacy/shadow/native switch. Compatibility code and
+rollout-only preview modes were removed as part of the native consolidation.
 
 ### Browser Validation Tooling
 

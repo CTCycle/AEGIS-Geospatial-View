@@ -1,4 +1,4 @@
-"""Native-v2 capability discovery handler."""
+"""Native capability discovery handler."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentState
+from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -40,15 +40,23 @@ class CatalogToolHandler:
     async def discover(
         self,
         request: CapabilityDiscoveryInput,
-        state: AgentState,
+        state: AgentRunState,
     ) -> ToolResult:
         started = time.perf_counter()
         route_domains = {CapabilityDomain.MIXED}
         if state.route is not None:
             route_domains = {state.route.primary_domain, *state.route.secondary_domains}
+        route = state.route
+        location = (
+            next(iter(state.location_refs.values()))
+            if len(state.location_refs) == 1
+            else state.active_map_session.resolved_location
+            if state.active_map_session is not None
+            else None
+        )
         query_values = [request.query] if request.query else (
-            list(state.route.capability_queries)
-            if state.route is not None
+            list(route.capability_queries)
+            if route is not None
             else []
         )
         candidates = self.capability_registry.shortlist(
@@ -59,7 +67,29 @@ class CatalogToolHandler:
             # Pagination is applied after deterministic ranking so a cursor
             # always addresses the same catalog snapshot.
             limit=50,
+            operation=route.operation if route is not None else None,
+            scope_kind=(
+                route.spatial_scope.kind
+                if route is not None and route.spatial_scope is not None
+                else None
+            ),
+            temporal_mode=(
+                route.temporal_scope.mode
+                if route is not None and route.temporal_scope.mode != "none"
+                else None
+            ),
+            requires_render=(
+                route is not None and route.presentation in {"map", "both"}
+            ),
+            location=location,
         )
+        if state.excluded_capability_ids:
+            excluded = set(state.excluded_capability_ids)
+            candidates = [
+                item
+                for item in candidates
+                if str(item.get("id") or "").strip() not in excluded
+            ]
         if request.provider_id:
             provider_id = request.provider_id.casefold()
             candidates = [
@@ -103,7 +133,7 @@ class CatalogToolHandler:
     async def describe(
         self,
         request: DescribeCapabilityInput,
-        state: AgentState,
+        state: AgentRunState,
     ) -> ToolResult:
         started = time.perf_counter()
         capability_id = request.capability_id

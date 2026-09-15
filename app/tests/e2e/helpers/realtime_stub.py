@@ -153,12 +153,17 @@ def register_realtime_stub(
                 key: turn_payload[key]
                 for key in (
                     "context_revision",
-                    "task_snapshot",
-                    "decision",
+                    "route",
+                    "goal",
+                    "completion_contract",
                     "operation",
                     "map_session",
                     "memory_snapshot",
+                    "conversation_state",
                     "context_usage",
+                    "presentation_status",
+                    "tool_results",
+                    "execution_trace",
                 )
                 if key in turn_payload
             }

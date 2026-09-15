@@ -9,7 +9,7 @@ from server.services.llm.types import LLMRequest, LLMToolDefinition
 ###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
-        name="list_geospatial_capabilities",
+        name="discover_geospatial_capabilities",
         description="List catalog",
         parameters_json_schema={"type": "object", "properties": {}},
     )
@@ -19,7 +19,7 @@ def test_openai_converts_tool_definitions() -> None:
     schema = OpenAIProvider.tool_to_openai_schema(_tool())
     assert schema == {
         "type": "function",
-        "name": "list_geospatial_capabilities",
+        "name": "discover_geospatial_capabilities",
         "description": "List catalog",
         "parameters": {
             "type": "object",
@@ -40,7 +40,7 @@ def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
                 "tool_calls": [
                     {
                         "id": "call-1",
-                        "name": "list_geospatial_capabilities",
+                        "name": "discover_geospatial_capabilities",
                         "arguments": {"limit": 5},
                     }
                 ],
@@ -48,14 +48,14 @@ def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
             {
                 "role": "tool",
                 "tool_call_id": "call-1",
-                "name": "list_geospatial_capabilities",
+                "name": "discover_geospatial_capabilities",
                 "content": '{"ok":true}',
             },
         ]
     )
 
     assert messages[0]["type"] == "function_call"
-    assert messages[0]["name"] == "list_geospatial_capabilities"
+    assert messages[0]["name"] == "discover_geospatial_capabilities"
     assert messages[0]["arguments"] == '{"limit":5}'
     assert messages[1] == {
         "type": "function_call_output",

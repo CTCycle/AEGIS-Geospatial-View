@@ -1,6 +1,6 @@
 # Public And Optional Sources
 
-Last updated: 2026-09-08
+Last updated: 2026-09-15
 
 ## Canonical POI path
 
@@ -137,7 +137,7 @@ Use for EV charging station discovery.
   raw secret environment variables are not used.
 - Prototype local snapshots with `AEGIS_OCM_SNAPSHOT_PATH` for bounded, keyless reads.
 - The runtime availability mode is `credential_or_local_source`: without either
-  the saved key or an existing snapshot, catalog and planner availability are
+  the saved key or an existing snapshot, catalog and native-route availability are
   false with an actionable configuration reason.
 - Bound requests by viewport, radius, and result count.
 - Cache station metadata and degrade gracefully on stale or empty results.

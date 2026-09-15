@@ -1,4 +1,4 @@
-"""Prompt declarations for the native-v2 route bootstrap call."""
+"""Prompt declarations for the native route bootstrap call."""
 
 from __future__ import annotations
 

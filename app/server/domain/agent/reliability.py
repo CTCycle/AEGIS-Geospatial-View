@@ -5,22 +5,21 @@ from __future__ import annotations
 import asyncio
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Any, Generator
 
 
-INTERPRETATION_RUN_SECONDS = 90.0
+INITIAL_RUN_SECONDS = 90.0
 SIMPLE_RUN_SECONDS = 150.0
 COMPLEX_RUN_SECONDS = 300.0
-DEFAULT_RUN_SECONDS = INTERPRETATION_RUN_SECONDS
+DEFAULT_RUN_SECONDS = INITIAL_RUN_SECONDS
 DEFAULT_STAGE_LIMITS: dict[str, float] = {
     "context_assembly": 5.0,
-    "structured_intent_extraction": 60.0,
-    "location_resolution": 30.0,
-    "planning": 5.0,
+    "route_request": 60.0,
+    "model_step": 60.0,
     "tool_execution": 90.0,
     "map_assembly": 20.0,
-    "response_synthesis": 30.0,
+    "render_ack": 90.0,
     "persistence": 5.0,
 }
 
@@ -69,21 +68,6 @@ def _new_stage_observations() -> list[StageObservation]:
 
 
 ###############################################################################
-def _new_pipeline_reach() -> dict[str, str]:
-    return {
-        "context_assembly": "not_reached",
-        "structured_intent_extraction": "not_reached",
-        "policy": "not_reached",
-        "location_resolution": "not_reached",
-        "planning": "not_reached",
-        "tool_execution": "not_reached",
-        "map_assembly": "not_reached",
-        "render_ack": "not_reached",
-        "response_synthesis": "not_reached",
-        "persistence": "not_reached",
-    }
-
-###############################################################################
 @dataclass
 class AgentExecutionBudget:
     """One absolute deadline and bounded counters for a complete run."""
@@ -107,8 +91,7 @@ class AgentExecutionBudget:
     retry_count: int = 0
     terminal_reason: str | None = None
     terminal_stage: str | None = None
-    parser_contract: dict[str, Any] | None = None
-    execution_mode: str = "interpretation"
+    run_profile: str = "initial"
     context_allocations: list[dict[str, Any]] = field(
         default_factory=lambda: list[dict[str, Any]]()
     )
@@ -119,7 +102,6 @@ class AgentExecutionBudget:
         default_factory=lambda: list[str]()
     )
     stopping_reason: str | None = None
-    pipeline_reach: dict[str, str] = field(default_factory=_new_pipeline_reach)
 
     # -------------------------------------------------------------------------
     def __post_init__(self) -> None:
@@ -129,7 +111,7 @@ class AgentExecutionBudget:
 
     # -------------------------------------------------------------------------
     def promote(self, profile: str) -> None:
-        """Promote once from interpretation to a bounded run profile."""
+        """Promote once from the initial budget to a bounded run profile."""
 
         requested = (
             min(self.simple_run_seconds, self.hard_max_seconds)
@@ -138,9 +120,11 @@ class AgentExecutionBudget:
         )
         requested = min(requested, self.hard_max_seconds)
         if requested <= self.total_seconds:
+            self.run_profile = profile
             return
         self.total_seconds = requested
         self.deadline_monotonic = self.started_monotonic + requested
+        self.run_profile = profile
 
     deadline_monotonic: float = field(init=False)
 
@@ -186,6 +170,25 @@ class AgentExecutionBudget:
         if self.remaining_seconds() <= 0.0:
             self.terminal_reason = "run_deadline_exhausted"
             raise TimeoutError(f"The agent run deadline expired before {stage}.")
+
+    # -------------------------------------------------------------------------
+    def operation_timeout(
+        self,
+        stage: str,
+        *,
+        requested_seconds: float | None = None,
+    ) -> float:
+        """Return a child timeout bounded by both the stage and run deadline."""
+
+        self.ensure_available(stage)
+        limit = self.stage_limits.get(stage)
+        if requested_seconds is not None:
+            requested = max(0.0, float(requested_seconds))
+            limit = requested if limit is None else min(limit, requested)
+        remaining = self.remaining_seconds()
+        if limit is None:
+            return remaining
+        return min(max(0.0, float(limit)), remaining)
 
     # -------------------------------------------------------------------------
     def record_model_call(self) -> None:
@@ -243,35 +246,6 @@ class AgentExecutionBudget:
         self.iteration_traces.append(dict(trace))
 
     # -------------------------------------------------------------------------
-    def mark_stage_failed(
-        self,
-        stage: str,
-        *,
-        error_code: str | None = None,
-        timeout_origin: str | None = None,
-    ) -> None:
-        """Correct a returned failure that did not raise through ``observe``.
-
-        Parser services intentionally return a non-executable failure contract
-        so the response layer can provide a bounded diagnostic.  The stage
-        record still needs to reflect that extraction failed rather than
-        looking like a successful parse followed by policy clarification.
-        """
-        for index in range(len(self.observations) - 1, -1, -1):
-            observation = self.observations[index]
-            if observation.stage != stage:
-                continue
-            self.observations[index] = replace(
-                observation,
-                status="failed",
-                error_code=error_code or observation.error_code,
-                timeout_origin=timeout_origin or observation.timeout_origin,
-            )
-            break
-        self.pipeline_reach[stage] = "failed"
-        self.terminal_stage = self.terminal_stage or stage
-
-    # -------------------------------------------------------------------------
     @contextmanager
     def observe(
         self,
@@ -300,11 +274,8 @@ class AgentExecutionBudget:
                 else "provider_transport"
             )
             error_code = str(getattr(exc, "code", "") or "timeout")
-            self.terminal_reason = self.terminal_reason or (
-                "application_deadline"
-                if timeout_origin == "application_deadline"
-                else "provider_timeout"
-            )
+            if timeout_origin == "application_deadline":
+                self.terminal_reason = self.terminal_reason or "run_deadline_exhausted"
             raise
         except Exception as exc:
             timeout_origin_value = getattr(exc, "timeout_origin", None)
@@ -326,15 +297,19 @@ class AgentExecutionBudget:
                 metadata=dict(metadata or {}),
             )
             self.observations.append(observation)
-            self.pipeline_reach[stage] = status
             if status in {"failed", "timeout", "cancelled"}:
                 self.terminal_stage = self.terminal_stage or stage
 
     # -------------------------------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
+        remaining_ms = max(0, int(self.remaining_seconds() * 1000))
         return {
             "total_budget_ms": int(self.total_seconds * 1000),
-            "remaining_ms": max(0, int(self.remaining_seconds() * 1000)),
+            "remaining_ms": remaining_ms,
+            # Monotonic clocks cannot survive a process restart.  Keep a wall
+            # clock deadline as a resume hint while in-process enforcement
+            # continues to use the monotonic deadline.
+            "deadline_epoch_ms": int(time.time() * 1000) + remaining_ms,
             "model_calls": self.model_calls,
             "tool_calls": self.tool_calls,
             "state_transitions": self.state_transitions,
@@ -344,14 +319,62 @@ class AgentExecutionBudget:
             "retry_count": self.retry_count,
             "terminal_reason": self.terminal_reason,
             "terminal_stage": self.terminal_stage,
-            "execution_mode": self.execution_mode,
+            "run_profile": self.run_profile,
             "completion_requirements": list(self.completion_requirements),
             "stopping_reason": self.stopping_reason or self.terminal_reason,
             "context_allocations": list(self.context_allocations[-16:]),
             "iteration_traces": list(self.iteration_traces[-12:]),
-            "parser_contract": (
-                dict(self.parser_contract) if self.parser_contract is not None else None
-            ),
-            "pipeline_reach": dict(self.pipeline_reach),
             "stages": [item.to_dict() for item in self.observations[-32:]],
         }
+
+    # -------------------------------------------------------------------------
+    def restore_from_snapshot(self, snapshot: dict[str, Any]) -> None:
+        """Restore bounded counters and deadline after a process restart."""
+
+        def _nonnegative_int(name: str) -> int:
+            value = snapshot.get(name, 0)
+            return max(0, int(value)) if isinstance(value, (int, float)) else 0
+
+        self.model_calls = _nonnegative_int("model_calls")
+        self.tool_calls = _nonnegative_int("tool_calls")
+        self.state_transitions = _nonnegative_int("state_transitions")
+        self.retry_count = _nonnegative_int("retry_count")
+        profile = snapshot.get("run_profile")
+        if isinstance(profile, str) and profile in {"initial", "simple", "complex"}:
+            self.run_profile = profile
+        terminal_reason = snapshot.get("terminal_reason")
+        self.terminal_reason = (
+            terminal_reason if isinstance(terminal_reason, str) else None
+        )
+        terminal_stage = snapshot.get("terminal_stage")
+        self.terminal_stage = terminal_stage if isinstance(terminal_stage, str) else None
+        stopping_reason = snapshot.get("stopping_reason")
+        self.stopping_reason = (
+            stopping_reason if isinstance(stopping_reason, str) else None
+        )
+        allocations = snapshot.get("context_allocations")
+        if isinstance(allocations, list):
+            self.context_allocations = [
+                dict(item) for item in allocations if isinstance(item, dict)
+            ][-16:]
+        iterations = snapshot.get("iteration_traces")
+        if isinstance(iterations, list):
+            self.iteration_traces = [
+                dict(item) for item in iterations if isinstance(item, dict)
+            ][-12:]
+
+        deadline_epoch_ms = snapshot.get("deadline_epoch_ms")
+        if isinstance(deadline_epoch_ms, (int, float)):
+            remaining_seconds = max(
+                0.0, (float(deadline_epoch_ms) - time.time() * 1000) / 1000.0
+            )
+        else:
+            remaining_seconds = max(
+                0.0, float(snapshot.get("remaining_ms") or 0) / 1000.0
+            )
+        self.total_seconds = min(
+            self.hard_max_seconds,
+            max(0.001, float(snapshot.get("total_budget_ms") or 0) / 1000.0),
+        )
+        self.started_monotonic = time.monotonic()
+        self.deadline_monotonic = self.started_monotonic + remaining_seconds

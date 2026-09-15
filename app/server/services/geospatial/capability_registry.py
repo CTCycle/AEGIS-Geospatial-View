@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 from server.common.typing import json_object
 from server.domain.geospatial.registry import (
@@ -28,12 +28,12 @@ class RuntimeEligibility(Protocol):
 
 ###############################################################################
 def normalized_execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
-    """Return explicit or conservatively inferred execution semantics.
+    """Return the explicit schema-v2 execution semantics for a capability.
 
-    Older catalog entries predate ``executionContract`` but still declare the
-    geometry, capability kind, and retrieval behavior needed for a bounded
-    routing decision.  Infer only those facts from typed metadata; an explicit
-    contract, including an explicitly empty one, remains authoritative.
+    Routing metadata is part of the manifest contract.  The registry must not
+    infer executable behavior from capability kind, geometry, or free-text
+    descriptions: an incomplete manifest is rejected from the executable
+    shortlist instead of silently acquiring a second routing contract.
     """
 
     metadata = json_object(capability.get("metadata"))
@@ -78,87 +78,6 @@ def normalized_execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
     contract["coverage"] = (
         str(raw.get("coverage")).strip() if raw.get("coverage") is not None else None
     )
-    if isinstance(raw_value, dict):
-        return contract
-
-    capability_type = str(capability.get("type") or "").strip().casefold()
-    capability_kind = str(
-        capability.get("capabilityKind")
-        or capability.get("capability_kind")
-        or ""
-    ).strip().casefold()
-    geometry = str(
-        metadata.get("geometry_type") or capability.get("geometry_type") or ""
-    ).strip().casefold().replace("_", "-")
-    queryable = bool(metadata.get("queryable", False))
-    vectorizable = bool(metadata.get("vectorizable", False))
-    raster = (
-        capability_kind == "raster-overlay"
-        or capability_type in {"tile", "wms", "wmts", "raster", "raster-overlay"}
-        or geometry in {"raster-grid", "raster", "tile"}
-    )
-    analysis = capability_kind in {"analysis-tool", "analysis_tool"} or capability_type in {
-        "direct-tool",
-        "direct_tool",
-        "point-insight",
-        "time-series-insight",
-    }
-    vector = (
-        capability_kind in {"vector-overlay", "dataset-ingestion", "search-index"}
-        or queryable
-        or vectorizable
-    ) and not analysis
-    capability_values: list[str] = []
-    for value in (
-        capability.get("name"),
-        capability.get("description"),
-        capability.get("capabilities"),
-        metadata.get("keywords"),
-        metadata.get("action_tags"),
-    ):
-        if isinstance(value, list):
-            capability_values.extend(
-                str(item) for item in cast(list[object], value)
-            )
-        else:
-            capability_values.append(str(value or ""))
-    capability_tokens = {
-        token.casefold()
-        for value in capability_values
-        for token in re.findall(r"[a-z0-9]+", value.casefold())
-    }
-
-    if raster:
-        contract["supported_scope_kinds"] = ["bbox"]
-        contract["render_support"] = "raster"
-        contract["output_geometry_type"] = "raster-grid"
-    elif analysis and geometry in {"point", "not-applicable", "none", ""}:
-        contract["supported_scope_kinds"] = ["point", "bbox"]
-        contract["render_support"] = "metadata_only"
-        contract["output_geometry_type"] = "Point"
-    elif vector and geometry in {"point", "line", "linestring", "polygon", "multipolygon"}:
-        contract["render_support"] = "vector"
-        contract["output_geometry_type"] = (
-            "Point" if geometry == "point" else geometry
-        )
-    elif geometry:
-        contract["supported_scope_kinds"] = ["bbox"]
-        contract["render_support"] = "vector" if vector else "none"
-        contract["output_geometry_type"] = geometry
-
-    operations = ["show"]
-    if queryable:
-        operations.extend(["search", "filter"])
-    if "forecast" in capability_tokens:
-        operations.append("forecast")
-    contract["supported_operations"] = operations
-    if metadata.get("requires_location") is True or geometry not in {"", "global"}:
-        contract["required_inputs"] = ["location"]
-    if "forecast" in capability_tokens:
-        contract["temporal_modes"] = ["current", "forecast"]
-    contract["coverage"] = str(
-        capability.get("coverage") or ""
-    ).strip() or None
     return contract
 
 
@@ -384,6 +303,8 @@ class CapabilityRegistry:
                 continue
             if not runtime_registry.access_available(capability_id):
                 continue
+            if not _has_explicit_execution_contract(item):
+                continue
             declared_domains = _declared_domains(item)
             if requested_domains and CapabilityDomain.MIXED not in requested_domains:
                 if not declared_domains.intersection(requested_domains):
@@ -397,6 +318,8 @@ class CapabilityRegistry:
                 requires_render=requires_render
                 and _has_explicit_execution_contract(item),
             ):
+                continue
+            if _avoid_when_conflicts(item, normalized_queries, location):
                 continue
             if location is not None and not _coverage_matches(
                 str(contract.get("coverage") or item.get("coverage") or ""),
@@ -524,9 +447,17 @@ def _coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
     ).strip()
     if not country:
         return True
-    if any(token in normalized for token in ("united states", " usa ", " us ")):
-        return any(token in country for token in ("united states", "usa", " us "))
-    if any(token in normalized for token in ("europe", " eu ", "eea")):
+    coverage_tokens = set(normalized.split())
+    country_tokens = set(country.split())
+    if (
+        "united" in coverage_tokens and "states" in coverage_tokens
+    ) or "usa" in coverage_tokens or "us" in coverage_tokens:
+        return (
+            {"united", "states"}.issubset(country_tokens)
+            or "usa" in country_tokens
+            or "us" in country_tokens
+        )
+    if "europe" in coverage_tokens or "eu" in coverage_tokens or "eea" in coverage_tokens:
         return any(
             token in country
             for token in (
@@ -551,6 +482,56 @@ def _coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
             )
         )
     return True
+
+
+def _avoid_when_conflicts(
+    capability: dict[str, Any],
+    query_tokens: set[str],
+    location: ResolvedLocation | None,
+) -> bool:
+    """Reject explicit manifest avoid-conditions before relevance ranking."""
+
+    agentic_use = capability.get("agenticUse")
+    if not isinstance(agentic_use, dict):
+        agentic_use = capability.get("agentic_use")
+    raw_avoid = agentic_use.get("avoidWhen") if isinstance(agentic_use, dict) else None
+    if not isinstance(raw_avoid, list):
+        return False
+
+    ignored = {
+        "a",
+        "an",
+        "and",
+        "analysis",
+        "chat",
+        "context",
+        "for",
+        "general",
+        "in",
+        "not",
+        "of",
+        "or",
+        "request",
+        "requests",
+        "source",
+        "the",
+        "use",
+        "with",
+    }
+    for raw_phrase in raw_avoid:
+        phrase = str(raw_phrase or "").casefold()
+        phrase_tokens = {
+            token
+            for token in re.findall(r"[a-z0-9]+", phrase)
+            if token not in ignored
+        }
+        if not phrase_tokens:
+            continue
+        if "no geographic context" in phrase and location is None:
+            return True
+        if phrase_tokens.intersection(query_tokens):
+            return True
+    return False
 
 ###############################################################################
 def _declared_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:

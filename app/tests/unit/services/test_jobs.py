@@ -16,33 +16,13 @@ class _ChatStreamingStub:
 
     # -------------------------------------------------------------------------
     async def stream_turn(self, payload: ChatTurnRequest):
-        yield ChatStreamEvent(event="parsed", data={"request_id": payload.request_id})
+        yield ChatStreamEvent(event="status", data={"request_id": payload.request_id})
         yield ChatStreamEvent(
             event="final",
             data={
                 "request_id": payload.request_id,
                 "conversation_id": payload.conversation_id,
                 "assistant_message": "done",
-                "turn_contract": {
-                    "task_class": "general_question",
-                    "user_text": payload.message,
-                    "normalized_action": {
-                        "action_id": "ask",
-                        "requires_location": False,
-                        "task_tags": [],
-                        "action_tags": [],
-                    },
-                    "location_signals": [],
-                    "ambiguities": [],
-                },
-                "decision": {
-                    "plan": {
-                        "state": "direct_response",
-                        "action_id": "ask",
-                        "mode": "chat",
-                    },
-                    "trace": {"steps": ["done"]},
-                },
                 "operation": {
                     "kind": "direct_answer",
                     "status": "success",
@@ -51,6 +31,9 @@ class _ChatStreamingStub:
                 "map_session": None,
                 "tool_payload": None,
                 "memory_snapshot": {},
+                "context_revision": 1,
+                "presentation_status": "not_requested",
+                "tool_results": [],
                 "context_usage": None,
             },
         )
@@ -80,26 +63,6 @@ class _ChatStreamingFailureStub:
                 "request_id": payload.request_id,
                 "conversation_id": payload.conversation_id,
                 "assistant_message": "failed",
-                "turn_contract": {
-                    "task_class": "general_question",
-                    "user_text": payload.message,
-                    "normalized_action": {
-                        "action_id": "ask",
-                        "requires_location": False,
-                        "task_tags": [],
-                        "action_tags": [],
-                    },
-                    "location_signals": [],
-                    "ambiguities": [],
-                },
-                "decision": {
-                    "plan": {
-                        "state": "direct_response",
-                        "action_id": "ask",
-                        "mode": "chat",
-                    },
-                    "trace": {"steps": ["done"]},
-                },
                 "operation": {
                     "kind": "error",
                     "status": "failed",
@@ -108,6 +71,9 @@ class _ChatStreamingFailureStub:
                 "map_session": None,
                 "tool_payload": None,
                 "memory_snapshot": {},
+                "context_revision": 1,
+                "presentation_status": "not_requested",
+                "tool_results": [],
                 "context_usage": None,
             },
         )

@@ -1,21 +1,20 @@
-"""Native-v2 turn coordination and the temporary response adapter."""
+"""Native turn coordination and the application response adapter."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from server.contracts.chat import (
     ChatOperationResult,
-    NativeToolResultSummary,
-    NativeV2TurnResponse,
+    AgentToolResultSummary,
+    AgentTurnResponse,
 )
 from server.contracts.geospatial import MapSession
 from server.domain.agent.context import AgentContextPackage
-from server.domain.agent.capability_route import AgentState
+from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.decision import ResolvedLocation
-from server.domain.agent.interpretation import CanonicalRequestInterpretation
 from server.domain.agent.reliability import AgentExecutionBudget
 from server.services.agent.agent_loop import AgentLoop, AgentLoopOutcome, AgentLoopRequest
 from server.services.agent.agent_state_factory import AgentStateFactory
@@ -23,7 +22,7 @@ from server.services.agent.agent_state_factory import AgentStateFactory
 
 ###############################################################################
 @dataclass(frozen=True)
-class NativeV2TurnRequest:
+class AgentTurnRequest:
     request_id: str
     conversation_id: str
     user_message: str
@@ -35,18 +34,18 @@ class NativeV2TurnRequest:
     active_map_session: MapSession | None = None
     location_refs: Mapping[str, ResolvedLocation] = field(default_factory=dict)
     evidence_refs: list[str] = field(default_factory=list)
-    canonical_request: CanonicalRequestInterpretation | None = None
     run_version: int = 1
     conversation_revision: int = 0
     checkpoint: Mapping[str, Any] | None = None
     defer_map_commit: bool = False
     run_id: str | None = None
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
+    checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None
     run_state_check: Callable[[], str | None] | None = None
 
 
 ###############################################################################
-class NativeV2TurnRunner:
+class AgentTurnRunner:
     """Run one typed native turn and build a bounded public result."""
 
     # -------------------------------------------------------------------------
@@ -55,9 +54,9 @@ class NativeV2TurnRunner:
         self.execution_settings = execution_settings
 
     # -------------------------------------------------------------------------
-    async def run(self, request: NativeV2TurnRequest) -> NativeV2TurnResponse:
+    async def run(self, request: AgentTurnRequest) -> AgentTurnResponse:
         if request.checkpoint is not None:
-            state = AgentState.from_checkpoint(dict(request.checkpoint))
+            state = AgentRunState.from_checkpoint(dict(request.checkpoint))
             if (
                 state.request_id != request.request_id
                 or state.conversation_id != request.conversation_id
@@ -68,6 +67,7 @@ class NativeV2TurnRunner:
             state.run_version = request.run_version
             state.conversation_revision = request.conversation_revision
             state.termination_reason = None
+            request.budget.restore_from_snapshot(state.budget_snapshot)
         else:
             state = AgentStateFactory.create(
                 request_id=request.request_id,
@@ -81,7 +81,6 @@ class NativeV2TurnRunner:
                 run_version=request.run_version,
                 conversation_revision=request.conversation_revision,
             )
-            state.canonical_request = request.canonical_request
         outcome = await self.agent_loop.run(
             AgentLoopRequest(
                 provider=request.provider,
@@ -103,6 +102,15 @@ class NativeV2TurnRunner:
                 ),
                 max_state_transitions=_setting(
                     self.execution_settings, "complex_max_state_transitions", 32
+                ),
+                simple_max_model_calls=_setting(
+                    self.execution_settings, "simple_max_model_calls", 4
+                ),
+                simple_max_tool_calls=_setting(
+                    self.execution_settings, "simple_max_tool_calls", 6
+                ),
+                simple_max_state_transitions=_setting(
+                    self.execution_settings, "simple_max_state_transitions", 32
                 ),
                 max_parallel_tool_calls=_setting(
                     self.execution_settings, "max_parallel_tool_calls", 8
@@ -129,28 +137,29 @@ class NativeV2TurnRunner:
                     self.execution_settings, "model_max_attempts", 2
                 ),
                 context_usage_callback=request.context_usage_callback,
+                checkpoint_callback=request.checkpoint_callback,
                 run_state_check=request.run_state_check,
             )
         )
-        return NativeV2ResponseBuilder.build(
+        return AgentResponseBuilder.build(
             request=request,
             outcome=outcome,
         )
 
 
 ###############################################################################
-class NativeV2ResponseBuilder:
+class AgentResponseBuilder:
 
     # -------------------------------------------------------------------------
     @staticmethod
     def build(
-        *, request: NativeV2TurnRequest, outcome: AgentLoopOutcome
-    ) -> NativeV2TurnResponse:
+        *, request: AgentTurnRequest, outcome: AgentLoopOutcome
+    ) -> AgentTurnResponse:
         state = outcome.state
         map_session = state.prepared_map_session
         message = outcome.final_text.strip() or _fallback_message(outcome)
         summaries = [
-            NativeToolResultSummary(
+            AgentToolResultSummary(
                 call_id=result.call_id,
                 tool_name=result.tool_name,
                 status=result.status,
@@ -162,11 +171,13 @@ class NativeV2ResponseBuilder:
             for result in outcome.tool_results
         ]
         operation = _operation(outcome, map_session, message)
-        return NativeV2TurnResponse(
+        return AgentTurnResponse(
             request_id=request.request_id,
             conversation_id=request.conversation_id,
             assistant_message=message,
             route=state.route,
+            goal=state.goal,
+            completion_contract=state.completion_contract,
             operation=operation,
             map_session=map_session,
             presentation_status=_presentation_status(
@@ -175,7 +186,6 @@ class NativeV2ResponseBuilder:
                 defer_map_commit=request.defer_map_commit,
             ),
             tool_results=summaries,
-            canonical_request=request.canonical_request,
             execution_trace={
                 "stopped_reason": outcome.stopped_reason,
                 "model_calls": outcome.model_calls,
@@ -220,10 +230,15 @@ def _operation(
     if outcome.failure_category is not None or outcome.stopped_reason in {
         "failed",
         "insufficient_evidence",
+        "provider_error",
+        "context_limit",
         "model_budget_exhausted",
         "tool_budget_exhausted",
         "transition_budget_exhausted",
         "run_deadline_exhausted",
+        "no_progress",
+        "cancelled",
+        "superseded",
     }:
         return ChatOperationResult(
             kind="error",
@@ -269,18 +284,24 @@ def _fallback_message(outcome: AgentLoopOutcome) -> str:
 ###############################################################################
 def _response_failure_category(value: str | None) -> str | None:
     if value == "provider_error":
-        return "provider_api"
+        return "provider_failure"
     if value in {
         "model_capability",
         "provider_api",
+        "provider_failure",
         "schema_definition",
         "response_parsing",
         "context_limit",
+        "insufficient_evidence",
         "model_budget_exhausted",
         "tool_budget_exhausted",
         "transition_budget_exhausted",
+        "run_deadline_exhausted",
+        "no_progress",
+        "cancelled",
+        "superseded",
     }:
-        return "context_limit" if value.endswith("_budget_exhausted") else value
+        return value
     return None
 
 
@@ -290,4 +311,4 @@ def _setting(settings: Any, name: str, default: int | float) -> Any:
     return value if isinstance(value, (int, float)) and not isinstance(value, bool) else default
 
 
-__all__ = ["NativeV2ResponseBuilder", "NativeV2TurnRequest", "NativeV2TurnRunner"]
+__all__ = ["AgentResponseBuilder", "AgentTurnRequest", "AgentTurnRunner"]

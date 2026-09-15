@@ -96,7 +96,7 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
     ),
     _catalog_model(
         name="gpt-4.1-mini",
-        description="Fast OpenAI model for responsive chat and structured extraction.",
+        description="Fast OpenAI model for responsive chat and structured native responses.",
         provider="openai",
         family="gpt-4.1",
         capabilities=["chat", "stream", "structured", "structured_output", "tools"],

@@ -8,7 +8,7 @@ from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
     AgentGoal,
     AgentPhase,
-    AgentState,
+    AgentRunState,
     CapabilityRoute,
 )
 from server.domain.agent.decision import ResolvedLocation
@@ -18,7 +18,7 @@ from server.contracts.geospatial import (
     GeospatialProviderLayersResponse,
 )
 from server.services.agent.capability_execution import ToolExecutionContext
-from server.services.agent.native_v2_tools import register_native_v2_tools
+from server.services.agent.native_v2_tools import register_agent_tools
 from server.services.agent.native_v2_tools import _execute_capability_handler
 from server.services.agent.native_v2_tools import _bind_execute_request
 from server.services.agent.native_v2_tools import _location_for_request
@@ -109,7 +109,7 @@ class FakeCapabilityExecutionService:
 def _registry() -> ToolRegistry:
     runtime = FakeRuntimeRegistry()
     registry = ToolRegistry(runtime_registry=runtime)  # type: ignore[arg-type]
-    register_native_v2_tools(
+    register_agent_tools(
         registry,
         capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
         runtime_registry=runtime,  # type: ignore[arg-type]
@@ -122,8 +122,8 @@ def _registry() -> ToolRegistry:
 
 
 ###############################################################################
-def _state() -> AgentState:
-    return AgentState(
+def _state() -> AgentRunState:
+    return AgentRunState(
         request_id="request-1",
         conversation_id="conversation-1",
         phase=AgentPhase.ROUTE_REQUEST,

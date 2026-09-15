@@ -8,7 +8,7 @@ from server.contracts.geospatial import (
     OverlayInstance,
     ViewportPolicy,
 )
-from server.domain.agent.capability_route import AgentPhase, AgentState
+from server.domain.agent.capability_route import AgentPhase, AgentRunState
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.evidence import AgentEvidenceSummary
 from server.domain.agent.map_plan import (
@@ -79,8 +79,8 @@ def _state(
     *,
     active_map_session: MapSession | None = None,
     phase: AgentPhase = AgentPhase.BUILD_TOOL_CONTEXT,
-) -> AgentState:
-    return AgentState(
+) -> AgentRunState:
+    return AgentRunState(
         request_id="request-1",
         conversation_id="conversation-1",
         phase=phase,

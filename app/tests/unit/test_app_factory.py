@@ -26,7 +26,6 @@ def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
         agent_orchestrator=object(),
         conversation_repository=object(),
         history_service=object(),
-        task_state_service=object(),
         settings_service=SimpleNamespace(
             get_settings=lambda: call_order.append("settings_service.get_settings")
         ),
@@ -123,9 +122,6 @@ def test_openapi_declares_stable_response_models(monkeypatch) -> None:
 ###############################################################################
 def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     call_order: list[str] = []
-    search_runtime = SimpleNamespace(
-        search_orchestrator=SimpleNamespace(execute=lambda payload: payload),
-    )
     chat_runtime = _build_chat_runtime(call_order)
     geospatial_runtime = _build_geospatial_runtime()
     job_service = SimpleNamespace(
@@ -142,20 +138,15 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         app_module,
-        "build_search_runtime",
-        lambda **kwargs: call_order.append("build_search_runtime") or search_runtime,
-    )
-    monkeypatch.setattr(
-        app_module,
         "build_chat_runtime",
-        lambda orchestrator, database, **kwargs: (
+        lambda database, **kwargs: (
             call_order.append("build_chat_runtime") or chat_runtime
         ),
     )
     monkeypatch.setattr(
         app_module,
         "build_geospatial_runtime",
-        lambda database: (
+        lambda database, **kwargs: (
             call_order.append("build_geospatial_runtime") or geospatial_runtime
         ),
     )
@@ -185,7 +176,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     created = app_module.create_app()
 
     with TestClient(created):
-        assert created.state.search_runtime is search_runtime
         assert created.state.chat_runtime is chat_runtime
         assert created.state.geospatial_runtime is geospatial_runtime
         assert created.state.job_service is job_service
@@ -193,7 +183,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     assert call_order == [
         "initialize_database",
         "build_geospatial_runtime",
-        "build_search_runtime",
         "build_chat_runtime",
         "job_service.start",
         "settings_service.get_settings",
@@ -204,7 +193,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
 ###############################################################################
 def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> None:
     call_order: list[str] = []
-    search_runtime = SimpleNamespace(search_orchestrator=SimpleNamespace())
     chat_runtime = _build_chat_runtime(call_order)
     lifecycle = _LifecycleStub(call_order)
     geospatial_runtime = _build_geospatial_runtime()
@@ -219,15 +207,14 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
         app_module, "initialize_database", lambda backend, **kwargs: None
     )
     monkeypatch.setattr(
-        app_module, "build_search_runtime", lambda **_kwargs: search_runtime
+        app_module,
+        "build_chat_runtime",
+        lambda database, **kwargs: chat_runtime,
     )
     monkeypatch.setattr(
         app_module,
-        "build_chat_runtime",
-        lambda orchestrator, database, **kwargs: chat_runtime,
-    )
-    monkeypatch.setattr(
-        app_module, "build_geospatial_runtime", lambda database: geospatial_runtime
+        "build_geospatial_runtime",
+        lambda database, **kwargs: geospatial_runtime,
     )
     monkeypatch.setattr(
         app_module, "AgentRunEventRepository", lambda database: object()

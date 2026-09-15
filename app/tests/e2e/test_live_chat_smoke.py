@@ -43,9 +43,9 @@ def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
         assistant = str(body.get("assistant_message") or "").lower()
         if (
             "configured agent model" in assistant
-            and "structured extraction" in assistant
+            and "native agent" in assistant
         ):
-            return False, "Configured agent model cannot perform structured extraction"
+            return False, "Configured agent model cannot run the native agent"
         return True, ""
     if response.status in {400, 502, 503}:
         return False, f"Live provider precondition failed with status {response.status}"

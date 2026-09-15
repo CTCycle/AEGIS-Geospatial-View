@@ -1,4 +1,4 @@
-"""Canonical model-visible tool result contracts for native-v2."""
+"""Canonical model-visible tool result contracts for the native harness."""
 
 from __future__ import annotations
 
@@ -65,6 +65,16 @@ class ToolExecutionMetadata(BaseModel):
     api_latency_ms: int | None = Field(default=None, ge=0)
     result_size_bytes: int | None = Field(default=None, ge=0)
     evidence_refs: list[str] = Field(default_factory=list)
+    result_type: str | None = None
+    result_status: str | None = None
+    stale: bool = False
+    fetched_at: str | None = None
+    observation_time: str | None = None
+    spatial_resolution: str | None = None
+    units: dict[str, str] = Field(default_factory=dict)
+    coverage: dict[str, Any] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    source_url: str | None = None
 
 ###############################################################################
 class ToolResult(BaseModel):
@@ -259,7 +269,7 @@ def _project_result_data(
     # removing ``data`` would remove the useful observation entirely. Keep
     # their semantic fields explicit and cap records/contracts before the
     # generic bounded projection runs.
-    if tool_name in {"discover_geospatial_capabilities", "list_geospatial_capabilities"}:
+    if tool_name == "discover_geospatial_capabilities":
         raw_items = data.get("capabilities", data.get("items", [])) if isinstance(data, dict) else []
         items = []
         if isinstance(raw_items, list):
@@ -289,7 +299,7 @@ def _project_result_data(
             projected["items"] = items
         return _fit_projection(projected, max_chars=max_chars, preserve_keys=("capabilities", "items"))
 
-    if tool_name in {"inspect_evidence", "inspect_geospatial_evidence"} and isinstance(data, dict):
+    if tool_name == "inspect_evidence" and isinstance(data, dict):
         raw_result = data.get("result")
         projected = {
             "evidence_ref": data.get("evidence_ref"),

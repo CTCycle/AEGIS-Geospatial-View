@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from server.contracts.geospatial import MapSession
-from server.domain.agent.pipeline import ConversationTaskSnapshot
+from server.domain.agent.conversation import ConversationState
 
 ###############################################################################
 class AgentRunState(StrEnum):
@@ -68,7 +68,7 @@ class ConversationSnapshotResponse(BaseModel):
     messages: list[ConversationMessageSnapshot] = Field(
         default_factory=lambda: list[ConversationMessageSnapshot]()
     )
-    task_snapshot: ConversationTaskSnapshot | None = None
+    conversation_state: ConversationState
     memory_snapshot: dict[str, Any] = Field(default_factory=dict)
     map_session: MapSession | None = None
     active_run: ActiveConversationRunSnapshot | None = None

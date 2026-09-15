@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-09-14
+Last updated: 2026-09-15
 
 ## Purpose
 
@@ -15,13 +15,11 @@ environment and credential availability on top of those manifests.
 
 The implemented chat model surface includes static cloud catalog entries,
 Ollama local models, and on-demand catalogs for DeepSeek, OpenCode Zen, and
-OpenCode Go. Agent execution now defaults to `native_v2`, which starts with a
-model-owned route, progressively constrained typed tools, one normalized
-execution boundary, and bounded evidence/result contracts. The shadow-preview
-implementation has been removed; the remaining legacy switch and execution
-chain are temporary deletion targets. Normalized provider results and derived
-datasets live in the conversation-scoped `agent_evidence` store rather than
-model messages.
+OpenCode Go. Agent execution uses one native harness: a model-owned route,
+progressively constrained typed tools, one normalized execution boundary, and
+bounded evidence/result contracts. Legacy and shadow execution paths have
+been removed. Normalized provider results and derived datasets live in the
+conversation-scoped `agent_evidence` store rather than model messages.
 
 ## Navigation Rules
 

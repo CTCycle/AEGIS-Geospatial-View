@@ -3,7 +3,7 @@
     <div class="settings-page__heading">
       <p class="page-kicker">Configuration</p>
       <h1>Model settings</h1>
-      <p>Select the agent model used for structured extraction, orchestration, tool calling, and chat.</p>
+      <p>Select the agent model used for native routing, orchestration, tool calling, and chat.</p>
     </div>
     <div class="settings-page__header-actions">
       <app-settings-icon-action
@@ -140,9 +140,9 @@
       <aside class="settings-page__right-column" aria-label="Selected agent model">
         <app-selected-model-summary [summary]="selectedAgentModelSummary" [isLoading]="isLoadingModels"></app-selected-model-summary>
         @if (selectedAgentModelSummary) {
-          <section class="settings-page__probe" aria-label="Structured parser verification">
+          <section class="settings-page__probe" aria-label="Native route and tool verification">
             <div>
-              <p class="settings-page__probe-label">Structured parser</p>
+              <p class="settings-page__probe-label">Native route and tools</p>
               <strong>{{ structuredProbeLabel }}</strong>
               @if (structuredProbe.message) {
                 <p>{{ structuredProbe.message }}</p>

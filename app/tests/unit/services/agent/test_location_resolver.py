@@ -7,7 +7,7 @@ from tests.conftest import run_async_in_thread
 
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.location_resolver import LocationResolver
-from server.contracts.extraction import LocationSignal
+from server.contracts.location import LocationSignal
 
 ###############################################################################
 def test_hierarchical_normalized_location_does_not_duplicate_parent_query() -> None:

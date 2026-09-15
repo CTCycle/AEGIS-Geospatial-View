@@ -367,6 +367,23 @@ def _message_blocks(
             blocks.append((list(range(index, end)), messages[index:end]))
             index = end
             continue
+        if str(message.get("type") or "") in {
+            "message",
+            "reasoning",
+            "function_call",
+            "function_call_output",
+        }:
+            end = index + 1
+            while end < len(messages) and str(messages[end].get("type") or "") in {
+                "message",
+                "reasoning",
+                "function_call",
+                "function_call_output",
+            }:
+                end += 1
+            blocks.append((list(range(index, end)), messages[index:end]))
+            index = end
+            continue
         blocks.append(([index], [message]))
         index += 1
     return blocks
@@ -393,9 +410,21 @@ def _compact_messages(
         if str(message.get("role") or "") in {"system", "developer"}
     }
     pinned_indices.add(last_user_index)
-    for indices, block in blocks:
-        if any(message.get("role") == "tool" for message in block):
-            pinned_indices.update(indices)
+    protocol_blocks = [
+        (indices, block)
+        for indices, block in blocks
+        if any(
+            message.get("role") == "tool"
+            or str(message.get("type") or "")
+            in {"reasoning", "function_call", "function_call_output"}
+            for message in block
+        )
+    ]
+    # Only the newest provider protocol block is pinned.  Older observations
+    # have already been incorporated into canonical native state and may be
+    # summarized without retaining an ever-growing chain of tool pairs.
+    if protocol_blocks:
+        pinned_indices.update(protocol_blocks[-1][0])
 
     selected_indices: set[int] = set(pinned_indices)
     dropped: list[dict[str, Any]] = []

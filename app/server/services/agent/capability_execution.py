@@ -1,4 +1,4 @@
-"""Canonical provider-backed capability execution for native-v2 tools."""
+"""Canonical provider-backed capability execution for native agent tools."""
 
 from __future__ import annotations
 
@@ -237,6 +237,20 @@ class CapabilityExecutionService:
                 duration_ms=_duration_ms(started),
                 result_size_bytes=result_size,
                 evidence_refs=evidence_refs,
+                result_type=response.result_type,
+                result_status=response.result_status,
+                stale=response.stale,
+                fetched_at=response.fetched_at.isoformat(),
+                observation_time=response.observation_time,
+                spatial_resolution=response.spatial_resolution,
+                units=dict(response.units),
+                coverage=(
+                    dict(response.coverage)
+                    if response.coverage is not None
+                    else None
+                ),
+                warnings=[str(item)[:300] for item in response.warnings[:8]],
+                source_url=response.source_url[:500] if response.source_url else None,
             ),
         )
 

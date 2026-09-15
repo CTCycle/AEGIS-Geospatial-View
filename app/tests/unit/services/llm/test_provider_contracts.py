@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from server.domain.agent.tools import ToolError, ToolExecutionEnvelope
+from server.domain.agent.tool_result import (
+    ToolExecutionError,
+    ToolExecutionMetadata,
+    ToolResult,
+)
 from server.services.llm.deepseek_provider import DeepSeekProvider
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
@@ -146,12 +150,21 @@ def test_ollama_chat_contract_emits_native_tools_and_parses_results() -> None:
     assert result.tool_calls[0].arguments == {"query": "Zurich"}
 
 ###############################################################################
-def test_provider_contract_envelope_error_remains_structured() -> None:
-    envelope = ToolExecutionEnvelope(
-        ok=False,
-        error=ToolError(code="provider_unavailable", message="upstream unavailable"),
+def test_provider_contract_error_remains_structured() -> None:
+    result = ToolResult(
+        call_id="call-1",
+        tool_name="execute_geospatial_capability",
+        status="failed",
+        summary="upstream unavailable",
+        error=ToolExecutionError(
+            error_type="provider_unavailable",
+            code="provider_unavailable",
+            message="upstream unavailable",
+            retryable=False,
+            recovery="choose_alternate_tool",
+        ),
+        metadata=ToolExecutionMetadata(duration_ms=0),
     )
-    assert envelope.to_dict()["error"] == {
-        "code": "provider_unavailable",
-        "message": "upstream unavailable",
-    }
+    assert result.error is not None
+    assert result.error.code == "provider_unavailable"
+    assert result.error.recovery == "choose_alternate_tool"

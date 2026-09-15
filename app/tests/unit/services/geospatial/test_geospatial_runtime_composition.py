@@ -9,7 +9,6 @@ from server.services.geospatial.composition import (
     build_provider_execution_policy,
     build_geospatial_runtime,
 )
-from server.services.search.composition import build_search_runtime
 from server.services.chat.composition import build_chat_runtime
 
 ###############################################################################
@@ -62,26 +61,14 @@ def test_build_geospatial_runtime_reuses_shared_services(sqlite_backend) -> None
     )
 
 ###############################################################################
-def test_search_and_chat_consume_shared_geospatial_runtime(sqlite_backend) -> None:
+def test_chat_consumes_shared_geospatial_runtime(sqlite_backend) -> None:
     seed_credential_encryption_material(sqlite_backend)
     geospatial_runtime = build_geospatial_runtime(sqlite_backend)
-    search_runtime = build_search_runtime(
-        capability_registry=geospatial_runtime.capability_registry,
-        provider_registry=geospatial_runtime.provider_registry,
-        credential_resolver=geospatial_runtime.credential_resolver,
-    )
     chat_runtime = build_chat_runtime(
-        search_runtime.search_orchestrator,
         sqlite_backend,
         geospatial_runtime=geospatial_runtime,
     )
 
-    assert search_runtime.capability_registry is geospatial_runtime.capability_registry
-    assert search_runtime.provider_registry is geospatial_runtime.provider_registry
-    assert (
-        search_runtime.search_orchestrator.render_descriptor_service.provider_registry
-        is geospatial_runtime.provider_registry
-    )
     assert (
         chat_runtime.agent_orchestrator.policy_engine.capability_registry
         is geospatial_runtime.capability_registry
@@ -97,10 +84,10 @@ def test_search_and_chat_consume_shared_geospatial_runtime(sqlite_backend) -> No
     assert chat_runtime.agent_loop is chat_runtime.agent_orchestrator.agent_loop
     assert chat_runtime.agent_loop is not None
     assert (
-        chat_runtime.native_v2_runner
-        is chat_runtime.agent_orchestrator.native_v2_runner
+        chat_runtime.agent_turn_runner
+        is chat_runtime.agent_orchestrator.agent_turn_runner
     )
-    assert chat_runtime.native_v2_runner is not None
+    assert chat_runtime.agent_turn_runner is not None
     assert {
         tool.definition.name
         for tool in chat_runtime.agent_loop.tool_registry._registered_tools.values()
@@ -108,6 +95,8 @@ def test_search_and_chat_consume_shared_geospatial_runtime(sqlite_backend) -> No
         "route_request",
         "resolve_geospatial_location",
         "discover_geospatial_capabilities",
+        "discover_geospatial_provider_layers",
+        "describe_geospatial_capability",
         "execute_geospatial_capability",
         "inspect_evidence",
         "transform_evidence",

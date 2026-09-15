@@ -494,7 +494,7 @@ class DeepSeekProvider(LLMProvider):
                     model=request.model,
                     stage="structured_output",
                     code="structured_invalid_payload",
-                    detail="The provider returned multiple structured extraction functions.",
+                    detail="The provider returned multiple structured native-response functions.",
                     context_usage=usage.to_dict(),
                 )
             call = tool_calls[0]
@@ -504,7 +504,7 @@ class DeepSeekProvider(LLMProvider):
                     model=request.model,
                     stage="structured_output",
                     code="structured_invalid_payload",
-                    detail="The provider returned an unexpected structured extraction function.",
+                    detail="The provider returned an unexpected structured native-response function.",
                     context_usage=usage.to_dict(),
                 )
             loaded: object = call.arguments
@@ -517,7 +517,7 @@ class DeepSeekProvider(LLMProvider):
                     model=request.model,
                     stage="structured_output",
                     code="structured_invalid_payload",
-                    detail="The provider returned invalid JSON for structured extraction.",
+                    detail="The provider returned invalid JSON for the structured native response.",
                     context_usage=usage.to_dict(),
                 ) from exc
         if not is_json_object(loaded):

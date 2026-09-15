@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
-from tests.conftest import run_async_in_thread
-from server.contracts.extraction import (
+from server.contracts.overlays import (
     OverlayCommand,
     OverlaySelector,
     OverlayScope,
@@ -17,7 +14,6 @@ from server.contracts.geospatial import (
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.overlay_collection import OverlayCollectionService
-from server.services.agent.turn_state_assembler import AgentTurnStateAssembler
 
 ###############################################################################
 def _instance(
@@ -351,8 +347,8 @@ def test_apply_overlay_commands_binds_default_revision_between_mutations() -> No
         overlay_collection=OverlayCollectionState(instances=[weather, traffic]),
     )
 
-    updated, results = AgentTurnStateAssembler.apply_overlay_commands(
-        session,
+    collection, results = OverlayCollectionService.apply_commands(
+        session.overlay_collection,
         [
             OverlayCommand(
                 action="remove",
@@ -363,7 +359,9 @@ def test_apply_overlay_commands_binds_default_revision_between_mutations() -> No
                 selector=OverlaySelector(instance_ids=["traffic-zurich"]),
             ),
         ],
+        basemap=session.basemap,
     )
+    updated = session.model_copy(update={"overlay_collection": collection})
 
     assert [result.revision for result in results] == [1, 2]
     assert updated.overlay_collection.revision == 2
@@ -465,8 +463,8 @@ def test_missing_location_scope_binds_to_the_map_session_target() -> None:
         overlay_collection=OverlayCollectionState(instances=[weather]),
     )
 
-    updated, results = AgentTurnStateAssembler.apply_overlay_commands(
-        session,
+    collection, results = OverlayCollectionService.apply_commands(
+        session.overlay_collection,
         [
             OverlayCommand(
                 action="add",
@@ -476,7 +474,9 @@ def test_missing_location_scope_binds_to_the_map_session_target() -> None:
                 scope=OverlayScope(kind="location"),
             )
         ],
+        basemap=session.basemap,
     )
+    updated = session.model_copy(update={"overlay_collection": collection})
 
     assert len(updated.overlay_collection.instances) == 1
     assert results[0].added_instance_ids == []
@@ -650,30 +650,20 @@ def test_provider_candidate_is_committed_against_active_revision_without_droppin
             ),
         }
     )
-    command = OverlayCommand(
-        action="show",
-        selector=OverlaySelector(
-            capability_ids=["openmeteo_weather_forecast"],
-            concepts=["environmental"],
-        ),
-        scope=OverlayScope(
-            kind="location",
-            location={"label": "Zurich", "latitude": 47.37, "longitude": 8.54},
-        ),
-        state_reference=OverlayStateReference(revision=1),
+    merged_collection = OverlayCollectionService.merge_instances(
+        active.overlay_collection,
+        fetched.overlay_collection.instances,
     )
-
-    updated, results = AgentTurnStateAssembler.apply_overlay_commands(
-        fetched,
-        [command],
-        state_session=active,
+    updated = OverlayCollectionService.merge_into_map_session(
+        active,
+        merged_collection,
     )
 
     assert updated.overlay_collection.revision == 2
     assert len(updated.overlay_collection.instances) == 1
-    assert results[0].added_instance_ids == [
-        updated.overlay_collection.instances[0].instance_id
-    ]
+    assert updated.overlay_collection.instances[0].capability_id == (
+        "openmeteo_weather_forecast"
+    )
 
 ###############################################################################
 def test_merge_replaces_only_the_authoritative_collection() -> None:
@@ -707,7 +697,7 @@ def test_merge_replaces_only_the_authoritative_collection() -> None:
     assert "failed_overlays" not in serialized
 
 ###############################################################################
-def test_tool_map_session_is_merged_into_active_map_without_refetch() -> None:
+def test_tool_overlay_instances_merge_into_active_map_without_refetch() -> None:
     location = ResolvedLocation(
         label="Rome",
         latitude=41.9028,
@@ -750,33 +740,17 @@ def test_tool_map_session_is_merged_into_active_map_without_refetch() -> None:
             "overlay_collection": OverlayCollectionState(instances=[fetched_overlay]),
         }
     )
-    assembler = object.__new__(AgentTurnStateAssembler)
-    contract = SimpleNamespace(
-        location_signals=[],
-        requested_basemap=None,
-        overlay_commands=[],
+    merged_collection = OverlayCollectionService.merge_instances(
+        active.overlay_collection,
+        fetched.overlay_collection.instances,
     )
-
-    merged = run_async_in_thread(
-        assembler.build_combined_map_session_from_tool_results(
-            tool_payload={
-                "tool_results": [
-                    {
-                        "content": {
-                            "ok": True,
-                            "data": {"map_session": fetched.model_dump(mode="json")},
-                        }
-                    }
-                ]
-            },
-            turn_contract=contract,
-            latest_memory={"active_visualization": active.model_dump(mode="json")},
-            resolved_location=location,
-        )
+    merged = OverlayCollectionService.merge_into_map_session(
+        active,
+        merged_collection,
     )
 
     assert isinstance(merged, MapSession)
-    assert merged.payload == {"source": "provider-tool"}
+    assert merged.payload == {}
     assert merged.resolved_location == location
     assert merged.basemap_id == "esri_world_imagery"
     assert merged.basemap == {"id": "esri_world_imagery", "label": "Satellite Imagery"}
@@ -831,25 +805,13 @@ def test_server_side_prepared_sessions_are_merged_without_reembedding_payload() 
             )
         }
     )
-    assembler = object.__new__(AgentTurnStateAssembler)
-
-    merged = run_async_in_thread(
-        assembler.build_combined_map_session_from_tool_results(
-            tool_payload={"tool_results": []},
-            turn_contract=SimpleNamespace(
-                location_signals=[],
-                requested_basemap=None,
-                overlay_commands=[],
-                relationship="new_task",
-                operations=[],
-            ),
-            latest_memory={},
-            resolved_location=location,
-            prepared_map_sessions=[
-                prepared.model_dump(mode="json"),
-                prepared_second.model_dump(mode="json"),
-            ],
-        )
+    merged_collection = OverlayCollectionService.merge_instances(
+        prepared.overlay_collection,
+        prepared_second.overlay_collection.instances,
+    )
+    merged = OverlayCollectionService.merge_into_map_session(
+        prepared,
+        merged_collection,
     )
 
     assert isinstance(merged, MapSession)
@@ -858,7 +820,7 @@ def test_server_side_prepared_sessions_are_merged_without_reembedding_payload() 
     } == {"rainviewer_precipitation_radar", "openmeteo_weather_forecast"}
 
 ###############################################################################
-def test_multi_target_tool_sessions_preserve_scope_and_aggregate_bounds() -> None:
+def test_multi_target_overlay_merge_preserves_each_location_scope() -> None:
     paris = ResolvedLocation(
         label="Paris, France",
         latitude=48.8566,
@@ -912,41 +874,16 @@ def test_multi_target_tool_sessions_preserve_scope_and_aggregate_bounds() -> Non
             "overlay_collection": OverlayCollectionState(instances=[london_overlay]),
         }
     )
-    assembler = object.__new__(AgentTurnStateAssembler)
-    contract = SimpleNamespace(
-        location_signals=[],
-        requested_basemap=None,
-        overlay_commands=[],
-        relationship="new_task",
-        operations=["compare"],
+    merged_collection = OverlayCollectionService.merge_instances(
+        paris_session.overlay_collection,
+        london_session.overlay_collection.instances,
     )
-
-    merged = run_async_in_thread(
-        assembler.build_combined_map_session_from_tool_results(
-            tool_payload={
-                "tool_results": [
-                    {
-                        "content": {
-                            "ok": True,
-                            "data": {"map_session": paris_session.model_dump(mode="json")},
-                        }
-                    },
-                    {
-                        "content": {
-                            "ok": True,
-                            "data": {"map_session": london_session.model_dump(mode="json")},
-                        }
-                    },
-                ]
-            },
-            turn_contract=contract,
-            latest_memory={},
-            resolved_location=paris,
-        )
+    merged = OverlayCollectionService.merge_into_map_session(
+        paris_session,
+        merged_collection,
     )
 
     assert isinstance(merged, MapSession)
-    assert merged.bounds == [-0.5, 48.5, 2.7, 51.8]
     scoped = {
         instance.scope_key: instance.resolved_location.label
         for instance in merged.overlay_collection.instances
@@ -954,7 +891,7 @@ def test_multi_target_tool_sessions_preserve_scope_and_aggregate_bounds() -> Non
     assert scoped == {"Paris": "Paris, France", "London": "London, United Kingdom"}
 
 ###############################################################################
-def test_new_task_replaces_same_location_search_layers() -> None:
+def test_overlay_merge_does_not_drop_unrelated_existing_layers() -> None:
     location = ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5)
     old = _instance(
         "old", "old_search", label="Old search", scope_key="Rome", latitude=41.9, longitude=12.5
@@ -969,33 +906,17 @@ def test_new_task_replaces_same_location_search_layers() -> None:
         viewport=ViewportPolicy(center_latitude=41.9, center_longitude=12.5),
         overlay_collection=OverlayCollectionState(instances=[old]),
     )
-    candidate = active.model_copy(
-        update={
-            "session_id": "candidate",
-            "overlay_collection": OverlayCollectionState(instances=[new]),
-        }
+    merged_collection = OverlayCollectionService.merge_instances(
+        active.overlay_collection,
+        [new],
     )
-    assembler = object.__new__(AgentTurnStateAssembler)
-    merged = run_async_in_thread(
-        assembler.build_combined_map_session_from_tool_results(
-            tool_payload={
-                "tool_results": [
-                    {"content": {"ok": True, "data": {"map_session": candidate.model_dump(mode="json")}}}
-                ]
-            },
-            turn_contract=SimpleNamespace(
-                location_signals=[],
-                requested_basemap=None,
-                overlay_commands=[],
-                relationship="new_task",
-                operations=[],
-            ),
-            latest_memory={"active_visualization": active.model_dump(mode="json")},
-            resolved_location=location,
-        )
+    merged = OverlayCollectionService.merge_into_map_session(
+        active,
+        merged_collection,
     )
 
     assert isinstance(merged, MapSession)
     assert [instance.capability_id for instance in merged.overlay_collection.instances] == [
-        "new_search"
+        "old_search",
+        "new_search",
     ]

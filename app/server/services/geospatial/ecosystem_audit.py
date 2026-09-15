@@ -18,7 +18,7 @@ from server.services.geospatial.provider_registry import PROVIDER_FACTORIES
 from server.services.geospatial.endpoint_validation import EndpointValidationService
 
 NATIVE_TOOL_SOURCE = (
-    PROJECT_DIR / "server" / "services" / "agent" / "agent_tool_catalog_service.py"
+    PROJECT_DIR / "server" / "services" / "agent" / "native_v2_tools.py"
 )
 RENDERER_SOURCE = (
     PROJECT_DIR / "client" / "src" / "app" / "components" / "map-preview-rendering.ts"
@@ -365,8 +365,8 @@ def build_inventory(
                     ]
                     + (
                         [
-                            "fetch_geospatial_provider_layers",
-                            "prepare_geospatial_map",
+                            "discover_geospatial_provider_layers",
+                            "apply_map_plan",
                         ]
                         if provider_id
                         in {

@@ -19,9 +19,9 @@ def _turn(api_context: APIRequestContext, message: str):
     assert response.ok, f"Expected 200, got {response.status}"
     body = response.json()
     assistant = str(body.get("assistant_message") or "").lower()
-    if "configured agent model" in assistant and "structured extraction" in assistant:
+    if "configured agent model" in assistant and "native agent" in assistant:
         pytest.skip(
-            "Configured agent model cannot perform structured extraction for orchestration check."
+            "Configured agent model cannot run the native agent for orchestration check."
         )
     return body
 
@@ -30,9 +30,9 @@ def test_ambiguous_temporal_request_produces_clarification(
     api_context: APIRequestContext,
 ) -> None:
     body = _turn(api_context, "Show me weather")
-    assert body.get("decision", {}).get("plan", {}).get("state") in {
-        "clarify",
-        "reject",
+    assert body.get("operation", {}).get("kind") in {
+        "clarification",
+        "rejection",
     }
     assert body.get("map_session") is None
 
@@ -41,7 +41,7 @@ def test_missing_location_produces_clarification_or_validation(
     api_context: APIRequestContext,
 ) -> None:
     body = _turn(api_context, "Show me air quality overlays")
-    if body.get("decision", {}).get("plan", {}).get("state") == "clarify":
+    if body.get("operation", {}).get("kind") == "clarification":
         return
     assistant = str(body.get("assistant_message") or "").lower()
     assert "location" in assistant or "where" in assistant or "clarify" in assistant
@@ -76,7 +76,7 @@ def test_missing_key_request_clarifies_or_falls_back_consistently(
 ) -> None:
     body = _turn(api_context, "Use TomTom traffic in Rome")
     assistant = str(body.get("assistant_message") or "").lower()
-    if body.get("decision", {}).get("plan", {}).get("state") == "clarify":
+    if body.get("operation", {}).get("kind") == "clarification":
         assert (
             "key" in assistant or "configure" in assistant or "alternative" in assistant
         )

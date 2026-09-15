@@ -18,8 +18,8 @@ from playwright.sync_api import ConsoleMessage, Page, Route, WebSocketRoute, exp
 
 from tests.e2e.helpers.chat_stub_payloads import (
     ROME_MAP_SESSION,
-    _chat_decision,
-    _chat_turn_contract,
+    _native_goal,
+    _native_route,
     conversation_snapshot_payload,
     geospatial_catalog_payload,
     map_overlay_instance,
@@ -249,9 +249,34 @@ def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> Non
                         "message": "Map ready.",
                     },
                     "map_session": map_session,
-                    "decision": _chat_decision("map_search"),
-                    "turn_contract": _chat_turn_contract("Show recent earthquakes around Rome"),
+                    "route": _native_route(
+                        task_mode="execute",
+                        presentation="map",
+                        operation="render",
+                        requires_location=True,
+                        capability_query="earthquakes",
+                        target_refs=["location:rome"],
+                    ),
+                    "goal": _native_goal(
+                        task_mode="execute",
+                        presentation="map",
+                        operation="render",
+                        requires_location=True,
+                        goal="Show recent earthquakes around Rome",
+                    ),
+                    "completion_contract": {
+                        "operation": "render",
+                        "requirements": ["answer_provided", "map_prepared"],
+                        "location_required": True,
+                        "evidence_required": False,
+                        "map_preparation_required": True,
+                        "temporal_scope_required": False,
+                        "spatial_scope_required": True,
+                    },
                     "memory_snapshot": {"active_visualization": map_session},
+                    "presentation_status": "ready",
+                    "tool_results": [],
+                    "execution_trace": {"stopped_reason": "goal_satisfied"},
                 },
             )
 

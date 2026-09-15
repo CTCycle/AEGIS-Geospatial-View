@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from typing import TYPE_CHECKING, Any, Literal
 from server.common.typing import json_array
 
@@ -9,7 +11,6 @@ from server.services.llm.context_budget import (
     resolve_model_context_profile,
 )
 from server.services.llm.errors import LLMContextLimitError
-from server.domain.agent.runtime import compact_task_context
 
 if TYPE_CHECKING:
     from server.services.llm.context_profile_resolver import ModelContextProfileResolver
@@ -43,7 +44,7 @@ class AgentContextAssembler:
         prior_summary: dict[str, Any] | None = None,
         relevant_tool_outcomes: list[dict[str, Any]] | None = None,
         policy_constraints: dict[str, Any] | None = None,
-        phase: Literal["parser", "native_loop", "synthesis"] = "parser",
+        phase: Literal["native_loop"] = "native_loop",
     ) -> AgentContextPackage:
         profile = (
             self.context_profile_resolver.resolve(provider, model)
@@ -56,15 +57,32 @@ class AgentContextAssembler:
             if profile
             else None
         )
-        outcomes = list(relevant_tool_outcomes or [])
-        constraints = dict(policy_constraints or {})
+        raw_outcomes = [
+            _bounded_json_value(item, depth=0)
+            for item in (relevant_tool_outcomes or [])
+            if isinstance(item, dict)
+        ]
+        constraints = _bounded_object(policy_constraints or {})
+        bounded_task_state = _bounded_object(task_state)
+        bounded_map_memory = _bounded_object(map_memory)
+        outcomes = _select_relevant_outcomes(
+            raw_outcomes,
+            current_user_message=current_user_message,
+            task_state=bounded_task_state,
+            map_memory=bounded_map_memory,
+        )
+        bounded_instructions = [
+            _bounded_json_value(
+                item.model_dump(mode="json"),
+                depth=0,
+            )
+            for item in directives
+        ]
         mandatory = {
-            "current_user_message": current_user_message,
-            "active_instructions": [
-                item.model_dump(mode="json") for item in directives
-            ],
-            "task_state": compact_task_context(task_state),
-            "map_memory": map_memory,
+            "current_user_message": str(current_user_message)[:12_000],
+            "active_directives": bounded_instructions,
+            "task_state": bounded_task_state,
+            "map_memory": bounded_map_memory,
             "policy_constraints": constraints,
         }
         mandatory_tokens = estimate_json_tokens(mandatory)
@@ -109,21 +127,42 @@ class AgentContextAssembler:
             outcome_tokens += cost
         selected_outcomes = list(reversed(selected_outcomes_reversed))
         raw_capacity = raw_budget + max(0, evidence_budget - outcome_tokens)
-        projected = [
-            {
-                key: item[key]
+        projected: list[dict[str, Any]] = []
+        source_costs: list[int] = []
+        for item in messages:
+            if not isinstance(item, dict):
+                continue
+            projected_item = {
+                key: (
+                    str(item[key])[:4_000]
+                    if key == "content"
+                    else item[key]
+                )
                 for key in ("id", "turn_index", "role", "content")
                 if key in item
             }
-            for item in messages
-        ]
+            projected.append(projected_item)
+            # A very large source message must not become admissible merely
+            # because its content was shortened for the model projection.
+            source_costs.append(
+                estimate_json_tokens(
+                    {
+                        key: item[key]
+                        for key in ("id", "turn_index", "role", "content")
+                        if key in item
+                    }
+                )
+            )
         included_reversed: list[dict[str, Any]] = []
         included_indices: list[int] = []
         included_tokens = 0
         for index in range(len(projected) - 1, -1, -1):
             message = projected[index]
             cost = estimate_json_tokens(message)
-            if included_tokens + cost > raw_capacity:
+            if (
+                source_costs[index] > raw_capacity
+                or included_tokens + cost > raw_capacity
+            ):
                 # An oversized item should not prevent later inspection of
                 # smaller, relevant history entries.
                 continue
@@ -174,10 +213,10 @@ class AgentContextAssembler:
                 summary = None
         return AgentContextPackage(
             current_user_message=current_user_message,
-            active_instructions=directives,
-            task_state=compact_task_context(task_state),
-            map_memory=map_memory,
-            conversation_summary=summary,
+            active_directives=directives,
+            task_state=bounded_task_state,
+            map_memory=bounded_map_memory,
+            summary=summary,
             recent_messages=included,
             relevant_tool_outcomes=selected_outcomes,
             policy_constraints=constraints,
@@ -202,3 +241,140 @@ class AgentContextAssembler:
                 "mandatory_overflow": False,
             },
         )
+
+
+def _bounded_object(value: object) -> dict[str, Any]:
+    bounded = _bounded_json_value(value, depth=0)
+    return bounded if isinstance(bounded, dict) else {}
+
+
+_RELEVANCE_STOP_WORDS = frozenset(
+    {
+        "about",
+        "after",
+        "around",
+        "from",
+        "into",
+        "that",
+        "their",
+        "there",
+        "this",
+        "with",
+        "within",
+    }
+)
+
+
+def _select_relevant_outcomes(
+    outcomes: list[dict[str, Any]],
+    *,
+    current_user_message: str,
+    task_state: dict[str, Any],
+    map_memory: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Keep durable evidence available while narrowing the immediate view.
+
+    The evidence repository remains the source of truth.  This projection only
+    chooses what belongs in the next model request, using the current request,
+    canonical goal/scope, explicit references, and recency.
+    """
+
+    if len(outcomes) <= 1:
+        return outcomes
+    seed_text = " ".join(
+        [
+            current_user_message,
+            json_text(task_state.get("goal")),
+            json_text(task_state.get("route")),
+            json_text(task_state.get("constraints")),
+            json_text(map_memory),
+        ]
+    )
+    terms = {
+        token
+        for token in re.findall(r"[a-z0-9][a-z0-9_-]+", seed_text.casefold())
+        if len(token) > 2 and token not in _RELEVANCE_STOP_WORDS
+    }
+    explicit_refs = {
+        str(value)
+        for value in _walk_values(task_state, keys={"evidence_refs", "evidence_id"})
+        if str(value).strip()
+    }
+    ranked: list[tuple[float, int, dict[str, Any]]] = []
+    for index, outcome in enumerate(outcomes):
+        text = json_text(outcome).casefold()
+        score = float(sum(1 for term in terms if term in text))
+        if explicit_refs and any(ref.casefold() in text for ref in explicit_refs):
+            score += 100.0
+        score += min(10.0, index / max(1, len(outcomes)))
+        ranked.append((score, index, outcome))
+    ranked.sort(key=lambda item: (-item[0], -item[1]))
+    selected = {index for _, index, _ in ranked[: min(32, len(ranked))]}
+    return [item for index, item in enumerate(outcomes) if index in selected]
+
+
+def json_text(value: object) -> str:
+    try:
+        return str(value) if isinstance(value, str) else json.dumps(value, default=str)
+    except Exception:
+        return str(value)
+
+
+def _walk_values(value: object, *, keys: set[str]) -> list[object]:
+    found: list[object] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if str(key) in keys:
+                if isinstance(child, list):
+                    found.extend(child)
+                else:
+                    found.append(child)
+            found.extend(_walk_values(child, keys=keys))
+    elif isinstance(value, list):
+        for child in value:
+            found.extend(_walk_values(child, keys=keys))
+    return found
+
+
+def _bounded_json_value(
+    value: object,
+    *,
+    depth: int,
+    max_depth: int = 4,
+    list_limit: int = 24,
+    key_limit: int = 32,
+    string_limit: int = 800,
+) -> Any:
+    """Bound structured context without ever producing partial JSON."""
+
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    if isinstance(value, str):
+        return value[:string_limit]
+    if depth >= max_depth:
+        return "[truncated]"
+    if isinstance(value, dict):
+        return {
+            str(key): _bounded_json_value(
+                child,
+                depth=depth + 1,
+                max_depth=max_depth,
+                list_limit=list_limit,
+                key_limit=key_limit,
+                string_limit=string_limit,
+            )
+            for key, child in list(value.items())[:key_limit]
+        }
+    if isinstance(value, (list, tuple)):
+        return [
+            _bounded_json_value(
+                child,
+                depth=depth + 1,
+                max_depth=max_depth,
+                list_limit=list_limit,
+                key_limit=key_limit,
+                string_limit=string_limit,
+            )
+            for child in list(value)[:list_limit]
+        ]
+    return str(value)[:string_limit]

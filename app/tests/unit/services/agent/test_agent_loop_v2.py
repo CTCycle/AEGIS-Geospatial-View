@@ -12,14 +12,9 @@ from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
     AgentGoal,
     AgentPhase,
-    AgentState,
+    AgentRunState,
     CapabilityRoute,
     CompletionContract,
-)
-from server.domain.agent.interpretation import (
-    CanonicalRequestInterpretation,
-    CanonicalSpatialConstraint,
-    CanonicalTemporalConstraints,
 )
 from server.domain.agent.reliability import AgentExecutionBudget
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
@@ -90,7 +85,7 @@ class EmptyInput(BaseModel):
 
 
 ###############################################################################
-async def _answer_handler(arguments: BaseModel, state: AgentState) -> ToolResult:
+async def _answer_handler(arguments: BaseModel, state: AgentRunState) -> ToolResult:
     return ToolResult(
         call_id="handler-call",
         tool_name="test_tool",
@@ -136,8 +131,8 @@ def _loop(provider: FakeProvider) -> AgentLoop:
 
 
 ###############################################################################
-def _state() -> AgentState:
-    return AgentState(
+def _state() -> AgentRunState:
+    return AgentRunState(
         request_id="request-1",
         conversation_id="conversation-1",
         phase=AgentPhase.RECEIVE_REQUEST,
@@ -186,6 +181,10 @@ async def test_loop_routes_exposes_tools_and_finishes_from_final_model_text() ->
 
     assert outcome.stopped_reason == "goal_satisfied"
     assert outcome.final_text == "Hospitals found."
+    assert [item["stage"] for item in outcome.state.budget_snapshot["stages"]] == [
+        "route_request",
+        "model_step",
+    ]
     assert state.route is not None
     assert state.capability_ids == ["places:hospitals"]
     assert [item["kwargs"]["tool_choice"] for item in provider.requests] == [
@@ -231,30 +230,27 @@ def test_native_route_promotes_the_execution_profile_once() -> None:
 ###############################################################################
 def test_native_goal_compiles_deterministic_completion_contract() -> None:
     state = _state()
-    state.canonical_request = CanonicalRequestInterpretation(
-        request_id="request-1",
-        primary_intent="data_layer_query",
-        operations=["filter"],
-        temporal_constraints=CanonicalTemporalConstraints(
-            mode="historical",
-            start_time_iso="2026-09-01T00:00:00+00:00",
-            end_time_iso="2026-09-02T00:00:00+00:00",
-        ),
-        spatial_constraints=[
-            CanonicalSpatialConstraint(
-                relationship="in",
-                target_id="target-1",
-                analysis_scope="bbox",
-            )
-        ],
-        filters={"category": "hospital"},
-    )
     route = CapabilityRoute(
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="both",
         requires_location=True,
         capability_queries=["hospitals"],
+        operation="filter",
+        target_refs=["target-1"],
+        temporal_scope={
+            "mode": "historical",
+            "start_time_iso": "2026-09-01T00:00:00+00:00",
+            "end_time_iso": "2026-09-02T00:00:00+00:00",
+            "granularity": "none",
+            "aggregation": "none",
+        },
+        spatial_scope={
+            "kind": "bbox",
+            "relationship": "in",
+            "target_refs": ["target-1"],
+        },
+        filters={"category": "hospital"},
     )
 
     AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
@@ -262,12 +258,14 @@ def test_native_goal_compiles_deterministic_completion_contract() -> None:
     assert state.goal is not None
     assert state.goal.operation == "filter"
     assert state.goal.temporal_scope["mode"] == "historical"
-    assert state.goal.spatial_scope[0]["analysis_scope"] == "bbox"
+    assert state.goal.spatial_scope[0]["kind"] == "bbox"
     assert state.goal.filters == {"category": "hospital"}
     assert state.completion_contract is not None
     assert state.completion_contract.requirements == [
         "location_resolved",
         "required_data_retrieved",
+        "temporal_scope_applied",
+        "spatial_scope_applied",
         "map_candidate_prepared",
     ]
     assert state.completion_contract.evidence_required is True
@@ -542,10 +540,10 @@ async def test_hydrated_context_is_rebuilt_with_the_latest_observation() -> None
         recent_messages=state.recent_messages,
         task_state=state.task_state,
     )
-    state.active_instructions = [
+    state.active_directives = [
         {"directive_id": "d1", "normalized_text": "Use verified sources."}
     ]
-    state.conversation_summary = {"turn_facts": [{"content": "Lugano"}]}
+    state.summary = {"turn_facts": [{"content": "Lugano"}]}
 
     outcome = await _loop(provider).run(
         AgentLoopRequest(

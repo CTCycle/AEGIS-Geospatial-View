@@ -38,11 +38,17 @@ def test_all_manifest_entries_expose_source_traits() -> None:
 ###############################################################################
 def test_enabled_executable_manifests_declare_execution_contracts() -> None:
     payload = GeospatialManifestLoader().load_all()
+    profiles = {
+        str(item["capability_id"]): item for item in payload["runtime_profiles"]
+    }
     missing = [
         f"{collection_name}:{item['id']}"
         for collection_name in ("basemaps", "overlays", "cameras", "transit", "tools")
         for item in payload[collection_name]
-        if bool(dict(item.get("agenticUse") or {}).get("defaultEnabled"))
+        if (
+            bool(profiles.get(item["id"], {}).get("enabled_by_default"))
+            or bool(profiles.get(item["id"], {}).get("manual_toggle"))
+        )
         and not isinstance(item.get("executionContract"), dict)
     ]
 

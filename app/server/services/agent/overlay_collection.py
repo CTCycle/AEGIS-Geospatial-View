@@ -9,7 +9,7 @@ from typing import Any, Iterable, cast
 import unicodedata
 
 from server.common.typing import is_json_object, json_array, json_object
-from server.contracts.extraction import OverlayCommand, OverlayScope, OverlaySelector
+from server.contracts.overlays import OverlayCommand, OverlayScope, OverlaySelector
 from server.contracts.geospatial import (
     MapSession,
     MapInspection,
@@ -240,7 +240,7 @@ class OverlayCollectionService:
         cls, instance: OverlayInstance, selector: OverlaySelector
     ) -> bool:
         concepts = cls._instance_concepts(instance)
-        # An exact instance/capability identity is authoritative. Parser
+        # An exact instance/capability identity is authoritative. Route
         # outputs may include a broad semantic hint alongside the allowlisted
         # capability id (for example ``environmental`` for a hydrography
         # layer); requiring that hint to be repeated in every descriptor makes

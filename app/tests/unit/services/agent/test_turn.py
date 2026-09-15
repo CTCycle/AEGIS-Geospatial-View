@@ -7,7 +7,11 @@ import pytest
 from pydantic import BaseModel
 
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentPhase
+from server.domain.agent.capability_route import (
+    AgentPhase,
+    AgentRunState,
+    CapabilityRoute,
+)
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.reliability import AgentExecutionBudget
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
@@ -16,8 +20,8 @@ from server.domain.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
 from server.services.agent.agent_loop import AgentLoop
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.native_v2_turn import (
-    NativeV2TurnRequest,
-    NativeV2TurnRunner,
+    AgentTurnRequest,
+    AgentTurnRunner,
 )
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
@@ -29,9 +33,11 @@ class _Provider:
     # -------------------------------------------------------------------------
     def __init__(self, results: list[LLMResult]) -> None:
         self.results = deque(results)
+        self.calls = 0
 
     # -------------------------------------------------------------------------
     async def achat(self, _request: Any, **_kwargs: Any) -> LLMResult:
+        self.calls += 1
         return self.results.popleft()
 
 
@@ -88,7 +94,7 @@ async def _handler(_arguments: BaseModel, _state: Any) -> ToolResult:
 
 
 ###############################################################################
-def _runner(provider: _Provider) -> NativeV2TurnRunner:
+def _runner(provider: _Provider) -> AgentTurnRunner:
     runtime = _RuntimeRegistry()
     registry = ToolRegistry(runtime_registry=runtime)  # type: ignore[arg-type]
     registry.register(
@@ -120,7 +126,7 @@ def _runner(provider: _Provider) -> NativeV2TurnRunner:
         tool_registry=registry,
         tool_executor=ToolExecutor(tool_registry=registry),
     )
-    return NativeV2TurnRunner(agent_loop=loop)
+    return AgentTurnRunner(agent_loop=loop)
 
 
 ###############################################################################
@@ -146,7 +152,7 @@ def _route_call() -> LLMResult:
 ###############################################################################
 async def _run(provider: _Provider):
     return await _runner(provider).run(
-        NativeV2TurnRequest(
+        AgentTurnRequest(
             request_id="request-1",
             conversation_id="conversation-1",
             user_message="find hospitals",
@@ -206,7 +212,7 @@ async def test_native_runner_preserves_location_refs_in_response() -> None:
     response = await _runner(
         _Provider([_route_call(), LLMResult(content="Found Rome.")])
     ).run(
-        NativeV2TurnRequest(
+        AgentTurnRequest(
             request_id="request-location",
             conversation_id="conversation-location",
             user_message="find hospitals in Rome",
@@ -218,3 +224,88 @@ async def test_native_runner_preserves_location_refs_in_response() -> None:
     )
 
     assert response.location_refs["rome"] == location
+
+
+@pytest.mark.asyncio
+async def test_native_runner_exposes_control_stops_as_failed_operations() -> None:
+    response = await _runner(_Provider([])).run(
+        AgentTurnRequest(
+            request_id="request-cancelled",
+            conversation_id="conversation-cancelled",
+            user_message="find hospitals",
+            provider="fake",
+            model="fake-model",
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            run_state_check=lambda: "cancelled",
+        )
+    )
+
+    assert response.operation.kind == "error"
+    assert response.operation.status == "failed"
+    assert response.operation.failure_category == "cancelled"
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_native_runner_resumes_a_valid_checkpoint_without_rerouting() -> None:
+    state = AgentRunState(
+        request_id="request-resume",
+        conversation_id="conversation-resume",
+        phase=AgentPhase.MODEL_STEP,
+        user_message="find hospitals",
+        route=CapabilityRoute(
+            primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+            task_mode="execute",
+            presentation="text",
+            requires_location=False,
+            capability_queries=["hospitals"],
+        ),
+        capability_ids=["places:hospitals"],
+    )
+    provider = _Provider([LLMResult(content="The resumed run completed.")])
+
+    response = await _runner(provider).run(
+        AgentTurnRequest(
+            request_id="request-resume",
+            conversation_id="conversation-resume",
+            user_message="find hospitals",
+            provider="fake",
+            model="fake-model",
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            run_id="run-resume",
+            run_version=2,
+            conversation_revision=4,
+            checkpoint=state.checkpoint(),
+        )
+    )
+
+    assert response.assistant_message == "The resumed run completed."
+    assert response.operation.kind == "direct_answer"
+    assert response.execution_trace["checkpoint"]["request_id"] == "request-resume"
+    assert provider.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_native_runner_persists_safe_checkpoint_boundaries() -> None:
+    checkpoints: list[AgentRunState] = []
+
+    async def record_checkpoint(state: AgentRunState) -> None:
+        checkpoints.append(AgentRunState.from_checkpoint(state.checkpoint()))
+
+    provider = _Provider([_route_call(), LLMResult(content="Completed safely.")])
+    response = await _runner(provider).run(
+        AgentTurnRequest(
+            request_id="request-checkpoint",
+            conversation_id="conversation-checkpoint",
+            user_message="find hospitals",
+            provider="fake",
+            model="fake-model",
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            checkpoint_callback=record_checkpoint,
+        )
+    )
+
+    assert response.assistant_message == "Completed safely."
+    assert len(checkpoints) >= 2
+    assert checkpoints[0].route is not None
+    assert checkpoints[-1].budget_snapshot["model_calls"] == 2

@@ -1,4 +1,4 @@
-"""Native-v2 evidence inspection and transformation handlers."""
+"""Native evidence inspection and transformation handlers."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import time
 from typing import Any
 
 from server.common.typing import is_json_array, is_json_object
-from server.domain.agent.capability_route import AgentState
+from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -32,7 +32,7 @@ class EvidenceToolHandler:
     async def inspect(
         self,
         request: InspectEvidenceInput,
-        state: AgentState,
+        state: AgentRunState,
     ) -> ToolResult:
         started = time.perf_counter()
         if request.evidence_ref not in state.evidence_refs:
@@ -94,7 +94,7 @@ class EvidenceToolHandler:
     async def transform(
         self,
         request: TransformEvidenceInput,
-        state: AgentState,
+        state: AgentRunState,
     ) -> ToolResult:
         started = time.perf_counter()
         refs = list(dict.fromkeys(request.evidence_refs))

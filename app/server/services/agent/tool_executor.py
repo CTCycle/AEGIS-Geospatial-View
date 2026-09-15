@@ -1,16 +1,17 @@
-"""Single validation and execution boundary for native-v2 tools."""
+"""Single validation and execution boundary for native agent tools."""
 
 from __future__ import annotations
 
 import asyncio
 import time
+from contextlib import nullcontext
 from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, ValidationError
 
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentState
+from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.reliability import ExecutionBudgetExceeded
 from server.domain.agent.tool_result import (
     ToolExecutionError,
@@ -41,7 +42,7 @@ class ToolExecutor:
     async def execute_tool(
         self,
         tool_call: LLMToolCall,
-        state: AgentState,
+        state: AgentRunState,
         budget: Any,
     ) -> ToolResult:
         result = await self._execute_tool(tool_call, state, budget)
@@ -69,7 +70,7 @@ class ToolExecutor:
     async def _execute_tool(
         self,
         tool_call: LLMToolCall,
-        state: AgentState,
+        state: AgentRunState,
         budget: Any,
     ) -> ToolResult:
         started = time.perf_counter()
@@ -175,13 +176,37 @@ class ToolExecutor:
                 ),
             )
 
-        budget.ensure_available("tool_execution")
+        execution_stage = (
+            "map_assembly"
+            if tool_call.name == "apply_map_plan"
+            else "tool_execution"
+        )
+        budget.ensure_available(execution_stage)
         remaining = float(budget.remaining_seconds())
-        timeout = min(self.timeout_seconds, max(0.01, remaining))
-        try:
-            raw_result = await asyncio.wait_for(
-                registered.handler(arguments, state), timeout=timeout
+        operation_timeout = getattr(budget, "operation_timeout", None)
+        if callable(operation_timeout):
+            timeout = float(
+                operation_timeout(
+                    execution_stage,
+                    requested_seconds=self.timeout_seconds,
+                )
             )
+        else:
+            timeout = min(self.timeout_seconds, max(0.01, remaining))
+        observe = getattr(budget, "observe", None)
+        observation_scope = (
+            observe(
+                execution_stage,
+                metadata={"tool": tool_call.name, "call_id": call_id},
+            )
+            if callable(observe)
+            else nullcontext()
+        )
+        try:
+            with observation_scope:
+                raw_result = await asyncio.wait_for(
+                    registered.handler(arguments, state), timeout=timeout
+                )
         except asyncio.TimeoutError:
             return self._failure(
                 call_id=call_id,
@@ -236,7 +261,7 @@ class ToolExecutor:
         self,
         tool: RegisteredTool,
         arguments: BaseModel,
-        state: AgentState,
+        state: AgentRunState,
     ) -> tuple[bool, str | None]:
         authorize = getattr(self.policy_engine, "authorize", None)
         if callable(authorize):

@@ -1,313 +1,186 @@
-# Agentic Search
+# Native Geospatial Agent Harness
 
-Last updated: 2026-09-14
+Last updated: 2026-09-15
 
 ## Summary
 
-The chat workflow is being consolidated into the native iterative harness. The
-native implementation is now the configured default, and the shadow-preview
-implementation has been removed. Legacy execution remains only as temporary
-code until the native goal/state/tool contracts cover its remaining semantics.
+AEGIS uses one native, bounded agent harness for geospatial chat. A run is
+hydrated from revisioned `ConversationState` into a canonical `AgentRunState`,
+compiled into a typed route and completion contract, and then advanced by the
+iterative native loop:
 
-1. `native_v2` assembles context once, starts with the model-owned
-   `route_request` tool, validates the route and progressively constrained
-   registry exposure, then runs the bounded native state machine.
-2. The native loop executes through one typed validation/execution boundary;
-   normalized results are persisted as bounded conversation-scoped evidence and
-   model messages receive references and summaries, never raw datasets.
-3. The typed response builder emits one operation, route, tool summaries, trace,
-   and optional map candidate. Direct native map responses are
-   `prepared_unverified`; realtime candidates remain pending until matching
-   browser `map.render_ack` evidence.
+```text
+route -> expose -> model decision -> typed tool call -> observation
+      -> state update -> completion evaluation -> continue or finish
+```
 
-The remaining migration work and exact deletion order are tracked in
-`assets/docs/geospatial/native_harness_bootstrap.md`.
+The model chooses semantic actions. AEGIS owns validation, geographic and
+temporal binding, tool eligibility, budgets, retries, evidence persistence,
+map commit, and terminal-state rules. There is no runtime legacy/native mode
+switch and no shadow execution path.
+
+The exact implementation status and remaining environment-gated validation are
+tracked in `assets/docs/geospatial/native_harness_bootstrap.md`.
+
+## Prompt and state boundaries
+
+`app/server/prompts/` is the sole source of free-form model instructions.
+`prompts/agent.py` builds the native system prompt, route instructions, and
+bounded state view. Typed route, goal, completion, tool, and observation
+contracts live under `domain/agent/` and `contracts/`; services own policy and
+execution rather than embedding prompt text.
+
+`AgentContextAssembler` is the semantic context owner. It hydrates the full
+conversation package, applies relevance and structured per-field bounds, and
+produces an ephemeral `AgentContextView` before each model call. Provider
+adapters may perform a final protocol-safety check, but they do not independently
+decide which semantic history to discard.
+
+Durable state is separated from the model view:
+
+- `ConversationState` owns revisioned conversation directives, summary, goal,
+  committed map state, durable evidence references, and unresolved questions.
+- `AgentRunState` owns one run's route, completion obligations, resolved
+  locations, candidate capabilities, observations, counters, deadlines, and
+  terminal state.
+- `AgentContextView` is rebuilt for one model decision and is not canonical
+  state.
+- `agent_evidence` stores raw or normalized external data outside the prompt.
+- trace events record model calls, tool calls, observations, retries, context
+  compaction, transitions, and stop evaluations.
+
+## Route, goal, and completion
+
+`route_request` is the internal bootstrap boundary. It produces a typed
+`CapabilityRoute`; the native goal compiler derives an `AgentGoal` and
+`CompletionContract` from the request, route, verified locations, explicit
+scope/time requirements, requested operation, and presentation requirement.
+The model may choose among eligible capabilities, but it cannot remove
+application-owned completion obligations.
 
 Location resolution is hierarchical and deterministic where evidence permits:
 coordinates take precedence, followed by address/POI/street, district or
-neighborhood, city or municipality, region/state, and country. The most-specific
-entity is the target and less-specific entities are ordered parents, so `EUR
-district, Rome` is one location hierarchy rather than two competing cities. The
-resolved target, parent entities, result type, confidence, parent match, and
-bounding box are carried through the run as one canonical `ResolvedLocation`.
-Deictic references use the active location as context and do not become new
-targets. Same-level candidates still produce a clarification when bounded
-geocoder evidence cannot establish a relationship.
+neighborhood, city or municipality, region/state, and country. A requested
+location reference must resolve exactly. Ambiguous candidates become an
+explicit clarification transition; an unavailable reference is a typed
+validation/replan outcome and never silently falls back to another geography.
 
-Location ambiguity is explicit: unresolved similar-confidence candidates produce
-a clarification with candidate choices. Overlay intent is represented
-as typed `OverlayCommand` values. Each command keeps action, selector,
-geographic scope, presentation patch, and collection revision independent.
-`OverlayCollectionService` resolves active instances before catalog
-capabilities, applies deterministic add/remove/keep-only/show/hide/update
-semantics, and rejects stale revisions or ambiguous selectors without changing
-the current map.
+The completion contract can require location resolution, data retrieval,
+spatial and temporal filtering, renderable geometry, map-state commit, viewport
+evidence, and final response readiness. A valid empty result remains data with
+an explicit no-results outcome, not a provider failure.
 
-Residential-building requests use `overpass_residential_buildings`; amenities
-remain separate. Satellite language selects the imagery basemap unless the user
-explicitly requests an imagery data layer.
+## Capability catalogue and tools
 
-The agentic path uses the current normalized routing and capability contracts.
+Manifest v2 metadata is authoritative. Agent-facing entries must declare an
+explicit execution contract and routing metadata; capability kind or free-text
+heuristics are not used to infer agent domains.
 
-## Prompt Architecture
+Deterministic routing narrows candidates by runtime eligibility, geographic
+coverage, temporal compatibility, required inputs, supported operation,
+rendering support, known limitations, and semantic relevance. If no confident
+candidate is available but the request may be supported, the route enters
+`discovery_required` and exposes discovery rather than stopping prematurely.
 
-`app/server/prompts/` is the sole source of free-form model instructions and
-prompt templates. `parser.py` defines legacy structured turn-interpretation guidance,
-`prompts/agent.py` defines native route/tool instructions, and
-`domain/agent/capability_route.py` defines their typed contract,
-`response.py` defines grounded synthesis, `context.py` defines the compacted
-history envelope, and `providers.py` defines provider-specific protocol
-instructions. Builders compose literal fragments at the model boundary.
+The permanent native meta-tool surface is deliberately small:
 
-The Pydantic extraction model remains the legacy structural parser contract;
-native-v2 uses the compact `CapabilityRoute` and typed tool input models.
-Deterministic orchestration, policy, retries, and budgets remain in
-`services/agent/` and `services/llm/`. No business service defines free-form
-model instructions inline.
-
-## Conversation Context
-
-`conversation_id` isolates history, directives, tasks, map memory, summaries, and
-tool outcomes. Explicit durable instructions enter a structured directive ledger;
-later conflicts supersede earlier directives. Context is rebuilt for the selected
-model using declared input/output limits, schema overhead, and safety margin.
-Legacy parsing receives a bounded projection rather than full prior task/map
-snapshots or raw tool payloads. Native-v2 gives the same bounded context package
-to `AgentStateFactory`; the loop carries only typed locations, evidence refs,
-route state, and normalized tool results.
-
-Every request also has a run-scoped absolute deadline, bounded stage budgets, and
-safe stage telemetry. Provider calls use their native async transports; OpenCode
-Go routes published Chat Completions and Responses models through the shared
-OpenAI-compatible serializers, while Messages and Gemini-specific transports are
-explicitly disabled. Retries are limited to the failed operation and remaining
-deadline; the full pipeline is not restarted. OpenCode inference requests carry
-the conversation-scoped `x-opencode-session` header and a versioned AEGIS
-`User-Agent`; no model or provider fallback is performed.
-
-The run starts with a 90-second interpretation budget and promotes once to a
-150-second simple or 300-second complex profile. A schema-correction request is sent only for
-an incomplete structured contract while at least 18 seconds remain in the
-extraction window; extraction transport timeouts are never retried and never
-restart the workflow. Provider fields `task_class`, `action_id`,
-`requires_location`, `parser_confidence`, `relationship`, and
-`presentation_mode` are required before normalization. Extraction is recorded as
-`complete`, `intentional_ambiguity`, or `contract_incomplete`; the last state is
-a failed extraction stage, not a policy clarification.
-
-## Legacy Parser Contract
-
-`TurnParseResult` contains:
-
-- user text and bounded context
-- task class
-- location signals
-- normalized action
-- temporal signal
-- ambiguities
-- disallowed patterns
-- parser confidence
-- task relationship and atomic tasks
-- map/entity targets, requested layers, basemap, and attributes
-- typed `overlay_commands` with independent selectors, scopes, presentation
-  patches, and `state_reference`
-- tool requirement/category and expected frontend update
-- capability limitations and parser-recursion signal
-- an optional generic clarification plan describing blocking fields, choices, and whether valid visualization changes may be applied before clarification
-
-It does not contain provider-specific tool schemas, concrete executable tool names, or final map payloads.
-
-Clarification is field-specific. Place-only requests ask for the operation;
-missing anchors ask for a location; `recent` asks for a time window;
-`strongest` asks for a threshold or top-N; and “Where is …?” asks whether the
-result should be shown on the map, in text, or both. Explicit map commands are
-never routed to a generic task-class question.
-
-## Capability Resolution
-
-Parser output may contain semantic concepts such as `precipitation`; only
-manifest IDs may enter an executable tool plan. Exact enabled IDs are preserved.
-Semantic concepts are ranked against capability names, descriptions, keywords,
-planner hints, rendering modes, and temporal compatibility.
-
-Current radar requests prefer `rainviewer_precipitation_radar`, rainfall-rate
-requests prefer `IMERG_Precipitation_Rate`, and forecast requests prefer
-`openmeteo_weather_forecast`. Numeric point-elevation requests prefer
-`openmeteo_elevation`; visual terrain, hillshade, and imagery layers must not be
-used as substitutes for a numeric elevation result. The current elevation
-capability is a coarse approximately 90 m point sample and does not satisfy
-slope, aspect, terrain-profile, zonal-statistics, parcel-scale, or survey-grade
-requests.
-
-Historical monthly precipitation means are not available in the current catalog,
-so those requests produce a structured clarification with supported current and
-forecast alternatives.
-
-## Stable Action Catalog
-
-Supported action values:
-
-- `map_search`
-- `location_render`
-- `geospatial_data_retrieval`
-- `data_layer_query`
-- `overlay_control`
-- `dataset_display`
-- `visible_layer_interrogation`
-- `map_external_source_combination`
-- `chat_response`
-- `unknown`
-
-Unknown or low-confidence classifications normalize to `unknown` before policy selection.
-
-## Native Geospatial Tools
-
-- `route_request` (internal bootstrap route)
 - `resolve_geospatial_location`
 - `discover_geospatial_capabilities`
+- `describe_geospatial_capability`
 - `execute_geospatial_capability`
-- `inspect_evidence` for bounded metadata, schema, samples, statistics, and pages
-- `transform_evidence` for allowlisted declarative vector/tabular operations
-- `apply_map_plan` for typed candidate presentation before browser acknowledgement
+- `inspect_evidence`
+- `transform_evidence`
+- `apply_map_plan`
 
-Catalog responses are deterministic, permission-aware, and capped at 50 items per page.
+The registry has one `RegisteredTool` contract and one `ToolExecutor` boundary.
+The executor validates policy and arguments, binds server-owned geography/time
+parameters, checks and accounts for budgets, applies the resolved timeout,
+records a trace span, invokes the handler, and normalizes the result.
 
-## Provider Boundary
+The model selects a capability, operation, evidence references, and allowed
+user-semantic filters. AEGIS binds resolved coordinates, canonical bbox/radius,
+temporal boundaries, task-owned filters, and provider argument names.
 
-Provider-neutral LLM tool contracts are translated by adapters for:
+Discovery responses implement bounded deterministic pagination. Provider-layer
+descriptors, where required by the catalog contract, are exposed through the
+same discovery boundary rather than a second live-provider catalog service.
 
-- OpenAI-compatible function tools
-- Google Gemini function declarations
-- Ollama chat tools
-- DeepSeek function tools
-- OpenCode Zen/OpenCode Go OpenAI-compatible Chat Completions and Responses tools
+## Observations and evidence
 
-Provider-specific schemas do not leak into parser, policy, or executor models.
-Native tools and structured response JSON are separate request modes; provider
-responses are normalized to JSON objects before agent synthesis. DeepSeek JSON
-schema enforcement and the Ollama native-tool capability probe are declared in
-`app/server/prompts/providers.py`; adapters only translate and invoke them.
+`ToolResult` is the canonical application result. Before the next model call,
+`ModelObservation` projects it into a bounded, tool-specific view containing
+status, summary, result metadata, evidence references, provenance, warnings,
+coverage, pagination, errors, recovery semantics, truncation, and continuation
+information.
 
-## Response Contract
+Discovery descriptors, evidence samples, statistics, schema, provider freshness,
+units, spatial resolution, coverage, partial state, and stale state remain
+available when relevant. Large feature collections and raw provider payloads
+remain in the evidence store and are never inserted wholesale into model
+context.
 
-`POST /api/chat/turn` returns a structured `ChatTurnResponse`.
+Recovery is semantic rather than a blind repeat:
 
-Stable high-level fields:
+- transport retry is owned by the provider registry;
+- `correct_arguments` returns an actionable observation;
+- `choose_alternate_tool` exposes alternatives;
+- `replan` re-evaluates route and candidates;
+- `request_user_input` enters clarification;
+- `terminal` ends the run.
 
-- `assistant_message`
-- `turn_contract`
-- `decision`
-- `operation`
-- `tool_payload`
-- `map_session`
-- `memory_snapshot`
-- `context_usage`
-- `execution_trace`
+Equivalent successful calls are replay-protected, and repeated failing
+fingerprints are suppressed. Tool timeouts normally become observations so an
+alternate source can be selected; only the run deadline necessarily terminates
+the whole run.
 
-`operation` is the frontend-facing summary of verified backend outcome. It exists so clients do not need to infer success mode by inspecting `decision`, `tool_payload`, or `map_session`.
+## Provider and budget boundary
 
-`operation.kind` values:
+One settings block feeds the native execution budget and provider execution
+policy. The timeout hierarchy is:
 
-- `map_session`
-- `direct_answer`
-- `capability_catalog`
-- `clarification`
-- `rejection`
-- `error`
-- `failure_diagnostic`
+```text
+run deadline > model step > tool execution > provider operation
+             > HTTP connect/read/write
+```
 
-`operation.status` values:
+Child operations are clamped to the remaining parent deadline, while a valid
+source-specific timeout is not accidentally shortened by a smaller global
+default. Model, tool, transition, wall-clock, context, retry, and persistence
+usage are recorded in the canonical trace with distinct terminal reasons.
 
-- `success`
-- `partial`
-- `failed`
+Provider adapters own protocol continuation details. The harness retains a
+bounded portable message history plus opaque provider continuation metadata so
+stateless reasoning/tool protocols can continue without putting provider
+wire-format objects into durable agent state.
 
-Current behavior:
+Cancellation and steering are checked at safe boundaries before and after
+model/tool work, evidence mutation, map preparation, and final persistence.
+Changed run versions stop stale work with `superseded`; cancellation produces a
+terminal cancelled run without committing stale state.
 
-- successful map requests return `operation.kind = "map_session"` and a non-null `map_session`
-- verified direct tool responses return `operation.kind = "direct_answer"` and may include `operation.direct_result`
-- preflight clarification returns `operation.kind = "clarification"`
-- policy denial returns `operation.kind = "rejection"`
-- parser, provider, validation, and timeout failures return `operation.kind = "error"`
+## Map and response contract
 
-Provider catalog and upstream geospatial failures remain warnings or structured
-errors. They do not create successful empty layers or overwrite the last-known-
-good visible map state.
+`apply_map_plan` creates a typed candidate only. A direct synchronous response
+can report `prepared_unverified`; the realtime browser path requires a matching
+successful `map.render_ack` containing the run version, map session, collection
+revision, and bounded rendering checks. Only that acknowledgement promotes the
+candidate to the committed map. Failed or stale candidates leave the
+last-known-good map untouched.
 
-`tool_payload` remains available for raw tool trace and debugging, but it is not the primary source of truth for user-visible outcome.
+The public `ChatTurnResponse` is canonical and contains the assistant message,
+operation, bounded tool summaries, route, goal, completion contract,
+conversation state, context usage, execution trace, and optional map session.
+Operation kinds are `map_session`, `direct_answer`, `capability_catalog`,
+`clarification`, `rejection`, and `error`; operation status distinguishes
+success, partial, pending, and failed outcomes.
 
-`execution_trace` contains bounded stage observations, durations, model/tool/retry
-counts, remaining deadline, timeout origin, terminal stage, a sanitized
-`parser_contract`, context allocations, native iteration traces, completion
-requirements, and per-stage `pipeline_reach` states. Parser telemetry records
-field presence/default counts, normalized intent, provider error category, and
-timeout origin. It is diagnostic metadata only and excludes prompts, user text,
-credentials, and provider payloads.
+## Validation boundary
 
-`GET` and `POST /api/chat/models/structured-probe` report the selected model's
-real parser-prompt/schema check. Results are process-local, keyed by provider,
-model, base URL, and credential fingerprint, and expire after 15 minutes. A
-catalogue transport's `reachable` flag is independent from structured inference
-proof; the catalogue also exposes the separate probe status.
-
-## Overlay Collection And Inspection
-
-`MapSession.overlay_collection` is the required authoritative revisioned
-collection of stable overlay instances. An instance identity combines
-capability, resolved geographic scope, and render variant, so the same weather
-capability can exist independently for Zurich and Switzerland. Visibility and
-opacity changes update only the selected instances; unrelated descriptors and
-provider results are retained. Render entries and ID lists are derived views,
-not parallel map-session state. The response `visualization_update` reports
-collection revision, added/removed/updated instance IDs, and unmatched or
-ambiguous selectors.
-
-Provider metadata is normalized into bounded `MapInspection` contracts. Feature
-and location associations can be inspected on the map; raster metadata remains
-overlay-level (time, units, legend/attribution, freshness, and warnings), and
-non-spatial dataset metadata is available from the details panel. Only
-allowlisted scalar fields and approved HTTP(S) source links cross into the UI.
-
-`assistant_message` is Markdown-capable user-facing text. The response model is
-grounded with the verified operation, map summary, direct result, warnings,
-clarification requirements, and task state. It must not invent facts or expose
-internal identifiers.
-
-## Canonical interpretation and map completion
-
-`RequestInterpreter` compiles one `CanonicalRequestInterpretation` after
-parsing, contextual merge, and location resolution. It is the only executable
-interpretation for the turn. Targets retain hierarchy and peer identity;
-spatial relationships use explicit scope kinds (`point`, `bbox`, `radius`,
-`administrative_geometry`, `feature_geometry`, or `viewport`); temporal mode
-and normalized boundaries are carried independently of provider arguments.
-Tool planning consumes these fields and never reinterprets raw user text,
-viewport bounds, or stale location memory.
-
-Map requests have a two-step outcome. Backend execution creates a candidate map
-and emits `map_prepared`; this does not promote conversation map memory or claim
-visibility. The MapLibre client validates the candidate source/layer IDs,
-loading state, viewport, and relevant rendered feature evidence, then sends an
-idempotent `map.render_ack` containing the run version, map session, collection
-revision, and bounded checks. Only a matching successful acknowledgment promotes
-the candidate, commits geographic memory, and permits a final response to claim
-that required layers are visible. A failed or stale candidate leaves the last
-committed map in place.
-
-The deterministic completion contract tracks `location_resolved`,
-`required_data_retrieved`, `spatial_filter_applied`, `temporal_filter_applied`,
-`renderable_geometry_created`, `map_state_committed`,
-`viewport_contains_results`, and `final_response_ready`. Metadata-only weather
-or other sampled values remain inspectable but cannot satisfy a required visual
-layer. A valid empty result is data retrieval with an explicit no-results map
-state, not provider success with fabricated features.
-
-Flood-related `compare` operations are deterministically clarified before
-provider or tool execution unless comparable measure, unit, and time-window
-semantics have been verified. The current contract supports requesting the
-layers separately; it does not add a comparison engine.
-
-The direct `/api/chat/turn` path remains an immediate response path because no
-second headless render-ack transport exists. Realtime map runs continue to use
-the browser acknowledgment flow: the acknowledgment is client-reported
-rendering evidence, while backend semantic validation is authoritative.
+The unit and trajectory suites cover the native loop, observations, recovery,
+discovery, context bounds, location safety, map acknowledgement semantics,
+budget accounting, cancellation/version checks, public response shape, and
+strict manifest contracts. Full provider-specific Responses/Ollama protocol
+proof, credentialed geospatial provider runs, and full browser/API execution
+remain explicit validation gates where the environment is required. Native
+iteration checkpoints are persisted in the internal run event log and active
+runs are requeued on application startup.

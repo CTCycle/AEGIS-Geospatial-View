@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
-    AgentState,
+    AgentRunState,
     CapabilityRoute,
     CapabilityRouteDecision,
 )
@@ -31,7 +31,7 @@ class CapabilityRouter:
         proposed: CapabilityRoute,
         *,
         user_message: str,
-        active_state: AgentState,
+        active_state: AgentRunState,
     ) -> CapabilityRouteDecision:
         """Validate route semantics and return only an eligible shortlist."""
 
@@ -134,13 +134,18 @@ class CapabilityRouter:
         capability_ids = [
             str(item.get("id") or "").strip()
             for item in candidates
-            if str(item.get("id") or "").strip() and _is_executable_candidate(item)
+            if (
+                str(item.get("id") or "").strip()
+                and _is_executable_candidate(item)
+                and str(item.get("id") or "").strip()
+                not in active_state.excluded_capability_ids
+            )
         ]
 
         if proposed.task_mode == "execute" and not capability_ids:
             status = (
                 "discovery_required"
-                if not proposed.explicit_capability_ids and proposed.capability_queries
+                if not proposed.explicit_capability_ids
                 else "no_capability"
             )
             return CapabilityRouteDecision(
@@ -183,7 +188,7 @@ def _is_executable_candidate(capability: dict[str, object]) -> bool:
     return kind != "basemap"
 
 
-def _single_known_location(state: AgentState) -> ResolvedLocation | None:
+def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:
     if len(state.location_refs) == 1:
         return next(iter(state.location_refs.values()))
     if state.active_map_session is not None:

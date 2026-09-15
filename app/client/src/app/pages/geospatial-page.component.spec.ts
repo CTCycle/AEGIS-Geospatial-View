@@ -23,18 +23,11 @@ describe('pages/geospatial-page.component', () => {
     conversation_id: 'conv-1',
     request_id: 'chat-1',
     assistant_message: 'ok',
-    turn_contract: {
-      user_text: 'x',
-      task_class: 'direct_query',
-      location_signals: [],
-      normalized_action: { action_id: 'x', action_label: 'X', task_tags: [], action_tags: [], requires_location: false },
-      temporal_signal: { mode: 'none' },
-      ambiguities: [],
-      parser_confidence: 0.9,
-    },
-    decision: { plan: { state: 'reject', action_id: 'x', overlay_ids: [] } },
     operation: { kind: 'rejection', status: 'failed', message: 'ok', warnings: [] },
     memory_snapshot: {},
+    context_revision: 0,
+    presentation_status: 'not_requested',
+    tool_results: [],
     ...overrides,
   });
 
@@ -114,7 +107,20 @@ describe('pages/geospatial-page.component', () => {
         { role: 'user', content: 'Show Rome', created_at: '2026-08-31T10:00:00Z' },
         { role: 'assistant', content: 'Restored', created_at: '2026-08-31T10:00:01Z' },
       ],
-      task_snapshot: null,
+      conversation_state: {
+        schema_version: 1,
+        conversation_id: 'conv-restore',
+        revision: 3,
+        active_directives: [],
+        summary: null,
+        goal: null,
+        route: null,
+        constraints: {},
+        resolved_locations: {},
+        evidence_refs: [],
+        committed_map_session: null,
+        unresolved_questions: [],
+      },
       memory_snapshot: { location_slots: [] },
       map_session: null,
       active_run: { run_id: 'run-restore', run_version: 2, state: 'running' },
@@ -165,7 +171,6 @@ describe('pages/geospatial-page.component', () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       assistant_message: 'Which location should I use?',
       operation: { kind: 'clarification', status: 'partial', message: 'Which location should I use?', warnings: [] },
-      decision: { plan: { state: 'clarify', action_id: 'weather', overlay_ids: [] } },
       map_session: null,
       tool_payload: null,
     }));
@@ -188,7 +193,6 @@ describe('pages/geospatial-page.component', () => {
         direct_result: { latitude: 41.8902, longitude: 12.4922 },
         warnings: [],
       },
-      decision: { plan: { state: 'direct_tool', action_id: 'location_lookup', overlay_ids: [], tool_id: 'location_to_coordinates' } },
       tool_payload: { tool_id: 'location_to_coordinates', result: { latitude: 41.8902, longitude: 12.4922 } },
       map_session: null,
     }));
@@ -327,7 +331,6 @@ describe('pages/geospatial-page.component', () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       assistant_message: 'Tool timed out.',
       operation: { kind: 'error', status: 'failed', message: 'Tool timed out.', warnings: [] },
-      decision: { plan: { state: 'direct_response', action_id: 'weather', overlay_ids: [] } },
       map_session: null,
       tool_payload: null,
     }));

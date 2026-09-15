@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -20,8 +21,10 @@ from server.services.geospatial.providers.base import (
     ProviderRequest,
     ProviderUnavailableError,
 )
-from server.domain.llm.types import LLMToolDefinition
-from server.services.agent.tool_registry import ToolRegistry
+from server.services.agent.capability_execution import (
+    CapabilityExecutionService,
+    ToolExecutionContext,
+)
 from server.services.geospatial.providers.census import CensusProvider
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
 from server.services.geospatial.providers.noaa import NOAAProvider
@@ -294,38 +297,28 @@ def test_local_open_data_requires_configured_source_id_and_preserves_geojson_mod
 @pytest.mark.parametrize(
     ("provider_error", "expected_code"),
     [
-        (ProviderAuthError("missing"), "auth_required"),
-        (ProviderRateLimitError("limited"), "rate_limited"),
-        (ProviderInvalidQueryError("invalid"), "invalid_query"),
-        (ProviderMalformedPayloadError("malformed"), "malformed_response"),
+        (ProviderAuthError("missing"), "provider_authentication"),
+        (ProviderRateLimitError("limited"), "provider_rate_limit"),
+        (ProviderInvalidQueryError("invalid"), "provider_invalid_query"),
+        (ProviderMalformedPayloadError("malformed"), "provider_malformed_response"),
         (ProviderUnavailableError("unavailable"), "provider_unavailable"),
     ],
 )
 def test_native_tool_maps_provider_failures_to_canonical_codes(
     provider_error: Exception, expected_code: str
 ) -> None:
-    registry = ToolRegistry(runtime_registry=object())  # type: ignore[arg-type]
-
-    async def handler(arguments, context):  # noqa: ANN001
-        del arguments, context
-        raise provider_error
-
-    registry.register_native_tool(
-        LLMToolDefinition(
-            name="provider_tool",
-            description="Provider tool",
-            parameters_json_schema={
-                "type": "object",
-                "additionalProperties": False,
-            },
+    service = object.__new__(CapabilityExecutionService)
+    result = service._provider_failure(
+        context=ToolExecutionContext(
+            conversation_id="conversation-1",
+            call_id="call-1",
         ),
-        handler,
+        capability_id="provider-capability",
+        provider_id="provider",
+        started=time.perf_counter(),
+        error=provider_error,
     )
 
-    envelope = run_async_in_thread(
-        registry.execute_native_tool("provider_tool", {}, None)
-    )
-
-    assert envelope.ok is False
-    assert envelope.error is not None
-    assert envelope.error.code == expected_code
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == expected_code

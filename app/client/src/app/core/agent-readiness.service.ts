@@ -42,13 +42,13 @@ export class AgentReadinessService {
         return {
           status: probe.status === 'not_tested' ? 'unknown' : 'needs_attention',
           label: probe.status === 'not_tested' ? 'Not verified' : 'Needs attention',
-          message: probe.message ?? 'The selected model has not passed the structured parser probe.',
+          message: probe.message ?? 'The selected model has not passed the native structured-response probe.',
         };
       }
       return {
         status: 'active',
         label: 'Configured',
-        message: `${this.describeActiveAgent(settings)} Structured parser probe passed.`,
+        message: `${this.describeActiveAgent(settings)} Native structured-response probe passed.`,
       };
     } catch {
       return {

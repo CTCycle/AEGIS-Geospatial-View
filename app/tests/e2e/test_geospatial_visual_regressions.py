@@ -11,6 +11,9 @@ from PIL import Image, ImageChops
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e.helpers.chat_stub_payloads import (
+    _native_conversation_state,
+    _native_goal,
+    _native_route,
     geospatial_catalog_payload,
     map_overlay_instance,
     model_settings_payload,
@@ -54,28 +57,30 @@ def _turn_payload() -> dict[str, Any]:
         "request_id": "visual-regression-7901",
         "conversation_id": "conversation-e2e",
         "assistant_message": "Loaded visual regression fixture.",
-        "turn_contract": {
-            "user_text": "show fixture map",
-            "task_class": "map_search",
-            "location_signals": [],
-            "normalized_action": {
-                "action_id": "visual_fixture_map",
-                "action_label": "Visual fixture map",
-                "task_tags": ["map"],
-                "action_tags": ["geospatial"],
-                "requires_location": True,
-            },
-            "temporal_signal": {"mode": "none"},
-            "ambiguities": [],
-            "parser_confidence": 0.95,
-        },
-        "decision": {
-            "plan": {
-                "state": "map_search",
-                "action_id": "visual_fixture_map",
-                "basemap_id": "osm_default",
-                "overlay_ids": ["visual_fixture_points"],
-            }
+        "context_revision": 1,
+        "route": _native_route(
+            task_mode="execute",
+            presentation="map",
+            operation="render",
+            requires_location=True,
+            capability_query="visual_fixture_map",
+            target_refs=["location:rome"],
+        ),
+        "goal": _native_goal(
+            task_mode="execute",
+            presentation="map",
+            operation="render",
+            requires_location=True,
+            goal="show fixture map",
+        ),
+        "completion_contract": {
+            "operation": "render",
+            "requirements": ["answer_provided", "map_prepared"],
+            "location_required": True,
+            "evidence_required": False,
+            "map_preparation_required": True,
+            "temporal_scope_required": False,
+            "spatial_scope_required": True,
         },
         "map_session": {
             "session_id": "visual-fixture-map",
@@ -135,6 +140,11 @@ def _turn_payload() -> dict[str, Any]:
             "execution": "map_search",
             "selected_overlay_ids": ["visual_fixture_points"],
         },
+        "memory_snapshot": {},
+        "presentation_status": "prepared",
+        "tool_results": [],
+        "conversation_state": _native_conversation_state(1),
+        "execution_trace": {"stopped_reason": "goal_satisfied"},
     }
 
 ###############################################################################

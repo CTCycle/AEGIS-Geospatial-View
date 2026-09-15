@@ -1,4 +1,4 @@
-"""Strict input models for the native-v2 model-facing tool primitives."""
+"""Strict input models for the native model-facing tool primitives."""
 
 from __future__ import annotations
 

@@ -1,18 +1,18 @@
-"""Unified native-v2 state machine for bounded agent execution."""
+"""Unified native state machine for bounded agent execution."""
 
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Awaitable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Protocol
 
 from server.domain.agent.capability_route import (
     AgentGoal,
     AgentPhase,
-    AgentState,
+    AgentRunState,
     CapabilityRoute,
     CompletionContract,
 )
@@ -72,7 +72,7 @@ class AgentRunControlSignal(RuntimeError):
 class AgentLoopRequest:
     provider: str
     model: str
-    state: AgentState
+    state: AgentRunState
     budget: AgentExecutionBudget
     messages: list[dict[str, Any]] = field(default_factory=list)
     temperature: float = 0.2
@@ -81,6 +81,9 @@ class AgentLoopRequest:
     max_model_calls: int = 10
     max_tool_calls: int = 20
     max_state_transitions: int = 32
+    simple_max_model_calls: int = 4
+    simple_max_tool_calls: int = 6
+    simple_max_state_transitions: int = 32
     max_parallel_tool_calls: int = 8
     max_consecutive_tool_failures: int = 3
     max_same_failed_fingerprint: int = 2
@@ -90,6 +93,7 @@ class AgentLoopRequest:
     max_tool_result_chars: int = 4096
     model_max_attempts: int = 2
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
+    checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None
     run_state_check: Callable[[], str | None] | None = None
 
 
@@ -97,7 +101,7 @@ class AgentLoopRequest:
 @dataclass(frozen=True)
 class AgentLoopOutcome:
     final_text: str
-    state: AgentState
+    state: AgentRunState
     stopped_reason: Literal[
         "goal_satisfied",
         "awaiting_render",
@@ -175,12 +179,35 @@ class AgentLoop:
                     category="response_parsing",
                 )
             state.route = route
-            request.budget.promote(self._budget_profile(route))
+            profile = self._budget_profile(route)
+            request.budget.promote(profile)
+            request.budget.configure_limits(
+                max_model_calls=(
+                    min(request.max_model_calls, request.simple_max_model_calls)
+                    if profile == "simple"
+                    else request.max_model_calls
+                ),
+                max_tool_calls=(
+                    min(request.max_tool_calls, request.simple_max_tool_calls)
+                    if profile == "simple"
+                    else request.max_tool_calls
+                ),
+                max_state_transitions=(
+                    min(
+                        request.max_state_transitions,
+                        request.simple_max_state_transitions,
+                    )
+                    if profile == "simple"
+                    else request.max_state_transitions
+                ),
+            )
             self._compile_native_goal(state, route)
+            await self._checkpoint(request)
 
             for iteration in range(max(1, request.max_iterations)):
                 self._ensure_run_control(request)
-                if state.model_calls >= request.max_model_calls:
+                model_limit = request.budget.max_model_calls or request.max_model_calls
+                if state.model_calls >= model_limit:
                     return self._budget_outcome(state, request, "model_budget_exhausted")
                 self._transition(state, AgentPhase.BUILD_TOOL_CONTEXT, request.budget)
                 tools = self.tool_registry.expose(state)
@@ -215,7 +242,7 @@ class AgentLoop:
                     )
                     state.provider_continuation = [
                         dict(item)
-                        for item in self._protocol_messages(messages)[-64:]
+                        for item in self._protocol_messages(messages)[-16:]
                     ]
                     self._transition(state, AgentPhase.UPDATE_STATE, request.budget)
                     self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
@@ -227,6 +254,7 @@ class AgentLoop:
                         max_validation_corrections=request.max_validation_corrections,
                         max_discovery_attempts=request.max_discovery_attempts,
                     )
+                    await self._checkpoint(request)
                     if stop is not None:
                         state.termination_reason = stop[0]
                         return self._outcome(state, stop[1], stop[0], request)
@@ -240,6 +268,7 @@ class AgentLoop:
                     final_text,
                     available_tools=[item.name for item in tools],
                 )
+                await self._checkpoint(request)
                 if stop is not None:
                     state.termination_reason = stop[0]
                     return self._outcome(state, final_text, stop[0], request)
@@ -255,6 +284,21 @@ class AgentLoop:
             return self._outcome(state, final_text, "cancelled", request)
         except ExecutionBudgetExceeded as exc:
             return self._budget_outcome(state, request, exc.reason)
+        except LLMProviderRequestError as exc:
+            if exc.timeout_origin == "application_deadline":
+                state.termination_reason = "run_deadline_exhausted"
+                return self._outcome(
+                    state,
+                    final_text,
+                    "run_deadline_exhausted",
+                    request,
+                )
+            return self._failed(
+                state,
+                request,
+                "The selected model could not complete this request.",
+                category=exc.category,
+            )
         except TimeoutError:
             state.termination_reason = "run_deadline_exhausted"
             return self._outcome(state, final_text, "run_deadline_exhausted", request)
@@ -281,6 +325,7 @@ class AgentLoop:
                 correction_messages,
                 [self.ROUTE_TOOL],
                 tool_choice="required",
+                budget_stage="route_request",
             )
             call = result.tool_calls[0] if result.tool_calls else None
             if (
@@ -370,10 +415,10 @@ class AgentLoop:
         context = build_native_context_messages(
             current_user_message=state.user_message,
             recent_messages=state.recent_messages,
-            active_instructions=view.active_instructions,
+            active_directives=view.active_directives,
             task_state=view.task_state,
             map_memory=view.map_memory,
-            conversation_summary=view.conversation_summary,
+            summary=view.summary,
             relevant_tool_outcomes=view.relevant_tool_outcomes,
             recent_observations=view.recent_observations,
             policy_constraints=view.policy_constraints,
@@ -387,7 +432,7 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     @staticmethod
     def _protocol_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return [
+        protocol = [
             message
             for message in messages
             if (
@@ -400,6 +445,11 @@ class AgentLoop:
                 or message.get("role") == "tool"
             )
         ]
+        # The canonical native context carries durable semantic history.  Keep
+        # only the latest provider protocol window here so Responses reasoning
+        # and function-call items remain paired without pinning every historical
+        # tool exchange forever.
+        return protocol[-16:]
 
     # -------------------------------------------------------------------------
     async def _model_call(
@@ -410,9 +460,10 @@ class AgentLoop:
         tools: list[LLMToolDefinition],
         *,
         tool_choice: str,
+        budget_stage: str = "model_step",
     ) -> LLMResult:
         self._ensure_run_control(request)
-        request.budget.ensure_available("model_step")
+        request.budget.ensure_available(budget_stage)
         metadata = {
             "supports_tools": True,
             REQUEST_DEADLINE_METADATA_KEY: request.budget.deadline_monotonic,
@@ -437,23 +488,30 @@ class AgentLoop:
         while True:
             attempts += 1
             self._ensure_run_control(request)
-            request.budget.ensure_available("model_step")
-            remaining = request.budget.remaining_seconds()
-            timeout = min(
-                remaining,
-                max(0.01, request.max_model_call_seconds),
+            request.budget.ensure_available(budget_stage)
+            timeout = request.budget.operation_timeout(
+                budget_stage,
+                requested_seconds=request.max_model_call_seconds,
             )
             request.budget.record_model_call()
             request.state.model_calls += 1
             try:
-                result = await asyncio.wait_for(
-                    provider.achat(
-                        llm_request,
-                        tools=tools or None,
-                        tool_choice=tool_choice,
-                    ),
-                    timeout=timeout,
-                )
+                with request.budget.observe(
+                    budget_stage,
+                    metadata={
+                        "provider": request.provider,
+                        "model": request.model,
+                        "attempt": attempts,
+                    },
+                ):
+                    result = await asyncio.wait_for(
+                        provider.achat(
+                            llm_request,
+                            tools=tools or None,
+                            tool_choice=tool_choice,
+                        ),
+                        timeout=timeout,
+                    )
                 self._ensure_run_control(request)
                 self._record_context_usage(
                     request,
@@ -464,6 +522,25 @@ class AgentLoop:
                     attempts,
                 )
                 return result
+            except asyncio.TimeoutError as exc:
+                usage = compute_context_usage(
+                    llm_request, provider=request.provider
+                ).to_dict()
+                self._record_context_usage(request, usage, attempts)
+                if request.budget.remaining_seconds() <= 0.001:
+                    raise TimeoutError(
+                        "The native agent run deadline expired during a model call."
+                    ) from exc
+                raise LLMProviderRequestError(
+                    provider=request.provider,
+                    model=request.model,
+                    stage="model_call",
+                    code="model_call_timeout",
+                    retryable=False,
+                    category="provider_api",
+                    context_usage=usage,
+                    timeout_origin="provider_transport",
+                ) from exc
             except LLMProviderRequestError as exc:
                 self._record_context_usage(
                     request,
@@ -482,6 +559,16 @@ class AgentLoop:
                 )
                 self._ensure_run_control(request)
                 request.budget.ensure_available("model_retry")
+
+    # -------------------------------------------------------------------------
+    async def _checkpoint(self, request: AgentLoopRequest) -> None:
+        """Persist a safe native state boundary when configured."""
+
+        callback = request.checkpoint_callback
+        if callback is None:
+            return
+        request.state.budget_snapshot = request.budget.snapshot()
+        await callback(request.state)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -528,9 +615,10 @@ class AgentLoop:
         self,
         request: AgentLoopRequest,
         calls: list[LLMToolCall],
-        state: AgentState,
+        state: AgentRunState,
     ) -> list[ToolResult]:
-        remaining_tool_calls = request.max_tool_calls - state.tool_calls
+        tool_limit = request.budget.max_tool_calls or request.max_tool_calls
+        remaining_tool_calls = tool_limit - state.tool_calls
         if remaining_tool_calls <= 0:
             raise ExecutionBudgetExceeded("tool_budget_exhausted", "tool_call")
         bounded_calls = calls[: min(request.max_parallel_tool_calls, remaining_tool_calls)]
@@ -614,7 +702,7 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _apply_result(state: AgentState, result: ToolResult) -> None:
+    def _apply_result(state: AgentRunState, result: ToolResult) -> None:
         if not any(item.call_id == result.call_id for item in state.tool_results):
             state.tool_results.append(result)
         if result.status == "failed":
@@ -624,6 +712,12 @@ class AgentLoop:
                 and result.error.recovery in {"choose_alternate_tool", "replan"}
                 and result.tool_name == "execute_geospatial_capability"
             ):
+                capability_id = result.metadata.capability_id
+                if (
+                    capability_id
+                    and capability_id not in state.excluded_capability_ids
+                ):
+                    state.excluded_capability_ids.append(capability_id)
                 # Re-open the discovery boundary after a provider/capability
                 # failure.  Keeping only the failed ID would prevent the
                 # model from selecting an equivalent source.
@@ -648,7 +742,7 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     def _evaluate_stop(
         self,
-        state: AgentState,
+        state: AgentRunState,
         route: CapabilityRoute,
         results: list[ToolResult],
         *,
@@ -705,7 +799,7 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     def _evaluate_text_stop(
         self,
-        state: AgentState,
+        state: AgentRunState,
         route: CapabilityRoute,
         text: str,
         *,
@@ -748,7 +842,7 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     @staticmethod
     def _transition(
-        state: AgentState,
+        state: AgentRunState,
         phase: AgentPhase,
         budget: AgentExecutionBudget | None = None,
         *,
@@ -772,10 +866,10 @@ class AgentLoop:
             return build_native_context_messages(
                 current_user_message=state.user_message,
                 recent_messages=state.recent_messages,
-                active_instructions=state.active_instructions,
+                active_directives=state.active_directives,
                 task_state=state.task_state,
                 map_memory=state.map_memory,
-                conversation_summary=state.conversation_summary,
+                summary=state.summary,
                 relevant_tool_outcomes=state.relevant_tool_outcomes,
                 policy_constraints=state.policy_constraints,
                 context_selection={
@@ -802,8 +896,7 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _compile_native_goal(state: AgentState, route: CapabilityRoute) -> None:
-        canonical = state.canonical_request
+    def _compile_native_goal(state: AgentRunState, route: CapabilityRoute) -> None:
         route_temporal_scope = route.temporal_scope.model_dump(mode="json")
         route_has_temporal_scope = any(
             route_temporal_scope.get(key)
@@ -816,38 +909,15 @@ class AgentLoop:
             route_temporal_scope.get(key) not in {None, "none", ""}
             for key in ("granularity", "aggregation")
         )
-        operation = route.operation or next(
-            (
-                str(item).strip()
-                for item in (canonical.operations if canonical else [])
-                if str(item).strip()
-            ),
-            route.primary_domain.value,
-        )
+        operation = route.operation or route.primary_domain.value
         target_ids = list(dict.fromkeys(str(item).strip() for item in route.target_refs if str(item).strip()))
-        if not target_ids and canonical is not None:
-            target_ids = [str(item.target_id) for item in canonical.targets]
-        temporal_scope = (
-            route_temporal_scope
-            if route_has_temporal_scope
-            else (
-                canonical.temporal_constraints.model_dump(mode="json")
-                if canonical is not None
-                else {}
-            )
-        )
+        temporal_scope = route_temporal_scope if route_has_temporal_scope else {}
         spatial_scope = (
             [route.spatial_scope.model_dump(mode="json")]
             if route.spatial_scope is not None
-            else (
-                [item.model_dump(mode="json") for item in canonical.spatial_constraints]
-                if canonical is not None
-                else []
-            )
+            else []
         )
         filters = dict(route.filters)
-        if not filters and canonical is not None:
-            filters = dict(canonical.filters)
         requirements: list[str] = []
         if route.requires_location:
             requirements.append("location_resolved")
@@ -901,7 +971,7 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _pending_native_requirements(state: AgentState) -> list[str]:
+    def _pending_native_requirements(state: AgentRunState) -> list[str]:
         if not state.context_hydrated or state.completion_contract is None:
             return []
         completed_data = any(
@@ -945,7 +1015,7 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _working_state_message(state: AgentState, limit: int) -> str:
+    def _working_state_message(state: AgentRunState, limit: int) -> str:
         payload = {
             "phase": state.phase.value,
             "goal": (
@@ -960,6 +1030,7 @@ class AgentLoop:
             ),
             "route": state.route.model_dump(mode="json") if state.route else None,
             "capability_ids": list(state.capability_ids),
+            "excluded_capability_ids": list(state.excluded_capability_ids),
             "location_refs": sorted(state.location_refs),
             "evidence_refs": list(state.evidence_refs),
             "prepared_map": bool(state.prepared_map_session),
@@ -1006,7 +1077,7 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _compact_goal(state: AgentState) -> dict[str, Any] | None:
+    def _compact_goal(state: AgentRunState) -> dict[str, Any] | None:
         if state.goal is None:
             return None
         return {
@@ -1026,7 +1097,7 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _compact_completion_contract(state: AgentState) -> dict[str, Any] | None:
+    def _compact_completion_contract(state: AgentRunState) -> dict[str, Any] | None:
         if state.completion_contract is None:
             return None
         return {
@@ -1041,7 +1112,7 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _compact_route(state: AgentState) -> dict[str, Any] | None:
+    def _compact_route(state: AgentRunState) -> dict[str, Any] | None:
         if state.route is None:
             return None
         return {
@@ -1142,7 +1213,7 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     def _outcome(
         self,
-        state: AgentState,
+        state: AgentRunState,
         final_text: str,
         reason: str,
         request: AgentLoopRequest,
@@ -1173,7 +1244,7 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     def _failed(
         self,
-        state: AgentState,
+        state: AgentRunState,
         request: AgentLoopRequest,
         detail: str,
         *,
@@ -1198,7 +1269,7 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     def _budget_outcome(
         self,
-        state: AgentState,
+        state: AgentRunState,
         request: AgentLoopRequest,
         reason: str,
     ) -> AgentLoopOutcome:

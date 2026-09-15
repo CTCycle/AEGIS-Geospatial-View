@@ -86,34 +86,105 @@ ROME_MAP_SESSION = {
 }
 
 ###############################################################################
-def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
+def _native_route(
+    *,
+    task_mode: str,
+    presentation: str,
+    operation: str,
+    requires_location: bool,
+    capability_query: str,
+    target_refs: list[str] | None = None,
+) -> dict[str, Any]:
     return {
-        "user_text": message,
-        "conversation_context": {"recent_messages": [], "memory_snapshot": {}},
-        "task_class": "direct_query",
-        "location_signals": [],
-        "normalized_action": {
-            "action_id": "stub",
-            "action_label": "Stub",
-            "task_tags": [],
-            "action_tags": [],
-            "requires_location": False,
+        "primary_domain": "geospatial",
+        "secondary_domains": [],
+        "task_mode": task_mode,
+        "presentation": presentation,
+        "requires_location": requires_location,
+        "capability_queries": [capability_query],
+        "explicit_capability_ids": [],
+        "clarification_question": None,
+        "operation": operation,
+        "target_refs": target_refs or [],
+        "temporal_scope": {
+            "mode": "none",
+            "granularity": "none",
+            "aggregation": "none",
         },
-        "temporal_signal": {"mode": "none"},
-        "ambiguities": [],
-        "disallowed_patterns": [],
-        "parser_confidence": 1.0,
+        "spatial_scope": None,
+        "filters": {},
     }
 
 ###############################################################################
-def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
+def _native_goal(
+    *,
+    task_mode: str,
+    presentation: str,
+    operation: str,
+    requires_location: bool,
+    goal: str,
+) -> dict[str, Any]:
     return {
-        "plan": {
-            "state": state,
-            "action_id": "stub",
-            "overlay_ids": [],
+        "goal": goal,
+        "task_mode": task_mode,
+        "presentation": presentation,
+        "operation": operation,
+        "requires_location": requires_location,
+        "target_ids": [],
+        "temporal_scope": {"mode": "none"},
+        "spatial_scope": [],
+        "filters": {},
+    }
+
+###############################################################################
+def _native_conversation_state(revision: int) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "conversation_id": E2E_CONVERSATION_ID,
+        "revision": revision,
+        "active_directives": [],
+        "summary": None,
+        "goal": None,
+        "route": None,
+        "constraints": {},
+        "resolved_locations": {},
+        "evidence_refs": [],
+        "committed_map_session": None,
+        "unresolved_questions": [],
+    }
+
+###############################################################################
+def _native_response_fields(
+    *,
+    turn_number: int,
+    assistant_message: str,
+    route: dict[str, Any],
+    goal: dict[str, Any],
+    presentation_status: str,
+    map_session: dict[str, Any] | None,
+    memory_snapshot: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "context_revision": turn_number,
+        "route": route,
+        "goal": goal,
+        "completion_contract": {
+            "operation": goal["operation"],
+            "requirements": ["answer_provided"],
+            "location_required": bool(goal["requires_location"]),
+            "evidence_required": False,
+            "map_preparation_required": map_session is not None,
+            "temporal_scope_required": False,
+            "spatial_scope_required": bool(goal["requires_location"]),
         },
-        "trace": {"steps": ["stub"]},
+        "presentation_status": presentation_status,
+        "tool_results": [],
+        "conversation_state": _native_conversation_state(turn_number),
+        "execution_trace": {
+            "stopped_reason": "goal_satisfied",
+            "iterations": 1,
+        },
+        "memory_snapshot": memory_snapshot or {},
     }
 
 ###############################################################################
@@ -122,12 +193,32 @@ def chat_completion_map_payload(
 ) -> dict[str, Any]:
     payload = deepcopy(ROME_MAP_SESSION)
     payload["basemap"] = {**ROME_MAP_SESSION["basemap"], "id": basemap_id}
+    route = _native_route(
+        task_mode="execute",
+        presentation="map",
+        operation="render",
+        requires_location=True,
+        capability_query="map",
+        target_refs=["location:rome"],
+    )
     return {
         "request_id": f"chat-stub-{turn_number}",
         "conversation_id": E2E_CONVERSATION_ID,
         "assistant_message": assistant_message,
-        "turn_contract": _chat_turn_contract(),
-        "decision": _chat_decision("map_search"),
+        **_native_response_fields(
+            turn_number=turn_number,
+            assistant_message=assistant_message,
+            route=route,
+            goal=_native_goal(
+                task_mode="execute",
+                presentation="map",
+                operation="render",
+                requires_location=True,
+                goal=assistant_message,
+            ),
+            presentation_status="prepared",
+            map_session=payload,
+        ),
         "map_session": payload,
         "tool_payload": {
             "execution": "map_search",
@@ -143,8 +234,26 @@ def chat_completion_clarification_payload(
         "request_id": f"chat-stub-{turn_number}",
         "conversation_id": E2E_CONVERSATION_ID,
         "assistant_message": message,
-        "turn_contract": _chat_turn_contract(),
-        "decision": _chat_decision("clarify"),
+        **_native_response_fields(
+            turn_number=turn_number,
+            assistant_message=message,
+            route=_native_route(
+                task_mode="clarify",
+                presentation="text",
+                operation="clarify_location",
+                requires_location=True,
+                capability_query="location",
+            ),
+            goal=_native_goal(
+                task_mode="clarify",
+                presentation="text",
+                operation="clarify_location",
+                requires_location=True,
+                goal=message,
+            ),
+            presentation_status="not_requested",
+            map_session=None,
+        ),
         "map_session": None,
         "tool_payload": {
             "execution": "follow_up",
@@ -157,8 +266,26 @@ def chat_completion_text_payload(turn_number: int, message: str) -> dict[str, An
         "request_id": f"chat-stub-{turn_number}",
         "conversation_id": E2E_CONVERSATION_ID,
         "assistant_message": message,
-        "turn_contract": _chat_turn_contract(),
-        "decision": _chat_decision("direct_tool"),
+        **_native_response_fields(
+            turn_number=turn_number,
+            assistant_message=message,
+            route=_native_route(
+                task_mode="execute",
+                presentation="text",
+                operation="lookup",
+                requires_location=False,
+                capability_query="coordinates",
+            ),
+            goal=_native_goal(
+                task_mode="execute",
+                presentation="text",
+                operation="lookup",
+                requires_location=False,
+                goal=message,
+            ),
+            presentation_status="not_requested",
+            map_session=None,
+        ),
         "map_session": None,
         "tool_payload": {"execution": "location_to_coordinates"},
     }
@@ -456,5 +583,18 @@ def conversation_snapshot_payload(
         "memory_snapshot": {},
         "map_session": deepcopy(map_session) if map_session is not None else None,
         "active_run": None,
-        "task_snapshot": None,
+        "conversation_state": {
+            "schema_version": 1,
+            "conversation_id": E2E_CONVERSATION_ID,
+            "revision": 5,
+            "active_directives": [],
+            "summary": None,
+            "goal": None,
+            "route": None,
+            "constraints": {},
+            "resolved_locations": {},
+            "evidence_refs": [],
+            "committed_map_session": None,
+            "unresolved_questions": [],
+        },
     }

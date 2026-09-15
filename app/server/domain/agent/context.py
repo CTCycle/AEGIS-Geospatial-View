@@ -23,12 +23,12 @@ class ConversationDirective(BaseModel):
 class AgentContextPackage(BaseModel):
     model_config = ConfigDict(extra="forbid")
     current_user_message: str
-    active_instructions: list[ConversationDirective] = Field(
+    active_directives: list[ConversationDirective] = Field(
         default_factory=lambda: list[ConversationDirective]()
     )
     task_state: dict[str, Any] | None = None
     map_memory: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
-    conversation_summary: dict[str, Any] | None = None
+    summary: dict[str, Any] | None = None
     recent_messages: list[dict[str, Any]] = Field(
         default_factory=lambda: list[dict[str, Any]]()
     )
@@ -53,10 +53,10 @@ class AgentContextView(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    active_instructions: list[dict[str, Any]] = Field(default_factory=list)
+    active_directives: list[dict[str, Any]] = Field(default_factory=list)
     task_state: dict[str, Any] = Field(default_factory=dict)
     map_memory: dict[str, Any] = Field(default_factory=dict)
-    conversation_summary: dict[str, Any] | None = None
+    summary: dict[str, Any] | None = None
     relevant_tool_outcomes: list[dict[str, Any]] = Field(default_factory=list)
     recent_observations: list[dict[str, Any]] = Field(default_factory=list)
     policy_constraints: dict[str, Any] = Field(default_factory=dict)
@@ -72,12 +72,12 @@ class AgentContextView(BaseModel):
         """Build a model view without persisting or mutating state."""
 
         return cls(
-            active_instructions=[dict(item) for item in state.active_instructions],
+            active_directives=[dict(item) for item in state.active_directives],
             task_state=dict(state.task_state),
             map_memory=dict(state.map_memory),
-            conversation_summary=(
-                dict(state.conversation_summary)
-                if state.conversation_summary is not None
+            summary=(
+                dict(state.summary)
+                if state.summary is not None
                 else None
             ),
             relevant_tool_outcomes=[

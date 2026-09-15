@@ -94,22 +94,41 @@ class RunLifecycleService:
         except PermissionError as exc:
             raise RunAccessError(str(exc)) from exc
         if created:
-            task = asyncio.create_task(self.run_orchestrator.execute_run(run.run_id))
-            self._tasks.add(task)
-            self._tasks_by_run[run.run_id] = task
-
-            def discard_task(completed: asyncio.Task[None]) -> None:
-                self._tasks.discard(completed)
-                if self._tasks_by_run.get(run.run_id) is completed:
-                    self._tasks_by_run.pop(run.run_id, None)
-
-            task.add_done_callback(discard_task)
+            self._schedule_run(run.run_id)
         return AgentRunCreateResult(
             conversation_id=conversation_id,
             run_id=run.run_id,
             run_version=run.active_run_version,
             state=run.state,
         ), created
+
+    # -------------------------------------------------------------------------
+    def resume_active_runs(self) -> int:
+        """Requeue non-terminal runs after application startup."""
+
+        list_resumable_runs = getattr(self.run_repository, "list_resumable_runs", None)
+        if not callable(list_resumable_runs):
+            return 0
+        scheduled = 0
+        for snapshot in list_resumable_runs():
+            if snapshot.run_id in self._tasks_by_run:
+                continue
+            self._schedule_run(snapshot.run_id)
+            scheduled += 1
+        return scheduled
+
+    # -------------------------------------------------------------------------
+    def _schedule_run(self, run_id: str) -> None:
+        task = asyncio.create_task(self.run_orchestrator.execute_run(run_id))
+        self._tasks.add(task)
+        self._tasks_by_run[run_id] = task
+
+        def discard_task(completed: asyncio.Task[None]) -> None:
+            self._tasks.discard(completed)
+            if self._tasks_by_run.get(run_id) is completed:
+                self._tasks_by_run.pop(run_id, None)
+
+        task.add_done_callback(discard_task)
 
     # -------------------------------------------------------------------------
     async def shutdown(self) -> None:
