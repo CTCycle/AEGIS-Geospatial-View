@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
+import asyncio
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
 from typing import Any
 
+import httpx
 from openai import OpenAI
 
 from server.services.llm.base import (
@@ -27,6 +29,10 @@ from server.services.llm.errors import (
 )
 from server.services.llm.response_serialization import dump_response_payload
 from server.services.llm.request_deadline import remaining_request_seconds
+from server.services.llm.transport import (
+    LLMTransportPolicy,
+    close_sync_client,
+)
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
@@ -42,9 +48,16 @@ class OpenAIProvider(LLMProvider):
     provider_name = "openai"
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, api_key: str, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str | None = None,
+        transport_policy: LLMTransportPolicy | None = None,
+    ) -> None:
         self.api_key = api_key
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
+        self.transport_policy = transport_policy or LLMTransportPolicy()
 
     # -------------------------------------------------------------------------
     def _request_headers(self, request: LLMRequest | None = None) -> dict[str, str]:
@@ -52,12 +65,20 @@ class OpenAIProvider(LLMProvider):
         return {}
 
     # -------------------------------------------------------------------------
-    def _client(self, request: LLMRequest | None = None) -> Any:
+    def _client(
+        self,
+        request: LLMRequest | None = None,
+        *,
+        stage: str = "chat",
+    ) -> Any:
         kwargs: dict[str, Any] = {
             "api_key": self.api_key,
             "base_url": self.base_url,
-            "timeout": 30.0,
+            "timeout": self.transport_policy.timeout_for(stage),
             "max_retries": 0,
+            "http_client": httpx.Client(
+                **self.transport_policy.httpx_options(stage)
+            ),
         }
         headers = self._request_headers(request)
         if headers:
@@ -65,11 +86,10 @@ class OpenAIProvider(LLMProvider):
         return OpenAI(**kwargs)
 
     # -------------------------------------------------------------------------
-    def _client_for_request(self, request: LLMRequest) -> Any:
-        try:
-            client = self._client(request)
-        except TypeError:
-            client = self._client()
+    def _client_for_request(
+        self, request: LLMRequest, *, stage: str = "chat"
+    ) -> Any:
+        client = self._client(request, stage=stage)
         remaining = remaining_request_seconds(request)
         if remaining is None:
             return client
@@ -79,6 +99,29 @@ class OpenAIProvider(LLMProvider):
         if callable(with_options):
             return with_options(timeout=remaining)
         return client
+
+    # -------------------------------------------------------------------------
+    async def achat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
+        return await asyncio.to_thread(
+            self.chat,
+            request,
+            tools=tools,
+            tool_choice=tool_choice,
+            response_json_schema=response_json_schema,
+        )
+
+    # -------------------------------------------------------------------------
+    async def astructured_output(
+        self, request: LLMRequest, schema: type[object]
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(self.structured_output, request, schema)
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
@@ -321,8 +364,10 @@ class OpenAIProvider(LLMProvider):
                     "strict": True,
                 }
             }
+        client: Any | None = None
         try:
-            response = self._client_for_request(effective_request).responses.create(
+            client = self._client_for_request(effective_request, stage="chat")
+            response = client.responses.create(
                 model=effective_request.model,
                 input=self.normalize_tool_messages(effective_request.messages),
                 **self._temperature_kwargs(effective_request),
@@ -338,6 +383,9 @@ class OpenAIProvider(LLMProvider):
                 stage="chat",
                 context_usage=usage.to_dict(),
             ) from exc
+        finally:
+            if client is not None:
+                close_sync_client(client)
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
         return LLMResult(
@@ -356,8 +404,10 @@ class OpenAIProvider(LLMProvider):
 
         def iterate() -> Iterable[str]:
             nonlocal usage
+            client: Any | None = None
             try:
-                response_stream = self._client_for_request(request).responses.create(
+                client = self._client_for_request(request, stage="stream")
+                response_stream = client.responses.create(
                     model=request.model,
                     input=request.messages,
                     stream=True,
@@ -395,6 +445,9 @@ class OpenAIProvider(LLMProvider):
                     stage="stream",
                     context_usage=usage.to_dict(),
                 ) from exc
+            finally:
+                if client is not None:
+                    close_sync_client(client)
 
         stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
         return stream
@@ -417,8 +470,10 @@ class OpenAIProvider(LLMProvider):
         except LLMStructuredOutputError as exc:
             exc.context_usage = usage.to_dict()
             raise
+        client: Any | None = None
         try:
-            response = self._client_for_request(request).responses.parse(
+            client = self._client_for_request(request, stage="structured_output")
+            response = client.responses.parse(
                 model=request.model,
                 input=request.messages,
                 text_format=schema,
@@ -440,6 +495,9 @@ class OpenAIProvider(LLMProvider):
                 stage="structured_output",
                 context_usage=usage.to_dict(),
             ) from exc
+        finally:
+            if client is not None:
+                close_sync_client(client)
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
         parsed = getattr(response, "output_parsed", None)
@@ -486,13 +544,40 @@ class OpenAIProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
-        response = self._client().embeddings.create(model=model, input=input_text)
+        client: Any | None = None
+        try:
+            client = self._client(stage="embeddings")
+            response = client.embeddings.create(model=model, input=input_text)
+        except LLMProviderRequestError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=model,
+                stage="embeddings",
+            ) from exc
+        finally:
+            if client is not None:
+                close_sync_client(client)
         data = getattr(response, "data", None)
         if not data:
-            return []
+            raise LLMProviderRequestError(
+                provider=self.provider_name,
+                model=model,
+                stage="embeddings",
+                code="provider_invalid_response",
+                retryable=False,
+            )
         embedding = getattr(data[0], "embedding", None)
         if not is_json_array(embedding):
-            return []
+            raise LLMProviderRequestError(
+                provider=self.provider_name,
+                model=model,
+                stage="embeddings",
+                code="provider_invalid_response",
+                retryable=False,
+            )
         return [float(value) for value in embedding if isinstance(value, (int, float))]
 
     # -------------------------------------------------------------------------

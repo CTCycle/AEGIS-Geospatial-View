@@ -303,7 +303,27 @@ function Import-EnvironmentFile {
 }
 
 function Set-LauncherEnvironment {
-    New-Item -ItemType Directory -Path $RuntimeCacheDir, $ToolCacheDir, $UvCacheDir, $NpmCacheDir, $PipCacheDir, $PythonBytecodeCacheDir, $PytestCacheDir, $PytestTempDir, $RuffCacheDir, $CoverageDir, $AngularCacheDir, $PlaywrightBrowsersDir -Force | Out-Null
+    foreach ($cachePath in @(
+        $RuntimeCacheDir,
+        $ToolCacheDir,
+        $UvCacheDir,
+        $NpmCacheDir,
+        $PipCacheDir,
+        $PythonBytecodeCacheDir,
+        $PytestCacheDir,
+        $PytestTempDir,
+        $RuffCacheDir,
+        $CoverageDir,
+        $AngularCacheDir,
+        $PlaywrightBrowsersDir
+    )) {
+        try {
+            New-Item -ItemType Directory -Path $cachePath -Force -ErrorAction Stop | Out-Null
+        }
+        catch {
+            Write-Status WARN "Optional cache directory unavailable; continuing without it: $cachePath"
+        }
+    }
     $env:UV_CACHE_DIR = $UvCacheDir
     $env:UV_PROJECT_ENVIRONMENT = $VenvDir
     $env:UV_LINK_MODE = 'copy'
@@ -550,14 +570,12 @@ function Invoke-LaunchApplication {
         throw "Virtual-environment Python was not found at $venvPython."
     }
 
-    $backendModule = 'app.server.app:app'
-    $backendWorkingDirectory = $RootDir
-    $env:PYTHONPATH = "$RootDir;$AppDir"
-    & $venvPython -c "import importlib; importlib.import_module('app.server.app')" 2>$null
+    $backendModule = 'server.app:app'
+    $backendWorkingDirectory = $AppDir
+    $env:PYTHONPATH = $AppDir
+    & $venvPython -c "import importlib; module = importlib.import_module('server.app'); assert getattr(module, 'app', None) is not None" 2>$null
     if ($LASTEXITCODE -ne 0) {
-        $backendModule = 'server.app:app'
-        $backendWorkingDirectory = $ServerDir
-        $env:PYTHONPATH = $AppDir
+        throw "The backend entrypoint server.app:app could not be imported from $AppDir or does not expose an ASGI app."
     }
 
     $backendArguments = @('-m', 'uvicorn', $backendModule, '--host', $env:FASTAPI_HOST, '--port', "$fastApiPort", '--log-level', 'info', '--ws-max-size', '65536', '--ws-ping-interval', '15', '--ws-ping-timeout', '10')
@@ -568,11 +586,7 @@ function Invoke-LaunchApplication {
     Write-Status RUN "Launching backend ($backendModule)"
     $backendProcess = $null
     if ($env:BACKEND_LOGS_VISIBLE -ieq 'true') {
-        $quotedArguments = $backendArguments | ForEach-Object {
-            if ($_ -match '\s') { '"{0}"' -f ($_ -replace '"', '""') } else { $_ }
-        }
-        $backendCommand = 'cd /d "{0}" && "{1}" {2}' -f $backendWorkingDirectory, $venvPython, ($quotedArguments -join ' ')
-        $backendProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/d', '/k', $backendCommand) -WorkingDirectory $backendWorkingDirectory -WindowStyle Normal -PassThru
+        $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -WindowStyle Normal -PassThru
     }
     else {
         $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -WindowStyle Hidden -PassThru
@@ -590,7 +604,12 @@ function Invoke-LaunchApplication {
         throw "Frontend preview did not become ready within 60 seconds at $uiUri."
     }
 
-    Start-Process $uiUri
+    try {
+        Start-Process -FilePath $uiUri -ErrorAction Stop | Out-Null
+    }
+    catch {
+        Write-Status WARN "The browser could not be opened automatically. Open $uiUri manually."
+    }
     $backendPid = @(Get-PortListenerPids -Port $fastApiPort) | Select-Object -First 1
     $frontendPid = @(Get-PortListenerPids -Port $uiPort) | Select-Object -First 1
     if (-not $backendPid -and $backendProcess) { $backendPid = $backendProcess.Id }

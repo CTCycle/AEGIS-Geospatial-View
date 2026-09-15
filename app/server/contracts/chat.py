@@ -312,15 +312,23 @@ class ModelSettingsUpdateRequest(BaseModel):
     )
 
     # -------------------------------------------------------------------------
-    @field_validator(
-        "agent_model_provider",
-        "agent_model_name",
-        mode="before",
-    )
+    @field_validator("agent_model_provider", mode="before")
     @classmethod
-    def normalize_optional_model_fields(cls, value: str | None) -> str | None:
+    def preserve_optional_provider_id(cls, value: str | None) -> str | None:
         if value is None:
             return None
+        if not isinstance(value, str):
+            raise ValueError("agent_model_provider must be a string")
+        return value
+
+    # -------------------------------------------------------------------------
+    @field_validator("agent_model_name", mode="before")
+    @classmethod
+    def normalize_optional_model_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("agent_model_name must be a string")
         return value.strip()
 
     # -------------------------------------------------------------------------

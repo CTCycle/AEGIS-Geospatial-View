@@ -201,10 +201,7 @@ class ProviderRegistry:
                 "metadata-only",
             }:
                 continue
-            fallback_provider_id = (
-                item.get("id") if collection_name == "providers" else ""
-            )
-            provider_id = str(item.get("provider") or fallback_provider_id).strip()
+            provider_id = str(item.get("provider") or "").strip()
             if not provider_id:
                 continue
             if provider_id.lower() in self._providers:

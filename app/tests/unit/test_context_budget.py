@@ -12,7 +12,6 @@ from server.services.llm.context_budget import (
     compute_ollama_context_usage,
     estimate_message_tokens,
     prepare_request,
-    resolve_model_context_limit,
     resolve_model_context_profile,
 )
 from server.services.llm.types import LLMRequest, LLMToolDefinition
@@ -56,8 +55,6 @@ def test_static_catalog_profile_is_exact_and_provider_scoped() -> None:
 
 ###############################################################################
 def test_model_name_alone_never_creates_a_local_context_cap() -> None:
-    assert resolve_model_context_limit("llama3.2") is None
-    assert resolve_model_context_limit("custom-4k") is None
     assert resolve_model_context_profile("ollama", "qwen3.5:2b") is None
 
     usage = compute_ollama_context_usage(_request("hello", model="qwen3.5:2b"))

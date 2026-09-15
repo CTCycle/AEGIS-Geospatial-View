@@ -8,6 +8,7 @@ import json
 from collections.abc import Awaitable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Protocol
+from urllib.parse import urlparse
 
 from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.capability_route import (
@@ -38,6 +39,7 @@ from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.context_budget import compute_context_usage
 from server.services.llm.errors import LLMProviderRequestError, LLMStructuredOutputError
 from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
+from server.services.llm.transport import LLMTransportPolicy
 
 ###############################################################################
 class AgentProvider(Protocol):
@@ -94,7 +96,6 @@ class AgentLoopRequest:
     max_validation_corrections: int = 2
     max_discovery_attempts: int = 2
     max_tool_result_chars: int = 4096
-    model_max_attempts: int = 2
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
     checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None
     run_state_check: Callable[[], str | None] | None = None
@@ -144,11 +145,13 @@ class AgentLoop:
         capability_router: CapabilityRouter,
         tool_registry: ToolRegistry,
         tool_executor: ToolExecutor,
+        transport_policy: LLMTransportPolicy | None = None,
     ) -> None:
         self.provider_factory = provider_factory
         self.capability_router = capability_router
         self.tool_registry = tool_registry
         self.tool_executor = tool_executor
+        self.transport_policy = transport_policy or LLMTransportPolicy()
 
     # -------------------------------------------------------------------------
     async def run(self, request: AgentLoopRequest) -> AgentLoopOutcome:
@@ -471,7 +474,12 @@ class AgentLoop:
             "supports_tools": True,
             REQUEST_DEADLINE_METADATA_KEY: request.budget.deadline_monotonic,
         }
-        if request.provider.strip().lower() == "opencode-go":
+        protocol = self._provider_protocol(provider, request.model)
+        endpoint_host = self._provider_endpoint_host(provider)
+        metadata["protocol"] = protocol
+        if endpoint_host is not None:
+            metadata["endpoint_host"] = endpoint_host
+        if request.provider == "opencode-go":
             # OpenCode Go's thinking-mode models reject explicit tool_choice
             # values while tools are enabled.  Disabling thinking selects the
             # provider's compatible native-tool contract without changing the
@@ -530,11 +538,7 @@ class AgentLoop:
                     llm_request, provider=request.provider
                 ).to_dict()
                 self._record_context_usage(request, usage, attempts)
-                if request.budget.remaining_seconds() <= 0.001:
-                    raise TimeoutError(
-                        "The native agent run deadline expired during a model call."
-                    ) from exc
-                raise LLMProviderRequestError(
+                error = LLMProviderRequestError(
                     provider=request.provider,
                     model=request.model,
                     stage="model_call",
@@ -543,7 +547,20 @@ class AgentLoop:
                     category="provider_api",
                     context_usage=usage,
                     timeout_origin="provider_transport",
-                ) from exc
+                    diagnostics={"exception_type": type(exc).__name__},
+                )
+                self._record_provider_failure(
+                    request,
+                    error,
+                    attempts=attempts,
+                    protocol=protocol,
+                    endpoint_host=endpoint_host,
+                )
+                if request.budget.remaining_seconds() <= 0.001:
+                    raise TimeoutError(
+                        "The native agent run deadline expired during a model call."
+                    ) from exc
+                raise error from exc
             except LLMProviderRequestError as exc:
                 self._record_context_usage(
                     request,
@@ -553,12 +570,53 @@ class AgentLoop:
                     ).to_dict(),
                     attempts,
                 )
-                if not exc.retryable or attempts >= max(1, request.model_max_attempts):
+                self._record_provider_failure(
+                    request,
+                    exc,
+                    attempts=attempts,
+                    protocol=protocol,
+                    endpoint_host=endpoint_host,
+                )
+                if not exc.retryable or attempts >= self.transport_policy.max_attempts:
                     raise
                 request.budget.record_retry()
                 request.budget.ensure_available("model_retry")
                 await asyncio.sleep(
-                    min(0.25, request.budget.remaining_seconds())
+                    min(
+                        self.transport_policy.retry_delay(attempts),
+                        request.budget.remaining_seconds(),
+                    )
+                )
+                self._ensure_run_control(request)
+                request.budget.ensure_available("model_retry")
+            except (AgentRunControlSignal, LLMStructuredOutputError):
+                raise
+            except Exception as exc:
+                normalized = LLMProviderRequestError.from_exception(
+                    exc,
+                    provider=request.provider,
+                    model=request.model,
+                    stage="model_call",
+                    context_usage=compute_context_usage(
+                        llm_request, provider=request.provider
+                    ).to_dict(),
+                )
+                self._record_provider_failure(
+                    request,
+                    normalized,
+                    attempts=attempts,
+                    protocol=protocol,
+                    endpoint_host=endpoint_host,
+                )
+                if not normalized.retryable or attempts >= self.transport_policy.max_attempts:
+                    raise normalized from exc
+                request.budget.record_retry()
+                request.budget.ensure_available("model_retry")
+                await asyncio.sleep(
+                    min(
+                        self.transport_policy.retry_delay(attempts),
+                        request.budget.remaining_seconds(),
+                    )
                 )
                 self._ensure_run_control(request)
                 request.budget.ensure_available("model_retry")
@@ -612,6 +670,66 @@ class AgentLoop:
         except Exception:
             # Telemetry must not change the model/tool execution semantics.
             return
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _provider_protocol(provider: AgentProvider, model: str) -> str:
+        protocol_for_model = getattr(provider, "protocol_for_model", None)
+        if callable(protocol_for_model):
+            try:
+                protocol = protocol_for_model(model)
+            except Exception:
+                protocol = None
+            if isinstance(protocol, str) and protocol.strip():
+                return protocol.strip()
+        provider_name = str(getattr(provider, "provider_name", ""))
+        return {
+            "openai": "openai-responses",
+            "google": "google-model",
+            "deepseek": "openai-chat-completions",
+            "ollama": "ollama-chat",
+        }.get(provider_name, "unknown")
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _provider_endpoint_host(provider: AgentProvider) -> str | None:
+        base_url = getattr(provider, "base_url", None)
+        if not isinstance(base_url, str) or not base_url:
+            return None
+        hostname = urlparse(base_url).hostname
+        return hostname if hostname else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _record_provider_failure(
+        request: AgentLoopRequest,
+        exc: LLMProviderRequestError,
+        *,
+        attempts: int,
+        protocol: str,
+        endpoint_host: str | None,
+    ) -> None:
+        diagnostics = dict(exc.diagnostics)
+        request.state.model_trace.append(
+            {
+                "attempt": attempts,
+                "model_call": request.state.model_calls,
+                "status": "failed",
+                "provider": request.provider,
+                "model": request.model,
+                "protocol": protocol,
+                "endpoint_host": endpoint_host,
+                "error_code": exc.code,
+                "exception_class": diagnostics.get(
+                    "exception_type", type(exc).__name__
+                ),
+                "win32_error": diagnostics.get("winerror"),
+                "http_status": exc.http_status,
+                "timeout_origin": exc.timeout_origin or "unknown",
+                "retryable": exc.retryable,
+                "diagnostics": diagnostics,
+            }
+        )
 
     # -------------------------------------------------------------------------
     async def _execute_calls(

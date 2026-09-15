@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.common.typing import is_json_array, is_json_object
 
 from dataclasses import replace
+import time
 from typing import Any
 
 import httpx
@@ -11,6 +12,7 @@ from server.common.constants import AEGIS_VERSION
 from server.services.llm.deepseek_provider import DeepSeekProvider
 from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.openai_provider import OpenAIProvider
+from server.services.llm.transport import LLMTransportPolicy
 from server.services.llm.types import LLMRequest, ModelDescriptor
 
 ###############################################################################
@@ -116,7 +118,11 @@ class _OpenCodeResponsesTransport(OpenAIProvider):
 
     # -------------------------------------------------------------------------
     def __init__(self, parent: "OpenCodeProvider") -> None:
-        super().__init__(api_key=parent.api_key, base_url=parent.base_url)
+        super().__init__(
+            api_key=parent.api_key,
+            base_url=parent.base_url,
+            transport_policy=parent.transport_policy,
+        )
         self.provider_name = parent.provider_name
         self._parent = parent
 
@@ -145,10 +151,20 @@ class OpenCodeProvider(DeepSeekProvider):
     provider_name = OPENCODE_PROVIDER
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, api_key: str, provider_name: str) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        provider_name: str,
+        transport_policy: LLMTransportPolicy | None = None,
+    ) -> None:
         if provider_name not in OPENCODE_BASE_URLS:
             raise ValueError(f"Unsupported OpenCode provider '{provider_name}'.")
-        super().__init__(api_key=api_key, base_url=OPENCODE_BASE_URLS[provider_name])
+        super().__init__(
+            api_key=api_key,
+            base_url=OPENCODE_BASE_URLS[provider_name],
+            transport_policy=transport_policy,
+        )
         self.provider_name = provider_name
         self._declared_model_protocols: dict[str, str] = {}
         self._responses_transport: _OpenCodeResponsesTransport | None = None
@@ -230,20 +246,32 @@ class OpenCodeProvider(DeepSeekProvider):
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
-        response = httpx.get(
-            f"{self.base_url}/models",
-            headers={
-                **self._request_headers(),
-                "Authorization": f"Bearer {self.api_key}",
-                "Accept": "application/json",
-            },
-            timeout=5.0,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        if not is_json_object(payload):
-            return []
-        raw_entries = payload.get("data", [])
+        started = time.perf_counter()
+        try:
+            response = httpx.get(
+                f"{self.base_url}/models",
+                headers={
+                    **self._request_headers(),
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Accept": "application/json",
+                },
+                **self.transport_policy.httpx_options("catalog"),
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not is_json_object(payload) or not is_json_array(payload.get("data")):
+                raise ValueError("OpenCode models response has no data array")
+        except LLMProviderRequestError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model="*",
+                stage="catalog",
+                elapsed_ms=max(0, int((time.perf_counter() - started) * 1000)),
+            ) from exc
+        raw_entries = payload.get("data")
         entries = raw_entries if is_json_array(raw_entries) else []
         models: list[ModelDescriptor] = []
         for raw_item in entries:

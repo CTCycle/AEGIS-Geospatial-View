@@ -19,6 +19,15 @@ export const INITIAL_AGENT_READINESS_STATE: AgentReadinessState = {
   message: 'Validating selected agent model status.',
 };
 
+const CANONICAL_LLM_PROVIDERS = new Set([
+  'openai',
+  'google',
+  'deepseek',
+  'opencode',
+  'opencode-go',
+  'ollama',
+]);
+
 @Injectable({ providedIn: 'root' })
 export class AgentReadinessService {
   constructor(
@@ -60,10 +69,13 @@ export class AgentReadinessService {
   }
 
   private async resolveIssue(settings: ModelSettingsResponse): Promise<string | null> {
-    const provider = settings.agent_model_provider.trim().toLowerCase();
+    const provider = settings.agent_model_provider;
     const model = settings.agent_model_name.trim();
     if (!provider || !model) {
       return 'No agent model is selected. Open Model Settings before using the workspace.';
+    }
+    if (!CANONICAL_LLM_PROVIDERS.has(provider)) {
+      return `Selected provider ID is not supported: ${provider}. Choose a canonical provider in Model Settings.`;
     }
 
     if (provider === 'ollama') {
@@ -105,7 +117,7 @@ export class AgentReadinessService {
   }
 
   private describeActiveAgent(settings: ModelSettingsResponse): string {
-    const provider = settings.agent_model_provider.trim();
+    const provider = settings.agent_model_provider;
     const model = settings.agent_model_name.trim();
     if (!provider || !model) {
       return 'No agent model selected.';

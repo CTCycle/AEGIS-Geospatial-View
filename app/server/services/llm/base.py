@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 
 from abc import ABC, abstractmethod
@@ -81,6 +80,7 @@ class LLMProvider(ABC):
     ) -> dict[str, Any]: ...
 
     # -------------------------------------------------------------------------
+    @abstractmethod
     async def achat(
         self,
         request: LLMRequest,
@@ -89,28 +89,16 @@ class LLMProvider(ABC):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
-        """Async agent boundary for providers without a native async client.
-
-        OpenAI-compatible providers override this with a cancellable network
-        request.  The fallback keeps less common adapters off the event loop
-        while their existing transport is migrated.
-        """
-
-        return await asyncio.to_thread(
-            self.chat,
-            request,
-            tools=tools,
-            tool_choice=tool_choice,
-            response_json_schema=response_json_schema,
-        )
+        """Execute the provider's canonical asynchronous chat protocol."""
+        raise NotImplementedError
 
     # -------------------------------------------------------------------------
+    @abstractmethod
     async def astructured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
-        """Async structured-output boundary used by the agent runtime."""
-
-        return await asyncio.to_thread(self.structured_output, request, schema)
+        """Execute the provider's canonical asynchronous structured protocol."""
+        raise NotImplementedError
 
     # -------------------------------------------------------------------------
     @abstractmethod

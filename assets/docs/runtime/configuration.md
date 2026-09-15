@@ -56,6 +56,11 @@ there is no legacy/shadow execution-mode setting.
 Model provider API keys are entered through Settings and stored as encrypted
 database records. They are not database connection settings.
 
+The model provider contract accepts exactly `openai`, `google`, `deepseek`,
+`opencode`, `opencode-go`, and `ollama`. Unknown, stale, case-variant, and
+aliased provider IDs are rejected; a provider or model failure never selects a
+different provider or model automatically.
+
 ## Local profile
 
 The source template is `settings/.env.example`. The Windows launcher uses the

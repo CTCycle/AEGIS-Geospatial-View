@@ -25,6 +25,7 @@ from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.errors import LLMProviderRequestError
+from server.services.llm.transport import LLMTransportPolicy
 
 
 ###############################################################################
@@ -96,7 +97,11 @@ async def _answer_handler(arguments: BaseModel, state: AgentRunState) -> ToolRes
 
 
 ###############################################################################
-def _loop(provider: FakeProvider) -> AgentLoop:
+def _loop(
+    provider: FakeProvider,
+    *,
+    transport_policy: LLMTransportPolicy | None = None,
+) -> AgentLoop:
     capability_registry = FakeCapabilityRegistry()
     registry = ToolRegistry(runtime_registry=FakeRuntimeRegistry())  # type: ignore[arg-type]
     registry.register(
@@ -127,6 +132,7 @@ def _loop(provider: FakeProvider) -> AgentLoop:
         ),
         tool_registry=registry,
         tool_executor=ToolExecutor(tool_registry=registry),
+        transport_policy=transport_policy,
     )
 
 
@@ -337,6 +343,68 @@ async def test_opencode_go_native_calls_use_conversation_session_and_compatible_
     captured = provider.requests[0]["request"]
     assert captured.provider_session_id == state.conversation_id
     assert captured.metadata["thinking_mode"] == "disabled"
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_model_retry_uses_same_provider_and_records_safe_transport_trace() -> None:
+    class _RetryingProvider(FakeProvider):
+        provider_name = "opencode-go"
+        base_url = "https://opencode.example/v1"
+
+        def __init__(self) -> None:
+            super().__init__([LLMResult(content="ready")])
+
+        def protocol_for_model(self, _model: str) -> str:
+            return "openai-chat-completions"
+
+        async def achat(self, request: Any, **kwargs: Any) -> LLMResult:
+            self.requests.append({"request": request, "kwargs": kwargs})
+            if len(self.requests) == 1:
+                raise LLMProviderRequestError(
+                    provider="opencode-go",
+                    model="deepseek-v4-flash",
+                    stage="model_call",
+                    code="provider_request_failed",
+                    retryable=True,
+                    diagnostics={"exception_type": "ConnectError"},
+                )
+            return self.results.popleft()
+
+    provider = _RetryingProvider()
+    request = AgentLoopRequest(
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+        state=_state(),
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+    )
+
+    result = await _loop(
+        provider,
+        transport_policy=LLMTransportPolicy(
+            max_attempts=2,
+            retry_backoff_base_seconds=0.0,
+            retry_backoff_max_seconds=0.0,
+        ),
+    )._model_call(  # pyright: ignore[reportPrivateUsage]
+        request,
+        provider,
+        [],
+        [],
+        tool_choice="none",
+    )
+
+    assert result.content == "ready"
+    assert len(provider.requests) == 2
+    failure = next(
+        item for item in request.state.model_trace if item.get("status") == "failed"
+    )
+    assert failure["provider"] == "opencode-go"
+    assert failure["model"] == "deepseek-v4-flash"
+    assert failure["protocol"] == "openai-chat-completions"
+    assert failure["endpoint_host"] == "opencode.example"
+    assert failure["exception_class"] == "ConnectError"
+    assert failure["retryable"] is True
 
 
 ###############################################################################

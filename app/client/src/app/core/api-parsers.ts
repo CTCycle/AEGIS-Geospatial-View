@@ -47,6 +47,15 @@ const apiContract = (endpoint: string, detail: string, raw?: unknown): never => 
   throw new ApiContractError(endpoint, detail, raw);
 };
 
+const CANONICAL_LLM_PROVIDERS = new Set([
+  'openai',
+  'google',
+  'deepseek',
+  'opencode',
+  'opencode-go',
+  'ollama',
+]);
+
 const requireApiRecord = (value: unknown, endpoint: string, field = 'response'): Record<string, unknown> => {
   if (!isRecord(value) || Array.isArray(value)) {
     return apiContract(endpoint, `${field} must be an object`, value);
@@ -1237,8 +1246,35 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
     endpoint,
     'selected_model_context',
   );
+  const agentModelProvider = requireApiString(record, 'agent_model_provider', endpoint);
+  if (agentModelProvider && !CANONICAL_LLM_PROVIDERS.has(agentModelProvider)) {
+    return apiContract(
+      endpoint,
+      'agent_model_provider must be a canonical registered provider ID',
+      agentModelProvider,
+    );
+  }
+  const selectedContextProvider = requireApiString(
+    selectedModelContextRecord,
+    'provider',
+    endpoint,
+  );
+  if (selectedContextProvider && !CANONICAL_LLM_PROVIDERS.has(selectedContextProvider)) {
+    return apiContract(
+      endpoint,
+      'selected_model_context.provider must be a canonical registered provider ID',
+      selectedContextProvider,
+    );
+  }
+  if (selectedContextProvider !== agentModelProvider) {
+    return apiContract(
+      endpoint,
+      'selected_model_context.provider must match agent_model_provider',
+      selectedContextProvider,
+    );
+  }
   const selectedModelContext: SelectedModelContext = {
-    provider: requireApiString(selectedModelContextRecord, 'provider', endpoint),
+    provider: selectedContextProvider,
     model: requireApiString(selectedModelContextRecord, 'model', endpoint),
     context_window_tokens: optionalApiNumber(
       selectedModelContextRecord,
@@ -1258,7 +1294,7 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
   };
   return {
     active_provider_mode: activeProviderMode,
-    agent_model_provider: requireApiString(record, 'agent_model_provider', endpoint),
+    agent_model_provider: agentModelProvider,
     agent_model_name: requireApiString(record, 'agent_model_name', endpoint),
     ollama_url: requireApiString(record, 'ollama_url', endpoint),
     openai_base_url: requireApiStringOrNull(record, 'openai_base_url', endpoint),

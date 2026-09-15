@@ -31,6 +31,10 @@ from server.services.llm.errors import (
 )
 from server.services.llm.response_serialization import dump_response_payload
 from server.services.llm.request_deadline import remaining_request_seconds
+from server.services.llm.transport import (
+    LLMTransportPolicy,
+    close_sync_client,
+)
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
@@ -50,9 +54,16 @@ class DeepSeekProvider(LLMProvider):
     STRUCTURED_FUNCTION_NAME = "submit_structured_response"
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, api_key: str, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str | None = None,
+        transport_policy: LLMTransportPolicy | None = None,
+    ) -> None:
         self.api_key = api_key
         self.base_url = (base_url or DEFAULT_DEEPSEEK_BASE_URL).rstrip("/")
+        self.transport_policy = transport_policy or LLMTransportPolicy()
         self._declared_model_capabilities: dict[str, dict[str, bool]] = {}
 
     # -------------------------------------------------------------------------
@@ -61,12 +72,20 @@ class DeepSeekProvider(LLMProvider):
         return {}
 
     # -------------------------------------------------------------------------
-    def _client(self, request: LLMRequest | None = None) -> Any:
+    def _client(
+        self,
+        request: LLMRequest | None = None,
+        *,
+        stage: str = "chat",
+    ) -> Any:
         kwargs: dict[str, Any] = {
             "api_key": self.api_key,
             "base_url": self.base_url,
-            "timeout": 30.0,
+            "timeout": self.transport_policy.timeout_for(stage),
             "max_retries": 0,
+            "http_client": httpx.Client(
+                **self.transport_policy.httpx_options(stage)
+            ),
         }
         headers = self._request_headers(request)
         if headers:
@@ -74,12 +93,20 @@ class DeepSeekProvider(LLMProvider):
         return OpenAI(**kwargs)
 
     # -------------------------------------------------------------------------
-    def _async_client(self, request: LLMRequest | None = None) -> Any:
+    def _async_client(
+        self,
+        request: LLMRequest | None = None,
+        *,
+        stage: str = "chat",
+    ) -> Any:
         kwargs: dict[str, Any] = {
             "api_key": self.api_key,
             "base_url": self.base_url,
-            "timeout": 30.0,
+            "timeout": self.transport_policy.timeout_for(stage),
             "max_retries": 0,
+            "http_client": httpx.AsyncClient(
+                **self.transport_policy.httpx_options(stage)
+            ),
         }
         headers = self._request_headers(request)
         if headers:
@@ -87,13 +114,10 @@ class DeepSeekProvider(LLMProvider):
         return AsyncOpenAI(**kwargs)
 
     # -------------------------------------------------------------------------
-    def _client_for_request(self, request: LLMRequest) -> Any:
-        try:
-            client = self._client(request)
-        except TypeError:
-            # Keep small injected test clients and third-party adapters that
-            # still expose the pre-request argument constructor usable.
-            client = self._client()
+    def _client_for_request(
+        self, request: LLMRequest, *, stage: str = "chat"
+    ) -> Any:
+        client = self._client(request, stage=stage)
         remaining = remaining_request_seconds(request)
         if remaining is None:
             return client
@@ -148,17 +172,31 @@ class DeepSeekProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
-        response = httpx.get(
-            f"{self.base_url}/models",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Accept": "application/json",
-            },
-            timeout=5.0,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        entries = json_array(json_object(payload).get("data"))
+        started = time.perf_counter()
+        try:
+            response = httpx.get(
+                f"{self.base_url}/models",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Accept": "application/json",
+                },
+                **self.transport_policy.httpx_options("catalog"),
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not is_json_object(payload) or not is_json_array(payload.get("data")):
+                raise ValueError("DeepSeek models response has no data array")
+        except LLMProviderRequestError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model="*",
+                stage="catalog",
+                elapsed_ms=max(0, int((time.perf_counter() - started) * 1000)),
+            ) from exc
+        entries = json_array(payload.get("data"))
         models = [
             self._model_descriptor(item)
             for item in entries
@@ -267,8 +305,10 @@ class DeepSeekProvider(LLMProvider):
             kwargs["tool_choice"] = tool_choice or request.tool_choice or "auto"
         if schema and not native_tools:
             kwargs["response_format"] = {"type": "json_object"}
+        client: Any | None = None
         try:
-            response = self._client_for_request(effective_request).chat.completions.create(
+            client = self._client_for_request(effective_request, stage="chat")
+            response = client.chat.completions.create(
                 model=effective_request.model,
                 messages=self.normalize_tool_messages(effective_request.messages),
                 temperature=effective_request.temperature,
@@ -285,6 +325,9 @@ class DeepSeekProvider(LLMProvider):
                 stage="chat",
                 context_usage=usage.to_dict(),
             ) from exc
+        finally:
+            if client is not None:
+                close_sync_client(client)
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
         content, tool_calls = self._parse_choice(response)
@@ -345,12 +388,10 @@ class DeepSeekProvider(LLMProvider):
             kwargs["tool_choice"] = tool_choice or request.tool_choice or "auto"
         if schema and not native_tools:
             kwargs["response_format"] = {"type": "json_object"}
-        try:
-            client = self._async_client(effective_request)
-        except TypeError:
-            client = self._async_client()
+        client: Any | None = None
         started = time.perf_counter()
         try:
+            client = self._async_client(effective_request, stage="chat")
             request_client: Any = client
             remaining = remaining_request_seconds(effective_request)
             if remaining is not None:
@@ -380,10 +421,11 @@ class DeepSeekProvider(LLMProvider):
                 elapsed_ms=max(0, int((time.perf_counter() - started) * 1000)),
             ) from exc
         finally:
-            try:
-                await client.close()
-            except Exception:
-                pass
+            if client is not None:
+                try:
+                    await client.close()
+                except Exception:
+                    pass
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
         content, tool_calls = self._parse_choice(response)
@@ -404,11 +446,11 @@ class DeepSeekProvider(LLMProvider):
 
         def iterate() -> Iterable[str]:
             nonlocal usage
+            client: Any | None = None
             try:
+                client = self._client_for_request(request, stage="stream")
                 max_tokens = self._request_max_tokens(request)
-                response_stream = self._client_for_request(
-                    request
-                ).chat.completions.create(
+                response_stream = client.chat.completions.create(
                     model=request.model,
                     messages=self.normalize_tool_messages(request.messages),
                     temperature=request.temperature,
@@ -445,6 +487,9 @@ class DeepSeekProvider(LLMProvider):
                     stage="stream",
                     context_usage=usage.to_dict(),
                 ) from exc
+            finally:
+                if client is not None:
+                    close_sync_client(client)
 
         stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
         return stream
@@ -618,7 +663,9 @@ class DeepSeekProvider(LLMProvider):
                 exc.code = "structured_schema_unsupported"
             exc.context_usage = usage.to_dict()
             raise
+        client: Any | None = None
         try:
+            client = self._client_for_request(request, stage="structured_output")
             max_tokens = self._request_max_tokens(request)
             request_kwargs: dict[str, Any] = {
                 "model": request.model,
@@ -642,9 +689,7 @@ class DeepSeekProvider(LLMProvider):
             if max_tokens is not None:
                 request_kwargs["max_tokens"] = max_tokens
             request_kwargs.update(self._request_thinking_options(request))
-            response = self._client_for_request(request).chat.completions.create(
-                **request_kwargs
-            )
+            response = client.chat.completions.create(**request_kwargs)
         except LLMProviderRequestError as exc:
             if exc.code == "provider_timeout":
                 exc.code = "structured_timeout"
@@ -660,6 +705,9 @@ class DeepSeekProvider(LLMProvider):
             if error.code == "provider_timeout":
                 error.code = "structured_timeout"
             raise error from exc
+        finally:
+            if client is not None:
+                close_sync_client(client)
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
         return self._parse_structured_payload(response, schema, request, usage)
@@ -700,12 +748,10 @@ class DeepSeekProvider(LLMProvider):
             exc.context_usage = usage.to_dict()
             raise
         max_tokens = self._request_max_tokens(request)
-        try:
-            client = self._async_client(request)
-        except TypeError:
-            client = self._async_client()
+        client: Any | None = None
         started = time.perf_counter()
         try:
+            client = self._async_client(request, stage="structured_output")
             request_client: Any = client
             remaining = remaining_request_seconds(request)
             if remaining is not None:
@@ -749,10 +795,11 @@ class DeepSeekProvider(LLMProvider):
                 error.code = "structured_timeout"
             raise error from exc
         finally:
-            try:
-                await client.close()
-            except Exception:
-                pass
+            if client is not None:
+                try:
+                    await client.close()
+                except Exception:
+                    pass
         raw = dump_response_payload(response)
         usage = apply_reported_usage(usage, raw)
         return self._parse_structured_payload(response, schema, request, usage)
@@ -772,8 +819,15 @@ class DeepSeekProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
-        _ = (model, input_text)
-        return []
+        _ = input_text
+        raise LLMProviderRequestError(
+            provider=self.provider_name,
+            model=model,
+            stage="embeddings",
+            code="provider_capability_unsupported",
+            category="model_capability",
+            retryable=False,
+        )
 
     # -------------------------------------------------------------------------
     def health_check(self) -> dict[str, Any]:

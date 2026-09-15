@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from typing import Any, Literal
 
 from server.services.llm.types import FailureCategory
@@ -11,6 +13,56 @@ TimeoutOrigin = Literal[
     "cancelled",
     "unknown",
 ]
+
+
+def _exception_chain(exc: BaseException) -> list[BaseException]:
+    chain: list[BaseException] = []
+    current: BaseException | None = exc
+    for _ in range(8):
+        if current is None or current in chain:
+            break
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+    return chain
+
+
+def transport_diagnostics(
+    exc: BaseException,
+    *,
+    http_status: int | None = None,
+) -> dict[str, Any]:
+    """Extract bounded transport facts without retaining exception messages."""
+
+    chain = _exception_chain(exc)
+    diagnostics: dict[str, Any] = {
+        "exception_type": type(exc).__name__,
+    }
+    if len(chain) > 1:
+        diagnostics["cause_type"] = type(chain[-1]).__name__
+    if http_status is not None:
+        diagnostics["http_status"] = http_status
+
+    for current in chain:
+        for attribute, diagnostic_key in (("winerror", "winerror"), ("errno", "errno")):
+            value = getattr(current, attribute, None)
+            if isinstance(value, int) and not isinstance(value, bool):
+                diagnostics.setdefault(diagnostic_key, value)
+        match = re.search(r"winerror\s+(\d+)", str(current), flags=re.IGNORECASE)
+        if match:
+            diagnostics.setdefault("winerror", int(match.group(1)))
+    return diagnostics
+
+
+def safe_failure_detail(exc: BaseException, fallback: str) -> str:
+    """Return a user-facing failure detail without raw provider text."""
+
+    if isinstance(exc, (LLMProviderRequestError, LLMConfigurationError)):
+        return str(exc)
+    diagnostics = transport_diagnostics(exc)
+    exception_type = str(diagnostics.get("exception_type") or "Exception")
+    winerror = diagnostics.get("winerror")
+    suffix = f" (WinError {winerror})" if isinstance(winerror, int) else ""
+    return f"{fallback} [{exception_type}{suffix}]"
 
 ###############################################################################
 class LLMConfigurationError(ValueError):
@@ -140,6 +192,7 @@ class LLMProviderRequestError(RuntimeError):
         context_usage: dict[str, Any] | None = None,
         timeout_origin: TimeoutOrigin | None = None,
         elapsed_ms: int | None = None,
+        diagnostics: dict[str, Any] | None = None,
     ) -> None:
         self.provider = provider
         self.model = model
@@ -150,6 +203,7 @@ class LLMProviderRequestError(RuntimeError):
         self.category = category
         self.timeout_origin = timeout_origin
         self.elapsed_ms = elapsed_ms
+        self.diagnostics = dict(diagnostics or {})
         self.context_usage = (
             dict(context_usage) if context_usage is not None else None
         )
@@ -247,6 +301,9 @@ class LLMProviderRequestError(RuntimeError):
         elif isinstance(status, int) and status >= 500:
             code, retryable = "provider_unavailable", True
             category = "provider_api"
+        elif cls._is_non_retryable_transport_error(exc):
+            code, retryable = "provider_request_failed", False
+            category = "provider_api"
         elif cls._is_transient_connection_error(exc):
             code, retryable = "provider_request_failed", True
             category = "provider_api"
@@ -264,6 +321,10 @@ class LLMProviderRequestError(RuntimeError):
             context_usage=context_usage,
             timeout_origin=timeout_origin,
             elapsed_ms=elapsed_ms,
+            diagnostics=transport_diagnostics(
+                exc,
+                http_status=status if isinstance(status, int) else None,
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -303,6 +364,21 @@ class LLMProviderRequestError(RuntimeError):
                     marker in detail
                     for marker in ("connection error", "winerror 100", "timed out")
                 )
+            ):
+                return True
+            current = current.__cause__ or current.__context__
+        return False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_non_retryable_transport_error(exc: Exception) -> bool:
+        current: BaseException | None = exc
+        for _ in range(4):
+            if current is None:
+                break
+            winerror = getattr(current, "winerror", None)
+            if winerror == 10013 or re.search(
+                r"winerror\s+10013", str(current), flags=re.IGNORECASE
             ):
                 return True
             current = current.__cause__ or current.__context__

@@ -154,7 +154,7 @@ def _positive_int(value: object) -> int | None:
 
 ###############################################################################
 def get_model_context_profile(provider: str, model: str) -> ModelContextProfile | None:
-    normalized_provider = provider.strip().lower()
+    normalized_provider = provider
     normalized_model = model.strip().lower()
     for descriptor in CLOUD_MODEL_CATALOG:
         if (

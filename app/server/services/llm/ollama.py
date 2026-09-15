@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
+import asyncio
 import json
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import replace
 from html.parser import HTMLParser
 from typing import Any, TextIO
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+from urllib.request import ProxyHandler, Request, build_opener, urlopen
 
 from server.services.llm.base import (
     LLMProvider,
@@ -28,6 +29,7 @@ from server.services.llm.errors import (
 )
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.request_deadline import remaining_request_seconds
+from server.services.llm.transport import LLMTransportPolicy
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
@@ -99,13 +101,32 @@ class OllamaProvider(LLMProvider):
         *,
         base_url: str,
         tool_capability_cache: OllamaToolCapabilityCache | None = None,
+        transport_policy: LLMTransportPolicy | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.tool_capability_cache = (
             tool_capability_cache or OllamaToolCapabilityCache()
         )
+        self.transport_policy = transport_policy or LLMTransportPolicy()
         self.last_list_models_error: str | None = None
+        self.last_list_models_diagnostics: dict[str, Any] = {}
+        self.last_list_library_models_error: str | None = None
+        self.last_list_library_models_diagnostics: dict[str, Any] = {}
         self._show_payload_cache: dict[str, dict[str, Any] | None] = {}
+
+    # -------------------------------------------------------------------------
+    def _open_url(self, request: Request, *, timeout: float) -> Any:
+        if self.transport_policy.proxy:
+            handler = ProxyHandler(
+                {
+                    "http": self.transport_policy.proxy,
+                    "https": self.transport_policy.proxy,
+                }
+            )
+            return build_opener(handler).open(request, timeout=timeout)
+        if self.transport_policy.trust_env:
+            return urlopen(request, timeout=timeout)
+        return build_opener(ProxyHandler({})).open(request, timeout=timeout)
 
     # -------------------------------------------------------------------------
     def _post_json(
@@ -121,15 +142,16 @@ class OllamaProvider(LLMProvider):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        default_timeout = (
-            self._STRUCTURED_REQUEST_TIMEOUT_SECONDS
+        timeout_stage = (
+            "structured_output"
             if path == "/api/chat" and payload.get("format")
-            else self._DEFAULT_REQUEST_TIMEOUT_SECONDS
+            else "chat"
         )
+        default_timeout = self.transport_policy.timeout_for(timeout_stage)
         effective_timeout = default_timeout if timeout is None else min(
             default_timeout, max(0.1, timeout)
         )
-        with urlopen(request, timeout=effective_timeout) as response:
+        with self._open_url(request, timeout=effective_timeout) as response:
             return json.loads(response.read().decode("utf-8"))
 
     # -------------------------------------------------------------------------
@@ -146,8 +168,11 @@ class OllamaProvider(LLMProvider):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        effective_timeout = 60.0 if timeout is None else min(60.0, max(0.1, timeout))
-        with urlopen(request, timeout=effective_timeout) as response:
+        default_timeout = self.transport_policy.timeout_for("stream")
+        effective_timeout = default_timeout if timeout is None else min(
+            default_timeout, max(0.1, timeout)
+        )
+        with self._open_url(request, timeout=effective_timeout) as response:
             reader: TextIO = response  # type: ignore[assignment]
             for line in reader:
                 line = line.strip()
@@ -161,14 +186,41 @@ class OllamaProvider(LLMProvider):
     # -------------------------------------------------------------------------
     def _get_json(self, path: str) -> dict[str, Any]:
         request = Request(f"{self.base_url}{path}", method="GET")
-        with urlopen(request, timeout=10) as response:
+        with self._open_url(
+            request, timeout=self.transport_policy.timeout_for("catalog")
+        ) as response:
             return json.loads(response.read().decode("utf-8"))
 
     # -------------------------------------------------------------------------
     def _get_text(self, url: str) -> str:
         request = Request(url, headers={"User-Agent": "AEGIS/1.0"}, method="GET")
-        with urlopen(request, timeout=20) as response:
+        with self._open_url(
+            request, timeout=self.transport_policy.timeout_for("catalog")
+        ) as response:
             return response.read().decode("utf-8", errors="ignore")
+
+    # -------------------------------------------------------------------------
+    async def achat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
+        return await asyncio.to_thread(
+            self.chat,
+            request,
+            tools=tools,
+            tool_choice=tool_choice,
+            response_json_schema=response_json_schema,
+        )
+
+    # -------------------------------------------------------------------------
+    async def astructured_output(
+        self, request: LLMRequest, schema: type[Any]
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(self.structured_output, request, schema)
 
     # -------------------------------------------------------------------------
     def _post_json_for_request(
@@ -197,12 +249,20 @@ class OllamaProvider(LLMProvider):
     def list_models(self) -> list[ModelDescriptor]:
         try:
             payload = self._get_json("/api/tags")
+            if not is_json_array(payload.get("models")):
+                raise ValueError("Ollama tags response has no models array")
         except Exception as exc:
-            self.last_list_models_error = (
-                str(exc) or f"Unable to reach Ollama at {self.base_url}."
+            error = LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model="*",
+                stage="catalog",
             )
+            self.last_list_models_error = str(error)
+            self.last_list_models_diagnostics = dict(error.diagnostics)
             return []
         self.last_list_models_error = None
+        self.last_list_models_diagnostics = {}
         models: list[ModelDescriptor] = []
         for item in payload.get("models", []):
             if not is_json_object(item):
@@ -492,8 +552,18 @@ class OllamaProvider(LLMProvider):
             html = self._get_text("https://registry.ollama.ai/library")
             parser = _OllamaLibraryParser()
             parser.feed(html)
-        except Exception:
+        except Exception as exc:
+            error = LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model="*",
+                stage="library_catalog",
+            )
+            self.last_list_library_models_error = str(error)
+            self.last_list_library_models_diagnostics = dict(error.diagnostics)
             return []
+        self.last_list_library_models_error = None
+        self.last_list_library_models_diagnostics = {}
         return [
             ModelDescriptor(
                 name=name,
@@ -507,7 +577,15 @@ class OllamaProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def pull_model(self, *, model: str) -> dict[str, Any]:
-        return self._post_json("/api/pull", {"name": model, "stream": False})
+        try:
+            return self._post_json("/api/pull", {"name": model, "stream": False})
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=model,
+                stage="pull",
+            ) from exc
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -756,11 +834,22 @@ class OllamaProvider(LLMProvider):
         }
         try:
             response = self._post_json("/api/embeddings", payload)
-        except Exception:
-            return []
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=model,
+                stage="embeddings",
+            ) from exc
         embedding = response.get("embedding")
         if not is_json_array(embedding):
-            return []
+            raise LLMProviderRequestError(
+                provider=self.provider_name,
+                model=model,
+                stage="embeddings",
+                code="provider_invalid_response",
+                retryable=False,
+            )
         return [float(value) for value in embedding if isinstance(value, (int | float))]
 
     # -------------------------------------------------------------------------
@@ -772,5 +861,16 @@ class OllamaProvider(LLMProvider):
                 "detail": "reachable",
                 "models": len(payload.get("models", [])),
             }
-        except (HTTPError, URLError, TimeoutError) as exc:
-            return {"ok": False, "detail": str(exc)}
+        except Exception as exc:
+            error = LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model="*",
+                stage="health",
+            )
+            return {
+                "ok": False,
+                "detail": str(error),
+                "error_code": error.code,
+                "diagnostics": dict(error.diagnostics),
+            }

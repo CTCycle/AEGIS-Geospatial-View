@@ -17,7 +17,10 @@ from server.services.agent.native_orchestrator import NativeAgentOrchestrator
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.tool_executor import ToolExecutor
-from server.services.chat.maintenance_service import ChatMaintenanceService
+from server.services.chat.maintenance_service import (
+    ChatMaintenanceService,
+    create_ollama_provider,
+)
 from server.services.chat.model_library import ChatModelLibraryService
 from server.services.chat.settings_service import ChatSettingsService
 from server.services.chat.structured_probe import StructuredProbeService
@@ -26,6 +29,7 @@ from server.services.geospatial.composition import GeospatialRuntime
 from server.services.llm.factory import LLMFactory
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
+from server.services.llm.transport import LLMTransportPolicy
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -55,15 +59,20 @@ def build_chat_runtime(
     conversation_repository = ConversationRepository(database)
     evidence_repository = AgentEvidenceRepository(database)
     ollama_tool_capability_cache = OllamaToolCapabilityCache()
+    llm_transport_policy = LLMTransportPolicy.from_execution_settings(
+        execution_settings
+    )
     llm_factory = LLMFactory(
         settings_repo=settings_repo,
         credentials_repo=credentials_repo,
         crypto_service=crypto_service,
         ollama_tool_capability_cache=ollama_tool_capability_cache,
+        transport_policy=llm_transport_policy,
     )
     model_library_service = ChatModelLibraryService(
         ollama_tool_capability_cache=ollama_tool_capability_cache,
         provider_factory=llm_factory,
+        transport_policy=llm_transport_policy,
     )
     context_profile_resolver = ModelContextProfileResolver(
         model_library_service=model_library_service,
@@ -118,6 +127,7 @@ def build_chat_runtime(
                 else 45.0
             ),
         ),
+        transport_policy=llm_transport_policy,
     )
     agent_turn_runner = AgentTurnRunner(
         agent_loop=agent_loop,
@@ -143,6 +153,11 @@ def build_chat_runtime(
             get_ollama_url=settings_service.get_ollama_url,
             model_library_service=model_library_service,
             ollama_tool_capability_cache=ollama_tool_capability_cache,
+            ollama_provider_factory=lambda base_url, cache: create_ollama_provider(
+                base_url,
+                cache,
+                transport_policy=llm_transport_policy,
+            ),
         ),
         history_service=history_service,
         agent_loop=agent_loop,

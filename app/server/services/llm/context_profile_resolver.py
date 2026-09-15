@@ -41,7 +41,7 @@ class ModelContextProfileResolver:
 
     # -------------------------------------------------------------------------
     def resolve(self, provider: str, model: str) -> ModelContextProfile | None:
-        normalized_provider = provider.strip().lower()
+        normalized_provider = provider
         normalized_model = model.strip()
         if not normalized_provider or not normalized_model:
             return None

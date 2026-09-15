@@ -164,6 +164,30 @@ def test_provider_registry_builds_manifest_backed_providers() -> None:
     assert "gibs" in registry.list_provider_ids()
 
 ###############################################################################
+def test_provider_registry_rejects_provider_entries_without_canonical_provider_id() -> None:
+
+    ###############################################################################
+    class _Loader:
+
+        # -------------------------------------------------------------------------
+        def load_all(self) -> dict[str, list[dict[str, object]]]:
+            return {
+                "providers": [{"id": "gibs", "name": "GIBS"}],
+                "basemaps": [],
+                "overlays": [],
+                "cameras": [],
+                "transit": [],
+                "tools": [],
+                "runtime_profiles": [],
+            }
+
+    registry = ProviderRegistry(manifest_loader=_Loader())  # type: ignore[arg-type]
+
+    registry.build_from_manifests()
+
+    assert "gibs" not in registry.list_provider_ids()
+
+###############################################################################
 def test_provider_registry_passes_database_only_credentials_to_provider() -> None:
     repository = _SavedCredentialRepository()
     resolver = GeospatialCredentialResolver(

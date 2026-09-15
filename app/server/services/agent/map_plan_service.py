@@ -293,7 +293,11 @@ class MapPlanService:
             if ref not in state.evidence_refs:
                 raise MapPlanBuildError(
                     "unknown_evidence",
-                    f"Evidence '{ref}' is not part of the current agent state.",
+                    f"Evidence '{ref}' is not part of the current agent state. "
+                    "Use an exact evidence_ref returned by a successful evidence-producing "
+                    "tool; location refs and capability IDs are not evidence. "
+                    "For a location-only map, omit add_evidence_layer and use "
+                    "set_viewport with fit_location.",
                 )
             repository = self.evidence_repository
             summary = (
