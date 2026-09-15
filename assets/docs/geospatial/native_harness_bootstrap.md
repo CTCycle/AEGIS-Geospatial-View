@@ -28,8 +28,9 @@ handshake, and run lifecycle remain application-owned invariants.
 ## Baseline and current status
 
 - Audit baseline: `c6809755e1ea2dafdc09e45f0f4c574d5327f04f`.
-- Work is being resumed on `develop`; the current consolidation changes are
-  intentionally kept in the working tree until the final validation gate.
+- Repository baseline before this remediation series: `4d55d16c` on `develop`.
+- Remediation is committed incrementally on local `develop`; the branch is
+  ahead of `origin/develop` and has not been pushed.
 - `app/assets/` is pre-existing untracked work and is out of scope. Never
   stage, delete, or reset it.
 - Native execution is now the only application execution path. There is no
@@ -62,6 +63,9 @@ handshake, and run lifecycle remain application-owned invariants.
 - Route validation distinguishes accepted, clarification, no-capability, and
   discovery-required outcomes. An empty deterministic shortlist can therefore
   enter `discover_geospatial_capabilities` before insufficiency is reported.
+- Undated `recent`, `latest`, `live`, and near-real-time intent is normalized to
+  the `current` temporal mode; explicitly dated historical requests remain
+  historical.
 - The route is compiled into deterministic location, temporal, spatial,
   evidence, operation, and map obligations. The model chooses semantic
   actions; server-owned binding supplies geography, time, radius, bbox, and
@@ -149,9 +153,11 @@ by the response models or client parsers.
 
 Map preparation is a candidate operation. Realtime runs persist the candidate
 as `awaiting_render`, retain the last committed map, and promote only after a
-matching browser `map.render_ack`. Metadata-only results finalize as data
-responses without an impossible render wait. Failed or stale acknowledgments
-cannot replace the last-known-good map.
+matching browser `map.render_ack`. A successful acknowledgment also finalizes
+the durable assistant response and stores the committed candidate on that
+message, so reloads cannot regress to transient “awaiting render” text.
+Metadata-only results finalize as data responses without an impossible render
+wait. Failed or stale acknowledgments cannot replace the last-known-good map.
 
 ## Original plan coverage
 
@@ -163,7 +169,7 @@ cannot replace the last-known-good map.
 | P0 exact location binding | Covered | semantic validator and location-reference tests |
 | P1 state/context consolidation | Covered | `ConversationState`, `AgentRunState`, `AgentContextView`, structured compaction |
 | P1 budgets/timeouts/cancellation | Covered | shared settings, provider policy injection, stage telemetry, run controls |
-| P1 provider continuation | Covered in harness | bounded opaque continuation; provider-specific live proof remains a gate |
+| P1 provider continuation | Covered in harness; OpenCode Go exercised | bounded opaque continuation; OpenAI Responses and Ollama remain unrun |
 | P2 tool registry and manifest contracts | Covered | one registry/executor and strict runtime catalog validation |
 | P2 live provider discovery transfer | Covered locally | canonical provider-layer handler; live upstream coverage remains environment-dependent |
 | P3 legacy/shadow runtime deletion | Covered | old execution files, parser/planner chain, shadow path, mode switch, and migration response fields deleted |
@@ -174,27 +180,37 @@ cannot replace the last-known-good map.
 The implementation is not declared production-complete solely from local
 synthetic success. The following evidence is now recorded:
 
-- Full server unit suite: `730 passed, 2 warnings` with the checkpoint/resume
-  tests included.
+- Full server unit and agent-benchmark suite: `736 passed, 2 warnings` with the
+  checkpoint/resume and render-response regression tests included.
+- Strict Pyright: `0 errors, 0 warnings, 0 informations`.
 - Ruff: passed with no findings. The managed workspace still reports
   access-denied cache warnings while scanning protected cache residue.
 - Client build: passed.
 - Client tests: `217 SUCCESS`.
 - E2E collection: `51 tests collected`.
-- Controlled browser-driven MapLibre render acknowledgement: `1 passed`.
+- Controlled browser-driven MapLibre render acknowledgement: passed after a
+  fresh restart. The configured `opencode-go/deepseek-v4-flash` lane resolved
+  Zurich through Nominatim, retrieved a USGS `valid_empty` result, rendered the
+  `USGS Earthquakes` clustered-points layer, and finalized the response as
+  “The map is ready. No results were found in the requested area or time
+  window.” Browser console diagnostics contained no warnings or errors, and a
+  reload preserved the final message and map state.
 - Durable native checkpoint callback/retrieval and active-run startup-resume
   tests pass; checkpoints are stored as bounded internal run events.
 
-The remaining external validation gates are explicitly blocked for this local
-run. No live backend/provider credential session was available, and the
-available environment variables do not establish a callable provider/model.
-The gates are:
+The remaining validation gates are explicitly separated from the local proof.
+The configured OpenCode Go credential was live for the run above; other lanes
+and hosted infrastructure were not silently substituted. The gates are:
 
-1. Provider-specific tool serialization and continuation proof for OpenAI
-   Responses, Ollama, and OpenCode Go using the configured provider/model.
-2. Full browser/API E2E execution against a running backend, including
-   external-provider credentials where required. The controlled MapLibre
-   contract is proven locally, but it is not a substitute for that live gate.
+1. Provider-specific serialization and continuation proof for OpenAI Responses
+   and Ollama. OpenCode Go has a live structured probe and the browser run
+   above, but this does not establish parity for the other providers.
+2. Hosted CI was not rerun after the local commits. The last exact-HEAD CI run
+   (`34967001626`) failed its stale Pyright job before this remediation.
+3. The full browser/API E2E matrix was not executed locally because its backend
+   services on ports `8000` and `8001` were unavailable. The controlled
+   MapLibre contract is proven locally, but it is not a substitute for that
+   broader gate.
 
 The local trajectory suite now covers the core synthetic cases, including
 valid-empty recovery, malformed-call correction, cancellation during model and
