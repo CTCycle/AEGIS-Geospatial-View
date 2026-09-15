@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import time
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from server.common.typing import json_object
+from server.contracts.geospatial import MapSession, OverlayInstance
 from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.evidence import AgentEvidenceEnvelope
 from server.domain.agent.map_plan import (
@@ -33,6 +35,11 @@ class EvidenceReader(Protocol):
     def get_summary(
         self, evidence_id: str, *, conversation_id: str | None = None
     ) -> Any: ...
+
+    # -------------------------------------------------------------------------
+    def get_payload(
+        self, evidence_id: str, *, conversation_id: str | None = None
+    ) -> tuple[Any, bytes] | None: ...
 
 ###############################################################################
 class MapPlanService:
@@ -98,6 +105,11 @@ class MapPlanService:
                 active_session=active_session,
                 actions=effective_actions,
             )
+            candidate = self._annotate_scope_metadata(
+                candidate,
+                state=state,
+                actions=effective_actions,
+            )
         except MapPlanBuildError as exc:
             return self._failure(
                 context=context,
@@ -160,6 +172,62 @@ class MapPlanService:
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _annotate_scope_metadata(
+        candidate: MapSession,
+        *,
+        state: AgentRunState,
+        actions: list[Any],
+    ) -> MapSession:
+        """Carry validated route scope onto newly prepared evidence layers."""
+
+        goal = state.goal
+        if goal is None:
+            return candidate
+        evidence_refs = {
+            str(action.evidence_ref)
+            for action in actions
+            if isinstance(action, AddEvidenceLayerAction)
+            and str(action.evidence_ref).strip()
+        }
+        if not evidence_refs:
+            return candidate
+        temporal = dict(goal.temporal_scope or {})
+        spatial = list(goal.spatial_scope or [])
+        temporal_mode = str(temporal.get("mode") or "").strip()
+        spatial_kind = (
+            str(spatial[0].get("kind") or "").strip() if spatial else ""
+        )
+        if temporal_mode in {"", "none"} and not spatial_kind:
+            return candidate
+        instances: list[OverlayInstance] = []
+        changed = False
+        for instance in candidate.overlay_collection.instances:
+            evidence_ref = str(instance.descriptor.get("evidence_ref") or "")
+            if evidence_ref not in evidence_refs:
+                instances.append(instance)
+                continue
+            descriptor = dict(instance.descriptor)
+            if temporal_mode and temporal_mode != "none":
+                descriptor["temporal_mode"] = temporal_mode
+                if temporal.get("granularity") not in {None, "", "none"}:
+                    descriptor["temporal_granularity"] = temporal["granularity"]
+                for key in ("reference_time_iso", "start_time_iso", "end_time_iso"):
+                    if temporal.get(key) is not None:
+                        descriptor[key] = temporal[key]
+            if spatial_kind:
+                descriptor["analysis_scope"] = spatial_kind
+            updated = instance.model_copy(update={"descriptor": descriptor}, deep=True)
+            instances.append(updated)
+            changed = changed or updated != instance
+        if not changed:
+            return candidate
+        collection = candidate.overlay_collection.model_copy(
+            update={"instances": instances}, deep=True
+        )
+        return candidate.model_copy(update={"overlay_collection": collection}, deep=True)
+
+    # -------------------------------------------------------------------------
     def _with_default_basemap(
         self,
         actions: list[Any],
@@ -190,7 +258,7 @@ class MapPlanService:
                 str(item.get("id") or "").strip(),
             )
             for item in basemaps
-            if isinstance(item, dict) and str(item.get("id") or "").strip()
+            if str(item.get("id") or "").strip()
         ]
         if candidates:
             return min(candidates)[1]
@@ -219,12 +287,15 @@ class MapPlanService:
                     "unknown_evidence",
                     f"Evidence '{ref}' is not part of the current agent state.",
                 )
-            summary = None
-            if self.evidence_repository is not None:
-                summary = self.evidence_repository.get_summary(
+            repository = self.evidence_repository
+            summary = (
+                repository.get_summary(
                     ref,
                     conversation_id=context.conversation_id,
                 )
+                if repository is not None
+                else None
+            )
             if summary is None:
                 evidence.append(
                     AgentEvidenceEnvelope(
@@ -234,6 +305,20 @@ class MapPlanService:
                     )
                 )
                 continue
+            payload: Any = None
+            raw_payload = (
+                repository.get_payload(
+                    ref,
+                    conversation_id=context.conversation_id,
+                )
+                if repository is not None
+                else None
+            )
+            if raw_payload is not None:
+                try:
+                    payload = _bounded_render_payload(json.loads(raw_payload[1]))
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    payload = None
             evidence.append(
                 AgentEvidenceEnvelope(
                     ok=summary.status != "failed",
@@ -242,6 +327,7 @@ class MapPlanService:
                     summary=dict(summary.summary),
                     provenance=dict(summary.provenance),
                     map_eligibility=summary.map_eligibility,
+                    payload=payload,
                 )
             )
         return evidence
@@ -282,3 +368,18 @@ class MapPlanService:
 
 
 __all__ = ["MapPlanService"]
+
+
+def _bounded_render_payload(value: Any) -> Any:
+    """Keep only the normalized feature payload required by the map client."""
+
+    payload = json_object(value)
+    features = payload.get("features")
+    if not isinstance(features, list):
+        return None
+    features = cast(list[Any], features)
+    return {
+        key: child
+        for key, child in payload.items()
+        if key != "features"
+    } | {"features": features[:5000]}

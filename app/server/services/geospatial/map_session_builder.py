@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from math import cos, radians
-from typing import Any
+from collections.abc import Callable, Sequence
+from typing import Any, cast
 from uuid import uuid4
 
 from server.common.typing import json_object
 from server.contracts.geospatial import (
     MapSession,
     OverlayCollectionState,
+    OverlayInstance,
     ViewportPolicy,
 )
 from server.domain.agent.evidence import AgentEvidenceEnvelope
@@ -22,7 +24,6 @@ from server.domain.agent.map_plan import (
     SetBasemapAction,
     SetLayerOpacityAction,
     SetLayerVisibilityAction,
-    SetViewportAction,
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.overlay_collection import OverlayCollectionService
@@ -145,6 +146,15 @@ class MapSessionBuilder:
                     "default_opacity": action.opacity,
                 }
             )
+            render_data = _geojson_render_data(evidence.payload)
+            if render_data is not None:
+                descriptor["data"] = render_data
+                descriptor["result_status"] = evidence.summary.get(
+                    "result_status", evidence.status
+                )
+                descriptor["result_type"] = evidence.summary.get(
+                    "result_type", "features"
+                )
             additions = OverlayCollectionService.from_rendered_descriptors(
                 [descriptor],
                 resolved_location=session.resolved_location,
@@ -214,36 +224,34 @@ class MapSessionBuilder:
                 deep=True,
             )
             return OverlayCollectionService.merge_into_map_session(session, collection)
-        if isinstance(action, SetViewportAction):
-            if action.strategy == "preserve_current":
-                return session
-            evidence = [
-                evidence_by_ref[ref]
-                for ref in action.evidence_refs
-                if ref in evidence_by_ref
-            ]
-            if action.strategy == "fit_evidence":
-                bbox = _evidence_bbox(evidence)
-                if bbox is not None:
-                    viewport = _viewport_for_bbox(bbox, session.viewport)
-                    return _with_viewport(session, viewport)
-            if action.strategy == "fit_location":
-                return _with_viewport(
-                    session,
-                    _viewport_for_location(session.resolved_location),
-                )
-            raise MapPlanBuildError(
-                "viewport_bounds_unavailable",
-                "The requested viewport cannot be derived from validated state.",
+        if action.strategy == "preserve_current":
+            return session
+        evidence = [
+            evidence_by_ref[ref]
+            for ref in action.evidence_refs
+            if ref in evidence_by_ref
+        ]
+        if action.strategy == "fit_evidence":
+            bbox = _evidence_bbox(evidence)
+            if bbox is not None:
+                viewport = _viewport_for_bbox(bbox, session.viewport)
+                return _with_viewport(session, viewport)
+        if action.strategy == "fit_location":
+            return _with_viewport(
+                session,
+                _viewport_for_location(session.resolved_location),
             )
-        raise MapPlanBuildError("unsupported_action", "The map action is unsupported.")
+        raise MapPlanBuildError(
+            "viewport_bounds_unavailable",
+            "The requested viewport cannot be derived from validated state.",
+        )
 
     # -------------------------------------------------------------------------
     def _update_instance(
         self,
         session: MapSession,
         instance_id: str,
-        update: Any,
+        update: Callable[[OverlayInstance], OverlayInstance],
     ) -> MapSession:
         instances = list(session.overlay_collection.instances)
         for index, instance in enumerate(instances):
@@ -348,12 +356,22 @@ def _viewport_for_bbox(bbox: list[float], previous: ViewportPolicy) -> ViewportP
 
 ###############################################################################
 def _valid_bbox(value: object) -> list[float] | None:
-    if not isinstance(value, list | tuple) or len(value) != 4:
+    if isinstance(value, list):
+        items = cast(Sequence[object], value)
+    elif isinstance(value, tuple):
+        items = cast(Sequence[object], value)
+    else:
         return None
-    try:
-        result = [float(item) for item in value]
-    except (TypeError, ValueError):
+    if len(items) != 4:
         return None
+    result: list[float] = []
+    for item in items:
+        if not isinstance(item, (str, int, float)) or isinstance(item, bool):
+            return None
+        try:
+            result.append(float(item))
+        except ValueError:
+            return None
     min_lon, min_lat, max_lon, max_lat = result
     if not (-180 <= min_lon <= max_lon <= 180 and -90 <= min_lat <= max_lat <= 90):
         return None
@@ -368,12 +386,54 @@ def _evidence_bbox(evidence: list[AgentEvidenceEnvelope]) -> list[float] | None:
                 bbox = _valid_bbox(source.get(key))
                 if bbox is not None:
                     return bbox
-            coverage = source.get("coverage")
-            if isinstance(coverage, dict):
+            coverage = json_object(source.get("coverage"))
+            if coverage:
                 bbox = _valid_bbox(coverage.get("bbox"))
                 if bbox is not None:
                     return bbox
     return None
+
+
+def _geojson_render_data(value: object) -> dict[str, Any] | None:
+    """Convert a bounded provider feature payload to client GeoJSON."""
+
+    payload = json_object(value)
+    raw_features = payload.get("features")
+    if not isinstance(raw_features, list):
+        return None
+    raw_features = cast(list[Any], raw_features)
+    normalized_features = [json_object(item) for item in raw_features]
+    if all(
+        item.get("type") == "Feature"
+        and isinstance(item.get("geometry"), dict)
+        for item in normalized_features
+    ):
+        return {"type": "FeatureCollection", "features": normalized_features}
+    features: list[dict[str, Any]] = []
+    for item in normalized_features:
+        if not item:
+            continue
+        latitude = item.get("latitude")
+        longitude = item.get("longitude")
+        if not isinstance(latitude, (int, float)) or isinstance(latitude, bool):
+            continue
+        if not isinstance(longitude, (int, float)) or isinstance(longitude, bool):
+            continue
+        properties = dict(item)
+        properties.pop("latitude", None)
+        properties.pop("longitude", None)
+        feature: dict[str, Any] = {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [float(longitude), float(latitude)],
+            },
+            "properties": properties,
+        }
+        if item.get("id") is not None:
+            feature["id"] = item["id"]
+        features.append(feature)
+    return {"type": "FeatureCollection", "features": features}
 
 
 __all__ = ["MapPlanBuildError", "MapSessionBuilder"]

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from server.contracts.geospatial import (
@@ -8,7 +10,7 @@ from server.contracts.geospatial import (
     OverlayInstance,
     ViewportPolicy,
 )
-from server.domain.agent.capability_route import AgentPhase, AgentRunState
+from server.domain.agent.capability_route import AgentGoal, AgentPhase, AgentRunState
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.evidence import AgentEvidenceSummary
 from server.domain.agent.map_plan import (
@@ -73,6 +75,31 @@ class FakeEvidenceRepository:
             map_eligibility="renderable",
         )
 
+    # -------------------------------------------------------------------------
+    def get_payload(
+        self,
+        evidence_id: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> tuple[AgentEvidenceSummary, bytes] | None:
+        if evidence_id != "evidence:hospitals":
+            return None
+        summary = self.get_summary(evidence_id, conversation_id=conversation_id)
+        if summary is None:
+            return None
+        return summary, json.dumps(
+            {
+                "features": [
+                    {
+                        "id": "hospital-1",
+                        "name": "Test Hospital",
+                        "latitude": 47.38,
+                        "longitude": 8.54,
+                    }
+                ]
+            }
+        ).encode()
+
 
 ###############################################################################
 def _state(
@@ -130,6 +157,22 @@ def _service() -> MapPlanService:
 @pytest.mark.asyncio
 async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
     state = _state(active_map_session=_active_session())
+    state.goal = AgentGoal(
+        goal="Show recent hospitals around Zurich on the map.",
+        task_mode="execute",
+        presentation="both",
+        operation="retrieve_recent_hospitals",
+        requires_location=True,
+        target_ids=["Zurich"],
+        temporal_scope={"mode": "historical", "granularity": "recent"},
+        spatial_scope=[
+            {
+                "kind": "radius",
+                "relationship": "around",
+                "target_refs": ["Zurich"],
+            }
+        ],
+    )
     result = await _service().apply(
         MapPlan(
             expected_collection_revision=2,
@@ -159,6 +202,12 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
     assert state.active_map_session.overlay_collection.revision == 2
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.overlay_collection.revision == 3
+    overlay = state.prepared_map_session.overlay_collection.instances[-1]
+    assert overlay.descriptor["data"]["type"] == "FeatureCollection"
+    assert overlay.descriptor["data"]["features"][0]["id"] == "hospital-1"
+    assert overlay.descriptor["temporal_mode"] == "historical"
+    assert overlay.descriptor["temporal_granularity"] == "recent"
+    assert overlay.descriptor["analysis_scope"] == "radius"
     assert result.data == {
         "map_candidate_id": result.map_candidate_id,
         "collection_revision": 3,

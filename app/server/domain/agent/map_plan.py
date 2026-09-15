@@ -15,8 +15,6 @@ from pydantic import BaseModel, ConfigDict, Field
 class MapActionBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    action: str
-
 ###############################################################################
 class SetBasemapAction(MapActionBase):
     action: Literal["set_basemap"]
@@ -57,7 +55,9 @@ class SetViewportAction(MapActionBase):
     action: Literal["set_viewport"]
     strategy: Literal["fit_evidence", "fit_location", "preserve_current"]
     location_ref: str | None = None
-    evidence_refs: list[str] = Field(default_factory=list, max_length=16)
+    evidence_refs: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=16
+    )
 
 
 MapAction = Annotated[
