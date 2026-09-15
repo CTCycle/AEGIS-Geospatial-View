@@ -8,6 +8,7 @@ from typing import Any, Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
+from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.conversation import ConversationState
 from server.domain.agent.decision import ResolvedLocation
 from server.contracts.geospatial import MapSession
@@ -18,14 +19,16 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-def _json_value(value: Any) -> Any:
-    if isinstance(value, (dict, list)):
+def _json_value(value: Any) -> dict[str, Any] | list[Any] | None:
+    if is_json_object(value) or is_json_array(value):
         return value
     if isinstance(value, str):
         try:
-            return json.loads(value)
+            parsed: object = json.loads(value)
         except json.JSONDecodeError:
             return None
+        if is_json_object(parsed) or is_json_array(parsed):
+            return parsed
     return None
 
 
@@ -35,22 +38,22 @@ def _migrate_state(row: dict[str, Any]) -> dict[str, Any]:
     state = ConversationState.empty(conversation_id, revision=revision)
 
     active_directives = _json_value(row.get("active_instructions"))
-    if isinstance(active_directives, list):
+    if is_json_array(active_directives):
         state.active_directives = [
-            item for item in active_directives if isinstance(item, dict)
+            item for item in active_directives if is_json_object(item)
         ]
 
     summary = _json_value(row.get("conversation_summary"))
-    if isinstance(summary, dict):
+    if is_json_object(summary):
         state.summary = summary
     state.summary_through_turn_index = max(
         0, int(row.get("summary_through_turn_index") or 0)
     )
 
     memory = _json_value(row.get("memory_snapshot"))
-    if isinstance(memory, dict):
+    if is_json_object(memory):
         raw_location = memory.get("active_location")
-        if isinstance(raw_location, dict):
+        if is_json_object(raw_location):
             try:
                 location = ResolvedLocation.model_validate(raw_location)
             except (TypeError, ValueError):
@@ -59,9 +62,9 @@ def _migrate_state(row: dict[str, Any]) -> dict[str, Any]:
                 state.resolved_locations["active_location"] = location
 
     task_snapshot = _json_value(row.get("task_snapshot"))
-    if isinstance(task_snapshot, dict):
+    if is_json_object(task_snapshot):
         raw_map = task_snapshot.get("active_map_session")
-        if isinstance(raw_map, dict):
+        if is_json_object(raw_map):
             try:
                 map_session = MapSession.model_validate(raw_map)
             except (TypeError, ValueError):

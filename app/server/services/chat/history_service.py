@@ -16,6 +16,11 @@ class ChatHistoryService:
         self.repo.append_message(**kwargs)
 
     # -------------------------------------------------------------------------
+    def append_assistant_message_with_state(self, **kwargs: Any) -> int:
+        _message, revision = self.repo.append_assistant_message_with_state(**kwargs)
+        return revision
+
+    # -------------------------------------------------------------------------
     def list_recent_messages(
         self, conversation_id: str, limit: int
     ) -> list[dict[str, Any]]:

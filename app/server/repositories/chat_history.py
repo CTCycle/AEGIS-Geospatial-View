@@ -10,9 +10,9 @@ from sqlalchemy import desc, select, update
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ChatMessageRecord, ConversationRecord
 
+
 ###############################################################################
 class ChatHistoryRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
@@ -72,6 +72,59 @@ class ChatHistoryRepository:
             session.commit()
             session.refresh(message)
             return message
+
+    # -------------------------------------------------------------------------
+    def append_assistant_message_with_state(
+        self,
+        *,
+        conversation_id: str,
+        expected_revision: int,
+        conversation_state: dict[str, Any],
+        content: str,
+        request_id: str,
+        structured_payload: Any = None,
+        tool_payload: Any = None,
+        map_session: Any = None,
+    ) -> tuple[ChatMessageRecord, int]:
+        """Commit the terminal assistant message and conversation state atomically."""
+
+        with self._session_factory() as session:
+            row = session.execute(
+                update(ConversationRecord)
+                .where(
+                    ConversationRecord.id == conversation_id,
+                    ConversationRecord.context_revision == expected_revision,
+                )
+                .values(
+                    context_revision=ConversationRecord.context_revision + 1,
+                    conversation_state=conversation_state,
+                    next_message_sequence=ConversationRecord.next_message_sequence + 1,
+                    updated_at=datetime.now(UTC),
+                )
+                .returning(
+                    ConversationRecord.next_message_sequence,
+                    ConversationRecord.context_revision,
+                )
+            ).one_or_none()
+            if row is None:
+                raise ValueError("Conversation context revision conflict.")
+            turn_index, revision = row
+            message = ChatMessageRecord(
+                conversation_id=conversation_id,
+                turn_index=turn_index,
+                request_id=request_id,
+                role="assistant",
+                content=content,
+                structured_payload=self._with_request_id(
+                    structured_payload, request_id
+                ),
+                tool_payload=tool_payload,
+                map_session=map_session,
+            )
+            session.add(message)
+            session.commit()
+            session.refresh(message)
+            return message, int(revision)
 
     # -------------------------------------------------------------------------
     @staticmethod
