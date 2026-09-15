@@ -20,6 +20,7 @@ from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.chat.conversation_snapshot import ConversationSnapshotService
 from server.services.chat.history_service import ChatHistoryService
 
+
 ###############################################################################
 class _InMemoryBackend:
     db_path = None
@@ -33,6 +34,7 @@ class _InMemoryBackend:
             future=True,
         )
         self.session = sessionmaker(bind=self.engine, future=True)
+
 
 ###############################################################################
 @pytest.fixture()
@@ -61,6 +63,7 @@ def conversations_api_client() -> TestClient:
     yield client
     client.close()
 
+
 ###############################################################################
 def test_create_conversation_returns_persisted_conversation(
     conversations_api_client: TestClient,
@@ -85,12 +88,14 @@ def test_create_conversation_returns_persisted_conversation(
     assert snapshot_payload["title"] == "Rome map"
     assert snapshot_payload["context_revision"] == 1
     assert snapshot_payload["messages"] == []
-    assert snapshot_payload["conversation_state"]["conversation_id"] == payload[
-        "conversation_id"
-    ]
+    assert (
+        snapshot_payload["conversation_state"]["conversation_id"]
+        == payload["conversation_id"]
+    )
     assert snapshot_payload["memory_snapshot"] == {}
     assert snapshot_payload["map_session"] is None
     assert snapshot_payload["active_run"] is None
+
 
 ###############################################################################
 def test_get_conversation_snapshot_returns_not_found_for_unknown_conversation(
@@ -99,3 +104,40 @@ def test_get_conversation_snapshot_returns_not_found_for_unknown_conversation(
     response = conversations_api_client.get("/api/conversations/missing")
 
     assert response.status_code == 404
+
+
+###############################################################################
+def test_terminal_assistant_message_and_state_rollback_together() -> None:
+    backend = _InMemoryBackend()
+    Base.metadata.create_all(backend.engine)
+    conversations = ConversationRepository(backend)
+    history = ChatHistoryRepository(backend)
+    conversation = conversations.create_conversation("Atomic persistence")
+
+    _message, revision = history.append_assistant_message_with_state(
+        conversation_id=conversation.id,
+        expected_revision=1,
+        conversation_state={"marker": "committed"},
+        content="First response",
+        request_id="request-1",
+    )
+
+    assert revision == 2
+    with pytest.raises(sqlalchemy.exc.IntegrityError):
+        history.append_assistant_message_with_state(
+            conversation_id=conversation.id,
+            expected_revision=2,
+            conversation_state={"marker": "must-roll-back"},
+            content="Duplicate response",
+            request_id="request-1",
+        )
+
+    persisted = conversations.get_conversation(conversation.id)
+    assert persisted is not None
+    assert persisted.context_revision == 2
+    assert persisted.next_message_sequence == 1
+    assert persisted.conversation_state == {"marker": "committed"}
+    assert [
+        item["content"]
+        for item in history.list_messages(conversation_id=conversation.id)
+    ] == ["First response"]

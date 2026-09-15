@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import contextmanager
-from collections.abc import Awaitable, Mapping
-from typing import Any, Callable, Generator
+from collections.abc import Awaitable, Iterable, Mapping
+from typing import Any, Callable, Generator, cast
 from uuid import uuid4
 
 from server.common.typing import is_json_object
@@ -313,14 +313,10 @@ class NativeAgentOrchestrator:
             request_id=request_id,
             conversation_id=conversation_id,
         ):
-            revision = self.conversation_repository.write_state(
-                conversation_id,
+            revision = self.history_service.append_assistant_message_with_state(
                 expected_revision=int(persisted.get("context_revision") or 0),
                 conversation_state=next_state.model_dump(mode="json"),
-            )
-            self.history_service.append_message(
                 conversation_id=conversation_id,
-                role="assistant",
                 content=response.assistant_message,
                 request_id=request_id,
                 structured_payload={
@@ -426,21 +422,21 @@ class NativeAgentOrchestrator:
         if self.evidence_repository is None:
             return []
         try:
-            values = self.evidence_repository.list_summaries(
-                conversation_id,
-                limit=100,
+            values = cast(
+                Iterable[object],
+                self.evidence_repository.list_summaries(
+                    conversation_id,
+                    limit=100,
+                ),
             )
         except Exception:
             return []
         result: list[dict[str, Any]] = []
         for item in values:
-            if hasattr(item, "model_dump"):
-                payload = item.model_dump(mode="json")
-            elif isinstance(item, dict):
-                payload = dict(item)
-            else:
-                continue
-            result.append(payload)
+            model_dump = getattr(item, "model_dump", None)
+            raw_payload = model_dump(mode="json") if callable(model_dump) else item
+            if is_json_object(raw_payload):
+                result.append(dict(raw_payload))
         return result
 
     # -------------------------------------------------------------------------
@@ -469,7 +465,7 @@ class NativeAgentOrchestrator:
         if existing is None:
             return None
         payload = existing.get("structured_payload")
-        if not isinstance(payload, dict) or not payload.get("native"):
+        if not is_json_object(payload) or not payload.get("native"):
             return None
         try:
             return ChatTurnResponse.model_validate(
