@@ -38,6 +38,9 @@ class CapabilityRouter:
         reasons: list[str] = []
         rejected: list[str] = []
         valid_explicit_ids: list[str] = []
+        proposed, temporal_reason = _normalize_recent_scope(proposed)
+        if temporal_reason is not None:
+            reasons.append(temporal_reason)
         for capability_id in proposed.explicit_capability_ids:
             normalized_id = capability_id.strip()
             capability = self.capability_registry.get_capability(normalized_id)
@@ -203,3 +206,35 @@ def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:
     if state.active_map_session is not None:
         return state.active_map_session.resolved_location
     return None
+
+
+###############################################################################
+def _normalize_recent_scope(
+    route: CapabilityRoute,
+) -> tuple[CapabilityRoute, str | None]:
+    """Treat undated recent-feed intent as current, not historical."""
+
+    temporal = route.temporal_scope
+    granularity = temporal.granularity.strip().casefold()
+    has_explicit_time = any(
+        value is not None
+        for value in (
+            temporal.reference_time_iso,
+            temporal.start_time_iso,
+            temporal.end_time_iso,
+        )
+    )
+    if (
+        temporal.mode == "historical"
+        and not has_explicit_time
+        and granularity in {"current", "latest", "live", "near_real_time", "recent"}
+    ):
+        return (
+            route.model_copy(
+                update={
+                    "temporal_scope": temporal.model_copy(update={"mode": "current"})
+                }
+            ),
+            "recent_scope_normalized_to_current",
+        )
+    return route, None
