@@ -15,7 +15,11 @@ import {
 } from '@angular/core';
 import maplibregl, { Map } from 'maplibre-gl';
 
-import { DEFAULT_MAP_FIT_MAX_ZOOM, DEFAULT_OVERLAY_OPACITY } from '../core/constants';
+import {
+  DEFAULT_MAP_FIT_MAX_ZOOM,
+  DEFAULT_OVERLAY_OPACITY,
+  DEFAULT_SATELLITE_MAP_FIT_MAX_ZOOM,
+} from '../core/constants';
 import {
   MapSession,
   CapabilityDescriptor,
@@ -626,7 +630,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.bindInspectionListeners(candidate);
       const bounds = normalizeBounds(this.mapSession?.bounds);
       if (bounds) {
-        candidate.fitBounds(bounds, { padding: 30, duration: 0, maxZoom: DEFAULT_MAP_FIT_MAX_ZOOM });
+        const maxZoom = nextBasemapId === 'esri_world_imagery'
+          ? DEFAULT_SATELLITE_MAP_FIT_MAX_ZOOM
+          : DEFAULT_MAP_FIT_MAX_ZOOM;
+        candidate.fitBounds(bounds, { padding: 30, duration: 0, maxZoom });
       }
       if (!this.hasRenderableCanvas(candidate, candidateContainer)) {
         candidateSettled = true;

@@ -21,7 +21,10 @@ async def test_coordinate_query_is_resolved_without_geocoder_egress() -> None:
     )
 
     result = await LocationToolHandler(resolver=LocationResolver()).resolve(
-        ResolveLocationInput(query="46.0037, 8.9511"),
+        ResolveLocationInput(
+            query="46.0037, 8.9511",
+            expected_location_type="coordinates",
+        ),
         state,
     )
 

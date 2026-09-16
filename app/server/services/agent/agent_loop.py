@@ -267,12 +267,28 @@ class AgentLoop:
                     continue
 
                 final_text = result.content.strip()
-                self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
-                stop = self._evaluate_text_stop(
-                    state,
+                recovery_results = await self._recover_location_only_map(
+                    request,
                     route,
-                    final_text,
-                    available_tools=[item.name for item in tools],
+                    state,
+                )
+                self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
+                stop = (
+                    self._evaluate_stop(
+                        state,
+                        route,
+                        recovery_results,
+                        max_consecutive_tool_failures=request.max_consecutive_tool_failures,
+                        max_validation_corrections=request.max_validation_corrections,
+                        max_discovery_attempts=request.max_discovery_attempts,
+                    )
+                    if recovery_results
+                    else self._evaluate_text_stop(
+                        state,
+                        route,
+                        final_text,
+                        available_tools=[item.name for item in tools],
+                    )
                 )
                 await self._checkpoint(request)
                 if stop is not None:
@@ -947,6 +963,76 @@ class AgentLoop:
                 )
             return "goal_satisfied", text
         return None
+
+    # -------------------------------------------------------------------------
+    async def _recover_location_only_map(
+        self,
+        request: AgentLoopRequest,
+        route: CapabilityRoute,
+        state: AgentRunState,
+    ) -> list[ToolResult]:
+        """Complete a location-only map when the model stops after resolving it.
+
+        Some providers can return a polished final answer after a successful
+        location lookup without issuing the required map-plan call.  Keep the
+        completion contract server-owned for this narrow route: reuse the
+        validated location and the normal typed tool boundary, without
+        fabricating a layer or changing the configured provider/model.
+        """
+
+        if (
+            not self._needs_location_only_map_recovery(state, route)
+            or self.tool_registry.get("apply_map_plan") is None
+        ):
+            return []
+        location_ref = next(iter(state.location_refs))
+        expected_revision = (
+            state.active_map_session.overlay_collection.revision
+            if state.active_map_session is not None
+            else 0
+        )
+        recovery_call = LLMToolCall(
+            id=f"server-location-map-recovery-{state.request_id}",
+            name="apply_map_plan",
+            arguments={
+                "expected_collection_revision": expected_revision,
+                "actions": [
+                    {
+                        "action": "set_viewport",
+                        "strategy": "fit_location",
+                        "location_ref": str(location_ref),
+                    }
+                ],
+            },
+        )
+        return await self._execute_calls(request, [recovery_call], state)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _needs_location_only_map_recovery(
+        state: AgentRunState,
+        route: CapabilityRoute,
+    ) -> bool:
+        if (
+            route.task_mode != "execute"
+            or route.primary_domain is not CapabilityDomain.MAP_RENDERING
+            or route.presentation not in {"map", "both"}
+            or route.secondary_domains
+            or state.prepared_map_session is not None
+            or len(state.location_refs) != 1
+        ):
+            return False
+        contract = state.completion_contract
+        if contract is None or not contract.map_preparation_required:
+            return False
+        if contract.evidence_required:
+            return False
+        normalized_queries = {
+            str(query).strip().casefold()
+            for query in route.capability_queries
+            if str(query).strip()
+        }
+        return normalized_queries <= {"basemap", "map view", "map rendering"}
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -16,6 +16,7 @@ from server.domain.agent.capability_route import (
     CapabilityRoute,
     CompletionContract,
 )
+from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.reliability import AgentExecutionBudget
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.domain.agent.tools import RegisteredTool
@@ -278,6 +279,35 @@ def test_native_goal_compiles_deterministic_completion_contract() -> None:
     assert state.completion_contract.map_preparation_required is True
     assert state.completion_contract.temporal_scope_required is True
     assert state.completion_contract.spatial_scope_required is True
+
+
+def test_location_only_map_recovery_requires_a_single_resolved_location() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        capability_queries=["basemap", "map rendering"],
+    )
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+    state.location_refs["great barrier reef, australia"] = ResolvedLocation(
+        label="Great Barrier Reef, Australia",
+        latitude=-16.35,
+        longitude=145.9,
+        confidence=0.87,
+        location_type="reef",
+    )
+    assert AgentLoop._needs_location_only_map_recovery(  # pyright: ignore[reportPrivateUsage]
+        state, route
+    )
+
+    state.location_refs["australia"] = state.location_refs[
+        "great barrier reef, australia"
+    ]
+    assert not AgentLoop._needs_location_only_map_recovery(  # pyright: ignore[reportPrivateUsage]
+        state, route
+    )
 
 
 ###############################################################################
