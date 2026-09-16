@@ -17,7 +17,6 @@ describe('SettingsApiKeyFieldComponent', () => {
   });
 
   it('keeps stored credentials masked and out of the input value', () => {
-    fixture.componentInstance.configured = true;
     fixture.componentInstance.credentialHealth = 'healthy';
     fixture.detectChanges();
 
@@ -25,7 +24,8 @@ describe('SettingsApiKeyFieldComponent', () => {
     expect(input.type).toBe('password');
     expect(input.autocomplete).toBe('off');
     expect(input.value).toBe('');
-    expect(fixture.nativeElement.textContent).toContain('OpenCode Go API key (Configured)');
+    expect(fixture.nativeElement.textContent).toContain('OpenCode Go API key');
+    expect(fixture.nativeElement.textContent).not.toContain('(Configured)');
     expect(fixture.nativeElement.textContent).toContain('Saved key is readable.');
   });
 

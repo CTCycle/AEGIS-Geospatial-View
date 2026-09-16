@@ -1,6 +1,6 @@
 :host {
   display: grid;
-  gap: 0.35rem;
+  gap: var(--space-1, 0.35rem);
   color: #c9d8de;
   font-size: 0.78rem;
   font-weight: 800;
@@ -8,7 +8,7 @@
 
 label {
   display: grid;
-  gap: 0.35rem;
+  gap: var(--space-1, 0.35rem);
   color: inherit;
   font: inherit;
 }
@@ -17,10 +17,10 @@ input {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  min-height: 2.35rem;
-  border: 1px solid #344953;
-  border-radius: 0.35rem;
-  background: #0f1a21;
+  min-height: var(--settings-control-height, 2.35rem);
+  border: 1px solid var(--settings-border-strong, #344953);
+  border-radius: var(--settings-radius, 0.4rem);
+  background: var(--settings-input-surface, #0f1a21);
   color: #e5f0f4;
   padding: 0.52rem 0.68rem;
   font: inherit;

@@ -17,14 +17,13 @@ export class SettingsApiKeyFieldComponent {
   @Input({ required: true }) placeholder = '';
   @Input() value = '';
   @Input() hint = '';
-  @Input() configured = false;
   @Input() credentialHealth: CredentialHealth = null;
   @Input() validationError: string | undefined;
 
   @Output() valueChange = new EventEmitter<string>();
 
   get labelText(): string {
-    return `${this.label} API key ${this.configured ? '(Configured)' : '(Not configured)'}`;
+    return `${this.label} API key`;
   }
 
   onValueChange(value: string): void {
