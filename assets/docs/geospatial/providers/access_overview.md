@@ -1,6 +1,6 @@
 # Access Overview
 
-Last updated: 2026-09-03
+Last updated: 2026-09-16
 
 ## Purpose
 
@@ -10,13 +10,15 @@ This file covers credential handling, provider-setup boundaries, access-policy s
 
 Preferred flow:
 
-1. Open the Access settings page.
+1. Open Settings and choose the Geospatial Access tab
+   (`/settings?tab=geospatial-access`).
 2. Add the provider credential with label `api_key`.
 3. Return to the geodata or workspace page; provider availability is resolved
    from the current credential and runtime profile.
 
-Model-provider credentials are managed separately in Model Settings. Geospatial
-agent visibility is catalog-based and does not require rebuilding embeddings.
+Model-provider credentials are managed in the Model Providers tab of the same
+Settings page. Geospatial agent visibility is catalog-based and does not
+require rebuilding embeddings.
 
 ## Resolution Semantics
 
@@ -80,14 +82,15 @@ none`.
 
 ## Secret Safety Rules
 
-- Store secrets only through encrypted credential storage in AEGIS Access settings.
+- Store secrets only through encrypted credential storage in Settings →
+  Geospatial Access.
 - Do not commit keys, tokens, `.env` files, shell history, screenshots, or provider dashboard exports.
 - Credential-gated manifests must reference only provider key names and access-page provider IDs.
 - Raw keys are prohibited in manifests, browser logs, provider responses, and snapshots.
 
 ## Guided Setup Boundary
 
-The Access page exposes an experimental human-in-the-loop `Get API key` trigger for some providers.
+The Geospatial Access tab exposes an experimental human-in-the-loop `Get API key` trigger for some providers.
 
 AEGIS:
 

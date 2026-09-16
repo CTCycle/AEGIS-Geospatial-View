@@ -2,32 +2,29 @@
   <header class="settings-page__header">
     <div class="settings-page__heading">
       <p class="page-kicker">Configuration</p>
-      <h1>Model settings</h1>
-      <p>Select the agent model used for native routing, orchestration, tool calling, and chat.</p>
-    </div>
-    <div class="settings-page__header-actions">
-      <app-settings-icon-action
-        ariaLabel="Open Ollama settings"
-        title="Ollama settings"
-        (buttonClick)="ollamaModalStatusText = ''; isOllamaModalOpen = true"
-      >
-          <img class="settings-page__ollama-logo" src="ollama-logo.svg" alt="" aria-hidden="true" />
-      </app-settings-icon-action>
-
-      <app-settings-icon-action
-        ariaLabel="Manage API keys"
-        title="API key settings"
-        (buttonClick)="keysModalStatusText = ''; keyValidationErrors = {}; isKeysModalOpen = true"
-      >
-          <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
-            <path d="M9.5 4a5.5 5.5 0 1 0 3.4 9.8l2.1 2.1V18h2v2h3v-3.8l-4.7-4.7A5.5 5.5 0 0 0 9.5 4Zm0 1.8a3.7 3.7 0 1 1 0 7.4 3.7 3.7 0 0 1 0-7.4Zm0 2a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Z" fill="currentColor" />
-          </svg>
-      </app-settings-icon-action>
-
+      <h1>Settings</h1>
+      <p>Manage the agent model, model providers, local runtime, and geospatial access.</p>
     </div>
   </header>
 
   <div class="settings-page__content">
+    <nav class="settings-tabs" role="tablist" aria-label="Settings sections">
+      @for (tab of settingsTabs; track tab.id) {
+        <button
+          type="button"
+          class="settings-tab"
+          [class.settings-tab--active]="isActiveTab(tab.id)"
+          [id]="'settings-tab-' + tab.id"
+          role="tab"
+          [attr.aria-selected]="isActiveTab(tab.id)"
+          [attr.aria-controls]="'settings-panel-' + tab.id"
+          [attr.tabindex]="isActiveTab(tab.id) ? 0 : -1"
+          (click)="setSettingsTab(tab.id)"
+          (keydown)="onSettingsTabKeydown($event, tab.id)"
+        >{{ tab.label }}</button>
+      }
+    </nav>
+
     @if (unavailableAssignedOllamaModels.length > 0) {
       <section
         appSettingsWarning
@@ -39,7 +36,7 @@
         [message]="unavailableAssignedOllamaModelsMessage"
       ></section>
     }
-    @if (dynamicProviderLoadFailed) {
+    @if (dynamicProviderLoadFailed && activeTab === 'models') {
       <section
         appSettingsWarning
         class="settings-page__warning"
@@ -50,210 +47,357 @@
         [message]="dynamicProviderFailureMessage"
       ></section>
     }
-    <div class="settings-page__layout">
-      <section class="settings-page__left-column">
-        <section class="settings-page__controls settings-page__controls--navbar" aria-label="Settings controls">
-          <div class="settings-page__controls-left">
-            <div class="provider-filter-toggle provider-toggle" role="group" aria-label="Model provider filter">
-              <button type="button" [class.active]="providerFilter === 'all'" [attr.aria-pressed]="providerFilter === 'all'" (click)="setProviderFilter('all')">All</button>
-              <button type="button" [class.active]="providerFilter === 'ollama'" [attr.aria-pressed]="providerFilter === 'ollama'" (click)="setProviderFilter('ollama')">Ollama</button>
-              <button type="button" [class.active]="providerFilter === 'openai'" [attr.aria-pressed]="providerFilter === 'openai'" (click)="setProviderFilter('openai')">OpenAI</button>
-              <button type="button" [class.active]="providerFilter === 'google'" [attr.aria-pressed]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
-              <button type="button" [class.active]="providerFilter === 'deepseek'" [attr.aria-pressed]="providerFilter === 'deepseek'" (click)="setProviderFilter('deepseek')">DeepSeek</button>
-              <button type="button" [class.active]="providerFilter === 'opencode'" [attr.aria-pressed]="providerFilter === 'opencode'" (click)="setProviderFilter('opencode')">OpenCode Zen</button>
-              <button type="button" [class.active]="providerFilter === 'opencode-go'" [attr.aria-pressed]="providerFilter === 'opencode-go'" (click)="setProviderFilter('opencode-go')">OpenCode Go</button>
+
+    @if (activeTab === 'models') {
+      <section
+        id="settings-panel-models"
+        class="settings-page__tab-panel settings-page__tab-panel--models"
+        role="tabpanel"
+        aria-labelledby="settings-tab-models"
+        tabindex="0"
+      >
+        <div class="settings-page__layout">
+          <section class="settings-page__left-column">
+            <section class="settings-page__controls settings-page__controls--navbar" aria-label="Model catalog controls">
+              <div class="settings-page__controls-left">
+                <div class="provider-filter-toggle provider-toggle" role="group" aria-label="Model provider filter">
+                  <button type="button" [class.active]="providerFilter === 'all'" [attr.aria-pressed]="providerFilter === 'all'" (click)="setProviderFilter('all')">All</button>
+                  <button type="button" [class.active]="providerFilter === 'ollama'" [attr.aria-pressed]="providerFilter === 'ollama'" (click)="setProviderFilter('ollama')">Ollama</button>
+                  <button type="button" [class.active]="providerFilter === 'openai'" [attr.aria-pressed]="providerFilter === 'openai'" (click)="setProviderFilter('openai')">OpenAI</button>
+                  <button type="button" [class.active]="providerFilter === 'google'" [attr.aria-pressed]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
+                  <button type="button" [class.active]="providerFilter === 'deepseek'" [attr.aria-pressed]="providerFilter === 'deepseek'" (click)="setProviderFilter('deepseek')">DeepSeek</button>
+                  <button type="button" [class.active]="providerFilter === 'opencode'" [attr.aria-pressed]="providerFilter === 'opencode'" (click)="setProviderFilter('opencode')">OpenCode Zen</button>
+                  <button type="button" [class.active]="providerFilter === 'opencode-go'" [attr.aria-pressed]="providerFilter === 'opencode-go'" (click)="setProviderFilter('opencode-go')">OpenCode Go</button>
+                </div>
+              </div>
+
+              <div class="settings-page__controls-right">
+                <button
+                  type="button"
+                  class="settings-page__refresh"
+                  aria-label="Refresh from Ollama API"
+                  [attr.aria-busy]="isRefreshingOllama"
+                  [disabled]="isRefreshingOllama"
+                  [attr.title]="isRefreshingOllama ? 'Refreshing available Ollama models' : 'Refresh from Ollama API'"
+                  (click)="refreshOllamaLibrary()"
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
+                    <path d="M12 4V1L8 5l4 4V6a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6H4a8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8z" fill="currentColor" />
+                  </svg>
+                </button>
+                <input
+                  class="model-search-bar"
+                  type="search"
+                  placeholder="Search models"
+                  aria-label="Search models"
+                  [ngModel]="searchText"
+                  (ngModelChange)="setSearchText($event)"
+                />
+              </div>
+            </section>
+
+            <div #modelGridScroll class="model-grid-scroll" (scroll)="onModelGridScroll($event)">
+              @if (isLoadingModels) {
+                <section class="settings-empty-state" aria-live="polite">
+                  <h2>Loading model catalog</h2>
+                  <p>Fetching model assignments and provider metadata.</p>
+                </section>
+              } @else if (isLoadingDynamicProviderModels) {
+                <section class="settings-empty-state" aria-live="polite">
+                  <h2>Loading {{ dynamicProviderLabel }} models</h2>
+                  <p>Fetching the live {{ dynamicProviderLabel }} catalog from the configured provider account.</p>
+                </section>
+              } @else if (!hasDisplayedModels) {
+                <section class="settings-empty-state" aria-live="polite">
+                  <h2>{{ dynamicProviderLoadFailed ? dynamicProviderLabel + ' models unavailable' : 'No models match this filter' }}</h2>
+                  <p>{{ dynamicProviderLoadFailed ? dynamicProviderFailureMessage : 'Adjust the provider tabs or search query to show available models.' }}</p>
+                  @if (dynamicProviderLoadFailed) {
+                    <button type="button" class="settings-page__inline-link" (click)="setSettingsTab('model-providers')">Open Model Providers</button>
+                  }
+                </section>
+              } @else {
+                @for (provider of providerKeys; track trackProviderGroup(provider)) {
+                  <section class="model-grid-provider">
+                    @if (providerKeys.length > 1) {
+                      <header class="model-grid-provider__separator">
+                        <span></span>
+                        <p>{{ providerLabel(provider) }}</p>
+                      </header>
+                    }
+                    <div class="model-grid">
+                      @for (model of groupedDisplayedModels[provider]; track model.provider + ':' + model.id) {
+                        <article
+                          appModelCard
+                          [model]="model"
+                          [description]="modelDescription(model)"
+                          [isLocal]="model.provider === 'ollama' && localModelIds.has(model.id)"
+                          [requiresPull]="requiresPull(model)"
+                          [isSelected]="isAgentModelSelected(model)"
+                          [disabledReason]="agentModelDisabledReason(model)"
+                          (modelSelected)="onModelSelected(model)"
+                          (pullRequested)="pullLocalModel($event)"
+                        ></article>
+                      }
+                    </div>
+                  </section>
+                }
+              }
             </div>
+          </section>
 
-          </div>
+          <aside class="settings-page__right-column" aria-label="Selected agent model">
+            <app-selected-model-summary [summary]="selectedAgentModelSummary" [isLoading]="isLoadingModels"></app-selected-model-summary>
+            @if (selectedAgentModelSummary) {
+              <section class="settings-page__probe" aria-label="Native route and tool verification">
+                <div>
+                  <p class="settings-page__probe-label">Native route and tools</p>
+                  <strong>{{ structuredProbeLabel }}</strong>
+                  @if (structuredProbe.message) {
+                    <p>{{ structuredProbe.message }}</p>
+                  }
+                </div>
+                <button
+                  type="button"
+                  class="primary-button"
+                  [disabled]="isTestingStructuredProbe"
+                  [attr.aria-busy]="isTestingStructuredProbe"
+                  (click)="testSelectedModel()"
+                >{{ isTestingStructuredProbe ? 'Testing…' : 'Test selected model' }}</button>
+              </section>
+            }
+          </aside>
+        </div>
+      </section>
+    }
 
-          <div class="settings-page__controls-right">
-            <button
-              type="button"
-              class="settings-page__refresh"
-              aria-label="Refresh from Ollama API"
-              [attr.aria-busy]="isRefreshingOllama"
-              [disabled]="isRefreshingOllama"
-              [attr.title]="isRefreshingOllama ? 'Refreshing available Ollama models' : 'Refresh from Ollama API'"
-              (click)="refreshOllamaLibrary()"
-            >
-              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
-                <path d="M12 4V1L8 5l4 4V6a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6H4a8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8z" fill="currentColor" />
-              </svg>
-            </button>
-            <input
-              class="model-search-bar"
-              type="search"
-              placeholder="Search models"
-              aria-label="Search models"
-              [ngModel]="searchText"
-              (ngModelChange)="setSearchText($event)"
-            />
+    @if (activeTab === 'model-providers') {
+      <section
+        id="settings-panel-model-providers"
+        class="settings-page__tab-panel settings-page__tab-panel--providers"
+        role="tabpanel"
+        aria-labelledby="settings-tab-model-providers"
+        tabindex="0"
+      >
+        <section class="settings-section" aria-labelledby="model-provider-heading">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Cloud access</p>
+              <h2 id="model-provider-heading">Model providers</h2>
+              <p>Save provider credentials to discover account-visible models. A readable saved key is not proof that a provider endpoint is reachable.</p>
+            </div>
+          </header>
+          <div class="settings-provider-grid">
+            @for (provider of cloudProviders; track provider.id) {
+              <article class="settings-provider-card">
+                <header class="settings-provider-card__header">
+                  <div>
+                    <h3>{{ provider.name }}</h3>
+                    <p>{{ provider.purpose }}</p>
+                  </div>
+                  <span class="settings-status" [class.settings-status--ready]="isCloudCredentialConfigured(provider.id)">
+                    <span aria-hidden="true"></span>{{ modelProviderHealth(provider.id) }}
+                  </span>
+                </header>
+                <app-settings-api-key-field
+                  [label]="provider.name"
+                  [inputName]="provider.id + '_api_key'"
+                  [placeholder]="provider.placeholder"
+                  [hint]="provider.hint ?? ''"
+                  [value]="cloudCredentialValue(provider.id)"
+                  [configured]="isCloudCredentialConfigured(provider.id)"
+                  [credentialHealth]="credentialHealthForTemplate(provider.id)"
+                  [validationError]="cloudCredentialValidationError(provider.id)"
+                  (valueChange)="setCloudCredentialValue(provider.id, $event)"
+                ></app-settings-api-key-field>
+                <footer class="settings-provider-card__actions">
+                  <button type="button" class="primary-button" [disabled]="isSavingCredential" (click)="saveCloudProvider(provider.id)">Save key</button>
+                  <button type="button" class="secondary-button" [disabled]="isSavingCredential || !isCloudCredentialConfigured(provider.id)" (click)="clearCloudProvider(provider.id)">Clear saved key</button>
+                </footer>
+              </article>
+            }
           </div>
         </section>
 
-        <div #modelGridScroll class="model-grid-scroll" (scroll)="onModelGridScroll($event)">
-          @if (isLoadingModels) {
-            <section class="settings-empty-state" aria-live="polite">
-              <h2>Loading model catalog</h2>
-              <p>Fetching model assignments and provider metadata.</p>
-            </section>
-          } @else if (isLoadingDynamicProviderModels) {
-            <section class="settings-empty-state" aria-live="polite">
-              <h2>Loading {{ dynamicProviderLabel }} models</h2>
-              <p>Fetching the live {{ dynamicProviderLabel }} catalog from the configured provider account.</p>
-            </section>
-          } @else if (!hasDisplayedModels) {
-            <section class="settings-empty-state" aria-live="polite">
-              <h2>{{ dynamicProviderLoadFailed ? dynamicProviderLabel + ' models unavailable' : 'No models match this filter' }}</h2>
-              <p>{{ dynamicProviderLoadFailed ? dynamicProviderFailureMessage : 'Adjust the provider tabs or search query to show available models.' }}</p>
-            </section>
-          } @else {
-            @for (provider of providerKeys; track trackProviderGroup(provider)) {
-              <section class="model-grid-provider">
-                @if (providerKeys.length > 1) {
-                  <header class="model-grid-provider__separator">
-                    <span></span>
-                    <p>{{ providerLabel(provider) }}</p>
-                  </header>
-                }
-                <div class="model-grid">
-                  @for (model of groupedDisplayedModels[provider]; track model.provider + ':' + model.id) {
-                    <article
-                      appModelCard
-                      [model]="model"
-                      [description]="modelDescription(model)"
-                      [isLocal]="model.provider === 'ollama' && localModelIds.has(model.id)"
-                      [requiresPull]="requiresPull(model)"
-                      [isSelected]="isAgentModelSelected(model)"
-                      [disabledReason]="agentModelDisabledReason(model)"
-                      (modelSelected)="onModelSelected(model)"
-                      (pullRequested)="pullLocalModel($event)"
-                    ></article>
-                  }
-                </div>
-              </section>
-            }
-          }
-        </div>
-      </section>
-
-      <aside class="settings-page__right-column" aria-label="Selected agent model">
-        <app-selected-model-summary [summary]="selectedAgentModelSummary" [isLoading]="isLoadingModels"></app-selected-model-summary>
-        @if (selectedAgentModelSummary) {
-          <section class="settings-page__probe" aria-label="Native route and tool verification">
+        <section class="settings-section settings-section--runtime" aria-labelledby="ollama-heading">
+          <header class="settings-section__header">
             <div>
-              <p class="settings-page__probe-label">Native route and tools</p>
-              <strong>{{ structuredProbeLabel }}</strong>
-              @if (structuredProbe.message) {
-                <p>{{ structuredProbe.message }}</p>
+              <p class="page-kicker">Local runtime</p>
+              <h2 id="ollama-heading">Ollama</h2>
+              <p>Connect to a local Ollama server, refresh its model library, or pull a model before selecting it.</p>
+            </div>
+            <span class="settings-status" [class.settings-status--ready]="ollamaStatus?.ok === true">
+              <span aria-hidden="true"></span>{{ ollamaStatus?.ok === true ? 'Connection healthy' : 'Not checked' }}
+            </span>
+          </header>
+          <form class="settings-runtime-form" (ngSubmit)="saveOllamaSettings()">
+            <label>
+              Ollama server URL
+              <input class="settings-control" [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" name="ollama_server_url" autocomplete="off" />
+            </label>
+            <div class="settings-provider-card__actions">
+              <button type="button" class="secondary-button" (click)="checkOllamaConnection()">Check connection</button>
+              <button type="button" class="secondary-button" [disabled]="isRefreshingOllama" (click)="refreshOllamaLibrary()">Refresh models</button>
+              <button type="submit" class="primary-button">Save settings</button>
+            </div>
+          </form>
+          @if (ollamaStatusText) {
+            <p class="settings-inline-status" role="status" aria-live="polite">{{ visibleOllamaStatusText }}</p>
+          }
+        </section>
+      </section>
+    }
+
+    @if (activeTab === 'geospatial-access') {
+      <section
+        id="settings-panel-geospatial-access"
+        class="settings-page__tab-panel settings-page__tab-panel--providers"
+        role="tabpanel"
+        aria-labelledby="settings-tab-geospatial-access"
+        tabindex="0"
+      >
+        <section class="settings-section" aria-labelledby="geospatial-access-heading">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Geospatial access</p>
+              <h2 id="geospatial-access-heading">Optional provider credentials</h2>
+              <p>Manage access for credential-gated geospatial capabilities. Public providers remain available subject to attribution and usage limits.</p>
+            </div>
+            <span class="settings-status">{{ geoProviders.length }} providers</span>
+          </header>
+
+          @if (isLoadingAccountSetups) {
+            <p class="settings-inline-status" role="status" aria-live="polite">Loading provider setup metadata…</p>
+          } @else if (!geoProviders.length) {
+            <p class="settings-inline-status" role="status">No optional geospatial provider setup is currently published.</p>
+          } @else {
+            <div class="settings-provider-list" aria-label="Geospatial provider access">
+              @for (provider of geoProviders; track provider.id) {
+                <article class="settings-provider-card settings-provider-card--geospatial">
+                  <header class="settings-provider-card__header">
+                    <div>
+                      <h3>{{ provider.name }}</h3>
+                      <p>{{ provider.purpose }}</p>
+                    </div>
+                    <span class="settings-status" [class.settings-status--ready]="geoProviderConfigured(provider.id)">
+                      <span aria-hidden="true"></span>{{ geoProviderHealth(provider.id) }}
+                    </span>
+                  </header>
+                  <div class="settings-provider-card__details">
+                    <span>{{ provider.requiresCredentials ? 'API key required for selected capabilities' : 'Documentation and setup guidance' }}</span>
+                    @if (provider.docsUrl) {
+                      <a [href]="provider.docsUrl" target="_blank" rel="noreferrer">Provider documentation</a>
+                    }
+                  </div>
+                  @if (provider.instructions.length) {
+                    <details class="settings-provider-card__instructions">
+                      <summary>Setup notes</summary>
+                      <ul>
+                        @for (instruction of provider.instructions; track instruction) {
+                          <li>{{ instruction }}</li>
+                        }
+                      </ul>
+                    </details>
+                  }
+                  @if (provider.requiresCredentials) {
+                    <app-settings-api-key-field
+                      [label]="provider.name"
+                      [inputName]="provider.id + '_api_key'"
+                      [placeholder]="provider.placeholder"
+                      [value]="geoCredentialDrafts[provider.id] ?? ''"
+                      [configured]="geoProviderConfigured(provider.id)"
+                      [credentialHealth]="geoProviderCredentialHealth(provider.id)"
+                      (valueChange)="setGeoCredentialDraft(provider.id, $event)"
+                    ></app-settings-api-key-field>
+                    <footer class="settings-provider-card__actions">
+                      @if (canShowGeoSignupTrigger(provider.id)) {
+                        <button type="button" class="secondary-button" [disabled]="isLoadingAccountSetups" (click)="openGeoProviderSignup(provider.id)">Get API key</button>
+                      }
+                      <button type="button" class="primary-button" [disabled]="isSavingGeospatialCredential" (click)="saveGeoProvider(provider.id)">Save key</button>
+                      <button type="button" class="secondary-button" [disabled]="isSavingGeospatialCredential || !geoProviderConfigured(provider.id)" (click)="clearGeoProvider(provider.id)">Clear saved key</button>
+                    </footer>
+                  } @else if (canShowGeoSignupTrigger(provider.id)) {
+                    <footer class="settings-provider-card__actions">
+                      <button type="button" class="secondary-button" (click)="openGeoProviderSignup(provider.id)">Open setup guidance</button>
+                    </footer>
+                  }
+                </article>
               }
             </div>
-            <button
-              type="button"
-              class="primary-button"
-              [disabled]="isTestingStructuredProbe"
-              [attr.aria-busy]="isTestingStructuredProbe"
-              (click)="testSelectedModel()"
-            >{{ isTestingStructuredProbe ? 'Testing…' : 'Test selected model' }}</button>
-          </section>
-        }
-      </aside>
-    </div>
-    <footer class="settings-page__status">{{ visibleStatusText }}</footer>
+          }
+        </section>
+      </section>
+    }
+
+    <footer class="settings-page__status" role="status" aria-live="polite">{{ visibleStatusText }}</footer>
   </div>
 
-  @if (isKeysModalOpen) {
-    <app-settings-modal-shell title="API keys" ariaLabel="API key management" (requestClose)="closeModal()">
-      <form class="settings-modal__form settings-modal__form--keys" (ngSubmit)="saveKeys()">
-        <div class="settings-modal__body">
-          <app-settings-api-key-field
-            label="OpenAI"
-            inputName="openai_api_key"
-            placeholder="sk-..."
-            [value]="openaiKey"
-            [configured]="openAiConfigured()"
-            [credentialHealth]="openAiCredentialHealth()"
-            [validationError]="keyValidationErrors.openai"
-            (valueChange)="openaiKey = $event; keyValidationErrors.openai = undefined"
-          ></app-settings-api-key-field>
-          <app-settings-api-key-field
-            label="Google"
-            inputName="google_api_key"
-            placeholder="AIza..."
-            [value]="googleKey"
-            [configured]="googleConfigured()"
-            [credentialHealth]="googleCredentialHealth()"
-            [validationError]="keyValidationErrors.google"
-            (valueChange)="googleKey = $event; keyValidationErrors.google = undefined"
-          ></app-settings-api-key-field>
-          <app-settings-api-key-field
-            label="DeepSeek"
-            inputName="deepseek_api_key"
-            placeholder="sk-..."
-            hint="Used to discover DeepSeek models and run the selected agent model through the DeepSeek API."
-            [value]="deepseekKey"
-            [configured]="deepSeekConfigured()"
-            [credentialHealth]="deepSeekCredentialHealth()"
-            [validationError]="keyValidationErrors.deepseek"
-            [providerSection]="true"
-            (valueChange)="deepseekKey = $event; keyValidationErrors.deepseek = undefined"
-          ></app-settings-api-key-field>
-          <app-settings-api-key-field
-            label="OpenCode Zen"
-            inputName="opencode_api_key"
-            placeholder="OpenCode API key"
-            hint="Used to discover and run OpenCode Zen’s OpenAI-compatible models."
-            [value]="opencodeKey"
-            [configured]="opencodeConfigured()"
-            [credentialHealth]="opencodeCredentialHealth()"
-            [validationError]="keyValidationErrors.opencode"
-            [providerSection]="true"
-            (valueChange)="opencodeKey = $event; keyValidationErrors.opencode = undefined"
-          ></app-settings-api-key-field>
-          <app-settings-api-key-field
-            label="OpenCode Go"
-            inputName="opencode_go_api_key"
-            placeholder="OpenCode API key"
-            hint="Used to discover and run OpenCode Go’s OpenAI-compatible models."
-            [value]="opencodeGoKey"
-            [configured]="opencodeGoConfigured()"
-            [credentialHealth]="opencodeGoCredentialHealth()"
-            [validationError]="keyValidationErrors['opencode-go']"
-            [providerSection]="true"
-            (valueChange)="opencodeGoKey = $event; keyValidationErrors['opencode-go'] = undefined"
-          ></app-settings-api-key-field>
-          @if (keysModalStatusText) {
-            <p class="settings-modal__status" aria-live="polite">{{ keysModalStatusText }}</p>
-          }
-        </div>
-        <footer class="settings-modal__footer">
-          <button type="submit" class="primary-button">Save keys</button>
-        </footer>
-      </form>
-    </app-settings-modal-shell>
-  }
+  @if (isSignupModalOpen && selectedProviderAccountSetup; as setup) {
+    <app-settings-modal-shell
+      title=""
+      [ariaLabel]="'API key setup for ' + setup.name"
+      [showHeader]="false"
+      [closeOnBackdrop]="false"
+      panelClass="provider-signup-modal__panel"
+      (requestClose)="closeProviderSignup()"
+    >
+      <header>
+        <p class="page-kicker">{{ setup.automation.experimentalLabel }}</p>
+        <h2>{{ setup.name }}</h2>
+        <p>{{ supportLabel(setup) }}. Automation is best-effort and pauses for provider-controlled steps.</p>
+      </header>
 
-  @if (isOllamaModalOpen) {
-    <app-settings-modal-shell title="Ollama settings" ariaLabel="Ollama settings" (requestClose)="closeModal()">
-      <form class="settings-modal__form" (ngSubmit)="saveOllamaSettings()">
-        <div class="settings-modal__body">
-          <label>
-            Ollama server URL
-            <input [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" name="ollama_server_url" />
-          </label>
-          @if (visibleOllamaModalStatusText) {
-            <p class="settings-modal__status" aria-live="polite">{{ visibleOllamaModalStatusText }}</p>
-          }
-        </div>
-        <footer class="settings-modal__footer settings-modal__footer--spread">
-          <div class="row-actions">
-            <button type="button" (click)="checkOllamaConnection()">Check connection</button>
-            <button type="button" (click)="refreshOllamaLibrary()">Refresh models</button>
-          </div>
-          <button type="submit" class="primary-button">Save settings</button>
-        </footer>
-      </form>
+      <section class="provider-signup-modal__notes" aria-label="Guided setup notes">
+        <h3>What AEGIS can help with</h3>
+        <ul>
+          @for (note of setup.automation.userActionNotes; track note) { <li>{{ note }}</li> }
+        </ul>
+      </section>
+
+      <section class="provider-signup-modal__notes" aria-label="Safety boundaries">
+        <h3>Safety boundaries</h3>
+        <ul>
+          @for (note of setup.automation.safetyNotes; track note) { <li>{{ note }}</li> }
+        </ul>
+      </section>
+
+      @if (setup.automation.requiredFields.length) {
+        <section class="provider-signup-modal__notes" aria-label="Provider information guidance">
+          <h3>Provider information</h3>
+          <ul>
+            @for (field of setup.automation.requiredFields; track field.label) {
+              <li>{{ field.label }}@if (field.helpText) { — {{ field.helpText }} }</li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (signupModalError) {
+        <p class="settings-inline-status" role="status" aria-live="polite">{{ signupModalError }}</p>
+      }
+
+      @if (setup.automation.support !== 'unsupported') {
+        <label class="settings-secret-field">
+          Generated API key
+          <input
+            type="password"
+            autocomplete="off"
+            [attr.aria-label]="'Generated API key for ' + setup.name"
+            [placeholder]="setup.keyFormatHint || 'Paste generated API key'"
+            [(ngModel)]="signupKeyInput"
+            name="guided_signup_api_key"
+          />
+        </label>
+      }
+
+      <div class="provider-signup-modal__actions">
+        <button type="button" class="secondary-button" (click)="openProviderPortal(setup)">
+          {{ setup.automation.support === 'unsupported' ? 'Open documentation' : 'Start guided setup' }}
+        </button>
+        @if (setup.automation.support !== 'unsupported') {
+          <button type="button" class="primary-button" [disabled]="isSavingGeospatialCredential" (click)="saveGeneratedCredential(setup)">Save generated API key</button>
+        }
+        <button type="button" class="secondary-button" (click)="closeProviderSignup()" aria-label="Cancel guided setup">Cancel</button>
+      </div>
     </app-settings-modal-shell>
   }
 </div>
-

@@ -132,9 +132,47 @@ def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
 
     assert provider.base_url == "https://opencode.ai/zen/go/v1"
+    assert provider.protocol_for_model("deepseek-v4.1-flash") == "openai-chat-completions"
+    assert provider.supports_tools("deepseek-v4.1-flash") is True
+    assert provider.supports_structured_output("deepseek-v4.1-flash") is True
     assert provider.supports_tools("deepseek-v4-flash") is True
     assert provider.supports_structured_output("deepseek-v4-flash") is True
     assert provider.supports_tools("claude-opus-5") is False
+
+###############################################################################
+def test_go_catalog_marks_deepseek_v41_flash_as_live_chat_model(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_get(url: str, **kwargs):  # noqa: ANN003, ANN202
+        captured["url"] = url
+        captured["kwargs"] = kwargs
+        return _Response(
+            {
+                "object": "list",
+                "data": [
+                    {"id": "deepseek-v4.1-flash", "owned_by": "opencode"},
+                    {"id": "model-published-without-a-transport"},
+                ],
+            }
+        )
+
+    monkeypatch.setattr("server.services.llm.opencode_provider.httpx.get", fake_get)
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+
+    models = provider.list_models()
+
+    assert [model.name for model in models] == [
+        "deepseek-v4.1-flash",
+        "model-published-without-a-transport",
+    ]
+    selected = models[0]
+    assert selected.provider == OPENCODE_GO_PROVIDER
+    assert selected.metadata["protocol"] == "openai-chat-completions"
+    assert selected.metadata["protocol_source"] == "opencode_published_endpoint_table"
+    assert "tools" in selected.capabilities
+    assert "structured_output" in selected.capabilities
+    assert models[1].metadata["supports_tools"] is False
+    assert captured["url"] == "https://opencode.ai/zen/go/v1/models"
 
 ###############################################################################
 def test_structured_output_uses_single_function_mode(monkeypatch) -> None:

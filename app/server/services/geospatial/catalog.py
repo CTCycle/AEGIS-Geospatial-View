@@ -169,7 +169,7 @@ class GeospatialCatalogService:
         availability_reason = (
             None
             if is_available
-            else "Configure provider credentials in AEGIS Access."
+            else "Configure provider credentials in Settings under Geospatial Access."
         )
         return {
             "id": provider_id,

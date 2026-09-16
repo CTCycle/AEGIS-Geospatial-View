@@ -1,13 +1,14 @@
 # Experience And Accessibility
 
-Last updated: 2026-08-20
+Last updated: 2026-09-16
 
 ## Core User Journeys
 
 - Ask a geospatial question, receive an assistant response, and inspect map session output.
 - Review geodata to understand layers, tools, providers, and access constraints.
-- Open Access configurations to add optional provider keys.
-- Open model settings to choose the agent model and manage provider credentials.
+- Open Settings → Geospatial Access to add optional provider keys.
+- Open Settings → Models to choose the agent model and Settings → Model
+  Providers to manage model credentials and Ollama.
 
 ## Interaction Rules
 
@@ -36,6 +37,9 @@ Last updated: 2026-08-20
 - Maintain keyboard navigability for all controls.
 - Preserve `:focus-visible` outlines.
 - Maintain semantic containers and labels for form elements.
+- Settings tabs use `tablist`/`tab`/`tabpanel` semantics, `aria-selected`, and
+  roving focus. Arrow keys, Home, and End move between tabs and browser
+  history restores the selected panel.
 - Keep exactly one `main` landmark in the routed application shell.
 - Modal dialogs must receive focus on open, trap Tab and Shift+Tab, close with Escape, and restore focus to the invoking control.
 - Do not encode status solely by color.

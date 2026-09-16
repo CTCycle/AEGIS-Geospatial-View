@@ -574,7 +574,7 @@ class RenderDescriptorService:
         except ProviderAuthError:
             raise ProviderAuthError(
                 f"{capability.get('name', 'Requested layer')} requires valid provider credentials. "
-                "Configure them in Access."
+                "Configure them in Settings under Geospatial Access."
             ) from None
         except (
             GeospatialProviderResponseError,

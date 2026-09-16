@@ -624,12 +624,12 @@ class AgentRunOrchestrator:
     @staticmethod
     def _safe_failure_message(exc: Exception) -> str:
         if isinstance(exc, ProviderAuthError):
-            return "The map data provider requires valid credentials. Configure them in Access."
+            return "The map data provider requires valid credentials. Configure them in Settings under Geospatial Access."
         if isinstance(exc, ProviderError):
             return "The map data provider could not complete this request. Try again later."
         text = str(exc).strip().lower()
         if "credential" in text or "api key" in text or "authentication" in text:
-            return "The configured agent provider is not ready. Open Model Settings and configure its credential."
+            return "The configured agent provider is not ready. Open Settings and configure its credential."
         if "timeout" in text:
             return "The configured agent provider timed out before the request could be completed."
         return "The agent could not complete this request."

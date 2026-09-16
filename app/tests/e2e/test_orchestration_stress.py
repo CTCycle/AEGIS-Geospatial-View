@@ -161,14 +161,14 @@ def test_route_switching_20_cycles_preserves_query_and_chat_state(
     expect(page.locator(".chat-message--assistant").first).to_be_visible(timeout=15000)
 
     for _ in range(20):
-        page.get_by_role("link", name="Model Settings").click()
+        page.get_by_role("link", name="Settings", exact=True).click()
         expect(page).to_have_url(re.compile(r".*/settings"))
         page.get_by_placeholder("Search models").fill("gpt")
         page.get_by_role("link", name="Search").click()
         expect(page).to_have_url(re.compile(rf"{re.escape(base_url.rstrip('/'))}/?$"))
         expect(page.get_by_text("show map state before route cycles")).to_be_visible()
 
-    page.get_by_role("link", name="Model Settings").click()
+    page.get_by_role("link", name="Settings", exact=True).click()
     expect(page.get_by_placeholder("Search models")).to_have_value("gpt")
 
 ###############################################################################

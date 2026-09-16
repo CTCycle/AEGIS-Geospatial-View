@@ -50,7 +50,7 @@ the existence of an upstream endpoint cannot expand the declared semantics.
 
 - Schema v2 is the only accepted manifest contract.
 - Credential-backed providers use encrypted credential storage without environment fallback.
-- API keys are resolved only through encrypted AEGIS Access storage. Source
+- API keys are resolved only through encrypted Settings → Geospatial Access storage. Source
   paths and feed URLs may use explicit non-secret configuration variables, but
   they must not be treated as API-key fallbacks.
 - Queryable claims are reserved for structured machine-readable sources.

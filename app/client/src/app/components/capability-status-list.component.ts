@@ -13,6 +13,7 @@ export interface CapabilityStatusItem {
 
 export interface CapabilityStatusInteraction {
   route?: string;
+  queryParams?: Record<string, string>;
   actionLabel?: string;
   description?: string;
 }

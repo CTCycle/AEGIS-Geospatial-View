@@ -140,7 +140,7 @@ def test_back_forward_between_routes_restores_both_states(
     _seed_persisted_state(page, _base_state())
     page.goto(base_url)
     expect(page.get_by_text("show map at 41.9028, 12.4964")).to_be_visible()
-    page.get_by_role("link", name="Model Settings").click()
+    page.get_by_role("link", name="Settings", exact=True).click()
     expect(page).to_have_url(re.compile(r".*/settings\?q=gpt"))
     expect(page.get_by_placeholder("Search models")).to_have_value("gpt")
     page.go_back()

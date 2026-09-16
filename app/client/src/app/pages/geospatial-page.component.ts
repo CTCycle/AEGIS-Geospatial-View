@@ -260,7 +260,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         tone: !this.catalog ? 'none' : weather?.is_available ? 'ok' : 'warn',
         detail: weather?.description || 'Weather intelligence is derived from the live capability catalog.',
       },
-      { label: 'Optional Keys', statusLabel: 'Optional', tone: 'warn', detail: 'Optional provider credentials are configured in Model Settings.' },
+      { label: 'Optional Keys', statusLabel: 'Optional', tone: 'warn', detail: 'Optional provider credentials are configured in Settings under Geospatial Access.' },
     ];
   }
 

@@ -130,7 +130,7 @@ describe('AgentReadinessService', () => {
 
     expect(readiness.status).toBe('needs_attention');
     expect(readiness.message).toBe(
-      'Selected provider ID is not supported: OpenAI. Choose a canonical provider in Model Settings.',
+      'Selected provider ID is not supported: OpenAI. Choose a canonical provider in Settings.',
     );
     expect(apiClient.fetchStructuredProbe).not.toHaveBeenCalled();
   });

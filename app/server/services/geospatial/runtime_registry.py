@@ -161,16 +161,16 @@ class RuntimeRegistry:
             provider = self._credential_provider(capability_id, profile)
             if provider == "openchargemap":
                 return (
-                    "Configure an Open Charge Map API key in AEGIS Access or "
+                    "Configure an Open Charge Map API key in Settings under Geospatial Access or "
                     "a local snapshot via AEGIS_OCM_SNAPSHOT_PATH."
                 )
-            return "Configure provider credentials in AEGIS Access or a local source."
+            return "Configure provider credentials in Settings under Geospatial Access or a local source."
         if mode == "credential":
-            return "Configure provider credentials in AEGIS Access."
+            return "Configure provider credentials in Settings under Geospatial Access."
         if mode in {"configured_source", "configuration-dependent"}:
             return "Configure the required local or trusted source before use."
         if self._auth_required(capability_id):
-            return "Configure provider credentials in AEGIS Access."
+            return "Configure provider credentials in Settings under Geospatial Access."
         return "Capability access is not configured."
 
     # -------------------------------------------------------------------------

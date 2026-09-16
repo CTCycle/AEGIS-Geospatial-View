@@ -47,7 +47,7 @@ describe('CapabilityStatusListComponent', () => {
     component.interactions = {
       'Agent model': {
         route: '/settings',
-        actionLabel: 'Open model settings',
+        actionLabel: 'Open Settings',
         description: 'The configured agent model is ready for use.',
       },
     };
@@ -68,11 +68,27 @@ describe('CapabilityStatusListComponent', () => {
     expect(tooltip?.querySelector('span')?.textContent).toBe(
       'The configured agent model is ready for use.',
     );
-    expect(tooltip?.querySelector('.status-tooltip__action')?.textContent).toBe('Open model settings');
+    expect(tooltip?.querySelector('.status-tooltip__action')?.textContent).toBe('Open Settings');
 
     items[0].dispatchEvent(new MouseEvent('mouseleave'));
     fixture.detectChanges();
     expect(host.querySelector('[role="tooltip"]')).toBeNull();
+  });
+
+  it('serializes interaction query parameters as router query parameters', () => {
+    component.items = [{ label: 'Optional Keys', statusLabel: 'Optional', tone: 'warn' }];
+    component.interactions = {
+      'Optional Keys': {
+        route: '/settings',
+        queryParams: { tab: 'geospatial-access' },
+        actionLabel: 'Open geospatial access settings',
+      },
+    };
+
+    fixture.detectChanges();
+
+    const action = (fixture.nativeElement as HTMLElement).querySelector('.status-item__action') as HTMLAnchorElement | null;
+    expect(action?.getAttribute('href')).toBe('/settings?tab=geospatial-access');
   });
 
   it('places a tooltip below a status item near the top edge', () => {

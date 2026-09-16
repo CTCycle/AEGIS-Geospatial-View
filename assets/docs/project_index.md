@@ -135,7 +135,7 @@ conversation-scoped `agent_evidence` store rather than model messages.
 - `user/workflows.md`
   Core end-user journeys, chat patterns, and key features.
 - `user/settings_and_access.md`
-  Model settings, access configuration, and user-facing controls.
+  Unified Models, Model Providers, and Geospatial Access settings controls.
 - `user/troubleshooting.md`
   Troubleshooting basics and operational notes for end users.
 

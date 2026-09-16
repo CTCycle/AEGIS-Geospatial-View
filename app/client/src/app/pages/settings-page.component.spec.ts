@@ -29,6 +29,7 @@ describe('pages/settings-page.component', () => {
   let checkOllamaHealthMock: jasmine.Spy;
   let refreshOllamaModelsMock: jasmine.Spy;
   let pullOllamaModelMock: jasmine.Spy;
+  let fetchGeospatialProviderAccountSetupsMock: jasmine.Spy;
 
   beforeEach(async () => {
     store = jasmine.createSpyObj<AppStateStoreService>('AppStateStoreService', ['getSettingsPage', 'updateSettingsPage']);
@@ -45,6 +46,7 @@ describe('pages/settings-page.component', () => {
       'checkOllamaHealth',
       'refreshOllamaModels',
       'pullOllamaModel',
+      'fetchGeospatialProviderAccountSetups',
     ]);
     fetchChatSettingsMock = jasmine.createSpy('fetchChatSettings').and.resolveTo({
       active_provider_mode: 'cloud',
@@ -66,6 +68,7 @@ describe('pages/settings-page.component', () => {
     checkOllamaHealthMock = jasmine.createSpy('checkOllamaHealth').and.resolveTo({ ok: true, detail: 'ok' });
     refreshOllamaModelsMock = jasmine.createSpy('refreshOllamaModels').and.resolveTo({});
     pullOllamaModelMock = jasmine.createSpy('pullOllamaModel').and.resolveTo({});
+    fetchGeospatialProviderAccountSetupsMock = jasmine.createSpy('fetchGeospatialProviderAccountSetups').and.resolveTo({ providers: [] });
 
     apiClient.fetchChatSettings.and.callFake(() => fetchChatSettingsMock());
     apiClient.fetchChatModels.and.callFake((provider) => fetchChatModelsMock(provider));
@@ -73,6 +76,7 @@ describe('pages/settings-page.component', () => {
     apiClient.checkOllamaHealth.and.callFake(() => checkOllamaHealthMock());
     apiClient.refreshOllamaModels.and.callFake(() => refreshOllamaModelsMock());
     apiClient.pullOllamaModel.and.callFake((model) => pullOllamaModelMock(model));
+    apiClient.fetchGeospatialProviderAccountSetups.and.callFake(() => fetchGeospatialProviderAccountSetupsMock());
 
     await TestBed.configureTestingModule({
       imports: [SettingsPageComponent],
@@ -472,32 +476,69 @@ describe('pages/settings-page.component', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
-    component.openaiKey = 'bad-openai-key';
-    component.googleKey = 'bad-google-key';
-    component.deepseekKey = 'bad-deepseek-key';
-    await component.saveKeys();
+    component.setCloudCredentialValue('openai', 'bad-openai-key');
+    component.setCloudCredentialValue('google', 'bad-google-key');
+    component.setCloudCredentialValue('deepseek', 'bad-deepseek-key');
+    await component.saveCloudProvider('openai');
+    await component.saveCloudProvider('google');
+    await component.saveCloudProvider('deepseek');
     expect(component.keyValidationErrors.openai).toContain('sk-');
     expect(component.keyValidationErrors.google).toContain('AIza');
     expect(component.keyValidationErrors.deepseek).toContain('sk-');
   });
 
-  it('save keys success and failure', async () => {
+  it('saves one model-provider credential through the shared settings owner', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
-    component.openaiKey = 'sk-valid-openai-key-12345';
-    component.deepseekKey = 'sk-valid-deepseek-key-12345';
-    await component.saveKeys();
-    expect(component.statusText).toContain('API keys saved');
+    const updated = {
+      ...component.settings,
+      credentials: { 'opencode-go': { api_key: true } },
+      credential_health: { 'opencode-go': { api_key: 'healthy' } },
+    };
+    updateChatSettingsMock.and.resolveTo(updated);
+    component.opencodeGoKey = 'go-secret-value-12345';
+
+    await component.saveCloudProvider('opencode-go');
 
     const payload = updateChatSettingsMock.calls.mostRecent().args[0];
-    expect(payload.credentials.deepseek.api_key).toBe('sk-valid-deepseek-key-12345');
+    expect(payload.credentials).toEqual({ 'opencode-go': { api_key: 'go-secret-value-12345' } });
+    expect(payload.credential_health).toBeUndefined();
+    expect(component.settings.credentials['opencode-go']?.api_key).toBeTrue();
+    expect(component.opencodeGoKey).toBe('');
+    expect(component.modelProviderHealth('opencode-go')).toContain('readable');
+  });
 
-    updateChatSettingsMock.and.rejectWith(new Error('fail'));
-    component.openaiKey = 'sk-valid-openai-key-12345';
-    await component.saveKeys();
-    expect(component.statusText).toContain('Could not save API keys right now.');
+  it('requires an explicit clear action and treats a blank draft as no replacement', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    const configured = {
+      ...component.settings,
+      credentials: { 'opencode-go': { api_key: true } },
+      credential_health: { 'opencode-go': { api_key: 'healthy' } },
+    };
+    component.settings = configured;
+    component.opencodeGoKey = '  ';
+    const updateCallsBeforeBlankSave = updateChatSettingsMock.calls.count();
+
+    await component.saveCloudProvider('opencode-go');
+
+    expect(updateChatSettingsMock.calls.count()).toBe(updateCallsBeforeBlankSave);
+    expect(component.keyValidationErrors['opencode-go']).toContain('Clear saved key');
+
+    updateChatSettingsMock.and.resolveTo({
+      ...configured,
+      credentials: {},
+      credential_health: {},
+    });
+    await component.clearCloudProvider('opencode-go');
+
+    const clearPayload = updateChatSettingsMock.calls.mostRecent().args[0];
+    expect(clearPayload.credentials).toEqual({ 'opencode-go': { api_key: '' } });
+    expect(component.settings.credentials['opencode-go']).toBeUndefined();
   });
 
   it('saveOllamaSettings sends a sanitized update payload', async () => {
@@ -525,7 +566,7 @@ describe('pages/settings-page.component', () => {
     expect(payload.credential_health).toBeUndefined();
   });
 
-  it('reports unreadable credential health in API key modal state', async () => {
+  it('reports unreadable credential health in model provider state', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',
       agent_model_provider: 'openai',
@@ -541,7 +582,7 @@ describe('pages/settings-page.component', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    expect(fixture.componentInstance.openAiCredentialHealth()).toBe('unreadable');
+    expect(fixture.componentInstance.credentialHealthForTemplate('openai')).toBe('unreadable');
   });
 
   it('Ollama health success and degraded failure message formatting', async () => {
@@ -619,6 +660,79 @@ describe('pages/settings-page.component', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('article.model-card').length).toBeGreaterThan(0);
+  });
+
+  it('normalizes the Settings tab query and exposes accessible tab relationships', async () => {
+    window.history.replaceState({}, '', '/settings?tab=unknown');
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const tabs = Array.from(fixture.nativeElement.querySelectorAll('[role="tab"]')) as HTMLButtonElement[];
+    expect(fixture.componentInstance.activeTab).toBe('models');
+    expect(tabs).toHaveSize(3);
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+    expect(tabs[0].getAttribute('aria-controls')).toBe('settings-panel-models');
+    expect(fixture.nativeElement.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby')).toBe('settings-tab-models');
+  });
+
+  it('moves Settings tabs with keyboard navigation and router history', async () => {
+    window.history.replaceState({}, '', '/settings');
+    const navigateSpy = spyOn(router, 'navigateByUrl').and.resolveTo(true);
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const firstTab = fixture.nativeElement.querySelector('#settings-tab-models') as HTMLButtonElement;
+
+    firstTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.activeTab).toBe('model-providers');
+    expect(navigateSpy).toHaveBeenCalledWith('/settings?tab=model-providers');
+
+    const secondTab = fixture.nativeElement.querySelector('#settings-tab-model-providers') as HTMLButtonElement;
+    secondTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'End' }));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.activeTab).toBe('geospatial-access');
+    expect(navigateSpy).toHaveBeenCalledWith('/settings?tab=geospatial-access');
+  });
+
+  it('renders manifest-driven geospatial access providers in the shared Settings page', async () => {
+    fetchGeospatialProviderAccountSetupsMock.and.resolveTo({
+      providers: [{
+        providerId: 'tomtom',
+        name: 'TomTom',
+        requiresCredentials: true,
+        authMode: 'api-key',
+        docsUrl: 'https://developer.tomtom.com/',
+        configured: false,
+        instructions: ['Create a key in the provider portal.'],
+        automation: {
+          support: 'manual_only',
+          signupUrl: 'https://developer.tomtom.com/',
+          developerPortalUrl: 'https://developer.tomtom.com/',
+          docsUrl: 'https://developer.tomtom.com/',
+          requiredFields: [],
+          userActionNotes: ['Paste the key back into AEGIS.'],
+          safetyNotes: ['AEGIS never collects provider passwords.'],
+          experimental: true,
+          experimentalLabel: 'Manual setup guidance',
+        },
+        credentialStorageKey: 'tomtom',
+        credentialLabel: 'api_key',
+        keyFormatHint: 'TomTom API key',
+        validationSupported: true,
+      }],
+    });
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance.activeTab = 'geospatial-access';
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('TomTom');
+    expect(fixture.nativeElement.textContent).toContain('Save key');
+    expect(fixture.nativeElement.querySelector('input[type="password"]')).not.toBeNull();
   });
 
   it('navigateBack preserves state before routing', async () => {

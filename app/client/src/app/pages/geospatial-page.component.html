@@ -188,9 +188,10 @@
             actionLabel: 'Browse geodata'
           },
           'Optional Keys': {
-            route: '/access-configurations',
-            actionLabel: 'Open access configurations',
-            description: 'Optional provider credentials are managed in Access Configurations.'
+            route: '/settings',
+            queryParams: { tab: 'geospatial-access' },
+            actionLabel: 'Open geospatial access settings',
+            description: 'Optional provider credentials are managed in Settings under Geospatial Access.'
           }
         }"
       ></app-capability-status-list>

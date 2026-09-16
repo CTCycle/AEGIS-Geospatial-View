@@ -1,6 +1,6 @@
 # Layout And Navigation
 
-Last updated: 2026-08-27
+Last updated: 2026-09-16
 
 ## Desktop Viewport Contract
 
@@ -45,13 +45,18 @@ is mouse-resizable and the chat rail can be collapsed when map focus is useful.
   chat workspace, map pane, resizable divider, inline alerts, context progress,
   and full-width status footer
 - `/settings`
-  sticky header, search/filter controls, model cards, API key and Ollama management modals
+  sticky header, accessible Models/Model Providers/Geospatial Access tabs,
+  model cards, inline provider credentials, and local Ollama controls
 - `/geodata`
   grouped manifest-backed capability tables
-- `/access-configurations`
-  optional geospatial provider credentials and access status
 
 ## Navigation Hierarchy
 
-- top-level Operations Bar routes: workspace, geodata, access, model settings
+- top-level Operations Bar routes: Search (`/`), Geodata (`/geodata`), and
+  Settings (`/settings`)
+- Settings tab query values: `models`, `model-providers`, and
+  `geospatial-access`; missing and invalid values normalize to `models`.
+- Settings tab transitions use router history so browser Back/Forward restores
+  the previous panel. Leaving Settings returns to the workspace without
+  carrying its query parameters.
 - unknown routes redirect to workspace

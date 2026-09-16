@@ -388,8 +388,8 @@ def test_geospatial_auth_failure_points_to_access_without_exposing_provider_text
     message = AgentRunOrchestrator._safe_failure_message(
         ProviderAuthError("invalid credential secret-token")
     )
-    assert "Access" in message
-    assert "Model Settings" not in message
+    assert "Geospatial Access" in message
+    assert "Settings under Geospatial Access" in message
     assert "secret-token" not in message
 
 ###############################################################################

@@ -18,7 +18,7 @@ def test_openchargemap_requires_key_for_hosted_access() -> None:
             )
         )
     except ProviderAuthError as exc:
-        assert "AEGIS Access" in str(exc)
+        assert "Geospatial Access" in str(exc)
     else:
         raise AssertionError("Hosted Open Charge Map access must not be anonymous.")
 

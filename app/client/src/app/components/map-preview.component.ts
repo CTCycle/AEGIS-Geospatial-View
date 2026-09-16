@@ -918,7 +918,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   private safeRenderError(error: unknown): string {
     const message = error instanceof Error ? error.message : '';
     if (/\b(401|403)\b/.test(message)) {
-      return 'Map layer access was denied. Check the provider credentials in Access.';
+      return 'Map layer access was denied. Check the provider credentials in Settings under Geospatial Access.';
     }
     return 'A map data source could not be loaded. Check provider availability and try again.';
   }
