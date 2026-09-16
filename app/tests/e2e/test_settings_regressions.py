@@ -4,6 +4,7 @@ import base64
 import json
 import re
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from playwright.sync_api import Page, Route, expect
@@ -20,6 +21,55 @@ from tests.e2e.helpers.realtime_stub import register_realtime_stub
 PNG_1X1_TRANSPARENT = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
+SETTINGS_UI_QA_DIR = Path(__file__).resolve().parents[3] / "assets" / "QA" / "settings-ui"
+
+###############################################################################
+def settings_provider_account_setup_payload() -> dict[str, Any]:
+    return {
+        "providers": [
+            {
+                "provider_id": "tomtom",
+                "name": "TomTom",
+                "requires_credentials": True,
+                "auth_mode": "api_key",
+                "docs_url": "https://developer.tomtom.com/",
+                "configured": False,
+                "instructions": [
+                    "Create or sign in to a TomTom developer account.",
+                    "Copy the browser key into AEGIS after it is generated.",
+                ],
+                "automation": {
+                    "support": "manual_only",
+                    "signup_url": "https://developer.tomtom.com/user/register",
+                    "developer_portal_url": "https://developer.tomtom.com/",
+                    "docs_url": "https://developer.tomtom.com/",
+                    "required_fields": [
+                        {
+                            "key": "email",
+                            "label": "Email address",
+                            "field_type": "email",
+                            "required": True,
+                            "sensitive": False,
+                            "help_text": "Use an address you control.",
+                        }
+                    ],
+                    "user_action_notes": [
+                        "Open the provider portal and complete the account steps in your browser.",
+                        "Return here and paste the generated API key.",
+                    ],
+                    "safety_notes": [
+                        "AEGIS never receives provider passwords or submits payment details.",
+                    ],
+                    "experimental": False,
+                    "experimental_label": "Manual setup guidance",
+                },
+                "credential_storage_key": "tomtom",
+                "credential_label": "TomTom API key",
+                "key_format_hint": "Paste TomTom API key",
+                "validation_supported": False,
+            }
+        ]
+    }
 
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
@@ -95,6 +145,10 @@ def _setup_stub_harness(
         re.compile(r".*/api/geospatial/capabilities.*"),
         lambda route: _json_ok(route, geospatial_catalog_payload()),
     )
+    page.route(
+        re.compile(r".*/api/geospatial/providers/account-setup$"),
+        lambda route: _json_ok(route, settings_provider_account_setup_payload()),
+    )
     page.route(re.compile(r".*/api/conversations$"), handle_create_conversation)
     page.route(
         re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png(?:\?.*)?$"),
@@ -125,6 +179,9 @@ def test_settings_layout_has_no_overlap_at_minimum_desktop_width(
     expect(
         page.get_by_role("complementary", name="Selected agent model")
     ).to_be_visible(timeout=15000)
+    expect(page.get_by_role("button", name="Test selected model")).to_be_visible(
+        timeout=5000
+    )
 
     layout_metrics = page.evaluate(
         """
@@ -157,12 +214,114 @@ def test_settings_layout_has_no_overlap_at_minimum_desktop_width(
     )
 
 ###############################################################################
+def test_settings_provider_surfaces_and_setup_modal_are_responsive(
+    page: Page, base_url: str
+) -> None:
+    _setup_stub_harness(page)
+
+    for width, height, expected_columns in ((1366, 768, 2), (1024, 700, 1)):
+        page.set_viewport_size({"width": width, "height": height})
+        page.goto(f"{base_url.rstrip('/')}/settings?tab=model-providers")
+
+        provider_grid = page.locator(".settings-provider-grid")
+        expect(provider_grid).to_be_visible(timeout=15000)
+        expect(provider_grid.locator(".settings-provider-card").first).to_be_visible(
+            timeout=15000
+        )
+
+        layout_metrics = page.evaluate(
+            """
+            () => {
+              const grid = document.querySelector('.settings-provider-grid');
+              const gridRect = grid?.getBoundingClientRect();
+              const rect = (element) => {
+                const value = element.getBoundingClientRect();
+                return { left: value.left, right: value.right, top: value.top, bottom: value.bottom };
+              };
+              return {
+                bodyOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+                columnCount: grid ? getComputedStyle(grid).gridTemplateColumns.trim().split(/\\s+/).length : 0,
+                gridRect: gridRect ? rect(grid) : null,
+                cards: [...document.querySelectorAll('.settings-provider-grid .settings-provider-card')].map((card) => ({
+                  card: rect(card),
+                  input: card.querySelector('input') ? rect(card.querySelector('input')) : null,
+                  actions: card.querySelector('.settings-actions') ? rect(card.querySelector('.settings-actions')) : null,
+                })),
+              };
+            }
+            """
+        )
+
+        assert layout_metrics["bodyOverflow"] <= 1
+        assert layout_metrics["columnCount"] == expected_columns
+        grid_rect = layout_metrics["gridRect"]
+        assert grid_rect is not None
+        for card in layout_metrics["cards"]:
+            assert card["card"]["left"] >= grid_rect["left"] - 1
+            assert card["card"]["right"] <= grid_rect["right"] + 1
+            if card["input"] is not None:
+                assert card["input"]["right"] <= card["card"]["right"] + 1
+            if card["actions"] is not None:
+                assert card["actions"]["right"] <= card["card"]["right"] + 1
+
+        SETTINGS_UI_QA_DIR.mkdir(parents=True, exist_ok=True)
+        page.screenshot(
+            path=str(SETTINGS_UI_QA_DIR / f"model-providers-{width}.png"),
+            full_page=True,
+        )
+
+        page.get_by_role("tab", name="Geospatial Access").click()
+        geospatial_card = page.locator(".settings-provider-list .settings-provider-card").first
+        expect(geospatial_card).to_be_visible(timeout=15000)
+        page.get_by_role("button", name="Get API key").click()
+        dialog = page.get_by_role("dialog", name="API key setup for TomTom")
+        expect(dialog).to_be_visible(timeout=5000)
+
+        modal_metrics = dialog.evaluate(
+            """
+            (element) => {
+              const dialogRect = element.getBoundingClientRect();
+              const content = element.querySelector('.provider-signup-modal');
+              const actions = element.querySelector('.settings-actions');
+              const rect = (value) => {
+                const result = value.getBoundingClientRect();
+                return { left: result.left, right: result.right, top: result.top, bottom: result.bottom };
+              };
+              return {
+                dialog: rect(element),
+                contentOverflow: content ? content.scrollWidth - content.clientWidth : 0,
+                actions: actions ? rect(actions) : null,
+                overflowY: getComputedStyle(element).overflowY,
+              };
+            }
+            """
+        )
+
+        assert modal_metrics["dialog"]["left"] >= -1
+        assert modal_metrics["dialog"]["right"] <= width + 1
+        assert modal_metrics["dialog"]["top"] >= -1
+        assert modal_metrics["dialog"]["bottom"] <= height + 1
+        assert modal_metrics["contentOverflow"] <= 1
+        assert modal_metrics["actions"] is not None
+        assert modal_metrics["actions"]["right"] <= modal_metrics["dialog"]["right"] + 1
+        assert modal_metrics["overflowY"] in {"auto", "scroll"}
+
+        page.screenshot(
+            path=str(SETTINGS_UI_QA_DIR / f"geospatial-setup-modal-{width}.png"),
+            full_page=True,
+        )
+
+        page.get_by_role("button", name="Cancel guided setup").click()
+        expect(dialog).to_be_hidden(timeout=5000)
+
+###############################################################################
 def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) -> None:
     patch_payloads: list[dict[str, Any]] = []
     expected_initial = selected_agent_settings_payload()
     _setup_stub_harness(
         page, settings_payload=expected_initial, patch_payloads=patch_payloads
     )
+    page.set_viewport_size({"width": 1366, "height": 768})
 
     page.goto(f"{base_url.rstrip('/')}/settings")
 
@@ -186,6 +345,37 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
     page.keyboard.press("Space")
     summary = page.get_by_role("complementary", name="Selected agent model")
     expect(summary.get_by_role("heading", name="gpt-5-mini")).to_be_visible()
+    probe_button = page.get_by_role("button", name="Test selected model")
+    expect(probe_button).to_be_visible()
+    selected_panel_metrics = page.evaluate(
+        """
+        () => {
+          const column = document.querySelector('.settings-page__right-column');
+          const probe = document.querySelector('.settings-page__probe');
+          const summary = document.querySelector('.selected-model-summary');
+          const rect = (element) => {
+            const value = element.getBoundingClientRect();
+            return { top: value.top, bottom: value.bottom, height: value.height };
+          };
+          return {
+            column: column ? rect(column) : null,
+            probe: probe ? rect(probe) : null,
+            summary: summary ? rect(summary) : null,
+            summaryScrollHeight: summary?.scrollHeight ?? null,
+            summaryClientHeight: summary?.clientHeight ?? null,
+          };
+        }
+        """
+    )
+    assert selected_panel_metrics["column"] is not None
+    assert selected_panel_metrics["probe"] is not None
+    assert selected_panel_metrics["probe"]["bottom"] <= selected_panel_metrics["column"]["bottom"] + 1, selected_panel_metrics
+    assert selected_panel_metrics["summaryScrollHeight"] >= selected_panel_metrics["summaryClientHeight"]
+    SETTINGS_UI_QA_DIR.mkdir(parents=True, exist_ok=True)
+    page.screenshot(
+        path=str(SETTINGS_UI_QA_DIR / "models-selected-model.png"),
+        full_page=True,
+    )
 
     assert patch_payloads, "Expected PATCH /api/chat/settings payload to be captured."
     payload = patch_payloads[-1]

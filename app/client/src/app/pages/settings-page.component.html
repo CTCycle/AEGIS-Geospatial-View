@@ -119,8 +119,7 @@
                 @for (provider of providerKeys; track trackProviderGroup(provider)) {
                   <section class="model-grid-provider">
                     @if (providerKeys.length > 1) {
-                      <header class="model-grid-provider__separator">
-                        <span></span>
+                      <header class="model-grid-provider__heading">
                         <p>{{ providerLabel(provider) }}</p>
                       </header>
                     }
@@ -204,14 +203,13 @@
                   [placeholder]="provider.placeholder"
                   [hint]="provider.hint ?? ''"
                   [value]="cloudCredentialValue(provider.id)"
-                  [configured]="isCloudCredentialConfigured(provider.id)"
                   [credentialHealth]="credentialHealthForTemplate(provider.id)"
                   [validationError]="cloudCredentialValidationError(provider.id)"
                   (valueChange)="setCloudCredentialValue(provider.id, $event)"
                 ></app-settings-api-key-field>
-                <footer class="settings-provider-card__actions">
-                  <button type="button" class="primary-button" [disabled]="isSavingCredential" (click)="saveCloudProvider(provider.id)">Save key</button>
+                <footer class="settings-actions">
                   <button type="button" class="secondary-button" [disabled]="isSavingCredential || !isCloudCredentialConfigured(provider.id)" (click)="clearCloudProvider(provider.id)">Clear saved key</button>
+                  <button type="button" class="primary-button" [disabled]="isSavingCredential" (click)="saveCloudProvider(provider.id)">Save key</button>
                 </footer>
               </article>
             }
@@ -234,7 +232,7 @@
               Ollama server URL
               <input class="settings-control" [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" name="ollama_server_url" autocomplete="off" />
             </label>
-            <div class="settings-provider-card__actions">
+            <div class="settings-actions">
               <button type="button" class="secondary-button" (click)="checkOllamaConnection()">Check connection</button>
               <button type="button" class="secondary-button" [disabled]="isRefreshingOllama" (click)="refreshOllamaLibrary()">Refresh models</button>
               <button type="submit" class="primary-button">Save settings</button>
@@ -304,19 +302,18 @@
                       [inputName]="provider.id + '_api_key'"
                       [placeholder]="provider.placeholder"
                       [value]="geoCredentialDrafts[provider.id] ?? ''"
-                      [configured]="geoProviderConfigured(provider.id)"
                       [credentialHealth]="geoProviderCredentialHealth(provider.id)"
                       (valueChange)="setGeoCredentialDraft(provider.id, $event)"
                     ></app-settings-api-key-field>
-                    <footer class="settings-provider-card__actions">
+                    <footer class="settings-actions">
                       @if (canShowGeoSignupTrigger(provider.id)) {
                         <button type="button" class="secondary-button" [disabled]="isLoadingAccountSetups" (click)="openGeoProviderSignup(provider.id)">Get API key</button>
                       }
-                      <button type="button" class="primary-button" [disabled]="isSavingGeospatialCredential" (click)="saveGeoProvider(provider.id)">Save key</button>
                       <button type="button" class="secondary-button" [disabled]="isSavingGeospatialCredential || !geoProviderConfigured(provider.id)" (click)="clearGeoProvider(provider.id)">Clear saved key</button>
+                      <button type="button" class="primary-button" [disabled]="isSavingGeospatialCredential" (click)="saveGeoProvider(provider.id)">Save key</button>
                     </footer>
                   } @else if (canShowGeoSignupTrigger(provider.id)) {
-                    <footer class="settings-provider-card__actions">
+                    <footer class="settings-actions">
                       <button type="button" class="secondary-button" (click)="openGeoProviderSignup(provider.id)">Open setup guidance</button>
                     </footer>
                   }
@@ -340,63 +337,65 @@
       panelClass="provider-signup-modal__panel"
       (requestClose)="closeProviderSignup()"
     >
-      <header>
-        <p class="page-kicker">{{ setup.automation.experimentalLabel }}</p>
-        <h2>{{ setup.name }}</h2>
-        <p>{{ supportLabel(setup) }}. Automation is best-effort and pauses for provider-controlled steps.</p>
-      </header>
+      <div class="provider-signup-modal">
+        <header>
+          <p class="page-kicker">{{ setup.automation.experimentalLabel }}</p>
+          <h2>{{ setup.name }}</h2>
+          <p>{{ supportLabel(setup) }}. Automation is best-effort and pauses for provider-controlled steps.</p>
+        </header>
 
-      <section class="provider-signup-modal__notes" aria-label="Guided setup notes">
-        <h3>What AEGIS can help with</h3>
-        <ul>
-          @for (note of setup.automation.userActionNotes; track note) { <li>{{ note }}</li> }
-        </ul>
-      </section>
-
-      <section class="provider-signup-modal__notes" aria-label="Safety boundaries">
-        <h3>Safety boundaries</h3>
-        <ul>
-          @for (note of setup.automation.safetyNotes; track note) { <li>{{ note }}</li> }
-        </ul>
-      </section>
-
-      @if (setup.automation.requiredFields.length) {
-        <section class="provider-signup-modal__notes" aria-label="Provider information guidance">
-          <h3>Provider information</h3>
+        <section class="provider-signup-modal__notes" aria-label="Guided setup notes">
+          <h3>What AEGIS can help with</h3>
           <ul>
-            @for (field of setup.automation.requiredFields; track field.label) {
-              <li>{{ field.label }}@if (field.helpText) { — {{ field.helpText }} }</li>
-            }
+            @for (note of setup.automation.userActionNotes; track note) { <li>{{ note }}</li> }
           </ul>
         </section>
-      }
 
-      @if (signupModalError) {
-        <p class="settings-inline-status" role="status" aria-live="polite">{{ signupModalError }}</p>
-      }
+        <section class="provider-signup-modal__notes" aria-label="Safety boundaries">
+          <h3>Safety boundaries</h3>
+          <ul>
+            @for (note of setup.automation.safetyNotes; track note) { <li>{{ note }}</li> }
+          </ul>
+        </section>
 
-      @if (setup.automation.support !== 'unsupported') {
-        <label class="settings-secret-field">
-          Generated API key
-          <input
-            type="password"
-            autocomplete="off"
-            [attr.aria-label]="'Generated API key for ' + setup.name"
-            [placeholder]="setup.keyFormatHint || 'Paste generated API key'"
-            [(ngModel)]="signupKeyInput"
-            name="guided_signup_api_key"
-          />
-        </label>
-      }
-
-      <div class="provider-signup-modal__actions">
-        <button type="button" class="secondary-button" (click)="openProviderPortal(setup)">
-          {{ setup.automation.support === 'unsupported' ? 'Open documentation' : 'Start guided setup' }}
-        </button>
-        @if (setup.automation.support !== 'unsupported') {
-          <button type="button" class="primary-button" [disabled]="isSavingGeospatialCredential" (click)="saveGeneratedCredential(setup)">Save generated API key</button>
+        @if (setup.automation.requiredFields.length) {
+          <section class="provider-signup-modal__notes" aria-label="Provider information guidance">
+            <h3>Provider information</h3>
+            <ul>
+              @for (field of setup.automation.requiredFields; track field.label) {
+                <li>{{ field.label }}@if (field.helpText) { — {{ field.helpText }} }</li>
+              }
+            </ul>
+          </section>
         }
-        <button type="button" class="secondary-button" (click)="closeProviderSignup()" aria-label="Cancel guided setup">Cancel</button>
+
+        @if (signupModalError) {
+          <p class="settings-inline-status" role="status" aria-live="polite">{{ signupModalError }}</p>
+        }
+
+        @if (setup.automation.support !== 'unsupported') {
+          <label class="settings-secret-field">
+            Generated API key
+            <input
+              type="password"
+              autocomplete="off"
+              [attr.aria-label]="'Generated API key for ' + setup.name"
+              [placeholder]="setup.keyFormatHint || 'Paste generated API key'"
+              [(ngModel)]="signupKeyInput"
+              name="guided_signup_api_key"
+            />
+          </label>
+        }
+
+        <div class="settings-actions provider-signup-modal__actions">
+          <button type="button" class="secondary-button" (click)="closeProviderSignup()" aria-label="Cancel guided setup">Cancel</button>
+          <button type="button" class="secondary-button" (click)="openProviderPortal(setup)">
+            {{ setup.automation.support === 'unsupported' ? 'Open documentation' : 'Start guided setup' }}
+          </button>
+          @if (setup.automation.support !== 'unsupported') {
+            <button type="button" class="primary-button" [disabled]="isSavingGeospatialCredential" (click)="saveGeneratedCredential(setup)">Save generated API key</button>
+          }
+        </div>
       </div>
     </app-settings-modal-shell>
   }
