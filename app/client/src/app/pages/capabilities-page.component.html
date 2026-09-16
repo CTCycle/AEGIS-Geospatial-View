@@ -1,11 +1,6 @@
 <div class="capabilities-page">
-  <header class="capabilities-page__header">
-    <div class="capabilities-page__heading">
-      <p class="page-kicker">Catalog</p>
-      <h1>Geospatial catalog</h1>
-      <p>Manifest-backed providers, map types, layers, cameras, transit feeds, and direct tools available to AEGIS.</p>
-    </div>
-    <div class="capabilities-page__summary" aria-label="Catalog status">
+  <header class="capabilities-page__header" aria-label="Catalog status">
+    <div class="capabilities-page__summary">
       <span>{{ catalogEntryCount }} entries</span>
       <span>{{ isLoading ? 'Loading' : catalogLoadFailed ? 'Unavailable' : 'Ready' }}</span>
     </div>

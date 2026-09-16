@@ -10,7 +10,6 @@
     flex-direction: column;
     height: 100%;
     overflow: hidden;
-    --settings-page-header-height: 4.75rem;
     --settings-border: #263a45;
     --settings-border-strong: #344953;
     --settings-surface: #101c23;
@@ -19,23 +18,6 @@
     --settings-radius: 0.4rem;
     background: #0d171d;
     color: #d9e6eb;
-}
-
-.settings-page__header {
-    position: sticky;
-    top: 0;
-    display: flex;
-    gap: var(--space-3);
-    align-items: center;
-    justify-content: space-between;
-    box-sizing: border-box;
-    height: var(--settings-page-header-height);
-    min-height: var(--settings-page-header-height);
-    padding: 0.55rem 1.15rem;
-    border-bottom: 1px solid #263640;
-    background: #101c23;
-    backdrop-filter: blur(6px);
-    z-index: 20;
 }
 
 .settings-page__content {
@@ -443,35 +425,6 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
-}
-
-.settings-page__heading p {
-    margin: 0;
-    color: #a9bac2;
-    font-size: var(--font-size-label);
-}
-
-.settings-page__heading .page-kicker {
-    margin-bottom: 0.18rem;
-    color: #8fb9cc;
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    line-height: 1;
-    text-transform: uppercase;
-}
-
-.settings-page__heading h1 {
-    margin: 0;
-    color: #f0f7fa;
-    font-size: 1.15rem;
-    line-height: 1.2;
-}
-
-.settings-page__heading h1 + p {
-    margin-top: 0.22rem;
-    font-size: 0.82rem;
-    line-height: 1.35;
 }
 
 .settings-page__controls {
