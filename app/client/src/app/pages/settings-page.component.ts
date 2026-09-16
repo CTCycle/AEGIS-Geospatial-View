@@ -1,12 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { NavigationEnd, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 
 import { ModelCardComponent } from '../components/model-card.component';
 import { SelectedModelSummaryComponent } from '../components/selected-model-summary.component';
 import { SettingsApiKeyFieldComponent } from '../components/settings-api-key-field.component';
-import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
 import { SettingsWarningBannerComponent } from '../components/settings-warning-banner.component';
 import { ApiClientService } from '../core/api-client.service';
@@ -38,6 +38,7 @@ import {
 } from '../core/model-library';
 import {
   ModelCardDescriptor,
+  GeospatialProviderAccountSetup,
   ModelLibraryResponse,
   ModelLibrarySourceStatus,
   ModelSettingsResponse,
@@ -48,6 +49,30 @@ import {
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
 
+export type SettingsTab = 'models' | 'model-providers' | 'geospatial-access';
+
+export const SETTINGS_TABS: readonly { id: SettingsTab; label: string }[] = [
+  { id: 'models', label: 'Models' },
+  { id: 'model-providers', label: 'Model Providers' },
+  { id: 'geospatial-access', label: 'Geospatial Access' },
+];
+
+const normalizeSettingsTab = (value: string | null | undefined): SettingsTab => (
+  SETTINGS_TABS.some((tab) => tab.id === value)
+    ? value as SettingsTab
+    : 'models'
+);
+
+interface GeoProviderAccess {
+  id: string;
+  name: string;
+  purpose: string;
+  placeholder: string;
+  docsUrl: string;
+  requiresCredentials: boolean;
+  instructions: string[];
+}
+
 @Component({
   selector: 'app-settings-page',
   standalone: true,
@@ -56,7 +81,6 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
     FormsModule,
     ModelCardComponent,
     SettingsApiKeyFieldComponent,
-    SettingsIconActionComponent,
     SettingsModalShellComponent,
     SettingsWarningBannerComponent,
     SelectedModelSummaryComponent,
@@ -68,6 +92,21 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
 export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('modelGridScroll', { static: false }) modelGridRef?: ElementRef<HTMLDivElement>;
 
+  readonly settingsTabs = SETTINGS_TABS;
+  readonly cloudProviders: readonly {
+    id: CloudCredentialProvider;
+    name: string;
+    purpose: string;
+    placeholder: string;
+    hint?: string;
+  }[] = [
+    { id: 'openai', name: 'OpenAI', purpose: 'Cloud models for general agent routing and chat.', placeholder: 'sk-...', hint: 'Stored credentials are masked and are never returned to the browser.' },
+    { id: 'google', name: 'Google', purpose: 'Google model access for agent routing and chat.', placeholder: 'AIza...', hint: 'Stored credentials are masked and are never returned to the browser.' },
+    { id: 'deepseek', name: 'DeepSeek', purpose: 'Discover and run models through the DeepSeek API.', placeholder: 'sk-...', hint: 'A saved key enables live DeepSeek model discovery.' },
+    { id: 'opencode', name: 'OpenCode Zen', purpose: 'Discover and run OpenCode Zen OpenAI-compatible models.', placeholder: 'OpenCode API key', hint: 'OpenCode Zen model availability comes from its live account catalog.' },
+    { id: 'opencode-go', name: 'OpenCode Go', purpose: 'Discover and run OpenCode Go OpenAI-compatible models.', placeholder: 'OpenCode API key', hint: 'DeepSeek V4.1 Flash is identified as deepseek-v4.1-flash when published by the live catalog.' },
+  ];
+  activeTab: SettingsTab = 'models';
   readonly state: PersistedSettingsPageState;
   settings: ModelSettingsResponse = {
     active_provider_mode: 'cloud',
@@ -97,16 +136,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   isRefreshingOllama = false;
   isLoadingDynamicProviderModels = false;
 
-  isKeysModalOpen = false;
-  isOllamaModalOpen = false;
+  isSavingCredential = false;
   openaiKey = '';
   googleKey = '';
   deepseekKey = '';
   opencodeKey = '';
   opencodeGoKey = '';
   ollamaUrlDraft = 'http://127.0.0.1:11434';
-  keysModalStatusText = '';
-  ollamaModalStatusText = '';
+  ollamaStatusText = '';
   keyValidationErrors: ApiKeyValidationErrors = {};
   ollamaStatus: ModelLibrarySourceStatus | null = null;
   deepseekStatus: ModelLibrarySourceStatus | null = null;
@@ -127,6 +164,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   providerFilter: ModelProviderFilter = 'all';
   private isDestroyed = false;
+  private routerEventsSubscription?: Subscription;
 
   constructor(
     private readonly apiClient: ApiClientService,
@@ -140,10 +178,20 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.state = this.appStateStore.getSettingsPage();
     const query = new URLSearchParams(window.location.search);
     this.searchText = query.get('q') ?? this.state.searchText;
+    this.activeTab = normalizeSettingsTab(query.get('tab'));
   }
 
   ngOnInit(): void {
+    this.routerEventsSubscription = this.router.events.subscribe((event) => {
+      if (event instanceof NavigationEnd && event.urlAfterRedirects.startsWith('/settings')) {
+        this.applyUrlState(event.urlAfterRedirects);
+      }
+    });
+    // Replace invalid or non-canonical tab values before the async settings
+    // load completes, so the public URL contract is stable on first paint.
+    this.syncQueryState();
     void this.loadData();
+    void this.loadProviderAccountSetups();
     this.syncState();
   }
 
@@ -158,6 +206,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.isDestroyed = true;
+    this.routerEventsSubscription?.unsubscribe();
     this.syncState();
   }
 
@@ -277,9 +326,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.userFacingErrorService.normalizeDisplayText(this.statusText);
   }
 
-  get visibleOllamaModalStatusText(): string {
+  get visibleOllamaStatusText(): string {
     return this.userFacingErrorService.normalizeDisplayText(
-      this.ollamaModalStatusText,
+      this.ollamaStatusText,
       `Unable to reach Ollama at ${this.settings.ollama_url || this.ollamaUrlDraft}. Check that the service is running and the URL is correct.`,
     );
   }
@@ -328,6 +377,56 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get dynamicProviderFailureMessage(): string {
     return this.dynamicProviderStatus?.message || `Could not load ${this.dynamicProviderLabel} models right now.`;
+  }
+
+  isActiveTab(tab: SettingsTab): boolean {
+    return this.activeTab === tab;
+  }
+
+  setSettingsTab(tab: string, focus = false): void {
+    const nextTab = normalizeSettingsTab(tab);
+    this.activeTab = nextTab;
+    if (focus && typeof window !== 'undefined') {
+      window.setTimeout(() => {
+        document.getElementById(`settings-tab-${nextTab}`)?.focus();
+      });
+    }
+    // Settings is the only component that owns this tab contract. Keep tab
+    // changes on the router so each selection is a browser-history entry.
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const params = new URLSearchParams();
+    if (this.searchText.trim()) {
+      params.set('q', this.searchText.trim());
+    }
+    if (nextTab !== 'models') {
+      params.set('tab', nextTab);
+    }
+    const query = params.toString();
+    void this.router.navigateByUrl(query ? `/settings?${query}` : '/settings');
+  }
+
+  onSettingsTabKeydown(event: KeyboardEvent, tab: SettingsTab): void {
+    const tabIndex = this.settingsTabs.findIndex((item) => item.id === tab);
+    if (tabIndex < 0) {
+      return;
+    }
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (tabIndex + 1) % this.settingsTabs.length;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (tabIndex - 1 + this.settingsTabs.length) % this.settingsTabs.length;
+    } else if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = this.settingsTabs.length - 1;
+    }
+    if (nextIndex === null) {
+      return;
+    }
+    event.preventDefault();
+    this.setSettingsTab(this.settingsTabs[nextIndex].id, true);
   }
 
   setSearchText(value: string): void {
@@ -383,55 +482,18 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  async saveKeys(): Promise<void> {
-    this.keyValidationErrors = this.validateKeyInputs();
-    if (Object.keys(this.keyValidationErrors).length > 0) {
-      this.keysModalStatusText = 'Fix the highlighted API key fields before saving.';
-      return;
-    }
-
-    try {
-      const updated = await this.credentialSettingsService.saveCloudCredentials(this.settings, {
-        openai: this.openaiKey,
-        google: this.googleKey,
-        deepseek: this.deepseekKey,
-        opencode: this.opencodeKey,
-        'opencode-go': this.opencodeGoKey,
-      });
-      this.settings = updated;
-      this.structuredProbe = this.unverifiedProbe(updated);
-      this.openaiKey = '';
-      this.googleKey = '';
-      this.deepseekKey = '';
-      this.opencodeKey = '';
-      this.opencodeGoKey = '';
-      await this.ensureProviderModelsLoaded(
-        this.dynamicProviderForSettings(updated) ?? 'all',
-        true,
-      );
-      this.statusText = 'API keys saved';
-      this.keysModalStatusText = 'API keys saved';
-      this.isKeysModalOpen = false;
-      this.syncState();
-    } catch (error: unknown) {
-      const detail = this.userFacingErrorService.toUserFacingError(error, 'Could not save API keys right now.');
-      this.statusText = detail;
-      this.keysModalStatusText = detail;
-    }
-  }
-
   async checkOllamaConnection(): Promise<void> {
     try {
       const health = await this.apiClient.checkOllamaHealth();
       const summary = this.formatOllamaHealthSummary(health);
-      this.ollamaModalStatusText = summary;
+      this.ollamaStatusText = summary;
       this.statusText = `Ollama: ${summary}`;
       this.syncState();
       this.changeDetectorRef.detectChanges();
     } catch (error: unknown) {
       const detail = this.getOllamaFailureMessage(error);
       this.statusText = detail;
-      this.ollamaModalStatusText = detail;
+      this.ollamaStatusText = detail;
       this.changeDetectorRef.detectChanges();
     }
   }
@@ -445,14 +507,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.syncState();
     try {
       await this.apiClient.refreshOllamaModels();
-      await this.loadData();
+      await this.reloadOllamaCatalog();
       this.statusText = 'Ollama library refreshed';
-      this.ollamaModalStatusText = 'Model library refreshed.';
+      this.ollamaStatusText = 'Model library refreshed.';
       this.syncState();
     } catch (error: unknown) {
       const detail = this.getOllamaFailureMessage(error);
       this.statusText = detail;
-      this.ollamaModalStatusText = detail;
+      this.ollamaStatusText = detail;
     } finally {
       this.isRefreshingOllama = false;
     }
@@ -467,14 +529,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.settings = updated;
       this.structuredProbe = this.unverifiedProbe(updated);
       this.ollamaUrlDraft = updated.ollama_url;
+      await this.reloadOllamaCatalog();
       this.statusText = 'Ollama settings saved';
-      this.ollamaModalStatusText = 'Ollama settings saved.';
-      this.isOllamaModalOpen = false;
+      this.ollamaStatusText = 'Ollama settings saved.';
       this.syncState();
     } catch (error: unknown) {
       const detail = this.getOllamaFailureMessage(error);
       this.statusText = detail;
-      this.ollamaModalStatusText = detail;
+      this.ollamaStatusText = detail;
     }
   }
 
@@ -482,13 +544,123 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     try {
       await this.apiClient.pullOllamaModel(model.name);
       await this.apiClient.refreshOllamaModels();
-      await this.loadData();
+      await this.reloadOllamaCatalog();
       this.statusText = `Pulled ${model.name}`;
       this.syncState();
       return true;
     } catch (error: unknown) {
       this.statusText = this.userFacingErrorService.toUserFacingError(error, `Could not pull ${model.name}.`);
       return false;
+    }
+  }
+
+  geoProviderConfigured(provider: string): boolean {
+    return Boolean(this.settings.credentials[provider]?.['api_key']);
+  }
+
+  geoProviderHealth(provider: string): string {
+    const status = this.settings.credential_health?.[provider]?.['api_key'];
+    if (status === 'unreadable') {
+      return 'Saved key cannot be read';
+    }
+    if (status === 'healthy' || status === 'stored' || this.geoProviderConfigured(provider)) {
+      return 'Saved key is readable (not validated)';
+    }
+    return 'Not configured';
+  }
+
+  geoProviderCredentialHealth(provider: string): string | null {
+    return this.settings.credential_health?.[provider]?.['api_key'] ?? null;
+  }
+
+  geoProviderSetup(provider: string): GeospatialProviderAccountSetup | undefined {
+    return this.providerAccountSetups.find(
+      (setup) => setup.providerId === provider || setup.credentialStorageKey === provider,
+    );
+  }
+
+  canShowGeoSignupTrigger(provider: string): boolean {
+    const setup = this.geoProviderSetup(provider);
+    return Boolean(setup?.automation.developerPortalUrl || setup?.automation.signupUrl || setup?.automation.docsUrl);
+  }
+
+  openGeoProviderSignup(provider: string): void {
+    const setup = this.geoProviderSetup(provider);
+    if (!setup) return;
+    this.selectedProviderAccountSetup = setup;
+    this.signupKeyInput = '';
+    this.signupModalError = '';
+    this.isSignupModalOpen = true;
+  }
+
+  closeProviderSignup(): void {
+    this.isSignupModalOpen = false;
+    this.selectedProviderAccountSetup = undefined;
+    this.signupModalError = '';
+    this.signupKeyInput = '';
+  }
+
+  openProviderPortal(setup: GeospatialProviderAccountSetup): void {
+    const target = setup.automation.developerPortalUrl
+      ?? setup.automation.signupUrl
+      ?? setup.automation.docsUrl
+      ?? setup.docsUrl;
+    if (!target) {
+      this.signupModalError = 'No provider portal link is available for this setup.';
+      return;
+    }
+    window.open(target, '_blank', 'noreferrer');
+  }
+
+  async saveGeoProvider(provider: string): Promise<void> {
+    const setup = this.geoProviderSetup(provider);
+    if (!setup || !setup.requiresCredentials || this.isSavingGeospatialCredential) {
+      return;
+    }
+    const draft = this.geoCredentialDrafts[provider]?.trim() ?? '';
+    if (!draft) {
+      this.statusText = `Enter a ${setup.name} API key before saving, or clear the saved key.`;
+      return;
+    }
+    await this.persistGeospatialCredential(provider, draft);
+  }
+
+  async clearGeoProvider(provider: string): Promise<void> {
+    const setup = this.geoProviderSetup(provider);
+    if (!setup || !this.geoProviderConfigured(provider) || this.isSavingGeospatialCredential) {
+      return;
+    }
+    await this.persistGeospatialCredential(provider, '');
+  }
+
+  geoCredentialDrafts: Record<string, string> = {};
+
+  setGeoCredentialDraft(provider: string, value: string): void {
+    this.geoCredentialDrafts[provider] = value;
+  }
+
+  supportLabel(setup: GeospatialProviderAccountSetup): string {
+    const labels: Record<string, string> = {
+      agent_assisted: 'Agent-assisted guidance',
+      guided_playwright: 'Guided browser setup',
+      manual_only: 'Manual setup guidance',
+      unsupported: 'Documentation only',
+    };
+    return labels[setup.automation.support] ?? setup.automation.support;
+  }
+
+  async saveGeneratedCredential(setup: GeospatialProviderAccountSetup): Promise<void> {
+    if (setup.automation.support === 'unsupported') {
+      this.signupModalError = 'This provider is documentation-only until automation support is verified.';
+      return;
+    }
+    const value = this.signupKeyInput.trim();
+    if (!value) {
+      this.signupModalError = 'Paste the generated API key before saving.';
+      return;
+    }
+    if (await this.persistGeospatialCredential(setup.credentialStorageKey, value)) {
+      this.closeProviderSignup();
     }
   }
 
@@ -504,14 +676,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.requiresPull(model) ? null : agentSelectionDisabledReason(model);
   }
 
-  closeModal(): void {
-    this.isKeysModalOpen = false;
-    this.isOllamaModalOpen = false;
-    this.keysModalStatusText = '';
-    this.ollamaModalStatusText = '';
-    this.keyValidationErrors = {};
-  }
-
   onModelGridScroll(event: Event): void {
     this.state.modelGridScrollTop = (event.target as HTMLDivElement).scrollTop;
     this.syncState();
@@ -522,45 +686,117 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     void this.router.navigateByUrl('/');
   }
 
-  openAiConfigured(): boolean {
-    return Boolean(this.settings.credentials['openai']?.['api_key']);
+  cloudCredentialValue(provider: CloudCredentialProvider): string {
+    return {
+      openai: this.openaiKey,
+      google: this.googleKey,
+      deepseek: this.deepseekKey,
+      opencode: this.opencodeKey,
+      'opencode-go': this.opencodeGoKey,
+    }[provider];
   }
 
-  googleConfigured(): boolean {
-    return Boolean(this.settings.credentials['google']?.['api_key']);
+  setCloudCredentialValue(provider: CloudCredentialProvider, value: string): void {
+    if (provider === 'openai') this.openaiKey = value;
+    if (provider === 'google') this.googleKey = value;
+    if (provider === 'deepseek') this.deepseekKey = value;
+    if (provider === 'opencode') this.opencodeKey = value;
+    if (provider === 'opencode-go') this.opencodeGoKey = value;
+    this.keyValidationErrors[provider] = undefined;
   }
 
-  deepSeekConfigured(): boolean {
-    return Boolean(this.settings.credentials['deepseek']?.['api_key']);
+  cloudCredentialValidationError(provider: CloudCredentialProvider): string | undefined {
+    return this.keyValidationErrors[provider];
   }
 
-  opencodeConfigured(): boolean {
-    return Boolean(this.settings.credentials.opencode?.['api_key']);
+  modelProviderHealth(provider: CloudCredentialProvider): string {
+    if (!this.isCloudCredentialConfigured(provider)) {
+      return 'Not configured';
+    }
+    return this.credentialHealth(provider) === 'unreadable'
+      ? 'Saved key cannot be read'
+      : 'Saved key is readable (not validated)';
   }
 
-  opencodeGoConfigured(): boolean {
-    return Boolean(this.settings.credentials['opencode-go']?.['api_key']);
+  credentialHealthForTemplate(provider: CloudCredentialProvider): string | null {
+    return this.credentialHealth(provider);
   }
 
-  openAiCredentialHealth(): string | null {
-    return this.credentialHealth('openai');
+  async saveCloudProvider(provider: CloudCredentialProvider): Promise<void> {
+    if (!this.settings || this.isSavingCredential) {
+      return;
+    }
+    const value = this.cloudCredentialValue(provider).trim();
+    if (!value) {
+      this.keyValidationErrors[provider] = 'Enter a key before saving, or use Clear saved key.';
+      this.statusText = `Enter a ${providerDisplayLabel(provider)} API key before saving.`;
+      return;
+    }
+    const validation = this.validateCloudCredential(provider, value);
+    if (validation) {
+      this.keyValidationErrors[provider] = validation;
+      this.statusText = validation;
+      return;
+    }
+    this.isSavingCredential = true;
+    try {
+      const updated = await this.credentialSettingsService.saveProviderCredential(this.settings, provider, value);
+      if (this.isDestroyed) return;
+      this.settings = updated;
+      this.setCloudCredentialValue(provider, '');
+      this.structuredProbe = this.unverifiedProbe(updated);
+      if (isDynamicCloudProvider(provider)) {
+        await this.ensureProviderModelsLoaded(provider, true);
+      }
+      this.statusText = `${providerDisplayLabel(provider)} key saved. Provider access has not been validated.`;
+      this.syncState();
+    } catch (error: unknown) {
+      this.statusText = this.userFacingErrorService.toUserFacingError(
+        error,
+        `Could not save the ${providerDisplayLabel(provider)} key right now.`,
+      );
+    } finally {
+      this.isSavingCredential = false;
+      this.changeDetectorRef.detectChanges();
+    }
   }
 
-  googleCredentialHealth(): string | null {
-    return this.credentialHealth('google');
+  async clearCloudProvider(provider: CloudCredentialProvider): Promise<void> {
+    if (!this.settings || this.isSavingCredential || !this.isCloudCredentialConfigured(provider)) {
+      return;
+    }
+    this.isSavingCredential = true;
+    try {
+      const updated = await this.credentialSettingsService.saveProviderCredential(this.settings, provider, '');
+      if (this.isDestroyed) return;
+      this.settings = updated;
+      this.setCloudCredentialValue(provider, '');
+      this.structuredProbe = this.unverifiedProbe(updated);
+      if (isDynamicCloudProvider(provider)) {
+        this.cloudModels = this.cloudModels.filter((model) => model.provider !== provider);
+        this.setDynamicProviderStatus(provider, { ok: false, message: `Add a ${providerDisplayLabel(provider)} API key to load ${providerDisplayLabel(provider)} models.` });
+      }
+      this.statusText = `${providerDisplayLabel(provider)} key cleared.`;
+      this.syncState();
+    } catch (error: unknown) {
+      this.statusText = this.userFacingErrorService.toUserFacingError(
+        error,
+        `Could not clear the ${providerDisplayLabel(provider)} key right now.`,
+      );
+    } finally {
+      this.isSavingCredential = false;
+      this.changeDetectorRef.detectChanges();
+    }
   }
 
-  deepSeekCredentialHealth(): string | null {
-    return this.credentialHealth('deepseek');
-  }
-
-  opencodeCredentialHealth(): string | null {
-    return this.credentialHealth('opencode');
-  }
-
-  opencodeGoCredentialHealth(): string | null {
-    return this.credentialHealth('opencode-go');
-  }
+  geoProviders: GeoProviderAccess[] = [];
+  providerAccountSetups: GeospatialProviderAccountSetup[] = [];
+  isLoadingAccountSetups = false;
+  isSavingGeospatialCredential = false;
+  selectedProviderAccountSetup?: GeospatialProviderAccountSetup;
+  isSignupModalOpen = false;
+  signupModalError = '';
+  signupKeyInput = '';
 
   requiresPull(model: ModelCardDescriptor): boolean {
     return model.provider === 'ollama' && !this.isInstalledOllamaModel(model);
@@ -570,12 +806,26 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return modelDisplayDescription(model);
   }
 
+  isCloudCredentialConfigured(provider: CloudCredentialProvider): boolean {
+    return Boolean(this.settings.credentials[provider]?.['api_key']);
+  }
+
   private credentialHealth(provider: CloudCredentialProvider): string | null {
     const configured = Boolean(this.settings.credentials[provider]?.['api_key']);
     if (!configured) {
       return null;
     }
     return this.settings.credential_health?.[provider]?.['api_key'] ?? 'unknown';
+  }
+
+  private validateCloudCredential(provider: CloudCredentialProvider, value: string): string | undefined {
+    if (provider === 'google' && !/^AIza[A-Za-z0-9_-]{20,}$/.test(value)) {
+      return 'Google key must start with "AIza" and include a valid key body.';
+    }
+    if ((provider === 'openai' || provider === 'deepseek') && !/^sk-[A-Za-z0-9][A-Za-z0-9_-]{10,}$/.test(value)) {
+      return `${providerDisplayLabel(provider)} key must start with "sk-" and include a valid key body.`;
+    }
+    return undefined;
   }
 
   private unverifiedProbe(settings: ModelSettingsResponse): StructuredProbeResponse {
@@ -592,30 +842,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
-  private validateKeyInputs(): ApiKeyValidationErrors {
-    const errors: ApiKeyValidationErrors = {};
-    const openAiValue = this.openaiKey.trim();
-    const googleValue = this.googleKey.trim();
-    const deepSeekValue = this.deepseekKey.trim();
-    const openAiPattern = /^sk-[A-Za-z0-9][A-Za-z0-9_-]{10,}$/;
-    const googlePattern = /^AIza[A-Za-z0-9_-]{20,}$/;
-    const deepSeekPattern = /^sk-[A-Za-z0-9][A-Za-z0-9_-]{10,}$/;
-
-    if (openAiValue && !openAiPattern.test(openAiValue)) {
-      errors.openai = 'OpenAI key must start with "sk-" and include a valid key body.';
-    }
-
-    if (googleValue && !googlePattern.test(googleValue)) {
-      errors.google = 'Google key must start with "AIza" and include a valid key body.';
-    }
-
-    if (deepSeekValue && !deepSeekPattern.test(deepSeekValue)) {
-      errors.deepseek = 'DeepSeek key must start with "sk-" and include a valid key body.';
-    }
-
-    return errors;
-  }
-
   private dynamicProviderForSettings(settings: ModelSettingsResponse): DynamicCloudProvider | null {
     if (isDynamicCloudProvider(this.providerFilter)) {
       return this.providerFilter;
@@ -623,6 +849,67 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return isDynamicCloudProvider(settings.agent_model_provider)
       ? settings.agent_model_provider
       : null;
+  }
+
+  private async loadProviderAccountSetups(): Promise<void> {
+    this.isLoadingAccountSetups = true;
+    try {
+      const response = await this.apiClient.fetchGeospatialProviderAccountSetups();
+      if (this.isDestroyed) return;
+      this.providerAccountSetups = response.providers;
+      this.geoProviders = response.providers.map((setup) => this.geoProviderFromSetup(setup));
+      response.providers.forEach((setup) => {
+        this.geoCredentialDrafts[setup.credentialStorageKey] = this.geoCredentialDrafts[setup.credentialStorageKey] ?? '';
+      });
+    } catch {
+      if (!this.isDestroyed) {
+        this.statusText = 'Could not load geospatial provider setup metadata.';
+      }
+    } finally {
+      this.isLoadingAccountSetups = false;
+      if (!this.isDestroyed) {
+        this.changeDetectorRef.detectChanges();
+      }
+    }
+  }
+
+  private async persistGeospatialCredential(provider: string, apiKey: string): Promise<boolean> {
+    if (!this.settings) {
+      return false;
+    }
+    const setup = this.geoProviderSetup(provider);
+    this.isSavingGeospatialCredential = true;
+    try {
+      this.settings = await this.credentialSettingsService.saveProviderCredential(this.settings, provider, apiKey);
+      this.geoCredentialDrafts[provider] = '';
+      this.structuredProbe = this.unverifiedProbe(this.settings);
+      this.statusText = apiKey
+        ? `${setup?.name ?? provider} key saved. Provider access has not been validated.`
+        : `${setup?.name ?? provider} key cleared. Optional capabilities are disabled.`;
+      this.syncState();
+      return true;
+    } catch (error: unknown) {
+      this.statusText = this.userFacingErrorService.toUserFacingError(
+        error,
+        `Could not update ${setup?.name ?? provider} access.`,
+      );
+      return false;
+    } finally {
+      this.isSavingGeospatialCredential = false;
+      this.changeDetectorRef.detectChanges();
+    }
+  }
+
+  private geoProviderFromSetup(setup: GeospatialProviderAccountSetup): GeoProviderAccess {
+    return {
+      id: setup.credentialStorageKey,
+      name: setup.name,
+      purpose: `${this.supportLabel(setup)} for credential-gated geospatial capabilities.`,
+      placeholder: setup.keyFormatHint ?? `${setup.name} API key`,
+      docsUrl: setup.automation.docsUrl || setup.docsUrl || setup.automation.developerPortalUrl || '',
+      requiresCredentials: setup.requiresCredentials,
+      instructions: setup.instructions,
+    };
   }
 
   private async loadData(): Promise<void> {
@@ -752,6 +1039,26 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.opencodeGoStatus = modelLibrary.sources['opencode-go'] ?? null;
   }
 
+  private async reloadOllamaCatalog(): Promise<void> {
+    const library = await this.apiClient.fetchChatModels();
+    if (this.isDestroyed) {
+      return;
+    }
+    // The unscoped catalog request refreshes only the base/Ollama data. Keep
+    // already-loaded dynamic cloud catalogs in memory so an Ollama URL or
+    // pull operation cannot invalidate unrelated provider state.
+    const dynamicCloudModels = this.cloudModels.filter((model) => isDynamicCloudProvider(model.provider));
+    const sources = { ...library.sources };
+    if (this.deepseekStatus) sources.deepseek = this.deepseekStatus;
+    if (this.opencodeStatus) sources.opencode = this.opencodeStatus;
+    if (this.opencodeGoStatus) sources['opencode-go'] = this.opencodeGoStatus;
+    this.applyModelLibrary({
+      cloud: mergeModelCards(library.cloud, dynamicCloudModels),
+      local: library.local,
+      sources,
+    });
+  }
+
   private setDynamicProviderStatus(
     provider: DynamicCloudProvider,
     status: ModelLibrarySourceStatus,
@@ -762,6 +1069,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private syncQueryState(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
     const currentPath = window.location.pathname;
     if (currentPath !== '/settings') {
       return;
@@ -773,6 +1083,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     } else {
       params.delete('q');
     }
+    if (this.activeTab !== 'models') {
+      params.set('tab', this.activeTab);
+    } else {
+      params.delete('tab');
+    }
 
     const queryParams: Record<string, string> = {};
     params.forEach((value, key) => {
@@ -781,6 +1096,18 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const query = new URLSearchParams(queryParams).toString();
     const nextUrl = query ? `/settings?${query}` : '/settings';
     window.history.replaceState(window.history.state, '', nextUrl);
+  }
+
+  private applyUrlState(url: string): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const queryStart = url.indexOf('?');
+    const query = queryStart >= 0 ? url.slice(queryStart + 1) : '';
+    const params = new URLSearchParams(query);
+    this.activeTab = normalizeSettingsTab(params.get('tab'));
+    this.searchText = params.get('q') ?? '';
+    this.syncState();
   }
 
   private async saveModelSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {

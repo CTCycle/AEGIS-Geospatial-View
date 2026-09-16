@@ -72,10 +72,10 @@ export class AgentReadinessService {
     const provider = settings.agent_model_provider;
     const model = settings.agent_model_name.trim();
     if (!provider || !model) {
-      return 'No agent model is selected. Open Model Settings before using the workspace.';
+      return 'No agent model is selected. Open Settings before using the workspace.';
     }
     if (!CANONICAL_LLM_PROVIDERS.has(provider)) {
-      return `Selected provider ID is not supported: ${provider}. Choose a canonical provider in Model Settings.`;
+      return `Selected provider ID is not supported: ${provider}. Choose a canonical provider in Settings.`;
     }
 
     if (provider === 'ollama') {

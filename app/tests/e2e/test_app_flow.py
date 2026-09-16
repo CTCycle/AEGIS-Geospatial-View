@@ -35,33 +35,29 @@ class TestChatFlow:
     # -------------------------------------------------------------------------
     def test_settings_page_opens_from_toolbar(self, page: Page, base_url: str):
         page.goto(base_url)
-        page.get_by_role("link", name="Model Settings").click()
+        page.get_by_role("link", name="Settings", exact=True).click()
         expect(page).to_have_url(f"{base_url.rstrip('/')}/settings")
-        expect(
-            page.get_by_text(
-                re.compile(r"Select the agent model used for native routing")
-            )
-        ).to_be_visible()
+        expect(page.get_by_role("heading", name="Settings", exact=True)).to_be_visible()
         expect(page.get_by_placeholder("Search models")).to_be_visible()
         expect(page.get_by_role("button", name="All")).to_be_visible()
-        expect(page.get_by_role("button", name="Open Ollama settings")).to_be_visible()
+        expect(page.get_by_role("tab", name="Models", exact=True)).to_be_visible()
+        expect(page.get_by_role("tab", name="Model Providers", exact=True)).to_be_visible()
+        expect(page.get_by_role("tab", name="Geospatial Access", exact=True)).to_be_visible()
+        page.get_by_role("tab", name="Model Providers", exact=True).click()
+        expect(page.get_by_role("heading", name="Ollama", exact=True)).to_be_visible()
 
     # -------------------------------------------------------------------------
     def test_back_forward_restores_route_and_settings_search(
         self, page: Page, base_url: str
     ):
         page.goto(base_url)
-        page.get_by_role("link", name="Model Settings").click()
+        page.get_by_role("link", name="Settings", exact=True).click()
         search = page.get_by_placeholder("Search models")
         search.fill("gpt")
         page.go_back()
         expect(page.get_by_label("Chat message")).to_be_visible()
         page.go_forward()
-        expect(
-            page.get_by_text(
-                re.compile(r"Select the agent model used for native routing")
-            )
-        ).to_be_visible()
+        expect(page.get_by_role("heading", name="Settings", exact=True)).to_be_visible()
         expect(search).to_have_value("gpt")
 
     # -------------------------------------------------------------------------
@@ -85,12 +81,10 @@ class TestChatFlow:
     # -------------------------------------------------------------------------
     def test_model_selection_persists(self, page: Page, base_url: str):
         page.goto(base_url)
-        page.get_by_role("link", name="Model Settings").click()
-        first_card_button = page.locator(
-            ".model-card__actions button", has_text="Use for chat"
-        ).first
+        page.get_by_role("link", name="Settings", exact=True).click()
+        first_card_button = page.locator("button.model-card__select:not([disabled])").first
         if first_card_button.count() == 0:
             expect(page.locator(".settings-empty-state").first).to_be_visible()
             return
         first_card_button.click()
-        expect(page.get_by_text("Selected")).to_be_visible(timeout=15000)
+        expect(page.get_by_text(re.compile(r"Selected agent model"))).to_be_visible(timeout=15000)

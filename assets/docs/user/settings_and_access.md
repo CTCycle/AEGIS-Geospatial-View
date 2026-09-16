@@ -1,14 +1,18 @@
 # Settings And Access
 
-Last updated: 2026-09-15
+Last updated: 2026-09-16
 
-## Access Configuration
+## Geospatial Access
 
-The Access page is for optional geospatial provider keys such as TomTom and OpenAQ. The default workflow remains usable without them.
+The Geospatial Access tab at `/settings?tab=geospatial-access` is for optional
+geospatial provider keys such as TomTom and OpenAQ. The default workflow
+remains usable without them. Setup notes, official documentation links, and
+the guided signup workflow remain manifest-driven; documentation-only
+providers stay manual.
 
-## Model Settings Workflow
+## Models Workflow
 
-1. Open Settings.
+1. Open Settings and choose Models.
 2. Choose Cloud or Local mode through provider selection.
 3. Search or filter models.
 4. Select one model card as the AEGIS agent model.
@@ -29,7 +33,11 @@ Re-enter a provider key only when Settings reports missing or undecryptable
 credentials; a valid key is not proof that the upstream catalog or inference
 endpoint is currently healthy.
 
-OpenCode requests identify AEGIS with a versioned `User-Agent` and carry a
+OpenCode Go identifies DeepSeek V4.1 Flash with the canonical mapping
+`DeepSeek V4.1 Flash` → `deepseek-v4.1-flash`. The ID is accepted only when
+it is returned by the live OpenCode Go `/models` catalog; the registry supplies
+its documented OpenAI-compatible Chat Completions transport metadata and does
+not seed or force an application default. OpenCode requests identify AEGIS with a versioned `User-Agent` and carry a
 stable `x-opencode-session` value for the conversation. The session is reused
 for retries and later turns, while catalog discovery sends only the
 `User-Agent`. AEGIS never silently substitutes a model or provider when a
@@ -56,7 +64,14 @@ and credential presence.
 
 ### Settings Controls
 
-- provider mode toggle
-- model search bar and provider filters
-- API key modal for supported cloud providers, including dedicated DeepSeek, OpenCode Zen, and OpenCode Go key sections
-- Ollama modal for URL, health, refresh, and model pull. The default local loopback URL is `http://127.0.0.1:11434`.
+- Models tab: model search, provider filters, model cards, selected-agent
+  summary, native structured probe, and Ollama model pull actions.
+- Model Providers tab: inline masked credentials for OpenAI, Google, DeepSeek,
+  OpenCode Zen, and OpenCode Go, each with explicit Save and Clear actions;
+  Ollama URL, health, refresh, and save controls. The default local loopback
+  URL is `http://127.0.0.1:11434`.
+- Geospatial Access tab: manifest-driven provider setup notes, documentation
+  links, guided setup, and explicit masked credential Save/Clear controls.
+- Blank credential drafts do not change saved keys. Clearing a credential is
+  an explicit action. Saved values are never returned to or repopulated in the
+  browser.

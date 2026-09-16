@@ -29,7 +29,8 @@ describe('AppComponent desktop viewport contract', () => {
     expect(fixture.componentInstance.isDesktopViewport).toBeTrue();
     expect(element.querySelector('.desktop-viewport-gate')?.classList.contains('desktop-viewport-gate--visible')).toBeFalse();
     expect(element.querySelector('.app-shell')?.hasAttribute('inert')).toBeFalse();
-    expect(element.querySelector('.operations-bar')?.textContent).toContain('Model Settings');
+    expect(element.querySelector('.operations-bar')?.textContent).toContain('Settings');
+    expect(element.querySelector('.operations-bar')?.textContent).not.toContain('Access');
     expect(element.querySelector('.nav-label--compact')).toBeNull();
   });
 

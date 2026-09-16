@@ -45,10 +45,13 @@ class _Provider:
         self.result = result
         self.error = error
         self.calls = 0
+        self.requests: list[object] = []
 
     # -------------------------------------------------------------------------
-    async def achat(self, *_args: object, **_kwargs: object) -> LLMResult:
+    async def achat(self, *args: object, **_kwargs: object) -> LLMResult:
         self.calls += 1
+        if args:
+            self.requests.append(args[0])
         if self.error is not None:
             raise self.error
         if self.result is None:
@@ -113,6 +116,7 @@ async def test_probe_is_not_tested_then_passed_and_cached() -> None:
     assert result.expires_at > datetime.now(timezone.utc)
     assert service.latest() == result
     assert parser.calls == 1
+    assert parser.requests[0].metadata["thinking_mode"] == "disabled"
 
 
 ###############################################################################

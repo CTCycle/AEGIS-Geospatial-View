@@ -1,9 +1,5 @@
-<label [class.settings-modal__provider-section]="providerSection">
-  @if (providerSection) {
-    <span>{{ labelText }}</span>
-  } @else {
-    {{ labelText }}
-  }
+<label>
+  {{ labelText }}
   <input
     type="password"
     autocomplete="off"
@@ -14,14 +10,14 @@
     [class.input-invalid]="!!validationError"
   />
   @if (hint) {
-    <small class="settings-modal__field-hint">{{ hint }}</small>
+    <small class="settings-api-key-field__hint">{{ hint }}</small>
   }
   @if (credentialHealth === 'unreadable') {
-    <span class="settings-modal__field-error">Saved key cannot be decrypted. Re-enter the key.</span>
+    <span class="settings-api-key-field__error">Saved key cannot be decrypted. Re-enter the key.</span>
   } @else if (credentialHealth === 'healthy') {
-    <span class="settings-modal__field-health">Saved key is readable.</span>
+    <span class="settings-api-key-field__health">Saved key is readable.</span>
   }
   @if (validationError) {
-    <span class="settings-modal__field-error">{{ validationError }}</span>
+    <span class="settings-api-key-field__error">{{ validationError }}</span>
   }
 </label>

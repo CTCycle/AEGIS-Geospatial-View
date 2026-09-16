@@ -36,7 +36,7 @@ The app is intentionally broad, but the everyday workflow is simple.
 - Add extra detail such as imagery, overlays, or a specific focus.
 - Review the response and the map area that comes with it.
 - Refine the result with follow-up messages instead of starting over.
-- Switch to the geodata, access, or settings pages when you need more control.
+- Switch to the Geodata or Settings pages when you need more control.
 
 Common examples include:
 
@@ -52,8 +52,9 @@ The app is organized around a few main places. Each one has a clear purpose.
 
 - `Workspace` is the main place to ask questions and review results.
 - `Geodata` is where you can browse the available map and data capabilities.
-- `Access configurations` is where optional provider access is managed.
-- `Model settings` is where you choose how the assistant should behave.
+- `Settings` is where you choose how the assistant should behave and manage
+  optional provider access. Use the Models, Model Providers, and Geospatial
+  Access tabs for the appropriate workflow.
 
 The top navigation bar is the quickest way to move between these areas. If you are unsure where something lives, start in the workspace and use the top-level navigation from there.
 
@@ -114,7 +115,7 @@ Depending on the request and the available data, the app can provide different k
 
 The exact result depends on what kind of request you make and what sources are available at the time.
 
-## Geodata, Access, And Settings
+## Geodata And Settings
 
 These pages are there for when you want more control than the workspace alone provides.
 
@@ -122,13 +123,11 @@ These pages are there for when you want more control than the workspace alone pr
 
 Use this page to understand what kinds of geospatial capabilities are available. It is useful when you want to know what the app can work with before you ask for it in chat.
 
-### Access Configurations
+### Settings
 
-Use this page if you need optional provider access for certain geospatial services. The default workflow is still usable without extra provider keys, so this page is mainly for cases where you want broader coverage or specific provider features.
-
-### Model Settings
-
-Use this page to choose how the assistant should operate.
+Use this page to choose how the assistant should operate and configure optional
+provider access. Settings is organized into Models, Model Providers, and
+Geospatial Access tabs.
 
 Typical tasks here include:
 
@@ -138,8 +137,12 @@ Typical tasks here include:
 - checking local model connectivity
 - refreshing available local models
 - pulling a model when needed
+- saving or clearing masked model-provider credentials
+- adding optional geospatial provider keys or opening their setup guidance
 
-If you are not sure what to change, keep the defaults and return to the workspace. Most users only need this page when they want to change behavior or connect a local model.
+If you are not sure what to change, keep the defaults and return to the
+workspace. Most users only need Settings when they want to change behavior or
+connect a local model/provider.
 
 ## Good Ways To Work
 
@@ -157,8 +160,9 @@ This approach is usually better than trying to specify everything in the first m
 The most common issues are straightforward.
 
 - If nothing happens, make sure the app is actually running.
-- If local model behavior looks wrong, check the model settings page.
-- If an external provider is not available, review the access configuration.
+- If local model behavior looks wrong, check Settings → Models and the Ollama
+  controls in Settings → Model Providers.
+- If an external provider is not available, review Settings → Geospatial Access.
 - If the app seems to be holding onto an old result, start a fresh request in the workspace.
 
 For more help, see:

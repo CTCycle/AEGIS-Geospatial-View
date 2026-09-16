@@ -42,7 +42,12 @@ export const buildCloudCredentialUpdateRequest = (
 ): ModelSettingsUpdateRequest => ({
   credentials: CLOUD_CREDENTIAL_PROVIDERS.reduce<ModelSettingsUpdateRequest['credentials']>((acc, provider) => {
     const apiKey = drafts[provider].trim();
-    acc[provider] = apiKey ? { api_key: apiKey } : {};
+    // An untouched/blank draft means "no replacement supplied". Clearing a
+    // saved credential is an explicit action and sends an empty api_key via
+    // buildCredentialUpdateRequest instead of silently deactivating siblings.
+    if (apiKey) {
+      acc[provider] = { api_key: apiKey };
+    }
     return acc;
   }, {}),
 });

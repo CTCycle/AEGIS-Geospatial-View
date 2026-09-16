@@ -15,6 +15,7 @@
         <a
           class="status-item__action"
           [routerLink]="route"
+          [queryParams]="interactionFor(item)?.queryParams"
           [attr.aria-label]="item.label + ': ' + item.statusLabel + '. ' + (interactionFor(item)?.actionLabel || 'Open details')"
           [attr.aria-describedby]="tooltipId($index)"
         >

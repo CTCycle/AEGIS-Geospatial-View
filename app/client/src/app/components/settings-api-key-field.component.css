@@ -1,0 +1,77 @@
+:host {
+  display: grid;
+  gap: 0.35rem;
+  color: #c9d8de;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  color: inherit;
+  font: inherit;
+}
+
+input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 2.35rem;
+  border: 1px solid #344953;
+  border-radius: 0.35rem;
+  background: #0f1a21;
+  color: #e5f0f4;
+  padding: 0.52rem 0.68rem;
+  font: inherit;
+  font-weight: 500;
+}
+
+input::placeholder {
+  color: #77909c;
+}
+
+input:hover {
+  border-color: #52717e;
+}
+
+input:focus-visible {
+  outline: 2px solid #3bb5f2;
+  outline-offset: 2px;
+  border-color: #3bb5f2;
+}
+
+input:disabled {
+  background: #17252c;
+  color: #81939b;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+input.input-invalid {
+  border-color: #d94f5f;
+  box-shadow: 0 0 0 2px rgb(217 79 95 / 18%);
+}
+
+small,
+.settings-api-key-field__hint {
+  color: #88a0ab;
+  line-height: 1.4;
+  font-size: 0.74rem;
+  font-weight: 500;
+}
+
+.settings-api-key-field__error,
+.settings-api-key-field__health {
+  font-size: 0.74rem;
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+.settings-api-key-field__error {
+  color: #ff8b9a;
+}
+
+.settings-api-key-field__health {
+  color: #73d696;
+}

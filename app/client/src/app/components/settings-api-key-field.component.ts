@@ -9,6 +9,7 @@ type CredentialHealth = 'healthy' | 'unreadable' | string | null;
   imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './settings-api-key-field.component.html',
+  styleUrl: './settings-api-key-field.component.css',
 })
 export class SettingsApiKeyFieldComponent {
   @Input({ required: true }) label = '';
@@ -19,7 +20,6 @@ export class SettingsApiKeyFieldComponent {
   @Input() configured = false;
   @Input() credentialHealth: CredentialHealth = null;
   @Input() validationError: string | undefined;
-  @Input() providerSection = false;
 
   @Output() valueChange = new EventEmitter<string>();
 

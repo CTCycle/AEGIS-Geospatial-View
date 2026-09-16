@@ -169,6 +169,16 @@ class StructuredProbeService:
         try:
             deadline = monotonic() + PROBE_TIMEOUT_SECONDS
             provider = self.provider_factory.get_provider(provider_id)
+            request_metadata: dict[str, Any] = {
+                "supports_tools": True,
+                "deadline_monotonic": deadline,
+            }
+            if provider_id == "opencode-go":
+                # OpenCode Go thinking-mode models reject explicit tool_choice
+                # values.  The native agent route uses the same compatible
+                # no-thinking mode for tool calls; keep the structured probe
+                # on that exact transport contract as well.
+                request_metadata["thinking_mode"] = "disabled"
             request = LLMRequest(
                 model=model,
                 provider=provider_id,
@@ -185,7 +195,7 @@ class StructuredProbeService:
                     )
                 ],
                 tool_choice="required",
-                metadata={"supports_tools": True, "deadline_monotonic": deadline},
+                metadata=request_metadata,
             )
             result = await asyncio.wait_for(
                 provider.achat(

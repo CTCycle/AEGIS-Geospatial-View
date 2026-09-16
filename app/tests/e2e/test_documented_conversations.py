@@ -317,7 +317,7 @@ def test_documented_conversation_settings_roundtrip_and_restore(
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     expect(page.locator(".overlay-controls")).to_be_visible(timeout=15000)
 
-    page.get_by_role("link", name="Model Settings").click()
+    page.get_by_role("link", name="Settings", exact=True).click()
     expect(page).to_have_url(f"{base_url.rstrip('/')}/settings")
     write_snapshot(page, dirs["screenshots"], "00-settings-entry")
 
@@ -332,7 +332,7 @@ def test_documented_conversation_settings_roundtrip_and_restore(
     expect(page.locator(".overlay-controls")).to_be_visible()
     write_snapshot(page, dirs["screenshots"], "02-back-to-chat")
 
-    page.get_by_role("link", name="Model Settings").click()
+    page.get_by_role("link", name="Settings", exact=True).click()
     expect(page.get_by_placeholder("Search models")).to_have_value("gpt")
     expect(page).to_have_url(re.compile(r".*/settings\?q=gpt"))
     scroll_top = page.locator(".model-grid-scroll").evaluate("node => node.scrollTop")

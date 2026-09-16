@@ -33,7 +33,7 @@ def test_openaq_auth_failure_cannot_be_a_deferred_success(monkeypatch) -> None:
         raise ProviderAuthError("OpenAQ API key is required.")
 
     monkeypatch.setattr(registry, "fetch", unavailable)
-    with pytest.raises(ProviderAuthError, match="Configure them in Access"):
+    with pytest.raises(ProviderAuthError, match="Configure them in Settings under Geospatial Access"):
         run_async_in_thread(
             RenderDescriptorService(
                 provider_registry=registry

@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-09-01
+Last updated: 2026-09-16
 
 ## Route-Level Pages
 
@@ -9,9 +9,10 @@ Last updated: 2026-09-01
 - `CapabilitiesPageComponent` at `/geodata`
   Manifest-backed geodata catalog.
 - `SettingsPageComponent` at `/settings`
-  Model, provider, and credential management.
-- `AccessConfigurationsPageComponent` at `/access-configurations`
-  Optional geospatial provider credential management.
+  Unified model selection, model-provider credentials, local runtime, and
+  optional geospatial provider credential management. The public query
+  contract is `tab=models`, `tab=model-providers`, or
+  `tab=geospatial-access`; an omitted or invalid tab resolves to `models`.
 
 ## Core Frontend Boundaries
 
@@ -101,11 +102,17 @@ Reusable component examples include:
 - `capability-status-list.component.*`
 
 Settings uses card-level model selection for one selected agent model.
+The single Settings page shell owns the authoritative `ModelSettingsResponse`
+and exposes three accessible URL-backed panels: Models, Model Providers, and
+Geospatial Access. Credential updates reuse the existing encrypted repository
+and the same settings update service; child panel controls do not create a
+second settings store.
 
 The Search workspace keeps context usage in a separate compact progress row
 below the composer. A 24px, non-wrapping workspace footer spans the chat and
-map panes and exposes Agent model, Satellite, Weather, and Optional Keys; model
-settings remain in the top navigation.
+map panes and exposes Agent model, Satellite, Weather, and Optional Keys;
+Optional Keys opens `/settings?tab=geospatial-access` and Agent model opens
+`/settings`.
 
 ## Routing Rule
 
