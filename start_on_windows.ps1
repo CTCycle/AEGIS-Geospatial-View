@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet('Launch')]
+    [string]$Action
+)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -1234,6 +1237,19 @@ function Show-LauncherMenu {
     Write-MenuRule
     Write-Host ''
     return $entries
+}
+
+if ($Action -eq 'Launch') {
+    try {
+        Invoke-TrackedLauncherAction -Name 'Launch application' -Action {
+            Invoke-LaunchApplication
+        }
+        exit 0
+    }
+    catch {
+        Write-Status FATAL $_.Exception.Message
+        exit 1
+    }
 }
 
 while ($true) {

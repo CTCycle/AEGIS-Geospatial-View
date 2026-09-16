@@ -41,6 +41,9 @@ class CapabilityRouter:
         proposed, temporal_reason = _normalize_recent_scope(proposed)
         if temporal_reason is not None:
             reasons.append(temporal_reason)
+        proposed, location_map_reason = _normalize_location_map_route(proposed)
+        if location_map_reason is not None:
+            reasons.append(location_map_reason)
         for capability_id in proposed.explicit_capability_ids:
             normalized_id = capability_id.strip()
             capability = self.capability_registry.get_capability(normalized_id)
@@ -238,3 +241,65 @@ def _normalize_recent_scope(
             "recent_scope_normalized_to_current",
         )
     return route, None
+
+
+###############################################################################
+def _normalize_location_map_route(
+    route: CapabilityRoute,
+) -> tuple[CapabilityRoute, str | None]:
+    """Keep location-only map requests on the map-planning route.
+
+    A model can describe a request to display a resolved place as a geocoding
+    operation.  That route is a data route and therefore filters out the
+    metadata-only location resolver when a render is required, leaving no
+    eligible capability and no path to ``apply_map_plan``.  Normalize only the
+    bounded location-only vocabulary; data-bearing place-search requests keep
+    their original route.
+    """
+
+    if (
+        route.task_mode != "execute"
+        or route.presentation not in {"map", "both"}
+        or route.primary_domain is not CapabilityDomain.PLACE_SEARCH
+        or route.secondary_domains
+    ):
+        return route, None
+    operation = str(route.operation or "").strip().casefold()
+    location_operations = {
+        "geocode",
+        "locate",
+        "resolve_location",
+        "resolve_place",
+    }
+    location_queries = {
+        str(query).strip().casefold()
+        for query in route.capability_queries
+        if str(query).strip()
+    }
+    location_query_vocabulary = {
+        "coordinates",
+        "geocoding",
+        "location lookup",
+        "map viewport",
+        "place search",
+        "reverse geocoding",
+    }
+    if not (
+        operation in location_operations
+        or (
+            location_queries
+            and location_queries <= location_query_vocabulary
+            and "place search" in location_queries
+        )
+    ):
+        return route, None
+    return (
+        route.model_copy(
+            update={
+                "primary_domain": CapabilityDomain.MAP_RENDERING,
+                "capability_queries": ["place search", "map viewport"],
+                "operation": "show_location_on_map",
+            }
+        ),
+        "location_map_route_normalized",
+    )

@@ -41,9 +41,15 @@ class _SettingsService:
 class _Provider:
 
     # -------------------------------------------------------------------------
-    def __init__(self, result: LLMResult | None = None, error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        result: LLMResult | None = None,
+        error: Exception | None = None,
+        responses: list[LLMResult | Exception] | None = None,
+    ) -> None:
         self.result = result
         self.error = error
+        self.responses = responses or []
         self.calls = 0
         self.requests: list[object] = []
 
@@ -52,6 +58,11 @@ class _Provider:
         self.calls += 1
         if args:
             self.requests.append(args[0])
+        if self.responses:
+            response = self.responses.pop(0)
+            if isinstance(response, Exception):
+                raise response
+            return response
         if self.error is not None:
             raise self.error
         if self.result is None:
@@ -153,6 +164,37 @@ async def test_probe_sanitizes_provider_failures_and_expires() -> None:
             "expires_at": datetime.now(timezone.utc) - timedelta(seconds=1),
         }
     )
+    assert service.latest().status == "not_tested"
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_transient_probe_failure_can_recover_and_success_remains_cached() -> None:
+    parser = _Provider(
+        responses=[
+            LLMProviderRequestError(
+                provider="opencode-go",
+                model="deepseek-v4-flash",
+                stage="probe",
+                code="provider_http_error",
+            ),
+            _parser_result(),
+        ]
+    )
+    service = _service(parser)
+
+    first = await service.run()
+    assert first.status == "failed"
+    assert first.expires_at is None
+    assert service.latest().status == "not_tested"
+
+    second = await service.run()
+    assert second.status == "passed"
+    assert parser.calls == 2
+    assert service.latest() == second
+    assert parser.calls == 2
+
+    service.clear()
     assert service.latest().status == "not_tested"
 
 
