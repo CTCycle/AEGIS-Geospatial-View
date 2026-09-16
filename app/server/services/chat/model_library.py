@@ -53,7 +53,6 @@ class ChatModelLibraryService:
         transport_policy: LLMTransportPolicy | None = None,
         ollama_unavailable_ttl_s: float = 20.0,
         dynamic_catalog_ttl_s: float = 900.0,
-        dynamic_catalog_failure_ttl_s: float = 60.0,
     ) -> None:
         self.ollama_tool_capability_cache = (
             ollama_tool_capability_cache or OllamaToolCapabilityCache()
@@ -66,7 +65,6 @@ class ChatModelLibraryService:
         )
         self.ollama_unavailable_ttl_s = ollama_unavailable_ttl_s
         self.dynamic_catalog_ttl_s = dynamic_catalog_ttl_s
-        self.dynamic_catalog_failure_ttl_s = dynamic_catalog_failure_ttl_s
         self._ollama_unavailable_cache: dict[str, _CachedOllamaFailure] = {}
         self._dynamic_catalog_cache: dict[str, _CachedModelDescriptors] = {}
         self._ollama_model_cache: dict[str, _CachedModelDescriptors] = {}
@@ -356,11 +354,10 @@ class ChatModelLibraryService:
                     "model_count": 0,
                     "stale": False,
                 }
-                self._dynamic_catalog_cache[provider_name] = _CachedModelDescriptors(
-                    expires_at=now + self.dynamic_catalog_failure_ttl_s,
-                    models=[],
-                    source=source,
-                )
+                # A failed provider lookup is intentionally not cached.  Catalog
+                # failures are commonly transient, and caching an empty result
+                # makes a later settings/startup request look unconfigured even
+                # after the provider has recovered.
                 return [], source
 
     # -------------------------------------------------------------------------

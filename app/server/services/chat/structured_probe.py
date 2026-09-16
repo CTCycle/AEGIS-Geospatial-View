@@ -155,10 +155,10 @@ class StructuredProbeService:
                 parse_status="failed",
                 duration_ms=0,
                 checked_at=checked_at,
-                expires_at=checked_at + timedelta(seconds=PROBE_TTL_SECONDS),
+                expires_at=None,
                 message="The selected provider ID is not canonical and cannot be probed.",
             )
-            self._cache[key] = result
+            self._cache.pop(key, None)
             return result
         protocol = self._protocol(provider_id, model, self.provider_factory)
         key = self._cache_key(settings, protocol)
@@ -247,7 +247,11 @@ class StructuredProbeService:
             status = "failed"
             parse_status = "failed"
         duration_ms = max(0, int((perf_counter() - started) * 1000))
-        expires_at = checked_at + timedelta(seconds=PROBE_TTL_SECONDS)
+        expires_at = (
+            checked_at + timedelta(seconds=PROBE_TTL_SECONDS)
+            if status == "passed"
+            else None
+        )
         result = StructuredProbeResponse(
             provider=provider_id,
             model=model,
@@ -259,5 +263,11 @@ class StructuredProbeService:
             expires_at=expires_at,
             message=self._safe_message(status),
         )
-        self._cache[key] = result
+        if status == "passed":
+            self._cache[key] = result
+        else:
+            # Provider failures and timeouts are transient health signals, not
+            # durable capability results.  Do not let one failed probe poison
+            # later startup or settings checks.
+            self._cache.pop(key, None)
         return result

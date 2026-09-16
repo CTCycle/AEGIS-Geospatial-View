@@ -178,6 +178,28 @@ def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools
 
 
 ###############################################################################
+def test_router_normalizes_geocoding_route_for_location_only_map() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.PLACE_SEARCH,
+            operation="resolve_place",
+            capability_queries=[
+                "place search",
+                "geocoding",
+                "reverse geocoding",
+            ],
+        ),
+        user_message="35.6762, 139.6503",
+        active_state=_state(),
+    )
+
+    assert decision.route.primary_domain is CapabilityDomain.MAP_RENDERING
+    assert decision.route.operation == "show_location_on_map"
+    assert decision.route.capability_queries == ["place search", "map viewport"]
+    assert "location_map_route_normalized" in decision.reason_codes
+
+
+###############################################################################
 def test_router_normalizes_undated_recent_historical_scope_to_current() -> None:
     decision = _router().validate_route(
         _route(

@@ -19,6 +19,21 @@ class _DeepSeekProviderStub:
     def list_models(self) -> list[ModelDescriptor]:
         return self.models
 
+
+@dataclass
+class _FlakyDynamicProvider:
+    responses: list[list[ModelDescriptor] | Exception]
+    calls: int = 0
+
+    # -------------------------------------------------------------------------
+    def list_models(self) -> list[ModelDescriptor]:
+        response = self.responses[min(self.calls, len(self.responses) - 1)]
+        self.calls += 1
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
 ###############################################################################
 class _ProviderFactoryStub:
 
@@ -129,6 +144,65 @@ def test_list_models_reports_deepseek_failure_in_sources(monkeypatch) -> None:
     assert response["cloud"]
     assert response["sources"]["deepseek"]["ok"] is False
     assert "DeepSeek credentials" in str(response["sources"]["deepseek"]["message"])
+
+
+###############################################################################
+def test_dynamic_catalog_failure_can_recover_and_success_remains_cached(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        model_library_module,
+        "OllamaProvider",
+        _OllamaProviderUnavailableStub,
+    )
+    dynamic_provider = _FlakyDynamicProvider(
+        responses=[
+            LLMConfigurationError("Transient catalog failure."),
+            [
+                ModelDescriptor(
+                    name="recovered-model",
+                    description="Recovered model",
+                    provider="deepseek",
+                )
+            ],
+        ]
+    )
+    service = ChatModelLibraryService(
+        provider_factory=_ProviderFactoryStub(dynamic_provider),
+    )
+
+    first = service.list_models(
+        ollama_url="http://127.0.0.1:11434",
+        cloud_provider="deepseek",
+        include_probe_status=False,
+    )
+    second = service.list_models(
+        ollama_url="http://127.0.0.1:11434",
+        cloud_provider="deepseek",
+        include_probe_status=False,
+    )
+    third = service.list_models(
+        ollama_url="http://127.0.0.1:11434",
+        cloud_provider="deepseek",
+        include_probe_status=False,
+    )
+
+    assert first["sources"]["deepseek"]["ok"] is False
+    assert second["sources"]["deepseek"]["ok"] is True
+    assert any(item["id"] == "recovered-model" for item in second["cloud"])
+    assert third["sources"]["deepseek"]["ok"] is True
+    assert dynamic_provider.calls == 2
+
+    service.invalidate_dynamic_catalogs()
+    fourth = service.list_models(
+        ollama_url="http://127.0.0.1:11434",
+        cloud_provider="deepseek",
+        include_probe_status=False,
+    )
+
+    assert fourth["sources"]["deepseek"]["ok"] is True
+    assert dynamic_provider.calls == 3
+
 
 ###############################################################################
 def test_find_model_raises_when_deepseek_catalog_cannot_be_loaded(monkeypatch) -> None:
