@@ -37,7 +37,9 @@ class TestChatFlow:
         page.goto(base_url)
         page.get_by_role("link", name="Settings", exact=True).click()
         expect(page).to_have_url(f"{base_url.rstrip('/')}/settings")
-        expect(page.get_by_role("heading", name="Settings", exact=True)).to_be_visible()
+        expect(page.get_by_role("link", name="Settings", exact=True)).to_have_class(
+            re.compile(r"\bactive\b")
+        )
         expect(page.get_by_placeholder("Search models")).to_be_visible()
         expect(page.get_by_role("button", name="All")).to_be_visible()
         expect(page.get_by_role("tab", name="Models", exact=True)).to_be_visible()
@@ -57,7 +59,9 @@ class TestChatFlow:
         page.go_back()
         expect(page.get_by_label("Chat message")).to_be_visible()
         page.go_forward()
-        expect(page.get_by_role("heading", name="Settings", exact=True)).to_be_visible()
+        expect(page.get_by_role("link", name="Settings", exact=True)).to_have_class(
+            re.compile(r"\bactive\b")
+        )
         expect(search).to_have_value("gpt")
 
     # -------------------------------------------------------------------------

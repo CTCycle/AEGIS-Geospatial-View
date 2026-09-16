@@ -9,43 +9,11 @@
 .capabilities-page__header {
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 1rem;
-    padding: 0.95rem 1.35rem;
+    padding: 0.55rem 1.35rem;
     border-bottom: 1px solid #263640;
     background: #101c23;
-}
-
-.capabilities-page__header p {
-    margin: 0;
-}
-
-.capabilities-page__heading {
-    min-width: 0;
-}
-
-.page-kicker {
-    margin: 0 0 0.22rem;
-    color: #8fb9cc;
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-}
-
-.capabilities-page__heading h1 {
-    margin: 0;
-    color: #f0f7fa;
-    font-size: 1.15rem;
-    line-height: 1.2;
-}
-
-.capabilities-page__heading > p:last-child {
-    margin: 0.28rem 0 0;
-    max-width: 72rem;
-    color: #a9bac2;
-    font-size: 0.82rem;
-    line-height: 1.4;
 }
 
 .capabilities-page__summary {
