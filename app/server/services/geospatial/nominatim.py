@@ -45,6 +45,7 @@ class NominatimService:
             "borough",
             "airport",
             "landmark",
+            "mount",
             "river",
             "road",
             "station",
@@ -88,9 +89,11 @@ class NominatimService:
             return None
         effective_limit = max(1, min(10, int(limit or 1)))
         ranked: list[dict[str, Any]] = []
+        fallback_ranked: list[dict[str, Any]] = []
         selected_query = queries[0]
+        fallback_query = queries[0]
         fetched_at = datetime.now(UTC)
-        for candidate_query in queries:
+        for query_index, candidate_query in enumerate(queries):
             params: dict[str, str] = {
                 "q": candidate_query,
                 "format": "jsonv2",
@@ -108,9 +111,15 @@ class NominatimService:
             response = await asyncio.to_thread(self.perform_request, params)
             if not response:
                 continue
-            ranked = self.rank_candidates(
+            candidate_address = (
+                candidate_query
+                if query_index > 0
+                and self._is_mount_name_variant(address, candidate_query)
+                else address
+            )
+            candidate_ranked = self.rank_candidates(
                 response,
-                address=address or "",
+                address=candidate_address or "",
                 city=city,
                 country_name=country_name,
                 country_code=country_code,
@@ -118,9 +127,27 @@ class NominatimService:
                 expected_location_type=expected_location_type,
                 fetched_at=fetched_at,
             )
-            if ranked:
-                selected_query = candidate_query
-                break
+            if not candidate_ranked:
+                continue
+            if (
+                query_index == 0
+                and len(queries) > 1
+                and self._should_try_mount_name_variant(
+                    address,
+                    expected_location_type,
+                    queries[1],
+                    candidate_ranked,
+                )
+            ):
+                fallback_ranked = candidate_ranked
+                fallback_query = candidate_query
+                continue
+            ranked = candidate_ranked
+            selected_query = candidate_query
+            break
+        if not ranked and fallback_ranked:
+            ranked = fallback_ranked
+            selected_query = fallback_query
         if not ranked:
             return None
         selected = dict(ranked[0])
@@ -138,6 +165,56 @@ class NominatimService:
         if ambiguous_candidates:
             selected["ambiguous_candidates"] = ambiguous_candidates
         return selected
+
+    # -------------------------------------------------------------------------
+    def _is_mount_name_variant(
+        self, address: str | None, candidate_query: str
+    ) -> bool:
+        normalized_address = self.normalize_component(address or "")
+        normalized_query = self.normalize_component(candidate_query)
+        for prefix in ("mount ", "mt "):
+            if not normalized_address.startswith(prefix):
+                continue
+            reduced_name = normalized_address[len(prefix) :].strip()
+            reduced_tokens = reduced_name.split()
+            query_tokens = normalized_query.split()
+            return bool(
+                reduced_tokens
+                and query_tokens[: len(reduced_tokens)] == reduced_tokens
+            )
+        return False
+
+    # -------------------------------------------------------------------------
+    def _should_try_mount_name_variant(
+        self,
+        address: str | None,
+        expected_location_type: str | None,
+        candidate_query: str,
+        ranked: list[dict[str, Any]],
+    ) -> bool:
+        expected = str(expected_location_type or "").strip().lower()
+        if expected not in {"feature", "landmark"}:
+            return False
+        if not self._is_mount_name_variant(address, candidate_query):
+            return False
+        natural_types = {
+            "cliff",
+            "island",
+            "lake",
+            "massif",
+            "mountain",
+            "peak",
+            "ridge",
+            "valley",
+            "volcano",
+        }
+        return not any(
+            str(candidate.get("selected_result_class") or "").lower()
+            in {"natural", "waterway"}
+            or str(candidate.get("selected_result_type") or "").lower()
+            in natural_types
+            for candidate in ranked
+        )
 
     # -------------------------------------------------------------------------
     def compose_query_variants(

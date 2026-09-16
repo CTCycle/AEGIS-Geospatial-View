@@ -405,6 +405,62 @@ def test_nominatim_retries_generic_named_target_with_bounded_acronym_variant() -
     ]
 
 ###############################################################################
+def test_nominatim_retries_mount_feature_when_exact_results_are_pois() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    queries: list[str] = []
+
+    def _perform_request(params: dict[str, str]) -> list[dict[str, object]]:
+        queries.append(params["q"])
+        if params["q"].casefold() == "mount kilimanjaro, tanzania":
+            return [
+                {
+                    "lat": "-3.0674",
+                    "lon": "37.3556",
+                    "display_name": "Mount Kilimanjaro Primary School, Tanzania",
+                    "class": "amenity",
+                    "type": "school",
+                    "importance": 0.2,
+                    "address": {"country": "Tanzania"},
+                }
+            ]
+        if params["q"].casefold() == "kilimanjaro, tanzania":
+            return [
+                {
+                    "lat": "-3.0674",
+                    "lon": "37.3556",
+                    "display_name": "Kilimanjaro, Northern Zone, Tanzania",
+                    "class": "natural",
+                    "type": "massif",
+                    "importance": 0.6,
+                    "address": {
+                        "state": "Kilimanjaro",
+                        "country": "Tanzania",
+                    },
+                }
+            ]
+        return []
+
+    service.perform_request = _perform_request  # type: ignore[method-assign]
+
+    async def _run() -> None:
+        result = await service.extract_coordinates(
+            address="Mount Kilimanjaro",
+            city=None,
+            country_name="Tanzania",
+            country_code=None,
+            expected_location_type="feature",
+        )
+        assert result is not None
+        assert result["selected_result_type"] == "massif"
+        assert result["lat"] == -3.0674
+
+    run_async_in_thread(_run())
+    assert queries == [
+        "Mount Kilimanjaro, Tanzania",
+        "kilimanjaro, Tanzania",
+    ]
+
+###############################################################################
 def test_nominatim_rejects_partial_acronym_child_for_named_target() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
 

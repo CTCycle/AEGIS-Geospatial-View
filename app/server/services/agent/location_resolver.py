@@ -88,6 +88,7 @@ class LocationResolver:
             "headquarters",
             "hq",
             "district",
+            "mount",
             "neighborhood",
             "neighbourhood",
             "quarter",

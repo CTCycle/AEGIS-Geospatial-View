@@ -199,6 +199,28 @@ def test_router_normalizes_geocoding_route_for_location_only_map() -> None:
     assert "location_map_route_normalized" in decision.reason_codes
 
 
+def test_router_normalizes_named_landmark_map_route() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.PLACE_SEARCH,
+            secondary_domains=[CapabilityDomain.MAP_RENDERING],
+            operation="show_on_map",
+            capability_queries=[
+                "place search",
+                "landmark lookup",
+                "map view of a named feature",
+            ],
+        ),
+        user_message="Show Table Mountain near Cape Town, South Africa on the map.",
+        active_state=_state(),
+    )
+
+    assert decision.route.primary_domain is CapabilityDomain.MAP_RENDERING
+    assert decision.route.operation == "show_location_on_map"
+    assert decision.route.capability_queries == ["place search", "map viewport"]
+    assert "location_map_route_normalized" in decision.reason_codes
+
+
 ###############################################################################
 def test_router_normalizes_undated_recent_historical_scope_to_current() -> None:
     decision = _router().validate_route(
