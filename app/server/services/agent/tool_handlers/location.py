@@ -23,6 +23,7 @@ _LOCATION_TYPES = frozenset(
         "airport",
         "city",
         "country",
+        "coordinates",
         "administrative_geometry",
         "feature",
         "landmark",

@@ -73,3 +73,4 @@ export const DEFAULT_BASE_TILE_PROXY_URL = `${API_BASE_URL}/geospatial/tiles/osm
 export const DEFAULT_BASE_ATTRIBUTION = '© OpenStreetMap contributors';
 export const DEFAULT_BASE_TILE_MAX_ZOOM = 19;
 export const DEFAULT_MAP_FIT_MAX_ZOOM = 18;
+export const DEFAULT_SATELLITE_MAP_FIT_MAX_ZOOM = 17;

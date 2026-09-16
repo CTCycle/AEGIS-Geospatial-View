@@ -2,7 +2,12 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import maplibregl from 'maplibre-gl';
 
-import { DEFAULT_BASE_TILE_MAX_ZOOM, DEFAULT_BASE_TILE_PROXY_URL, DEFAULT_MAP_FIT_MAX_ZOOM } from '../core/constants';
+import {
+  DEFAULT_BASE_TILE_MAX_ZOOM,
+  DEFAULT_BASE_TILE_PROXY_URL,
+  DEFAULT_MAP_FIT_MAX_ZOOM,
+  DEFAULT_SATELLITE_MAP_FIT_MAX_ZOOM,
+} from '../core/constants';
 import { MapPreviewComponent } from './map-preview.component';
 import { OverlayControlsComponent } from './overlay-controls.component';
 
@@ -549,6 +554,29 @@ describe('components/map-preview.component', () => {
     expect(vectorLayer?.['source-layer']).toBe('admin_boundaries');
     expect(component.metadataOnlyOverlays.map((overlay) => overlay.id)).toContain('parcel_template');
     expect(component.attributionEntries.map((entry) => entry.label)).toContain('Natural Earth');
+  });
+
+  it('uses a lower fit cap for satellite imagery on tight bounds', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        basemap_id: 'esri_world_imagery',
+        basemap: {
+          id: 'esri_world_imagery',
+          label: 'Satellite Imagery',
+          provider: 'arcgis',
+          tile_url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          render_status: 'available',
+        },
+        bounds: [145.89995, -16.35005, 145.90005, -16.34995],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(fakeMap.fitBounds).toHaveBeenCalledWith(
+      [[145.89995, -16.35005], [145.90005, -16.34995]],
+      { padding: 30, duration: 0, maxZoom: DEFAULT_SATELLITE_MAP_FIT_MAX_ZOOM },
+    );
   });
 
   it('renders valid-empty overlays as accessible no-results and successful evidence', () => {
