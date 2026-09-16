@@ -7,6 +7,7 @@ import hashlib
 import json
 from collections.abc import Awaitable, Sequence
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 from typing import Any, Callable, Literal, Protocol
 from urllib.parse import urlparse
 
@@ -985,7 +986,9 @@ class AgentLoop:
             or self.tool_registry.get("apply_map_plan") is None
         ):
             return []
-        location_ref = next(iter(state.location_refs))
+        location_ref = self._location_only_map_recovery_ref(state, route)
+        if location_ref is None:
+            return []
         expected_revision = (
             state.active_map_session.overlay_collection.revision
             if state.active_map_session is not None
@@ -1009,6 +1012,47 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _location_only_map_recovery_ref(
+        state: AgentRunState,
+        route: CapabilityRoute | None = None,
+    ) -> str | None:
+        location_results = [
+            result
+            for result in state.tool_results
+            if result.tool_name == "resolve_geospatial_location"
+            and result.status == "success"
+        ]
+        if len(location_results) == 1:
+            data = location_results[0].data
+            if isinstance(data, dict):
+                target_id = str(data.get("target_id") or "").strip()
+                if target_id in state.location_refs:
+                    return target_id
+                normalized_target_id = target_id.casefold()
+                for location_ref in state.location_refs:
+                    if location_ref.casefold() == normalized_target_id:
+                        return location_ref
+            return None
+        if not location_results and len(state.location_refs) == 1:
+            return next(iter(state.location_refs))
+        if not location_results and route is not None and len(route.target_refs) == 1:
+            target_ref = " ".join(route.target_refs[0].casefold().split())
+            close_matches = [
+                location_ref
+                for location_ref in state.location_refs
+                if SequenceMatcher(
+                    None,
+                    " ".join(location_ref.casefold().split()),
+                    target_ref,
+                ).ratio()
+                >= 0.9
+            ]
+            if len(close_matches) == 1:
+                return close_matches[0]
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _needs_location_only_map_recovery(
         state: AgentRunState,
         route: CapabilityRoute,
@@ -1019,7 +1063,6 @@ class AgentLoop:
             or route.presentation not in {"map", "both"}
             or route.secondary_domains
             or state.prepared_map_session is not None
-            or len(state.location_refs) != 1
         ):
             return False
         contract = state.completion_contract
@@ -1032,7 +1075,17 @@ class AgentLoop:
             for query in route.capability_queries
             if str(query).strip()
         }
-        return normalized_queries <= {"basemap", "map view", "map rendering"}
+        return (
+            AgentLoop._location_only_map_recovery_ref(state, route) is not None
+            and normalized_queries
+            <= {
+                "basemap",
+                "map view",
+                "map rendering",
+                "geocode place name",
+                "place viewport",
+            }
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

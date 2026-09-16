@@ -311,6 +311,82 @@ def test_location_only_map_recovery_requires_a_single_resolved_location() -> Non
 
 
 ###############################################################################
+def test_location_only_map_recovery_uses_the_current_location_result() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        capability_queries=["basemap", "map rendering"],
+    )
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+    state.location_refs["paris, france"] = ResolvedLocation(
+        label="Paris, France",
+        latitude=48.8566,
+        longitude=2.3522,
+        confidence=0.9,
+        location_type="city",
+    )
+    state.location_refs["kolkata, india"] = ResolvedLocation(
+        label="Kolkata, West Bengal, India",
+        latitude=22.5726,
+        longitude=88.3639,
+        confidence=0.9,
+        location_type="city",
+    )
+    state.tool_results.append(
+        ToolResult(
+            call_id="resolve-current",
+            tool_name="resolve_geospatial_location",
+            status="success",
+            summary="Resolved Kolkata, West Bengal, India.",
+            data={"target_id": "kolkata, india"},
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    )
+
+    assert AgentLoop._needs_location_only_map_recovery(  # pyright: ignore[reportPrivateUsage]
+        state, route
+    )
+    assert AgentLoop._location_only_map_recovery_ref(  # pyright: ignore[reportPrivateUsage]
+        state
+    ) == "kolkata, india"
+
+
+###############################################################################
+def test_location_only_map_recovery_can_reuse_one_close_current_route_ref() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        capability_queries=["geocode place name", "basemap"],
+        target_refs=["Kolkatta, India"],
+    )
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+    state.location_refs["paris, france"] = ResolvedLocation(
+        label="Paris, France",
+        latitude=48.8566,
+        longitude=2.3522,
+        confidence=0.9,
+        location_type="city",
+    )
+    state.location_refs["kolkata, india"] = ResolvedLocation(
+        label="Kolkata, West Bengal, India",
+        latitude=22.5726,
+        longitude=88.3639,
+        confidence=0.9,
+        location_type="city",
+    )
+
+    assert AgentLoop._location_only_map_recovery_ref(  # pyright: ignore[reportPrivateUsage]
+        state, route
+    ) == "kolkata, india"
+
+
+###############################################################################
 @pytest.mark.asyncio
 async def test_model_budget_exhaustion_has_a_distinct_terminal_reason() -> None:
     provider = FakeProvider([_route_call()])

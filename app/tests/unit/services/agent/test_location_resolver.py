@@ -121,6 +121,49 @@ def test_location_resolver_accepts_native_administrative_geometry_target() -> No
     assert calls[0]["expected_location_type"] == "administrative_geometry"
 
 ###############################################################################
+def test_location_resolver_accepts_localized_hierarchical_city_boundary_target() -> None:
+    class Geocoder:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003
+            return {
+                "display_name": "Milan, Rodano, Milan, Lombardy, Italy",
+                "lat": 45.4641943,
+                "lon": 9.1896346,
+                "confidence": 0.95,
+                "selected_result_type": "administrative",
+                "selected_result_class": "boundary",
+                "selected_address_type": "city",
+                "address": {
+                    "city": "Milan",
+                    "state": "Lombardy",
+                    "country": "Italy",
+                    "country_code": "it",
+                },
+                "namedetails": {
+                    "name": "Milan",
+                    "name:en": "Milan",
+                    "name:it": "Milano",
+                },
+            }
+
+    result = run_async_in_thread(
+        LocationResolver(nominatim_service=Geocoder()).resolve_location_signals(
+            [
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="Milano, Lombardia, Italia",
+                    confidence=1.0,
+                )
+            ],
+            {},
+        )
+    )
+
+    assert isinstance(result, ResolvedLocation)
+    assert result.latitude == 45.4641943
+    assert result.longitude == 9.1896346
+    assert result.country == "Italy"
+
+###############################################################################
 def test_location_resolver_resolves_same_level_peer_targets_independently() -> None:
     calls: list[str] = []
 
