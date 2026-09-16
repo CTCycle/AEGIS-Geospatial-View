@@ -30,6 +30,10 @@ from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
 ###############################################################################
+MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
+MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
+
+
 class MapPlanBuildError(ValueError):
 
     # -------------------------------------------------------------------------
@@ -340,12 +344,29 @@ def _with_viewport(session: MapSession, viewport: ViewportPolicy) -> MapSession:
 
 ###############################################################################
 def _viewport_for_location(location: ResolvedLocation) -> ViewportPolicy:
-    bbox = _valid_bbox(location.bbox)
+    bbox = _usable_location_bbox(location)
     return ViewportPolicy(
         center_latitude=location.latitude,
         center_longitude=location.longitude,
         bbox=bbox,
     )
+
+
+def _usable_location_bbox(location: ResolvedLocation) -> list[float] | None:
+    bbox = _valid_bbox(location.bbox)
+    if bbox is None:
+        return bbox
+    min_lon, min_lat, max_lon, max_lat = bbox
+    if max(max_lon - min_lon, max_lat - min_lat) < MIN_LOCATION_VIEWPORT_SPAN_DEGREES:
+        return None
+    if location.location_type not in {"city", "municipality"}:
+        return bbox
+    if (
+        max_lon - min_lon > MAX_CITY_VIEWPORT_SPAN_DEGREES
+        or max_lat - min_lat > MAX_CITY_VIEWPORT_SPAN_DEGREES
+    ):
+        return None
+    return bbox
 
 
 ###############################################################################

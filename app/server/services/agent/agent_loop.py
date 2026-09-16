@@ -291,6 +291,12 @@ class AgentLoop:
                         available_tools=[item.name for item in tools],
                     )
                 )
+                if recovery_results and any(
+                    result.tool_name == "apply_map_plan"
+                    and result.status == "success"
+                    for result in recovery_results
+                ):
+                    final_text = "The map is ready."
                 await self._checkpoint(request)
                 if stop is not None:
                     state.termination_reason = stop[0]
@@ -1022,16 +1028,25 @@ class AgentLoop:
             if result.tool_name == "resolve_geospatial_location"
             and result.status == "success"
         ]
-        if len(location_results) == 1:
-            data = location_results[0].data
-            if isinstance(data, dict):
-                target_id = str(data.get("target_id") or "").strip()
-                if target_id in state.location_refs:
-                    return target_id
-                normalized_target_id = target_id.casefold()
-                for location_ref in state.location_refs:
-                    if location_ref.casefold() == normalized_target_id:
-                        return location_ref
+        target_ids = [
+            str(result.data.get("target_id") or "").strip()
+            for result in location_results
+            if isinstance(result.data, dict)
+            and str(result.data.get("target_id") or "").strip()
+        ]
+        normalized_target_ids = {
+            " ".join(target_id.casefold().split()) for target_id in target_ids
+        }
+        if target_ids and len(target_ids) == len(location_results) and len(
+            normalized_target_ids
+        ) == 1:
+            target_id = target_ids[0]
+            if target_id in state.location_refs:
+                return target_id
+            normalized_target_id = target_id.casefold()
+            for location_ref in state.location_refs:
+                if location_ref.casefold() == normalized_target_id:
+                    return location_ref
             return None
         if not location_results and len(state.location_refs) == 1:
             return next(iter(state.location_refs))
@@ -1080,9 +1095,13 @@ class AgentLoop:
             and normalized_queries
             <= {
                 "basemap",
+                "location map view",
+                "location viewport",
+                "map viewport",
                 "map view",
                 "map rendering",
                 "geocode place name",
+                "place search",
                 "place viewport",
             }
         )

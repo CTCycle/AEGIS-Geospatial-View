@@ -261,7 +261,10 @@ def _normalize_location_map_route(
         route.task_mode != "execute"
         or route.presentation not in {"map", "both"}
         or route.primary_domain is not CapabilityDomain.PLACE_SEARCH
-        or route.secondary_domains
+        or any(
+            domain is not CapabilityDomain.MAP_RENDERING
+            for domain in route.secondary_domains
+        )
     ):
         return route, None
     operation = str(route.operation or "").strip().casefold()
@@ -279,8 +282,10 @@ def _normalize_location_map_route(
     location_query_vocabulary = {
         "coordinates",
         "geocoding",
+        "landmark lookup",
         "location lookup",
         "map viewport",
+        "map view of a named feature",
         "place search",
         "reverse geocoding",
     }

@@ -288,7 +288,7 @@ def test_location_only_map_recovery_requires_a_single_resolved_location() -> Non
         task_mode="execute",
         presentation="map",
         requires_location=True,
-        capability_queries=["basemap", "map rendering"],
+        capability_queries=["place search", "map viewport"],
     )
     AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
     state.location_refs["great barrier reef, australia"] = ResolvedLocation(
@@ -308,6 +308,102 @@ def test_location_only_map_recovery_requires_a_single_resolved_location() -> Non
     assert not AgentLoop._needs_location_only_map_recovery(  # pyright: ignore[reportPrivateUsage]
         state, route
     )
+
+
+def test_location_only_map_recovery_accepts_duplicate_same_location_results() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        capability_queries=["place search", "map viewport"],
+    )
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+    state.location_refs["kilimanjaro, tanzania"] = ResolvedLocation(
+        label="Kilimanjaro, Tanzania",
+        latitude=-3.0786,
+        longitude=37.4198,
+        confidence=0.81,
+        location_type="massif",
+    )
+    for call_id in ("resolve-1", "resolve-2"):
+        state.tool_results.append(
+            ToolResult(
+                call_id=call_id,
+                tool_name="resolve_geospatial_location",
+                status="success",
+                summary="Resolved Kilimanjaro, Tanzania.",
+                data={"target_id": "Kilimanjaro, Tanzania"},
+                metadata=ToolExecutionMetadata(duration_ms=0),
+            )
+        )
+
+    assert AgentLoop._location_only_map_recovery_ref(state, route) == (
+        "kilimanjaro, tanzania"
+    )  # pyright: ignore[reportPrivateUsage]
+    assert AgentLoop._needs_location_only_map_recovery(  # pyright: ignore[reportPrivateUsage]
+        state, route
+    )
+
+
+@pytest.mark.asyncio
+async def test_location_only_map_recovery_replaces_stale_failure_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeProvider([LLMResult(content="The map cannot be prepared.")])
+    loop = _loop(provider)
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        capability_queries=["basemap", "location map view"],
+    )
+    state = _state()
+    state.route = route
+    state.location_refs["great barrier reef, australia"] = ResolvedLocation(
+        label="Great Barrier Reef, Australia",
+        latitude=-16.35,
+        longitude=145.9,
+        confidence=0.87,
+        location_type="reef",
+    )
+    state.tool_results.append(
+        ToolResult(
+            call_id="resolve-current",
+            tool_name="resolve_geospatial_location",
+            status="success",
+            summary="Resolved Great Barrier Reef, Australia.",
+            data={"target_id": "great barrier reef, australia"},
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    )
+
+    async def recover_map(*args: Any) -> list[ToolResult]:
+        state.prepared_map_session = object()  # type: ignore[assignment]
+        return [
+            ToolResult(
+                call_id="apply-map",
+                tool_name="apply_map_plan",
+                status="success",
+                summary="A map candidate was prepared.",
+                metadata=ToolExecutionMetadata(duration_ms=0),
+            )
+        ]
+
+    monkeypatch.setattr(loop, "_recover_location_only_map", recover_map)
+    outcome = await loop.run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        )
+    )
+
+    assert outcome.stopped_reason == "awaiting_render"
+    assert outcome.final_text == "The map is ready."
 
 
 ###############################################################################
