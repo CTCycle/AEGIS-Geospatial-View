@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import re
+from difflib import SequenceMatcher
 from typing import Any, cast
 
 from server.common.typing import json_object
@@ -707,10 +708,21 @@ class LocationResolver:
         # Keep the extracted span for validation.  Canonical model text is
         # used only to form the geocoder query in _resolve_signal; this avoids
         # accepting a candidate solely because a model rewrote its parentage.
-        target = self._normalize_text(signal.raw_value or signal.normalized_value or "")
+        raw_target = str(signal.raw_value or signal.normalized_value or "").strip()
+        target = self._normalize_text(raw_target)
+        target_components = tuple(
+            self._normalize_text(component)
+            for component in re.split(r"[,;]", raw_target)
+            if self._normalize_text(component)
+        )
         display = self._normalize_text(str(candidate.get("display_name") or ""))
         address = json_object(candidate.get("address"))
         namedetails = json_object(candidate.get("namedetails"))
+        candidate_parent_values = tuple(
+            str(address.get(key) or "")
+            for key in ("state", "region", "province", "county", "country")
+            if str(address.get(key) or "").strip()
+        )
         structured = self._normalize_text(
             " ".join(
                 [
@@ -724,6 +736,8 @@ class LocationResolver:
             candidate_text,
             target,
             signal.signal_type,
+            target_components=target_components,
+            candidate_parent_values=candidate_parent_values,
             allow_related_type=allow_related_type,
         ):
             return False
@@ -775,6 +789,11 @@ class LocationResolver:
                     and not (
                         self._contains_location_text(target, candidate_city)
                         or self._contains_location_text(candidate_text, target)
+                        or self._matches_hierarchical_administrative_target(
+                            candidate_text,
+                            target_components,
+                            candidate_parent_values,
+                        )
                     )
                 )
             ):
@@ -944,6 +963,8 @@ class LocationResolver:
         target: str,
         signal_type: str,
         *,
+        target_components: Sequence[str] = (),
+        candidate_parent_values: Sequence[str] = (),
         allow_related_type: bool = False,
     ) -> bool:
         """Match names while allowing a generic role word around the name.
@@ -965,6 +986,10 @@ class LocationResolver:
         target_without_country = self._strip_country_suffix(target)
         if target_without_country and self._contains_location_text(
             candidate_text, target_without_country
+        ):
+            return True
+        if signal_type in {"city", "municipality", "administrative_geometry"} and self._matches_hierarchical_administrative_target(
+            candidate_text, target_components, candidate_parent_values
         ):
             return True
         if (
@@ -996,6 +1021,64 @@ class LocationResolver:
         if self._contains_location_text(candidate_text, " ".join(core_tokens)):
             return True
         return False
+
+    # -------------------------------------------------------------------------
+    def _matches_hierarchical_administrative_target(
+        self,
+        candidate_text: str,
+        target_components: Sequence[str],
+        candidate_parent_values: Sequence[str],
+    ) -> bool:
+        """Match qualified administrative names across localized labels.
+
+        Nominatim is queried in English but retains alternate names in
+        ``namedetails``.  Keep the exact component match as the default and
+        allow one long, high-similarity component to cover a translated or
+        lightly misspelled administrative parent such as Lombardia/Lombardy.
+        """
+
+        components = [self._normalize_text(component) for component in target_components]
+        components = [component for component in components if component]
+        if len(components) < 2:
+            return False
+
+        candidate_tokens = set(re.findall(r"[a-z0-9]+", candidate_text.casefold()))
+        if not candidate_tokens:
+            return False
+        parent_tokens = [
+            set(re.findall(r"[a-z0-9]+", self._normalize_text(value)))
+            for value in candidate_parent_values
+        ]
+
+        exact_matches = 0
+        fuzzy_matches = 0
+        for index, component in enumerate(components):
+            aliases = (
+                self._country_aliases(component)
+                if index == len(components) - 1
+                else {component}
+            )
+            if any(
+                self._contains_location_text(candidate_text, alias)
+                for alias in aliases
+            ):
+                exact_matches += 1
+                continue
+            if index > 0 and any(
+                len(token) >= 5 and token in value_tokens
+                for token in re.findall(r"[a-z0-9]+", component)
+                for value_tokens in parent_tokens
+            ):
+                exact_matches += 1
+                continue
+            if len(component) < 6 or not any(
+                SequenceMatcher(None, component, candidate_token).ratio() >= 0.8
+                for candidate_token in candidate_tokens
+            ):
+                return False
+            fuzzy_matches += 1
+
+        return exact_matches >= len(components) - 1 and fuzzy_matches <= 1
 
     # -------------------------------------------------------------------------
     def _is_district_candidate(
