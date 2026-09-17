@@ -9,6 +9,7 @@ from server.contracts.runs import (
     AgentRunState,
     ConversationCreateResponse,
 )
+from server.contracts.chat import ChatTurnResponse
 from server.contracts.events import RunEventType
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.conversations import ConversationRepository
@@ -39,8 +40,8 @@ class RunLifecycleService:
         self.aggregation_service = aggregation_service
         self.event_publisher = event_publisher
         self.run_orchestrator = run_orchestrator
-        self._tasks: set[asyncio.Task[None]] = set()
-        self._tasks_by_run: dict[str, asyncio.Task[None]] = {}
+        self._tasks: set[asyncio.Task[ChatTurnResponse | None]] = set()
+        self._tasks_by_run: dict[str, asyncio.Task[ChatTurnResponse | None]] = {}
 
     # -------------------------------------------------------------------------
     def create_conversation(
@@ -66,10 +67,13 @@ class RunLifecycleService:
         self,
         conversation_id: str,
         payload: AgentRunCreateRequest,
+        *,
+        schedule: bool = True,
+        owner_user_id: str | None = None,
     ) -> tuple[AgentRunCreateResult, bool]:
         try:
             self.conversation_repository.verify_conversation_access(
-                conversation_id, None
+                conversation_id, owner_user_id
             )
         except ValueError as exc:
             raise RunNotFoundError("Conversation not found.") from exc
@@ -93,7 +97,7 @@ class RunLifecycleService:
             raise RunNotFoundError(message) from exc
         except PermissionError as exc:
             raise RunAccessError(str(exc)) from exc
-        if created:
+        if created and schedule:
             self._schedule_run(run.run_id)
         return AgentRunCreateResult(
             conversation_id=conversation_id,
@@ -101,6 +105,71 @@ class RunLifecycleService:
             run_version=run.active_run_version,
             state=run.state,
         ), created
+
+    # -------------------------------------------------------------------------
+    async def execute_run(self, run_id: str) -> ChatTurnResponse | None:
+        """Execute or observe one persisted run through the canonical worker.
+
+        Realtime connections schedule runs through ``create_run_with_status``;
+        synchronous HTTP and NDJSON transports call this method with
+        ``schedule=False``.  Both paths therefore enter the exact same
+        persisted ``AgentRunOrchestrator`` boundary and never invoke the
+        native model directly from a transport.
+        """
+
+        existing = self._tasks_by_run.get(run_id)
+        if existing is not None and not existing.done():
+            return await existing
+        return await self.run_orchestrator.execute_run(run_id)
+
+    # -------------------------------------------------------------------------
+    async def run_turn(
+        self,
+        conversation_id: str,
+        payload: AgentRunCreateRequest,
+        *,
+        owner_user_id: str | None = None,
+    ) -> tuple[ChatTurnResponse | None, AgentRunCreateResult, bool]:
+        """Create/observe one run and return its canonical response if ready."""
+
+        result, created = await self.create_run_with_status(
+            conversation_id,
+            payload,
+            schedule=False,
+            owner_user_id=owner_user_id,
+        )
+        response = await self.execute_run(result.run_id)
+        if response is None:
+            response = self.read_completed_response(
+                conversation_id,
+                result.run_id,
+            )
+        return response, result, created
+
+    # -------------------------------------------------------------------------
+    def read_completed_response(
+        self,
+        conversation_id: str,
+        run_id: str,
+    ) -> ChatTurnResponse | None:
+        """Hydrate a terminal response from the durable user event envelope."""
+
+        snapshot = self.run_repository.get_run(run_id)
+        if snapshot is None or snapshot.conversation_id != conversation_id:
+            return None
+        for event in reversed(self.event_publisher.replay(run_id)):
+            if event.type.value not in {"completed", "clarification_needed"}:
+                continue
+            payload = dict(event.payload)
+            if "assistant_message" not in payload and "content" in payload:
+                payload["assistant_message"] = payload.get("content")
+            payload.pop("content", None)
+            payload.pop("content", None)
+            try:
+                return ChatTurnResponse.model_validate(payload)
+            except (TypeError, ValueError):
+                continue
+        return None
 
     # -------------------------------------------------------------------------
     def resume_active_runs(self) -> int:
@@ -120,7 +189,9 @@ class RunLifecycleService:
         self._tasks.add(task)
         self._tasks_by_run[run_id] = task
 
-        def discard_task(completed: asyncio.Task[None]) -> None:
+        def discard_task(
+            completed: asyncio.Task[ChatTurnResponse | None],
+        ) -> None:
             self._tasks.discard(completed)
             if self._tasks_by_run.get(run_id) is completed:
                 self._tasks_by_run.pop(run_id, None)

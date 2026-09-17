@@ -19,6 +19,7 @@ import {
   parseCatalogResponse,
   parseChatTurnResponse,
   parseConversationCreateResponse,
+  parseConversationListResponse,
   parseConversationSnapshotResponse,
   parseGenericObjectResponse,
   parseGeospatialCredentialStatus,
@@ -30,6 +31,7 @@ import {
   parseOllamaHealthResponse,
   parseOllamaRefreshResponse,
   parseStructuredProbeResponse,
+  parseRunTraceResponse,
 } from './api-parsers';
 import {
   CatalogResponse,
@@ -37,6 +39,7 @@ import {
   ChatTurnResponse,
   ConversationCreateRequest,
   ConversationCreateResponse,
+  ConversationListResponse,
   ConversationSnapshotResponse,
   GenericObjectResponse,
   GeospatialCredentialStatus,
@@ -46,6 +49,7 @@ import {
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   StructuredProbeResponse,
+  RunTraceResponse,
   OllamaHealthResponse,
 } from './types';
 import { ApiRequestError } from './api-errors';
@@ -216,6 +220,35 @@ export const fetchConversationSnapshot = async (
     cache: 'no-store',
   });
   return parseConversationSnapshotResponse(data);
+};
+
+export const fetchConversations = async (
+  params: { query?: string; limit?: number; cursor?: string } = {},
+): Promise<ConversationListResponse> => {
+  const suffix = buildQuerySuffix({
+    query: params.query,
+    limit: params.limit,
+    cursor: params.cursor,
+  });
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CONVERSATIONS_PATH}${suffix}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  return parseConversationListResponse(data);
+};
+
+export const fetchConversationRunTrace = async (
+  conversationId: string,
+  runId: string,
+  params: { limit?: number; cursor?: string } = {},
+): Promise<RunTraceResponse> => {
+  const suffix = buildQuerySuffix({ limit: params.limit, cursor: params.cursor });
+  const path = `${API_CONVERSATION_PATH(conversationId)}/runs/${encodeURIComponent(runId)}/trace`;
+  const data = await executeApiRequest(`${API_BASE_URL}${path}${suffix}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  return parseRunTraceResponse(data);
 };
 
 export const fetchChatModels = async (

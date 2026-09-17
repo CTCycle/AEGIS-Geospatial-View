@@ -9,9 +9,9 @@ from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_loop import AgentLoop
-from server.services.agent.native_v2_turn import AgentTurnRunner
+from server.services.agent.turn_runner import AgentTurnRunner
 from server.services.agent.capability_router import CapabilityRouter
-from server.services.agent.native_v2_tools import register_agent_tools
+from server.services.agent.native_tools import register_agent_tools
 from server.services.agent.location_resolver import LocationResolver
 from server.services.agent.native_orchestrator import NativeAgentOrchestrator
 from server.services.agent.policy_engine import PolicyEngine
@@ -110,6 +110,7 @@ def build_chat_runtime(
         evidence_repository=evidence_repository,
         location_resolver=location_resolver,
         geospatial_api_service=geospatial_api_service,
+        history_repository=history_repository,
     )
     agent_loop = AgentLoop(
         provider_factory=llm_factory,

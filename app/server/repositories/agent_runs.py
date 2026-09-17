@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import base64
+import json
 import math
+import re
 
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
@@ -13,15 +16,17 @@ from server.contracts.events import (
 )
 from server.contracts.runs import AgentRunSnapshot, AgentRunState
 from server.contracts.geospatial import MapSession
+from server.domain.agent.capability_route import AgentTaskState
 from server.domain.agent.conversation import ConversationState
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.database.sqlite import SQLiteRepository
-from sqlalchemy import or_, select, text, update
+from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from server.repositories.schemas.models import (
+    AgentRunEventRecord,
     AgentRunRecord,
     ChatMessageRecord,
     ConversationRecord,
@@ -47,6 +52,10 @@ def _json_list(value: object) -> list[Any]:
 
 ###############################################################################
 class AgentRunRepository:
+
+    MAX_PAGE_LIMIT = 50
+    MAX_TRACE_LIMIT = 200
+    MAX_QUERY_CHARS = 300
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -171,7 +180,43 @@ class AgentRunRepository:
     def get_run(self, run_id: str) -> AgentRunSnapshot | None:
         with self._session_factory() as session:
             record = session.get(AgentRunRecord, run_id)
-            return self._to_snapshot(record) if record is not None else None
+            snapshot = self._to_snapshot(record) if record is not None else None
+        return self._attach_task_state(snapshot)
+
+    # -------------------------------------------------------------------------
+    def get_task_state(
+        self,
+        run_id: str,
+        *,
+        run_version: int | None = None,
+    ) -> dict[str, Any] | None:
+        """Return the newest typed task-state checkpoint for one run.
+
+        Task state is intentionally kept in the existing event/evidence
+        storage boundary rather than adding a second run table.  Completed
+        responses and native checkpoints both carry the same bounded task
+        ledger, so this reader accepts either envelope while never exposing
+        provider messages or hidden reasoning.
+        """
+
+        with self._session_factory() as session:
+            filters: list[Any] = [AgentRunEventRecord.run_id == str(run_id)]
+            if run_version is not None:
+                filters.append(AgentRunEventRecord.run_version == run_version)
+            rows = list(
+                session.scalars(
+                    select(AgentRunEventRecord)
+                    .where(*filters)
+                    .order_by(AgentRunEventRecord.sequence.desc())
+                    .limit(256)
+                ).all()
+            )
+        for row in rows:
+            payload = _json_object(row.payload_json)
+            candidate = _task_state_from_payload(payload)
+            if candidate is not None:
+                return candidate
+        return None
 
     # -------------------------------------------------------------------------
     def get_active_run_for_conversation(
@@ -190,7 +235,31 @@ class AgentRunRepository:
                     ),
                 )
             )
-            return self._to_snapshot(record) if record is not None else None
+            snapshot = self._to_snapshot(record) if record is not None else None
+        return self._attach_task_state(snapshot)
+
+    # -------------------------------------------------------------------------
+    def _attach_task_state(
+        self, snapshot: AgentRunSnapshot | None
+    ) -> AgentRunSnapshot | None:
+        if snapshot is None:
+            return None
+        raw = self.get_task_state(
+            snapshot.run_id,
+            run_version=snapshot.active_run_version,
+        )
+        if not isinstance(raw, dict):
+            return snapshot
+        try:
+            typed = AgentTaskState.model_validate(raw)
+        except (TypeError, ValueError):
+            return snapshot
+        return snapshot.model_copy(
+            update={
+                "current_iteration": typed.current_iteration,
+                "task_state": typed,
+            }
+        )
 
     # -------------------------------------------------------------------------
     def list_resumable_runs(self) -> list[AgentRunSnapshot]:
@@ -216,7 +285,353 @@ class AgentRunRepository:
                 .scalars()
                 .all()
             )
-        return [self._to_snapshot(record) for record in records]
+        return [
+            attached
+            for record in records
+            if (attached := self._attach_task_state(self._to_snapshot(record)))
+            is not None
+        ]
+
+    # -------------------------------------------------------------------------
+    def list_runs_for_conversation(
+        self,
+        conversation_id: str,
+        *,
+        query: str | None = None,
+        cursor: str | None = None,
+        limit: int = 20,
+        include_terminal: bool = True,
+    ) -> dict[str, Any]:
+        """Return bounded run summaries for one conversation.
+
+        Runs are sorted newest-first by ``created_at`` and ``id``.  The
+        cursor is an opaque keyset cursor, so adding a newer run does not
+        duplicate or skip entries already paged through.  Search is scoped to
+        the run's original and aggregated request text.
+        """
+
+        normalized_conversation_id = str(conversation_id).strip()
+        if not normalized_conversation_id:
+            raise ValueError("Conversation id is required.")
+        bounded_limit = max(1, min(int(limit), self.MAX_PAGE_LIMIT))
+        normalized_query = " ".join(str(query or "").split())
+        if len(normalized_query) > self.MAX_QUERY_CHARS:
+            normalized_query = normalized_query[: self.MAX_QUERY_CHARS]
+        sort_cursor = _decode_run_cursor(cursor)
+
+        with self._session_factory() as session:
+            if session.get(ConversationRecord, normalized_conversation_id) is None:
+                raise ValueError("Conversation not found.")
+            filters = [
+                AgentRunRecord.conversation_id == normalized_conversation_id
+            ]
+            if not include_terminal:
+                filters.append(
+                    AgentRunRecord.state.notin_(
+                        [
+                            AgentRunState.COMPLETED.value,
+                            AgentRunState.FAILED.value,
+                            AgentRunState.CANCELLED.value,
+                        ]
+                    )
+                )
+            if normalized_query:
+                pattern = _sqlite_contains_pattern(normalized_query)
+                filters.append(
+                    or_(
+                        func.lower(AgentRunRecord.original_request).like(
+                            pattern, escape="\\"
+                        ),
+                        func.lower(AgentRunRecord.aggregated_request).like(
+                            pattern, escape="\\"
+                        ),
+                    )
+                )
+            all_filters = list(filters)
+            if sort_cursor is not None:
+                cursor_time, cursor_id = sort_cursor
+                filters.append(
+                    or_(
+                        AgentRunRecord.created_at < cursor_time,
+                        and_(
+                            AgentRunRecord.created_at == cursor_time,
+                            AgentRunRecord.id < cursor_id,
+                        ),
+                    )
+                )
+            total = int(
+                session.scalar(
+                    select(func.count())
+                    .select_from(AgentRunRecord)
+                    .where(*all_filters)
+                )
+                or 0
+            )
+            rows = list(
+                session.scalars(
+                    select(AgentRunRecord)
+                    .where(*filters)
+                    .order_by(
+                        AgentRunRecord.created_at.desc(), AgentRunRecord.id.desc()
+                    )
+                    .limit(bounded_limit + 1)
+                ).all()
+            )
+
+        has_more = len(rows) > bounded_limit
+        page_rows = rows[:bounded_limit]
+        next_cursor = (
+            _encode_run_cursor(page_rows[-1]) if has_more and page_rows else None
+        )
+        summaries: list[dict[str, Any]] = []
+        for row in page_rows:
+            summary = self._to_run_summary(row)
+            raw_task_state = self.get_task_state(
+                row.id,
+                run_version=int(row.active_run_version),
+            )
+            if isinstance(raw_task_state, dict):
+                try:
+                    typed_task_state = AgentTaskState.model_validate(raw_task_state)
+                except (TypeError, ValueError):
+                    typed_task_state = None
+                if typed_task_state is not None:
+                    summary["current_iteration"] = typed_task_state.current_iteration
+                    summary["task_state"] = typed_task_state.model_dump(
+                        mode="json"
+                    )
+            summaries.append(summary)
+        pagination = {
+            "cursor": cursor,
+            "next_cursor": next_cursor,
+            "has_more": has_more,
+            "total": total,
+            "limit": bounded_limit,
+        }
+        return {
+            "runs": summaries,
+            "pagination": pagination,
+            "next_cursor": next_cursor,
+            "has_more": has_more,
+            "total": total,
+        }
+
+    # -------------------------------------------------------------------------
+    def list_run_summaries(
+        self,
+        conversation_id: str,
+        *,
+        query: str | None = None,
+        cursor: str | None = None,
+        limit: int = 20,
+        include_terminal: bool = True,
+    ) -> dict[str, Any]:
+        """Return recent-run summaries using the API-facing spelling."""
+
+        return self.list_runs_for_conversation(
+            conversation_id,
+            query=query,
+            cursor=cursor,
+            limit=limit,
+            include_terminal=include_terminal,
+        )
+
+    # -------------------------------------------------------------------------
+    def read_trace(
+        self,
+        conversation_id: str,
+        run_id: str,
+        *,
+        run_version: int | None = None,
+        after_sequence: int | None = None,
+        cursor: str | None = None,
+        limit: int = 100,
+        include_internal: bool = True,
+    ) -> dict[str, Any]:
+        """Read a redacted operational trace for one conversation run.
+
+        Trace rows are read directly from ``agent_run_events`` so internal
+        checkpoints and trace events can be included for an authenticated
+        inspector.  Payloads are bounded and redacted at this boundary; this
+        method never returns provider credentials, raw payload bodies, or
+        chain-of-thought/reasoning fields.
+        """
+
+        normalized_conversation_id = str(conversation_id).strip()
+        normalized_run_id = str(run_id).strip()
+        if not normalized_conversation_id or not normalized_run_id:
+            raise ValueError("Conversation and run ids are required.")
+        bounded_limit = max(1, min(int(limit), self.MAX_TRACE_LIMIT))
+        parsed_cursor = _parse_sequence_cursor(cursor)
+        effective_after = max(
+            value
+            for value in (after_sequence or 0, parsed_cursor or 0)
+        )
+        if effective_after < 0:
+            raise ValueError("after_sequence must be non-negative.")
+        if run_version is not None and run_version < 1:
+            raise ValueError("run_version must be positive.")
+
+        with self._session_factory() as session:
+            run = session.scalar(
+                select(AgentRunRecord).where(
+                    AgentRunRecord.id == normalized_run_id,
+                    AgentRunRecord.conversation_id == normalized_conversation_id,
+                )
+            )
+            if run is None:
+                raise ValueError("Run not found.")
+            filters: list[Any] = [
+                AgentRunEventRecord.run_id == normalized_run_id,
+                AgentRunEventRecord.conversation_id == normalized_conversation_id,
+            ]
+            if run_version is not None:
+                filters.append(AgentRunEventRecord.run_version == run_version)
+            if not include_internal:
+                filters.append(AgentRunEventRecord.visibility == "user")
+            total = int(
+                session.scalar(
+                    select(func.count())
+                    .select_from(AgentRunEventRecord)
+                    .where(*filters)
+                )
+                or 0
+            )
+            page_filters = list(filters)
+            if effective_after:
+                page_filters.append(AgentRunEventRecord.sequence > effective_after)
+            rows = list(
+                session.scalars(
+                    select(AgentRunEventRecord)
+                    .where(*page_filters)
+                    .order_by(AgentRunEventRecord.sequence.asc())
+                    .limit(bounded_limit + 1)
+                ).all()
+            )
+
+        has_more = len(rows) > bounded_limit
+        page_rows = rows[:bounded_limit]
+        next_cursor = str(page_rows[-1].sequence) if has_more and page_rows else None
+        events = [self._to_trace_event(row) for row in page_rows]
+        pagination = {
+            "cursor": cursor,
+            "next_cursor": next_cursor,
+            "has_more": has_more,
+            "total": total,
+            "limit": bounded_limit,
+            "after_sequence": effective_after or None,
+        }
+        return {
+            "conversation_id": normalized_conversation_id,
+            "run_id": normalized_run_id,
+            "run_version": run_version,
+            "events": events,
+            "pagination": pagination,
+            "next_cursor": next_cursor,
+            "has_more": has_more,
+            "total": total,
+        }
+
+    # -------------------------------------------------------------------------
+    def get_run_trace(
+        self,
+        conversation_id: str,
+        run_id: str,
+        *,
+        run_version: int | None = None,
+        after_sequence: int | None = None,
+        cursor: str | None = None,
+        limit: int = 100,
+        include_internal: bool = True,
+    ) -> dict[str, Any]:
+        """Alias for :meth:`read_trace` used by API adapters."""
+
+        return self.read_trace(
+            conversation_id,
+            run_id,
+            run_version=run_version,
+            after_sequence=after_sequence,
+            cursor=cursor,
+            limit=limit,
+            include_internal=include_internal,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _to_run_summary(record: AgentRunRecord) -> dict[str, Any]:
+        started = _aware_datetime(record.started_at)
+        completed = _aware_datetime(record.completed_at)
+        duration_ms = (
+            max(0, int((completed - started).total_seconds() * 1000))
+            if started is not None and completed is not None
+            else None
+        )
+        return {
+            "run_id": record.id,
+            "conversation_id": record.conversation_id,
+            "run_version": int(record.active_run_version),
+            "active_run_version": int(record.active_run_version),
+            "state": record.state,
+            "original_request": record.original_request[:2_000],
+            "aggregated_request": record.aggregated_request[:2_000],
+            "request_timezone": record.request_timezone,
+            "created_at": _iso_datetime(record.created_at),
+            "started_at": _iso_datetime(record.started_at),
+            "completed_at": _iso_datetime(record.completed_at),
+            "cancel_requested_at": _iso_datetime(record.cancel_requested_at),
+            "error_code": record.error_code,
+            "error_message": _safe_trace_string(record.error_message),
+            "presentation_status": record.presentation_status,
+            "duration_ms": duration_ms,
+            "current_iteration": None,
+            "task_state": None,
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _to_trace_event(record: AgentRunEventRecord) -> dict[str, Any]:
+        payload = redact_trace_payload(record.payload_json)
+        event: dict[str, Any] = {
+            "event_id": record.id,
+            "run_id": record.run_id,
+            "conversation_id": record.conversation_id,
+            "sequence": int(record.sequence),
+            "run_version": int(record.run_version),
+            "type": record.type,
+            "visibility": record.visibility,
+            "timestamp": _iso_datetime(record.created_at),
+            "payload": payload,
+        }
+        # Native trace events are persisted as an envelope whose operational
+        # fields live in ``payload`` (and, for AgentTraceEvent, often one
+        # level deeper in ``payload.payload``).  Flatten only the small UI/API
+        # projection fields; retain the redacted envelope for full inspection.
+        event["kind"] = str(payload.get("kind") or record.type)
+        nested = payload.get("payload")
+        nested_payload = (
+            cast(dict[str, Any], nested) if isinstance(nested, dict) else {}
+        )
+        for key, aliases in {
+            "task_id": ("task_id", "active_task_id"),
+            "tool_name": ("tool_name", "tool"),
+            "call_id": ("call_id", "tool_call_id"),
+            "iteration": ("iteration", "current_iteration"),
+            "label": ("label",),
+            "status": ("status",),
+            "summary": ("summary", "message"),
+            "duration_ms": ("duration_ms", "duration"),
+            "evidence_refs": ("evidence_refs", "evidence_ids"),
+            "retryable": ("retryable",),
+            "error": ("error", "error_message", "failure"),
+        }.items():
+            for alias in aliases:
+                candidate = payload.get(alias)
+                if candidate is None:
+                    candidate = nested_payload.get(alias)
+                if candidate is not None:
+                    event[key] = candidate
+                    break
+        return event
 
     # -------------------------------------------------------------------------
     def set_state(self, run_id: str, state: AgentRunState) -> AgentRunSnapshot:
@@ -598,6 +1013,11 @@ class AgentRunRepository:
                             "map_session": candidate_map,
                             "presentation_status": "ready",
                         }
+                task_state = _terminal_task_state_payload(
+                    pending_response.get("task_state"), status="completed"
+                )
+                if task_state is not None:
+                    pending_response["task_state"] = task_state
                 run.state = AgentRunState.COMPLETED.value
                 run.completed_at = datetime.now(UTC)
                 run.presentation_status = "ready"
@@ -673,6 +1093,11 @@ class AgentRunRepository:
                     ),
                 ]
             elif status == "failed":
+                task_state = _terminal_task_state_payload(
+                    pending_response.get("task_state"), status="failed"
+                )
+                if task_state is not None:
+                    pending_response["task_state"] = task_state
                 run.state = AgentRunState.FAILED.value
                 run.completed_at = datetime.now(UTC)
                 run.error_code = str(acknowledgment.get("failure_code") or "render_failed")
@@ -1034,6 +1459,58 @@ class AgentRunRepository:
 
 
 ###############################################################################
+def _task_state_from_payload(payload: JsonObject) -> dict[str, Any] | None:
+    """Locate a bounded task ledger in a known native event envelope."""
+
+    candidates: list[object] = [payload.get("task_state")]
+    nested = payload.get("payload")
+    if isinstance(nested, dict):
+        nested_object = cast(JsonObject, nested)
+        candidates.append(nested_object.get("task_state"))
+        checkpoint_state = nested_object.get("run_state")
+        if isinstance(checkpoint_state, dict):
+            candidates.append(cast(JsonObject, checkpoint_state).get("task_state"))
+    for candidate in candidates:
+        if isinstance(candidate, dict):
+            return dict(cast(dict[str, Any], candidate))
+    return None
+
+
+def _terminal_task_state_payload(
+    value: object,
+    *,
+    status: Literal["completed", "failed"],
+) -> dict[str, Any] | None:
+    """Promote the persisted task ledger with the render terminal state.
+
+    Render acknowledgment is the final server-owned observation for map
+    runs.  It must update the same run-scoped ledger that was emitted while
+    awaiting the browser; otherwise the run row becomes terminal while its
+    public task projection remains ``in_progress``.
+    """
+
+    if not isinstance(value, dict):
+        return None
+    try:
+        typed = AgentTaskState.model_validate(value)
+    except (TypeError, ValueError):
+        return None
+    requirements = [
+        item.model_copy(update={"status": "satisfied" if status == "completed" else "failed"})
+        for item in typed.completion_requirements
+    ]
+    tasks = [item.model_copy(update={"status": status}) for item in typed.tasks]
+    return typed.model_copy(
+        update={
+            "active_task_id": typed.root_task_id,
+            "status": status,
+            "tasks": tasks,
+            "completion_requirements": requirements,
+        }
+    ).model_dump(mode="json", exclude_none=True)
+
+
+###############################################################################
 def _final_render_message(pending_response: JsonObject) -> str:
     """Replace the transient render-wait text with a durable terminal result."""
 
@@ -1078,3 +1555,217 @@ def _final_render_message(pending_response: JsonObject) -> str:
         noun = "result" if feature_count == 1 else "results"
         return f"The map is ready with {feature_count} {noun}."
     return "The map is ready."
+
+
+###############################################################################
+_TRACE_SECRET_MARKERS = (
+    "authorization",
+    "access_token",
+    "api_key",
+    "apikey",
+    "password",
+    "secret",
+    "cookie",
+    "credential",
+    "private_key",
+    "client_secret",
+)
+_TRACE_REASONING_KEYS = {
+    "analysis",
+    "chain_of_thought",
+    "chainofthought",
+    "deliberation",
+    "hidden_reasoning",
+    "internal_reasoning",
+    "scratchpad",
+    "thought",
+    "thoughts",
+    "reasoning",
+}
+_BEARER_PATTERN = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
+_SECRET_VALUE_PATTERN = re.compile(
+    r"(?i)\b(?:sk|pk|ghp|gsk|xox[baprs])-[A-Za-z0-9_-]{8,}\b"
+)
+_NAMED_SECRET_PATTERN = re.compile(
+    r"(?i)\b(?:api[_ -]?key|access[_ -]?token|password|secret|credential)"
+    r"\s*[:=]\s*[^\s,;]+"
+)
+
+
+###############################################################################
+def redact_trace_payload(
+    value: object,
+    *,
+    max_depth: int = 8,
+    max_items: int = 128,
+    max_string_chars: int = 4_096,
+) -> JsonObject:
+    """Return a bounded operational payload safe for a run inspector.
+
+    This is deliberately independent of provider-specific payload models.
+    Trace records have historically accepted JSON objects from several
+    execution layers, so the repository boundary applies a conservative
+    recursive policy: remove credential/reasoning fields, cap collection and
+    string sizes, and retain scalar operational metadata.
+    """
+
+    safe = _redact_trace_value(
+        value,
+        depth=0,
+        max_depth=max_depth,
+        max_items=max_items,
+        max_string_chars=max_string_chars,
+    )
+    if isinstance(safe, dict):
+        return cast(JsonObject, safe)
+    if isinstance(safe, list):
+        return {"items": safe}
+    return {"value": safe}
+
+
+###############################################################################
+def _redact_trace_value(
+    value: object,
+    *,
+    depth: int,
+    max_depth: int,
+    max_items: int,
+    max_string_chars: int,
+) -> Any:
+    if depth >= max_depth:
+        return "[depth-limited]"
+    if isinstance(value, dict):
+        mapping = cast(dict[Any, Any], value)
+        result: dict[str, Any] = {}
+        for index, (raw_key, raw_value) in enumerate(mapping.items()):
+            if index >= max_items:
+                result["_truncated_keys"] = True
+                break
+            key = str(raw_key)
+            normalized_key = key.casefold().replace("-", "_").replace(" ", "_")
+            if _is_trace_secret_key(normalized_key):
+                continue
+            if normalized_key in _TRACE_REASONING_KEYS:
+                continue
+            result[key] = _redact_trace_value(
+                raw_value,
+                depth=depth + 1,
+                max_depth=max_depth,
+                max_items=max_items,
+                max_string_chars=max_string_chars,
+            )
+        return result
+    if isinstance(value, list):
+        items = cast(list[Any], value)
+        bounded = [
+            _redact_trace_value(
+                item,
+                depth=depth + 1,
+                max_depth=max_depth,
+                max_items=max_items,
+                max_string_chars=max_string_chars,
+            )
+            for item in items[:max_items]
+        ]
+        if len(items) > max_items:
+            bounded.append("[items-truncated]")
+        return bounded
+    if isinstance(value, tuple):
+        items = cast(tuple[Any, ...], value)
+        return _redact_trace_value(
+            list(items),
+            depth=depth,
+            max_depth=max_depth,
+            max_items=max_items,
+            max_string_chars=max_string_chars,
+        )
+    if isinstance(value, bytes):
+        return "[binary-redacted]"
+    if isinstance(value, str):
+        safe_value = _BEARER_PATTERN.sub("[redacted bearer token]", value)
+        safe_value = _SECRET_VALUE_PATTERN.sub("[redacted secret]", safe_value)
+        safe_value = _NAMED_SECRET_PATTERN.sub("[redacted secret]", safe_value)
+        if len(safe_value) > max_string_chars:
+            return f"{safe_value[: max_string_chars - 1]}…"
+        return safe_value
+    return value
+
+
+###############################################################################
+def _is_trace_secret_key(normalized_key: str) -> bool:
+    return any(marker in normalized_key for marker in _TRACE_SECRET_MARKERS)
+
+
+###############################################################################
+def _safe_trace_string(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return str(
+        _redact_trace_value(
+            value,
+            depth=0,
+            max_depth=1,
+            max_items=1,
+            max_string_chars=2_000,
+        )
+    )
+
+
+###############################################################################
+def _iso_datetime(value: datetime | None) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+###############################################################################
+def _aware_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+
+###############################################################################
+def _sqlite_contains_pattern(value: str) -> str:
+    escaped = value.casefold().replace("\\", "\\\\")
+    escaped = escaped.replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+###############################################################################
+def _encode_run_cursor(row: AgentRunRecord) -> str:
+    timestamp = row.created_at.isoformat() if row.created_at else ""
+    payload = json.dumps(
+        {"created_at": timestamp, "run_id": row.id},
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
+
+###############################################################################
+def _decode_run_cursor(cursor: str | None) -> tuple[datetime, str] | None:
+    if cursor is None or not str(cursor).strip():
+        return None
+    encoded = str(cursor).strip()
+    try:
+        padded = encoded + "=" * (-len(encoded) % 4)
+        decoded = base64.urlsafe_b64decode(padded.encode("ascii"))
+        payload = json.loads(decoded.decode("utf-8"))
+        timestamp = datetime.fromisoformat(str(payload.get("created_at") or ""))
+        run_id = str(payload.get("run_id") or "").strip()
+    except (ValueError, TypeError, KeyError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Invalid run cursor.") from exc
+    if not run_id:
+        raise ValueError("Invalid run cursor.")
+    if timestamp.tzinfo is not None:
+        timestamp = timestamp.astimezone(UTC).replace(tzinfo=None)
+    return timestamp, run_id
+
+
+###############################################################################
+def _parse_sequence_cursor(cursor: str | None) -> int | None:
+    if cursor is None or not str(cursor).strip():
+        return None
+    value = str(cursor).strip()
+    if not value.isdigit():
+        raise ValueError("Invalid trace cursor.")
+    return max(0, int(value))

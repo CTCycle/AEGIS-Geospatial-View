@@ -16,7 +16,7 @@ def test_ecosystem_inventory_covers_catalog_runtime_and_native_tools() -> None:
         "manifests": 86,
         "providers": 38,
         "direct_tools": 4,
-        "llm_native_tools": 9,
+        "llm_native_tools": 10,
         "runtime_profiles": 68,
     }
     providers = {item["id"]: item for item in report["providers"]}

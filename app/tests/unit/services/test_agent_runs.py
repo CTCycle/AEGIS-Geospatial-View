@@ -611,6 +611,27 @@ def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
         "pending_response": {
             "assistant_message": "Data prepared; the map is loading.",
             "map_session": candidate_map,
+            "task_state": {
+                "root_task_id": "task-root-render-handshake",
+                "active_task_id": "task-root-render-handshake",
+                "status": "in_progress",
+                "current_iteration": 1,
+                "max_iterations": 12,
+                "tasks": [
+                    {
+                        "task_id": "task-root-render-handshake",
+                        "description": "Show earthquakes in Rome",
+                        "status": "in_progress",
+                    }
+                ],
+                "completion_requirements": [
+                    {
+                        "name": "map_candidate_prepared",
+                        "required": True,
+                        "status": "satisfied",
+                    }
+                ],
+            },
             "memory_snapshot": {"active_location": {"label": "Rome"}},
             "conversation_state": {
                 "conversation_id": conversation.conversation_id,
@@ -653,18 +674,21 @@ def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
         "overlay_results": [],
         "failure_code": None,
     }
-    completed, duplicate, _ = run_repositories["runs"].acknowledge_render(
-        conversation_id=conversation.conversation_id,
-        run_id=run.run_id,
-        run_version=run.run_version,
-        map_session_id="map-session-1",
-        collection_revision=4,
-        status="ready",
-        acknowledgment=acknowledgment,
+    completed, duplicate, completed_response = (
+        run_repositories["runs"].acknowledge_render(
+            conversation_id=conversation.conversation_id,
+            run_id=run.run_id,
+            run_version=run.run_version,
+            map_session_id="map-session-1",
+            collection_revision=4,
+            status="ready",
+            acknowledgment=acknowledgment,
+        )
     )
     assert completed.state.value == "completed"
     assert completed.presentation_status == "ready"
     assert duplicate is False
+    assert completed_response["task_state"]["status"] == "completed"
     with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
         message = session.scalar(
             sqlalchemy.select(ChatMessageRecord).where(

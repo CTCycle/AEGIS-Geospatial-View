@@ -19,7 +19,7 @@ from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
 from server.services.agent.agent_loop import AgentLoop
 from server.services.agent.capability_router import CapabilityRouter
-from server.services.agent.native_v2_turn import (
+from server.services.agent.turn_runner import (
     AgentTurnRequest,
     AgentTurnRunner,
 )

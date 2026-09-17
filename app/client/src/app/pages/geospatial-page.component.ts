@@ -8,11 +8,13 @@ import {
   CapabilityStatusTone,
 } from '../components/capability-status-list.component';
 import { ChatMessageComponent } from '../components/chat-message.component';
+import { ConversationHistoryComponent } from '../components/conversation-history.component';
 import {
   MapPreviewComponent,
   MapRenderIdentity,
   MapRenderStateChange,
 } from '../components/map-preview.component';
+import { RunInspectorComponent } from '../components/run-inspector.component';
 import {
   AgentReadinessService,
   AgentReadinessState,
@@ -21,10 +23,14 @@ import {
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { LocalCommandService } from '../core/local-command.service';
-import { normalizeMapSession, parseContextUsage } from '../core/api-parsers';
+import { normalizeMapSession, parseAgentTaskState, parseContextUsage } from '../core/api-parsers';
 import { PersistedChatPageState } from '../core/app-state';
 import { MAX_CHAT_MESSAGE_LENGTH } from '../core/constants';
-import { parseRunCompletionPayload, parseRunEvent } from '../core/realtime-parsers';
+import {
+  parseRunCompletionPayload,
+  parseRunEvent,
+  parseToolProgressPayload,
+} from '../core/realtime-parsers';
 import { RealtimeService } from '../core/realtime.service';
 import {
   ChatOperationResult,
@@ -45,6 +51,10 @@ import {
   RealtimeConnectionState,
   RunEvent,
   PresentationStatus,
+  AgentTaskState,
+  ConversationSummary,
+  RunTraceEntry,
+  ToolProgressItem,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
@@ -53,7 +63,14 @@ import { mapSessionOverlayEntries } from '../components/map-preview-rendering';
 @Component({
   selector: 'app-geospatial-page',
   standalone: true,
-  imports: [CommonModule, CapabilityStatusListComponent, ChatMessageComponent, MapPreviewComponent],
+  imports: [
+    CommonModule,
+    CapabilityStatusListComponent,
+    ChatMessageComponent,
+    ConversationHistoryComponent,
+    MapPreviewComponent,
+    RunInspectorComponent,
+  ],
   templateUrl: './geospatial-page.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './geospatial-page.component.css',
@@ -78,6 +95,18 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   streamState: RealtimeConnectionState = 'idle';
   progressStage?: string;
   progressLabel?: string;
+  taskState?: AgentTaskState | null;
+  toolProgress: ToolProgressItem[] = [];
+  traceEntries: RunTraceEntry[] = [];
+  isRunInspectorOpen = false;
+  runTraceLoading = false;
+  runTraceError = '';
+  conversationHistory: ConversationSummary[] = [];
+  conversationHistoryQuery = '';
+  conversationHistoryCursor?: string | null;
+  isConversationHistoryOpen = false;
+  conversationHistoryLoading = false;
+  conversationHistoryError = '';
   conversationNonce = 1;
   messages: ChatMessage[] = [];
   lastRoute?: ChatTurnResponse['route'];
@@ -127,6 +156,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   private removeRealtimeMessageListener?: () => void;
   private removeRealtimeStateListener?: () => void;
   private cancelRequested = false;
+  private historyRequestNonce = 0;
 
   get mapRenderIdentity(): MapRenderIdentity | undefined {
     return this.pendingRenderContext;
@@ -179,6 +209,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   ngOnDestroy(): void {
     this.isDestroyed = true;
+    this.historyRequestNonce += 1;
     this.removeRealtimeMessageListener?.();
     this.removeRealtimeStateListener?.();
     this.realtimeService.disconnect({ discardPending: true });
@@ -231,6 +262,23 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   get showProgressIndicator(): boolean {
     return this.isLoading;
+  }
+
+  get inspectedRunId(): string | undefined {
+    return this.activeRunId ?? this.lastHandledRunId;
+  }
+
+  get iterationLabel(): string | undefined {
+    const iteration = this.taskState?.current_iteration;
+    if (iteration === undefined) {
+      return undefined;
+    }
+    const max = this.taskState?.max_iterations;
+    return max === undefined ? `Iteration ${iteration}` : `Iteration ${iteration} of ${max}`;
+  }
+
+  get latestToolProgress(): ToolProgressItem | undefined {
+    return this.toolProgress.at(-1);
   }
 
   get capabilityStatusItems(): CapabilityStatusItem[] {
@@ -372,6 +420,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   startNewChat(): void {
     this.realtimeService.disconnect({ discardPending: true });
+    this.historyRequestNonce += 1;
     this.conversationId = undefined;
     this.contextRevision = undefined;
     this.conversationState = undefined;
@@ -385,6 +434,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.progressLabel = undefined;
     this.seenEventIds.clear();
     this.conversationNonce += 1;
+    this.taskState = undefined;
+    this.toolProgress = [];
+    this.traceEntries = [];
+    this.isRunInspectorOpen = false;
+    this.runTraceLoading = false;
+    this.runTraceError = '';
     this.messages = [];
     this.lastRoute = undefined;
     this.lastGoal = undefined;
@@ -407,6 +462,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.mapState = { overlayVisibility: {}, overlayOpacity: {} };
     this.progressPercent = 0;
     this.isAlertsOpen = false;
+    this.isConversationHistoryOpen = false;
     this.cancelRequested = false;
     this.appStateStore.resetChatPage();
     this.syncState();
@@ -415,6 +471,131 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   toggleAlerts(): void {
     this.isAlertsOpen = !this.isAlertsOpen;
+  }
+
+  toggleConversationHistory(): void {
+    this.isConversationHistoryOpen = !this.isConversationHistoryOpen;
+    if (this.isConversationHistoryOpen && this.conversationHistory.length === 0) {
+      void this.loadConversationHistory(true);
+    }
+  }
+
+  onConversationHistoryQuery(query: string): void {
+    this.conversationHistoryQuery = query;
+    void this.loadConversationHistory(true);
+  }
+
+  loadMoreConversations(): void {
+    if (!this.conversationHistoryCursor || this.conversationHistoryLoading) {
+      return;
+    }
+    void this.loadConversationHistory(false);
+  }
+
+  async selectConversation(conversation: ConversationSummary): Promise<void> {
+    if (!conversation.conversation_id || conversation.conversation_id === this.conversationId) {
+      this.isConversationHistoryOpen = false;
+      return;
+    }
+    this.startNewChat();
+    this.conversationId = conversation.conversation_id;
+    this.isConversationHistoryOpen = false;
+    this.syncState();
+    await this.hydrateConversation(conversation.conversation_id);
+  }
+
+  toggleRunInspector(expanded?: boolean): void {
+    this.isRunInspectorOpen = expanded === undefined ? !this.isRunInspectorOpen : expanded;
+    if (this.isRunInspectorOpen && this.inspectedRunId) {
+      void this.loadRunTrace(this.inspectedRunId, true);
+    }
+  }
+
+  refreshRunTrace(): void {
+    if (this.inspectedRunId) {
+      void this.loadRunTrace(this.inspectedRunId, true);
+    }
+  }
+
+  private async loadConversationHistory(reset: boolean): Promise<void> {
+    const requestNonce = ++this.historyRequestNonce;
+    this.conversationHistoryLoading = true;
+    this.conversationHistoryError = '';
+    const cursor = reset ? undefined : this.conversationHistoryCursor ?? undefined;
+    if (reset) {
+      this.conversationHistoryCursor = undefined;
+    }
+    this.changeDetectorRef.detectChanges();
+    try {
+      const result = await this.apiClient.fetchConversations({
+        query: this.conversationHistoryQuery.trim() || undefined,
+        limit: 30,
+        cursor,
+      });
+      if (this.isDestroyed || requestNonce !== this.historyRequestNonce) {
+        return;
+      }
+      const merged = reset ? result.conversations : [...this.conversationHistory, ...result.conversations];
+      const seen = new Set<string>();
+      this.conversationHistory = merged.filter((item) => {
+        if (seen.has(item.conversation_id)) {
+          return false;
+        }
+        seen.add(item.conversation_id);
+        return true;
+      });
+      this.conversationHistoryCursor = result.next_cursor;
+    } catch (error: unknown) {
+      if (this.isDestroyed || requestNonce !== this.historyRequestNonce) {
+        return;
+      }
+      this.conversationHistoryError = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not load conversation history.',
+      );
+    } finally {
+      if (!this.isDestroyed && requestNonce === this.historyRequestNonce) {
+        this.conversationHistoryLoading = false;
+        this.changeDetectorRef.detectChanges();
+      }
+    }
+  }
+
+  private async loadRunTrace(runId: string, reset: boolean): Promise<void> {
+    if (!this.conversationId || !runId) {
+      return;
+    }
+    const requestNonce = this.historyRequestNonce;
+    this.runTraceLoading = true;
+    this.runTraceError = '';
+    try {
+      const result = await this.apiClient.fetchConversationRunTrace(
+        this.conversationId,
+        runId,
+        { limit: 100, cursor: reset ? undefined : undefined },
+      );
+      if (this.isDestroyed
+        || requestNonce !== this.historyRequestNonce
+        || this.inspectedRunId !== runId
+        || this.conversationId !== result.conversation_id
+        || result.run_id !== runId) {
+        return;
+      }
+      this.traceEntries = result.entries;
+    } catch (error: unknown) {
+      if (this.isDestroyed || requestNonce !== this.historyRequestNonce) {
+        return;
+      }
+      this.runTraceError = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not load the run trace.',
+      );
+    } finally {
+      if (!this.isDestroyed && requestNonce === this.historyRequestNonce) {
+        this.runTraceLoading = false;
+        this.changeDetectorRef.detectChanges();
+      }
+    }
   }
 
   toggleToolbar(): void {
@@ -495,6 +676,11 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.progressStage = undefined;
       this.progressLabel = undefined;
       this.progressPercent = 0;
+      this.taskState = snapshot.active_run?.task_state;
+      this.toolProgress = [];
+      this.traceEntries = [];
+      this.runTraceLoading = false;
+      this.runTraceError = '';
       this.pendingRun = undefined;
       this.cancelRequested = false;
       this.seenEventIds.clear();
@@ -580,6 +766,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   private resetInvalidConversation(): void {
     this.realtimeService.disconnect({ discardPending: true });
+    this.historyRequestNonce += 1;
     this.conversationId = undefined;
     this.conversationNonce += 1;
     this.contextRevision = undefined;
@@ -591,6 +778,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.streamState = 'idle';
     this.progressStage = undefined;
     this.progressLabel = undefined;
+    this.taskState = undefined;
+    this.toolProgress = [];
+    this.traceEntries = [];
+    this.isRunInspectorOpen = false;
+    this.runTraceLoading = false;
+    this.runTraceError = '';
     this.seenEventIds.clear();
     this.messages = [];
     this.lastRoute = undefined;
@@ -695,6 +888,10 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.progressStage = 'understanding_request';
     this.progressLabel = 'Understanding the request';
     this.progressPercent = 18;
+    this.taskState = undefined;
+    this.toolProgress = [];
+    this.traceEntries = [];
+    this.runTraceError = '';
     this.messages = [...this.messages, { role: 'user', content: message, kind: 'normal' }];
     this.assistantDraft = '';
     this.syncState();
@@ -800,6 +997,10 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.activeRunId = runId;
         this.lastHandledRunId = runId;
         this.activeRunVersion = this.readNumber(message.payload['run_version']);
+        this.applyTaskState(message.payload['task_state']);
+        this.toolProgress = [];
+        this.traceEntries = [];
+        this.runTraceError = '';
         this.isLoading = true;
         this.realtimeService.setResumeCursor(runId, this.lastRunSequence);
         if (this.cancelRequested) {
@@ -839,6 +1040,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return;
     }
     if (message.type === 'session.resumed') {
+      this.applyTaskState(message.payload['task_state']);
       const state = this.readString(message.payload['state']);
       if (state === 'awaiting_render') {
         this.isLoading = true;
@@ -924,6 +1126,20 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.realtimeService.setResumeCursor(event.run_id, event.sequence);
     this.activeRunVersion = event.run_version;
     this.lastHandledRunId = event.run_id;
+    this.applyTaskState(event.payload['task_state']);
+    if (event.type === 'tool_started' || event.type === 'tool_completed') {
+      const progress = parseToolProgressPayload(event.payload, event.type);
+      if (progress) {
+        this.upsertToolProgress(progress);
+      }
+    }
+    // Internal trace/checkpoint events advance the replay cursor but never
+    // become user-visible progress or transcript content. The expandable
+    // inspector reads the sanitized trace endpoint when requested.
+    if (event.visibility !== 'user') {
+      this.syncState();
+      return;
+    }
     switch (event.type) {
       case 'context_usage': {
         const usage = parseContextUsage(event.payload['context_usage']);
@@ -933,12 +1149,21 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         break;
       }
       case 'progress':
-      case 'tool_started':
-      case 'tool_completed':
         this.progressStage = String(event.payload['stage'] ?? event.type);
         this.progressLabel = String(event.payload['label'] ?? this.progressLabel ?? this.status);
         this.status = this.progressLabel;
         break;
+      case 'tool_started':
+      case 'tool_completed': {
+        this.progressStage = String(event.payload['stage'] ?? event.type);
+        this.progressLabel = String(event.payload['label'] ?? this.progressLabel ?? this.status);
+        this.status = this.progressLabel;
+        const iteration = this.readNumber(event.payload['iteration'] ?? event.payload['current_iteration']);
+        if (iteration !== undefined && this.taskState) {
+          this.taskState = { ...this.taskState, current_iteration: iteration };
+        }
+        break;
+      }
       case 'assistant_text_delta':
         this.assistantDraft += String(event.payload['delta'] ?? '');
         break;
@@ -962,6 +1187,11 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           const presentationStatus = this.readString(event.payload['presentation_status']);
           if (parsed.operation !== undefined) {
             this.lastOperation = parsed.operation;
+          }
+          if (parsed.operation?.failure_category === 'iteration_budget_exhausted'
+            || errorCode === 'iteration_budget_exhausted') {
+            this.status = 'Iteration budget exhausted';
+            this.progressLabel = 'Iteration budget exhausted';
           }
           if (parsed.presentationStatus !== undefined) {
             this.presentationStatus = parsed.presentationStatus;
@@ -1119,6 +1349,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (parsed.presentationStatus !== undefined) {
       this.presentationStatus = parsed.presentationStatus;
     }
+    if (parsed.taskState !== undefined) {
+      this.taskState = parsed.taskState;
+    }
     this.applyContextUsage(parsed.contextUsage);
   }
 
@@ -1128,6 +1361,46 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   private readNumber(value: unknown): number | undefined {
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  }
+
+  private applyTaskState(value: unknown): void {
+    if (value === undefined) {
+      return;
+    }
+    try {
+      const parsed = parseAgentTaskState(value, 'realtime run event');
+      if (parsed !== undefined) {
+        this.taskState = parsed;
+      }
+    } catch {
+      // Optional progress metadata must never make a valid run unusable.
+    }
+  }
+
+  private upsertToolProgress(progress: ToolProgressItem): void {
+    const existingIndex = this.toolProgress.findIndex((item) => item.call_id === progress.call_id);
+    if (existingIndex < 0) {
+      this.toolProgress = [...this.toolProgress, progress].slice(-48);
+      return;
+    }
+    const existing = this.toolProgress[existingIndex];
+    this.toolProgress = this.toolProgress.map((item, index) => (
+      index === existingIndex
+        ? {
+          ...existing,
+          ...progress,
+          label: progress.label ?? existing.label,
+          task_id: progress.task_id ?? existing.task_id,
+          iteration: progress.iteration ?? existing.iteration,
+          summary: progress.summary ?? existing.summary,
+          duration_ms: progress.duration_ms ?? existing.duration_ms,
+          evidence_refs: progress.evidence_refs ?? existing.evidence_refs,
+          error: progress.error ?? existing.error,
+          started_at: progress.started_at ?? existing.started_at,
+          completed_at: progress.completed_at ?? existing.completed_at,
+        }
+        : item
+    ));
   }
 
   private applyContextUsage(usage: ContextUsage | null | undefined): void {
@@ -1163,6 +1436,19 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.lastOperation = operation;
     this.presentationStatus = result.presentation_status;
     this.memorySnapshot = result.memory_snapshot ?? {};
+    this.taskState = result.task_state;
+    result.tool_results.forEach((tool) => {
+      this.upsertToolProgress({
+        call_id: tool.call_id,
+        tool_name: tool.tool_name,
+        status: tool.status,
+        summary: tool.summary,
+        evidence_refs: tool.evidence_refs,
+        error: tool.error && typeof tool.error['message'] === 'string'
+          ? tool.error['message']
+          : null,
+      });
+    });
     this.applyContextUsage(result.context_usage);
     this.assistantDraft = '';
     this.status = 'Agent ready';

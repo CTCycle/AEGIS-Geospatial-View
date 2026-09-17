@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
 from uuid import uuid4
 
@@ -15,9 +17,11 @@ from server.domain.agent.reliability import (
     AgentExecutionBudget,
     ExecutionBudgetExceeded,
 )
+from server.domain.agent.trace import AgentTraceEvent, redact_trace_value
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
+    ModelObservation,
     ToolResult,
     ValidationIssue,
 )
@@ -35,10 +39,14 @@ class ToolExecutor:
         tool_registry: ToolRegistry,
         policy_engine: Any | None = None,
         timeout_seconds: float = 45.0,
+        trace_callback: Callable[
+            [AgentTraceEvent], Awaitable[None] | None
+        ] | None = None,
     ) -> None:
         self.tool_registry = tool_registry
         self.policy_engine = policy_engine
         self.timeout_seconds = max(0.01, float(timeout_seconds))
+        self.trace_callback = trace_callback
 
     # -------------------------------------------------------------------------
     async def execute_tool(
@@ -46,27 +54,206 @@ class ToolExecutor:
         tool_call: LLMToolCall,
         state: AgentRunState,
         budget: AgentExecutionBudget,
+        *,
+        trace_callback: Callable[
+            [AgentTraceEvent], Awaitable[None] | None
+        ] | None = None,
+        iteration: int | None = None,
+        task_id: str | None = None,
     ) -> ToolResult:
-        result = await self._execute_tool(tool_call, state, budget)
+        call_id = tool_call.id or f"call_{uuid4().hex}"
+        await self._emit_tool_selected(
+            state,
+            tool_call,
+            call_id=call_id,
+            iteration=iteration,
+            task_id=task_id,
+            callback=trace_callback or self.trace_callback,
+        )
+        result = await self._execute_tool(
+            tool_call,
+            state,
+            budget,
+            call_id=call_id,
+        )
         if not any(item.call_id == result.call_id for item in state.tool_results):
             # The executor is the only application boundary that may publish a
             # normalized result.  The loop can still merge it idempotently when
             # it applies the observation to its state.
             state.tool_results.append(result)
-        if len(state.tool_trace) < 128:
-            state.tool_trace.append(
-                {
-                    "call_id": result.call_id,
-                    "tool": result.tool_name,
-                    "status": result.status,
-                    "duration_ms": result.metadata.duration_ms,
-                    "error_code": result.error.code if result.error else None,
-                    "recovery": result.error.recovery if result.error else None,
-                    "semantic_outcome": result.semantic_outcome,
-                    "boundary": "tool_executor",
-                }
+        state.tool_trace.append(
+            self._result_trace_payload(
+                result,
+                iteration=iteration,
+                task_id=task_id,
             )
+        )
+        await self._emit_tool_result(
+            state,
+            result,
+            iteration=iteration,
+            task_id=task_id,
+            callback=trace_callback or self.trace_callback,
+        )
         return result
+
+    # -------------------------------------------------------------------------
+    async def _emit_tool_selected(
+        self,
+        state: AgentRunState,
+        tool_call: LLMToolCall,
+        *,
+        call_id: str,
+        iteration: int | None,
+        task_id: str | None,
+        callback: Callable[[AgentTraceEvent], Awaitable[None] | None] | None,
+    ) -> None:
+        arguments, redacted_fields = redact_trace_value(tool_call.arguments or {})
+        redaction = {
+            "policy": "trace-safe-v1",
+            "applied": bool(redacted_fields),
+            "fields": redacted_fields,
+            "raw_payload_omitted": True,
+        }
+        payload = {
+            "arguments": arguments,
+            "parse_error": tool_call.parse_error,
+            "redaction": redaction,
+            "boundary": "tool_executor",
+        }
+        state.tool_trace.append(
+            {
+                "kind": "tool_selected",
+                "call_id": call_id,
+                "tool": tool_call.name,
+                "tool_name": tool_call.name,
+                "iteration": iteration,
+                "task_id": task_id,
+                "status": "selected",
+                "arguments": arguments,
+                "redaction": redaction,
+                "boundary": "tool_executor",
+            }
+        )
+        await self._emit_trace(
+            state,
+            AgentTraceEvent(
+                kind="tool_selected",
+                run_id=state.run_id or state.request_id,
+                run_version=state.run_version,
+                sequence=self._trace_sequence(state),
+                iteration=iteration if iteration and iteration > 0 else None,
+                task_id=task_id,
+                call_id=call_id,
+                tool_name=tool_call.name,
+                redaction=redaction,
+                payload=payload,
+            ),
+            callback,
+        )
+
+    # -------------------------------------------------------------------------
+    async def _emit_tool_result(
+        self,
+        state: AgentRunState,
+        result: ToolResult,
+        *,
+        iteration: int | None,
+        task_id: str | None,
+        callback: Callable[[AgentTraceEvent], Awaitable[None] | None] | None,
+    ) -> None:
+        payload = self._result_trace_payload(
+            result,
+            iteration=iteration,
+            task_id=task_id,
+        )
+        redaction = dict(payload.get("redaction") or {})
+        await self._emit_trace(
+            state,
+            AgentTraceEvent(
+                kind="tool_result",
+                run_id=state.run_id or state.request_id,
+                run_version=state.run_version,
+                sequence=self._trace_sequence(state),
+                iteration=iteration if iteration and iteration > 0 else None,
+                task_id=task_id,
+                call_id=result.call_id,
+                tool_name=result.tool_name,
+                redaction=redaction,
+                payload=payload,
+            ),
+            callback,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _result_trace_payload(
+        result: ToolResult,
+        *,
+        iteration: int | None,
+        task_id: str | None,
+    ) -> dict[str, Any]:
+        observation = ModelObservation.from_tool_result(result, max_chars=4096)
+        projected, result_fields = redact_trace_value(
+            observation.result,
+            path="$.result",
+        )
+        metadata, metadata_fields = redact_trace_value(
+            result.metadata.model_dump(mode="json", exclude_none=True),
+            path="$.metadata",
+        )
+        error, error_fields = redact_trace_value(
+            result.error.model_dump(mode="json", exclude_none=True)
+            if result.error is not None
+            else None,
+            path="$.error",
+        )
+        fields = list(
+            dict.fromkeys([*result_fields, *metadata_fields, *error_fields])
+        )
+        redaction = {
+            "policy": "trace-safe-v1",
+            "applied": bool(fields),
+            "fields": fields,
+            "raw_payload_omitted": True,
+        }
+        return {
+            "kind": "tool_result",
+            "call_id": result.call_id,
+            "tool": result.tool_name,
+            "tool_name": result.tool_name,
+            "iteration": iteration,
+            "task_id": task_id,
+            "status": result.status,
+            "summary": result.summary[:1000],
+            "semantic_outcome": result.semantic_outcome,
+            "result": projected,
+            "evidence_refs": list(dict.fromkeys(result.evidence_refs))[:16],
+            "map_candidate_id": result.map_candidate_id,
+            "metadata": metadata,
+            "error": error,
+            "recovery": result.error.recovery if result.error else None,
+            "redaction": redaction,
+            "boundary": "tool_executor",
+        }
+
+    # -------------------------------------------------------------------------
+    async def _emit_trace(
+        self,
+        state: AgentRunState,
+        event: AgentTraceEvent,
+        callback: Callable[[AgentTraceEvent], Awaitable[None] | None] | None,
+    ) -> None:
+        if callback is None:
+            return
+        emitted = callback(event)
+        if inspect.isawaitable(emitted):
+            await emitted
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _trace_sequence(state: AgentRunState) -> int:
+        return max(1, len(state.tool_trace))
 
     # -------------------------------------------------------------------------
     async def _execute_tool(
@@ -74,9 +261,11 @@ class ToolExecutor:
         tool_call: LLMToolCall,
         state: AgentRunState,
         budget: AgentExecutionBudget,
+        *,
+        call_id: str | None = None,
     ) -> ToolResult:
         started = time.perf_counter()
-        call_id = tool_call.id or f"call_{uuid4().hex}"
+        call_id = call_id or tool_call.id or f"call_{uuid4().hex}"
         # Count every model-issued attempt, including malformed and rejected
         # calls.  The loop budget is an attempt budget, not only a successful
         # provider-execution budget.

@@ -105,6 +105,20 @@ class TransformEvidenceInput(StrictToolInput):
     operations: list[dict[str, Any]] = Field(min_length=1, max_length=8)
 
 ###############################################################################
+class SearchConversationHistoryInput(StrictToolInput):
+    """Bounded recall of original messages from the active conversation."""
+
+    query: str = Field(min_length=1, max_length=300)
+    before_turn_index: int | None = Field(default=None, ge=0)
+    cursor: str | None = Field(default=None, max_length=200)
+    limit: int = Field(default=8, ge=1, le=50)
+
+
+# Keep the shorter spelling available to composition code while retaining a
+# descriptive schema/class name in generated tool definitions.
+HistorySearchInput = SearchConversationHistoryInput
+
+
 class ApplyMapPlanInput(StrictToolInput):
     expected_collection_revision: int = Field(ge=0)
     actions: list[MapAction] = Field(min_length=1, max_length=32)
@@ -119,9 +133,11 @@ __all__ = [
     "CapabilityDiscoveryInput",
     "DescribeCapabilityInput",
     "ExecuteCapabilityInput",
+    "HistorySearchInput",
     "InspectEvidenceInput",
     "ProviderLayerDiscoveryInput",
     "ResolveLocationInput",
     "RouteRequestInput",
+    "SearchConversationHistoryInput",
     "TransformEvidenceInput",
 ]

@@ -175,11 +175,18 @@
     overflow: hidden;
 }
 
-.agent-chat-panel__new-chat {
+.agent-chat-panel__actions {
     position: absolute;
     top: 0.62rem;
     right: 0.62rem;
     z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 0.32rem;
+}
+
+.agent-chat-panel__icon-button,
+.agent-chat-panel__history-button {
     width: 2.15rem;
     height: 2.05rem;
     display: grid;
@@ -191,10 +198,37 @@
     padding: 0;
 }
 
-.agent-chat-panel__new-chat:hover {
+.agent-chat-panel__icon-button:hover,
+.agent-chat-panel__icon-button:focus-visible,
+.agent-chat-panel__history-button:hover,
+.agent-chat-panel__history-button:focus-visible {
     border-color: #3a89b8;
     background: #1b3340;
     color: #f8fcff;
+}
+
+.agent-chat-panel__history-button {
+    width: auto;
+    min-width: 4.6rem;
+    padding: 0 0.5rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.conversation-history-drawer {
+    position: absolute;
+    top: 3.05rem;
+    right: 0.62rem;
+    left: 0.62rem;
+    z-index: 8;
+    max-height: calc(100% - 3.65rem);
+    overflow: auto;
+    border-radius: 0.4rem;
+    box-shadow: 0 18px 34px rgb(0 0 0 / 32%);
+}
+
+.conversation-history-drawer app-conversation-history {
+    max-height: 100%;
 }
 
 .chat-transcript {
@@ -343,6 +377,41 @@
 
 .context-window-row--critical .context-window-row__value {
     color: #e76f76;
+}
+
+.tool-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.85rem;
+    box-sizing: border-box;
+    overflow: hidden;
+    padding: 0.22rem 0.72rem;
+    border-top: 1px solid rgb(38 58 69 / 70%);
+    background: #0f1a21;
+    color: #b7cbd2;
+    font-size: 0.66rem;
+    white-space: nowrap;
+}
+
+.tool-progress-row__iteration {
+    flex: 0 0 auto;
+    color: #8098a2;
+    font-variant-numeric: tabular-nums;
+}
+
+.tool-progress-row__tool {
+    min-width: 0;
+    overflow: hidden;
+    color: #d9ebf1;
+    font-weight: 700;
+    text-overflow: ellipsis;
+}
+
+.tool-progress-row__status {
+    flex: 0 0 auto;
+    color: #8dc8ea;
+    text-transform: capitalize;
 }
 
 .workspace-status-bar {

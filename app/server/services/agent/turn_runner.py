@@ -33,6 +33,7 @@ type FailureCategory = Literal[
     "model_budget_exhausted",
     "tool_budget_exhausted",
     "transition_budget_exhausted",
+    "iteration_budget_exhausted",
     "run_deadline_exhausted",
     "no_progress",
     "cancelled",
@@ -64,6 +65,7 @@ class AgentTurnRequest:
     defer_map_commit: bool = False
     run_id: str | None = None
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
+    trace_callback: Callable[[Any], Awaitable[None] | None] | None = None
     checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None
     run_state_check: Callable[[], str | None] | None = None
 
@@ -158,6 +160,7 @@ class AgentTurnRunner:
                     self.execution_settings, "max_tool_result_chars", 4096
                 ),
                 context_usage_callback=request.context_usage_callback,
+                trace_callback=request.trace_callback,
                 checkpoint_callback=request.checkpoint_callback,
                 run_state_check=request.run_state_check,
             )
@@ -199,6 +202,7 @@ class AgentResponseBuilder:
             route=state.route,
             goal=state.goal,
             completion_contract=state.completion_contract,
+            task_state=state.typed_task_state(),
             operation=operation,
             map_session=map_session,
             presentation_status=_presentation_status(
@@ -219,6 +223,9 @@ class AgentResponseBuilder:
                 "context_usage_trace": list(state.context_usage_trace[-16:]),
                 "model_trace": list(state.model_trace[-16:]),
                 "tool_trace": list(state.tool_trace[-32:]),
+                "task_state": state.typed_task_state().model_dump(
+                    mode="json", exclude_none=True
+                ),
                 "checkpoint": state.checkpoint(),
             },
             location_refs=dict(state.location_refs),
@@ -256,6 +263,7 @@ def _operation(
         "model_budget_exhausted",
         "tool_budget_exhausted",
         "transition_budget_exhausted",
+        "iteration_budget_exhausted",
         "run_deadline_exhausted",
         "no_progress",
         "cancelled",
@@ -317,6 +325,7 @@ def _response_failure_category(value: str | None) -> FailureCategory | None:
         "model_budget_exhausted",
         "tool_budget_exhausted",
         "transition_budget_exhausted",
+        "iteration_budget_exhausted",
         "run_deadline_exhausted",
         "no_progress",
         "cancelled",

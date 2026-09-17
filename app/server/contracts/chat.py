@@ -10,6 +10,7 @@ from server.common.time import utc_now
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.capability_route import (
     AgentGoal,
+    AgentTaskState,
     CapabilityRoute,
     CompletionContract,
 )
@@ -103,6 +104,7 @@ class ChatOperationResult(BaseModel):
             "model_budget_exhausted",
             "tool_budget_exhausted",
             "transition_budget_exhausted",
+            "iteration_budget_exhausted",
             "run_deadline_exhausted",
             "no_progress",
             "cancelled",
@@ -148,6 +150,7 @@ class AgentTurnResponse(BaseModel):
     conversation_state: ConversationState | None = None
     goal: AgentGoal | None = None
     completion_contract: CompletionContract | None = None
+    task_state: AgentTaskState | None = None
     execution_trace: dict[str, Any] | None = None
     location_refs: dict[str, ResolvedLocation] = Field(
         default_factory=lambda: dict[str, ResolvedLocation]()
@@ -173,6 +176,7 @@ class ChatTurnResponse(BaseModel):
     route: CapabilityRoute | None = None
     goal: AgentGoal | None = None
     completion_contract: CompletionContract | None = None
+    task_state: AgentTaskState | None = None
     presentation_status: Literal[
         "not_requested", "prepared", "prepared_unverified", "ready", "failed"
     ] = "not_requested"
@@ -191,6 +195,8 @@ class ChatStreamEvent(BaseModel):
         "context_usage",
         "tool_call_started",
         "tool_call_completed",
+        "tool_started",
+        "tool_completed",
         "map_session_created",
         "stage",
         "final",
@@ -314,7 +320,7 @@ class ModelSettingsUpdateRequest(BaseModel):
     # -------------------------------------------------------------------------
     @field_validator("agent_model_provider", mode="before")
     @classmethod
-    def preserve_optional_provider_id(cls, value: str | None) -> str | None:
+    def preserve_optional_provider_id(cls, value: object) -> str | None:
         if value is None:
             return None
         if not isinstance(value, str):
@@ -324,7 +330,7 @@ class ModelSettingsUpdateRequest(BaseModel):
     # -------------------------------------------------------------------------
     @field_validator("agent_model_name", mode="before")
     @classmethod
-    def normalize_optional_model_name(cls, value: str | None) -> str | None:
+    def normalize_optional_model_name(cls, value: object) -> str | None:
         if value is None:
             return None
         if not isinstance(value, str):

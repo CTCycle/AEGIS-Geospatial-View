@@ -8,6 +8,7 @@ import {
   parseNativeGoal,
   parseNativeRoute,
   parseNativeToolResult,
+  parseAgentTaskState,
 } from './api-parsers';
 import { isFiniteNumber, isJsonObject } from './type-guards';
 import type {
@@ -26,6 +27,7 @@ import type {
   RunEvent,
   RunEventType,
   RunEventVisibility,
+  ToolProgressItem,
 } from './types';
 
 const RUN_EVENT_TYPES: readonly RunEventType[] = [
@@ -59,7 +61,66 @@ export interface ParsedRunCompletionPayload {
   presentationStatus?: PresentationStatus;
   toolResults?: NativeToolResultSummary[];
   executionTrace?: Record<string, JsonValue> | null;
+  taskState?: import('./types').AgentTaskState | null;
 }
+
+const optionalText = (value: unknown, maxLength = 800): string | undefined => (
+  typeof value === 'string' && value.trim() ? value.trim().slice(0, maxLength) : undefined
+);
+
+const optionalNumber = (value: unknown): number | undefined => (
+  isFiniteNumber(value) && value >= 0 ? value : undefined
+);
+
+/**
+ * Normalize user-visible tool progress without passing arbitrary provider
+ * payloads to the template.  Full observations remain server-owned.
+ */
+export const parseToolProgressPayload = (
+  value: unknown,
+  eventType: 'tool_started' | 'tool_completed' = 'tool_completed',
+): ToolProgressItem | undefined => {
+  if (!isJsonObject(value)) {
+    return undefined;
+  }
+  const callId = optionalText(value['call_id'] ?? value['tool_call_id'], 160);
+  const toolName = optionalText(value['tool_name'] ?? value['tool'], 160);
+  if (!callId || !toolName) {
+    return undefined;
+  }
+  const rawStatus = optionalText(value['status'], 64);
+  const allowedStatuses = ['running', 'success', 'valid_empty', 'partial', 'failed'] as const;
+  const status = eventType === 'tool_started'
+    ? 'running'
+    : allowedStatuses.includes(rawStatus as typeof allowedStatuses[number])
+      ? rawStatus as ToolProgressItem['status']
+      : 'success';
+  const refs = value['evidence_refs'];
+  const evidenceRefs = Array.isArray(refs)
+    ? refs.filter((item): item is string => typeof item === 'string').slice(0, 32)
+    : undefined;
+  const rawError = value['error'];
+  const error = typeof rawError === 'string'
+    ? optionalText(rawError)
+    : isJsonObject(rawError) ? optionalText(rawError['message'] ?? rawError['detail']) : undefined;
+  const iteration = optionalNumber(value['iteration'] ?? value['current_iteration']);
+  return {
+    call_id: callId,
+    tool_name: toolName,
+    status,
+    label: optionalText(value['label'], 240),
+    task_id: optionalText(value['task_id'] ?? value['active_task_id'], 160) ?? null,
+    iteration: iteration ?? null,
+    summary: optionalText(value['summary'] ?? value['message']),
+    duration_ms: optionalNumber(value['duration_ms'] ?? value['duration']) ?? null,
+    evidence_refs: evidenceRefs,
+    error: error ?? null,
+    started_at: optionalText(value['started_at'] ?? value['timestamp'], 80),
+    completed_at: eventType === 'tool_completed'
+      ? optionalText(value['completed_at'] ?? value['timestamp'], 80)
+      : undefined,
+  };
+};
 
 const hasOwn = (value: JsonObject, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(value, key);
@@ -242,6 +303,12 @@ export const parseRunCompletionPayload = (value: unknown): ParsedRunCompletionPa
     parsed.executionTrace = null;
   } else if (isJsonObject(value['execution_trace'])) {
     parsed.executionTrace = value['execution_trace'];
+  }
+
+  if (hasOwn(value, 'task_state')) {
+    parsed.taskState = value['task_state'] === null
+      ? null
+      : parseAgentTaskState(value['task_state'], 'realtime completion') ?? undefined;
   }
 
   return parsed;

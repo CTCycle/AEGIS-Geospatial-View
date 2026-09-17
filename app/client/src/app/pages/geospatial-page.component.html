@@ -7,18 +7,47 @@
     <aside class="toolbar-panel" aria-label="Chat toolbar">
       <div class="toolbar-panel__content">
         <section class="agent-chat-panel" aria-label="Agent Chat">
-          <button
-            type="button"
-            class="agent-chat-panel__new-chat"
-            aria-label="Start new chat"
-            title="Start new chat"
-            (click)="startNewChat()"
-          >
-            <span class="sr-only">Start new chat</span>
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-              <path d="M19.6 6.8a8.1 8.1 0 1 0 1.6 8 .9.9 0 1 0-1.8-.3 6.3 6.3 0 1 1-1.3-6.2l-2.2.2a.9.9 0 0 0 .1 1.8h4.1a.9.9 0 0 0 .9-.9V5.3a.9.9 0 1 0-1.8 0l.4 1.5Z" fill="currentColor" />
-            </svg>
-          </button>
+          <div class="agent-chat-panel__actions">
+            <button
+              type="button"
+              class="agent-chat-panel__icon-button"
+              aria-label="Start new chat"
+              title="Start new chat"
+              (click)="startNewChat()"
+            >
+              <span class="sr-only">Start new chat</span>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                <path d="M19.6 6.8a8.1 8.1 0 1 0 1.6 8 .9.9 0 1 0-1.8-.3 6.3 6.3 0 1 1-1.3-6.2l-2.2.2a.9.9 0 0 0 .1 1.8h4.1a.9.9 0 0 0 .9-.9V5.3a.9.9 0 1 0-1.8 0l.4 1.5Z" fill="currentColor" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="agent-chat-panel__history-button"
+              [attr.aria-expanded]="isConversationHistoryOpen"
+              aria-controls="conversation-history-drawer"
+              (click)="toggleConversationHistory()"
+            >
+              <span aria-hidden="true">History</span>
+              <span class="sr-only">{{ isConversationHistoryOpen ? 'Hide' : 'Show' }} conversation history</span>
+            </button>
+          </div>
+          @if (isConversationHistoryOpen) {
+            <div id="conversation-history-drawer" class="conversation-history-drawer">
+              <app-conversation-history
+                [conversations]="conversationHistory"
+                [query]="conversationHistoryQuery"
+                [selectedConversationId]="conversationId"
+                [loading]="conversationHistoryLoading"
+                [error]="conversationHistoryError"
+                [nextCursor]="conversationHistoryCursor"
+                (queryChange)="onConversationHistoryQuery($event)"
+                (selectConversation)="selectConversation($event)"
+                (loadMore)="loadMoreConversations()"
+                (close)="isConversationHistoryOpen = false"
+                (newConversation)="startNewChat()"
+              ></app-conversation-history>
+            </div>
+          }
           <div
             #transcript
             class="chat-transcript"
@@ -83,6 +112,33 @@
             }
             <span class="context-window-row__value">{{ contextUsageLabel }}</span>
           </div>
+          @if (isLoading && (latestToolProgress || iterationLabel)) {
+            <section class="tool-progress-row" aria-live="polite" aria-label="Agent progress">
+              @if (iterationLabel) {
+                <span class="tool-progress-row__iteration">{{ iterationLabel }}</span>
+              }
+              @if (latestToolProgress) {
+                <span class="tool-progress-row__tool">
+                  {{ latestToolProgress.label || latestToolProgress.tool_name }}
+                </span>
+                <span class="tool-progress-row__status">{{ latestToolProgress.status.replaceAll('_', ' ') }}</span>
+              }
+            </section>
+          }
+          @if (inspectedRunId) {
+            <app-run-inspector
+              [runId]="inspectedRunId"
+              [runVersion]="activeRunVersion"
+              [taskState]="taskState"
+              [toolProgress]="toolProgress"
+              [traceEntries]="traceEntries"
+              [loading]="runTraceLoading"
+              [error]="runTraceError"
+              [expanded]="isRunInspectorOpen"
+              (expandedChange)="toggleRunInspector($event)"
+              (refresh)="refreshRunTrace()"
+            ></app-run-inspector>
+          }
           @if (composerError) {
             <p class="chat-composer-error" role="alert">{{ composerError }}</p>
           }

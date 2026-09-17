@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import json
 from contextlib import suppress
-from typing import Any
+from typing import Any, cast
 
 from server.common.typing import is_json_object
 from server.contracts.runs import AgentRunSnapshot
@@ -52,13 +52,13 @@ class AgentRunOrchestrator:
         self.defer_map_completion = defer_map_completion
 
     # -------------------------------------------------------------------------
-    async def execute_run(self, run_id: str) -> None:
+    async def execute_run(self, run_id: str) -> ChatTurnResponse | None:
         snapshot = self.run_repository.get_run(run_id)
         if snapshot is None:
-            return
+            return None
         if snapshot.cancel_requested_at is not None:
             await self._publish_cancelled(snapshot)
-            return
+            return None
         expected_version = snapshot.active_run_version
         checkpoint = self._latest_checkpoint(run_id, expected_version)
         snapshot, transitioned = self.run_repository.mark_started_if_current(
@@ -68,8 +68,8 @@ class AgentRunOrchestrator:
             if snapshot.cancel_requested_at is not None:
                 await self._publish_cancelled(snapshot)
             elif snapshot.active_run_version != expected_version:
-                await self.execute_run(run_id)
-            return
+                return await self.execute_run(run_id)
+            return None
         await self._publish_progress(snapshot, RunProgressStage.UNDERSTANDING_REQUEST)
         await self._publish_trace(
             snapshot,
@@ -120,6 +120,32 @@ class AgentRunOrchestrator:
                         RunEventVisibility.INTERNAL,
                     )
                 )
+
+        async def on_agent_trace(trace: AgentTraceEvent) -> None:
+            """Persist the redacted trace and publish concise tool progress."""
+
+            current = self.run_repository.get_run(run_id)
+            if (
+                current is None
+                or current.active_run_version != snapshot.active_run_version
+                or current.cancel_requested_at is not None
+            ):
+                return
+            await self._publish_trace(current, trace)
+            if trace.kind not in {"tool_selected", "tool_result"}:
+                return
+            completed = trace.kind == "tool_result"
+            await self.event_publisher.publish(
+                conversation_id=current.conversation_id,
+                run_id=current.run_id,
+                run_version=current.active_run_version,
+                type=(
+                    RunEventType.TOOL_COMPLETED
+                    if completed
+                    else RunEventType.TOOL_STARTED
+                ),
+                payload=self._tool_progress_payload(trace, completed=completed),
+            )
 
         def run_state_check() -> str | None:
             latest = self.run_repository.get_run(run_id)
@@ -174,6 +200,7 @@ class AgentRunOrchestrator:
                     conversation_id=snapshot.conversation_id,
                 ),
                 progress_callback=on_agent_progress,
+                trace_callback=on_agent_trace,
                 defer_map_commit=True,
                 agent_run_id=run_id,
                 agent_run_version=snapshot.active_run_version,
@@ -185,19 +212,20 @@ class AgentRunOrchestrator:
             latest = self.run_repository.get_run(run_id) or snapshot
             if latest.cancel_requested_at is not None:
                 await self._publish_cancelled(latest)
-                return
+                return None
+            safe_message = self._safe_failure_message(exc)
             failed, transitioned = self.run_repository.mark_failed_if_current(
                 run_id,
                 snapshot.active_run_version,
                 "agent_execution_failed",
-                str(exc),
+                safe_message,
             )
             if not transitioned:
                 if failed.cancel_requested_at is not None:
                     await self._publish_cancelled(failed)
                 elif failed.active_run_version != snapshot.active_run_version:
-                    await self.execute_run(run_id)
-                return
+                    return await self.execute_run(run_id)
+                return None
             await self.event_publisher.publish(
                 conversation_id=latest.conversation_id,
                 run_id=latest.run_id,
@@ -205,7 +233,7 @@ class AgentRunOrchestrator:
                 type=RunEventType.ERROR,
                 payload={
                     "code": "agent_execution_failed",
-                    "message": self._safe_failure_message(exc),
+                    "message": safe_message,
                 },
             )
             await self._publish_trace(
@@ -221,7 +249,7 @@ class AgentRunOrchestrator:
                     },
                 ),
             )
-            return
+            return None
         finally:
             await context_events.join()
             context_event_task.cancel()
@@ -231,7 +259,7 @@ class AgentRunOrchestrator:
         latest = self.run_repository.get_run(run_id) or snapshot
         if latest.cancel_requested_at is not None:
             await self._publish_cancelled(latest)
-            return
+            return None
         if latest.active_run_version != snapshot.active_run_version:
             await self.event_publisher.publish(
                 conversation_id=latest.conversation_id,
@@ -246,8 +274,7 @@ class AgentRunOrchestrator:
                     "current_version": latest.active_run_version,
                 },
             )
-            await self.execute_run(run_id)
-            return
+            return await self.execute_run(run_id)
 
         if (
             self.defer_map_completion
@@ -339,12 +366,12 @@ class AgentRunOrchestrator:
                             "message": "The requested map could not be prepared for rendering.",
                         },
                     )
-                return
+                return None
             if not prepared:
                 # A cancellation or version change won the compare-and-swap;
                 # never let the normal completion path promote this stale
                 # candidate.
-                return
+                return None
             if prepared:
                 loading_operation = response.operation.model_copy(
                     update={
@@ -372,7 +399,7 @@ class AgentRunOrchestrator:
                         "operation": loading_operation.model_dump(mode="json"),
                     },
                 )
-                return
+                return loading_response
         await self._publish_trace(
             latest,
             AgentTraceEvent(
@@ -546,6 +573,49 @@ class AgentRunOrchestrator:
         return payload
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _tool_progress_payload(
+        trace: AgentTraceEvent,
+        *,
+        completed: bool,
+    ) -> dict[str, Any]:
+        """Build the user-visible, non-sensitive projection of a tool trace."""
+
+        raw = trace.payload
+        evidence_refs = raw.get("evidence_refs")
+        safe_refs = (
+            [
+                str(item)
+                for item in cast(list[Any], evidence_refs)
+                if str(item).strip()
+            ][:16]
+            if isinstance(evidence_refs, list)
+            else []
+        )
+        status = str(raw.get("status") or ("success" if completed else "running"))
+        payload: dict[str, Any] = {
+            "call_id": trace.call_id or "",
+            "tool_name": trace.tool_name or "",
+            "task_id": trace.task_id,
+            "iteration": trace.iteration,
+            "label": _tool_label(trace.tool_name),
+            "status": status if completed else "running",
+            "started_at": trace.timestamp.isoformat(),
+        }
+        if completed:
+            payload.update(
+                {
+                    "summary": str(raw.get("summary") or "")[:1_000],
+                    "duration_ms": raw.get("duration_ms"),
+                    "evidence_refs": safe_refs,
+                    "error": raw.get("error"),
+                    "recovery": raw.get("recovery"),
+                    "completed_at": trace.timestamp.isoformat(),
+                }
+            )
+        return payload
+
+    # -------------------------------------------------------------------------
     async def _publish_progress(
         self, snapshot: AgentRunSnapshot, stage: RunProgressStage
     ) -> None:
@@ -579,25 +649,20 @@ class AgentRunOrchestrator:
         snapshot: AgentRunSnapshot,
         trace: AgentTraceEvent,
     ) -> None:
-        """Persist operational metadata without affecting user-visible events."""
+        """Persist one operational event in the canonical run event log."""
 
-        try:
-            await self.event_publisher.publish(
-                conversation_id=snapshot.conversation_id,
-                run_id=snapshot.run_id,
-                run_version=snapshot.active_run_version,
-                type=(
-                    RunEventType.CHECKPOINT
-                    if trace.kind == "checkpoint"
-                    else RunEventType.TRACE
-                ),
-                visibility=RunEventVisibility.INTERNAL,
-                payload=trace.model_dump(mode="json"),
-            )
-        except Exception:
-            # Observability is best effort.  A storage hiccup must not turn a
-            # successful geospatial response into an agent failure.
-            return
+        await self.event_publisher.publish(
+            conversation_id=snapshot.conversation_id,
+            run_id=snapshot.run_id,
+            run_version=snapshot.active_run_version,
+            type=(
+                RunEventType.CHECKPOINT
+                if trace.kind == "checkpoint"
+                else RunEventType.TRACE
+            ),
+            visibility=RunEventVisibility.INTERNAL,
+            payload=trace.model_dump(mode="json"),
+        )
 
     # -------------------------------------------------------------------------
     def _latest_checkpoint(
@@ -661,3 +726,8 @@ def _hash_json(value: dict[str, Any]) -> str:
             "utf-8"
         )
     ).hexdigest()
+
+
+def _tool_label(tool_name: str | None) -> str:
+    normalized = " ".join(str(tool_name or "tool").replace("_", " ").split())
+    return normalized[:1].upper() + normalized[1:]

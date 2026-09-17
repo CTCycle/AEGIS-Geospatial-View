@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from server.contracts.geospatial import MapSession
 from server.domain.agent.conversation import ConversationState
+from server.domain.agent.capability_route import AgentTaskState
 
 ###############################################################################
 class AgentRunState(StrEnum):
@@ -57,6 +58,121 @@ class ActiveConversationRunSnapshot(BaseModel):
     state: AgentRunState
     presentation_status: Literal["not_required", "pending", "ready", "failed", "render_timeout"] = "not_required"
     presentation: dict[str, Any] | None = None
+    current_iteration: int | None = Field(default=None, ge=0)
+    task_state: AgentTaskState | None = None
+
+
+###############################################################################
+class ConversationRunSummary(BaseModel):
+    """Bounded operational summary of one persisted native run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str
+    run_id: str
+    run_version: int = Field(..., ge=1)
+    active_run_version: int = Field(..., ge=1)
+    original_request: str
+    aggregated_request: str
+    state: AgentRunState
+    request_timezone: str | None = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    cancel_requested_at: datetime | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+    presentation_status: Literal[
+        "not_required", "pending", "ready", "failed", "render_timeout"
+    ] = "not_required"
+    duration_ms: int | None = Field(default=None, ge=0)
+    current_iteration: int | None = Field(default=None, ge=0)
+    task_state: AgentTaskState | None = None
+
+
+###############################################################################
+class ConversationSummary(BaseModel):
+    """Searchable, bounded conversation listing item."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str
+    title: str | None = None
+    context_revision: int = Field(..., ge=0)
+    message_count: int = Field(default=0, ge=0)
+    last_message_preview: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    active_run: ActiveConversationRunSnapshot | None = None
+    latest_run: ConversationRunSummary | None = None
+
+
+###############################################################################
+class ConversationListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    conversations: list[ConversationSummary] = Field(
+        default_factory=lambda: list[ConversationSummary]()
+    )
+    next_cursor: str | None = None
+    has_more: bool = False
+    total: int = Field(default=0, ge=0)
+    pagination: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]()
+    )
+
+
+###############################################################################
+class RunTraceEntry(BaseModel):
+    """Redacted operational trace row; never a chain-of-thought contract."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: str
+    sequence: int = Field(..., ge=1)
+    conversation_id: str
+    run_id: str
+    run_version: int = Field(..., ge=1)
+    type: str
+    visibility: Literal["user", "internal"]
+    timestamp: datetime
+    kind: str
+    task_id: str | None = None
+    tool_name: str | None = None
+    call_id: str | None = None
+    iteration: int | None = Field(default=None, ge=1)
+    label: str | None = None
+    status: str | None = None
+    summary: str | None = None
+    duration_ms: int | None = Field(default=None, ge=0)
+    evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
+    retryable: bool | None = None
+    error: Any | None = None
+    payload: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+
+
+###############################################################################
+class RunTraceResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str
+    run_id: str
+    run_version: int | None = Field(default=None, ge=1)
+    events: list[RunTraceEntry] = Field(
+        default_factory=lambda: list[RunTraceEntry]()
+    )
+    next_cursor: str | None = None
+    has_more: bool = False
+    total: int = Field(default=0, ge=0)
+    pagination: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]()
+    )
+
+    @property
+    def entries(self) -> list[RunTraceEntry]:
+        """Alias for clients that call trace rows entries."""
+
+        return self.events
 
 ###############################################################################
 class ConversationSnapshotResponse(BaseModel):
@@ -72,6 +188,9 @@ class ConversationSnapshotResponse(BaseModel):
     memory_snapshot: dict[str, Any] = Field(default_factory=dict)
     map_session: MapSession | None = None
     active_run: ActiveConversationRunSnapshot | None = None
+    recent_runs: list[ConversationRunSummary] = Field(
+        default_factory=lambda: list[ConversationRunSummary]()
+    )
 
 ###############################################################################
 class AgentRunCreateRequest(BaseModel):
@@ -133,6 +252,8 @@ class AgentRunSnapshot(BaseModel):
     error_message: str | None = None
     presentation_status: Literal["not_required", "pending", "ready", "failed", "render_timeout"] = "not_required"
     presentation: dict[str, Any] | None = None
+    current_iteration: int | None = Field(default=None, ge=0)
+    task_state: AgentTaskState | None = None
 
 ###############################################################################
 class AgentRunCancelResponse(BaseModel):

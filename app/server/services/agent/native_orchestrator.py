@@ -29,7 +29,7 @@ from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_loop import AgentLoop
 from server.services.agent.context_assembler import AgentContextAssembler
 from server.services.agent.instruction_state import ConversationInstructionService
-from server.services.agent.native_v2_turn import (
+from server.services.agent.turn_runner import (
     AgentTurnRequest,
     AgentTurnResponse,
     AgentTurnRunner,
@@ -85,6 +85,7 @@ class NativeAgentOrchestrator:
         self,
         payload: ChatTurnRequest,
         progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
+        trace_callback: Callable[[Any], Awaitable[None] | None] | None = None,
         *,
         defer_map_commit: bool = False,
         agent_run_id: str | None = None,
@@ -100,6 +101,7 @@ class NativeAgentOrchestrator:
             return await self._run_serialized(
                 payload,
                 progress_callback,
+                trace_callback,
                 defer_map_commit=defer_map_commit,
                 agent_run_id=agent_run_id,
                 agent_run_version=agent_run_version,
@@ -113,6 +115,7 @@ class NativeAgentOrchestrator:
         self,
         payload: ChatTurnRequest,
         progress_callback: Callable[[str, dict[str, Any]], None] | None,
+        trace_callback: Callable[[Any], Awaitable[None] | None] | None,
         *,
         defer_map_commit: bool,
         agent_run_id: str | None,
@@ -259,6 +262,7 @@ class NativeAgentOrchestrator:
                         usage=usage,
                     )
                 ),
+                trace_callback=trace_callback,
                 run_state_check=run_state_check,
             )
         )
@@ -325,6 +329,7 @@ class NativeAgentOrchestrator:
             route=native_response.route,
             goal=native_response.goal,
             completion_contract=native_response.completion_contract,
+            task_state=native_response.task_state,
             presentation_status=native_response.presentation_status,
             tool_results=native_response.tool_results,
             conversation_state=next_state,
@@ -358,6 +363,11 @@ class NativeAgentOrchestrator:
                     "completion_contract": (
                         response.completion_contract.model_dump(mode="json")
                         if response.completion_contract is not None
+                        else None
+                    ),
+                    "task_state": (
+                        response.task_state.model_dump(mode="json")
+                        if response.task_state is not None
                         else None
                     ),
                     "memory_snapshot": memory_snapshot,
@@ -509,6 +519,7 @@ class NativeAgentOrchestrator:
                     ),
                     "tool_results": payload.get("tool_results") or [],
                     "conversation_state": payload.get("conversation_state"),
+                    "task_state": payload.get("task_state"),
                 }
             )
         except Exception:

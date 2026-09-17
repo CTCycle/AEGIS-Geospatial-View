@@ -226,7 +226,7 @@ class BackgroundJobService:
                     "persistence": 90,
                 }.get(stage, 35)
                 self._heartbeat(job.job_id, progress, f"Agent stage: {stage}")
-            elif event.event == "tool_call_started":
+            elif event.event in {"tool_call_started", "tool_started"}:
                 self._heartbeat(job.job_id, 55, "Running tools")
             elif event.event == "map_session_created":
                 self._heartbeat(job.job_id, 85, "Map session created")
@@ -285,6 +285,8 @@ class BackgroundJobService:
         mapped_name = {
             "tool_call_started": "tool_call",
             "tool_call_completed": "tool_result",
+            "tool_started": "tool_call",
+            "tool_completed": "tool_result",
             "final": "completed",
             "map_session_created": "map_session",
         }.get(event_name, event_name)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -136,6 +136,157 @@ class CompletionRequirement(BaseModel):
     evidence_ref: str | None = None
     failure_code: str | None = None
 
+
+###############################################################################
+TaskStatus = Literal[
+    "pending",
+    "in_progress",
+    "completed",
+    "failed",
+    "blocked",
+    "cancelled",
+    "superseded",
+]
+
+
+class AgentTask(BaseModel):
+    """One lightweight, run-scoped obligation.
+
+    Tasks are operational state, not a second planner.  The native loop owns
+    their status and the model receives only the bounded projection embedded
+    in :class:`AgentTaskState`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: str = Field(min_length=1, max_length=160)
+    description: str = Field(min_length=1, max_length=500)
+    status: TaskStatus = "pending"
+    parent_task_id: str | None = Field(default=None, max_length=160)
+    dependencies: list[str] = Field(default_factory=list, max_length=16)
+    requirement_name: str | None = Field(default=None, max_length=120)
+    target_id: str | None = Field(default=None, max_length=160)
+    result: dict[str, object] | None = None
+    failure_code: str | None = Field(default=None, max_length=120)
+
+    @property
+    def id(self) -> str:
+        """Compatibility/readability alias for consumers that call it ``id``."""
+
+        return self.task_id
+
+
+class AgentTaskState(BaseModel):
+    """Typed projection of the run-scoped task ledger.
+
+    The durable ``AgentRunState.task_state`` field intentionally remains a
+    JSON object for checkpoint compatibility with older native runs.  This
+    model is the schema and normalization boundary for that object.
+    """
+
+    # Conversation-state fields may coexist in the legacy JSON projection;
+    # they are deliberately ignored by this task-ledger view.
+    model_config = ConfigDict(extra="ignore")
+
+    root_task_id: str = Field(min_length=1, max_length=160)
+    active_task_id: str | None = Field(default=None, max_length=160)
+    status: TaskStatus = "pending"
+    current_iteration: int = Field(default=0, ge=0)
+    max_iterations: int = Field(default=1, ge=1, le=100)
+    tasks: list[AgentTask] = Field(
+        default_factory=lambda: list[AgentTask](), max_length=32
+    )
+    completion_requirements: list[CompletionRequirement] = Field(
+        default_factory=lambda: list[CompletionRequirement](), max_length=16
+    )
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        run_id: str,
+        description: str,
+        max_iterations: int,
+        requirements: list[str] | None = None,
+        target_ids: list[str] | None = None,
+        compound: bool = False,
+    ) -> "AgentTaskState":
+        """Create a deterministic root task and optional child obligations."""
+
+        root_task_id = f"task-root-{_safe_task_id(run_id)}"
+        root = AgentTask(
+            task_id=root_task_id,
+            description=description[:500],
+            status="in_progress",
+        )
+        names = list(dict.fromkeys(str(item).strip() for item in requirements or [] if str(item).strip()))
+        targets = list(dict.fromkeys(str(item).strip() for item in target_ids or [] if str(item).strip()))
+        children: list[AgentTask] = []
+        if compound:
+            for name in names:
+                children.append(
+                    AgentTask(
+                        task_id=f"{root_task_id}:requirement:{_safe_task_id(name)}",
+                        description=f"Satisfy {name.replace('_', ' ')}.",
+                        parent_task_id=root_task_id,
+                        requirement_name=name,
+                    )
+                )
+            for target in targets:
+                children.append(
+                    AgentTask(
+                        task_id=f"{root_task_id}:target:{_safe_task_id(target)}",
+                        description=f"Complete the request for {target}.",
+                        parent_task_id=root_task_id,
+                        target_id=target,
+                    )
+                )
+        return cls(
+            root_task_id=root_task_id,
+            active_task_id=root_task_id,
+            status="in_progress",
+            current_iteration=0,
+            max_iterations=max(1, min(100, int(max_iterations))),
+            tasks=[root, *children][:32],
+            completion_requirements=[CompletionRequirement(name=name) for name in names],
+        )
+
+    @classmethod
+    def from_payload(
+        cls,
+        payload: object,
+        *,
+        run_id: str = "unknown",
+        description: str = "Native agent request",
+        max_iterations: int = 1,
+    ) -> "AgentTaskState":
+        """Normalize a legacy or partially populated task JSON object."""
+
+        payload_object = (
+            cast(dict[str, object], payload) if isinstance(payload, dict) else {}
+        )
+        if payload_object.get("root_task_id"):
+            try:
+                return cls.model_validate(payload_object)
+            except Exception:
+                # A malformed persisted projection must not make a run
+                # unrecoverable; rebuild the bounded root ledger below.
+                pass
+        return cls.create(
+            run_id=run_id,
+            description=description,
+            max_iterations=max_iterations,
+        )
+
+    def to_payload(self) -> dict[str, object]:
+        return self.model_dump(mode="json", exclude_none=True)
+
+
+def _safe_task_id(value: str) -> str:
+    normalized = "-".join(str(value).strip().casefold().split())
+    safe = "".join(char if char.isalnum() or char in "-_" else "-" for char in normalized)
+    return (safe.strip("-") or "unknown")[:96]
+
 ###############################################################################
 class CapabilityRouteDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -252,6 +403,16 @@ class AgentRunState(BaseModel):
     consecutive_tool_failures: int = Field(default=0, ge=0)
     route_corrections: int = Field(default=0, ge=0)
     validation_corrections: int = Field(default=0, ge=0)
+    # Iterations are one-based once the first model decision starts.  Keeping
+    # the explicit alias makes checkpoints and diagnostics readable while
+    # retaining ``current_iteration`` as the canonical field.
+    current_iteration: int = Field(default=0, ge=0)
+    iteration: int = Field(default=0, ge=0)
+    max_iterations: int = Field(default=12, ge=1, le=100)
+    finalization_attempted: bool = False
+    iteration_trace: list[dict[str, object]] = Field(
+        default_factory=lambda: list[dict[str, object]]()
+    )
     model_calls: int = Field(default=0, ge=0)
     tool_calls: int = Field(default=0, ge=0)
     transitions: int = Field(default=0, ge=0)
@@ -266,6 +427,26 @@ class AgentRunState(BaseModel):
         default_factory=lambda: dict[str, object]()
     )
     termination_reason: str | None = None
+
+    def typed_task_state(self) -> AgentTaskState:
+        """Return the validated task ledger for this run.
+
+        Older checkpoints and callers may still supply arbitrary task JSON;
+        the normalization helper gives them a safe root task without mutating
+        the canonical state until the loop explicitly persists it.
+        """
+
+        return AgentTaskState.from_payload(
+            self.task_state,
+            run_id=self.run_id or self.request_id,
+            description=self.user_message,
+            max_iterations=self.max_iterations,
+        )
+
+    def set_typed_task_state(self, value: AgentTaskState) -> None:
+        """Persist a typed ledger as the checkpoint-compatible JSON object."""
+
+        self.task_state = value.to_payload()
 
     def checkpoint(self) -> dict[str, Any]:
         """Return a bounded JSON-safe checkpoint for durable resume."""

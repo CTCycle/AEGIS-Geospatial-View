@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 from collections.abc import Awaitable, Sequence
 from dataclasses import dataclass, field
@@ -16,8 +17,13 @@ from server.domain.agent.capability_route import (
     AgentGoal,
     AgentPhase,
     AgentRunState,
+    AgentTask,
+    AgentTaskState,
     CapabilityRoute,
+    CompletionStatus,
     CompletionContract,
+    CompletionRequirement,
+    TaskStatus,
 )
 from server.domain.agent.context import AgentContextView
 from server.domain.agent.capability_domains import CapabilityDomain
@@ -25,6 +31,7 @@ from server.domain.agent.reliability import (
     AgentExecutionBudget,
     ExecutionBudgetExceeded,
 )
+from server.domain.agent.trace import AgentTraceEvent
 from server.domain.agent.tool_result import (
     ModelObservation,
     ToolExecutionError,
@@ -35,6 +42,7 @@ from server.domain.llm.types import LLMRequest, LLMResult, LLMToolCall, LLMToolD
 from server.prompts.agent import build_native_context_messages
 from server.prompts.capability_route import build_capability_route_prompt
 from server.services.agent.capability_router import CapabilityRouter
+from server.services.agent.context_assembler import select_pair_safe_messages
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.context_budget import compute_context_usage
@@ -99,6 +107,9 @@ class AgentLoopRequest:
     max_tool_result_chars: int = 4096
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
     checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None
+    trace_callback: Callable[
+        [AgentTraceEvent], Awaitable[None] | None
+    ] | None = None
     run_state_check: Callable[[], str | None] | None = None
 
 
@@ -118,6 +129,7 @@ class AgentLoopOutcome:
         "tool_budget_exhausted",
         "transition_budget_exhausted",
         "run_deadline_exhausted",
+        "iteration_budget_exhausted",
         "no_progress",
         "cancelled",
         "superseded",
@@ -160,6 +172,8 @@ class AgentLoop:
         provider = self.provider_factory.get_provider(request.provider)
         messages = self._initial_messages(request)
         final_text = ""
+        state.max_iterations = max(1, min(100, int(request.max_iterations)))
+        self._ensure_task_state(state, request.max_iterations)
         request.budget.configure_limits(
             max_model_calls=request.max_model_calls,
             max_tool_calls=request.max_tool_calls,
@@ -209,10 +223,35 @@ class AgentLoop:
                 ),
             )
             self._compile_native_goal(state, route)
+            self._sync_task_state(state)
             await self._checkpoint(request)
 
-            for iteration in range(max(1, request.max_iterations)):
+            for iteration in range(state.max_iterations):
                 self._ensure_run_control(request)
+                state.current_iteration = iteration + 1
+                # Keep the historical ``iteration`` alias synchronized for
+                # consumers that persisted the earlier run-state shape.
+                state.iteration = state.current_iteration
+                self._sync_task_state(state)
+                iteration_started: dict[str, object] = {
+                    "iteration": state.current_iteration,
+                    "status": "started",
+                    "task_id": self._active_task_id(state),
+                }
+                state.iteration_trace.append(iteration_started)
+                request.budget.record_iteration(iteration_started)
+                await self._emit_trace(
+                    request,
+                    AgentTraceEvent(
+                        kind="iteration_started",
+                        run_id=state.run_id or state.request_id,
+                        run_version=state.run_version,
+                        sequence=self._trace_sequence(state),
+                        iteration=state.current_iteration,
+                        task_id=self._active_task_id(state),
+                        payload={"status": "started"},
+                    ),
+                )
                 model_limit = request.budget.max_model_calls or request.max_model_calls
                 if state.model_calls >= model_limit:
                     return self._budget_outcome(state, request, "model_budget_exhausted")
@@ -249,9 +288,10 @@ class AgentLoop:
                     )
                     state.provider_continuation = [
                         dict(item)
-                        for item in self._protocol_messages(messages)[-16:]
+                        for item in self._protocol_messages(messages)
                     ]
                     self._transition(state, AgentPhase.UPDATE_STATE, request.budget)
+                    self._sync_task_state(state)
                     self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
                     stop = self._evaluate_stop(
                         state,
@@ -265,6 +305,19 @@ class AgentLoop:
                     if stop is not None:
                         state.termination_reason = stop[0]
                         return self._outcome(state, stop[1], stop[0], request)
+                    await self._emit_iteration_completed(request, "continue")
+                    if iteration + 1 >= state.max_iterations:
+                        final_text = await self._finalize_iteration_exhaustion(
+                            request,
+                            provider,
+                            messages,
+                        )
+                        return self._outcome(
+                            state,
+                            final_text,
+                            "iteration_budget_exhausted",
+                            request,
+                        )
                     continue
 
                 final_text = result.content.strip()
@@ -297,14 +350,36 @@ class AgentLoop:
                     for result in recovery_results
                 ):
                     final_text = "The map is ready."
+                self._sync_task_state(state)
                 await self._checkpoint(request)
                 if stop is not None:
                     state.termination_reason = stop[0]
                     return self._outcome(state, final_text, stop[0], request)
                 messages.append({"role": "assistant", "content": final_text})
-                if iteration + 1 >= request.max_iterations:
-                    return self._budget_outcome(state, request, "no_progress")
-            return self._budget_outcome(state, request, "no_progress")
+                await self._emit_iteration_completed(request, "continue")
+                if iteration + 1 >= state.max_iterations:
+                    final_text = await self._finalize_iteration_exhaustion(
+                        request,
+                        provider,
+                        messages,
+                    )
+                    return self._outcome(
+                        state,
+                        final_text,
+                        "iteration_budget_exhausted",
+                        request,
+                    )
+            final_text = await self._finalize_iteration_exhaustion(
+                request,
+                provider,
+                messages,
+            )
+            return self._outcome(
+                state,
+                final_text,
+                "iteration_budget_exhausted",
+                request,
+            )
         except AgentRunControlSignal as exc:
             state.termination_reason = exc.reason
             return self._outcome(state, final_text, exc.reason, request)
@@ -335,6 +410,396 @@ class AgentLoop:
             return self._failed(state, request, "The selected model could not complete this request.", category=exc.category)
         except Exception:
             return self._failed(state, request, "The agent stopped after an unexpected execution failure.", category="provider_error")
+
+    # -------------------------------------------------------------------------
+    async def _emit_trace(
+        self,
+        request: AgentLoopRequest,
+        event: AgentTraceEvent,
+    ) -> None:
+        """Deliver one operational event to the durable run sink, if wired."""
+
+        callback = request.trace_callback
+        if callback is None:
+            return
+        result = callback(event)
+        if inspect.isawaitable(result):
+            await result
+
+    # -------------------------------------------------------------------------
+    async def _emit_iteration_completed(
+        self,
+        request: AgentLoopRequest,
+        status: Literal["continue", "exhausted"],
+    ) -> None:
+        state = request.state
+        record: dict[str, object] = {
+            "iteration": state.current_iteration,
+            "status": status,
+            "task_id": self._active_task_id(state),
+        }
+        state.iteration_trace.append(record)
+        request.budget.record_iteration(record)
+        await self._emit_trace(
+            request,
+            AgentTraceEvent(
+                kind="iteration_completed",
+                run_id=state.run_id or state.request_id,
+                run_version=state.run_version,
+                sequence=self._trace_sequence(state),
+                iteration=max(1, state.current_iteration),
+                task_id=self._active_task_id(state),
+                payload={"status": status},
+            ),
+        )
+
+    # -------------------------------------------------------------------------
+    async def _finalize_iteration_exhaustion(
+        self,
+        request: AgentLoopRequest,
+        provider: AgentProvider,
+        messages: list[dict[str, Any]],
+    ) -> str:
+        """Make one bounded, tools-disabled finalization attempt.
+
+        Exhaustion is a distinct terminal state even when the provider can
+        provide a useful final explanation.  The model is never allowed to
+        issue another tool call during this finalization step; unresolved
+        server-owned obligations are appended deterministically so a polished
+        but unsupported claim cannot be mistaken for completion.
+        """
+
+        state = request.state
+        candidate = ""
+        model_limit = request.budget.max_model_calls or request.max_model_calls
+        can_finalize = (
+            not state.finalization_attempted
+            and state.model_calls < model_limit
+            and request.budget.remaining_seconds() > 0.001
+        )
+        if can_finalize:
+            state.finalization_attempted = True
+            try:
+                result = await self._model_step(request, provider, messages, [])
+                # A provider violating ``tools=[]`` is treated as an empty
+                # finalization result; the deterministic explanation remains
+                # the safe terminal response.
+                if not result.tool_calls:
+                    candidate = (result.content or "").strip()
+            except (AgentRunControlSignal, asyncio.CancelledError):
+                raise
+            except (
+                ExecutionBudgetExceeded,
+                LLMProviderRequestError,
+                LLMStructuredOutputError,
+                TimeoutError,
+            ):
+                candidate = ""
+            except Exception:
+                candidate = ""
+
+        pending = self._pending_requirements_for_task_state(state)
+        if pending:
+            suffix = (
+                "The iteration limit was reached before these requirements were "
+                "satisfied: "
+                + ", ".join(item.replace("_", " ") for item in pending)
+                + "."
+            )
+        else:
+            suffix = (
+                "The iteration limit was reached before completion could be "
+                "verified."
+            )
+        final = candidate.rstrip()
+        if final:
+            final = f"{final}\n\n{suffix}"
+        else:
+            final = suffix
+        await self._emit_iteration_completed(request, "exhausted")
+        return final
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _trace_sequence(state: AgentRunState) -> int:
+        return max(
+            1,
+            len(state.transition_trace)
+            + len(state.iteration_trace)
+            + len(state.tool_trace)
+            + len(state.model_trace),
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _active_task_id(state: AgentRunState) -> str | None:
+        raw = state.task_state
+        for key in ("active_task_id", "current_task_id", "root_task_id"):
+            value = raw.get(key)
+            if value is not None and str(value).strip():
+                return str(value)
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _ensure_task_state(state: AgentRunState, max_iterations: int) -> None:
+        """Ensure every run has a deterministic root task in its state."""
+
+        raw = dict(state.task_state)
+        typed = AgentTaskState.from_payload(
+            raw,
+            run_id=state.run_id or state.request_id,
+            description=state.user_message,
+            max_iterations=max_iterations,
+        )
+        typed = typed.model_copy(
+            update={
+                "current_iteration": max(0, state.current_iteration),
+                "max_iterations": max(1, min(100, int(max_iterations))),
+            }
+        )
+        raw.update(typed.to_payload())
+        state.task_state = raw
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _initialize_task_state_for_route(
+        state: AgentRunState,
+        route: CapabilityRoute,
+    ) -> None:
+        requirements = list(state.completion_requirements)
+        target_ids = list(state.goal.target_ids) if state.goal is not None else []
+        compound = bool(
+            len(requirements) > 1
+            or len(target_ids) > 1
+            or route.secondary_domains
+            or len(route.capability_queries) > 1
+        )
+        raw = dict(state.task_state)
+        typed = AgentTaskState.create(
+            run_id=state.run_id or state.request_id,
+            description=state.user_message,
+            max_iterations=state.max_iterations,
+            requirements=requirements,
+            target_ids=target_ids,
+            compound=compound,
+        )
+        # Preserve conversation-state keys from pre-hydrated checkpoints while
+        # making the task ledger authoritative for its own namespace.
+        raw.update(typed.to_payload())
+        state.task_state = raw
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _pending_requirements_for_task_state(state: AgentRunState) -> list[str]:
+        checks = AgentLoop._completion_checks(state)
+        contract = state.completion_contract
+        if contract is None:
+            return []
+        required = list(contract.requirements)
+        if contract.temporal_scope_required and "temporal_scope_applied" not in required:
+            required.append("temporal_scope_applied")
+        if contract.spatial_scope_required and "spatial_scope_applied" not in required:
+            required.append("spatial_scope_applied")
+        return [name for name in required if not checks.get(name, False)]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _completion_checks(state: AgentRunState) -> dict[str, bool]:
+        completed_data = any(
+            result.status in {"success", "valid_empty", "partial"}
+            and result.tool_name
+            in {
+                "execute_geospatial_capability",
+                "inspect_evidence",
+                "transform_evidence",
+            }
+            for result in state.tool_results
+        )
+        return {
+            "location_resolved": bool(state.location_refs)
+            or state.active_map_session is not None,
+            "required_data_retrieved": completed_data,
+            "temporal_scope_applied": completed_data,
+            # A successful map-plan observation is the server-owned proof
+            # that the requested spatial scope was applied.  Location-only
+            # map requests have no data tool result, so using ``completed_data``
+            # alone left their spatial task pending even after a valid
+            # candidate had been prepared.
+            "spatial_scope_applied": completed_data
+            or state.prepared_map_session is not None,
+            "map_candidate_prepared": state.prepared_map_session is not None,
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _sync_task_state(state: AgentRunState) -> None:
+        """Derive task statuses solely from completion obligations/results."""
+
+        raw = dict(state.task_state)
+        typed = AgentTaskState.from_payload(
+            raw,
+            run_id=state.run_id or state.request_id,
+            description=state.user_message,
+            max_iterations=state.max_iterations,
+        )
+        checks = AgentLoop._completion_checks(state)
+        names = list(state.completion_requirements)
+        requirements: list[CompletionRequirement] = []
+        existing = {
+            item.name: item for item in typed.completion_requirements
+        }
+        for name in names:
+            prior = existing.get(name)
+            status: CompletionStatus
+            if checks.get(name, False):
+                status = "satisfied"
+                failure_code = None
+            else:
+                status = prior.status if prior is not None else "pending"
+                failure_code = prior.failure_code if prior is not None else None
+                if status == "satisfied":
+                    status = "pending"
+            requirements.append(
+                CompletionRequirement(
+                    name=name,
+                    required=True,
+                    status=status,
+                    target_id=prior.target_id if prior is not None else None,
+                    evidence_ref=prior.evidence_ref if prior is not None else None,
+                    failure_code=failure_code,
+                )
+            )
+
+        pending_names = [
+            item.name for item in requirements if item.status == "pending"
+        ]
+        pending = set(pending_names)
+        failed = {
+            item.name for item in requirements if item.status == "failed"
+        }
+        completed_targets = set(state.location_refs)
+        for result in state.tool_results:
+            if result.status not in {"success", "valid_empty", "partial"}:
+                continue
+            if isinstance(result.data, dict):
+                target = result.data.get("target_id") or result.data.get("targetId")
+                if target is not None and str(target).strip():
+                    completed_targets.add(str(target).strip())
+        updated_tasks: list[AgentTask] = []
+        first_pending = pending_names[0] if pending_names else None
+        target_pending = next(
+            (
+                task.target_id
+                for task in typed.tasks
+                if task.target_id and task.target_id not in completed_targets
+            ),
+            None,
+        )
+        for task in typed.tasks:
+            update: dict[str, Any] = {}
+            if task.task_id == typed.root_task_id:
+                if failed:
+                    update["status"] = "failed"
+                elif not pending and requirements:
+                    update["status"] = "completed"
+                else:
+                    update["status"] = "in_progress"
+            elif task.requirement_name:
+                if task.requirement_name not in names:
+                    update["status"] = "blocked"
+                elif task.requirement_name in failed:
+                    update["status"] = "failed"
+                elif task.requirement_name not in pending:
+                    update["status"] = "completed"
+                elif task.requirement_name == first_pending:
+                    update["status"] = "in_progress"
+                else:
+                    update["status"] = "pending"
+            elif task.target_id:
+                if task.target_id in completed_targets:
+                    update["status"] = "completed"
+                elif task.target_id == target_pending:
+                    update["status"] = "in_progress"
+                else:
+                    update["status"] = "pending"
+            updated_tasks.append(task.model_copy(update=update))
+        active = next(
+            (
+                task.task_id
+                for task in updated_tasks
+                if task.status == "in_progress" and task.task_id != typed.root_task_id
+            ),
+            typed.root_task_id,
+        )
+        ledger_status: TaskStatus = (
+            "failed"
+            if failed
+            else "completed"
+            if requirements and not pending
+            else "in_progress"
+        )
+        typed = typed.model_copy(
+            update={
+                "active_task_id": active,
+                "status": ledger_status,
+                "current_iteration": max(0, state.current_iteration),
+                "max_iterations": state.max_iterations,
+                "tasks": updated_tasks,
+                "completion_requirements": requirements,
+            }
+        )
+        raw.update(typed.to_payload())
+        state.task_state = raw
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _set_terminal_task_state(state: AgentRunState, reason: str) -> None:
+        raw = dict(state.task_state)
+        typed = AgentTaskState.from_payload(
+            raw,
+            run_id=state.run_id or state.request_id,
+            description=state.user_message,
+            max_iterations=state.max_iterations,
+        )
+        status: TaskStatus = (
+            "completed"
+            if reason == "goal_satisfied"
+            else "cancelled"
+            if reason == "cancelled"
+            else "superseded"
+            if reason == "superseded"
+            else "in_progress"
+            if reason == "awaiting_render"
+            else "blocked"
+            if reason in {
+                "iteration_budget_exhausted",
+                "model_budget_exhausted",
+                "tool_budget_exhausted",
+                "transition_budget_exhausted",
+                "run_deadline_exhausted",
+                "no_progress",
+                "clarification_required",
+            }
+            else "failed"
+        )
+        tasks = [
+            task.model_copy(
+                update={
+                    "status": (
+                        status
+                        if task.task_id == typed.root_task_id
+                        else task.status
+                        if status == "in_progress"
+                        else status
+                    )
+                }
+            )
+            for task in typed.tasks
+        ]
+        typed = typed.model_copy(update={"status": status, "tasks": tasks})
+        raw.update(typed.to_payload())
+        state.task_state = raw
 
     # -------------------------------------------------------------------------
     async def _route(
@@ -455,7 +920,9 @@ class AgentLoop:
         )
         protocol_messages = self._protocol_messages(messages)
         if not protocol_messages and state.provider_continuation:
-            protocol_messages = [dict(item) for item in state.provider_continuation]
+            protocol_messages = self._protocol_messages(
+                [dict(item) for item in state.provider_continuation]
+            )
         return [*context, *protocol_messages]
 
     # -------------------------------------------------------------------------
@@ -478,7 +945,7 @@ class AgentLoop:
         # only the latest provider protocol window here so Responses reasoning
         # and function-call items remain paired without pinning every historical
         # tool exchange forever.
-        return protocol[-16:]
+        return select_pair_safe_messages(protocol, max_items=16)
 
     # -------------------------------------------------------------------------
     async def _model_call(
@@ -813,6 +1280,9 @@ class AgentLoop:
                     call,
                     state,
                     request.budget,
+                    trace_callback=request.trace_callback,
+                    iteration=state.current_iteration,
+                    task_id=self._active_task_id(state),
                 )
                 self._ensure_run_control(request)
                 self._transition(state, AgentPhase.NORMALIZE_RESULT, request.budget)
@@ -1256,34 +1726,18 @@ class AgentLoop:
             ),
             spatial_scope_required=bool(spatial_scope),
         )
+        AgentLoop._initialize_task_state_for_route(state, route)
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _pending_native_requirements(state: AgentRunState) -> list[str]:
         if not state.context_hydrated or state.completion_contract is None:
             return []
-        completed_data = any(
-            result.status in {"success", "valid_empty", "partial"}
-            and result.tool_name
-            in {
-                "execute_geospatial_capability",
-                "inspect_evidence",
-                "transform_evidence",
-            }
-            for result in state.tool_results
-        )
-        checks = {
-            "location_resolved": bool(state.location_refs)
-            or state.active_map_session is not None,
-            "required_data_retrieved": completed_data,
-            # Scope is bound by the server-owned execution adapter.  A
-            # successful/empty/partial capability observation therefore proves
-            # that the selected temporal and spatial contract was applied to
-            # the provider request, without trusting model-supplied geometry.
-            "temporal_scope_applied": completed_data,
-            "spatial_scope_applied": completed_data,
-            "map_candidate_prepared": state.prepared_map_session is not None,
-        }
+        # Scope is bound by the server-owned execution adapter.  A
+        # successful/empty/partial capability observation therefore proves
+        # that the selected temporal and spatial contract was applied to the
+        # provider request, without trusting model-supplied geometry.
+        checks = AgentLoop._completion_checks(state)
         required_names = list(state.completion_contract.requirements)
         if (
             state.completion_contract.temporal_scope_required
@@ -1515,6 +1969,8 @@ class AgentLoop:
         reason: str,
         request: AgentLoopRequest,
     ) -> AgentLoopOutcome:
+        self._sync_task_state(state)
+        self._set_terminal_task_state(state, reason)
         state.budget_snapshot = request.budget.snapshot()
         target_phase = (
             AgentPhase.AWAIT_RENDER
@@ -1548,6 +2004,8 @@ class AgentLoop:
         category: str,
     ) -> AgentLoopOutcome:
         state.termination_reason = "failed"
+        self._sync_task_state(state)
+        self._set_terminal_task_state(state, "failed")
         state.budget_snapshot = request.budget.snapshot()
         try:
             self._transition(state, AgentPhase.FAILED, request.budget)
@@ -1573,6 +2031,8 @@ class AgentLoop:
         state.termination_reason = reason
         request.budget.terminal_reason = reason
         request.budget.stopping_reason = reason
+        self._sync_task_state(state)
+        self._set_terminal_task_state(state, reason)
         state.budget_snapshot = request.budget.snapshot()
         self._transition(state, AgentPhase.FAILED, count=False)
         return AgentLoopOutcome(

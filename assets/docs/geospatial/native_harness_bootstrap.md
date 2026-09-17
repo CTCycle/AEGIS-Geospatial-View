@@ -1,6 +1,6 @@
 # Native AEGIS harness status and completion plan
 
-Last updated: 2026-09-15
+Last updated: 2026-09-17
 
 ## Purpose
 
@@ -29,15 +29,14 @@ handshake, and run lifecycle remain application-owned invariants.
 
 - Audit baseline: `c6809755e1ea2dafdc09e45f0f4c574d5327f04f`.
 - Repository baseline before this remediation series: `4d55d16c` on `develop`.
-- Remediation is committed incrementally on local `develop`; the branch is
-  ahead of `origin/develop` and has not been pushed.
+- Remediation is staged in the shared local worktree on `develop`; no push or
+  pull request is part of this task.
 - `app/assets/` is pre-existing untracked work and is out of scope. Never
   stage, delete, or reset it.
 - Native execution is now the only application execution path. There is no
   runtime mode switch for legacy or shadow execution.
-- The `native_v2_*` filenames are historical names for the native tool and
-  turn adapters; they do not represent a second runtime or compatibility
-  branch.
+- The native tool and turn adapters use the canonical `native_tools.py` and
+  `turn_runner.py` filenames. No `native_v2_*` compatibility runtime remains.
 
 ## Covered implementation slices
 
@@ -142,6 +141,13 @@ cursors, bounded descriptors, and evidence persistence.
   cancels the tracked in-flight task.
 - OpenAI/Responses protocol continuation items remain opaque to the semantic
   state and are retained only in a bounded provider continuation window.
+- Every run has a typed root task and current iteration. Compound routes add
+  requirement/target children, and task status is derived from observations and
+  completion checks rather than model prose.
+- Tool selection and normalized results emit linked internal trace events with
+  run version, iteration, task ID, call ID, safe arguments/results, timing,
+  recovery, and evidence references. The trace reader redacts credentials and
+  reasoning fields; raw provider payloads remain in `agent_evidence`.
 
 ### Public result and map contracts
 
@@ -150,6 +156,11 @@ assistant message, operation, route, goal, completion contract, tool-result
 summaries, context usage, trace, conversation state, and optional map
 candidate. Removed parser/planner/task/migration projections are not accepted
 by the response models or client parsers.
+
+HTTP turns, NDJSON streams, background jobs, and realtime runs all create or
+observe the same persisted `AgentRun` lifecycle. Conversation listing/search,
+recent-run summaries, and the access-checked redacted run-trace endpoint reuse
+the existing conversation, run-event, and evidence tables.
 
 Map preparation is a candidate operation. Realtime runs persist the candidate
 as `awaiting_render`, retain the last committed map, and promote only after a
@@ -171,6 +182,9 @@ wait. Failed or stale acknowledgments cannot replace the last-known-good map.
 | P1 budgets/timeouts/cancellation | Covered | shared settings, provider policy injection, stage telemetry, run controls |
 | P1 provider continuation | Covered in harness; OpenCode Go exercised | bounded opaque continuation; OpenAI Responses and Ollama remain unrun |
 | P2 tool registry and manifest contracts | Covered | one registry/executor and strict runtime catalog validation |
+| P2 durable traces and bounded task state | Covered | typed task ledger, iteration exhaustion category, paired context, redacted run trace |
+| P2 conversation history and run inspection | Covered | conversation page/search, scoped history tool, recent runs, trace endpoint |
+| P2 transport lifecycle consolidation | Covered | HTTP/NDJSON/jobs use `RunLifecycleService`; realtime already used it |
 | P2 live provider discovery transfer | Covered locally | canonical provider-layer handler; live upstream coverage remains environment-dependent |
 | P3 legacy/shadow runtime deletion | Covered | old execution files, parser/planner chain, shadow path, mode switch, and migration response fields deleted |
 | P4 trajectory/evaluation suite | Covered locally | core native trajectories and focused contracts pass, including discovery, replan, valid-empty, malformed-call correction, 10-turn bounded context, in-flight cancellation, durable checkpoint retrieval/resume, duplicate suppression, and MapLibre acknowledgement; live/provider coverage remains an external validation gate |
@@ -180,8 +194,9 @@ wait. Failed or stale acknowledgments cannot replace the last-known-good map.
 The implementation is not declared production-complete solely from local
 synthetic success. The following evidence is now recorded:
 
-- Full server unit and agent-benchmark suite: `736 passed, 2 warnings` with the
-  checkpoint/resume and render-response regression tests included.
+- Full server unit and agent-benchmark suite: rerun after this integration
+  change and recorded in the companion QA report; protected cache warnings are
+  not test failures.
 - Strict Pyright: `0 errors, 0 warnings, 0 informations`.
 - Ruff: passed with no findings. The managed workspace still reports
   access-denied cache warnings while scanning protected cache residue.
@@ -212,7 +227,7 @@ and hosted infrastructure were not silently substituted. The gates are:
    MapLibre contract is proven locally, but it is not a substitute for that
    broader gate.
 
-The local trajectory suite now covers the core synthetic cases, including
+The local trajectory suite covers the core synthetic cases, including
 valid-empty recovery, malformed-call correction, cancellation during model and
 tool work, duplicate replay, bounded multi-iteration context, and checkpoint
 restoration from the durable run event log. The broader external-provider and
