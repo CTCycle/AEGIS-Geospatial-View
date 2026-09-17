@@ -44,3 +44,42 @@ def test_unrelated_turn_defers_but_does_not_delete_clarification() -> None:
     assert projection["pending_clarification"] is None
     assert state.pending_clarification is not None
     assert state.pending_clarification.question.endswith("Bracciano?")
+
+
+def test_generic_unrelated_turn_does_not_answer_clarification() -> None:
+    state = ConversationState.from_persisted(
+        "conversation-3",
+        {
+            "conversation_id": "conversation-3",
+            "pending_clarification": {
+                "question": "Which country contains Lake Bracciano?",
+                "source_turn_index": 1,
+            },
+        },
+    )
+
+    assert state.context_projection("Hello")["pending_clarification"] is None
+    deferred = state.clarification_after_turn("Hello")
+    assert deferred is not None
+    assert deferred.status == "deferred"
+
+
+def test_direct_answer_resolves_and_preserves_terminal_clarification() -> None:
+    state = ConversationState.from_persisted(
+        "conversation-4",
+        {
+            "conversation_id": "conversation-4",
+            "pending_clarification": {
+                "question": "Which country contains Lake Bracciano?",
+                "source_turn_index": 1,
+            },
+        },
+    )
+
+    answered = state.clarification_after_turn("Italy")
+    assert answered is not None
+    assert answered.status == "answered"
+    answered_state = state.model_copy(update={"pending_clarification": answered})
+    preserved = answered_state.clarification_after_turn("Hello")
+    assert preserved is not None
+    assert preserved.status == "answered"

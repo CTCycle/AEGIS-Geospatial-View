@@ -292,14 +292,8 @@ class NativeAgentOrchestrator:
                 source_text=payload.message,
             )
         elif stored_clarification is not None:
-            next_clarification = stored_clarification.model_copy(
-                update={
-                    "status": (
-                        "answered"
-                        if stored_clarification.applies_to(payload.message)
-                        else "deferred"
-                    )
-                }
+            next_clarification = conversation_state.clarification_after_turn(
+                payload.message
             )
         else:
             next_clarification = None

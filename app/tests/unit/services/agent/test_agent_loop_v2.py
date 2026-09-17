@@ -354,6 +354,24 @@ async def test_verified_render_emits_tools_disabled_finalization_trace() -> None
     assert all(event.payload["tools_exposed"] == 0 for event in finalization)
     assert all(event.payload["tool_choice"] == "none" for event in finalization)
     assert [event.payload["model_call_index"] for event in finalization] == [0, 1]
+    assert set(finalization[0].payload) == {
+        "reason",
+        "tools_exposed",
+        "tool_choice",
+        "model_call_index",
+    }
+    assert set(finalization[1].payload) == {
+        "reason",
+        "tools_exposed",
+        "tool_choice",
+        "model_call_index",
+        "outcome",
+    }
+    assert all(
+        key not in event.payload
+        for event in finalization
+        for key in ("content", "messages", "tool_calls", "reasoning")
+    )
     assert provider.requests[0]["kwargs"]["tool_choice"] == "none"
     assert provider.requests[0]["kwargs"]["tools"] is None
 

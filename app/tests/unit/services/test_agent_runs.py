@@ -323,6 +323,80 @@ def test_terminal_render_failure_and_cancellation_close_pending_presentation(
     assert cancelled.presentation_status == "failed"
 
 
+def test_explicit_pending_failure_status_is_normalized_atomically(run_repositories) -> None:
+    lifecycle, _, _, _ = _services(run_repositories)
+    conversation = lifecycle.create_conversation(title="Explicit pending failure")
+    run_result, _ = run_async_in_thread(
+        lifecycle.create_run_with_status(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Map Rome"),
+            schedule=False,
+        )
+    )
+    repository = run_repositories["runs"]
+    with repository._session_factory() as session:  # noqa: SLF001
+        record = session.get(AgentRunRecord, run_result.run_id)
+        assert record is not None
+        record.presentation_status = "pending"
+        session.commit()
+
+    failed, transitioned = repository.mark_failed_if_current(
+        run_result.run_id,
+        run_result.run_version,
+        "render_failed",
+        "The browser rejected the map layer.",
+        presentation_status="pending",
+    )
+
+    assert transitioned is True
+    assert failed.state == AgentRunState.FAILED
+    assert failed.presentation_status == "failed"
+
+
+def test_superseding_pending_render_closes_the_old_presentation(
+    run_repositories,
+) -> None:
+    lifecycle, _, _, _ = _services(run_repositories)
+    conversation = lifecycle.create_conversation(title="Superseded presentation")
+    old_result, _ = run_async_in_thread(
+        lifecycle.create_run_with_status(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Map Rome"),
+            schedule=False,
+        )
+    )
+    repository = run_repositories["runs"]
+    repository.prepare_render(
+        old_result.run_id,
+        old_result.run_version,
+        {
+            "status": "pending",
+            "map_session_id": "map-old",
+            "collection_revision": 1,
+            "pending_response": {"map_session": {"session_id": "map-old"}},
+            "required_render_checks": {},
+            "completion_requirements": [],
+        },
+    )
+
+    new_result, created = run_async_in_thread(
+        lifecycle.create_run_with_status(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Map Milan"),
+            schedule=False,
+        )
+    )
+
+    assert created is True
+    assert new_result.run_id != old_result.run_id
+    superseded = repository.get_run(old_result.run_id)
+    assert superseded is not None
+    assert superseded.state == AgentRunState.CANCELLED
+    assert superseded.error_code == "superseded"
+    assert superseded.presentation_status == "not_required"
+    assert superseded.presentation is None
+
+
 @pytest.mark.asyncio
 async def test_lifecycle_resumes_persisted_active_native_run(run_repositories) -> None:
     lifecycle, _, _, fake_orchestrator = _services(run_repositories)

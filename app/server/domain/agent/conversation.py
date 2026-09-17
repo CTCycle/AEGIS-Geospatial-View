@@ -25,6 +25,12 @@ _CLARIFICATION_ACTION_MARKERS = re.compile(
     r"overlay|zoom|around|near)\b",
     re.IGNORECASE,
 )
+_CLARIFICATION_NON_ANSWER = re.compile(
+    r"^(?:hello|hi|hey)(?: there)?[.!?]?$|"
+    r"^(?:thanks?|thank you|ok(?:ay)?|sure|great|fine|no problem|"
+    r"never mind|nevermind|not sure|i(?: do not| don't) know)[.!?]?$",
+    re.IGNORECASE,
+)
 
 
 class PendingClarification(BaseModel):
@@ -80,11 +86,16 @@ class PendingClarification(BaseModel):
         sticky clarification blocker.
         """
 
-        if self.status == "answered" or not message.strip():
+        normalized = " ".join(message.strip().split())
+        if self.status == "answered" or not normalized:
             return False
-        if _CLARIFICATION_ACTION_MARKERS.search(message):
+        if _CLARIFICATION_ACTION_MARKERS.search(normalized):
             return False
-        return len(message.split()) <= 16
+        if _CLARIFICATION_NON_ANSWER.fullmatch(normalized):
+            return False
+        if "?" in normalized or len(normalized.split()) > 16:
+            return False
+        return bool(re.findall(r"[a-z0-9]+", normalized.casefold()))
 
 
 class ConversationState(BaseModel):
@@ -171,6 +182,23 @@ class ConversationState(BaseModel):
         if pending is None or not pending.applies_to(message):
             return None
         return pending.model_copy(update={"status": "active"})
+
+    def clarification_after_turn(self, message: str) -> PendingClarification | None:
+        """Advance the durable clarification record for one user turn.
+
+        An unrelated turn clears the current blocking projection but keeps the
+        record deferred for a possible later answer.  Once answered, the
+        record is terminal and must not be reopened by later turns.
+        """
+
+        pending = self.pending_clarification
+        if pending is None or pending.status == "answered":
+            return pending
+        return pending.model_copy(
+            update={
+                "status": "answered" if pending.applies_to(message) else "deferred"
+            }
+        )
 
     def context_projection(self, message: str) -> dict[str, Any]:
         """Return the model-visible state with clarification scope applied."""
