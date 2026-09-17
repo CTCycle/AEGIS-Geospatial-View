@@ -277,6 +277,52 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
     assert first.state == "pending"
 
 
+def test_terminal_render_failure_and_cancellation_close_pending_presentation(
+    run_repositories,
+) -> None:
+    lifecycle, _, _, _ = _services(run_repositories)
+    conversation = lifecycle.create_conversation(title="Render terminal state")
+    run = run_async_in_thread(
+        lifecycle.create_run(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Map Rome"),
+        )
+    )
+    repository = run_repositories["runs"]
+    with repository._session_factory() as session:  # noqa: SLF001
+        record = session.get(AgentRunRecord, run.run_id)
+        assert record is not None
+        record.presentation_status = "pending"
+        session.commit()
+
+    failed, transitioned = repository.mark_failed_if_current(
+        run.run_id,
+        run.run_version,
+        "render_failed",
+        "The browser rejected the map layer.",
+    )
+    assert transitioned is True
+    assert failed.state == AgentRunState.FAILED
+    assert failed.presentation_status == "failed"
+
+    cancelled_run = run_async_in_thread(
+        lifecycle.create_run(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Map Milan"),
+        )
+    )
+    with repository._session_factory() as session:  # noqa: SLF001
+        record = session.get(AgentRunRecord, cancelled_run.run_id)
+        assert record is not None
+        record.presentation_status = "pending"
+        session.commit()
+
+    cancelled, transitioned = repository.request_cancel_once(cancelled_run.run_id)
+    assert transitioned is True
+    assert cancelled.state == AgentRunState.CANCELLED
+    assert cancelled.presentation_status == "failed"
+
+
 @pytest.mark.asyncio
 async def test_lifecycle_resumes_persisted_active_native_run(run_repositories) -> None:
     lifecycle, _, _, fake_orchestrator = _services(run_repositories)

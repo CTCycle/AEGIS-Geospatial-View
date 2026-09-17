@@ -124,7 +124,12 @@ class _FakeRunRepository:
 
     # -------------------------------------------------------------------------
     def mark_failed_if_current(
-        self, run_id: str, expected_run_version: int, code: str, message: str
+        self,
+        run_id: str,
+        expected_run_version: int,
+        code: str,
+        message: str,
+        **_kwargs,
     ) -> tuple[AgentRunSnapshot, bool]:
         assert expected_run_version == self.snapshot.active_run_version
         return self.mark_failed(run_id, code, message), True

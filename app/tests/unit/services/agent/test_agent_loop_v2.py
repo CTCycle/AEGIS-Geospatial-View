@@ -274,6 +274,39 @@ def test_verified_render_closes_map_completion_contract() -> None:
     assert stop == ("goal_satisfied", "The map is ready.")
 
 
+@pytest.mark.asyncio
+async def test_verified_render_emits_tools_disabled_finalization_trace() -> None:
+    provider = FakeProvider([LLMResult(content="Verified map summary.")])
+    events = []
+
+    async def trace(event) -> None:  # noqa: ANN001
+        events.append(event)
+
+    request = AgentLoopRequest(
+        provider="fake",
+        model="fake-model",
+        state=_state(),
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        trace_callback=trace,
+    )
+    answer = await _loop(provider)._finalize_verified_render(  # pyright: ignore[reportPrivateUsage]
+        request,
+        provider,
+        [],
+    )
+
+    assert answer == "Verified map summary."
+    finalization = [event for event in events if event.kind == "finalization"]
+    assert [event.payload["phase"] for event in finalization] == [
+        "started",
+        "completed",
+    ]
+    assert all(event.payload["tools_exposed"] == 0 for event in finalization)
+    assert all(event.payload["tool_choice"] == "none" for event in finalization)
+    assert provider.requests[0]["kwargs"]["tool_choice"] == "none"
+    assert provider.requests[0]["kwargs"]["tools"] is None
+
+
 ###############################################################################
 def test_native_goal_compiles_deterministic_completion_contract() -> None:
     state = _state()

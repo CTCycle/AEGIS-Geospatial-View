@@ -46,6 +46,7 @@ TraceKind = Literal[
     "run_resumed",
     "completion_decision",
     "render_retry_exhausted",
+    "finalization",
 ]
 
 ###############################################################################
