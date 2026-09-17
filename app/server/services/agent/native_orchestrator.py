@@ -284,10 +284,6 @@ class NativeAgentOrchestrator:
         merged_locations = dict(conversation_state.resolved_locations)
         merged_locations.update(native_response.location_refs)
         stored_clarification = conversation_state.pending_clarification
-        if stored_clarification is None and conversation_state.unresolved_questions:
-            stored_clarification = PendingClarification.from_legacy(
-                conversation_state.unresolved_questions[0]
-            )
         if native_response.operation.kind == "clarification":
             next_clarification = PendingClarification.from_turn(
                 native_response.operation.message,
@@ -295,7 +291,6 @@ class NativeAgentOrchestrator:
                 source_request_id=request_id,
                 source_text=payload.message,
             )
-            next_questions = [native_response.operation.message]
         elif stored_clarification is not None:
             next_clarification = stored_clarification.model_copy(
                 update={
@@ -306,10 +301,8 @@ class NativeAgentOrchestrator:
                     )
                 }
             )
-            next_questions = []
         else:
             next_clarification = None
-            next_questions = []
         next_state = conversation_state.model_copy(
             update={
                 "revision": int(persisted.get("context_revision") or 0) + 1,
@@ -335,7 +328,6 @@ class NativeAgentOrchestrator:
                     )
                 ),
                 "committed_map_session": committed_map,
-                "unresolved_questions": next_questions,
                 "pending_clarification": next_clarification,
             }
         )
