@@ -441,7 +441,7 @@ class AgentLoop:
                     ):
                         state.no_progress_corrections += 1
                         pending = self._pending_native_requirements(state)
-                        render_failure = self._latest_render_failure(state)
+                        render_failure = self._first_render_failure(state)
                         correction = (
                             {
                                 "observation_type": "failed_render_recovery",
@@ -1721,8 +1721,15 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _latest_render_failure(state: AgentRunState) -> Any | None:
-        for observation in reversed(state.render_observations):
+    def _first_render_failure(state: AgentRunState) -> Any | None:
+        """Return the first bounded render failure for this run.
+
+        Later observations may be generic follow-on validation failures. They
+        must not replace the first decisive cause in recovery instructions or
+        terminal text; the checkpoint retains the bounded chronological list.
+        """
+
+        for observation in state.render_observations:
             if observation.status == "failed":
                 return observation
         return None
@@ -2455,7 +2462,7 @@ class AgentLoop:
     ) -> str:
         if reason in {"awaiting_render", "goal_satisfied"} or state.render_verified:
             return text
-        observation = cls._latest_render_failure(state)
+        observation = cls._first_render_failure(state)
         if observation is None:
             return text
         code = observation.failure_code or "render_failed"

@@ -274,6 +274,52 @@ def test_verified_render_closes_map_completion_contract() -> None:
     assert stop == ("goal_satisfied", "The map is ready.")
 
 
+def test_render_recovery_exhaustion_preserves_first_failure_cause() -> None:
+    state = _state()
+    state.render_attempts = 2
+    state.render_retry_exhausted = True
+    state.render_observations = [
+        RenderObservation(
+            map_session_id="map-1",
+            collection_revision=1,
+            attempt=1,
+            status="failed",
+            checks={"required_sources_loaded": False},
+            failure_code="missing_source",
+            failure_stage="maplibre",
+            failure_summary="The selected source was not registered.",
+            recovery="revise_map",
+        ),
+        RenderObservation(
+            map_session_id="map-2",
+            collection_revision=2,
+            attempt=2,
+            status="failed",
+            checks={"required_layers_present": False},
+            failure_code="generic_validation",
+            failure_stage="backend_validation",
+            failure_summary="A later generic validation check failed.",
+            recovery="terminal",
+        ),
+    ]
+    loop = _loop(FakeProvider([]))
+    outcome = loop._outcome(  # pyright: ignore[reportPrivateUsage]
+        state,
+        "The map renderer did not produce a verified result.",
+        "render_recovery_exhausted",
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        ),
+    )
+
+    assert "missing_source" in outcome.final_text
+    assert "The selected source was not registered." in outcome.final_text
+    assert "generic_validation" not in outcome.final_text
+
+
 @pytest.mark.asyncio
 async def test_verified_render_emits_tools_disabled_finalization_trace() -> None:
     provider = FakeProvider([LLMResult(content="Verified map summary.")])
