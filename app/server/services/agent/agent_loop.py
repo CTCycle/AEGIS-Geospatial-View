@@ -920,17 +920,31 @@ class AgentLoop:
             }
             for result in state.tool_results
         )
+        geocode_location_resolved = (
+            state.route is not None
+            and state.route.task_mode == "execute"
+            and state.route.primary_domain is CapabilityDomain.PLACE_SEARCH
+            and state.route.presentation == "text"
+            and state.route.operation == "geocode"
+            and bool(state.location_refs)
+            and any(
+                result.tool_name == "resolve_geospatial_location"
+                and result.status == "success"
+                for result in state.tool_results
+            )
+        )
+        data_completed = completed_data or geocode_location_resolved
         return {
             "location_resolved": bool(state.location_refs)
             or state.active_map_session is not None,
-            "required_data_retrieved": completed_data,
+            "required_data_retrieved": data_completed,
             "temporal_scope_applied": completed_data,
             # A successful map-plan observation is the server-owned proof
             # that the requested spatial scope was applied.  Location-only
             # map requests have no data tool result, so using ``completed_data``
             # alone left their spatial task pending even after a valid
             # candidate had been prepared.
-            "spatial_scope_applied": completed_data
+            "spatial_scope_applied": data_completed
             or state.prepared_map_session is not None
             or (state.active_map_session is not None and state.render_verified),
             "map_candidate_prepared": state.prepared_map_session is not None
