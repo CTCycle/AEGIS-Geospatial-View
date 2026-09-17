@@ -232,10 +232,10 @@ synthetic success. Current evidence is recorded in
 - Angular production build passed. The targeted Karma process was unavailable
   after the restart and is recorded as blocked rather than inferred from build
   success.
-- A full repository test attempt was not a clean gate (`699 passed, 147
-  failed, 4 skipped, 75 warnings`); the failures include unavailable backend
-  services/browser E2E and provider/integration suites outside the focused
-  orchestration proof.
+- A full repository test attempt during integration (before the final focused
+  contract fixes) was not a clean gate (`699 passed, 147 failed, 4 skipped,
+  75 warnings`); the failures include unavailable backend services/browser E2E
+  and provider/integration suites outside the focused orchestration proof.
 - Browser-driven MapLibre and live-provider validation were not rerun in this
   continuation because the required services/credentials were unavailable; no
   provider or browser success is claimed here.
