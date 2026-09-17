@@ -10,7 +10,7 @@ reconstructing semantic state from a recent-message suffix.
 from __future__ import annotations
 
 import re
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -128,12 +128,16 @@ class ConversationState(BaseModel):
         if payload is None:
             return cls.empty(conversation_id, revision=revision)
         if isinstance(payload, dict):
-            migrated = dict(payload)
+            raw_payload = cast(dict[str, Any], payload)
+            migrated: dict[str, Any] = dict(raw_payload)
             migrated.setdefault("schema_version", 2)
-            pending = migrated.get("pending_clarification")
+            pending: Any = migrated.get("pending_clarification")
             if pending is None:
-                legacy_questions = migrated.get("unresolved_questions")
-                if isinstance(legacy_questions, list):
+                legacy_questions_value: Any = migrated.get("unresolved_questions")
+                if isinstance(legacy_questions_value, list):
+                    legacy_questions: list[Any] = cast(
+                        list[Any], legacy_questions_value
+                    )
                     first = next(
                         (
                             str(item).strip()
