@@ -66,6 +66,22 @@ class CapabilityRouter:
                 continue
             valid_explicit_ids.append(normalized_id)
 
+        if proposed.task_mode == "execute" and _is_broad_infrastructure_route(
+            proposed
+        ):
+            return CapabilityRouteDecision(
+                status="clarification",
+                route=proposed,
+                rejected_capability_ids=rejected,
+                reason_codes=[
+                    *dict.fromkeys([*reasons, "ambiguous_infrastructure_category"])
+                ],
+                clarification_question=(
+                    "Which infrastructure category do you need: EV charging stations, "
+                    "buildings, airports, roads/transit, or another specific category?"
+                ),
+            )
+
         # A new map cannot be prepared without a validated location.  Keep this
         # prerequisite server-owned so a model route that asks for a map but
         # forgets it still enters the typed location tool phase.
@@ -162,6 +178,27 @@ class CapabilityRouter:
             )
         ]
 
+        if (
+            proposed.task_mode == "execute"
+            and not capability_ids
+            and _is_unsupported_boundary_route(proposed)
+        ):
+            reason_codes = [*reasons, "unsupported_boundary_scope"]
+            if active_state.active_map_session is not None:
+                reason_codes.append("active_map_preserved")
+            return CapabilityRouteDecision(
+                status="clarification",
+                route=proposed,
+                rejected_capability_ids=rejected,
+                reason_codes=list(dict.fromkeys(reason_codes)),
+                clarification_question=(
+                    "The enabled catalog does not provide an exact administrative "
+                    "boundary layer for this request, so I left the active map "
+                    "unchanged. Would a generalized geographic-context boundary "
+                    "or another supported regional layer work instead?"
+                ),
+            )
+
         if proposed.task_mode == "execute" and not capability_ids:
             status = (
                 "discovery_required"
@@ -227,6 +264,62 @@ def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:
     if state.active_map_session is not None:
         return state.active_map_session.resolved_location
     return None
+
+
+###############################################################################
+def _route_terms(route: CapabilityRoute) -> set[str]:
+    values = [route.operation or "", *route.capability_queries]
+    return {
+        token
+        for value in values
+        for token in re.findall(r"[a-z0-9]+", str(value).casefold())
+        if len(token) > 1
+    }
+
+
+def _is_broad_infrastructure_route(route: CapabilityRoute) -> bool:
+    terms = _route_terms(route)
+    if "infrastructure" not in terms:
+        return False
+    specific_terms = terms.difference(
+        {
+            "and",
+            "data",
+            "find",
+            "get",
+            "infrastructure",
+            "layer",
+            "map",
+            "nearby",
+            "of",
+            "on",
+            "retrieve",
+            "show",
+            "the",
+            "to",
+        }
+    )
+    return not specific_terms
+
+
+def _is_unsupported_boundary_route(route: CapabilityRoute) -> bool:
+    if route.spatial_scope is None:
+        return False
+    if route.spatial_scope.kind != "administrative_geometry":
+        return False
+    terms = _route_terms(route)
+    return bool(
+        terms.intersection(
+            {
+                "boundary",
+                "boundaries",
+                "exact",
+                "precise",
+                "precision",
+                "administrative",
+            }
+        )
+    )
 
 
 ###############################################################################
