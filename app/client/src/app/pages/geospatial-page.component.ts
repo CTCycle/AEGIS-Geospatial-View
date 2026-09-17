@@ -152,6 +152,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   };
   private renderAckQueued = false;
   private pendingRenderAckMessageId?: string;
+  private latestAcceptedRunId?: string;
+  private latestAcceptedRunVersion?: number;
   private lastRunSequence = 0;
   private lastHandledRunId?: string;
   private pendingRun?: { clientRequestId: string; message: string };
@@ -429,6 +431,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.activeRunId = undefined;
     this.activeRunVersion = undefined;
     this.lastHandledRunId = undefined;
+    this.latestAcceptedRunId = undefined;
+    this.latestAcceptedRunVersion = undefined;
     this.pendingRun = undefined;
     this.lastRunSequence = 0;
     this.streamState = 'idle';
@@ -690,6 +694,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.activeRunId = snapshot.active_run?.run_id;
       this.lastHandledRunId = this.activeRunId;
       this.activeRunVersion = snapshot.active_run?.run_version;
+      this.latestAcceptedRunId = this.activeRunId;
+      this.latestAcceptedRunVersion = this.activeRunVersion;
       this.isLoading = snapshot.active_run !== null
         && snapshot.active_run !== undefined
         && ['pending', 'running', 'updating', 'awaiting_render'].includes(snapshot.active_run.state);
@@ -777,6 +783,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.conversationState = undefined;
     this.activeRunId = undefined;
     this.activeRunVersion = undefined;
+    this.latestAcceptedRunId = undefined;
+    this.latestAcceptedRunVersion = undefined;
     this.pendingRun = undefined;
     this.lastRunSequence = 0;
     this.streamState = 'idle';
@@ -999,10 +1007,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     if (message.type === 'run.ack') {
       const runId = this.readString(message.payload['run_id']);
+      const runVersion = this.readNumber(message.payload['run_version']);
+      if (message.payload['accepted'] !== false) {
+        this.rememberAcceptedRunVersion(runId, runVersion);
+      }
       if (runId && message.payload['command'] === 'run.start') {
         this.activeRunId = runId;
         this.lastHandledRunId = runId;
-        this.activeRunVersion = this.readNumber(message.payload['run_version']);
+        this.activeRunVersion = runVersion;
         this.applyTaskState(message.payload['task_state']);
         this.toolProgress = [];
         this.traceEntries = [];
@@ -1143,6 +1155,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     this.lastRunSequence = event.sequence;
     this.realtimeService.setResumeCursor(event.run_id, event.sequence);
+    this.rememberAcceptedRunVersion(event.run_id, event.run_version);
     this.activeRunVersion = event.run_version;
     this.lastHandledRunId = event.run_id;
     this.applyTaskState(event.payload['task_state']);
@@ -1446,12 +1459,20 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
   }
 
-  private isStaleRenderAcknowledgement(message: RealtimeServerMessage): boolean {
-    const correlationId = this.readString(message.correlation_id);
-    if (correlationId !== undefined
-      && (!this.renderAckQueued || correlationId !== this.pendingRenderAckMessageId)) {
-      return true;
+  private rememberAcceptedRunVersion(runId: string | undefined, runVersion: number | undefined): void {
+    if (runId === undefined || runVersion === undefined) {
+      return;
     }
+    if (this.latestAcceptedRunId === runId
+      && this.latestAcceptedRunVersion !== undefined
+      && runVersion <= this.latestAcceptedRunVersion) {
+      return;
+    }
+    this.latestAcceptedRunId = runId;
+    this.latestAcceptedRunVersion = runVersion;
+  }
+
+  private isStaleRenderAcknowledgement(message: RealtimeServerMessage): boolean {
     const rejectedRunId = this.readString(message.payload['run_id']);
     const rejectedRunVersion = this.readNumber(message.payload['run_version']);
     if (rejectedRunId === undefined && rejectedRunVersion === undefined) {
@@ -1460,8 +1481,11 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
     const currentRunId = this.pendingRenderContext?.runId
       ?? this.activeRunId
-      ?? this.lastHandledRunId;
-    const currentRunVersion = this.pendingRenderContext?.runVersion ?? this.activeRunVersion;
+      ?? this.lastHandledRunId
+      ?? this.latestAcceptedRunId;
+    const currentRunVersion = this.pendingRenderContext?.runVersion
+      ?? this.activeRunVersion
+      ?? (currentRunId === this.latestAcceptedRunId ? this.latestAcceptedRunVersion : undefined);
     if (rejectedRunId !== undefined
       && currentRunId !== undefined
       && rejectedRunId !== currentRunId) {
