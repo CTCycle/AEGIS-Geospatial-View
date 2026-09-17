@@ -228,10 +228,11 @@ termination reason. No chain-of-thought is captured.
 
 ### Blocked or non-clean gates
 
-- A full repository test attempt reported **699 passed, 147 failed, 4 skipped,
-  75 warnings**. Failures include unavailable backend/browser services and
-  provider/integration suites outside the focused native proof; this is not
-  represented as a successful full gate.
+- A full repository test attempt during integration (before the final focused
+  contract fixes) reported **699 passed, 147 failed, 4 skipped, 75 warnings**.
+  Failures include unavailable backend/browser services and provider/integration
+  suites outside the focused native proof; this is not represented as a
+  successful full gate.
 - Full strict Pyright still reports baseline diagnostics in provider optional
   accesses, maintenance-service typing, transport checks, and an AgentLoop
   complexity cascade. The changed-module target is clean; the repository-wide
