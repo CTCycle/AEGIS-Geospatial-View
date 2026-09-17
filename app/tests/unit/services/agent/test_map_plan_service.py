@@ -56,6 +56,13 @@ class FakeCapabilityRegistry:
                 "capabilityKind": "overlay",
                 "renderingMode": "vector",
             },
+            "broken:vector-tile": {
+                "id": "broken:vector-tile",
+                "name": "Broken vector tile",
+                "provider": "natural-earth",
+                "capabilityKind": "overlay",
+                "renderingMode": "vector-tile",
+            },
         }
         return values.get(capability_id)
 
@@ -71,6 +78,14 @@ class FakeEvidenceRepository:
         conversation_id: str | None = None,
     ) -> AgentEvidenceSummary | None:
         if evidence_id != "evidence:hospitals":
+            if evidence_id == "evidence:metadata":
+                return AgentEvidenceSummary(
+                    evidence_id=evidence_id,
+                    kind="diagnostic",
+                    media_type="application/json",
+                    status="available",
+                    map_eligibility="not_renderable",
+                )
             return None
         return AgentEvidenceSummary(
             evidence_id=evidence_id,
@@ -365,6 +380,55 @@ async def test_missing_evidence_is_rejected() -> None:
     assert result.status == "failed"
     assert result.error is not None
     assert result.error.code == "unknown_evidence"
+
+
+@pytest.mark.asyncio
+async def test_not_renderable_evidence_is_rejected_before_candidate_build() -> None:
+    state = _state(active_map_session=_active_session())
+    state.evidence_refs = ["evidence:metadata"]
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                AddEvidenceLayerAction(
+                    action="add_evidence_layer",
+                    evidence_ref="evidence:metadata",
+                    capability_id="places:hospitals",
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "evidence_not_renderable"
+    assert state.prepared_map_session is None
+
+
+@pytest.mark.asyncio
+async def test_vector_tile_descriptor_without_source_metadata_is_rejected() -> None:
+    state = _state(active_map_session=_active_session())
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                AddEvidenceLayerAction(
+                    action="add_evidence_layer",
+                    evidence_ref="evidence:hospitals",
+                    capability_id="broken:vector-tile",
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "render_descriptor_unavailable"
+    assert state.prepared_map_session is None
 
 
 ###############################################################################

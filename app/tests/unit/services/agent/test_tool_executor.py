@@ -205,6 +205,12 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
 
     assert schema_result.error is not None
     assert schema_result.error.error_type == "schema_validation"
+    assert schema_result.data is not None
+    correction = schema_result.data["correction"]
+    assert correction["tool_name"] == "test_tool"
+    assert correction["canonical_arguments"] == {}
+    assert correction["required"] == ["value"]
+    assert correction["validation_errors"]
     assert policy_result.error is not None
     assert policy_result.error.error_type == "policy_rejection"
 

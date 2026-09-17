@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from server.common.typing import is_json_array
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentPhase, AgentRunState
-from server.domain.agent.map_plan import MapPlan
+from server.domain.agent.map_plan import AddEvidenceLayerAction, MapPlan
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -245,6 +245,7 @@ def register_agent_tools(
             # validated basemap and viewport without fabricating a data layer.
             prerequisites=frozenset({"route", "location", "map_presentation"}),
             idempotent=False,
+            semantic_validator=_map_plan_semantic_validator,
         ),
     )
     if history is not None:
@@ -476,6 +477,35 @@ def _apply_map_plan_handler(service: MapPlanService) -> Any:
         )
 
     return apply
+
+
+###############################################################################
+def _map_plan_semantic_validator(
+    request: ApplyMapPlanInput, state: AgentRunState
+) -> list[str]:
+    """Admit only map actions backed by the current evidence boundary."""
+
+    evidence_actions = [
+        action
+        for action in request.actions
+        if isinstance(action, AddEvidenceLayerAction)
+    ]
+    known_evidence = {str(ref) for ref in state.evidence_refs if str(ref).strip()}
+    errors: list[str] = []
+    for action in evidence_actions:
+        if action.evidence_ref not in known_evidence:
+            errors.append(
+                f"evidence_ref '{action.evidence_ref}' must exactly match a successful "
+                "evidence-producing tool result in the current run."
+            )
+
+    contract = state.completion_contract
+    if contract is not None and contract.evidence_required and not evidence_actions:
+        errors.append(
+            "Data-bearing map plans must include add_evidence_layer with an exact "
+            "evidence_ref from successful evidence-producing output."
+        )
+    return errors[:8]
 
 
 ###############################################################################

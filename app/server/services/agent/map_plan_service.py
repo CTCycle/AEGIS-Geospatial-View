@@ -122,8 +122,12 @@ class MapPlanService:
                         "missing_location",
                         "unknown_evidence",
                         "failed_evidence",
+                        "superseded_evidence",
+                        "evidence_not_renderable",
                         "unknown_layer",
                         "viewport_bounds_unavailable",
+                        "render_descriptor_unavailable",
+                        "render_descriptor_invalid",
                     }
                     else "semantic_validation"
                 ),
@@ -131,7 +135,15 @@ class MapPlanService:
                 message=exc.message,
                 recovery=(
                     "replan"
-                    if exc.code in {"unknown_layer", "viewport_bounds_unavailable"}
+                    if exc.code
+                    in {
+                        "unknown_layer",
+                        "viewport_bounds_unavailable",
+                        "evidence_not_renderable",
+                        "superseded_evidence",
+                        "render_descriptor_unavailable",
+                        "render_descriptor_invalid",
+                    }
                     else "correct_arguments"
                 ),
             )
@@ -317,6 +329,23 @@ class MapPlanService:
                     )
                 )
                 continue
+            if summary.status == "superseded":
+                raise MapPlanBuildError(
+                    "superseded_evidence",
+                    f"Evidence '{ref}' is superseded and cannot be rendered. "
+                    "Use a current successful evidence_ref.",
+                )
+            if summary.status == "failed":
+                raise MapPlanBuildError(
+                    "failed_evidence",
+                    f"Evidence '{ref}' failed and cannot be rendered.",
+                )
+            if summary.map_eligibility == "not_renderable":
+                raise MapPlanBuildError(
+                    "evidence_not_renderable",
+                    f"Evidence '{ref}' is not renderable; choose a successful "
+                    "evidence result with map_eligibility='renderable'.",
+                )
             payload: Any = None
             raw_payload = (
                 repository.get_payload(
@@ -333,7 +362,7 @@ class MapPlanService:
                     payload = None
             evidence.append(
                 AgentEvidenceEnvelope(
-                    ok=summary.status != "failed",
+                    ok=summary.status not in {"failed", "superseded"},
                     status=summary.status,
                     evidence_ref=summary.evidence_id,
                     summary=dict(summary.summary),
