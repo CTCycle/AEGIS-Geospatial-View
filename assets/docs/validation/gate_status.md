@@ -8,7 +8,7 @@ hosted CI. A gate is not complete until its exact evidence is linked or its
 environment blocker is recorded. `PASS` means the stated path was exercised;
 `PARTIAL` means only the listed subset passed; `FAIL` means the path ran and
 violated its contract; `BLOCKED` means an external prerequisite was absent;
-`NOT RUN` means no claim is made.
+`UNRUN` means no claim is made.
 
 ## Current ledger
 
@@ -20,7 +20,9 @@ violated its contract; `BLOCKED` means an external prerequisite was absent;
 | Controlled MapLibre happy path | PASS | `assets/QA/native-agent-loop-evaluation-20260917/` and `app/tests/e2e/test_agentic_map_completion.py` | Prior evidence; retest after this slice when frontend/backend services are available. |
 | Controlled browser fault matrix (failed layer, viewport mismatch, stale/duplicate ack, cancellation, supersession, retry exhaustion) | UNRUN | Scenario injector is test-only in `app/tests/e2e/test_agentic_map_completion.py` | Run the parameterized Playwright test with real Angular/MapLibre; record each scenario's screenshot/report under `assets/QA/`. |
 | Alembic migration head/check | PASS | Isolated SQLite `alembic upgrade head` followed by `alembic check` on 2026-09-17; head `202609170001` | The migration creates a schema-v2 clarification projection without dropping the legacy audit trail. |
-| Focused backend tests | PASS | `53 passed, 2 warnings` on 2026-09-17 using the existing `app/server/.venv` | Includes conversation, loop finalization, run repository, and run orchestrator seams. |
+| Focused backend/integration tests | PASS | Final integration run at commits `2633923a` / `758c7fbd`: `125 passed, 3 warnings` | Includes the clarification migration/type fix and bounded native-loop seams; retain the warnings as non-blocking evidence. |
+| Ruff lint | PASS | `ruff check --no-cache app/server app/tests` at the final integration revision | Protected-cache access-denied warnings are environmental; rerun with a writable cache when ACL residue is cleared. |
+| Full strict Pyright | FAIL | Repository-wide strict run at the final integration revision reported exactly `47 errors` (the changed clarification modules' targeted run is clean) | Resolve the repository baseline in provider Optional-access, maintenance-service, transport, and AgentLoop complexity diagnostics, then rerun `pyright --project app/server/pyproject.toml`. |
 | Frontend production build | UNRUN | Existing build evidence remains in prior QA reports | Run `npm run build` after the browser harness is available. |
 | Configured live provider completion | BLOCKED | Live credential/provider lane was unavailable in the 2026-09-17 evaluation | Re-run the exact configured model/provider; do not substitute a catalog or alternate provider. |
 | Full browser/API E2E matrix | BLOCKED | Required backend services/ports were unavailable in the evaluation | Start the canonical services, then run the full matrix separately from controlled fixtures. |
@@ -47,5 +49,5 @@ errors:
 ## Update rule
 
 Append or revise the smallest affected row when evidence changes. Keep blocked
-and unrun gates visible; do not convert a local synthetic result into live,
+and `UNRUN` gates visible; do not convert a local synthetic result into live,
 browser, provider, or hosted-CI proof.
