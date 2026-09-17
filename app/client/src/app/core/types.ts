@@ -758,8 +758,17 @@ export interface ConversationDirective {
   created_at_turn?: number;
 }
 
+export interface PendingClarification {
+  question: string;
+  source_turn_index: number;
+  source_request_id?: string | null;
+  scope: 'current_request';
+  scope_terms: string[];
+  status: 'active' | 'deferred' | 'answered';
+}
+
 export interface ConversationState {
-  schema_version: 1;
+  schema_version: 2;
   conversation_id: string;
   revision: number;
   active_directives: Array<Record<string, JsonValue>>;
@@ -770,7 +779,7 @@ export interface ConversationState {
   resolved_locations: Record<string, ResolvedLocation>;
   evidence_refs: string[];
   committed_map_session?: MapSession | null;
-  unresolved_questions: string[];
+  pending_clarification?: PendingClarification | null;
 }
 
 export interface ChatOperationResult {

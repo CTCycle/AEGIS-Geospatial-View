@@ -19,9 +19,12 @@ def test_legacy_unresolved_question_migrates_and_is_scoped() -> None:
     assert state.context_projection("Add an environmental layer")[
         "pending_clarification"
     ] is None
-    assert state.context_projection("Italy")["unresolved_questions"] == [
+    projection = state.context_projection("Italy")
+    assert projection["pending_clarification"]["question"] == (
         "Which country contains Lake Bracciano?"
-    ]
+    )
+    assert "unresolved_questions" not in projection
+    assert "unresolved_questions" not in state.model_dump(mode="json")
 
 
 def test_unrelated_turn_defers_but_does_not_delete_clarification() -> None:

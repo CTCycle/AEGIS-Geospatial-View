@@ -78,7 +78,7 @@ const nativeRoute = {
 };
 
 const nativeConversationState = (conversationId: string) => ({
-  schema_version: 1,
+  schema_version: 2,
   conversation_id: conversationId,
   revision: 1,
   active_directives: [],
@@ -89,7 +89,7 @@ const nativeConversationState = (conversationId: string) => ({
   resolved_locations: {},
   evidence_refs: [],
   committed_map_session: null,
-  unresolved_questions: [],
+  pending_clarification: null,
 });
 
 describe('core/api', () => {

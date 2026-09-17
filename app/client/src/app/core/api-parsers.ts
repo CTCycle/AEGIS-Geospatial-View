@@ -18,6 +18,7 @@ import {
   ConversationRunSummary,
   ConversationSummary,
   ConversationState,
+  PendingClarification,
   ConversationSnapshotResponse,
   CompletionContract,
   GenericObjectResponse,
@@ -1184,12 +1185,37 @@ export const parseCompletionContract = (
   };
 };
 
+const parsePendingClarification = (
+  value: unknown,
+  endpoint: string,
+): PendingClarification => {
+  const record = requireApiRecord(value, endpoint, 'pending_clarification');
+  const scope = requireApiString(record, 'scope', endpoint);
+  if (scope !== 'current_request') {
+    return apiContract(endpoint, 'pending_clarification.scope is unsupported', scope);
+  }
+  const status = requireApiString(record, 'status', endpoint);
+  if (!['active', 'deferred', 'answered'].includes(status)) {
+    return apiContract(endpoint, 'pending_clarification.status is unsupported', status);
+  }
+  return {
+    question: requireApiString(record, 'question', endpoint),
+    source_turn_index: requireApiNumber(record, 'source_turn_index', endpoint),
+    source_request_id: record.source_request_id === undefined
+      ? undefined
+      : requireApiStringOrNull(record, 'source_request_id', endpoint),
+    scope: 'current_request',
+    scope_terms: requireApiStringArray(record, 'scope_terms', endpoint),
+    status: status as PendingClarification['status'],
+  };
+};
+
 export const parseConversationState = (
   value: unknown,
   endpoint = 'conversation snapshot',
 ): ConversationState => {
   const record = requireApiRecord(value, endpoint, 'conversation_state');
-  if (record.schema_version !== 1) {
+  if (record.schema_version !== 2) {
     return apiContract(endpoint, 'conversation_state.schema_version is unsupported', record.schema_version);
   }
   const resolvedLocations = requireApiRecord(record.resolved_locations, endpoint, 'resolved_locations');
@@ -1211,8 +1237,11 @@ export const parseConversationState = (
     && !committedMap) {
     return apiContract(endpoint, 'conversation_state.committed_map_session is malformed', record.committed_map_session);
   }
+  const pendingClarification = record.pending_clarification === undefined || record.pending_clarification === null
+    ? record.pending_clarification ?? undefined
+    : parsePendingClarification(record.pending_clarification, endpoint);
   return {
-    schema_version: 1,
+    schema_version: 2,
     conversation_id: requireApiString(record, 'conversation_id', endpoint),
     revision: requireApiNumber(record, 'revision', endpoint),
     active_directives: requireApiArray(record.active_directives, endpoint, 'active_directives')
@@ -1226,7 +1255,7 @@ export const parseConversationState = (
     resolved_locations: parsedLocations,
     evidence_refs: requireApiStringArray(record, 'evidence_refs', endpoint),
     committed_map_session: committedMap as MapSession | null | undefined,
-    unresolved_questions: requireApiStringArray(record, 'unresolved_questions', endpoint),
+    pending_clarification: pendingClarification as PendingClarification | null | undefined,
   };
 };
 

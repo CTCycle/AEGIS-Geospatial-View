@@ -30,8 +30,8 @@ _CLARIFICATION_ACTION_MARKERS = re.compile(
 class PendingClarification(BaseModel):
     """A clarification tied to the request that produced it.
 
-    ``unresolved_questions`` predates the native loop and is retained as a
-    small compatibility projection.  This record is the durable source of
+    The legacy ``unresolved_questions`` value is read only while hydrating
+    pre-schema-v2 persisted state.  This record is the durable source of
     truth: status and source terms let a later turn consume the clarification
     without making it a global blocker for unrelated work.
     """
@@ -92,7 +92,7 @@ class ConversationState(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal[1, 2] = 2
+    schema_version: Literal[2] = 2
     conversation_id: str
     revision: int = Field(default=0, ge=0)
     active_directives: list[dict[str, Any]] = Field(
@@ -108,7 +108,6 @@ class ConversationState(BaseModel):
     )
     evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
     committed_map_session: MapSession | None = None
-    unresolved_questions: list[str] = Field(default_factory=lambda: list[str]())
     pending_clarification: PendingClarification | None = None
 
     @classmethod
@@ -153,6 +152,9 @@ class ConversationState(BaseModel):
                             )
                         )
             migrated["schema_version"] = 2
+            # The old key is a migration input only; never retain it in the
+            # validated durable/public contract.
+            migrated.pop("unresolved_questions", None)
             state = cls.model_validate(migrated)
         else:
             state = cls.model_validate(payload)
@@ -166,8 +168,6 @@ class ConversationState(BaseModel):
         """Project only a clarification relevant to the current user turn."""
 
         pending = self.pending_clarification
-        if pending is None and self.unresolved_questions:
-            pending = PendingClarification.from_legacy(self.unresolved_questions[0])
         if pending is None or not pending.applies_to(message):
             return None
         return pending.model_copy(update={"status": "active"})
@@ -179,9 +179,6 @@ class ConversationState(BaseModel):
         pending = self.pending_clarification_for(message)
         result["pending_clarification"] = (
             pending.model_dump(mode="json") if pending is not None else None
-        )
-        result["unresolved_questions"] = (
-            [pending.question] if pending is not None else []
         )
         return result
 

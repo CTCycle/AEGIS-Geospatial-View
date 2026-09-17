@@ -139,7 +139,7 @@ def _native_goal(
 ###############################################################################
 def _native_conversation_state(revision: int) -> dict[str, Any]:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "conversation_id": E2E_CONVERSATION_ID,
         "revision": revision,
         "active_directives": [],
@@ -150,7 +150,7 @@ def _native_conversation_state(revision: int) -> dict[str, Any]:
         "resolved_locations": {},
         "evidence_refs": [],
         "committed_map_session": None,
-        "unresolved_questions": [],
+        "pending_clarification": None,
     }
 
 ###############################################################################
@@ -584,7 +584,7 @@ def conversation_snapshot_payload(
         "map_session": deepcopy(map_session) if map_session is not None else None,
         "active_run": None,
         "conversation_state": {
-            "schema_version": 1,
+            "schema_version": 2,
             "conversation_id": E2E_CONVERSATION_ID,
             "revision": 5,
             "active_directives": [],
@@ -595,6 +595,6 @@ def conversation_snapshot_payload(
             "resolved_locations": {},
             "evidence_refs": [],
             "committed_map_session": None,
-            "unresolved_questions": [],
+            "pending_clarification": None,
         },
     }

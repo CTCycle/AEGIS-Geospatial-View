@@ -108,7 +108,7 @@ describe('pages/geospatial-page.component', () => {
         { role: 'assistant', content: 'Restored', created_at: '2026-08-31T10:00:01Z' },
       ],
       conversation_state: {
-        schema_version: 1,
+        schema_version: 2,
         conversation_id: 'conv-restore',
         revision: 3,
         active_directives: [],
@@ -119,7 +119,7 @@ describe('pages/geospatial-page.component', () => {
         resolved_locations: {},
         evidence_refs: [],
         committed_map_session: null,
-        unresolved_questions: [],
+        pending_clarification: null,
       },
       memory_snapshot: { location_slots: [] },
       map_session: null,
