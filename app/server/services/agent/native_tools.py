@@ -618,7 +618,6 @@ def _manifest_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
         "location_refs",
         "longitude",
         "radius",
-        "radius_m",
         "start",
         "start_time",
         "start_time_iso",
