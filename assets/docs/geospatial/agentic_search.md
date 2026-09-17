@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-09-15
+Last updated: 2026-09-17
 
 ## Summary
 
@@ -11,7 +11,7 @@ iterative native loop:
 
 ```text
 route -> expose -> model decision -> typed tool call -> observation
-      -> state update -> completion evaluation -> continue or finish
+      -> state update -> completion evaluation -> continue, render, or finish
 ```
 
 The model chooses semantic actions. AEGIS owns validation, geographic and
@@ -48,6 +48,12 @@ Durable state is separated from the model view:
 - `agent_evidence` stores raw or normalized external data outside the prompt.
 - trace events record model calls, tool calls, observations, retries, context
   compaction, transitions, and stop evaluations.
+
+Render acknowledgments use the same state boundary as tool results. The
+browser's bounded checks are normalized into `RenderObservation`, appended to
+`AgentRunState`, and fed back to the model. A failed candidate therefore
+supports `render -> observation -> revised map plan -> render` in one user
+turn; a ready candidate is committed before the final answer is generated.
 
 ## Route, goal, and completion
 
@@ -119,6 +125,13 @@ available when relevant. Large feature collections and raw provider payloads
 remain in the evidence store and are never inserted wholesale into model
 context.
 
+`RenderObservation` is the corresponding bounded projection for the browser
+render phase. It identifies the candidate/session and collection revision,
+attempt number, ready/failed status, verified viewport, required checks,
+overlay outcomes, safe failure code/stage/summary, and deterministic recovery
+class. It is operational evidence rather than chain-of-thought and is retained
+alongside tool observations in the checkpoint.
+
 Recovery is semantic rather than a blind repeat:
 
 - transport retry is owned by the provider registry;
@@ -162,10 +175,13 @@ terminal cancelled run without committing stale state.
 
 `apply_map_plan` creates a typed candidate only. A direct synchronous response
 can report `prepared_unverified`; the realtime browser path requires a matching
-successful `map.render_ack` containing the run version, map session, collection
-revision, and bounded rendering checks. Only that acknowledgement promotes the
-candidate to the committed map. Failed or stale candidates leave the
-last-known-good map untouched.
+`map.render_ack` containing the run version, map session, collection revision,
+and bounded rendering checks. The acknowledgment becomes a render observation
+and resumes the same bounded run: only a verified ready observation promotes
+the candidate to the committed map, while a failed observation leaves the
+last-known-good map untouched and gives the model a correction opportunity.
+Three render attempts are allowed by default, with duplicate failed action
+fingerprints rejected and a finalization-only response after exhaustion.
 
 The public `ChatTurnResponse` is canonical and contains the assistant message,
 operation, bounded tool summaries, route, goal, completion contract,
