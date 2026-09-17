@@ -1489,6 +1489,12 @@ class AgentRunRepository:
     ) -> tuple[AgentRunSnapshot, bool]:
         """Fail only the still-current, non-cancelled run version."""
         with self._session_factory() as session:
+            # ``pending`` is a presentation-in-progress value, never a valid
+            # terminal outcome. Normalize an explicit stale value here as
+            # well as the default pending-to-failed case below so every
+            # failure commit closes the presentation lifecycle atomically.
+            if presentation_status == "pending":
+                presentation_status = "failed"
             if presentation_status is not None and presentation_status not in {
                 "not_required",
                 "pending",
