@@ -49,6 +49,15 @@ class FakeCapabilityRegistry:
         return {"capability_id": capability_id, "render_support": "vector"}
 
     # -------------------------------------------------------------------------
+    def argument_schema(self, capability_id: str) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["query"],
+            "properties": {"query": {"type": "string", "minLength": 1}},
+        }
+
+    # -------------------------------------------------------------------------
     def shortlist(self, **_kwargs: Any) -> list[dict[str, Any]]:
         return [self.get_capability("places:hospitals")]  # type: ignore[list-item]
 
@@ -304,6 +313,25 @@ def test_goal_target_reference_is_required_and_cannot_be_replaced() -> None:
     assert errors == [
         "location_ref must match an exact target in the validated goal; "
         "another geography will not be substituted."
+    ]
+
+
+def test_manifest_argument_schema_is_checked_before_execution() -> None:
+    state = _state()
+    state.capability_ids = ["places:hospitals"]
+
+    errors = _capability_semantic_validator(
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals",
+            arguments={"query": "", "unexpected": True},
+        ),
+        state,
+        capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
+    )
+
+    assert errors == [
+        "arguments.unexpected: additional property is not allowed.",
+        "arguments.query: string is too short.",
     ]
 
 

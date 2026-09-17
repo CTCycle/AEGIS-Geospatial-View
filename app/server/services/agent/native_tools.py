@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from functools import partial
 from typing import Any
 
 from pydantic import BaseModel
@@ -196,7 +197,13 @@ def register_agent_tools(
                 }
             ),
             idempotent=False,
-            semantic_validator=_capability_semantic_validator,
+            semantic_validator=partial(
+                _capability_semantic_validator,
+                capability_registry=capability_registry,
+            ),
+            argument_schema_provider=_execute_argument_schema_provider(
+                capability_registry
+            ),
         ),
         _registration(
             name="inspect_evidence",
@@ -283,6 +290,7 @@ def _registration(
     prerequisites: frozenset[str],
     idempotent: bool,
     semantic_validator: Any = None,
+    argument_schema_provider: Any = None,
 ) -> RegisteredTool:
     return RegisteredTool(
         definition=LLMToolDefinition(
@@ -300,6 +308,7 @@ def _registration(
         idempotent=idempotent,
         result_normalizer=_normalize_result,
         semantic_validator=semantic_validator,
+        argument_schema_provider=argument_schema_provider,
     )
 
 
@@ -535,10 +544,14 @@ def _normalize_result(value: Any, call_id: str) -> ToolResult:
 
 ###############################################################################
 def _capability_semantic_validator(
-    request: ExecuteCapabilityInput, state: AgentRunState
+    request: ExecuteCapabilityInput,
+    state: AgentRunState,
+    *,
+    capability_registry: CapabilityRegistry | None = None,
 ) -> list[str]:
+    errors: list[str] = []
     if state.capability_ids and request.capability_id not in state.capability_ids:
-        return ["capability_id is outside the validated route shortlist."]
+        errors.append("capability_id is outside the validated route shortlist.")
     goal_targets = {
         normalize_target_key(str(item))
         for item in (state.goal.target_ids if state.goal is not None else [])
@@ -546,22 +559,170 @@ def _capability_semantic_validator(
     }
     requested_target = normalize_target_key(str(request.location_ref or ""))
     if requested_target and goal_targets and requested_target not in goal_targets:
-        return [
+        errors.append(
             "location_ref must match an exact target in the validated goal; "
             "another geography will not be substituted."
-        ]
-    if request.location_ref:
+        )
+    elif request.location_ref:
         if _location_for_request(request, state) is None:
-            return [
+            errors.append(
                 "location_ref must match one exact resolved location reference; "
                 "another location will not be substituted."
-            ]
+            )
     elif len(state.location_refs) > 1:
-        return [
+        errors.append(
             "location_ref is required when more than one resolved location is "
             "available."
-        ]
-    return []
+        )
+    if capability_registry is not None:
+        schema_provider = getattr(capability_registry, "argument_schema", None)
+        if callable(schema_provider):
+            try:
+                schema = schema_provider(request.capability_id)
+            except Exception:
+                errors.append(
+                    "The selected capability does not expose a usable argument schema."
+                )
+            else:
+                errors.extend(
+                    _json_schema_errors(
+                        _manifest_arguments(request.arguments),
+                        schema,
+                        path="arguments",
+                    )
+                )
+    return errors[:8]
+
+
+def _manifest_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Remove route-owned aliases before applying the manifest schema."""
+
+    owned = {
+        "bbox",
+        "end",
+        "end_time",
+        "end_time_iso",
+        "latitude",
+        "location_ref",
+        "location_refs",
+        "longitude",
+        "radius",
+        "radius_m",
+        "start",
+        "start_time",
+        "start_time_iso",
+        "temporal_scope",
+        "time",
+        "live",
+    }
+    return {
+        str(key): value
+        for key, value in arguments.items()
+        if str(key).strip().casefold() not in owned
+    }
+
+
+def _json_schema_errors(value: Any, schema: Any, *, path: str) -> list[str]:
+    """Validate the bounded manifest subset used at the execute boundary."""
+
+    if not isinstance(schema, dict):
+        return ["arguments: the capability argument schema is invalid."]
+    errors: list[str] = []
+    if "const" in schema and value != schema["const"]:
+        errors.append(f"{path}: value must equal the manifest constant.")
+    if isinstance(schema.get("enum"), list) and value not in schema["enum"]:
+        errors.append(f"{path}: value is not in the manifest enum.")
+    schema_type = schema.get("type")
+    if isinstance(schema_type, list):
+        if not any(_json_type_matches(value, item) for item in schema_type):
+            errors.append(f"{path}: value has the wrong type.")
+            return errors
+    elif isinstance(schema_type, str) and not _json_type_matches(value, schema_type):
+        errors.append(f"{path}: value must be a {schema_type}.")
+        return errors
+
+    if isinstance(value, dict):
+        properties = schema.get("properties")
+        properties = properties if isinstance(properties, dict) else {}
+        required = schema.get("required")
+        if isinstance(required, list):
+            for name in required[:32]:
+                if str(name) not in value:
+                    errors.append(f"{path}.{name}: required value is missing.")
+        if schema.get("additionalProperties") is False:
+            for name in value:
+                if str(name) not in properties:
+                    errors.append(f"{path}.{name}: additional property is not allowed.")
+        for name, child in value.items():
+            child_schema = properties.get(str(name))
+            if child_schema is not None:
+                errors.extend(
+                    _json_schema_errors(child, child_schema, path=f"{path}.{name}")
+                )
+    if isinstance(value, list):
+        min_items = schema.get("minItems")
+        max_items = schema.get("maxItems")
+        if isinstance(min_items, int) and len(value) < min_items:
+            errors.append(f"{path}: too few items.")
+        if isinstance(max_items, int) and len(value) > max_items:
+            errors.append(f"{path}: too many items.")
+        item_schema = schema.get("items")
+        if item_schema is not None:
+            for index, child in enumerate(value[:32]):
+                errors.extend(
+                    _json_schema_errors(child, item_schema, path=f"{path}[{index}]")
+                )
+    if isinstance(value, str):
+        min_length = schema.get("minLength")
+        max_length = schema.get("maxLength")
+        if isinstance(min_length, int) and len(value) < min_length:
+            errors.append(f"{path}: string is too short.")
+        if isinstance(max_length, int) and len(value) > max_length:
+            errors.append(f"{path}: string is too long.")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        minimum = schema.get("minimum")
+        maximum = schema.get("maximum")
+        if isinstance(minimum, (int, float)) and value < minimum:
+            errors.append(f"{path}: number is below the minimum.")
+        if isinstance(maximum, (int, float)) and value > maximum:
+            errors.append(f"{path}: number exceeds the maximum.")
+    return errors[:8]
+
+
+def _json_type_matches(value: Any, schema_type: Any) -> bool:
+    if schema_type == "object":
+        return isinstance(value, dict)
+    if schema_type == "array":
+        return isinstance(value, list)
+    if schema_type == "string":
+        return isinstance(value, str)
+    if schema_type == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if schema_type == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if schema_type == "boolean":
+        return isinstance(value, bool)
+    if schema_type == "null":
+        return value is None
+    return True
+
+
+def _execute_argument_schema_provider(
+    capability_registry: CapabilityRegistry,
+) -> Any:
+    def provide(
+        request: ExecuteCapabilityInput, _state: AgentRunState
+    ) -> dict[str, Any] | None:
+        argument_schema = getattr(capability_registry, "argument_schema", None)
+        if not callable(argument_schema):
+            return None
+        try:
+            schema = argument_schema(request.capability_id)
+        except Exception:
+            return None
+        return dict(schema) if isinstance(schema, dict) else None
+
+    return provide
 
 
 ###############################################################################

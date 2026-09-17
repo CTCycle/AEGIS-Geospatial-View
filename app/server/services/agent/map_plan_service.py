@@ -340,11 +340,26 @@ class MapPlanService:
                     "failed_evidence",
                     f"Evidence '{ref}' failed and cannot be rendered.",
                 )
-            if summary.map_eligibility == "not_renderable":
+            if summary.status == "valid_empty":
+                raise MapPlanBuildError(
+                    "evidence_not_renderable",
+                    f"Evidence '{ref}' is empty and cannot satisfy a requested map layer.",
+                )
+            if summary.map_eligibility != "renderable":
                 raise MapPlanBuildError(
                     "evidence_not_renderable",
                     f"Evidence '{ref}' is not renderable; choose a successful "
                     "evidence result with map_eligibility='renderable'.",
+                )
+            if summary.kind not in {
+                "vector",
+                "raster_descriptor",
+                "provider_layer_descriptor",
+                "capability_result",
+            }:
+                raise MapPlanBuildError(
+                    "evidence_not_renderable",
+                    f"Evidence '{ref}' is not a supported vector or raster layer.",
                 )
             payload: Any = None
             raw_payload = (
@@ -360,6 +375,11 @@ class MapPlanService:
                     payload = _bounded_render_payload(json.loads(raw_payload[1]))
                 except (TypeError, ValueError, json.JSONDecodeError):
                     payload = None
+            if payload is None:
+                raise MapPlanBuildError(
+                    "evidence_not_renderable",
+                    f"Evidence '{ref}' has no usable render payload.",
+                )
             evidence.append(
                 AgentEvidenceEnvelope(
                     ok=summary.status not in {"failed", "superseded"},
@@ -444,11 +464,37 @@ def _bounded_render_payload(value: Any) -> Any:
 
     payload = json_object(value)
     features = payload.get("features")
-    if not isinstance(features, list):
-        return None
-    features = cast(list[Any], features)
-    return {
-        key: child
-        for key, child in payload.items()
-        if key != "features"
-    } | {"features": features[:5000]}
+    if isinstance(features, list):
+        features = cast(list[Any], features)
+        return {
+            key: child
+            for key, child in payload.items()
+            if key != "features"
+        } | {"features": features[:5000]}
+    descriptor_keys = {
+        "renderingMode",
+        "rendering_mode",
+        "url",
+        "tileUrl",
+        "tile_url_template",
+        "serviceUrl",
+        "service_url",
+        "source_url",
+        "layers",
+        "layerId",
+        "layer_id",
+        "source_layer",
+        "tileMatrixSet",
+        "tile_matrix_set",
+        "format",
+        "version",
+        "style",
+        "bounds",
+        "legend",
+    }
+    descriptor = {
+        key: payload[key]
+        for key in descriptor_keys
+        if key in payload
+    }
+    return descriptor or None
