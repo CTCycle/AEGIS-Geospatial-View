@@ -18,7 +18,7 @@ from server.services.geospatial.provider_registry import PROVIDER_FACTORIES
 from server.services.geospatial.endpoint_validation import EndpointValidationService
 
 NATIVE_TOOL_SOURCE = (
-    PROJECT_DIR / "server" / "services" / "agent" / "native_v2_tools.py"
+    PROJECT_DIR / "server" / "services" / "agent" / "native_tools.py"
 )
 RENDERER_SOURCE = (
     PROJECT_DIR / "client" / "src" / "app" / "components" / "map-preview-rendering.ts"

@@ -120,7 +120,6 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         ),
         execution_settings=getattr(settings, "agent_execution", None),
     )
-    chat_streaming_service = ChatStreamingService(chat_runtime.agent_orchestrator)
     event_repository = AgentRunEventRepository(database)
     run_event_publisher = RunEventPublisher(event_repository)
     run_repository = AgentRunRepository(database, event_repository=event_repository)
@@ -156,6 +155,10 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         aggregation_service=aggregation_service,
         event_publisher=run_event_publisher,
         run_orchestrator=run_orchestrator,
+    )
+    chat_streaming_service = ChatStreamingService(
+        lifecycle_service=run_lifecycle_service,
+        event_publisher=run_event_publisher,
     )
     run_steering_service = RunSteeringService(
         run_repository=run_repository,

@@ -18,11 +18,11 @@ from server.contracts.geospatial import (
     GeospatialProviderLayersResponse,
 )
 from server.services.agent.capability_execution import ToolExecutionContext
-from server.services.agent.native_v2_tools import register_agent_tools
-from server.services.agent.native_v2_tools import _execute_capability_handler
-from server.services.agent.native_v2_tools import _bind_execute_request
-from server.services.agent.native_v2_tools import _location_for_request
-from server.services.agent.native_v2_tools import _capability_semantic_validator
+from server.services.agent.native_tools import register_agent_tools
+from server.services.agent.native_tools import _execute_capability_handler
+from server.services.agent.native_tools import _bind_execute_request
+from server.services.agent.native_tools import _location_for_request
+from server.services.agent.native_tools import _capability_semantic_validator
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.agent.tool_definitions import ProviderLayerDiscoveryInput

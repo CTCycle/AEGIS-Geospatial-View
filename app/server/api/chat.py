@@ -33,12 +33,19 @@ from server.contracts.chat import (
     OllamaRefreshResponse,
     StructuredProbeResponse,
 )
+from server.contracts.runs import AgentRunCreateRequest
 from server.domain.jobs import BackgroundJobCreateResponse
 from server.services.chat.composition import ChatRuntime
 from server.services.chat.model_library import DYNAMIC_CLOUD_PROVIDERS
 from server.services.chat.settings_service import ChatSettingsValidationError
 from server.services.chat.streaming import ChatStreamingService
 from server.services.jobs import BackgroundJobService
+from server.services.agent_runs.exceptions import (
+    RunAccessError,
+    RunConflictError,
+    RunNotFoundError,
+)
+from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.llm.errors import (
     LLMConfigurationError,
     LLMProviderRequestError,
@@ -60,6 +67,11 @@ def get_job_service(request: Request) -> BackgroundJobService:
 def get_chat_streaming_service(request: Request) -> ChatStreamingService:
     return request.app.state.chat_streaming_service
 
+
+###############################################################################
+def get_run_lifecycle_service(request: Request) -> RunLifecycleService | None:
+    return getattr(request.app.state, "run_lifecycle_service", None)
+
 ###############################################################################
 def _stream_event(event: ChatStreamEvent) -> str:
     return json.dumps(event.model_dump(mode="json")) + "\n"
@@ -68,8 +80,12 @@ def _stream_event(event: ChatStreamEvent) -> str:
 async def _serialize_chat_event_stream(
     streaming_service: ChatStreamingService,
     payload: ChatTurnRequest,
+    owner_user_id: str | None = None,
 ) -> AsyncIterator[str]:
-    async for event in streaming_service.stream_turn(payload):
+    async for event in streaming_service.stream_turn(
+        payload,
+        owner_user_id=owner_user_id,
+    ):
         yield _stream_event(event)
 
 ###############################################################################
@@ -93,6 +109,7 @@ async def create_chat_job(
 )
 async def chat_turn(
     payload: ChatTurnRequest,
+    request: Request,
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ChatTurnResponse:
     try:
@@ -101,12 +118,52 @@ async def chat_turn(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conversation not found.",
             )
-        return await runtime.agent_orchestrator.run_turn(payload)
-    except LLMConfigurationError as exc:
+        lifecycle_service = getattr(request.app.state, "run_lifecycle_service", None)
+        if not isinstance(lifecycle_service, RunLifecycleService):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="The persisted agent-run lifecycle is unavailable.",
+            )
+        response, result, _created = await lifecycle_service.run_turn(
+            payload.conversation_id,
+            AgentRunCreateRequest(
+                message=payload.message,
+                client_request_id=payload.request_id,
+                timezone=payload.timezone,
+            ),
+            owner_user_id=(
+                str(getattr(request.state, "user_id")).strip()
+                if getattr(request.state, "user_id", None) is not None
+                else None
+            ),
+        )
+        if response is not None:
+            return response
+        snapshot = lifecycle_service.run_repository.get_run(result.run_id)
+        if snapshot is not None and snapshot.error_message:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=snapshot.error_message,
+            )
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The agent run is still in progress; observe it through realtime.",
+        )
+    except (RunNotFoundError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc) or "Conversation not found.",
         ) from exc
-
+    except RunAccessError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except RunConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 ###############################################################################
 @router.post(
     CHAT_STREAM_ROUTE,
@@ -114,10 +171,16 @@ async def chat_turn(
 )
 async def chat_stream(
     payload: ChatTurnRequest,
+    request: Request,
     streaming_service: ChatStreamingService = Depends(get_chat_streaming_service),
 ) -> StreamingResponse:
+    owner_user_id = getattr(request.state, "user_id", None)
     return StreamingResponse(
-        _serialize_chat_event_stream(streaming_service, payload),
+        _serialize_chat_event_stream(
+            streaming_service,
+            payload,
+            str(owner_user_id).strip() if owner_user_id is not None else None,
+        ),
         media_type="application/x-ndjson",
     )
 

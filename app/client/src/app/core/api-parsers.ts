@@ -1,5 +1,9 @@
 import {
   ActiveConversationRunSnapshot,
+  AgentTask,
+  AgentTaskState,
+  AgentTaskStatus,
+  CompletionRequirement,
   AgentGoal,
   AgentSpatialScope,
   AgentTemporalScope,
@@ -10,6 +14,9 @@ import {
   ChatRole,
   ChatTurnResponse,
   ConversationCreateResponse,
+  ConversationListResponse,
+  ConversationRunSummary,
+  ConversationSummary,
   ConversationState,
   ConversationSnapshotResponse,
   CompletionContract,
@@ -32,6 +39,8 @@ import {
   NativeToolResultSummary,
   PresentationStatus,
   ResolvedLocation,
+  RunTraceEntry,
+  RunTraceResponse,
   SelectedModelContext,
   StructuredProbeResponse,
   StructuredProbeStatus,
@@ -894,6 +903,164 @@ const RUN_STATES: readonly AgentRunState[] = [
   'cancelled',
 ];
 
+const TASK_STATES: readonly AgentTaskStatus[] = [
+  'pending',
+  'in_progress',
+  'completed',
+  'failed',
+  'blocked',
+  'cancelled',
+  'superseded',
+];
+
+const boundedText = (value: unknown, maxLength: number): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const text = value.trim();
+  return text ? text.slice(0, maxLength) : null;
+};
+
+const optionalStringField = (
+  record: Record<string, unknown>,
+  fields: string[],
+  endpoint: string,
+): string | null | undefined => {
+  const field = fields.find((candidate) => Object.prototype.hasOwnProperty.call(record, candidate));
+  if (!field) {
+    return undefined;
+  }
+  const value = record[field];
+  if (value !== null && typeof value !== 'string') {
+    return apiContract(endpoint, `${field} must be a string or null`, value);
+  }
+  return value as string | null;
+};
+
+const parseAgentTask = (
+  value: unknown,
+  endpoint: string,
+  index: number,
+): AgentTask => {
+  const record = requireApiRecord(value, endpoint, `task_state.tasks[${index}]`);
+  const id = optionalStringField(record, ['id', 'task_id'], endpoint);
+  if (!id || !id.trim()) {
+    return apiContract(endpoint, `task_state.tasks[${index}].id must be a string`, value);
+  }
+  const description = optionalStringField(record, ['description', 'title', 'name'], endpoint)
+    ?? id;
+  const statusValue = optionalStringField(record, ['status', 'state'], endpoint) ?? 'pending';
+  if (!TASK_STATES.includes(statusValue as AgentTaskStatus)) {
+    return apiContract(endpoint, `task_state.tasks[${index}].status is unsupported`, statusValue);
+  }
+  const dependencies = record.dependencies === undefined
+    ? undefined
+    : requireApiStringArray(record, 'dependencies', endpoint);
+  const result = record.result === undefined || record.result === null
+    ? record.result ?? undefined
+    : requireApiJsonObject(record.result, endpoint, `task_state.tasks[${index}].result`);
+  const failureCode = optionalStringField(record, ['failure_code', 'error_code'], endpoint);
+  const parentTaskId = optionalStringField(record, ['parent_task_id', 'parent_id'], endpoint);
+  return {
+    id,
+    task_id: id,
+    description,
+    status: statusValue as AgentTaskStatus,
+    parent_task_id: parentTaskId,
+    dependencies,
+    result: result as Record<string, JsonValue> | null | undefined,
+    failure_code: failureCode,
+    requirement_name: optionalStringField(record, ['requirement_name'], endpoint),
+    target_id: optionalStringField(record, ['target_id'], endpoint),
+  };
+};
+
+const parseCompletionRequirement = (
+  value: unknown,
+  endpoint: string,
+  index: number,
+): CompletionRequirement => {
+  const record = requireApiRecord(value, endpoint, `task_state.completion_requirements[${index}]`);
+  const name = requireApiString(record, 'name', endpoint);
+  const required = record.required === undefined ? true : requireApiBoolean(record, 'required', endpoint);
+  const status = record.status === undefined ? 'pending' : requireApiString(record, 'status', endpoint);
+  if (!['pending', 'satisfied', 'failed', 'not_applicable'].includes(status)) {
+    return apiContract(endpoint, `task_state.completion_requirements[${index}].status is unsupported`, status);
+  }
+  return {
+    name,
+    required,
+    status: status as CompletionRequirement['status'],
+    target_id: optionalStringField(record, ['target_id'], endpoint),
+    evidence_ref: optionalStringField(record, ['evidence_ref'], endpoint),
+    failure_code: optionalStringField(record, ['failure_code'], endpoint),
+  };
+};
+
+/** Parse the bounded, operational task projection returned by native runs. */
+export const parseAgentTaskState = (
+  value: unknown,
+  endpoint = 'native agent',
+): AgentTaskState | null | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  const record = requireApiRecord(value, endpoint, 'task_state');
+  const rawTasks = record.tasks;
+  let tasks: AgentTask[] = [];
+  if (rawTasks !== undefined) {
+    if (Array.isArray(rawTasks)) {
+      tasks = rawTasks.map((item, index) => parseAgentTask(item, endpoint, index));
+    } else if (isRecord(rawTasks)) {
+      tasks = Object.values(rawTasks).map((item, index) => parseAgentTask(item, endpoint, index));
+    } else {
+      return apiContract(endpoint, 'task_state.tasks must be an array or object', rawTasks);
+    }
+  } else if (record.root_task !== undefined && record.root_task !== null) {
+    tasks = [parseAgentTask(record.root_task, endpoint, 0)];
+  }
+  const iterationValue = record.current_iteration ?? record.iteration;
+  const maxIterationValue = record.max_iterations ?? record.iteration_budget;
+  if (iterationValue !== undefined && !isNonNegativeInteger(iterationValue)) {
+    return apiContract(endpoint, 'task_state.current_iteration must be a non-negative integer', iterationValue);
+  }
+  if (maxIterationValue !== undefined
+    && (!isNonNegativeInteger(maxIterationValue) || maxIterationValue < 1)) {
+    return apiContract(endpoint, 'task_state.max_iterations must be a positive integer', maxIterationValue);
+  }
+  const runId = optionalStringField(record, ['run_id'], endpoint);
+  const activeTaskId = optionalStringField(record, ['active_task_id', 'current_task_id'], endpoint);
+  const status = optionalStringField(record, ['status', 'state'], endpoint);
+  if (status !== undefined
+    && status !== null
+    && !TASK_STATES.includes(status as AgentTaskStatus)) {
+    return apiContract(endpoint, 'task_state.status is unsupported', status);
+  }
+  const rootTaskId = optionalStringField(record, ['root_task_id'], endpoint);
+  const rawRequirements = record.completion_requirements;
+  const completionRequirements = rawRequirements === undefined
+    ? undefined
+    : requireApiArray(rawRequirements, endpoint, 'completion_requirements')
+      .map((item, index) => parseCompletionRequirement(item, endpoint, index));
+  const unresolvedRequirements = record.unresolved_requirements === undefined
+    ? undefined
+    : requireApiStringArray(record, 'unresolved_requirements', endpoint);
+  return {
+    run_id: runId,
+    root_task_id: rootTaskId ?? undefined,
+    current_iteration: iterationValue as number | undefined,
+    max_iterations: maxIterationValue as number | undefined,
+    active_task_id: activeTaskId,
+    status: status as AgentTaskStatus | undefined,
+    tasks,
+    completion_requirements: completionRequirements,
+    unresolved_requirements: unresolvedRequirements,
+  };
+};
+
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
@@ -1335,6 +1502,7 @@ export const parseOllamaHealthResponse = (value: unknown): OllamaHealthResponse 
 };
 
 const NATIVE_PRESENTATION_STATUSES: PresentationStatus[] = [
+  'not_required',
   'not_requested',
   'prepared',
   'prepared_unverified',
@@ -1422,7 +1590,7 @@ export const parseChatOperation = (value: unknown, endpoint: string): ChatOperat
     ? record.failure_category ?? null
     : requireApiString(record, 'failure_category', endpoint);
   if (failureCategory !== null
-    && !['model_capability', 'provider_api', 'provider_failure', 'schema_definition', 'response_parsing', 'context_limit', 'insufficient_evidence', 'model_budget_exhausted', 'tool_budget_exhausted', 'transition_budget_exhausted', 'run_deadline_exhausted', 'no_progress', 'cancelled', 'superseded'].includes(failureCategory)) {
+    && !['model_capability', 'provider_api', 'provider_failure', 'schema_definition', 'response_parsing', 'context_limit', 'insufficient_evidence', 'model_budget_exhausted', 'tool_budget_exhausted', 'transition_budget_exhausted', 'iteration_budget_exhausted', 'run_deadline_exhausted', 'no_progress', 'cancelled', 'superseded'].includes(failureCategory)) {
     return apiContract(endpoint, 'operation.failure_category is unsupported', failureCategory);
   }
   return {
@@ -1494,6 +1662,11 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   const executionTrace = record.execution_trace === undefined || record.execution_trace === null
     ? record.execution_trace ?? undefined
     : requireApiJsonObject(record.execution_trace, endpoint, 'execution_trace');
+  const taskState = record.task_state === undefined
+    ? undefined
+    : record.task_state === null
+      ? null
+      : parseAgentTaskState(record.task_state, endpoint);
   const presentationStatus = requireApiString(record, 'presentation_status', endpoint);
   if (!NATIVE_PRESENTATION_STATUSES.includes(presentationStatus as PresentationStatus)) {
     return apiContract(endpoint, 'presentation_status is unsupported', presentationStatus);
@@ -1518,6 +1691,7 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     presentation_status: presentationStatus as PresentationStatus,
     tool_results: toolResults,
     conversation_state: conversationState as ChatTurnResponse['conversation_state'],
+    task_state: taskState,
   };
 };
 
@@ -1565,6 +1739,250 @@ const normalizeActiveConversationRun = (
     presentation: value.presentation === null || value.presentation === undefined
       ? null
       : isJsonObject(value.presentation) ? value.presentation : null,
+    task_state: value.task_state === undefined
+      ? undefined
+      : value.task_state === null
+        ? null
+        : parseAgentTaskState(value.task_state, 'conversation snapshot'),
+    current_iteration: value.current_iteration === null || value.current_iteration === undefined
+      ? value.current_iteration as number | null | undefined
+      : isNonNegativeInteger(value.current_iteration) ? value.current_iteration : undefined,
+    max_iterations: value.max_iterations === null || value.max_iterations === undefined
+      ? value.max_iterations as number | null | undefined
+      : isNonNegativeInteger(value.max_iterations) ? value.max_iterations : undefined,
+  };
+};
+
+const normalizeOptionalTimestamp = (
+  record: Record<string, unknown>,
+  fields: string[],
+  endpoint: string,
+): string | null | undefined => optionalStringField(record, fields, endpoint);
+
+const normalizeOptionalInteger = (
+  record: Record<string, unknown>,
+  fields: string[],
+  endpoint: string,
+): number | null | undefined => {
+  const field = fields.find((candidate) => Object.prototype.hasOwnProperty.call(record, candidate));
+  if (!field) {
+    return undefined;
+  }
+  const value = record[field];
+  if (value === null) {
+    return null;
+  }
+  if (!isNonNegativeInteger(value)) {
+    return apiContract(endpoint, `${field} must be a non-negative integer or null`, value);
+  }
+  return value;
+};
+
+export const parseConversationRunSummary = (
+  value: unknown,
+  endpoint = 'conversation runs',
+): ConversationRunSummary => {
+  const record = requireApiRecord(value, endpoint, 'run');
+  const runId = optionalStringField(record, ['run_id', 'id'], endpoint);
+  if (!runId) {
+    return apiContract(endpoint, 'run_id must be a non-empty string', value);
+  }
+  const state = optionalStringField(record, ['state', 'status'], endpoint);
+  if (!state || !RUN_STATES.includes(state as AgentRunState)) {
+    return apiContract(endpoint, 'run state is unsupported', state);
+  }
+  const presentationStatus = optionalStringField(record, ['presentation_status'], endpoint);
+  if (presentationStatus !== undefined
+    && presentationStatus !== null
+    && !NATIVE_PRESENTATION_STATUSES.includes(presentationStatus as PresentationStatus)
+    && presentationStatus !== 'pending'
+    && presentationStatus !== 'render_timeout') {
+    return apiContract(endpoint, 'run presentation_status is unsupported', presentationStatus);
+  }
+  const taskState = record.task_state === undefined
+    ? undefined
+    : record.task_state === null
+      ? null
+      : parseAgentTaskState(record.task_state, endpoint);
+  const runVersion = normalizeOptionalInteger(record, ['active_run_version', 'run_version'], endpoint);
+  const currentIteration = normalizeOptionalInteger(record, ['current_iteration', 'iteration'], endpoint);
+  const maxIterations = normalizeOptionalInteger(record, ['max_iterations', 'iteration_budget'], endpoint);
+  return {
+    conversation_id: optionalStringField(record, ['conversation_id'], endpoint) ?? undefined,
+    run_id: runId,
+    original_request: optionalStringField(record, ['original_request', 'message'], endpoint) ?? undefined,
+    aggregated_request: optionalStringField(record, ['aggregated_request'], endpoint) ?? undefined,
+    run_version: runVersion ?? undefined,
+    active_run_version: runVersion ?? undefined,
+    state: state as AgentRunState,
+    created_at: normalizeOptionalTimestamp(record, ['created_at'], endpoint) ?? undefined,
+    started_at: normalizeOptionalTimestamp(record, ['started_at'], endpoint),
+    completed_at: normalizeOptionalTimestamp(record, ['completed_at'], endpoint),
+    request_timezone: normalizeOptionalTimestamp(record, ['request_timezone'], endpoint),
+    cancel_requested_at: normalizeOptionalTimestamp(record, ['cancel_requested_at'], endpoint),
+    error_code: optionalStringField(record, ['error_code'], endpoint),
+    error_message: optionalStringField(record, ['error_message'], endpoint),
+    presentation_status: presentationStatus as PresentationStatus | undefined,
+    presentation: record.presentation === undefined || record.presentation === null
+      ? record.presentation as Record<string, JsonValue> | null | undefined
+      : requireApiJsonObject(record.presentation, endpoint, 'run.presentation'),
+    task_state: taskState,
+    current_iteration: currentIteration,
+    max_iterations: maxIterations,
+  };
+};
+
+const parseConversationSummary = (
+  value: unknown,
+  endpoint: string,
+): ConversationSummary => {
+  const record = requireApiRecord(value, endpoint, 'conversation');
+  const conversationId = optionalStringField(record, ['conversation_id', 'id'], endpoint);
+  if (!conversationId) {
+    return apiContract(endpoint, 'conversation_id must be a non-empty string', value);
+  }
+  const activeRun = record.active_run === undefined || record.active_run === null
+    ? record.active_run === null ? null : undefined
+    : normalizeActiveConversationRun(record.active_run);
+  if (record.active_run !== undefined && record.active_run !== null && !activeRun) {
+    return apiContract(endpoint, 'conversation.active_run is malformed', record.active_run);
+  }
+  const latestRunValue = record.latest_run ?? record.last_run ?? record.recent_run;
+  const latestRun = latestRunValue === undefined || latestRunValue === null
+    ? latestRunValue === null ? null : undefined
+    : parseConversationRunSummary(latestRunValue, endpoint);
+  return {
+    conversation_id: conversationId,
+    title: optionalStringField(record, ['title', 'name'], endpoint),
+    created_at: normalizeOptionalTimestamp(record, ['created_at'], endpoint),
+    updated_at: normalizeOptionalTimestamp(record, ['updated_at'], endpoint),
+    message_count: normalizeOptionalInteger(record, ['message_count'], endpoint) ?? undefined,
+    last_message_preview: optionalStringField(record, ['last_message_preview', 'preview'], endpoint),
+    active_run: activeRun as ActiveConversationRunSnapshot | null | undefined,
+    latest_run: latestRun,
+  };
+};
+
+export const parseConversationListResponse = (
+  value: unknown,
+): ConversationListResponse => {
+  const endpoint = 'conversation list';
+  const record = requireApiRecord(value, endpoint);
+  const rawConversations = record.conversations ?? record.items;
+  const conversations = requireApiArray(rawConversations, endpoint, 'conversations')
+    .map((item) => parseConversationSummary(item, endpoint));
+  const cursor = record.next_cursor ?? record.nextCursor;
+  if (cursor !== undefined && cursor !== null && typeof cursor !== 'string') {
+    return apiContract(endpoint, 'next_cursor must be a string or null', cursor);
+  }
+  return {
+    conversations,
+    next_cursor: cursor as string | null | undefined,
+  };
+};
+
+const parseRunTraceEntry = (
+  value: unknown,
+  endpoint: string,
+  index: number,
+  fallbackRunId: string,
+): RunTraceEntry => {
+  const record = requireApiRecord(value, endpoint, `entries[${index}]`);
+  const payload = isRecord(record.payload) ? record.payload : {};
+  const read = (keys: string[]): unknown => {
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(record, key)) {
+        return record[key];
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, key)) {
+        return payload[key];
+      }
+    }
+    return undefined;
+  };
+  const sequenceValue = read(['sequence']);
+  if (!isNonNegativeInteger(sequenceValue)) {
+    return apiContract(endpoint, `entries[${index}].sequence must be a non-negative integer`, sequenceValue);
+  }
+  const runVersionValue = read(['run_version', 'runVersion']);
+  if (!isNonNegativeInteger(runVersionValue) || runVersionValue < 1) {
+    return apiContract(endpoint, `entries[${index}].run_version must be a positive integer`, runVersionValue);
+  }
+  const kind = boundedText(read(['kind', 'type']), 80);
+  const timestamp = boundedText(read(['timestamp', 'created_at']), 80);
+  if (!kind || !timestamp) {
+    return apiContract(endpoint, `entries[${index}] kind and timestamp are required`, value);
+  }
+  const eventId = boundedText(read(['event_id', 'id']), 160) ?? `trace_${fallbackRunId}_${sequenceValue}`;
+  const evidenceValue = read(['evidence_refs', 'evidence_ids']);
+  const evidenceRefs = evidenceValue === undefined
+    ? []
+    : Array.isArray(evidenceValue) && evidenceValue.every((item) => typeof item === 'string')
+      ? evidenceValue.slice(0, 32) as string[]
+      : [];
+  const iteration = read(['iteration', 'current_iteration']);
+  if (iteration !== undefined && iteration !== null && !isNonNegativeInteger(iteration)) {
+    return apiContract(endpoint, `entries[${index}].iteration must be a non-negative integer or null`, iteration);
+  }
+  const duration = read(['duration_ms', 'duration']);
+  if (duration !== undefined && duration !== null && !isFiniteNumber(duration)) {
+    return apiContract(endpoint, `entries[${index}].duration_ms must be a finite number or null`, duration);
+  }
+  const retryable = read(['retryable']);
+  if (retryable !== undefined && retryable !== null && typeof retryable !== 'boolean') {
+    return apiContract(endpoint, `entries[${index}].retryable must be a boolean or null`, retryable);
+  }
+  const summaryValue = read(['summary', 'message']);
+  const summary = boundedText(
+    isRecord(summaryValue) ? summaryValue['message'] ?? summaryValue['detail'] : summaryValue,
+    800,
+  );
+  const errorValue = read(['error', 'error_message', 'failure']);
+  const error = boundedText(
+    isRecord(errorValue) ? errorValue['message'] ?? errorValue['detail'] : errorValue,
+    800,
+  );
+  return {
+    event_id: eventId,
+    sequence: sequenceValue,
+    run_id: boundedText(read(['run_id']), 160) ?? fallbackRunId,
+    run_version: runVersionValue,
+    kind,
+    timestamp,
+    task_id: boundedText(read(['task_id', 'active_task_id']), 160),
+    tool_name: boundedText(read(['tool_name', 'tool']), 160),
+    call_id: boundedText(read(['call_id', 'tool_call_id']), 160),
+    iteration: iteration as number | null | undefined,
+    label: boundedText(read(['label']), 240),
+    status: boundedText(read(['status']), 64),
+    summary,
+    duration_ms: duration as number | null | undefined,
+    evidence_refs: evidenceRefs,
+    retryable: retryable as boolean | null | undefined,
+    error,
+  };
+};
+
+export const parseRunTraceResponse = (value: unknown): RunTraceResponse => {
+  const endpoint = 'run trace';
+  const record = requireApiRecord(value, endpoint);
+  const conversationId = optionalStringField(record, ['conversation_id'], endpoint);
+  const runId = optionalStringField(record, ['run_id'], endpoint);
+  if (!conversationId || !runId) {
+    return apiContract(endpoint, 'conversation_id and run_id are required', value);
+  }
+  const rawEntries = record.entries ?? record.events ?? record.trace;
+  const entries = requireApiArray(rawEntries, endpoint, 'entries')
+    .map((item, index) => parseRunTraceEntry(item, endpoint, index, runId));
+  const cursor = record.next_cursor ?? record.nextCursor;
+  if (cursor !== undefined && cursor !== null && typeof cursor !== 'string') {
+    return apiContract(endpoint, 'next_cursor must be a string or null', cursor);
+  }
+  return {
+    conversation_id: conversationId,
+    run_id: runId,
+    entries,
+    next_cursor: cursor as string | null | undefined,
   };
 };
 
@@ -1629,6 +2047,15 @@ export const parseConversationSnapshotResponse = (
     throw new Error('Unexpected conversation snapshot title format');
   }
 
+  const rawRecentRuns = value.recent_runs ?? value.runs ?? value.run_summaries;
+  let recentRuns: ConversationRunSummary[] | undefined;
+  if (rawRecentRuns !== undefined) {
+    if (!Array.isArray(rawRecentRuns)) {
+      throw new Error('Unexpected conversation snapshot run history format');
+    }
+    recentRuns = rawRecentRuns.map((item) => parseConversationRunSummary(item, 'conversation snapshot'));
+  }
+
   return {
     conversation_id: value.conversation_id,
     title: value.title as string | null | undefined,
@@ -1638,5 +2065,6 @@ export const parseConversationSnapshotResponse = (
     memory_snapshot: value.memory_snapshot,
     map_session: mapSession,
     active_run: activeRun,
+    recent_runs: recentRuns,
   };
 };

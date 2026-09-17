@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from server.contracts.runs import (
     ActiveConversationRunSnapshot,
     ConversationMessageSnapshot,
+    ConversationRunSummary,
     ConversationSnapshotResponse,
 )
 from server.domain.agent.conversation import ConversationState
@@ -33,10 +34,15 @@ class ConversationSnapshotService:
         self.run_repository = run_repository
 
     # -------------------------------------------------------------------------
-    def get_snapshot(self, conversation_id: str) -> ConversationSnapshotResponse:
+    def get_snapshot(
+        self,
+        conversation_id: str,
+        *,
+        owner_user_id: str | None = None,
+    ) -> ConversationSnapshotResponse:
         record = self.conversation_repository.verify_conversation_access(
             conversation_id,
-            None,
+            owner_user_id,
         )
         persisted = self.conversation_repository.read_state(conversation_id)
         try:
@@ -65,6 +71,15 @@ class ConversationSnapshotService:
         active_run = self.run_repository.get_active_run_for_conversation(
             conversation_id
         )
+        recent_run_page = self.run_repository.list_run_summaries(
+            conversation_id,
+            limit=8,
+        )
+        recent_runs = [
+            ConversationRunSummary.model_validate(item)
+            for item in recent_run_page.get("runs", [])
+            if isinstance(item, dict)
+        ]
         return ConversationSnapshotResponse(
             conversation_id=record.id,
             title=record.title,
@@ -80,8 +95,11 @@ class ConversationSnapshotService:
                     state=active_run.state,
                     presentation_status=active_run.presentation_status,
                     presentation=active_run.presentation,
+                    current_iteration=active_run.current_iteration,
+                    task_state=active_run.task_state,
                 )
                 if active_run is not None
                 else None
             ),
+            recent_runs=recent_runs,
         )

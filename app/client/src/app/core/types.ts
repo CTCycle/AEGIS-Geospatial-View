@@ -462,6 +462,54 @@ export type AgentRunState =
   | 'failed'
   | 'cancelled';
 
+/**
+ * A small, run-scoped task projection.  Task state is operational UI data;
+ * it is deliberately separate from provider messages and never contains
+ * hidden model reasoning.
+ */
+export type AgentTaskStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'completed'
+  | 'failed'
+  | 'blocked'
+  | 'cancelled'
+  | 'superseded';
+
+export interface CompletionRequirement {
+  name: string;
+  required: boolean;
+  status: 'pending' | 'satisfied' | 'failed' | 'not_applicable';
+  target_id?: string | null;
+  evidence_ref?: string | null;
+  failure_code?: string | null;
+}
+
+export interface AgentTask {
+  id: string;
+  task_id?: string;
+  description: string;
+  status: AgentTaskStatus;
+  parent_task_id?: string | null;
+  dependencies?: string[];
+  result?: Record<string, JsonValue> | null;
+  failure_code?: string | null;
+  requirement_name?: string | null;
+  target_id?: string | null;
+}
+
+export interface AgentTaskState {
+  run_id?: string | null;
+  root_task_id?: string;
+  current_iteration?: number;
+  max_iterations?: number;
+  active_task_id?: string | null;
+  status?: AgentTaskStatus;
+  tasks: AgentTask[];
+  completion_requirements?: CompletionRequirement[];
+  unresolved_requirements?: string[];
+}
+
 export type RunEventType =
   | 'progress'
   | 'context_usage'
@@ -507,6 +555,92 @@ export interface ActiveConversationRunSnapshot {
   state: AgentRunState;
   presentation_status?: PresentationStatus;
   presentation?: Record<string, JsonValue> | null;
+  task_state?: AgentTaskState | null;
+  current_iteration?: number | null;
+  max_iterations?: number | null;
+}
+
+export interface ConversationRunSummary {
+  conversation_id?: string;
+  run_id: string;
+  original_request?: string;
+  aggregated_request?: string;
+  run_version?: number;
+  active_run_version?: number;
+  state: AgentRunState;
+  created_at?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  request_timezone?: string | null;
+  cancel_requested_at?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  presentation_status?: PresentationStatus;
+  presentation?: Record<string, JsonValue> | null;
+  task_state?: AgentTaskState | null;
+  current_iteration?: number | null;
+  max_iterations?: number | null;
+}
+
+export interface ConversationSummary {
+  conversation_id: string;
+  title?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  message_count?: number;
+  last_message_preview?: string | null;
+  active_run?: ActiveConversationRunSnapshot | null;
+  latest_run?: ConversationRunSummary | null;
+}
+
+export interface ConversationListResponse {
+  conversations: ConversationSummary[];
+  next_cursor?: string | null;
+}
+
+/** Safe, operational fields returned by the run-trace inspection endpoint. */
+export interface RunTraceEntry {
+  event_id: string;
+  sequence: number;
+  run_id: string;
+  run_version: number;
+  kind: string;
+  timestamp: string;
+  task_id?: string | null;
+  tool_name?: string | null;
+  call_id?: string | null;
+  iteration?: number | null;
+  label?: string | null;
+  status?: string | null;
+  summary?: string | null;
+  duration_ms?: number | null;
+  evidence_refs: string[];
+  retryable?: boolean | null;
+  error?: string | null;
+}
+
+export interface RunTraceResponse {
+  conversation_id: string;
+  run_id: string;
+  entries: RunTraceEntry[];
+  next_cursor?: string | null;
+}
+
+export type ToolProgressStatus = 'running' | 'success' | 'valid_empty' | 'partial' | 'failed';
+
+export interface ToolProgressItem {
+  call_id: string;
+  tool_name: string;
+  status: ToolProgressStatus;
+  label?: string;
+  task_id?: string | null;
+  iteration?: number | null;
+  summary?: string | null;
+  duration_ms?: number | null;
+  evidence_refs?: string[];
+  error?: string | null;
+  started_at?: string;
+  completed_at?: string;
 }
 
 export interface ConversationSnapshotResponse {
@@ -518,6 +652,7 @@ export interface ConversationSnapshotResponse {
   memory_snapshot: Record<string, JsonValue>;
   map_session?: MapSession | null;
   active_run?: ActiveConversationRunSnapshot | null;
+  recent_runs?: ConversationRunSummary[];
 }
 
 export interface ChatTurnRequest {
@@ -622,7 +757,7 @@ export interface ChatOperationResult {
   warnings?: string[];
   direct_result?: Record<string, JsonValue> | null;
   provider_error?: Record<string, JsonValue> | null;
-  failure_category?: 'model_capability' | 'provider_api' | 'provider_failure' | 'schema_definition' | 'response_parsing' | 'context_limit' | 'insufficient_evidence' | 'model_budget_exhausted' | 'tool_budget_exhausted' | 'transition_budget_exhausted' | 'run_deadline_exhausted' | 'no_progress' | 'cancelled' | 'superseded' | null;
+  failure_category?: 'model_capability' | 'provider_api' | 'provider_failure' | 'schema_definition' | 'response_parsing' | 'context_limit' | 'insufficient_evidence' | 'model_budget_exhausted' | 'tool_budget_exhausted' | 'transition_budget_exhausted' | 'iteration_budget_exhausted' | 'run_deadline_exhausted' | 'no_progress' | 'cancelled' | 'superseded' | null;
 }
 
 export type RealtimeConnectionState =
@@ -685,6 +820,7 @@ export interface ChatTurnResponse {
   presentation_status: PresentationStatus;
   tool_results: NativeToolResultSummary[];
   conversation_state?: ConversationState | null;
+  task_state?: AgentTaskState | null;
 }
 
 export type ChatStreamEventType =

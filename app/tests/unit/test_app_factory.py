@@ -166,7 +166,7 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         app_module, "BackgroundJobService", lambda **kwargs: job_service
     )
     monkeypatch.setattr(
-        app_module, "ChatStreamingService", lambda orchestrator: object()
+        app_module, "ChatStreamingService", lambda *args, **kwargs: object()
     )
     monkeypatch.setattr(
         app_module,
@@ -233,7 +233,7 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
         app_module, "BackgroundJobService", lambda **kwargs: job_service
     )
     monkeypatch.setattr(
-        app_module, "ChatStreamingService", lambda orchestrator: object()
+        app_module, "ChatStreamingService", lambda *args, **kwargs: object()
     )
     monkeypatch.setattr(
         app_module,

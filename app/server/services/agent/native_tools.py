@@ -19,6 +19,7 @@ from server.domain.agent.tool_result import (
 from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMToolDefinition
 from server.repositories.agent_evidence import AgentEvidenceRepository
+from server.repositories.chat_history import ChatHistoryRepository
 from server.services.agent.capability_execution import (
     CapabilityExecutionService,
     ToolExecutionContext,
@@ -34,11 +35,13 @@ from server.services.agent.tool_definitions import (
     ResolveLocationInput,
     RouteRequestInput,
     TransformEvidenceInput,
+    SearchConversationHistoryInput,
 )
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
 from server.services.agent.tool_handlers.evidence import EvidenceToolHandler
 from server.services.agent.tool_handlers.location import LocationToolHandler
 from server.services.agent.tool_handlers.provider_layers import ProviderLayerToolHandler
+from server.services.agent.tool_handlers.history import HistoryToolHandler
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.provider_registry import ProviderRegistry
@@ -78,6 +81,7 @@ def register_agent_tools(
     evidence_repository: AgentEvidenceRepository,
     location_resolver: LocationResolver,
     geospatial_api_service: Any,
+    history_repository: ChatHistoryRepository | None = None,
 ) -> None:
     """Register the permanent model-facing native tool surface once."""
 
@@ -100,6 +104,11 @@ def register_agent_tools(
     provider_layers = ProviderLayerToolHandler(
         geospatial_api_service=geospatial_api_service,
         evidence_repository=evidence_repository,
+    )
+    history = (
+        HistoryToolHandler(repository=history_repository)
+        if history_repository is not None
+        else None
     )
     basemap_ids = _validated_basemap_ids(capability_registry)
     basemap_catalog = ", ".join(basemap_ids) or "no basemap IDs"
@@ -238,6 +247,24 @@ def register_agent_tools(
             idempotent=False,
         ),
     )
+    if history is not None:
+        registrations += (
+            _registration(
+                name="search_conversation_history",
+                description=(
+                    "Search bounded original user and assistant messages in the "
+                    "active conversation. Results are paged and never cross "
+                    "conversation boundaries."
+                ),
+                input_model=SearchConversationHistoryInput,
+                handler=history.search_conversation_history,
+                domains=_MIXED,
+                phases=_MODEL_PHASE,
+                visibility="model",
+                prerequisites=frozenset({"route"}),
+                idempotent=True,
+            ),
+        )
     for tool in registrations:
         registry.register(tool)
 

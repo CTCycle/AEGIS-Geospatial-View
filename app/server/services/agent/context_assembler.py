@@ -20,6 +20,20 @@ if TYPE_CHECKING:
 # in their authoritative stores. This cap is independent of model capacity.
 KNOWN_MODEL_WORKING_SET_CEILING = 64_000
 UNKNOWN_MODEL_WORKING_SET_CEILING = 32_768
+_MESSAGE_PROJECTION_KEYS = (
+    "id",
+    "turn_index",
+    "role",
+    "content",
+    "type",
+    "name",
+    "call_id",
+    "callId",
+    "tool_call_id",
+    "tool_calls",
+    "arguments",
+    "output",
+)
 type BoundedJson = (
     None
     | bool
@@ -142,42 +156,49 @@ class AgentContextAssembler:
         for item in messages:
             projected_item = {
                 key: (
-                    str(item[key])[:4_000]
-                    if key == "content"
-                    else item[key]
+                    item[key]
+                    if key == "content" and isinstance(item[key], str)
+                    else _bounded_json_value(item[key], depth=0)
                 )
-                for key in ("id", "turn_index", "role", "content")
+                for key in _MESSAGE_PROJECTION_KEYS
                 if key in item
             }
             projected.append(projected_item)
             # A very large source message must not become admissible merely
-            # because its content was shortened for the model projection.
+            # because its content was shortened for the model projection.  The
+            # source cost is measured from the original selected fields and the
+            # projected content remains verbatim whenever the whole item fits.
             source_costs.append(
                 estimate_json_tokens(
                     {
                         key: item[key]
-                        for key in ("id", "turn_index", "role", "content")
+                        for key in _MESSAGE_PROJECTION_KEYS
                         if key in item
                     }
                 )
             )
-        included_reversed: list[dict[str, Any]] = []
-        included_indices: list[int] = []
+        groups = _message_groups(projected)
+        included_group_indices: list[int] = []
         included_tokens = 0
-        for index in range(len(projected) - 1, -1, -1):
-            message = projected[index]
-            cost = estimate_json_tokens(message)
-            if (
-                source_costs[index] > raw_capacity
-                or included_tokens + cost > raw_capacity
-            ):
+        for group_index in range(len(groups) - 1, -1, -1):
+            group = groups[group_index]
+            group_cost = sum(
+                estimate_json_tokens(projected[index]) for index in group
+            )
+            source_cost = sum(source_costs[index] for index in group)
+            if source_cost > raw_capacity or included_tokens + group_cost > raw_capacity:
                 # An oversized item should not prevent later inspection of
-                # smaller, relevant history entries.
+                # smaller, relevant history entries.  A call/result group is
+                # considered one unit so its members can never be split.
                 continue
-            included_reversed.append(message)
-            included_indices.append(index)
-            included_tokens += cost
-        included = list(reversed(included_reversed))
+            included_group_indices.append(group_index)
+            included_tokens += group_cost
+        included_indices = sorted(
+            index
+            for group_index in included_group_indices
+            for index in groups[group_index]
+        )
+        included = [projected[index] for index in included_indices]
         included_indices.sort()
         included_ids = [
             int(item["id"]) for item in included if isinstance(item.get("id"), int)
@@ -246,6 +267,8 @@ class AgentContextAssembler:
                 "response_reserve_tokens": output_reserve or 0,
                 "safety_tokens": 512,
                 "compacted_ids": omitted_ids,
+                "pair_safe": True,
+                "message_groups": len(groups),
                 "mandatory_overflow": False,
             },
         )
@@ -254,6 +277,156 @@ class AgentContextAssembler:
 def _bounded_object(value: object) -> dict[str, Any]:
     bounded = _bounded_json_value(value, depth=0)
     return bounded if is_json_object(bounded) else {}
+
+
+def select_pair_safe_messages(
+    messages: list[dict[str, Any]],
+    *,
+    max_items: int | None = None,
+    require_complete_pairs: bool = True,
+) -> list[dict[str, Any]]:
+    """Select a bounded message window without splitting tool exchanges.
+
+    OpenAI Responses items identify calls with ``call_id`` while chat
+    completions commonly use an assistant ``tool_calls`` array plus ``tool``
+    messages.  The grouping logic understands both forms and keeps all
+    members of a call/result exchange together.  Orphan results are omitted
+    from protocol windows; ordinary semantic history may opt out of that
+    strictness with ``require_complete_pairs=False``.
+    """
+
+    groups = _message_groups(messages)
+    eligible: list[list[int]] = []
+    for group in groups:
+        if require_complete_pairs and not _group_is_pair_safe(messages, group):
+            continue
+        eligible.append(group)
+    selected: list[list[int]] = []
+    remaining = max_items if max_items is not None else None
+    for group in reversed(eligible):
+        size = len(group)
+        if remaining is not None and selected and size > remaining:
+            if _group_has_tool_exchange(messages, group):
+                # A complete exchange is more valuable than an older
+                # singleton that happened to consume the final slot.  Keep
+                # the recent suffix plus the whole pair rather than selecting
+                # an invalid partial continuation or unrelated history.
+                selected.append(group)
+                break
+            continue
+        if remaining is not None and not selected and size > remaining:
+            # Never return half of an active exchange.  The group may exceed a
+            # very small requested window, but preserving the pair is safer
+            # than sending an invalid provider continuation.
+            selected.append(group)
+            remaining = 0
+            continue
+        selected.append(group)
+        if remaining is not None:
+            remaining -= size
+            if remaining <= 0:
+                break
+    selected_indices = sorted(index for group in selected for index in group)
+    return [messages[index] for index in selected_indices]
+
+
+def _message_groups(messages: list[dict[str, Any]]) -> list[list[int]]:
+    """Build stable connected components for call/result message exchanges."""
+
+    parents = list(range(len(messages)))
+
+    def find(index: int) -> int:
+        while parents[index] != index:
+            parents[index] = parents[parents[index]]
+            index = parents[index]
+        return index
+
+    def union(first: int, second: int) -> None:
+        left, right = find(first), find(second)
+        if left != right:
+            parents[right] = left
+
+    key_indices: dict[str, list[int]] = {}
+    for index, message in enumerate(messages):
+        for key in _message_call_ids(message):
+            key_indices.setdefault(key, []).append(index)
+    for indices in key_indices.values():
+        for index in indices[1:]:
+            union(indices[0], index)
+
+    # A Responses reasoning item is protocol context for the immediately
+    # following function call.  Keep it with that exchange even though it has
+    # no call id of its own.
+    for index in range(len(messages) - 1):
+        if (
+            str(messages[index].get("type") or "") == "reasoning"
+            and str(messages[index + 1].get("type") or "") == "function_call"
+        ):
+            union(index, index + 1)
+
+    grouped: dict[int, list[int]] = {}
+    for index in range(len(messages)):
+        grouped.setdefault(find(index), []).append(index)
+    return sorted(grouped.values(), key=lambda item: item[0])
+
+
+def _message_call_ids(message: dict[str, Any]) -> list[str]:
+    """Return call identifiers present in one request or result item."""
+
+    values: list[str] = []
+    message_type = str(message.get("type") or "")
+    role = str(message.get("role") or "")
+    if message_type in {"function_call", "function_call_output"}:
+        for key in ("call_id", "callId", "tool_call_id", "id"):
+            value = message.get(key)
+            if value is not None and str(value).strip():
+                values.append(str(value).strip())
+                break
+    if role == "tool":
+        for key in ("tool_call_id", "call_id", "callId"):
+            value = message.get(key)
+            if value is not None and str(value).strip():
+                values.append(str(value).strip())
+                break
+    if role == "assistant" and is_json_array(message.get("tool_calls")):
+        for raw_call in cast(list[object], message["tool_calls"]):
+            if not is_json_object(raw_call):
+                continue
+            for key in ("id", "call_id", "callId"):
+                value = raw_call.get(key)
+                if value is not None and str(value).strip():
+                    values.append(str(value).strip())
+                    break
+    return list(dict.fromkeys(values))
+
+
+def _group_is_pair_safe(messages: list[dict[str, Any]], group: list[int]) -> bool:
+    call_ids: set[str] = set()
+    result_ids: set[str] = set()
+    for index in group:
+        message = messages[index]
+        message_type = str(message.get("type") or "")
+        role = str(message.get("role") or "")
+        ids = set(_message_call_ids(message))
+        if message_type == "function_call_output" or role == "tool":
+            result_ids.update(ids)
+        elif message_type == "function_call" or role == "assistant" and message.get("tool_calls"):
+            call_ids.update(ids)
+    if not call_ids and not result_ids:
+        return True
+    # A group made from an assistant tool call and all matching results is
+    # valid.  Reasoning-only items remain valid semantic context.
+    return bool(call_ids) and call_ids == result_ids
+
+
+def _group_has_tool_exchange(messages: list[dict[str, Any]], group: list[int]) -> bool:
+    return any(
+        str(messages[index].get("type") or "")
+        in {"function_call", "function_call_output"}
+        or str(messages[index].get("role") or "") in {"assistant", "tool"}
+        and bool(messages[index].get("tool_calls"))
+        for index in group
+    )
 
 
 _RELEVANCE_STOP_WORDS = frozenset(
