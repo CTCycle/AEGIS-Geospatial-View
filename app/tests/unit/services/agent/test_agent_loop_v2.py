@@ -15,6 +15,7 @@ from server.domain.agent.capability_route import (
     AgentRunState,
     CapabilityRoute,
     CompletionContract,
+    RenderObservation,
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.reliability import AgentExecutionBudget
@@ -232,6 +233,45 @@ def test_native_route_promotes_the_execution_profile_once() -> None:
 
     assert simple_budget.total_seconds == 150
     assert complex_budget.total_seconds == 300
+
+
+def test_verified_render_closes_map_completion_contract() -> None:
+    state = _state()
+    state.context_hydrated = True
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        capability_queries=["map"],
+    )
+    state.completion_contract = CompletionContract(
+        operation="map",
+        requirements=[],
+        map_preparation_required=True,
+        render_verification_required=True,
+        render_verified=True,
+    )
+    state.render_verified = True
+    state.render_observations = [
+        RenderObservation(
+            map_session_id="map-1",
+            collection_revision=1,
+            attempt=1,
+            status="ready",
+            checks={"viewport_valid": True},
+            recovery="continue",
+        )
+    ]
+
+    stop = _loop(FakeProvider([]))._evaluate_text_stop(  # pyright: ignore[reportPrivateUsage]
+        state,
+        state.route,
+        "The map is ready.",
+        available_tools=["apply_map_plan"],
+    )
+
+    assert stop == ("goal_satisfied", "The map is ready.")
 
 
 ###############################################################################

@@ -7,7 +7,7 @@ import { defaultAppState } from '../core/app-state';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { FakeRealtimeService } from '../core/realtime.test-support';
 import { RealtimeService } from '../core/realtime.service';
-import { ChatTurnResponse } from '../core/types';
+import { ChatTurnResponse, MapSession } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { GeospatialPageComponent } from './geospatial-page.component';
 
@@ -474,6 +474,103 @@ describe('pages/geospatial-page.component', () => {
     });
 
     expect(fixture.nativeElement.textContent).toContain('Rendering map...');
+  });
+
+  it('promotes an acknowledged render candidate while the run resumes', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const candidate = {
+      session_id: 'candidate-map',
+      overlay_collection: { revision: 2, instances: [] },
+    } as never;
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.isLoading = true;
+    component['pendingMapSession'] = candidate;
+    component['pendingRenderContext'] = {
+      runId: 'run-1',
+      runVersion: 1,
+      mapSessionId: 'candidate-map',
+      collectionRevision: 2,
+    };
+
+    component['handleRunEvent']({
+      event_id: 'render-observed-ready',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'render_observed',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: {
+        map_session_id: 'candidate-map',
+        collection_revision: 2,
+        attempt: 1,
+        status: 'ready',
+        checks: { viewport_valid: true },
+        overlay_results: [],
+        recovery: 'continue',
+      },
+    });
+
+    expect(component.mapSession?.session_id).toBe('candidate-map');
+    expect(component['pendingMapSession']).toBeUndefined();
+    expect(component['pendingRenderContext']).toBeUndefined();
+    expect(component.presentationStatus).toBe('ready');
+    expect(component.isLoading).toBeTrue();
+  });
+
+  it('keeps the last-known-good map after a failed render observation', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const committed = { session_id: 'good-map' } as unknown as MapSession;
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.isLoading = true;
+    component.mapSession = committed;
+    component['committedMapSession'] = committed;
+    component['pendingMapSession'] = {
+      session_id: 'candidate-map',
+      overlay_collection: { revision: 4, instances: [] },
+    } as never;
+    component['pendingRenderContext'] = {
+      runId: 'run-1',
+      runVersion: 1,
+      mapSessionId: 'candidate-map',
+      collectionRevision: 4,
+    };
+
+    component['handleRunEvent']({
+      event_id: 'render-observed-failed',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'render_observed',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: {
+        map_session_id: 'candidate-map',
+        collection_revision: 4,
+        attempt: 1,
+        status: 'failed',
+        checks: { required_layers_present: false },
+        overlay_results: [],
+        failure_code: 'render_failed',
+        failure_stage: 'maplibre',
+        failure_summary: 'Layer was not registered.',
+        recovery: 'revise_map',
+      },
+    });
+
+    expect(component.mapSession?.session_id).toBe('good-map');
+    expect(component['pendingMapSession']).toBeUndefined();
+    expect(component['pendingRenderContext']).toBeUndefined();
+    expect(component.progressStage).toBe('correcting_render');
+    expect(component.isLoading).toBeTrue();
   });
 
   it('does not duplicate an assistant message when the matching error event arrives', () => {

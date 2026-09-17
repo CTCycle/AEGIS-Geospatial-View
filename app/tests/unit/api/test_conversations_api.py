@@ -141,3 +141,41 @@ def test_terminal_assistant_message_and_state_rollback_together() -> None:
         item["content"]
         for item in history.list_messages(conversation_id=conversation.id)
     ] == ["First response"]
+
+
+def test_native_provisional_assistant_is_upserted_on_resume() -> None:
+    backend = _InMemoryBackend()
+    Base.metadata.create_all(backend.engine)
+    conversations = ConversationRepository(backend)
+    history = ChatHistoryRepository(backend)
+    conversation = conversations.create_conversation("Resumable map")
+
+    first, revision = history.append_assistant_message_with_state(
+        conversation_id=conversation.id,
+        expected_revision=1,
+        conversation_state={"marker": "pending"},
+        content="Data prepared; the map is loading.",
+        request_id="run-1",
+        structured_payload={
+            "native": True,
+            "presentation_status": "prepared",
+        },
+    )
+    second, resumed_revision = history.append_assistant_message_with_state(
+        conversation_id=conversation.id,
+        expected_revision=revision,
+        conversation_state={"marker": "ready"},
+        content="The map is ready.",
+        request_id="run-1",
+        structured_payload={
+            "native": True,
+            "presentation_status": "ready",
+        },
+    )
+
+    assert resumed_revision == revision + 1
+    assert second.id == first.id
+    assert [
+        item["content"]
+        for item in history.list_messages(conversation_id=conversation.id)
+    ] == ["The map is ready."]

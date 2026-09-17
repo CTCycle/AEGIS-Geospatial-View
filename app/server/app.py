@@ -139,6 +139,12 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
             "render_ack_seconds",
             90.0,
         ),
+        resume_mode=True,
+        max_render_attempts=getattr(
+            getattr(settings, "agent_execution", None),
+            "max_render_attempts",
+            3,
+        ),
     )
     run_orchestrator = AgentRunOrchestrator(
         agent_orchestrator=chat_runtime.agent_orchestrator,

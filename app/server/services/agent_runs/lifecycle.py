@@ -9,6 +9,11 @@ from server.contracts.runs import (
     AgentRunState,
     ConversationCreateResponse,
 )
+from server.domain.realtime import RealtimeRenderAckPayload
+from server.services.agent_runs.render_completion import (
+    RenderAcknowledgementError,
+    RenderAcknowledgementResult,
+)
 from server.contracts.chat import ChatTurnResponse
 from server.contracts.events import RunEventType
 from server.repositories.agent_runs import AgentRunRepository
@@ -40,6 +45,9 @@ class RunLifecycleService:
         self.aggregation_service = aggregation_service
         self.event_publisher = event_publisher
         self.run_orchestrator = run_orchestrator
+        self.render_completion_service = getattr(
+            run_orchestrator, "render_completion_service", None
+        )
         self._tasks: set[asyncio.Task[ChatTurnResponse | None]] = set()
         self._tasks_by_run: dict[str, asyncio.Task[ChatTurnResponse | None]] = {}
 
@@ -123,6 +131,25 @@ class RunLifecycleService:
         return await self.run_orchestrator.execute_run(run_id)
 
     # -------------------------------------------------------------------------
+    async def acknowledge_render(
+        self,
+        conversation_id: str,
+        payload: RealtimeRenderAckPayload,
+    ) -> RenderAcknowledgementResult:
+        """Apply browser evidence and resume the same native run when needed."""
+
+        service = self.render_completion_service
+        if service is None:
+            raise RenderAcknowledgementError("Render acknowledgment is unavailable.")
+        result = await service.acknowledge(
+            conversation_id=conversation_id,
+            payload=payload,
+        )
+        if result.resume_required:
+            self._schedule_run_if_idle(result.run_id)
+        return result
+
+    # -------------------------------------------------------------------------
     async def run_turn(
         self,
         conversation_id: str,
@@ -197,6 +224,19 @@ class RunLifecycleService:
                 self._tasks_by_run.pop(run_id, None)
 
         task.add_done_callback(discard_task)
+
+    # -------------------------------------------------------------------------
+    def _schedule_run_if_idle(self, run_id: str) -> None:
+        existing = self._tasks_by_run.get(run_id)
+        if existing is not None and not existing.done():
+            # The worker that prepared the candidate can still be unwinding
+            # its ``awaiting_render`` return when the browser acknowledges it.
+            # Queue a second CAS-protected worker instead of dropping the
+            # resume: the first worker is already past model execution and
+            # ``mark_started_if_current`` ensures only one continuation wins.
+            self._schedule_run(run_id)
+            return
+        self._schedule_run(run_id)
 
     # -------------------------------------------------------------------------
     async def shutdown(self) -> None:

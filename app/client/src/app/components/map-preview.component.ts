@@ -65,6 +65,9 @@ export interface MapRenderStateChange {
   viewportBounds?: [number, number, number, number];
   checks?: Record<string, boolean>;
   overlayResults?: Array<Record<string, string | number | boolean | null>>;
+  failureCode?: string;
+  failureStage?: string;
+  failureSummary?: string;
 }
 
 @Component({
@@ -769,6 +772,13 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         viewportBounds: evidence.viewportBounds,
         checks: evidence.checks,
         overlayResults: evidence.overlayResults,
+        failureCode: state === 'failed'
+          ? (message === 'render_timeout' ? 'render_timeout' : 'render_failed')
+          : undefined,
+        failureStage: state === 'failed'
+          ? (message === 'render_timeout' ? 'watchdog' : 'maplibre')
+          : undefined,
+        failureSummary: state === 'failed' ? message : undefined,
       });
     }
   }

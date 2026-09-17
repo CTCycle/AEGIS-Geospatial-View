@@ -7,7 +7,8 @@ import logging
 import os
 import time
 from contextlib import suppress
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 from uuid import uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -41,6 +42,7 @@ from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.metrics import RealtimeMetrics
 from server.services.agent_runs.render_completion import (
     RenderAcknowledgementError,
+    RenderAcknowledgementResult,
     RenderCompletionService,
 )
 from server.services.agent_runs.steering import RunSteeringService
@@ -436,13 +438,24 @@ class RealtimeConnection:
 
     # -------------------------------------------------------------------------
     async def _render_ack(self, message: RealtimeClientMessage) -> None:
-        if self.render_completion_service is None:
-            raise RenderAcknowledgementError("Render acknowledgment is unavailable.")
         payload = RealtimeRenderAckPayload.model_validate(message.payload)
-        result = await self.render_completion_service.acknowledge(
-            conversation_id=self.conversation_id,
-            payload=payload,
-        )
+        acknowledge_render = getattr(self.lifecycle_service, "acknowledge_render", None)
+        if callable(acknowledge_render):
+            acknowledge = cast(
+                Callable[
+                    [str, RealtimeRenderAckPayload],
+                    Awaitable[RenderAcknowledgementResult],
+                ],
+                acknowledge_render,
+            )
+            result = await acknowledge(self.conversation_id, payload)
+        else:
+            if self.render_completion_service is None:
+                raise RenderAcknowledgementError("Render acknowledgment is unavailable.")
+            result = await self.render_completion_service.acknowledge(
+                conversation_id=self.conversation_id,
+                payload=payload,
+            )
         await self._send(
             "run.ack",
             correlation_id=message.message_id,

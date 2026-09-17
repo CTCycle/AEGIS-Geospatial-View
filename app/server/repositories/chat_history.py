@@ -120,15 +120,44 @@ class ChatHistoryRepository:
             if row is None:
                 raise ValueError("Conversation context revision conflict.")
             turn_index, revision = row
+            existing = session.scalar(
+                select(ChatMessageRecord).where(
+                    ChatMessageRecord.conversation_id == conversation_id,
+                    ChatMessageRecord.role == "assistant",
+                    ChatMessageRecord.request_id == request_id,
+                )
+            )
+            structured = self._with_request_id(structured_payload, request_id)
+            existing_payload = (
+                existing.structured_payload
+                if existing is not None and is_json_object(existing.structured_payload)
+                else {}
+            )
+            existing_status = str(
+                existing_payload.get("presentation_status") or ""
+            )
+            if (
+                existing is not None
+                and existing_payload.get("native") is True
+                and existing_status in {"prepared", "pending", "prepared_unverified"}
+            ):
+                # Suspended native runs first persist a provisional assistant
+                # row.  Resumption updates that row in place so the durable
+                # conversation contains one assistant turn per request.
+                existing.content = content
+                existing.structured_payload = structured
+                existing.tool_payload = tool_payload
+                existing.map_session = map_session
+                session.commit()
+                session.refresh(existing)
+                return existing, int(revision)
             message = ChatMessageRecord(
                 conversation_id=conversation_id,
                 turn_index=turn_index,
                 request_id=request_id,
                 role="assistant",
                 content=content,
-                structured_payload=self._with_request_id(
-                    structured_payload, request_id
-                ),
+                structured_payload=structured,
                 tool_payload=tool_payload,
                 map_session=map_session,
             )

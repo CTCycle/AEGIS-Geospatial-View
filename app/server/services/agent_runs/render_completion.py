@@ -4,12 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+import hashlib
+import json
 from typing import Any, cast
 
-from server.contracts.events import RunEventType, RunProgressStage
-from server.domain.realtime import RealtimeRenderAckPayload
+from server.common.time import utc_now
+from server.contracts.events import RunEventType, RunEventVisibility, RunProgressStage
 from server.contracts.geospatial import MapSession
+from server.domain.realtime import RealtimeRenderAckPayload
 from server.domain.agent.capability_route import AgentGoal, CompletionContract
+from server.domain.agent.capability_route import RenderObservation
+from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
 from server.repositories.agent_runs import AgentRunRepository
 from server.services.agent.completion import CompletionEvaluator
 from server.services.agent_runs.events import RunEventPublisher
@@ -34,6 +39,8 @@ class RenderAcknowledgementResult:
     state: str
     presentation_status: str
     duplicate: bool
+    resume_required: bool = False
+    observation: RenderObservation | None = None
 
 ###############################################################################
 class RenderCompletionService:
@@ -46,10 +53,14 @@ class RenderCompletionService:
         run_repository: AgentRunRepository,
         event_publisher: RunEventPublisher,
         render_ack_timeout_seconds: float = 90.0,
+        resume_mode: bool = False,
+        max_render_attempts: int = 3,
     ) -> None:
         self.run_repository = run_repository
         self.event_publisher = event_publisher
         self.render_ack_timeout_seconds = max(0.1, float(render_ack_timeout_seconds))
+        self.resume_mode = bool(resume_mode)
+        self.max_render_attempts = max(1, min(32, int(max_render_attempts)))
 
     # -------------------------------------------------------------------------
     def prepare(
@@ -99,6 +110,23 @@ class RenderCompletionService:
             "map_session_id": session_id,
             "collection_revision": revision,
             "pending_response": response_payload,
+            "render_attempts": int(
+                _json_object(
+                    _json_object(response_payload.get("execution_trace")).get(
+                        "checkpoint"
+                    )
+                ).get("render_attempts")
+                or 0
+            ),
+            "render_observations": list(
+                _json_list(
+                    _json_object(
+                        _json_object(response_payload.get("execution_trace")).get(
+                            "checkpoint"
+                        )
+                    ).get("render_observations")
+                )
+            )[-8:],
             "required_render_checks": {
                 "required_sources_loaded": True,
                 "required_layers_present": True,
@@ -181,6 +209,47 @@ class RenderCompletionService:
         payload: RealtimeRenderAckPayload,
     ) -> RenderAcknowledgementResult:
         acknowledgment = payload.model_dump(mode="json")
+        prior_snapshot = self.run_repository.get_run(payload.run_id)
+        prior_presentation = _json_object(
+            prior_snapshot.presentation if prior_snapshot else None
+        )
+        prior_attempt = int(
+            prior_presentation.get("render_attempts")
+            or 0
+        )
+        pending_response = _json_object(prior_presentation.get("pending_response"))
+        pending_checkpoint = _json_object(
+            _json_object(pending_response.get("execution_trace")).get("checkpoint")
+        )
+        action_fingerprint = str(
+            pending_checkpoint.get("prepared_map_action_fingerprint") or ""
+        ) or None
+        # A duplicate of the terminal retry is still idempotent, but a new
+        # browser result after the configured bound is a protocol error.  In
+        # particular, do not allow a late successful acknowledgment to bypass
+        # the same-run render recovery limit.
+        if (
+            self.resume_mode
+            and prior_snapshot is not None
+            and prior_attempt >= self.max_render_attempts
+            and prior_presentation.get("acknowledgment") != acknowledgment
+        ):
+            raise RenderAcknowledgementError(
+                "Render recovery attempts are exhausted for this run."
+            )
+        observation = self._observation_from_ack(payload).model_copy(
+            update={
+                "attempt": prior_attempt + 1,
+                "recovery": (
+                    "continue"
+                    if payload.status == "ready"
+                    else "terminal"
+                    if prior_attempt + 1 >= self.max_render_attempts
+                    else "revise_map"
+                ),
+                "action_fingerprint": action_fingerprint,
+            }
+        )
         expire_pending = getattr(self.run_repository, "expire_pending_render", None)
         if callable(expire_pending):
             expire_pending(
@@ -198,9 +267,62 @@ class RenderCompletionService:
                 collection_revision=payload.collection_revision,
                 status=payload.status,
                 acknowledgment=acknowledgment,
+                resume=self.resume_mode,
+                observation=observation.model_dump(mode="json"),
             )
         except ValueError as exc:
-            raise RenderAcknowledgementError(str(exc)) from exc
+            # A browser can report ``ready`` while a deterministic server
+            # check still rejects the candidate (for example a missing layer,
+            # invisible feature set, or viewport mismatch). In resumable mode
+            # that is an actionable render failure, not a terminal protocol
+            # error: feed the normalized rejection back into the same run so
+            # the model can revise the map. Identity/version/state errors are
+            # deliberately left as protocol errors below.
+            if not (
+                self.resume_mode
+                and payload.status == "ready"
+                and self._is_render_validation_rejection(str(exc))
+            ):
+                raise RenderAcknowledgementError(str(exc)) from exc
+            failure_payload = payload.model_copy(
+                update={
+                    "status": "failed",
+                    "failure_code": "render_validation_failed",
+                    "failure_stage": "backend_validation",
+                    "failure_summary": str(exc)[:500],
+                }
+            )
+            acknowledgment = failure_payload.model_dump(mode="json")
+            observation = self._observation_from_ack(failure_payload).model_copy(
+                update={
+                    "attempt": prior_attempt + 1,
+                    "recovery": (
+                        "terminal"
+                        if prior_attempt + 1 >= self.max_render_attempts
+                        else "revise_map"
+                    ),
+                    "action_fingerprint": action_fingerprint,
+                }
+            )
+            try:
+                snapshot, duplicate, pending_response = self.run_repository.acknowledge_render(
+                    conversation_id=conversation_id,
+                    run_id=payload.run_id,
+                    run_version=payload.run_version,
+                    map_session_id=payload.map_session_id,
+                    collection_revision=payload.collection_revision,
+                    status="failed",
+                    acknowledgment=acknowledgment,
+                    resume=True,
+                    observation=observation.model_dump(mode="json"),
+                )
+            except ValueError as retry_exc:
+                raise RenderAcknowledgementError(str(retry_exc)) from retry_exc
+        observed_attempt = int(
+            _json_object(snapshot.presentation).get("render_attempts")
+            or observation.attempt
+        )
+        observation = observation.model_copy(update={"attempt": observed_attempt})
         if duplicate:
             return RenderAcknowledgementResult(
                 run_id=snapshot.run_id,
@@ -208,6 +330,24 @@ class RenderCompletionService:
                 state=snapshot.state.value,
                 presentation_status=snapshot.presentation_status,
                 duplicate=True,
+                resume_required=False,
+                observation=observation,
+            )
+
+        if self.resume_mode:
+            await self._publish_resume_observation(
+                snapshot=snapshot,
+                pending_response=pending_response or {},
+                observation=observation,
+            )
+            return RenderAcknowledgementResult(
+                run_id=snapshot.run_id,
+                run_version=snapshot.active_run_version,
+                state=snapshot.state.value,
+                presentation_status=snapshot.presentation_status,
+                duplicate=False,
+                resume_required=True,
+                observation=observation,
             )
 
         response = pending_response or {}
@@ -297,4 +437,160 @@ class RenderCompletionService:
             state=snapshot.state.value,
             presentation_status=snapshot.presentation_status,
             duplicate=False,
+            observation=observation,
+        )
+
+    # -------------------------------------------------------------------------
+    def _observation_from_ack(
+        self, payload: RealtimeRenderAckPayload
+    ) -> RenderObservation:
+        fingerprint = hashlib.sha256(
+            json.dumps(
+                {
+                    "map_session_id": payload.map_session_id,
+                    "collection_revision": payload.collection_revision,
+                    "checks": payload.checks,
+                    "overlay_results": payload.overlay_results,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            ).encode("utf-8")
+        ).hexdigest()
+        failure_code = payload.failure_code or (
+            "render_failed" if payload.status == "failed" else None
+        )
+        return RenderObservation(
+            map_session_id=payload.map_session_id,
+            collection_revision=payload.collection_revision,
+            attempt=1,
+            status=payload.status,
+            viewport_bounds=payload.viewport_bounds,
+            checks=dict(payload.checks),
+            overlay_results=[dict(item) for item in payload.overlay_results],
+            failure_code=failure_code,
+            failure_stage=payload.failure_stage,
+            failure_summary=payload.failure_summary,
+            recovery="continue" if payload.status == "ready" else "revise_map",
+            observed_at=utc_now().isoformat(),
+        ).model_copy(update={"fingerprint": fingerprint})
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_render_validation_rejection(message: str) -> bool:
+        normalized = message.casefold()
+        return normalized.startswith(
+            (
+                "required render checks failed:",
+                "required overlay render checks failed:",
+                "required rendered features are not visible:",
+                "acknowledged viewport does not contain the prepared map.",
+                "required map completion checks failed:",
+            )
+        )
+
+    # -------------------------------------------------------------------------
+    async def _publish_resume_observation(
+        self,
+        *,
+        snapshot: Any,
+        pending_response: dict[str, Any],
+        observation: RenderObservation,
+    ) -> None:
+        """Publish a bounded render observation and the resume checkpoint."""
+
+        payload = observation.model_dump(mode="json", exclude_none=True)
+        payload["run_id"] = snapshot.run_id
+        payload["run_version"] = snapshot.active_run_version
+        await self.event_publisher.publish(
+            conversation_id=snapshot.conversation_id,
+            run_id=snapshot.run_id,
+            run_version=snapshot.active_run_version,
+            type=RunEventType.RENDER_OBSERVED,
+            visibility=RunEventVisibility.USER,
+            payload=payload,
+        )
+        await self.event_publisher.publish(
+            conversation_id=snapshot.conversation_id,
+            run_id=snapshot.run_id,
+            run_version=snapshot.active_run_version,
+            type=RunEventType.TRACE,
+            visibility=RunEventVisibility.INTERNAL,
+            payload=AgentTraceEvent(
+                kind="render_observed",
+                run_id=snapshot.run_id,
+                run_version=snapshot.active_run_version,
+                sequence=max(1, int(observation.attempt)),
+                iteration=None,
+                payload=payload,
+            ).model_dump(mode="json"),
+        )
+        if observation.status == "failed":
+            await self.event_publisher.publish(
+                conversation_id=snapshot.conversation_id,
+                run_id=snapshot.run_id,
+                run_version=snapshot.active_run_version,
+                type=RunEventType.PROGRESS,
+                payload={
+                    "stage": RunProgressStage.CORRECTING_RENDER.value,
+                    "label": "Correcting the map after a render failure",
+                    "failure_code": observation.failure_code,
+                },
+            )
+        await self.event_publisher.publish(
+            conversation_id=snapshot.conversation_id,
+            run_id=snapshot.run_id,
+            run_version=snapshot.active_run_version,
+            type=RunEventType.TRACE,
+            visibility=RunEventVisibility.INTERNAL,
+            payload=AgentTraceEvent(
+                kind="run_resumed",
+                run_id=snapshot.run_id,
+                run_version=snapshot.active_run_version,
+                sequence=max(1, int(observation.attempt)),
+                iteration=None,
+                payload={
+                    "reason": "render_observation",
+                    "status": observation.status,
+                    "attempt": observation.attempt,
+                    "render_retry_exhausted": observation.recovery == "terminal",
+                },
+            ).model_dump(mode="json"),
+        )
+        checkpoint = _json_object(
+            _json_object(pending_response.get("execution_trace")).get("checkpoint")
+        )
+        if not checkpoint:
+            return
+        checkpoint_event = AgentCheckpoint(
+            run_id=snapshot.run_id,
+            conversation_id=snapshot.conversation_id,
+            run_version=snapshot.active_run_version,
+            conversation_state={},
+            run_state=checkpoint,
+            state_hash=hashlib.sha256(
+                json.dumps(
+                    checkpoint, sort_keys=True, separators=(",", ":"), default=str
+                ).encode("utf-8")
+            ).hexdigest(),
+            completed_call_fingerprints=list(
+                _json_object(checkpoint.get("successful_fingerprints")).keys()
+            )[-32:],
+            completion_reason=None,
+        )
+        trace = AgentTraceEvent(
+            kind="checkpoint",
+            run_id=snapshot.run_id,
+            run_version=snapshot.active_run_version,
+            sequence=int(checkpoint.get("transitions") or 0),
+            iteration=max(1, int(checkpoint.get("current_iteration") or 1)),
+            payload=checkpoint_event.model_dump(mode="json"),
+        )
+        await self.event_publisher.publish(
+            conversation_id=snapshot.conversation_id,
+            run_id=snapshot.run_id,
+            run_version=snapshot.active_run_version,
+            type=RunEventType.CHECKPOINT,
+            visibility=RunEventVisibility.INTERNAL,
+            payload=trace.model_dump(mode="json"),
         )

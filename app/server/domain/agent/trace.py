@@ -41,6 +41,11 @@ TraceKind = Literal[
     "model_usage",
     "stage",
     "completion",
+    "render_observed",
+    "run_suspended",
+    "run_resumed",
+    "completion_decision",
+    "render_retry_exhausted",
 ]
 
 ###############################################################################

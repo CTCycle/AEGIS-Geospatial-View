@@ -119,6 +119,8 @@ class CompletionContract(BaseModel):
     map_preparation_required: bool = False
     temporal_scope_required: bool = False
     spatial_scope_required: bool = False
+    render_verification_required: bool = False
+    render_verified: bool = False
 
 
 CompletionStatus = Literal["pending", "satisfied", "failed", "not_applicable"]
@@ -135,6 +137,32 @@ class CompletionRequirement(BaseModel):
     target_id: str | None = None
     evidence_ref: str | None = None
     failure_code: str | None = None
+
+
+###############################################################################
+class RenderObservation(BaseModel):
+    """Bounded browser observation returned to the native agent state."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    map_session_id: str = Field(min_length=1, max_length=160)
+    collection_revision: int = Field(ge=0)
+    attempt: int = Field(ge=1, le=32)
+    status: Literal["ready", "failed"]
+    viewport_bounds: list[float] | None = Field(default=None, max_length=4)
+    checks: dict[str, bool] = Field(default_factory=lambda: dict[str, bool](), max_length=32)
+    overlay_results: list[dict[str, object]] = Field(
+        default_factory=lambda: list[dict[str, object]](), max_length=64
+    )
+    failure_code: str | None = Field(default=None, max_length=120)
+    failure_stage: str | None = Field(default=None, max_length=120)
+    failure_summary: str | None = Field(default=None, max_length=500)
+    fingerprint: str | None = Field(default=None, max_length=64)
+    action_fingerprint: str | None = Field(default=None, max_length=64)
+    recovery: Literal["continue", "revise_map", "alternate_source", "terminal"] = (
+        "continue"
+    )
+    observed_at: str | None = Field(default=None, max_length=64)
 
 
 ###############################################################################
@@ -393,6 +421,19 @@ class AgentRunState(BaseModel):
     evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
     active_map_session: MapSession | None = None
     prepared_map_session: MapSession | None = None
+    render_observations: list[RenderObservation] = Field(
+        default_factory=lambda: list[RenderObservation](), max_length=8
+    )
+    render_attempts: int = Field(default=0, ge=0, le=32)
+    render_verified: bool = False
+    render_retry_exhausted: bool = False
+    prepared_map_action_fingerprint: str | None = Field(
+        default=None, max_length=64
+    )
+    failed_render_fingerprints: dict[str, int] = Field(
+        default_factory=lambda: dict[str, int]()
+    )
+    no_progress_corrections: int = Field(default=0, ge=0, le=8)
     tool_results: list[ToolResult] = Field(default_factory=lambda: list[ToolResult]())
     successful_fingerprints: dict[str, ToolResult] = Field(
         default_factory=lambda: dict[str, ToolResult]()
@@ -467,13 +508,33 @@ class AgentRunState(BaseModel):
         payload["transition_trace"] = list(self.transition_trace[-64:])
         payload["exposure_trace"] = list(self.exposure_trace[-64:])
         payload["provider_continuation"] = list(self.provider_continuation[-16:])
+        payload["render_observations"] = [
+            item.model_dump(mode="json") for item in self.render_observations[-8:]
+        ]
+        payload["failed_render_fingerprints"] = dict(
+            list(self.failed_render_fingerprints.items())[-32:]
+        )
         return payload
 
     @classmethod
     def from_checkpoint(cls, payload: dict[str, Any]) -> "AgentRunState":
         """Restore one validated native run checkpoint."""
 
-        return cls.model_validate(payload)
+        state = cls.model_validate(payload)
+        # Checkpoints written by the earlier native harness used ``iteration``
+        # (and the task ledger) as the progress counter.  Reconcile all three
+        # representations so a resumed run cannot silently restart at one.
+        task_iteration = 0
+        try:
+            task_iteration = state.typed_task_state().current_iteration
+        except Exception:
+            task_iteration = 0
+        cumulative = max(
+            int(state.current_iteration), int(state.iteration), int(task_iteration)
+        )
+        state.current_iteration = cumulative
+        state.iteration = cumulative
+        return state
 
 
 def _checkpoint_tool_result(value: ToolResult) -> dict[str, Any]:

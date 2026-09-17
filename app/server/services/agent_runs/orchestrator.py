@@ -399,6 +399,23 @@ class AgentRunOrchestrator:
                         "operation": loading_operation.model_dump(mode="json"),
                     },
                 )
+                await self._publish_trace(
+                    awaiting,
+                    AgentTraceEvent(
+                        kind="run_suspended",
+                        run_id=awaiting.run_id,
+                        run_version=awaiting.active_run_version,
+                        sequence=3,
+                        payload={
+                            "reason": "awaiting_render",
+                            "map_session_id": response.map_session.session_id,
+                            "collection_revision": response.map_session.overlay_collection.revision,
+                            "render_attempts": int(
+                                (presentation.get("render_attempts") or 0)
+                            ),
+                        },
+                    ),
+                )
                 return loading_response
         await self._publish_trace(
             latest,
@@ -493,9 +510,24 @@ class AgentRunOrchestrator:
                 },
             )
             return
-        completed, transitioned = self.run_repository.mark_completed_if_current(
-            run_id, snapshot.active_run_version
+        terminal_presentation_status = (
+            response.presentation_status
+            if response.presentation_status in {"ready", "failed", "render_timeout"}
+            else None
         )
+        if terminal_presentation_status is None:
+            # Keep the legacy repository seam usable for lightweight worker
+            # doubles and non-render transports; ``not_requested`` is already
+            # the repository default and carries no additional state.
+            completed, transitioned = self.run_repository.mark_completed_if_current(
+                run_id, snapshot.active_run_version
+            )
+        else:
+            completed, transitioned = self.run_repository.mark_completed_if_current(
+                run_id,
+                snapshot.active_run_version,
+                presentation_status=terminal_presentation_status,
+            )
         if not transitioned:
             if completed.cancel_requested_at is not None:
                 await self._publish_cancelled(completed)
