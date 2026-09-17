@@ -338,3 +338,58 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
             location=location,
         )
         assert usgs[0]["id"] == "usgs_earthquakes"
+
+
+def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> None:
+    registry = CapabilityRegistry()
+    runtime = RuntimeRegistry()
+    zurich = ResolvedLocation(
+        label="Zurich",
+        latitude=47.3769,
+        longitude=8.5417,
+        country="Switzerland",
+    )
+    rome = zurich.model_copy(update={"label": "Rome", "country": "Italy"})
+
+    def shortlist(query: str, operation: str, location: ResolvedLocation) -> list[str]:
+        return [
+            str(item["id"])
+            for item in registry.shortlist(
+                domains={
+                    CapabilityDomain.DATA_RETRIEVAL,
+                    CapabilityDomain.MAP_RENDERING,
+                    CapabilityDomain.PLACE_SEARCH,
+                },
+                queries=[query],
+                explicit_ids=[],
+                runtime_registry=runtime,
+                operation=operation,
+                scope_kind="bbox",
+                temporal_mode="current",
+                requires_render=True,
+                location=location,
+            )
+        ]
+
+    weather = shortlist("weather", "retrieve_weather", zurich)
+    assert weather[0] in {
+        "openmeteo_pressure_humidity_wind",
+        "openmeteo_weather_forecast",
+    }
+    assert "openmeteo_air_quality_forecast" not in weather
+
+    poi = shortlist("points of interest", "find_poi", zurich)
+    assert poi[0] == "overpass_poi_amenities"
+    assert "openaddresses_points" not in poi
+
+    land_cover = shortlist("land cover", "retrieve_land_cover", zurich)
+    assert set(land_cover) <= {
+        "esa_worldcover",
+        "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    }
+
+    demographics = shortlist("census demographics", "retrieve_demographics", rome)
+    assert demographics == []
+
+    charging = shortlist("EV charging stations", "retrieve_infrastructure", rome)
+    assert charging == []
