@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from functools import partial
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel
 
@@ -57,6 +57,17 @@ _ROUTE_PHASE = frozenset({AgentPhase.ROUTE_REQUEST})
 _MIXED = frozenset({CapabilityDomain.MIXED})
 _DATA = frozenset({CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.SPATIAL_ANALYSIS})
 _MAP = frozenset({CapabilityDomain.MAP_RENDERING, CapabilityDomain.MAP_STATE})
+
+type JsonValue = (
+    None
+    | bool
+    | int
+    | float
+    | str
+    | list["JsonValue"]
+    | dict[str, "JsonValue"]
+)
+type JsonSchema = dict[str, JsonValue]
 
 
 ###############################################################################
@@ -627,12 +638,14 @@ def _json_schema_errors(value: Any, schema: Any, *, path: str) -> list[str]:
 
     if not isinstance(schema, dict):
         return ["arguments: the capability argument schema is invalid."]
+    schema = cast(JsonSchema, schema)
     errors: list[str] = []
     if "const" in schema and value != schema["const"]:
         errors.append(f"{path}: value must equal the manifest constant.")
-    if isinstance(schema.get("enum"), list) and value not in schema["enum"]:
+    enum = schema.get("enum")
+    if isinstance(enum, list) and value not in cast(list[JsonValue], enum):
         errors.append(f"{path}: value is not in the manifest enum.")
-    schema_type = schema.get("type")
+    schema_type = cast(str | list[str] | None, schema.get("type"))
     if isinstance(schema_type, list):
         if not any(_json_type_matches(value, item) for item in schema_type):
             errors.append(f"{path}: value has the wrong type.")
@@ -642,33 +655,39 @@ def _json_schema_errors(value: Any, schema: Any, *, path: str) -> list[str]:
         return errors
 
     if isinstance(value, dict):
-        properties = schema.get("properties")
-        properties = properties if isinstance(properties, dict) else {}
-        required = schema.get("required")
-        if isinstance(required, list):
-            for name in required[:32]:
-                if str(name) not in value:
-                    errors.append(f"{path}.{name}: required value is missing.")
+        object_value = cast(dict[str, JsonValue], value)
+        raw_properties = schema.get("properties")
+        properties = (
+            cast(JsonSchema, raw_properties)
+            if isinstance(raw_properties, dict)
+            else {}
+        )
+        raw_required = schema.get("required")
+        required = cast(list[str], raw_required) if isinstance(raw_required, list) else []
+        for name in required[:32]:
+            if name not in object_value:
+                errors.append(f"{path}.{name}: required value is missing.")
         if schema.get("additionalProperties") is False:
-            for name in value:
-                if str(name) not in properties:
+            for name in object_value:
+                if name not in properties:
                     errors.append(f"{path}.{name}: additional property is not allowed.")
-        for name, child in value.items():
-            child_schema = properties.get(str(name))
+        for name, child in object_value.items():
+            child_schema = properties.get(name)
             if child_schema is not None:
                 errors.extend(
                     _json_schema_errors(child, child_schema, path=f"{path}.{name}")
                 )
     if isinstance(value, list):
+        array_value = cast(list[JsonValue], value)
         min_items = schema.get("minItems")
         max_items = schema.get("maxItems")
-        if isinstance(min_items, int) and len(value) < min_items:
+        if isinstance(min_items, int) and len(array_value) < min_items:
             errors.append(f"{path}: too few items.")
-        if isinstance(max_items, int) and len(value) > max_items:
+        if isinstance(max_items, int) and len(array_value) > max_items:
             errors.append(f"{path}: too many items.")
         item_schema = schema.get("items")
         if item_schema is not None:
-            for index, child in enumerate(value[:32]):
+            for index, child in enumerate(array_value[:32]):
                 errors.extend(
                     _json_schema_errors(child, item_schema, path=f"{path}[{index}]")
                 )
@@ -720,7 +739,11 @@ def _execute_argument_schema_provider(
             schema = argument_schema(request.capability_id)
         except Exception:
             return None
-        return dict(schema) if isinstance(schema, dict) else None
+        return (
+            dict(cast(dict[str, Any], schema))
+            if isinstance(schema, dict)
+            else None
+        )
 
     return provide
 

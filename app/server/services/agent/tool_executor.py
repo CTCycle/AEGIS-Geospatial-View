@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ValidationError
 
+from server.common.typing import is_json_object
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.reliability import (
@@ -365,16 +366,19 @@ class ToolExecutor:
                     mode="json", exclude_none=True
                 )
                 if isinstance(applicable_schema, dict):
-                    raw_properties = applicable_schema.get("properties")
-                    if isinstance(raw_properties, dict) and (
-                        raw_properties
-                        or applicable_schema.get("additionalProperties") is False
-                    ):
+                    raw_properties_value: object = applicable_schema.get("properties")
+                    raw_properties = (
+                        raw_properties_value
+                        if is_json_object(raw_properties_value)
+                        else {}
+                    )
+                    if raw_properties or applicable_schema.get("additionalProperties") is False:
                         nested = canonical_arguments.get("arguments")
                         if isinstance(nested, dict):
+                            nested_arguments = cast(dict[str, Any], nested)
                             canonical_arguments["arguments"] = {
                                 str(key): value
-                                for key, value in nested.items()
+                                for key, value in nested_arguments.items()
                                 if str(key) in raw_properties
                             }
                 return self._failure(
