@@ -407,6 +407,9 @@ class CapabilityRegistry:
             # and are allowed through the normal runtime/contract checks.
             if meaningful_queries and explicit_index is None and not matched_queries:
                 continue
+            identity_matches = meaningful_queries.intersection(
+                _identity_searchable_text(item)
+            )
             score = (
                 1000.0 - float(explicit_index)
                 if explicit_index is not None
@@ -414,11 +417,13 @@ class CapabilityRegistry:
             )
             score += float(len(declared_domains.intersection(requested_domains))) * 100.0
             score += float(len(matched_queries) * 10)
+            score += float(len(identity_matches) * 30)
             if capability_id.casefold() in {item.casefold() for item in normalized_queries}:
                 score += 50.0
             candidate = dict(item)
             candidate["routing_score"] = score
             candidate["routing_query_matches"] = sorted(matched_queries)
+            candidate["routing_identity_matches"] = sorted(identity_matches)
             candidate["routing_domains"] = sorted(domain.value for domain in declared_domains)
             candidate["routing_contract"] = contract
             candidate["runtime_eligible"] = True
@@ -726,6 +731,21 @@ def _searchable_text(capability: dict[str, Any]) -> set[str]:
         metadata.get("primary_use_cases"),
         metadata.get("search_examples"),
         metadata.get("human_summary"),
+    ]
+    return {
+        token
+        for value in values
+        for token in _query_tokens(value if is_json_array(value) else [value])
+    }
+
+
+def _identity_searchable_text(capability: dict[str, Any]) -> set[str]:
+    """Return high-signal identity terms used only for deterministic ranking."""
+
+    values: list[object] = [
+        capability.get("id"),
+        capability.get("name"),
+        capability.get("capabilities"),
     ]
     return {
         token

@@ -8,6 +8,7 @@ from server.domain.agent.capability_route import (
     AgentRunState,
     CapabilityRoute,
 )
+from server.domain.agent.decision import ResolvedLocation
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -161,6 +162,50 @@ def test_router_opens_discovery_when_semantic_shortlist_is_empty() -> None:
 
     assert decision.status == "discovery_required"
     assert "discovery_required" in decision.reason_codes
+
+
+def test_router_clarifies_broad_infrastructure_category_before_shortlisting() -> None:
+    decision = _router().validate_route(
+        _route(
+            operation="retrieve_infrastructure",
+            capability_queries=["infrastructure"],
+        ),
+        user_message="Show infrastructure.",
+        active_state=_state(),
+    )
+
+    assert decision.status == "clarification"
+    assert decision.capability_ids == []
+    assert "ambiguous_infrastructure_category" in decision.reason_codes
+    assert decision.clarification_question is not None
+    assert "EV charging" in decision.clarification_question
+
+
+def test_router_returns_boundary_limitation_without_replacing_active_map() -> None:
+    state = _state(active_map=True)
+    state.location_refs["zurich"] = ResolvedLocation(
+        label="Zurich",
+        latitude=47.3769,
+        longitude=8.5417,
+        country="Switzerland",
+    )
+    active_map = state.active_map_session
+    decision = _router().validate_route(
+        _route(
+            operation="show_boundary",
+            capability_queries=["exact boundary"],
+            spatial_scope={"kind": "administrative_geometry"},
+        ),
+        user_message="Show the exact boundary of Zurich.",
+        active_state=state,
+    )
+
+    assert decision.status == "clarification"
+    assert "unsupported_boundary_scope" in decision.reason_codes
+    assert "active_map_preserved" in decision.reason_codes
+    assert decision.clarification_question is not None
+    assert "left the active map unchanged" in decision.clarification_question
+    assert state.active_map_session is active_map
 
 
 ###############################################################################

@@ -6,6 +6,7 @@ from server.domain.agent.decision import ResolvedLocation
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.capability_registry import _operation_candidates
+from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
 ###############################################################################
@@ -255,3 +256,85 @@ def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
         location=us_location,
     )
     assert [item["id"] for item in candidate] == ["us-parcels"]
+
+
+def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> None:
+    registry = CapabilityRegistry()
+    runtime = RuntimeRegistry()
+    location = ResolvedLocation(
+        label="Zurich",
+        latitude=47.3769,
+        longitude=8.5417,
+        country="Switzerland",
+    )
+
+    vegetation = registry.shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        queries=["vegetation"],
+        explicit_ids=[],
+        runtime_registry=runtime,
+        operation="retrieve_land_cover",
+        scope_kind="bbox",
+        temporal_mode="current",
+        requires_render=True,
+        location=location,
+    )
+    assert {item["id"] for item in vegetation}.issuperset(
+        {"esa_worldcover", "MODIS_Terra_NDVI_8Day"}
+    )
+    assert "local_parcel_template" not in {item["id"] for item in vegetation}
+
+    land_cover = registry.shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        queries=["land cover"],
+        explicit_ids=[],
+        runtime_registry=runtime,
+        operation="retrieve_land_cover",
+        scope_kind="bbox",
+        temporal_mode="current",
+        requires_render=True,
+        location=location,
+    )
+    assert {item["id"] for item in land_cover}.issuperset(
+        {"esa_worldcover", "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual"}
+    )
+
+    modis = registry.shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        queries=["MODIS"],
+        explicit_ids=[],
+        runtime_registry=runtime,
+        operation="retrieve_land_cover",
+        scope_kind="bbox",
+        temporal_mode="current",
+        requires_render=True,
+        location=location,
+    )
+    assert "MODIS_Terra_NDVI_8Day" in {item["id"] for item in modis}
+
+    worldcover = registry.shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        queries=["WorldCover"],
+        explicit_ids=[],
+        runtime_registry=runtime,
+        operation="retrieve_land_cover",
+        scope_kind="bbox",
+        temporal_mode="current",
+        requires_render=True,
+        location=location,
+    )
+    assert worldcover[0]["id"] == "esa_worldcover"
+
+    for query in ("USGS", "hazard"):
+        usgs = registry.shortlist(
+            domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+            queries=[query],
+            explicit_ids=[],
+            runtime_registry=runtime,
+            operation="retrieve_hazard",
+            scope_kind="bbox",
+            temporal_mode="current",
+            requires_render=True,
+            location=location,
+        )
+        assert usgs[0]["id"] == "usgs_earthquakes"
