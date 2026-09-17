@@ -362,6 +362,41 @@ describe('pages/geospatial-page.component', () => {
     expect(component['pendingRenderContext']).toBeUndefined();
   });
 
+  it('preserves a synchronous completed event after a ready render ack', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    const sendMapRenderAck = jasmine.createSpy('sendMapRenderAck');
+    Object.assign(realtime, { sendMapRenderAck });
+    sendMapRenderAck.and.callFake(() => {
+      component['handleRunEvent']({
+        event_id: 'render-completed',
+        sequence: 1,
+        conversation_id: 'conv-1',
+        run_id: 'run-1',
+        run_version: 1,
+        type: 'completed',
+        timestamp: new Date().toISOString(),
+        visibility: 'user',
+        payload: {},
+      } as never);
+      return 'ack-1';
+    });
+
+    component.onMapRenderStateChange({
+      sessionId: 'candidate-map',
+      runId: 'run-1',
+      runVersion: 1,
+      state: 'ready',
+      collectionRevision: 4,
+    });
+
+    expect(component.status).toBe('Agent ready');
+    expect(component.isLoading).toBeFalse();
+    expect(component.activeRunId).toBeUndefined();
+  });
+
   it('ignores a stale render callback before mutating presentation state', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
