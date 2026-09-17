@@ -153,7 +153,10 @@
   "executionContract": {
     "supported_operations": [
       "show",
-      "inspect"
+      "inspect",
+      "search",
+      "near",
+      "within_distance"
     ],
     "supported_scope_kinds": [
       "point",
@@ -170,7 +173,7 @@
       "location"
     ],
     "output_geometry_type": "Point",
-    "render_support": "metadata_only",
+    "render_support": "vector",
     "coverage": "global",
     "limitations": [],
     "fallback_ids": []

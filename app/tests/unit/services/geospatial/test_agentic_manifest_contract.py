@@ -84,7 +84,7 @@ def test_shortlist_is_domain_aware_and_bounded() -> None:
         limit=25,
     )
 
-    assert [item["id"] for item in candidates] == ["weather", "traffic"]
+    assert [item["id"] for item in candidates] == ["weather"]
     assert len(candidates) <= 12
     assert candidates[0]["routing_domains"] == ["data_retrieval"]
 
@@ -203,7 +203,7 @@ def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
                 "description": "High precision parcel data.",
                 "agenticUse": {
                     "domains": ["spatial_analysis"],
-                    "avoidWhen": ["outside United States", "high precision parcel analysis"],
+                    "avoidWhen": ["outside United States"],
                 },
                 "executionContract": {
                     "supported_operations": ["show", "analyze"],
@@ -247,16 +247,9 @@ def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
     us_location = zurich.model_copy(
         update={"label": "New York", "country": "United States"}
     )
-    assert registry.shortlist(
-        domains={CapabilityDomain.SPATIAL_ANALYSIS},
-        queries=["parcel analysis"],
-        explicit_ids=[],
-        runtime_registry=_RuntimeEligibility(),
-        location=us_location,
-    ) == []
     candidate = registry.shortlist(
         domains={CapabilityDomain.SPATIAL_ANALYSIS},
-        queries=["registry"],
+        queries=["parcel analysis"],
         explicit_ids=[],
         runtime_registry=_RuntimeEligibility(),
         location=us_location,

@@ -142,7 +142,7 @@
       "temporal_mode"
     ],
     "output_geometry_type": "Point",
-    "render_support": "metadata_only",
+    "render_support": "vector",
     "coverage": "global",
     "limitations": [],
     "fallback_ids": []

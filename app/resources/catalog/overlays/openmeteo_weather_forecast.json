@@ -134,7 +134,7 @@
     "temporal_windows": ["provider_forecast_window"],
     "required_inputs": ["location", "temporal_mode"],
     "output_geometry_type": "Point",
-    "render_support": "metadata_only",
+    "render_support": "vector",
     "coverage": "global",
     "limitations": ["Weather values are sampled at a point; no area raster is provided."],
     "fallback_ids": []
