@@ -118,7 +118,7 @@ conversation-scoped `agent_evidence` store rather than model messages.
 #### Validation Ledger
 
 - `validation/gate_status.md`
-  Canonical PASS/PARTIAL/FAIL/BLOCKED/NOT RUN ledger for native-loop,
+  Canonical PASS/PARTIAL/FAIL/BLOCKED/UNRUN ledger for native-loop,
   presentation, browser-fault, provider, and hosted-CI gates.
 
 ### UI
