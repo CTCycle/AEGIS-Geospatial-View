@@ -15,6 +15,8 @@ from server.domain.agent.reliability import (
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMToolCall, LLMToolDefinition
+from server.services.agent.native_tools import _json_schema_errors
+from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 
@@ -302,6 +304,59 @@ def test_manifest_validation_correction_contains_bounded_applicable_schema() -> 
     assert correction["applicable_schema"] == manifest_schema
     assert correction["canonical_arguments"]["arguments"] == {}
     assert len(correction["validation_errors"]) == 1
+
+
+def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
+    calls: list[int] = []
+    manifest_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "radius_m": {"type": "number", "exclusiveMinimum": 0},
+        },
+    }
+
+    async def handler(
+        _arguments: ExecuteCapabilityInput, _state: AgentRunState
+    ) -> dict[str, Any]:
+        calls.append(1)
+        return {"ok": True}
+
+    def validate(arguments: BaseModel, _state: AgentRunState) -> list[str]:
+        request = cast(ExecuteCapabilityInput, arguments)
+        return _json_schema_errors(
+            request.arguments,
+            manifest_schema,
+            path="arguments",
+        )
+
+    registry = ToolRegistry(runtime_registry=cast(Any, None))
+    registry.register(
+        _tool(
+            handler,
+            name="execute_geospatial_capability",
+            semantic_validator=validate,
+            argument_schema_provider=lambda _arguments, _state: manifest_schema,
+            input_model=ExecuteCapabilityInput,
+        )
+    )
+    result = asyncio.run(
+        ToolExecutor(tool_registry=registry).execute_tool(
+            LLMToolCall(
+                id="exclusive-radius",
+                name="execute_geospatial_capability",
+                arguments={"capability_id": "radius-test", "arguments": {"radius_m": 0}},
+            ),
+            _state(),
+            _budget(),
+        )
+    )
+
+    assert result.error is not None
+    assert result.error.error_type == "semantic_validation"
+    assert result.error.validation_errors[0].path == "$"
+    assert "exclusive minimum" in result.error.validation_errors[0].message
+    assert calls == []
 
 
 ###############################################################################
