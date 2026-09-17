@@ -32,6 +32,11 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 ###############################################################################
 MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
 MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
+_GEOJSON_RENDERING_MODES = frozenset(
+    {"geojson", "arcgis-geojson", "clustered-points", "choropleth", "camera-points"}
+)
+_RASTER_RENDERING_MODES = frozenset({"xyz", "raster-tile", "wmts", "wms", "tile"})
+_RENDERING_MODE_ALIASES = {"vector": "geojson", "feature-collection": "geojson"}
 
 
 class MapPlanBuildError(ValueError):
@@ -174,6 +179,7 @@ class MapSessionBuilder:
                 descriptor["result_type"] = evidence.summary.get(
                     "result_type", "features"
                 )
+            self._validate_render_descriptor(descriptor)
             additions = OverlayCollectionService.from_rendered_descriptors(
                 [descriptor],
                 resolved_location=session.resolved_location,
@@ -325,6 +331,76 @@ class MapSessionBuilder:
             }
         )
         return descriptor
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _validate_render_descriptor(descriptor: dict[str, Any]) -> None:
+        """Reject candidates the browser renderer cannot consume safely."""
+
+        mode = str(
+            descriptor.get("rendering_mode")
+            or descriptor.get("renderingMode")
+            or descriptor.get("type")
+            or ""
+        ).strip().casefold()
+        if mode in _RENDERING_MODE_ALIASES and descriptor.get("data") is not None:
+            mode = _RENDERING_MODE_ALIASES[mode]
+            descriptor["rendering_mode"] = mode
+        if mode in {"metadata-only", "metadata_only", ""}:
+            raise MapPlanBuildError(
+                "render_descriptor_unavailable",
+                "The selected evidence has no browser-renderable layer descriptor.",
+            )
+        if mode in _GEOJSON_RENDERING_MODES:
+            data = json_object(descriptor.get("data"))
+            has_feature_collection = data.get("type") == "FeatureCollection" and isinstance(
+                data.get("features"), list
+            )
+            has_url = bool(str(descriptor.get("url") or "").strip())
+            if not has_feature_collection and not has_url:
+                raise MapPlanBuildError(
+                    "render_descriptor_unavailable",
+                    "The GeoJSON layer is missing feature data or a source URL.",
+                )
+            return
+        if mode in _RASTER_RENDERING_MODES:
+            if mode in {"wms", "wmts"} and not descriptor.get("url"):
+                service_url = descriptor.get("service_url") or descriptor.get("serviceUrl")
+                if service_url:
+                    descriptor["url"] = service_url
+            has_source = bool(
+                str(
+                    descriptor.get("tile_url_template")
+                    or descriptor.get("url")
+                    or ""
+                ).strip()
+            )
+            if not has_source:
+                raise MapPlanBuildError(
+                    "render_descriptor_unavailable",
+                    f"The {mode} layer is missing a tile or service URL.",
+                )
+            return
+        if mode == "vector-tile":
+            if not str(
+                descriptor.get("tile_url_template") or descriptor.get("url") or ""
+            ).strip():
+                raise MapPlanBuildError(
+                    "render_descriptor_unavailable",
+                    "The vector-tile layer is missing a tile URL template.",
+                )
+            if not str(
+                descriptor.get("source_layer") or descriptor.get("layer_id") or ""
+            ).strip():
+                raise MapPlanBuildError(
+                    "render_descriptor_invalid",
+                    "The vector-tile layer is missing source_layer metadata.",
+                )
+            return
+        raise MapPlanBuildError(
+            "render_descriptor_invalid",
+            f"Unsupported browser rendering mode '{mode}'.",
+        )
 
 
 ###############################################################################

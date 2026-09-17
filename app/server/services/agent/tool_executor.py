@@ -286,6 +286,12 @@ class ToolExecutor:
                     retryable=False,
                     recovery="correct_arguments",
                 ),
+                data={
+                    "correction": self._correction_payload(
+                        tool_call,
+                        registered=None,
+                    )
+                },
             )
 
         registered = self.tool_registry.get(tool_call.name)
@@ -326,6 +332,13 @@ class ToolExecutor:
                     recovery="correct_arguments",
                     validation_errors=issues,
                 ),
+                data={
+                    "correction": self._correction_payload(
+                        tool_call,
+                        registered=registered,
+                        validation_errors=issues,
+                    )
+                },
             )
 
         if registered.semantic_validator is not None:
@@ -350,6 +363,23 @@ class ToolExecutor:
                             for message in semantic_errors[:8]
                         ],
                     ),
+                    data={
+                        "correction": self._correction_payload(
+                            tool_call,
+                            registered=registered,
+                            validation_errors=[
+                                ValidationIssue(
+                                    path="$",
+                                    code="semantic_validation_failed",
+                                    message=str(message),
+                                )
+                                for message in semantic_errors[:8]
+                            ],
+                            canonical_arguments=arguments.model_dump(
+                                mode="json", exclude_none=True
+                            ),
+                        )
+                    },
                 )
 
         authorization = self._authorize(registered, arguments, state)
@@ -470,6 +500,7 @@ class ToolExecutor:
         tool_name: str,
         started: float,
         error: ToolExecutionError,
+        data: dict[str, Any] | None = None,
     ) -> ToolResult:
         duration_ms = max(0, int((time.perf_counter() - started) * 1000))
         return ToolResult(
@@ -477,6 +508,82 @@ class ToolExecutor:
             tool_name=tool_name,
             status="failed",
             summary=error.message,
+            data=data,
             error=error,
             metadata=ToolExecutionMetadata(duration_ms=duration_ms),
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _correction_payload(
+        tool_call: LLMToolCall,
+        *,
+        registered: RegisteredTool | None,
+        validation_errors: list[ValidationIssue] | None = None,
+        canonical_arguments: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return a bounded, executable correction for invalid arguments.
+
+        The error object remains the typed source of truth.  This companion
+        payload gives the model one stable retry shape and the exact exposed
+        schema without replaying arbitrary malformed arguments or provider
+        payloads into the next request.
+        """
+
+        schema: dict[str, Any] = {}
+        if registered is not None:
+            raw_schema = registered.input_model.model_json_schema()
+            schema = _bounded_correction_value(raw_schema, depth=0)
+            if not isinstance(schema, dict):
+                schema = {}
+        raw_arguments = tool_call.arguments
+        properties = schema.get("properties")
+        allowed = (
+            set(properties)
+            if isinstance(properties, dict)
+            else set()
+        )
+        if canonical_arguments is not None:
+            canonical = dict(canonical_arguments)
+        elif isinstance(raw_arguments, dict):
+            canonical = {
+                str(key): value
+                for key, value in raw_arguments.items()
+                if not allowed or str(key) in allowed
+            }
+        else:
+            canonical = {}
+        return {
+            "tool_name": tool_call.name,
+            "retry": "call the same tool with canonical_arguments only",
+            "canonical_arguments": _bounded_correction_value(canonical, depth=0),
+            "schema": schema,
+            "required": list(schema.get("required", []))[:32],
+            "validation_errors": [
+                issue.model_dump(mode="json")
+                for issue in (validation_errors or [])[:8]
+            ],
+        }
+
+
+###############################################################################
+def _bounded_correction_value(value: Any, *, depth: int, max_depth: int = 4) -> Any:
+    """Bound schemas and arguments before exposing them to a model retry."""
+
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    if isinstance(value, str):
+        return value[:500]
+    if depth >= max_depth:
+        return "[truncated]"
+    if isinstance(value, dict):
+        return {
+            str(key): _bounded_correction_value(child, depth=depth + 1)
+            for key, child in list(value.items())[:32]
+        }
+    if isinstance(value, list):
+        return [
+            _bounded_correction_value(child, depth=depth + 1)
+            for child in value[:32]
+        ]
+    return str(value)[:500]

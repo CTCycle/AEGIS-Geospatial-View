@@ -441,16 +441,37 @@ class AgentLoop:
                     ):
                         state.no_progress_corrections += 1
                         pending = self._pending_native_requirements(state)
-                        correction = {
-                            "observation_type": "pending_requirements",
-                            "status": "action_required",
-                            "pending_requirements": pending,
-                            "message": (
-                                "The response did not complete the deterministic "
-                                "completion contract. Select and execute the "
-                                "next required tool action."
-                            ),
-                        }
+                        render_failure = self._latest_render_failure(state)
+                        correction = (
+                            {
+                                "observation_type": "failed_render_recovery",
+                                "status": "action_required",
+                                "pending_requirements": pending,
+                                "failure_code": render_failure.failure_code,
+                                "failure_stage": render_failure.failure_stage,
+                                "failure_summary": render_failure.failure_summary,
+                                "failed_action_fingerprint": (
+                                    render_failure.action_fingerprint
+                                ),
+                                "message": (
+                                    "The previous map action failed browser rendering. "
+                                    "Do not repeat its action fingerprint; issue a "
+                                    "materially revised map plan or choose a supported "
+                                    "renderable source."
+                                ),
+                            }
+                            if render_failure is not None
+                            else {
+                                "observation_type": "pending_requirements",
+                                "status": "action_required",
+                                "pending_requirements": pending,
+                                "message": (
+                                    "The response did not complete the deterministic "
+                                    "completion contract. Select and execute the "
+                                    "next required tool action."
+                                ),
+                            }
+                        )
                         state.relevant_tool_outcomes.append(correction)
                         messages.append(
                             {
@@ -1453,6 +1474,13 @@ class AgentLoop:
                 )
             failed_count = state.failed_fingerprints.get(fingerprint, 0)
             render_failed_count = state.failed_render_fingerprints.get(fingerprint, 0)
+            if call.name == "apply_map_plan" and render_failed_count == 0:
+                render_failed_count = sum(
+                    1
+                    for observation in state.render_observations
+                    if observation.status == "failed"
+                    and observation.action_fingerprint == fingerprint
+                )
             if (
                 call.name == "apply_map_plan"
                 # A failed browser render is already proof that this exact
@@ -1579,13 +1607,31 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     @staticmethod
     def _fingerprint(call: LLMToolCall) -> str:
+        arguments = call.arguments
+        if call.name == "apply_map_plan" and isinstance(arguments, dict):
+            # Collection revision is a server-owned CAS token. It changes on
+            # every resumed attempt but does not make the semantic map action
+            # materially different for render-recovery deduplication.
+            arguments = {
+                key: value
+                for key, value in arguments.items()
+                if key != "expected_collection_revision"
+            }
         payload = {
             "name": call.name,
-            "arguments": call.arguments,
+            "arguments": arguments,
             "parse_error": call.parse_error,
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
         return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _latest_render_failure(state: AgentRunState) -> Any | None:
+        for observation in reversed(state.render_observations):
+            if observation.status == "failed":
+                return observation
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -2237,6 +2283,9 @@ class AgentLoop:
             # The terminal record itself must remain writable when the last
             # permitted transition was consumed by the failed operation.
             self._transition(state, target_phase, count=False)
+        final_text = self._preserve_render_failure_cause(
+            state, final_text, reason
+        )
         state.budget_snapshot = request.budget.snapshot()
         return AgentLoopOutcome(
             final_text=final_text,
@@ -2263,6 +2312,7 @@ class AgentLoop:
             self._transition(state, AgentPhase.FAILED, request.budget)
         except ExecutionBudgetExceeded:
             self._transition(state, AgentPhase.FAILED, count=False)
+        detail = self._preserve_render_failure_cause(state, detail, "failed")
         return AgentLoopOutcome(
             final_text=detail,
             state=state,
@@ -2287,8 +2337,13 @@ class AgentLoop:
         self._set_terminal_task_state(state, reason)
         state.budget_snapshot = request.budget.snapshot()
         self._transition(state, AgentPhase.FAILED, count=False)
+        final_text = self._preserve_render_failure_cause(
+            state,
+            "The agent reached its configured execution limit.",
+            reason,
+        )
         return AgentLoopOutcome(
-            final_text="The agent reached its configured execution limit.",
+            final_text=final_text,
             state=state,
             stopped_reason=reason,  # type: ignore[arg-type]
             model_calls=state.model_calls,
@@ -2296,12 +2351,37 @@ class AgentLoop:
             # Keep the stop reason intact.  Context pressure, a transition
             # limit, and a no-progress guard have different remediation paths.
             failure_category=reason,
-            failure_detail=(
-                "The agent made no progress toward its completion contract."
-                if reason == "no_progress"
-                else "The agent reached its configured execution limit."
-            ),
+            failure_detail=final_text,
         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _preserve_render_failure_cause(
+        cls, state: AgentRunState, text: str, reason: str
+    ) -> str:
+        if reason in {"awaiting_render", "goal_satisfied"} or state.render_verified:
+            return text
+        observation = cls._latest_render_failure(state)
+        if observation is None:
+            return text
+        code = observation.failure_code or "render_failed"
+        marker = f"Previous map render failed ({code})"
+        if marker in text:
+            return text
+        stage = (
+            f" during {observation.failure_stage}"
+            if observation.failure_stage
+            else ""
+        )
+        summary = (
+            observation.failure_summary
+            or "The renderer did not verify the prepared map."
+        )
+        suffix = (
+            f"{marker}{stage}: {summary} "
+            "The last-known-good map was left unchanged."
+        )
+        return f"{text.rstrip()}\n\n{suffix}" if text.strip() else suffix
 
 
 __all__ = [

@@ -287,9 +287,17 @@ class RenderCompletionService:
             failure_payload = payload.model_copy(
                 update={
                     "status": "failed",
-                    "failure_code": "render_validation_failed",
-                    "failure_stage": "backend_validation",
-                    "failure_summary": str(exc)[:500],
+                    # Preserve browser-provided diagnostics when the server
+                    # additionally rejects a ready acknowledgment.  The
+                    # resume observation must retain the original cause, not
+                    # replace it with a generic backend-validation label.
+                    "failure_code": payload.failure_code or "render_validation_failed",
+                    "failure_stage": payload.failure_stage or "backend_validation",
+                    "failure_summary": (
+                        f"{payload.failure_summary}; backend validation: {exc}"
+                        if payload.failure_summary
+                        else str(exc)
+                    )[:500],
                 }
             )
             acknowledgment = failure_payload.model_dump(mode="json")
@@ -460,6 +468,15 @@ class RenderCompletionService:
         failure_code = payload.failure_code or (
             "render_failed" if payload.status == "failed" else None
         )
+        failure_summary = payload.failure_summary
+        if payload.status == "failed" and not failure_summary:
+            failed_checks = [
+                key for key, value in payload.checks.items() if value is False
+            ]
+            failure_summary = (
+                "Render acknowledgment failed"
+                + (f" checks: {', '.join(failed_checks[:8])}." if failed_checks else ".")
+            )
         return RenderObservation(
             map_session_id=payload.map_session_id,
             collection_revision=payload.collection_revision,
@@ -470,7 +487,7 @@ class RenderCompletionService:
             overlay_results=[dict(item) for item in payload.overlay_results],
             failure_code=failure_code,
             failure_stage=payload.failure_stage,
-            failure_summary=payload.failure_summary,
+            failure_summary=failure_summary,
             recovery="continue" if payload.status == "ready" else "revise_map",
             observed_at=utc_now().isoformat(),
         ).model_copy(update={"fingerprint": fingerprint})
