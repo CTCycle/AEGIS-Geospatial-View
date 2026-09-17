@@ -1,15 +1,16 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-17 (final local evaluation)
+Last updated: 2026-09-18 (authorized remote push pending hosted verification)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
 provider lane, migrations, and hosted-CI boundary. Status values are limited
 to `PASS`, `PARTIAL`, `FAIL`, `BLOCKED`, and `UNRUN`.
 
-Final tested repository head: `bf5a7cfa2d943ed380bcd74808eb1dc76b2d548f` on `develop`.
+Final tested repository head: `a33642a29c4353a760aac34bf1234b8121211da6` on `develop`.
 Production behavior commit: `558f1966afc3cef4b6e755d4edfdc87dfd258c11`;
-the final head adds only controlled-harness evidence capture.
+the final tested head adds only controlled-harness evidence capture and
+documentation reconciliation.
 
 ## Current ledger
 
@@ -35,7 +36,7 @@ the final head adds only controlled-harness evidence capture.
 | FRONTEND-KARMA — client regression suite | Angular client | ChromeHeadlessNoGpu | PASS | 2026-09-17 | `558f1966` | [frontend-karma-558f-final.log](../../QA/native-agent-loop-evaluation-20260917-final/frontend-karma-558f-final.log) | 233/233 pass; add browser-timing coverage before retrying supersession remediation. |
 | MIGRATION — isolated upgrade/head/check | Persistence schema | Isolated SQLite under dated QA data | PASS | 2026-09-17 | `558f1966` | [migration-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/migration-final-commit.log) | Keep migration head `202609170001` and rerun only against isolated data. |
 | MATRIX-22 — complete required scenario matrix | Coverage | Exact live provider plus controlled browser | PARTIAL | 2026-09-17 | `bf5a7cfa` | [final-report.md](../../QA/native-agent-loop-evaluation-20260917-final/final-report.md) | Complete the explicit PARTIAL and UNRUN rows, including a separate mismatched-ack case, before any overall PASS claim. |
-| HOSTED-CI — exact tested head | Hosted CI | Remote workflow | BLOCKED | 2026-09-17 | `bf5a7cfa` | [evidence-index.md](../../QA/native-agent-loop-evaluation-20260917-final/evidence-index.md) | No push or CI ownership change was authorized; run only when an authorized hosted boundary exists. |
+| HOSTED-CI — exact tested head | Hosted CI | GitHub Actions push workflows on `develop` | UNRUN | 2026-09-18 | `a33642a` | [push boundary record](../../QA/native-agent-loop-evaluation-20260918/push-status.md) | The current head is being pushed under explicit user authorization; inspect the resulting exact-head workflow run before changing this gate to PASS or FAIL. |
 | PROCESS-CLEANUP — task-owned services and browser | Test harness | Local host, ports 4512/7059/9876 | PASS | 2026-09-17 | `bf5a7cfa` | [process-cleanup-final.md](../../QA/native-agent-loop-evaluation-20260917-final/process-cleanup-final.md) | Final harness services and browser tab stopped; ports verified free; unrelated services and caches preserved. |
 
 ## Browser fault acceptance contract
