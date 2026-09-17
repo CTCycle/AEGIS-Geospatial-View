@@ -325,6 +325,53 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.at(-1)?.content).toContain('real-time connection');
   });
 
+  it('ignores a stale render rejection after a newer run version is staged', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    component.activeRunVersion = 2;
+    component['pendingMapSession'] = {
+      session_id: 'new-candidate-map',
+      overlay_collection: { revision: 5, instances: [] },
+    } as never;
+    component['pendingRenderContext'] = {
+      runId: 'run-1',
+      runVersion: 2,
+      mapSessionId: 'new-candidate-map',
+      collectionRevision: 5,
+    };
+    component['renderAckQueued'] = true;
+    component['pendingRenderAckMessageId'] = 'new-render-ack';
+    component.status = 'Map data ready; rendering';
+    component.progressLabel = 'Map data ready; rendering';
+    component.messages = [{ role: 'assistant', content: 'Data prepared; the map is loading.' }];
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'protocol.error',
+      message_id: 'stale-render-rejected',
+      correlation_id: 'old-render-ack',
+      conversation_id: 'conv-1',
+      payload: {
+        code: 'render_ack_rejected',
+        command: 'map.render_ack',
+        run_id: 'run-1',
+        run_version: 1,
+      },
+    } as never);
+
+    expect(component.status).toBe('Map data ready; rendering');
+    expect(component.progressLabel).toBe('Map data ready; rendering');
+    expect(component.isLoading).toBeTrue();
+    expect(component.activeRunId).toBe('run-1');
+    expect(component.activeRunVersion).toBe(2);
+    const pendingMapSession = component['pendingMapSession'] as MapSession | undefined;
+    expect(pendingMapSession?.session_id).toBe('new-candidate-map');
+    expect(component['pendingRenderContext']?.runVersion).toBe(2);
+    expect(component.messages.at(-1)?.content).not.toContain('real-time connection');
+  });
+
   it('preserves a synchronous failed run ack after a failed render ack', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
