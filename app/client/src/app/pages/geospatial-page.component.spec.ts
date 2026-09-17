@@ -31,6 +31,24 @@ describe('pages/geospatial-page.component', () => {
     ...overrides,
   });
 
+  const stagePendingRender = (component: GeospatialPageComponent): void => {
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.isLoading = true;
+    component.mapSession = { session_id: 'committed-map' } as never;
+    component['committedMapSession'] = component.mapSession;
+    component['pendingMapSession'] = {
+      session_id: 'candidate-map',
+      overlay_collection: { revision: 4, instances: [] },
+    } as never;
+    component['pendingRenderContext'] = {
+      runId: 'run-1',
+      runVersion: 1,
+      mapSessionId: 'candidate-map',
+      collectionRevision: 4,
+    };
+  };
+
   beforeEach(async () => {
     store = jasmine.createSpyObj<AppStateStoreService>('AppStateStoreService', ['getChatPage', 'updateChatPage', 'resetChatPage']);
     store.getChatPage.and.returnValue(defaultAppState().chatPage);
@@ -269,6 +287,79 @@ describe('pages/geospatial-page.component', () => {
     expect(component.mapSession?.session_id).toBe('canonical-map');
     expect(component.mapSession?.overlay_collection.instances.map((instance) => instance.capability_id))
       .toEqual(['safe_overlay']);
+  });
+
+  it('preserves a synchronous protocol rejection after a failed render ack', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    const sendMapRenderAck = jasmine.createSpy('sendMapRenderAck');
+    Object.assign(realtime, { sendMapRenderAck });
+    sendMapRenderAck.and.callFake(() => {
+      component['handleRealtimeMessage']({
+        protocol_version: 1,
+        type: 'protocol.error',
+        message_id: 'render-rejected',
+        conversation_id: 'conv-1',
+        payload: {
+          code: 'render_ack_rejected',
+          command: 'map.render_ack',
+        },
+      } as never);
+      return 'ack-1';
+    });
+
+    component.onMapRenderStateChange({
+      sessionId: 'candidate-map',
+      runId: 'run-1',
+      runVersion: 1,
+      state: 'failed',
+      collectionRevision: 4,
+    });
+
+    expect(component.status).toBe('Agent ready');
+    expect(component.isLoading).toBeFalse();
+    expect(component['pendingMapSession']).toBeUndefined();
+    expect(component['pendingRenderContext']).toBeUndefined();
+    expect(component.messages.at(-1)?.content).toContain('real-time connection');
+  });
+
+  it('preserves a synchronous failed run ack after a failed render ack', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    const sendMapRenderAck = jasmine.createSpy('sendMapRenderAck');
+    Object.assign(realtime, { sendMapRenderAck });
+    sendMapRenderAck.and.callFake(() => {
+      component['handleRealtimeMessage']({
+        protocol_version: 1,
+        type: 'run.ack',
+        message_id: 'render-failed',
+        conversation_id: 'conv-1',
+        payload: {
+          command: 'map.render_ack',
+          run_id: 'run-1',
+          run_version: 1,
+          presentation_status: 'failed',
+        },
+      } as never);
+      return 'ack-1';
+    });
+
+    component.onMapRenderStateChange({
+      sessionId: 'candidate-map',
+      runId: 'run-1',
+      runVersion: 1,
+      state: 'failed',
+      collectionRevision: 4,
+    });
+
+    expect(component.status).toBe('Map update failed; previous map retained');
+    expect(component.isLoading).toBeFalse();
+    expect(component['pendingMapSession']).toBeUndefined();
+    expect(component['pendingRenderContext']).toBeUndefined();
   });
 
   it('ignores a stale render callback before mutating presentation state', () => {

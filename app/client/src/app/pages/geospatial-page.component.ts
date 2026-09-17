@@ -1703,14 +1703,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           failure_summary: change.failureSummary ?? change.message ?? null,
         };
         this.renderAckQueued = true;
+        this.status = 'Map update failed';
+        this.progressLabel = undefined;
         try {
           this.realtimeService.sendMapRenderAck(acknowledgement);
         } catch {
           this.renderAckQueued = false;
           this.restoreCommittedMap('Map update failed; previous map retained');
         }
-        this.status = 'Map update failed';
-        this.progressLabel = undefined;
         this.syncState();
         this.changeDetectorRef.detectChanges();
         return;
