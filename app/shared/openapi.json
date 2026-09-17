@@ -3694,9 +3694,9 @@
         "properties": {
           "schema_version": {
             "type": "integer",
-            "const": 1,
+            "const": 2,
             "title": "Schema Version",
-            "default": 1
+            "default": 2
           },
           "conversation_id": {
             "type": "string",
@@ -3783,12 +3783,15 @@
               }
             ]
           },
-          "unresolved_questions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Unresolved Questions"
+          "pending_clarification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PendingClarification"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -6074,6 +6077,64 @@
         ],
         "title": "OverlayInstance",
         "description": "Stable capability instance rendered on a map at one scoped location."
+      },
+      "PendingClarification": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "source_turn_index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Source Turn Index",
+            "default": 0
+          },
+          "source_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Request Id"
+          },
+          "scope": {
+            "type": "string",
+            "const": "current_request",
+            "title": "Scope",
+            "default": "current_request"
+          },
+          "scope_terms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 24,
+            "title": "Scope Terms"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "deferred",
+              "answered"
+            ],
+            "title": "Status",
+            "default": "active"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "PendingClarification",
+        "description": "A clarification tied to the request that produced it.\n\nThe legacy ``unresolved_questions`` value is read only while hydrating\npre-schema-v2 persisted state.  This record is the durable source of\ntruth: status and source terms let a later turn consume the clarification\nwithout making it a global blocker for unrelated work."
       },
       "ResolvedLocation": {
         "properties": {
