@@ -19,6 +19,7 @@ from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.chat.conversation_snapshot import ConversationSnapshotService
 from server.services.chat.history_service import ChatHistoryService
+from server.domain.agent.conversation import ConversationState
 
 
 ###############################################################################
@@ -114,10 +115,13 @@ def test_terminal_assistant_message_and_state_rollback_together() -> None:
     history = ChatHistoryRepository(backend)
     conversation = conversations.create_conversation("Atomic persistence")
 
+    committed_state = ConversationState.empty(conversation.id, revision=2).model_dump(
+        mode="json"
+    )
     _message, revision = history.append_assistant_message_with_state(
         conversation_id=conversation.id,
         expected_revision=1,
-        conversation_state={"marker": "committed"},
+        conversation_state=committed_state,
         content="First response",
         request_id="request-1",
     )
@@ -127,7 +131,9 @@ def test_terminal_assistant_message_and_state_rollback_together() -> None:
         history.append_assistant_message_with_state(
             conversation_id=conversation.id,
             expected_revision=2,
-            conversation_state={"marker": "must-roll-back"},
+            conversation_state=ConversationState.empty(
+                conversation.id, revision=3
+            ).model_dump(mode="json"),
             content="Duplicate response",
             request_id="request-1",
         )
@@ -136,7 +142,7 @@ def test_terminal_assistant_message_and_state_rollback_together() -> None:
     assert persisted is not None
     assert persisted.context_revision == 2
     assert persisted.next_message_sequence == 1
-    assert persisted.conversation_state == {"marker": "committed"}
+    assert persisted.conversation_state == committed_state
     assert [
         item["content"]
         for item in history.list_messages(conversation_id=conversation.id)
@@ -153,7 +159,9 @@ def test_native_provisional_assistant_is_upserted_on_resume() -> None:
     first, revision = history.append_assistant_message_with_state(
         conversation_id=conversation.id,
         expected_revision=1,
-        conversation_state={"marker": "pending"},
+        conversation_state=ConversationState.empty(
+            conversation.id, revision=2
+        ).model_dump(mode="json"),
         content="Data prepared; the map is loading.",
         request_id="run-1",
         structured_payload={
@@ -164,7 +172,9 @@ def test_native_provisional_assistant_is_upserted_on_resume() -> None:
     second, resumed_revision = history.append_assistant_message_with_state(
         conversation_id=conversation.id,
         expected_revision=revision,
-        conversation_state={"marker": "ready"},
+        conversation_state=ConversationState.empty(
+            conversation.id, revision=3
+        ).model_dump(mode="json"),
         content="The map is ready.",
         request_id="run-1",
         structured_payload={
@@ -179,3 +189,30 @@ def test_native_provisional_assistant_is_upserted_on_resume() -> None:
         item["content"]
         for item in history.list_messages(conversation_id=conversation.id)
     ] == ["The map is ready."]
+
+
+def test_assistant_state_write_migrates_legacy_clarification() -> None:
+    backend = _InMemoryBackend()
+    Base.metadata.create_all(backend.engine)
+    conversations = ConversationRepository(backend)
+    history = ChatHistoryRepository(backend)
+    conversation = conversations.create_conversation("Legacy assistant state")
+
+    _message, revision = history.append_assistant_message_with_state(
+        conversation_id=conversation.id,
+        expected_revision=1,
+        conversation_state={
+            "schema_version": 1,
+            "conversation_id": conversation.id,
+            "unresolved_questions": ["Which country contains Lake Bracciano?"],
+        },
+        content="Which country contains Lake Bracciano?",
+        request_id="legacy-state-request",
+    )
+
+    assert revision == 2
+    persisted = conversations.read_state(conversation.id)["conversation_state"]
+    assert persisted["schema_version"] == 2
+    assert persisted["revision"] == 2
+    assert "unresolved_questions" not in persisted
+    assert persisted["pending_clarification"]["status"] == "active"

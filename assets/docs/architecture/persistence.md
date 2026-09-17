@@ -91,6 +91,21 @@ SQLite/ORM records into domain snapshots, while services own orchestration and
 business behavior. Persistence construction remains explicit at the
 application composition root.
 
+### Native conversation and presentation contracts
+
+`conversation_state` is always persisted and returned as schema version 2.
+`pending_clarification` is the sole durable clarification field;
+`unresolved_questions` is accepted only while migrating an older payload and
+is removed before a repository read or write returns. Conversation-state
+writes validate the typed contract and set the state revision to the same
+optimistic context revision that commits the write.
+
+Agent-run terminal transitions close an in-flight presentation in the same
+transaction as the run state. A failed, cancelled, superseded, or timed-out
+run cannot leave a `pending` presentation or its `pending_response` behind.
+Render timeouts also append a bounded terminal error event in that transaction
+so replay retains the causal terminal state.
+
 ## Reference catalog policy
 
 Startup orchestration belongs under `app/server/services/catalog/startup.py`.

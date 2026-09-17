@@ -27,6 +27,21 @@ def test_legacy_unresolved_question_migrates_and_is_scoped() -> None:
     assert "unresolved_questions" not in state.model_dump(mode="json")
 
 
+def test_future_conversation_state_schema_is_rejected() -> None:
+    try:
+        ConversationState.from_persisted(
+            "conversation-future",
+            {
+                "schema_version": 3,
+                "conversation_id": "conversation-future",
+            },
+        )
+    except ValueError as exc:
+        assert str(exc) == "Unsupported conversation state schema version."
+    else:
+        raise AssertionError("Future conversation state schema was accepted.")
+
+
 def test_unrelated_turn_defers_but_does_not_delete_clarification() -> None:
     state = ConversationState.from_persisted(
         "conversation-2",

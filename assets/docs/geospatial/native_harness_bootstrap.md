@@ -76,7 +76,7 @@ handshake, and run lifecycle remain application-owned invariants.
 
 - `ConversationState` is the revisioned durable conversation state: directives,
   summary, goal/route/constraints, resolved locations, evidence references,
-  committed map, and unresolved questions.
+  committed map, and the scope-bound pending clarification.
 - `AgentRunState` is the mutable/checkpointable state for one run.
 - `AgentContextView` is ephemeral model input. `AgentEvidence` is durable raw
   and normalized external data. `AgentTrace` is append-only operational data.
@@ -193,6 +193,11 @@ map and return a structured observation to the model. Metadata-only results
 finalize as data responses without an impossible render wait. Failed, stale,
 conflicting, or superseded acknowledgments cannot replace the last-known-good
 map.
+
+Repository terminal transitions also finalize the run presentation atomically:
+failed, cancelled, superseded, and timed-out runs do not retain a pending
+presentation response. A render timeout records its bounded terminal error in
+the durable event stream for reconnect and replay.
 
 ## Original plan coverage
 

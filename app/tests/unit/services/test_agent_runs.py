@@ -61,11 +61,12 @@ class _FakeRunOrchestrator:
 def run_repositories() -> dict[str, object]:
     backend = _InMemoryBackend()
     Base.metadata.create_all(backend.engine)
+    event_repository = AgentRunEventRepository(backend)
     return {
         "conversations": ConversationRepository(backend),
-        "runs": AgentRunRepository(backend),
+        "runs": AgentRunRepository(backend, event_repository=event_repository),
         "steering": AgentSteeringRepository(backend),
-        "events": AgentRunEventRepository(backend),
+        "events": event_repository,
     }
 
 ###############################################################################
@@ -293,6 +294,10 @@ def test_terminal_render_failure_and_cancellation_close_pending_presentation(
         record = session.get(AgentRunRecord, run.run_id)
         assert record is not None
         record.presentation_status = "pending"
+        record.presentation_json = {
+            "status": "pending",
+            "pending_response": {"assistant_message": "Map is loading."},
+        }
         session.commit()
 
     failed, transitioned = repository.mark_failed_if_current(
@@ -304,6 +309,9 @@ def test_terminal_render_failure_and_cancellation_close_pending_presentation(
     assert transitioned is True
     assert failed.state == AgentRunState.FAILED
     assert failed.presentation_status == "failed"
+    assert failed.presentation is not None
+    assert failed.presentation["status"] == "failed"
+    assert "pending_response" not in failed.presentation
 
     cancelled_run = run_async_in_thread(
         lifecycle.create_run(
@@ -315,12 +323,19 @@ def test_terminal_render_failure_and_cancellation_close_pending_presentation(
         record = session.get(AgentRunRecord, cancelled_run.run_id)
         assert record is not None
         record.presentation_status = "pending"
+        record.presentation_json = {
+            "status": "pending",
+            "pending_response": {"assistant_message": "Map is loading."},
+        }
         session.commit()
 
     cancelled, transitioned = repository.request_cancel_once(cancelled_run.run_id)
     assert transitioned is True
     assert cancelled.state == AgentRunState.CANCELLED
     assert cancelled.presentation_status == "failed"
+    assert cancelled.presentation is not None
+    assert cancelled.presentation["status"] == "failed"
+    assert "pending_response" not in cancelled.presentation
 
 
 def test_explicit_pending_failure_status_is_normalized_atomically(run_repositories) -> None:
@@ -478,6 +493,34 @@ def test_conversation_context_state_survives_repository_restart(
             expected_revision=initial["context_revision"],
             conversation_state=state.model_dump(mode="json"),
         )
+
+
+def test_conversation_repository_canonicalizes_legacy_state_on_write(
+    run_repositories,
+) -> None:
+    conversations = run_repositories["conversations"]
+    conversation = conversations.create_conversation("Legacy state")
+
+    revision = conversations.write_state(
+        conversation.id,
+        expected_revision=1,
+        conversation_state={
+            "schema_version": 1,
+            "conversation_id": conversation.id,
+            "revision": 1,
+            "unresolved_questions": ["Which country contains Lake Bracciano?"],
+        },
+    )
+
+    persisted = conversations.read_state(conversation.id)
+    assert revision == 2
+    assert persisted["conversation_state"]["schema_version"] == 2
+    assert persisted["conversation_state"]["revision"] == 2
+    assert "unresolved_questions" not in persisted["conversation_state"]
+    assert (
+        persisted["conversation_state"]["pending_clarification"]["question"]
+        == "Which country contains Lake Bracciano?"
+    )
 
 ###############################################################################
 def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
@@ -933,3 +976,16 @@ def test_render_deadline_starts_when_candidate_enters_awaiting_render(
     )
     assert expired is not None
     assert expired.presentation_status == "render_timeout"
+    assert expired.presentation is not None
+    assert expired.presentation["status"] == "render_timeout"
+    assert "pending_response" not in expired.presentation
+    timeout_events = run_repositories["events"].list_events(run.run_id)
+    assert [event.type for event in timeout_events] == [RunEventType.ERROR]
+    assert timeout_events[0].payload == {
+        "code": "render_timeout",
+        "message": (
+            "The browser did not acknowledge the prepared map before the render deadline."
+        ),
+        "presentation_status": "render_timeout",
+        "state": "failed",
+    }
