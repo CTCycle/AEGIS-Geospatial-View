@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Sequence, Union
+from typing import Any, Sequence, Union, cast
 
 from alembic import op
 import sqlalchemy as sa
@@ -19,13 +19,17 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def _state(value: object) -> dict[str, Any] | None:
     if isinstance(value, dict):
-        return dict(value)
+        return dict(cast(dict[str, Any], value))
     if isinstance(value, str):
         try:
-            parsed = json.loads(value)
+            parsed: object = json.loads(value)
         except json.JSONDecodeError:
             return None
-        return dict(parsed) if isinstance(parsed, dict) else None
+        return (
+            dict(cast(dict[str, Any], parsed))
+            if isinstance(parsed, dict)
+            else None
+        )
     return None
 
 
