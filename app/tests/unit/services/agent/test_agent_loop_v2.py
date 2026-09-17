@@ -423,6 +423,55 @@ def test_native_goal_compiles_deterministic_completion_contract() -> None:
     assert state.completion_contract.spatial_scope_required is True
 
 
+def test_text_geocode_resolution_satisfies_data_and_spatial_completion() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.PLACE_SEARCH,
+        task_mode="execute",
+        presentation="text",
+        requires_location=True,
+        capability_queries=["geocode"],
+        operation="geocode",
+        target_refs=["Rome, Italy"],
+        spatial_scope={
+            "kind": "point",
+            "relationship": "at",
+            "target_refs": ["Rome, Italy"],
+        },
+    )
+    state.route = route
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+    state.context_hydrated = True
+    state.location_refs["rome, italy"] = ResolvedLocation(
+        label="Rome, Italy",
+        latitude=41.9028,
+        longitude=12.4964,
+        confidence=0.95,
+        location_type="city",
+    )
+    state.tool_results.append(
+        ToolResult(
+            call_id="resolve-rome",
+            tool_name="resolve_geospatial_location",
+            status="success",
+            summary="Resolved Rome, Italy.",
+            data={
+                "target_id": "rome, italy",
+                "coordinates": [12.4964, 41.9028],
+            },
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    )
+
+    checks = AgentLoop._completion_checks(state)  # pyright: ignore[reportPrivateUsage]
+
+    assert checks["required_data_retrieved"] is True
+    assert checks["spatial_scope_applied"] is True
+    assert AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
+        state
+    ) == []
+
+
 def test_location_only_map_recovery_requires_a_single_resolved_location() -> None:
     state = _state()
     route = CapabilityRoute(
@@ -450,6 +499,18 @@ def test_location_only_map_recovery_requires_a_single_resolved_location() -> Non
     assert not AgentLoop._needs_location_only_map_recovery(  # pyright: ignore[reportPrivateUsage]
         state, route
     )
+    state.route = route
+    state.tool_results.append(
+        ToolResult(
+            call_id="resolve-reef",
+            tool_name="resolve_geospatial_location",
+            status="success",
+            summary="Resolved Great Barrier Reef, Australia.",
+            data={"target_id": "great barrier reef, australia"},
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    )
+    assert AgentLoop._completion_checks(state)["required_data_retrieved"] is False  # pyright: ignore[reportPrivateUsage]
 
 
 def test_location_only_map_recovery_accepts_duplicate_same_location_results() -> None:
