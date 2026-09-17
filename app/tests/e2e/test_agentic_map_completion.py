@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import re
 from copy import deepcopy
 from pathlib import Path
@@ -32,6 +33,18 @@ CONVERSATION_ID = "conversation-controlled-map"
 RUN_ID = "controlled-map-run-1"
 MAP_SESSION_ID = "rome-earthquake-session"
 COLLECTION_REVISION = 7
+MAX_EVIDENCE_ITEMS = 64
+MAX_EVIDENCE_TEXT = 4000
+
+_SENSITIVE_EVIDENCE_KEY_MARKERS = (
+    "api_key",
+    "apikey",
+    "authorization",
+    "credential",
+    "password",
+    "secret",
+    "token",
+)
 
 # A small opaque but visible raster fixture.  The meaningful geographic proof
 # is the inline GeoJSON feature; this tile keeps the basemap visibly non-empty
@@ -161,11 +174,139 @@ FAULT_SCENARIOS = (
 )
 
 
+def _tested_commit() -> str:
+    return os.environ.get("APP_TEST_COMMIT") or "unknown"
+
+
+def _sanitize_evidence(value: Any) -> Any:
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if any(marker in key_text.casefold() for marker in _SENSITIVE_EVIDENCE_KEY_MARKERS):
+                sanitized[key_text] = "[REDACTED]"
+            else:
+                sanitized[key_text] = _sanitize_evidence(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_evidence(item) for item in value[:MAX_EVIDENCE_ITEMS]]
+    if isinstance(value, tuple):
+        return [_sanitize_evidence(item) for item in value[:MAX_EVIDENCE_ITEMS]]
+    return value
+
+
+def _bounded_text(value: str) -> str:
+    return " ".join(value.split())[:MAX_EVIDENCE_TEXT]
+
+
+def _capture_console_output(page: Page) -> list[dict[str, str]]:
+    console_output: list[dict[str, str]] = []
+
+    def capture_console(message: ConsoleMessage) -> None:
+        if message.type in {"error", "warning"} and len(console_output) < MAX_EVIDENCE_ITEMS:
+            console_output.append({"type": message.type, "text": _bounded_text(message.text)})
+
+    page.on("console", capture_console)
+    return console_output
+
+
+def _candidate_refs(
+    acknowledgments: list[dict[str, Any]],
+    synthetic_events: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    seen: set[tuple[Any, Any]] = set()
+    references = [
+        {
+            "map_session_id": acknowledgment.get("map_session_id"),
+            "collection_revision": acknowledgment.get("collection_revision"),
+            "run_version": acknowledgment.get("run_version"),
+            "status": acknowledgment.get("status"),
+        }
+        for acknowledgment in acknowledgments
+    ]
+    references.extend(
+        {
+            "map_session_id": event.get("map_session_id"),
+            "collection_revision": event.get("collection_revision"),
+            "run_version": event.get("run_version"),
+            "status": event.get("status"),
+        }
+        for event in synthetic_events
+        if event.get("map_session_id") is not None
+    )
+    for reference_data in references:
+        reference = (
+            reference_data["map_session_id"],
+            reference_data["collection_revision"],
+        )
+        if reference in seen or reference == (None, None):
+            continue
+        seen.add(reference)
+        candidates.append(
+            {
+                "map_session_id": reference[0],
+                "collection_revision": reference[1],
+                "run_version": reference_data["run_version"],
+                "status": reference_data["status"],
+            }
+        )
+    return candidates
+
+
+def _final_run_version(
+    acknowledgments: list[dict[str, Any]],
+    synthetic_events: list[dict[str, Any]],
+) -> int | None:
+    for item in reversed(acknowledgments):
+        if isinstance(item.get("run_version"), int):
+            return item["run_version"]
+    for item in reversed(synthetic_events):
+        if isinstance(item.get("run_version"), int):
+            return item["run_version"]
+    return None
+
+
+def _scenario_evidence(
+    *,
+    page: Page,
+    scenario: str,
+    acknowledgments: list[dict[str, Any]],
+    synthetic_events: list[dict[str, Any]],
+    console_output: list[dict[str, str]],
+    screenshot_path: Path,
+    final_presentation_status: str | None,
+) -> dict[str, Any]:
+    candidates = _candidate_refs(acknowledgments, synthetic_events)
+    final_run_version = _final_run_version(acknowledgments, synthetic_events)
+    final_map_session_id = candidates[-1]["map_session_id"] if candidates else None
+    return {
+        "scenario": scenario,
+        "run_id": RUN_ID,
+        "run_version": final_run_version,
+        "final_run_version": final_run_version,
+        "map_session_id": final_map_session_id,
+        "candidate_map_sessions": candidates,
+        "tested_commit": _tested_commit(),
+        "acknowledgment_count": len(acknowledgments),
+        "acknowledgments": _sanitize_evidence(acknowledgments),
+        "ack_payloads": _sanitize_evidence(acknowledgments),
+        "synthetic_event_sequence": _sanitize_evidence(synthetic_events[:MAX_EVIDENCE_ITEMS]),
+        "final_ui_state_text": _bounded_text(page.locator("body").inner_text()),
+        "console_output": _sanitize_evidence(console_output),
+        "screenshot": str(screenshot_path),
+        "screenshot_path": str(screenshot_path),
+        "final_presentation_status": final_presentation_status,
+    }
+
+
 def _controlled_socket(
     page: Page,
     acknowledgments: list[dict[str, Any]],
     *,
     scenario: str = "none",
+    synthetic_events: list[dict[str, Any]],
+    fixture_state: dict[str, Any],
 ) -> None:
     map_session = _map_session()
     presentation = _prepared_presentation(map_session)
@@ -193,9 +334,28 @@ def _controlled_socket(
             sequence=sequence,
         )
         if run_version is not None:
-            parsed = json.loads(envelope)
-            parsed["payload"]["run_version"] = run_version
-            envelope = json.dumps(parsed)
+            effective_run_version = run_version
+        else:
+            effective_run_version = active_run_version
+        if len(synthetic_events) < MAX_EVIDENCE_ITEMS:
+            sequence_entry: dict[str, Any] = {
+                "sequence": sequence,
+                "type": event_type,
+                "run_version": effective_run_version,
+            }
+            for key in ("code", "collection_revision", "map_session_id", "recovery", "status"):
+                if key in payload:
+                    sequence_entry[key] = payload[key]
+            if event_type == "map_prepared" and isinstance(payload.get("map_session"), dict):
+                map_session = payload["map_session"]
+                sequence_entry["map_session_id"] = map_session.get("session_id")
+                overlay_collection = map_session.get("overlay_collection")
+                if isinstance(overlay_collection, dict):
+                    sequence_entry["collection_revision"] = overlay_collection.get("revision")
+            synthetic_events.append(sequence_entry)
+        parsed = json.loads(envelope)
+        parsed["payload"]["run_version"] = effective_run_version
+        envelope = json.dumps(parsed)
         socket.send(envelope)
 
     def send_prepared(socket: WebSocketRoute) -> None:
@@ -259,6 +419,7 @@ def _controlled_socket(
                 return
             if request_type == "run.cancel" and scenario == "cancelled":
                 cancelled = True
+                fixture_state["final_presentation_status"] = "failed"
                 socket.send(
                     _envelope(
                         message_type="run.ack",
@@ -324,6 +485,7 @@ def _controlled_socket(
                 return
             render_attempt += 1
             if scenario == "stale_ack":
+                fixture_state["final_presentation_status"] = "failed"
                 socket.send(
                     _envelope(
                         message_type="protocol.error",
@@ -437,6 +599,7 @@ def _controlled_socket(
                         message_id="controlled-retry-exhausted-ack",
                     )
                 )
+                fixture_state["final_presentation_status"] = "render_timeout"
                 send_event(
                     socket,
                     "error",
@@ -463,6 +626,7 @@ def _controlled_socket(
                     message_id="controlled-render-ack",
                 )
             )
+            fixture_state["final_presentation_status"] = "ready"
             if scenario == "duplicate_ack":
                 socket.send(
                     _envelope(
@@ -479,8 +643,18 @@ def _controlled_socket(
                         message_id="controlled-duplicate-render-ack",
                     )
                 )
-            send_event(socket, "progress", {"stage": "completed", "label": "Completed"})
-            send_event(socket, "assistant_text_completed", {"content": "Map ready."})
+            send_event(
+                socket,
+                "progress",
+                {"stage": "completed", "label": "Completed"},
+                run_version=active_run_version,
+            )
+            send_event(
+                socket,
+                "assistant_text_completed",
+                {"content": "Map ready."},
+                run_version=active_run_version,
+            )
             send_event(
                 socket,
                 "completed",
@@ -521,6 +695,7 @@ def _controlled_socket(
                     "tool_results": [],
                     "execution_trace": {"stopped_reason": "goal_satisfied"},
                 },
+                run_version=active_run_version,
             )
 
         socket.send(
@@ -542,6 +717,8 @@ def _setup_controlled_routes(
     acknowledgments: list[dict[str, Any]],
     *,
     scenario: str = "none",
+    synthetic_events: list[dict[str, Any]],
+    fixture_state: dict[str, Any],
 ) -> None:
     def fulfill(route: Route, payload: dict[str, Any]) -> None:
         route.fulfill(
@@ -550,7 +727,13 @@ def _setup_controlled_routes(
             body=json.dumps(payload),
         )
 
-    _controlled_socket(page, acknowledgments, scenario=scenario)
+    _controlled_socket(
+        page,
+        acknowledgments,
+        scenario=scenario,
+        synthetic_events=synthetic_events,
+        fixture_state=fixture_state,
+    )
     page.route(
         re.compile(r".*/api/chat/settings$"),
         lambda route: fulfill(route, model_settings_payload()),
@@ -594,14 +777,15 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
     save_snapshot,
 ) -> None:
     acknowledgments: list[dict[str, Any]] = []
-    _setup_controlled_routes(page, acknowledgments)
-    console_errors: list[str] = []
-
-    def capture_console(message: ConsoleMessage) -> None:
-        if message.type == "error":
-            console_errors.append(message.text)
-
-    page.on("console", capture_console)
+    synthetic_events: list[dict[str, Any]] = []
+    fixture_state: dict[str, Any] = {}
+    _setup_controlled_routes(
+        page,
+        acknowledgments,
+        synthetic_events=synthetic_events,
+        fixture_state=fixture_state,
+    )
+    console_output = _capture_console_output(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("Show recent earthquakes around Rome")
     page.get_by_role("button", name="Send message").click()
@@ -639,23 +823,31 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
     expect(page.locator(".chat-message--assistant").last).to_contain_text("Map ready.")
 
     screenshot_path = save_snapshot(page, "controlled-map-completed")
-    evidence = {
-        "scenario": "recent earthquakes around Rome",
-        "run_id": RUN_ID,
-        "run_version": 1,
-        "map_session_id": MAP_SESSION_ID,
-        "collection_revision": COLLECTION_REVISION,
-        "acknowledgment": acknowledgment,
-        "canvas": canvas_box,
-        "screenshot": str(screenshot_path),
-        "console_errors": console_errors,
-    }
+    evidence = _scenario_evidence(
+        page=page,
+        scenario="recent earthquakes around Rome",
+        acknowledgments=acknowledgments,
+        synthetic_events=synthetic_events,
+        console_output=console_output,
+        screenshot_path=screenshot_path,
+        final_presentation_status=fixture_state.get("final_presentation_status"),
+    )
+    evidence.update(
+        {
+            "map_session_id": MAP_SESSION_ID,
+            "collection_revision": COLLECTION_REVISION,
+            "acknowledgment": _sanitize_evidence(acknowledgment),
+            "canvas": canvas_box,
+            "console_errors": [entry["text"] for entry in console_output if entry["type"] == "error"],
+        }
+    )
     report_path = artifact_root / "reports" / "controlled-map-completion.json"
     report_path.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
     assert not [
-        error
-        for error in console_errors
-        if any(token in error.casefold() for token in ("typeerror", "webgl", "map source"))
+        entry
+        for entry in console_output
+        if entry["type"] == "error"
+        and any(token in entry["text"].casefold() for token in ("typeerror", "webgl", "map source"))
     ]
 
 
@@ -675,7 +867,16 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
     """
 
     acknowledgments: list[dict[str, Any]] = []
-    _setup_controlled_routes(page, acknowledgments, scenario=scenario)
+    synthetic_events: list[dict[str, Any]] = []
+    fixture_state: dict[str, Any] = {}
+    _setup_controlled_routes(
+        page,
+        acknowledgments,
+        scenario=scenario,
+        synthetic_events=synthetic_events,
+        fixture_state=fixture_state,
+    )
+    console_output = _capture_console_output(page)
     page.goto(base_url)
     composer = page.get_by_label("Chat message")
     composer.fill("Show recent earthquakes around Rome")
@@ -704,23 +905,26 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
         )
         assert len(acknowledgments) >= (2 if scenario != "duplicate_ack" else 1)
     elif scenario == "retry_exhausted":
-        expect(page.get_by_role("status").first).to_contain_text(
-            "Agent needs attention", timeout=15000
+        expect(page.locator(".chat-message--assistant").last).to_contain_text(
+            "The map renderer did not produce a verified result.", timeout=15000
         )
         assert len(acknowledgments) == 3
+        assert "Map ready." not in page.locator(".chat-message--assistant").all_inner_texts()[-1]
+        assert "Map data ready; rendering" not in _bounded_text(page.locator("body").inner_text())
+        assert page.get_by_role("button", name="Stop generating").count() == 0
     elif scenario == "stale_ack":
-        expect(page.get_by_role("status").first).to_contain_text(
-            "Agent ready", timeout=15000
-        )
         expect(page.locator(".chat-message--assistant").last).to_contain_text(
             "real-time connection", timeout=15000
         )
         assert len(acknowledgments) == 1
+        assert "Map ready." not in page.locator(".chat-message--assistant").all_inner_texts()[-1]
+        assert "Map data ready; rendering" not in _bounded_text(page.locator("body").inner_text())
+        assert page.get_by_role("button", name="Stop generating").count() == 0
     elif scenario == "cancelled":
-        expect(page.get_by_role("status").first).to_contain_text(
-            "Agent ready", timeout=15000
-        )
-        assert page.locator(".chat-message--assistant").last.inner_text() != "Map ready."
+        assistant_messages = page.locator(".chat-message--assistant").all_inner_texts()
+        assert assistant_messages and assistant_messages[-1] != "Map ready."
+        assert "Map data ready; rendering" not in _bounded_text(page.locator("body").inner_text())
+        assert page.get_by_role("button", name="Stop generating").count() == 0
     else:
         expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
         expect(page.locator(".chat-message--assistant").last).to_contain_text(
@@ -729,17 +933,14 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
 
     screenshot_path = save_snapshot(page, f"controlled-map-{scenario}")
     report_path = artifact_root / "reports" / f"controlled-map-{scenario}.json"
-    report_path.write_text(
-        json.dumps(
-            {
-                "scenario": scenario,
-                "run_id": RUN_ID,
-                "acknowledgment_count": len(acknowledgments),
-                "acknowledgments": acknowledgments,
-                "screenshot": str(screenshot_path),
-                "fault_injection": "WebSocket fixture only",
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
+    evidence = _scenario_evidence(
+        page=page,
+        scenario=scenario,
+        acknowledgments=acknowledgments,
+        synthetic_events=synthetic_events,
+        console_output=console_output,
+        screenshot_path=screenshot_path,
+        final_presentation_status=fixture_state.get("final_presentation_status"),
     )
+    evidence["fault_injection"] = "WebSocket fixture only"
+    report_path.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
