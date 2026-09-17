@@ -705,6 +705,20 @@ def _json_schema_errors(value: Any, schema: Any, *, path: str) -> list[str]:
             errors.append(f"{path}: number is below the minimum.")
         if isinstance(maximum, (int, float)) and value > maximum:
             errors.append(f"{path}: number exceeds the maximum.")
+        exclusive_minimum = schema.get("exclusiveMinimum")
+        if (
+            isinstance(exclusive_minimum, (int, float))
+            and not isinstance(exclusive_minimum, bool)
+            and value <= exclusive_minimum
+        ):
+            errors.append(f"{path}: number is at or below the exclusive minimum.")
+        exclusive_maximum = schema.get("exclusiveMaximum")
+        if (
+            isinstance(exclusive_maximum, (int, float))
+            and not isinstance(exclusive_maximum, bool)
+            and value >= exclusive_maximum
+        ):
+            errors.append(f"{path}: number is at or above the exclusive maximum.")
     return errors[:8]
 
 
