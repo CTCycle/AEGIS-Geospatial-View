@@ -151,6 +151,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     collectionRevision: number;
   };
   private renderAckQueued = false;
+  private pendingRenderAckMessageId?: string;
   private lastRunSequence = 0;
   private lastHandledRunId?: string;
   private pendingRun?: { clientRequestId: string; message: string };
@@ -454,6 +455,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.committedMapSession = undefined;
     this.pendingRenderContext = undefined;
     this.renderAckQueued = false;
+    this.pendingRenderAckMessageId = undefined;
     this.payload = undefined;
     this.status = 'Agent ready';
     this.isLoading = false;
@@ -698,6 +700,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.committedMapSession = undefined;
       this.pendingRenderContext = undefined;
       this.renderAckQueued = false;
+      this.pendingRenderAckMessageId = undefined;
       this.payload = undefined;
       if (snapshot.map_session) {
         this.mapSession = snapshot.map_session;
@@ -799,6 +802,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.committedMapSession = undefined;
     this.pendingRenderContext = undefined;
     this.renderAckQueued = false;
+    this.pendingRenderAckMessageId = undefined;
     this.payload = undefined;
     this.assistantDraft = '';
     this.status = 'Agent ready';
@@ -884,6 +888,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.pendingMapSession = undefined;
     this.pendingRenderContext = undefined;
     this.renderAckQueued = false;
+    this.pendingRenderAckMessageId = undefined;
     this.isLoading = true;
     this.status = 'Understanding the request';
     this.progressStage = 'understanding_request';
@@ -1024,6 +1029,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.cancelRequested = false;
       }
       if (message.payload['command'] === 'map.render_ack') {
+        if (message.correlation_id === this.pendingRenderAckMessageId) {
+          this.pendingRenderAckMessageId = undefined;
+        }
         const ackRunId = this.readString(message.payload['run_id']);
         const presentationStatus = this.readString(message.payload['presentation_status']);
         if (ackRunId === this.pendingRenderContext?.runId
@@ -1034,6 +1042,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           this.pendingRun = undefined;
           this.pendingRenderContext = undefined;
           this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
         }
       }
       this.syncState();
@@ -1057,6 +1066,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           );
           this.pendingRenderContext = undefined;
           this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
         }
         this.isLoading = false;
         this.activeRunId = undefined;
@@ -1085,9 +1095,17 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.pendingRun = undefined;
       }
       if (command === 'map.render_ack' || code === 'render_ack_rejected') {
+        if (this.isStaleRenderAcknowledgement(message)) {
+          // A render command from an earlier run version can be rejected after
+          // steering has already staged the newer candidate.  That rejection
+          // is an observation of superseded work, not a failure of the active
+          // candidate; keep the current render context alive.
+          return;
+        }
         this.restoreCommittedMap('Map update failed; previous map retained');
         this.pendingRenderContext = undefined;
         this.renderAckQueued = false;
+        this.pendingRenderAckMessageId = undefined;
         this.isLoading = false;
         this.activeRunId = undefined;
         this.pendingRun = undefined;
@@ -1208,6 +1226,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
             this.restoreCommittedMap('Map update failed or timed out; previous map retained');
             this.pendingRenderContext = undefined;
             this.renderAckQueued = false;
+            this.pendingRenderAckMessageId = undefined;
           }
           this.agentReadiness = {
             status: 'needs_attention',
@@ -1223,6 +1242,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.pendingRun = undefined;
         this.cancelRequested = false;
         this.streamState = 'closed';
+        this.pendingRenderAckMessageId = undefined;
         break;
       case 'map_prepared': {
         const presentation = event.payload['presentation'];
@@ -1241,6 +1261,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
               collectionRevision: revision,
             };
             this.renderAckQueued = false;
+            this.pendingRenderAckMessageId = undefined;
             this.handleMapSession(mapSession);
             this.presentationStatus = 'prepared';
             this.mapRenderState = 'preparing';
@@ -1279,6 +1300,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
             this.commitMapSession(this.pendingMapSession);
             this.pendingRenderContext = undefined;
             this.renderAckQueued = false;
+            this.pendingRenderAckMessageId = undefined;
           }
           this.mapRenderState = 'ready';
           this.status = 'Map rendering verified; continuing';
@@ -1292,6 +1314,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           this.restoreCommittedMap(summary);
           this.pendingRenderContext = undefined;
           this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
           this.status = 'Correcting map rendering';
           this.progressStage = 'correcting_render';
           this.progressLabel = String(event.payload['label'] ?? 'Correcting the map after a render failure');
@@ -1308,6 +1331,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.pendingRun = undefined;
         this.cancelRequested = false;
         this.streamState = 'closed';
+        this.pendingRenderAckMessageId = undefined;
         this.applyRunCompletionPayload(event.payload);
         this.agentReadiness = {
           status: 'active',
@@ -1320,6 +1344,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           this.restoreCommittedMap('Map update cancelled; previous map retained');
           this.pendingRenderContext = undefined;
           this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
         }
         this.isLoading = false;
         this.status = 'Agent ready';
@@ -1377,12 +1402,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           this.commitMapSession(parsed.mapSession);
           this.pendingRenderContext = undefined;
           this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
         } else {
           // A completion payload for another candidate must not replace the
           // map that is still awaiting acknowledgment for the current run.
           this.restoreCommittedMap('Map update failed; previous map retained');
           this.pendingRenderContext = undefined;
           this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
         }
       } else {
         // A resumable render acknowledgment may have already promoted this
@@ -1417,6 +1444,32 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   private readNumber(value: unknown): number | undefined {
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  }
+
+  private isStaleRenderAcknowledgement(message: RealtimeServerMessage): boolean {
+    const correlationId = this.readString(message.correlation_id);
+    if (correlationId !== undefined
+      && (!this.renderAckQueued || correlationId !== this.pendingRenderAckMessageId)) {
+      return true;
+    }
+    const rejectedRunId = this.readString(message.payload['run_id']);
+    const rejectedRunVersion = this.readNumber(message.payload['run_version']);
+    if (rejectedRunId === undefined && rejectedRunVersion === undefined) {
+      return false;
+    }
+
+    const currentRunId = this.pendingRenderContext?.runId
+      ?? this.activeRunId
+      ?? this.lastHandledRunId;
+    const currentRunVersion = this.pendingRenderContext?.runVersion ?? this.activeRunVersion;
+    if (rejectedRunId !== undefined
+      && currentRunId !== undefined
+      && rejectedRunId !== currentRunId) {
+      return true;
+    }
+    return rejectedRunVersion !== undefined
+      && currentRunVersion !== undefined
+      && rejectedRunVersion < currentRunVersion;
   }
 
   private applyTaskState(value: unknown): void {
@@ -1679,9 +1732,13 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.status = 'Map data ready; rendering';
         this.progressLabel = 'Map data ready; rendering';
         try {
-          this.realtimeService.sendMapRenderAck(acknowledgement);
+          const messageId = this.realtimeService.sendMapRenderAck(acknowledgement);
+          if (this.renderAckQueued) {
+            this.pendingRenderAckMessageId = messageId;
+          }
         } catch {
           this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
           this.restoreCommittedMap('Map update failed; previous map retained');
         }
         this.syncState();
@@ -1706,9 +1763,13 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.status = 'Map update failed';
         this.progressLabel = undefined;
         try {
-          this.realtimeService.sendMapRenderAck(acknowledgement);
+          const messageId = this.realtimeService.sendMapRenderAck(acknowledgement);
+          if (this.renderAckQueued) {
+            this.pendingRenderAckMessageId = messageId;
+          }
         } catch {
           this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
           this.restoreCommittedMap('Map update failed; previous map retained');
         }
         this.syncState();
