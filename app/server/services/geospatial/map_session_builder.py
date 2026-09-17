@@ -456,11 +456,11 @@ def _usable_render_url(value: object) -> bool:
 def _valid_geojson_feature_collection(value: object) -> bool:
     data = json_object(value)
     features = data.get("features")
-    return (
-        data.get("type") == "FeatureCollection"
-        and isinstance(features, list)
-        and bool(features)
-        and all(_valid_geojson_feature(feature) for feature in features)
+    if data.get("type") != "FeatureCollection" or not isinstance(features, list):
+        return False
+    feature_items = cast(list[object], features)
+    return bool(feature_items) and all(
+        _valid_geojson_feature(feature) for feature in feature_items
     )
 
 
@@ -481,10 +481,11 @@ def _valid_geojson_geometry(value: object) -> bool:
         return False
     if geometry_type == "GeometryCollection":
         geometries = geometry.get("geometries")
-        return (
-            isinstance(geometries, list)
-            and bool(geometries)
-            and all(_valid_geojson_geometry(item) for item in geometries)
+        if not isinstance(geometries, list):
+            return False
+        geometry_items = cast(list[object], geometries)
+        return bool(geometry_items) and all(
+            _valid_geojson_geometry(item) for item in geometry_items
         )
     coordinates = geometry.get("coordinates")
     if geometry_type == "Point":
@@ -519,9 +520,10 @@ def _valid_geojson_geometry(value: object) -> bool:
 
 
 def _valid_geojson_position(value: object) -> bool:
-    if not isinstance(value, list) or len(value) < 2:
+    if not isinstance(value, list):
         return False
-    return all(_finite_number(item) for item in value)
+    position = cast(list[object], value)
+    return len(position) >= 2 and all(_finite_number(item) for item in position)
 
 
 def _finite_number(value: object) -> bool:
@@ -539,11 +541,10 @@ def _valid_geojson_sequence(
     *,
     minimum: int = 1,
 ) -> bool:
-    return (
-        isinstance(value, list)
-        and len(value) >= minimum
-        and all(validator(item) for item in value)
-    )
+    if not isinstance(value, list):
+        return False
+    items = cast(list[object], value)
+    return len(items) >= minimum and all(validator(item) for item in items)
 
 
 ###############################################################################
