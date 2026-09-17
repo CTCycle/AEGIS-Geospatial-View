@@ -11,6 +11,7 @@ import base64
 import json
 import os
 import re
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -175,7 +176,21 @@ FAULT_SCENARIOS = (
 
 
 def _tested_commit() -> str:
-    return os.environ.get("APP_TEST_COMMIT") or "unknown"
+    configured = os.environ.get("APP_TEST_COMMIT")
+    if configured and configured.strip():
+        return configured.strip()
+    repository_root = Path(__file__).resolve().parents[3]
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    commit = result.stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise RuntimeError("Could not determine the exact tested commit.")
+    return commit
 
 
 def _sanitize_evidence(value: Any) -> Any:
@@ -276,6 +291,7 @@ def _scenario_evidence(
     console_output: list[dict[str, str]],
     screenshot_path: Path,
     final_presentation_status: str | None,
+    fixture_state: dict[str, Any],
 ) -> dict[str, Any]:
     candidates = _candidate_refs(acknowledgments, synthetic_events)
     final_run_version = _final_run_version(acknowledgments, synthetic_events)
@@ -297,6 +313,9 @@ def _scenario_evidence(
         "screenshot": str(screenshot_path),
         "screenshot_path": str(screenshot_path),
         "final_presentation_status": final_presentation_status,
+        "rejected_acknowledgments": _sanitize_evidence(
+            fixture_state.get("rejected_acknowledgments", [])
+        ),
     }
 
 
@@ -316,6 +335,7 @@ def _controlled_socket(
     current_map_session = map_session
     current_presentation = presentation
     cancelled = False
+    fixture_state.setdefault("rejected_acknowledgments", [])
 
     def send_event(
         socket: WebSocketRoute,
@@ -414,8 +434,7 @@ def _controlled_socket(
                     {"stage": "understanding_request", "label": "Understanding the request"},
                 )
                 send_event(socket, "assistant_text_completed", {"content": "Data prepared; the map is loading."})
-                if scenario != "superseded":
-                    send_prepared(socket)
+                send_prepared(socket)
                 return
             if request_type == "run.cancel" and scenario == "cancelled":
                 cancelled = True
@@ -439,6 +458,8 @@ def _controlled_socket(
                 return
             if request_type == "run.steer" and scenario == "superseded":
                 active_run_version = 2
+                current_map_session = _map_session_variant(2)
+                current_presentation = _prepared_presentation(current_map_session)
                 socket.send(
                     _envelope(
                         message_type="run.ack",
@@ -480,6 +501,33 @@ def _controlled_socket(
                             "accepted": False,
                         },
                         message_id="controlled-cancelled-render-ack",
+                    )
+                )
+                return
+            if scenario == "superseded" and (
+                payload.get("run_version") != active_run_version
+                or payload.get("run_version") == 1
+                or payload.get("map_session_id")
+                != current_map_session.get("session_id")
+                or payload.get("collection_revision")
+                != current_map_session.get("overlay_collection", {}).get("revision")
+            ):
+                rejected = deepcopy(payload)
+                rejected["rejection_reason"] = "superseded"
+                if len(fixture_state["rejected_acknowledgments"]) < MAX_EVIDENCE_ITEMS:
+                    fixture_state["rejected_acknowledgments"].append(rejected)
+                socket.send(
+                    _envelope(
+                        message_type="protocol.error",
+                        payload={
+                            "code": "render_ack_rejected",
+                            "message": "The render acknowledgment is stale after supersession.",
+                            "command": "map.render_ack",
+                            "accepted": False,
+                            "run_id": RUN_ID,
+                            "run_version": payload.get("run_version"),
+                        },
+                        message_id="controlled-superseded-render-ack",
                     )
                 )
                 return
@@ -831,6 +879,7 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
         console_output=console_output,
         screenshot_path=screenshot_path,
         final_presentation_status=fixture_state.get("final_presentation_status"),
+        fixture_state=fixture_state,
     )
     evidence.update(
         {
@@ -841,6 +890,7 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
             "console_errors": [entry["text"] for entry in console_output if entry["type"] == "error"],
         }
     )
+    assert re.fullmatch(r"[0-9a-f]{40}", evidence["tested_commit"])
     report_path = artifact_root / "reports" / "controlled-map-completion.json"
     report_path.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
     assert not [
@@ -925,6 +975,20 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
         assert assistant_messages and assistant_messages[-1] != "Map ready."
         assert "Map data ready; rendering" not in _bounded_text(page.locator("body").inner_text())
         assert page.get_by_role("button", name="Stop generating").count() == 0
+    elif scenario == "superseded":
+        expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
+        expect(page.locator(".chat-message--assistant").last).to_contain_text(
+            "Map ready.", timeout=15000
+        )
+        assert len(acknowledgments) >= 2
+        assert any(item.get("run_version") == 1 for item in acknowledgments)
+        assert any(item.get("run_version") == 2 for item in acknowledgments)
+        rejected = fixture_state.get("rejected_acknowledgments", [])
+        assert rejected and rejected[0].get("rejection_reason") == "superseded"
+        assert any(
+            event.get("type") == "map_prepared" and event.get("run_version") == 2
+            for event in synthetic_events
+        )
     else:
         expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
         expect(page.locator(".chat-message--assistant").last).to_contain_text(
@@ -941,6 +1005,12 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
         console_output=console_output,
         screenshot_path=screenshot_path,
         final_presentation_status=fixture_state.get("final_presentation_status"),
+        fixture_state=fixture_state,
     )
+    assert re.fullmatch(r"[0-9a-f]{40}", evidence["tested_commit"])
     evidence["fault_injection"] = "WebSocket fixture only"
     report_path.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+
+
+def test_controlled_evidence_resolves_an_exact_commit() -> None:
+    assert re.fullmatch(r"[0-9a-f]{40}", _tested_commit())
