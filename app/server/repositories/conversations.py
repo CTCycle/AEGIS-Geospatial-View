@@ -52,9 +52,15 @@ class ConversationRepository:
     # -------------------------------------------------------------------------
     def read_state(self, conversation_id: str) -> dict[str, Any]:
         record = self._require(conversation_id)
+        context_revision = int(record.context_revision)
+        state = ConversationState.from_persisted(
+            conversation_id,
+            record.conversation_state,
+            revision=context_revision,
+        ).model_copy(update={"revision": context_revision})
         return {
-            "context_revision": record.context_revision,
-            "conversation_state": record.conversation_state,
+            "context_revision": context_revision,
+            "conversation_state": state.model_dump(mode="json"),
         }
 
     # -------------------------------------------------------------------------
@@ -65,10 +71,16 @@ class ConversationRepository:
         expected_revision: int,
         conversation_state: dict[str, Any],
     ) -> int:
+        next_revision = max(0, int(expected_revision) + 1)
+        state = ConversationState.from_persisted(
+            conversation_id,
+            conversation_state,
+            revision=next_revision,
+        ).model_copy(update={"revision": next_revision})
         values: dict[str, Any] = {
             "context_revision": ConversationRecord.context_revision + 1,
             "updated_at": datetime.now(UTC),
-            "conversation_state": conversation_state,
+            "conversation_state": state.model_dump(mode="json"),
         }
         with self._session_factory() as session:
             revision = session.scalar(

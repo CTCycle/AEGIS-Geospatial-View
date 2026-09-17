@@ -50,6 +50,30 @@ def _json_list(value: object) -> list[Any]:
     return []
 
 
+def _finalize_pending_presentation(
+    value: object,
+    *,
+    status: str,
+    error_code: str | None = None,
+    force: bool = False,
+) -> JsonObject | None:
+    """Close an in-flight presentation without retaining its pending response."""
+
+    if not isinstance(value, dict):
+        return None
+    presentation = dict(cast(JsonObject, value))
+    if not force and str(presentation.get("status") or "").casefold() not in {
+        "pending",
+        "resuming",
+    }:
+        return presentation
+    presentation["status"] = status
+    if error_code:
+        presentation["error_code"] = error_code
+    presentation.pop("pending_response", None)
+    return presentation
+
+
 ###############################################################################
 class AgentRunRepository:
 
@@ -652,6 +676,12 @@ class AgentRunRepository:
             record.completed_at = record.completed_at or datetime.now(UTC)
             if record.presentation_status == "pending":
                 record.presentation_status = "failed"
+            finalized_presentation = _finalize_pending_presentation(
+                record.presentation_json,
+                status="failed",
+            )
+            if finalized_presentation is not None:
+                record.presentation_json = finalized_presentation
             session.commit()
             session.refresh(record)
             return self._to_snapshot(record)
@@ -697,8 +727,15 @@ class AgentRunRepository:
                     )
                 ),
             )
-            session.commit()
             record = self._require_run(session, run_id)
+            if int(updated.rowcount or 0) == 1:
+                finalized_presentation = _finalize_pending_presentation(
+                    record.presentation_json,
+                    status="failed",
+                )
+                if finalized_presentation is not None:
+                    record.presentation_json = finalized_presentation
+            session.commit()
             return self._to_snapshot(record), int(updated.rowcount or 0) == 1
 
     # -------------------------------------------------------------------------
@@ -1199,6 +1236,7 @@ class AgentRunRepository:
                 run.presentation_status = "ready"
                 updated_presentation: JsonObject = {
                     **presentation,
+                    "status": "ready",
                     "acknowledgment": acknowledgment,
                 }
                 stored_requirements = _json_list(
@@ -1228,6 +1266,7 @@ class AgentRunRepository:
                             + ", ".join(blocked_after_ack)
                         )
                     updated_presentation["completion_requirements"] = updated_requirements
+                updated_presentation.pop("pending_response", None)
                 durable_event_creates = [
                     RunEventCreate(
                         conversation_id=conversation_id,
@@ -1281,8 +1320,11 @@ class AgentRunRepository:
                 run.presentation_status = "failed"
                 updated_presentation = {
                     **presentation,
+                    "status": "failed",
                     "acknowledgment": acknowledgment,
+                    "error_code": run.error_code,
                 }
+                updated_presentation.pop("pending_response", None)
                 durable_event_creates = [
                     RunEventCreate(
                         conversation_id=conversation_id,
@@ -1366,11 +1408,41 @@ class AgentRunRepository:
             run.error_message = "The browser did not acknowledge the prepared map before the render deadline."
             run.presentation_status = "render_timeout"
             presentation = _json_object(run.presentation_json)
-            run.presentation_json = {
-                **presentation,
+            finalized_presentation = _finalize_pending_presentation(
+                presentation,
+                status="render_timeout",
+                error_code="render_timeout",
+                force=True,
+            ) or {
                 "status": "render_timeout",
                 "error_code": "render_timeout",
             }
+            durable_event_ids = [
+                str(item)
+                for item in _json_list(presentation.get("durable_event_ids"))
+                if str(item).strip()
+            ]
+            if self._event_repository is not None:
+                timeout_event = self._event_repository.append_event_in_session(
+                    session,
+                    RunEventCreate(
+                        conversation_id=conversation_id,
+                        run_id=run_id,
+                        run_version=run_version,
+                        type=RunEventType.ERROR,
+                        visibility=RunEventVisibility.USER,
+                        payload={
+                            "code": "render_timeout",
+                            "message": run.error_message,
+                            "presentation_status": "render_timeout",
+                            "state": AgentRunState.FAILED.value,
+                        },
+                    ),
+                )
+                durable_event_ids.append(timeout_event.event_id)
+            if durable_event_ids:
+                finalized_presentation["durable_event_ids"] = durable_event_ids
+            run.presentation_json = finalized_presentation
             session.commit()
             session.refresh(run)
             return self._to_snapshot(run)
@@ -1513,7 +1585,7 @@ class AgentRunRepository:
             )
             updated = cast(
                 CursorResult[Any],
-                session.execute(
+            session.execute(
                     update(AgentRunRecord)
                     .where(
                         AgentRunRecord.id == run_id,
@@ -1538,8 +1610,17 @@ class AgentRunRepository:
                     )
                 ),
             )
-            session.commit()
             record = self._require_run(session, run_id)
+            terminal_status = presentation_status or "failed"
+            if int(updated.rowcount or 0) == 1:
+                finalized_presentation = _finalize_pending_presentation(
+                    record.presentation_json,
+                    status=terminal_status,
+                    error_code=code,
+                )
+                if finalized_presentation is not None:
+                    record.presentation_json = finalized_presentation
+            session.commit()
             return self._to_snapshot(record), int(updated.rowcount) == 1
 
     # -------------------------------------------------------------------------
@@ -1625,6 +1706,13 @@ class AgentRunRepository:
             record.completed_at = datetime.now(UTC)
             if record.presentation_status == "pending":
                 record.presentation_status = "failed"
+            finalized_presentation = _finalize_pending_presentation(
+                record.presentation_json,
+                status=record.presentation_status,
+                error_code=code,
+            )
+            if finalized_presentation is not None:
+                record.presentation_json = finalized_presentation
             session.commit()
             session.refresh(record)
             return self._to_snapshot(record)

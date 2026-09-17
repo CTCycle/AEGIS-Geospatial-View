@@ -140,7 +140,11 @@ class ConversationState(BaseModel):
         if isinstance(payload, dict):
             raw_payload = cast(dict[str, Any], payload)
             migrated: dict[str, Any] = dict(raw_payload)
-            migrated.setdefault("schema_version", 2)
+            schema_version = migrated.get("schema_version", 2)
+            if type(schema_version) is not int or schema_version not in {1, 2}:
+                raise ValueError(
+                    "Unsupported conversation state schema version."
+                )
             pending: Any = migrated.get("pending_clarification")
             if pending is None:
                 legacy_questions_value: Any = migrated.get("unresolved_questions")

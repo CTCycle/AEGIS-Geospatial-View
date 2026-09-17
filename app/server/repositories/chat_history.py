@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy import desc, func, select, update
 
+from server.domain.agent.conversation import ConversationState
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ChatMessageRecord, ConversationRecord
 
@@ -99,6 +100,13 @@ class ChatHistoryRepository:
     ) -> tuple[ChatMessageRecord, int]:
         """Commit the terminal assistant message and conversation state atomically."""
 
+        next_revision = max(0, int(expected_revision) + 1)
+        canonical_state = ConversationState.from_persisted(
+            conversation_id,
+            conversation_state,
+            revision=next_revision,
+        ).model_copy(update={"revision": next_revision})
+        persisted_state = canonical_state.model_dump(mode="json")
         with self._session_factory() as session:
             row = session.execute(
                 update(ConversationRecord)
@@ -108,7 +116,7 @@ class ChatHistoryRepository:
                 )
                 .values(
                     context_revision=ConversationRecord.context_revision + 1,
-                    conversation_state=conversation_state,
+                    conversation_state=persisted_state,
                     next_message_sequence=ConversationRecord.next_message_sequence + 1,
                     updated_at=datetime.now(UTC),
                 )

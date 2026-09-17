@@ -598,6 +598,8 @@ def test_production_render_ack_persists_terminal_events_atomically() -> None:
     assert snapshot is not None
     assert snapshot.presentation_status == "ready"
     presentation = snapshot.presentation or {}
+    assert presentation["status"] == "ready"
+    assert "pending_response" not in presentation
     assert len(presentation.get("durable_event_ids", [])) == 3
 
 
