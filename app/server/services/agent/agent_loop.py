@@ -375,6 +375,29 @@ class AgentLoop:
                     )
                     await self._checkpoint(request)
                     if stop is not None:
+                        if (
+                            stop[0] == "no_progress"
+                            and state.no_progress_corrections
+                            < request.max_no_progress_corrections
+                        ):
+                            state.no_progress_corrections += 1
+                            correction = self._no_progress_correction(state)
+                            state.relevant_tool_outcomes.append(correction)
+                            messages.append(
+                                {
+                                    "role": "system",
+                                    "content": json.dumps(
+                                        correction, separators=(",", ":")
+                                    ),
+                                }
+                            )
+                            await self._emit_completion_decision(
+                                request,
+                                reason="no_progress",
+                                status="continue",
+                            )
+                            await self._emit_iteration_completed(request, "continue")
+                            continue
                         await self._emit_completion_decision(
                             request,
                             reason=stop[0],
@@ -440,38 +463,7 @@ class AgentLoop:
                         < request.max_no_progress_corrections
                     ):
                         state.no_progress_corrections += 1
-                        pending = self._pending_native_requirements(state)
-                        render_failure = self._first_render_failure(state)
-                        correction = (
-                            {
-                                "observation_type": "failed_render_recovery",
-                                "status": "action_required",
-                                "pending_requirements": pending,
-                                "failure_code": render_failure.failure_code,
-                                "failure_stage": render_failure.failure_stage,
-                                "failure_summary": render_failure.failure_summary,
-                                "failed_action_fingerprint": (
-                                    render_failure.action_fingerprint
-                                ),
-                                "message": (
-                                    "The previous map action failed browser rendering. "
-                                    "Do not repeat its action fingerprint; issue a "
-                                    "materially revised map plan or choose a supported "
-                                    "renderable source."
-                                ),
-                            }
-                            if render_failure is not None
-                            else {
-                                "observation_type": "pending_requirements",
-                                "status": "action_required",
-                                "pending_requirements": pending,
-                                "message": (
-                                    "The response did not complete the deterministic "
-                                    "completion contract. Select and execute the "
-                                    "next required tool action."
-                                ),
-                            }
-                        )
+                        correction = self._no_progress_correction(state)
                         state.relevant_tool_outcomes.append(correction)
                         messages.append(
                             {
@@ -1761,6 +1753,55 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _no_progress_correction(state: AgentRunState) -> dict[str, Any]:
+        pending = AgentLoop._pending_native_requirements(state)
+        render_failure = AgentLoop._first_render_failure(state)
+        if render_failure is not None:
+            return {
+                "observation_type": "failed_render_recovery",
+                "status": "action_required",
+                "pending_requirements": pending,
+                "failure_code": render_failure.failure_code,
+                "failure_stage": render_failure.failure_stage,
+                "failure_summary": render_failure.failure_summary,
+                "failed_action_fingerprint": render_failure.action_fingerprint,
+                "message": (
+                    "The previous map action failed browser rendering. Do not "
+                    "repeat its action fingerprint; issue a materially revised "
+                    "map plan or choose a supported renderable source."
+                ),
+            }
+        return {
+            "observation_type": "pending_requirements",
+            "status": "action_required",
+            "pending_requirements": pending,
+            "message": (
+                "The response did not complete the deterministic completion "
+                "contract. Select and execute the next required tool action."
+            ),
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _render_recovery_requires_map_action(
+        state: AgentRunState,
+        results: list[ToolResult],
+    ) -> bool:
+        """Require a new map candidate after a browser render failure."""
+
+        return (
+            not state.render_verified
+            and state.prepared_map_session is None
+            and AgentLoop._first_render_failure(state) is not None
+            and not any(
+                result.tool_name == "apply_map_plan"
+                and result.status == "success"
+                for result in results
+            )
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _evaluate_stop(
         state: AgentRunState,
         route: CapabilityRoute,
@@ -1797,6 +1838,11 @@ class AgentLoop:
                 and result.error.recovery == "request_user_input"
             )
             return "clarification_required", question
+        if AgentLoop._render_recovery_requires_map_action(state, results):
+            return (
+                "no_progress",
+                "Render recovery requires a materially different map action.",
+            )
         if any(result.status != "failed" for result in results):
             if (
                 all(result.status == "valid_empty" for result in results)
