@@ -907,6 +907,7 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
     base_url: str,
     artifact_root: Path,
     save_snapshot,
+    request: pytest.FixtureRequest,
     scenario: str,
 ) -> None:
     """Exercise browser-visible render faults without production fault flags.
@@ -927,6 +928,24 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
         fixture_state=fixture_state,
     )
     console_output = _capture_console_output(page)
+
+    def save_controlled_evidence() -> None:
+        screenshot_path = save_snapshot(page, f"controlled-map-{scenario}")
+        report_path = artifact_root / "reports" / f"controlled-map-{scenario}.json"
+        evidence = _scenario_evidence(
+            page=page,
+            scenario=scenario,
+            acknowledgments=acknowledgments,
+            synthetic_events=synthetic_events,
+            console_output=console_output,
+            screenshot_path=screenshot_path,
+            final_presentation_status=fixture_state.get("final_presentation_status"),
+            fixture_state=fixture_state,
+        )
+        evidence["fault_injection"] = "WebSocket fixture only"
+        report_path.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+
+    request.addfinalizer(save_controlled_evidence)
     page.goto(base_url)
     composer = page.get_by_label("Chat message")
     composer.fill("Show recent earthquakes around Rome")
@@ -995,22 +1014,7 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
             "Map ready.", timeout=15000
         )
 
-    screenshot_path = save_snapshot(page, f"controlled-map-{scenario}")
-    report_path = artifact_root / "reports" / f"controlled-map-{scenario}.json"
-    evidence = _scenario_evidence(
-        page=page,
-        scenario=scenario,
-        acknowledgments=acknowledgments,
-        synthetic_events=synthetic_events,
-        console_output=console_output,
-        screenshot_path=screenshot_path,
-        final_presentation_status=fixture_state.get("final_presentation_status"),
-        fixture_state=fixture_state,
-    )
-    assert re.fullmatch(r"[0-9a-f]{40}", evidence["tested_commit"])
-    evidence["fault_injection"] = "WebSocket fixture only"
-    report_path.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
-
+    assert re.fullmatch(r"[0-9a-f]{40}", _tested_commit())
 
 def test_controlled_evidence_resolves_an_exact_commit() -> None:
     assert re.fullmatch(r"[0-9a-f]{40}", _tested_commit())
