@@ -6,7 +6,7 @@ import asyncio
 import inspect
 import time
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from pydantic import BaseModel, ValidationError
@@ -533,16 +533,19 @@ class ToolExecutor:
         schema: dict[str, Any] = {}
         if registered is not None:
             raw_schema = registered.input_model.model_json_schema()
-            schema = _bounded_correction_value(raw_schema, depth=0)
-            if not isinstance(schema, dict):
-                schema = {}
+            schema = cast(
+                dict[str, Any],
+                _bounded_correction_value(raw_schema, depth=0),
+            )
         raw_arguments = tool_call.arguments
-        properties = schema.get("properties")
-        allowed = (
-            set(properties)
-            if isinstance(properties, dict)
-            else set()
+        raw_properties: Any = schema.get("properties")
+        properties: dict[str, Any] = (
+            cast(dict[str, Any], raw_properties)
+            if isinstance(raw_properties, dict)
+            else {}
         )
+        allowed: set[str] = set(properties)
+        canonical: dict[str, Any]
         if canonical_arguments is not None:
             canonical = dict(canonical_arguments)
         elif isinstance(raw_arguments, dict):
@@ -553,12 +556,18 @@ class ToolExecutor:
             }
         else:
             canonical = {}
+        raw_required: Any = schema.get("required")
+        required: list[str] = (
+            [str(item) for item in cast(list[Any], raw_required)[:32]]
+            if isinstance(raw_required, list)
+            else []
+        )
         return {
             "tool_name": tool_call.name,
             "retry": "call the same tool with canonical_arguments only",
             "canonical_arguments": _bounded_correction_value(canonical, depth=0),
             "schema": schema,
-            "required": list(schema.get("required", []))[:32],
+            "required": required,
             "validation_errors": [
                 issue.model_dump(mode="json")
                 for issue in (validation_errors or [])[:8]
@@ -577,13 +586,15 @@ def _bounded_correction_value(value: Any, *, depth: int, max_depth: int = 4) -> 
     if depth >= max_depth:
         return "[truncated]"
     if isinstance(value, dict):
+        mapping: dict[str, Any] = cast(dict[str, Any], value)
         return {
             str(key): _bounded_correction_value(child, depth=depth + 1)
-            for key, child in list(value.items())[:32]
+            for key, child in list(mapping.items())[:32]
         }
     if isinstance(value, list):
+        items: list[Any] = cast(list[Any], value)
         return [
             _bounded_correction_value(child, depth=depth + 1)
-            for child in value[:32]
+            for child in items[:32]
         ]
     return str(value)[:500]
