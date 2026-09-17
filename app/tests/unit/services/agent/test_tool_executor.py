@@ -15,7 +15,9 @@ from server.domain.agent.reliability import (
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMToolCall, LLMToolDefinition
-from server.services.agent.native_tools import _json_schema_errors
+from server.services.agent.native_tools import (  # pyright: ignore[reportPrivateUsage]
+    _capability_semantic_validator,
+)
 from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
@@ -322,12 +324,20 @@ def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
         calls.append(1)
         return {"ok": True}
 
+    class _CapabilityRegistry:
+        def argument_schema(self, _capability_id: str) -> dict[str, Any]:
+            return manifest_schema
+
+    def provide_schema(
+        _arguments: BaseModel, _state: AgentRunState
+    ) -> dict[str, Any]:
+        return manifest_schema
+
     def validate(arguments: BaseModel, _state: AgentRunState) -> list[str]:
-        request = cast(ExecuteCapabilityInput, arguments)
-        return _json_schema_errors(
-            request.arguments,
-            manifest_schema,
-            path="arguments",
+        return _capability_semantic_validator(
+            cast(ExecuteCapabilityInput, arguments),
+            _state,
+            capability_registry=cast(Any, _CapabilityRegistry()),
         )
 
     registry = ToolRegistry(runtime_registry=cast(Any, None))
@@ -336,7 +346,7 @@ def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
             handler,
             name="execute_geospatial_capability",
             semantic_validator=validate,
-            argument_schema_provider=lambda _arguments, _state: manifest_schema,
+            argument_schema_provider=provide_schema,
             input_model=ExecuteCapabilityInput,
         )
     )
