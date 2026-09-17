@@ -4,7 +4,7 @@ Date: 2026-09-17
 Repository: AEGIS Geospatial View
 Branch: `develop`
 Implementation commit: `c3b009bf` (`feat(agent): resume native loop after render acknowledgements`)
-Documentation/evidence commits: `d3c8514d`, `7c97e484`, `6aa253d5`
+Documentation/evidence series: `d3c8514d` through `2ea05371`
 
 ## Executive summary
 
