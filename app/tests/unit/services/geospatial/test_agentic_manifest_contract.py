@@ -258,6 +258,72 @@ def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
     assert [item["id"] for item in candidate] == ["us-parcels"]
 
 
+def test_semantic_routing_uses_manifest_hints_and_rejects_domain_only_matches() -> None:
+    snapshot = GeospatialManifestSnapshot(
+        providers=(),
+        basemaps=[],
+        overlays=[
+            {
+                "id": "hinted_capability",
+                "name": "Structured observations",
+                "provider": "test",
+                "capabilityKind": "vector-overlay",
+                "description": "Generic structured observations.",
+                "capabilities": ["observations"],
+                "agenticUse": {
+                    "domains": ["data_retrieval"],
+                    "plannerHints": ["weather"],
+                    "requiredUserAction": ["weather_map"],
+                },
+                "executionContract": {
+                    "supported_operations": ["show"],
+                    "supported_scope_kinds": ["point"],
+                    "temporal_modes": ["current"],
+                    "render_support": "vector",
+                    "coverage": "global",
+                },
+            },
+            {
+                "id": "domain_only_capability",
+                "name": "Generic observations",
+                "provider": "test",
+                "capabilityKind": "vector-overlay",
+                "description": "Generic structured observations.",
+                "capabilities": ["observations"],
+                "agenticUse": {"domains": ["data_retrieval"]},
+                "executionContract": {
+                    "supported_operations": ["show"],
+                    "supported_scope_kinds": ["point"],
+                    "temporal_modes": ["current"],
+                    "render_support": "vector",
+                    "coverage": "global",
+                },
+            },
+        ],
+        cameras=[],
+        transit=[],
+        tools=[],
+        runtime_profiles=(),
+    )
+    registry = CapabilityRegistry.from_catalog_snapshot(snapshot)
+
+    weather = registry.shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL},
+        queries=["weather"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+    )
+    assert [item["id"] for item in weather] == ["hinted_capability"]
+
+    context_only = registry.shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL},
+        queries=["current conditions"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+    )
+    assert context_only == []
+
+
 def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> None:
     registry = CapabilityRegistry()
     runtime = RuntimeRegistry()
@@ -378,6 +444,18 @@ def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> No
     }
     assert "openmeteo_air_quality_forecast" not in weather
 
+    forecast = shortlist("forecast", "retrieve_weather", zurich)
+    assert forecast[0] in {
+        "openmeteo_pressure_humidity_wind",
+        "openmeteo_weather_forecast",
+    }
+    assert "openmeteo_air_quality_forecast" not in forecast
+
+    air_quality = shortlist(
+        "air quality forecast", "retrieve_weather", zurich
+    )
+    assert air_quality[0] == "openmeteo_air_quality_forecast"
+
     poi = shortlist("points of interest", "find_poi", zurich)
     assert poi[0] == "overpass_poi_amenities"
     assert "openaddresses_points" not in poi
@@ -387,6 +465,23 @@ def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> No
         "esa_worldcover",
         "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
     }
+
+    modis_vegetation = shortlist("MODIS vegetation", "retrieve_land_cover", zurich)
+    assert set(modis_vegetation) == {
+        "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+        "MODIS_Terra_NDVI_8Day",
+    }
+
+    modis_land_cover = shortlist("MODIS land cover", "retrieve_land_cover", zurich)
+    assert modis_land_cover == [
+        "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual"
+    ]
+
+    world_cover = shortlist("world cover", "retrieve_land_cover", zurich)
+    assert world_cover == ["esa_worldcover"]
+
+    esa = shortlist("European Space Agency", "retrieve_land_cover", zurich)
+    assert esa == ["esa_worldcover"]
 
     demographics = shortlist("census demographics", "retrieve_demographics", rome)
     assert demographics == []

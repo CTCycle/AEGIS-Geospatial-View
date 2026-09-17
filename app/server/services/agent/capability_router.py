@@ -284,10 +284,15 @@ def _is_broad_infrastructure_route(route: CapabilityRoute) -> bool:
     specific_terms = terms.difference(
         {
             "and",
+            "category",
+            "categories",
             "data",
             "find",
             "get",
+            "general",
             "infrastructure",
+            "kind",
+            "kinds",
             "layer",
             "map",
             "nearby",
@@ -295,8 +300,13 @@ def _is_broad_infrastructure_route(route: CapabilityRoute) -> bool:
             "on",
             "retrieve",
             "show",
+            "specific",
+            "subtype",
+            "subtypes",
             "the",
             "to",
+            "type",
+            "types",
         }
     )
     return not specific_terms

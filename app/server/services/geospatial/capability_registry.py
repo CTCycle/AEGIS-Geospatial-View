@@ -89,7 +89,7 @@ _GENERIC_QUERY_TOKENS = {
 _ROUTING_QUERY_ALIASES: dict[str, set[str]] = {
     "weather": {"weather"},
     "meteo": {"weather"},
-    "forecast": {"forecast"},
+    "forecast": {"weather"},
     "vegetation": {"vegetation"},
     "landcover": {"landcover"},
     "ndvi": {"vegetation", "ndvi"},
@@ -110,6 +110,11 @@ _ROUTING_QUERY_ALIASES: dict[str, set[str]] = {
     "residential": {"residential"},
     "building": {"building"},
     "buildings": {"building"},
+    "housing": {"residential"},
+    "house": {"residential"},
+    "houses": {"residential"},
+    "home": {"residential"},
+    "homes": {"residential"},
     "demographic": {"demographics"},
     "demographics": {"demographics"},
     "population": {"demographics"},
@@ -122,14 +127,27 @@ _ROUTING_QUERY_ALIASES: dict[str, set[str]] = {
     "airports": {"airport"},
     "road": {"road"},
     "roads": {"road"},
+    "roadway": {"road"},
+    "roadways": {"road"},
     "transit": {"transit"},
+    "transport": {"transit"},
+    "transportation": {"transit"},
     "utility": {"utilities"},
     "utilities": {"utilities"},
+    "electricity": {"utilities"},
+    "power": {"utilities"},
 }
 
 _ROUTING_QUERY_PHRASES: tuple[tuple[str, set[str]], ...] = (
+    ("modis ndvi", {"modis", "ndvi", "vegetation"}),
+    ("modis vegetation", {"modis", "vegetation"}),
+    ("modis land cover", {"modis", "landcover"}),
+    ("air quality forecast", {"air_quality"}),
+    ("air quality", {"air_quality"}),
     ("residential building footprints", {"residential_buildings"}),
     ("residential buildings", {"residential_buildings"}),
+    ("residential building", {"residential_buildings"}),
+    ("residential structures", {"residential_buildings"}),
     ("building footprints", {"building"}),
     ("census demographics", {"census_demographics"}),
     ("usgs earthquakes", {"usgs_hazard"}),
@@ -143,6 +161,10 @@ _ROUTING_QUERY_PHRASES: tuple[tuple[str, set[str]], ...] = (
     ("nearby amenities", {"poi"}),
     ("nearby places", {"poi"}),
     ("weather forecast", {"weather"}),
+    ("european space agency", {"esa"}),
+    ("world cover", {"worldcover"}),
+    ("public transportation", {"transit"}),
+    ("public transport", {"transit"}),
     ("land cover", {"landcover"}),
 )
 
@@ -150,11 +172,17 @@ _ROUTING_CONTEXT_TOKENS = _GENERIC_QUERY_TOKENS | {
     "around",
     "at",
     "check",
+    "condition",
+    "conditions",
+    "current",
     "display",
+    "event",
+    "events",
     "find",
     "from",
     "get",
     "in",
+    "index",
     "latest",
     "live",
     "near",
@@ -166,8 +194,19 @@ _ROUTING_CONTEXT_TOKENS = _GENERIC_QUERY_TOKENS | {
     "search",
     "show",
     "today",
+    "vehicle",
+    "vehicles",
     "visualize",
 }
+
+_ROUTING_CANONICAL_TERMS = {
+    term
+    for aliases in _ROUTING_QUERY_ALIASES.values()
+    for term in aliases
+}
+_ROUTING_CANONICAL_TERMS.update(
+    term for _, aliases in _ROUTING_QUERY_PHRASES for term in aliases
+)
 
 ###############################################################################
 def normalized_execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
@@ -428,15 +467,15 @@ class CapabilityRegistry:
 
         bounded_limit = max(1, min(int(limit), 50))
         normalized_queries = _query_tokens(queries)
-        meaningful_queries = _raw_query_tokens(queries).difference(
-            _GENERIC_QUERY_TOKENS
-        )
+        raw_query_terms = _raw_query_tokens(queries)
+        meaningful_queries = raw_query_terms.difference(_ROUTING_CONTEXT_TOKENS)
         routing_query_terms, has_routing_alias = _routing_query_terms(queries)
         normalized_explicit = [
             str(value).strip() for value in explicit_ids if str(value).strip()
         ]
         requested_domains = set(domains)
         candidates: list[dict[str, Any]] = []
+        strong_semantic_candidate_ids: set[str] = set()
         snapshot = self._ensure_snapshot()
         for item in (
             *snapshot.basemaps,
@@ -483,8 +522,13 @@ class CapabilityRegistry:
                 continue
             searchable = _searchable_text(item)
             matched_queries = meaningful_queries.intersection(searchable)
-            semantic_matches = routing_query_terms.intersection(
-                _routing_searchable_text(item)
+            routing_searchable = _routing_searchable_text(item)
+            semantic_matches = routing_query_terms.intersection(routing_searchable)
+            required_routing_terms = routing_query_terms.intersection(
+                _ROUTING_CANONICAL_TERMS
+            )
+            unmapped_routing_terms = routing_query_terms.difference(
+                _ROUTING_CANONICAL_TERMS
             )
             explicit_index = (
                 normalized_explicit.index(capability_id)
@@ -492,6 +536,13 @@ class CapabilityRegistry:
                 else None
             )
             if normalized_explicit and explicit_index is None and not normalized_queries:
+                continue
+            if (
+                raw_query_terms
+                and not meaningful_queries
+                and not routing_query_terms
+                and explicit_index is None
+            ):
                 continue
             # A semantic query is a contract, not a hint.  Without at least
             # one meaningful match, a broad domain score must not substitute an
@@ -501,7 +552,13 @@ class CapabilityRegistry:
                 has_routing_alias
                 and routing_query_terms
                 and explicit_index is None
-                and not semantic_matches
+                and (
+                    not required_routing_terms.issubset(routing_searchable)
+                    or (
+                        unmapped_routing_terms
+                        and not unmapped_routing_terms.issubset(searchable)
+                    )
+                )
             ):
                 continue
             if (
@@ -511,6 +568,18 @@ class CapabilityRegistry:
                 and not matched_queries
             ):
                 continue
+            if has_routing_alias and routing_query_terms:
+                strong_routing_searchable = _routing_searchable_text(
+                    item, include_hints=False
+                )
+                if (
+                    required_routing_terms.issubset(strong_routing_searchable)
+                    and (
+                        not unmapped_routing_terms
+                        or unmapped_routing_terms.issubset(searchable)
+                    )
+                ):
+                    strong_semantic_candidate_ids.add(capability_id)
             identity_matches = meaningful_queries.intersection(
                 _identity_searchable_text(item)
             )
@@ -521,7 +590,11 @@ class CapabilityRegistry:
             )
             score += float(len(declared_domains.intersection(requested_domains))) * 100.0
             score += float(len(matched_queries) * 10)
-            score += float(len(identity_matches) * 30)
+            # Direct capability identity is stronger evidence than a broad
+            # planner hint.  Keep hinted capabilities eligible, but do not let
+            # a generic domain/hint match outrank a manifest whose declared
+            # capability is the requested subject.
+            score += float(len(identity_matches) * 120)
             score += float(len(semantic_matches) * 60)
             if capability_id.casefold() in {item.casefold() for item in normalized_queries}:
                 score += 50.0
@@ -539,6 +612,18 @@ class CapabilityRegistry:
                 else None
             )
             candidates.append(candidate)
+
+        # Planner hints are valid fallback evidence, but an explicit catalog
+        # subject should outrank a broad hint-only capability.  This prevents a
+        # context layer such as weather radar or satellite imagery from
+        # displacing the direct executable subject when one is available.
+        if has_routing_alias and routing_query_terms and strong_semantic_candidate_ids:
+            candidates = [
+                candidate
+                for candidate in candidates
+                if str(candidate.get("id") or "") in strong_semantic_candidate_ids
+                or str(candidate.get("id") or "") in normalized_explicit
+            ]
 
         candidates.sort(
             key=lambda item: (
@@ -887,7 +972,9 @@ def _routing_query_terms(values: Sequence[object]) -> tuple[set[str], bool]:
     return terms, recognized
 
 
-def _routing_searchable_text(capability: dict[str, Any]) -> set[str]:
+def _routing_searchable_text(
+    capability: dict[str, Any], *, include_hints: bool = True
+) -> set[str]:
     """Return explicit catalog terms plus narrowly derived subject aliases."""
 
     agentic_use = json_object(capability.get("agenticUse"))
@@ -900,14 +987,24 @@ def _routing_searchable_text(capability: dict[str, Any]) -> set[str]:
         capability.get("capabilities"),
         agentic_use.get("intentTags"),
         metadata.get("semantic_aliases"),
+        metadata.get("action_tags"),
+        metadata.get("supported_categories"),
     ]
+    if include_hints:
+        values.extend(
+            [agentic_use.get("plannerHints"), agentic_use.get("requiredUserAction")]
+        )
     terms = {
         token
         for value in values
         for token in _raw_query_tokens(value if is_json_array(value) else [value])
     }
+    if "worldcover" in terms:
+        terms.update({"worldcover", "landcover", "vegetation"})
     if "landcover" in terms or {"land", "cover"}.issubset(terms):
         terms.update({"landcover", "vegetation"})
+    if {"air", "quality"}.issubset(terms):
+        terms.add("air_quality")
     if terms.intersection({"vegetation", "ndvi"}):
         terms.add("vegetation")
     if terms.intersection({"poi", "amenity", "amenities", "place", "places"}):
