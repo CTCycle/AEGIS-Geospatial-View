@@ -26,6 +26,13 @@ class _Input(BaseModel):
     value: int
 
 
+class _ManifestInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: int
+    arguments: dict[str, Any] = {}
+
+
 ###############################################################################
 class _Policy:
 
@@ -59,6 +66,8 @@ def _tool(
     *,
     name: str = "test_tool",
     semantic_validator: Any | None = None,
+    argument_schema_provider: Any | None = None,
+    input_model: type[BaseModel] = _Input,
 ) -> RegisteredTool:
     def normalize(value: Any, call_id: str) -> ToolResult:
         return ToolResult(
@@ -73,9 +82,9 @@ def _tool(
         definition=LLMToolDefinition(
             name=name,
             description="Test tool",
-            parameters_json_schema=_Input.model_json_schema(),
+            parameters_json_schema=input_model.model_json_schema(),
         ),
-        input_model=_Input,
+        input_model=input_model,
         handler=handler,
         domains=frozenset({CapabilityDomain.DATA_RETRIEVAL}),
         phases=frozenset({AgentPhase.MODEL_STEP}),
@@ -85,6 +94,7 @@ def _tool(
         idempotent=True,
         result_normalizer=normalize,
         semantic_validator=semantic_validator,
+        argument_schema_provider=argument_schema_provider,
     )
 
 
@@ -242,6 +252,56 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     assert map_result.error is not None
     assert map_result.error.error_type == "timeout"
     assert [item.stage for item in map_budget.observations] == ["map_assembly"]
+
+
+def test_manifest_validation_correction_contains_bounded_applicable_schema() -> None:
+    calls: list[int] = []
+
+    async def handler(arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
+        calls.append(arguments.value)
+        return {"value": arguments.value}
+
+    manifest_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["query"],
+        "properties": {"query": {"type": "string", "minLength": 1}},
+    }
+
+    def reject(_arguments: BaseModel, _state: AgentRunState) -> list[str]:
+        return ["arguments.query: required value is missing."]
+
+    registry = ToolRegistry(runtime_registry=cast(Any, None))
+    registry.register(
+        _tool(
+            handler,
+            semantic_validator=reject,
+            argument_schema_provider=lambda _arguments, _state: manifest_schema,
+            input_model=_ManifestInput,
+        )
+    )
+    result = asyncio.run(
+        ToolExecutor(tool_registry=registry).execute_tool(
+            LLMToolCall(
+                id="manifest-schema",
+                name="test_tool",
+                arguments={
+                    "value": 3,
+                    "arguments": {"unexpected": "discard"},
+                },
+            ),
+            _state(),
+            _budget(),
+        )
+    )
+
+    assert result.error is not None
+    assert result.error.error_type == "semantic_validation"
+    assert calls == []
+    correction = result.data["correction"]  # type: ignore[index]
+    assert correction["applicable_schema"] == manifest_schema
+    assert correction["canonical_arguments"]["arguments"] == {}
+    assert len(correction["validation_errors"]) == 1
 
 
 ###############################################################################

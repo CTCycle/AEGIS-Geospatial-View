@@ -320,6 +320,7 @@ class ToolExecutor:
                 )
                 for error in exc.errors()
             ]
+            issues = issues[:8]
             return self._failure(
                 call_id=call_id,
                 tool_name=tool_call.name,
@@ -344,6 +345,38 @@ class ToolExecutor:
         if registered.semantic_validator is not None:
             semantic_errors = registered.semantic_validator(arguments, state)
             if semantic_errors:
+                issues = [
+                    ValidationIssue(
+                        path="$",
+                        code="semantic_validation_failed",
+                        message=str(message),
+                    )
+                    for message in semantic_errors[:8]
+                ]
+                applicable_schema = None
+                if registered.argument_schema_provider is not None:
+                    try:
+                        applicable_schema = registered.argument_schema_provider(
+                            arguments, state
+                        )
+                    except Exception:
+                        applicable_schema = None
+                canonical_arguments = arguments.model_dump(
+                    mode="json", exclude_none=True
+                )
+                if isinstance(applicable_schema, dict):
+                    raw_properties = applicable_schema.get("properties")
+                    if isinstance(raw_properties, dict) and (
+                        raw_properties
+                        or applicable_schema.get("additionalProperties") is False
+                    ):
+                        nested = canonical_arguments.get("arguments")
+                        if isinstance(nested, dict):
+                            canonical_arguments["arguments"] = {
+                                str(key): value
+                                for key, value in nested.items()
+                                if str(key) in raw_properties
+                            }
                 return self._failure(
                     call_id=call_id,
                     tool_name=tool_call.name,
@@ -354,30 +387,15 @@ class ToolExecutor:
                         message="Tool arguments failed semantic validation.",
                         retryable=False,
                         recovery="correct_arguments",
-                        validation_errors=[
-                            ValidationIssue(
-                                path="$",
-                                code="semantic_validation_failed",
-                                message=str(message),
-                            )
-                            for message in semantic_errors[:8]
-                        ],
+                        validation_errors=issues,
                     ),
                     data={
                         "correction": self._correction_payload(
                             tool_call,
                             registered=registered,
-                            validation_errors=[
-                                ValidationIssue(
-                                    path="$",
-                                    code="semantic_validation_failed",
-                                    message=str(message),
-                                )
-                                for message in semantic_errors[:8]
-                            ],
-                            canonical_arguments=arguments.model_dump(
-                                mode="json", exclude_none=True
-                            ),
+                            validation_errors=issues,
+                            canonical_arguments=canonical_arguments,
+                            applicable_schema=applicable_schema,
                         )
                     },
                 )
@@ -521,6 +539,7 @@ class ToolExecutor:
         registered: RegisteredTool | None,
         validation_errors: list[ValidationIssue] | None = None,
         canonical_arguments: dict[str, Any] | None = None,
+        applicable_schema: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Return a bounded, executable correction for invalid arguments.
 
@@ -562,7 +581,7 @@ class ToolExecutor:
             if isinstance(raw_required, list)
             else []
         )
-        return {
+        payload = {
             "tool_name": tool_call.name,
             "retry": "call the same tool with canonical_arguments only",
             "canonical_arguments": _bounded_correction_value(canonical, depth=0),
@@ -573,6 +592,11 @@ class ToolExecutor:
                 for issue in (validation_errors or [])[:8]
             ],
         }
+        if applicable_schema is not None:
+            payload["applicable_schema"] = _bounded_correction_value(
+                applicable_schema, depth=0
+            )
+        return payload
 
 
 ###############################################################################

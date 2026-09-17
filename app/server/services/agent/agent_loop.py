@@ -1699,9 +1699,20 @@ class AgentLoop:
                 state.evidence_refs.append(evidence_ref)
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _fingerprint(call: LLMToolCall) -> str:
+    def _fingerprint(self, call: LLMToolCall) -> str:
         arguments = call.arguments
+        registered = self.tool_registry.get(call.name)
+        if registered is not None and isinstance(arguments, dict):
+            try:
+                arguments = registered.input_model.model_validate(
+                    arguments
+                ).model_dump(
+                    mode="json", exclude_none=True, exclude_defaults=True
+                )
+            except Exception:
+                # JSON object ordering is canonicalized by the serializer
+                # below; retain malformed arguments for the typed executor.
+                pass
         if call.name == "apply_map_plan" and isinstance(arguments, dict):
             # Collection revision is a server-owned CAS token. It changes on
             # every resumed attempt but does not make the semantic map action

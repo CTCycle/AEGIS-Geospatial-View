@@ -122,6 +122,41 @@ class FakeEvidenceRepository:
         ).encode()
 
 
+class _AdmissionEvidenceRepository(FakeEvidenceRepository):
+
+    def __init__(self, *, status: str, map_eligibility: str) -> None:
+        self.status = status
+        self.map_eligibility = map_eligibility
+
+    def get_summary(
+        self,
+        evidence_id: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> AgentEvidenceSummary | None:
+        if evidence_id != "evidence:hospitals":
+            return None
+        return AgentEvidenceSummary(
+            evidence_id=evidence_id,
+            kind="vector",
+            media_type="application/geo+json",
+            status=self.status,  # type: ignore[arg-type]
+            summary={"feature_count": 1},
+            map_eligibility=self.map_eligibility,  # type: ignore[arg-type]
+        )
+
+    def get_payload(
+        self,
+        evidence_id: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> tuple[AgentEvidenceSummary, bytes] | None:
+        summary = self.get_summary(evidence_id, conversation_id=conversation_id)
+        if summary is None:
+            return None
+        return summary, json.dumps({"features": [{"id": "hospital-1"}]}).encode()
+
+
 ###############################################################################
 def _state(
     *,
@@ -393,6 +428,46 @@ async def test_not_renderable_evidence_is_rejected_before_candidate_build() -> N
                 AddEvidenceLayerAction(
                     action="add_evidence_layer",
                     evidence_ref="evidence:metadata",
+                    capability_id="places:hospitals",
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "evidence_not_renderable"
+    assert state.prepared_map_session is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status", "map_eligibility"),
+    [("valid_empty", "renderable"), ("available", "unknown")],
+)
+async def test_non_usable_evidence_cannot_satisfy_a_requested_layer(
+    status: str,
+    map_eligibility: str,
+) -> None:
+    state = _state(active_map_session=_active_session())
+    repository = _AdmissionEvidenceRepository(
+        status=status,
+        map_eligibility=map_eligibility,
+    )
+    service = MapPlanService(
+        capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
+        evidence_repository=repository,
+    )
+
+    result = await service.apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                AddEvidenceLayerAction(
+                    action="add_evidence_layer",
+                    evidence_ref="evidence:hospitals",
                     capability_id="places:hospitals",
                 )
             ],

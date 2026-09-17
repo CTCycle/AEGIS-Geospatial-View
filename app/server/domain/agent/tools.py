@@ -16,6 +16,9 @@ if TYPE_CHECKING:
 ToolHandler = Callable[[BaseModel, "AgentRunState"], Awaitable[Any]]
 ToolResultNormalizer = Callable[[Any, str], ToolResult]
 ToolSemanticValidator = Callable[[BaseModel, "AgentRunState"], list[str]]
+ToolArgumentSchemaProvider = Callable[
+    [BaseModel, "AgentRunState"], dict[str, Any] | None
+]
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -33,3 +36,4 @@ class RegisteredTool:
     idempotent: bool
     result_normalizer: ToolResultNormalizer
     semantic_validator: ToolSemanticValidator | None = None
+    argument_schema_provider: ToolArgumentSchemaProvider | None = None

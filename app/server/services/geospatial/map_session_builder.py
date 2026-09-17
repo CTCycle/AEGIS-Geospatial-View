@@ -170,6 +170,26 @@ class MapSessionBuilder:
                     "default_opacity": action.opacity,
                 }
             )
+            evidence_payload = json_object(evidence.payload)
+            for key in (
+                "url",
+                "tileUrl",
+                "tile_url_template",
+                "serviceUrl",
+                "service_url",
+                "source_url",
+                "layers",
+                "layerId",
+                "layer_id",
+                "source_layer",
+                "tileMatrixSet",
+                "tile_matrix_set",
+                "format",
+                "version",
+                "style",
+            ):
+                if key in evidence_payload and key not in descriptor:
+                    descriptor[key] = evidence_payload[key]
             render_data = _geojson_render_data(evidence.payload)
             if render_data is not None:
                 descriptor["data"] = render_data
@@ -353,8 +373,10 @@ class MapSessionBuilder:
             )
         if mode in _GEOJSON_RENDERING_MODES:
             data = json_object(descriptor.get("data"))
-            has_feature_collection = data.get("type") == "FeatureCollection" and isinstance(
-                data.get("features"), list
+            has_feature_collection = (
+                data.get("type") == "FeatureCollection"
+                and isinstance(data.get("features"), list)
+                and bool(data.get("features"))
             )
             has_url = bool(str(descriptor.get("url") or "").strip())
             if not has_feature_collection and not has_url:
