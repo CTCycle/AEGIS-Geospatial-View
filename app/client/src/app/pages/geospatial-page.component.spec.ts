@@ -301,10 +301,13 @@ describe('pages/geospatial-page.component', () => {
         protocol_version: 1,
         type: 'protocol.error',
         message_id: 'render-rejected',
+        correlation_id: 'unexpected-current-render-ack',
         conversation_id: 'conv-1',
         payload: {
           code: 'render_ack_rejected',
           command: 'map.render_ack',
+          run_id: 'run-1',
+          run_version: 1,
         },
       } as never);
       return 'ack-1';
@@ -370,6 +373,53 @@ describe('pages/geospatial-page.component', () => {
     expect(pendingMapSession?.session_id).toBe('new-candidate-map');
     expect(component['pendingRenderContext']?.runVersion).toBe(2);
     expect(component.messages.at(-1)?.content).not.toContain('real-time connection');
+  });
+
+  it('ignores an older render rejection after the accepted run has completed', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.activeRunVersion = 1;
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'run.ack',
+      message_id: 'run-2-accepted',
+      conversation_id: 'conv-1',
+      payload: {
+        accepted: true,
+        command: 'run.steer',
+        run_id: 'run-1',
+        run_version: 2,
+      },
+    } as never);
+
+    component.activeRunId = undefined;
+    component.activeRunVersion = undefined;
+    component['lastHandledRunId'] = undefined;
+    component.status = 'Agent ready';
+    component.messages = [{ role: 'assistant', content: 'Map ready.' }];
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'protocol.error',
+      message_id: 'late-old-render-rejected',
+      conversation_id: 'conv-1',
+      payload: {
+        code: 'render_ack_rejected',
+        command: 'map.render_ack',
+        run_id: 'run-1',
+        run_version: 1,
+      },
+    } as never);
+
+    expect(component.status).toBe('Agent ready');
+    expect(component.isLoading).toBeFalse();
+    expect(component.messages.at(-1)?.content).toBe('Map ready.');
+    expect(component['latestAcceptedRunId']).toBe('run-1');
+    expect(component['latestAcceptedRunVersion']).toBe(2);
   });
 
   it('preserves a synchronous failed run ack after a failed render ack', () => {
