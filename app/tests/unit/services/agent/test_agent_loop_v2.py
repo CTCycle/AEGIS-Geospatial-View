@@ -320,6 +320,127 @@ def test_render_recovery_exhaustion_preserves_first_failure_cause() -> None:
     assert "generic_validation" not in outcome.final_text
 
 
+def test_failed_render_requires_a_new_map_candidate_for_tool_progress() -> None:
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        capability_queries=["map"],
+    )
+    state.render_observations = [
+        RenderObservation(
+            map_session_id="map-1",
+            collection_revision=1,
+            attempt=1,
+            status="failed",
+            checks={"required_sources_loaded": False},
+            failure_code="missing_source",
+            failure_stage="maplibre",
+            failure_summary="The selected source was not registered.",
+            action_fingerprint="failed-map-action",
+            recovery="revise_map",
+        )
+    ]
+    discovery = ToolResult(
+        call_id="discovery-1",
+        tool_name="discover_geospatial_capabilities",
+        status="success",
+        summary="Discovery completed.",
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    )
+    failed_map = ToolResult(
+        call_id="map-repeat-1",
+        tool_name="apply_map_plan",
+        status="failed",
+        summary="The same map action was rejected.",
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    )
+
+    expected = (
+        "no_progress",
+        "Render recovery requires a materially different map action.",
+    )
+    assert AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
+        state,
+        state.route,
+        [discovery],
+        max_consecutive_tool_failures=3,
+        max_validation_corrections=2,
+        max_discovery_attempts=2,
+    ) == expected
+    assert AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
+        state,
+        state.route,
+        [failed_map],
+        max_consecutive_tool_failures=3,
+        max_validation_corrections=2,
+        max_discovery_attempts=2,
+    ) == expected
+
+
+@pytest.mark.asyncio
+async def test_tool_turn_no_progress_after_render_failure_gets_bounded_correction() -> None:
+    provider = FakeProvider(
+        [
+            LLMResult(
+                content="",
+                tool_calls=[
+                    LLMToolCall(id="tool-1", name="test_tool", arguments={})
+                ],
+            ),
+            LLMResult(
+                content="",
+                tool_calls=[
+                    LLMToolCall(id="tool-2", name="test_tool", arguments={})
+                ],
+            ),
+        ]
+    )
+    state = _state()
+    state.context_hydrated = True
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="map",
+        requires_location=False,
+        capability_queries=["map"],
+    )
+    state.render_observations = [
+        RenderObservation(
+            map_session_id="map-1",
+            collection_revision=1,
+            attempt=1,
+            status="failed",
+            checks={"required_sources_loaded": False},
+            failure_code="missing_source",
+            failure_stage="maplibre",
+            failure_summary="The selected source was not registered.",
+            action_fingerprint="failed-map-action",
+            recovery="revise_map",
+        )
+    ]
+
+    outcome = await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            max_no_progress_corrections=1,
+        )
+    )
+    assert outcome.stopped_reason == "no_progress"
+    assert state.no_progress_corrections == 1
+    assert [
+        item["observation_type"]
+        for item in state.relevant_tool_outcomes
+        if isinstance(item, dict) and "observation_type" in item
+    ] == ["failed_render_recovery"]
+    assert provider.requests[1]["kwargs"]["tool_choice"] == "auto"
+
+
 @pytest.mark.asyncio
 async def test_verified_render_emits_tools_disabled_finalization_trace() -> None:
     provider = FakeProvider([LLMResult(content="Verified map summary.")])
