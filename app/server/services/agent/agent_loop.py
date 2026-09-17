@@ -652,7 +652,7 @@ class AgentLoop:
             await self._emit_finalization_trace(
                 request,
                 reason=finalization_reason,
-                phase="started",
+                kind="finalization_started",
             )
             outcome = "empty"
             try:
@@ -683,14 +683,14 @@ class AgentLoop:
                 await self._emit_finalization_trace(
                     request,
                     reason=finalization_reason,
-                    phase="completed",
+                    kind="finalization_completed",
                     outcome=outcome,
                 )
         else:
             await self._emit_finalization_trace(
                 request,
                 reason=finalization_reason,
-                phase="skipped",
+                kind="finalization_completed",
                 outcome=(
                     "already_attempted"
                     if state.finalization_attempted
@@ -747,7 +747,7 @@ class AgentLoop:
             await self._emit_finalization_trace(
                 request,
                 reason=finalization_reason,
-                phase="started",
+                kind="finalization_started",
             )
             outcome = "empty"
             try:
@@ -775,14 +775,14 @@ class AgentLoop:
                 await self._emit_finalization_trace(
                     request,
                     reason=finalization_reason,
-                    phase="completed",
+                    kind="finalization_completed",
                     outcome=outcome,
                 )
         else:
             await self._emit_finalization_trace(
                 request,
                 reason="verified_render",
-                phase="skipped",
+                kind="finalization_completed",
                 outcome=(
                     "already_attempted"
                     if state.finalization_attempted
@@ -797,25 +797,24 @@ class AgentLoop:
         request: AgentLoopRequest,
         *,
         reason: str,
-        phase: Literal["started", "completed", "skipped"],
+        kind: Literal["finalization_started", "finalization_completed"],
         outcome: str | None = None,
     ) -> None:
         """Expose the tools-disabled finalization boundary without content."""
 
         state = request.state
         payload: dict[str, Any] = {
-            "phase": phase,
             "reason": reason,
             "tools_exposed": 0,
             "tool_choice": "none",
-            "model_call": state.model_calls,
+            "model_call_index": state.model_calls,
         }
         if outcome is not None:
             payload["outcome"] = outcome
         await self._emit_trace(
             request,
             AgentTraceEvent(
-                kind="finalization",
+                kind=kind,
                 run_id=state.run_id or state.request_id,
                 run_version=state.run_version,
                 sequence=self._trace_sequence(state),

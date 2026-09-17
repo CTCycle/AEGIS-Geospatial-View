@@ -296,13 +296,18 @@ async def test_verified_render_emits_tools_disabled_finalization_trace() -> None
     )
 
     assert answer == "Verified map summary."
-    finalization = [event for event in events if event.kind == "finalization"]
-    assert [event.payload["phase"] for event in finalization] == [
-        "started",
-        "completed",
+    finalization = [
+        event
+        for event in events
+        if event.kind in {"finalization_started", "finalization_completed"}
+    ]
+    assert [event.kind for event in finalization] == [
+        "finalization_started",
+        "finalization_completed",
     ]
     assert all(event.payload["tools_exposed"] == 0 for event in finalization)
     assert all(event.payload["tool_choice"] == "none" for event in finalization)
+    assert [event.payload["model_call_index"] for event in finalization] == [0, 1]
     assert provider.requests[0]["kwargs"]["tool_choice"] == "none"
     assert provider.requests[0]["kwargs"]["tools"] is None
 
