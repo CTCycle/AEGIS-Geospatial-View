@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-09-15
+Last updated: 2026-09-17
 
 ## Layering
 
@@ -62,8 +62,9 @@ Chat requests flow through:
    executes typed actions, projects observations, and evaluates completion.
 7. `NativeAgentOrchestrator` writes the next canonical conversation state and
    assistant history with optimistic revision control.
-8. `AgentRunOrchestrator` completes the run or hands a map candidate to
-   `RenderCompletionService` for browser acknowledgment.
+8. `AgentRunOrchestrator` completes a data-only run or hands a map candidate
+   to `RenderCompletionService` for browser acknowledgment. A render
+   acknowledgment is a continuation event, not an implicit terminal result.
 
 The geospatial runtime is composed once at startup and accessed through
 `app.state.geospatial_runtime`. Routes do not construct a fallback runtime at
@@ -93,6 +94,8 @@ completion evaluation
       ├─ continue with a new model view
       ├─ ask for clarification
       ├─ await browser render acknowledgement
+      │       ↓
+      │   RenderObservation → same checkpoint → correction/retry or finalization
       └─ finalize a grounded response
 ```
 
@@ -182,18 +185,31 @@ contract. It does not create a conversation or execute a provider capability.
 
 ## Map completion flow
 
-`apply_map_plan` creates a typed candidate. For realtime runs:
+`apply_map_plan` creates a typed candidate and suspends the run only while the
+browser verifies it. For realtime runs:
 
 1. the candidate is persisted as `awaiting_render`;
 2. `map_prepared` publishes the exact run version, session ID, collection
    revision, and required render checks;
-3. the browser validates the candidate in MapLibre and sends `map.render_ack`;
+3. the browser validates the candidate in MapLibre and sends `map.render_ack`
+   with bounded check and failure metadata;
 4. `RenderCompletionService` verifies ownership, identities, revision, and
-   completion requirements; and
-5. the repository atomically promotes the candidate and publishes completion.
+   completion requirements, then normalizes the outcome into a bounded
+   `RenderObservation`;
+5. the observation is persisted and reinjected into the same checkpoint. A
+   failed render discards the candidate, preserves the last-known-good map,
+   and resumes the model for a revised action; a ready render atomically
+   promotes the candidate and resumes the run for a tools-disabled final
+   answer (or for any remaining completion requirement); and
+6. after three bounded render attempts, one finalization-only model call
+   explains the failure and the run terminates as
+   `render_recovery_exhausted`.
 
 The last committed map remains active while a candidate is pending. Failed,
-stale, conflicting, or superseded acknowledgments cannot replace it.
+stale, conflicting, or superseded acknowledgments cannot replace it. Duplicate
+identical acknowledgments are idempotent; stale or mismatched acknowledgments
+remain protocol errors. A failed candidate/action fingerprint is not treated
+as a reusable success, and exact failed repetition is rejected as non-progress.
 Metadata-only products finalize as data responses without an impossible render
 wait.
 
@@ -222,7 +238,7 @@ native loop for semantic recovery.
 Terminal reasons remain distinct: `model_budget_exhausted`,
 `tool_budget_exhausted`, `transition_budget_exhausted`,
 `run_deadline_exhausted`, `no_progress`, `context_limit`, `provider_failure`,
-`cancelled`, and `superseded`.
+`cancelled`, `superseded`, and `render_recovery_exhausted`.
 
 ## Async and threaded behavior
 
@@ -234,6 +250,10 @@ Terminal reasons remain distinct: `model_budget_exhausted`,
   `/api/jobs/{job_id}`.
 - The realtime WebSocket supports session resume, run commands, steering,
   render acknowledgments, heartbeats, and ordered durable events.
+- Render continuation publishes bounded `run_suspended`, `render_observed`,
+  `run_resumed`, `completion_decision`, and (when needed)
+  `render_retry_exhausted` trace events. These events expose operational state
+  and sanitized outcomes without private model reasoning.
 - Cancellation and version checks occur before/after external work and before
   durable commits. Tracked lifecycle tasks are directly cancelled on request.
 

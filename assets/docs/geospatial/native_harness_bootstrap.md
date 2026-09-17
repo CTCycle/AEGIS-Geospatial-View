@@ -118,6 +118,27 @@ Provider-layer discovery and capability description now sit behind the native
 catalog handlers. Discovery and provider-layer pages have deterministic
 cursors, bounded descriptors, and evidence persistence.
 
+### Render continuation and completion
+
+- `apply_map_plan` persists a realtime candidate as `awaiting_render` and
+  emits `map_prepared`; preparation is a suspension point, not completion.
+- `map.render_ack` is normalized by `RenderCompletionService` into a bounded
+  `RenderObservation` carrying candidate identity, collection revision,
+  attempt, viewport/check outcomes, overlay results, failure metadata, and a
+  recovery class.
+- The observation is persisted and reinjected into the same checkpoint. Ready
+  acknowledgments atomically commit the candidate and trigger a tools-disabled
+  finalization call (or continue for remaining requirements). Failed
+  acknowledgments preserve the last-known-good map, discard the candidate, and
+  resume the model for correction.
+- Three render attempts are allowed by default. Failed action fingerprints are
+  invalidated and exact failed repetition is rejected as non-progress.
+  Exhaustion produces one finalization-only response and the terminal reason
+  `render_recovery_exhausted`.
+- Render continuation is observable through `run_suspended`,
+  `render_observed`, `run_resumed`, `completion_decision`, and
+  `render_retry_exhausted` events/traces.
+
 ### One observation, context, and budget policy
 
 - Semantic context reduction belongs to `AgentContextAssembler`. Provider
@@ -163,12 +184,15 @@ recent-run summaries, and the access-checked redacted run-trace endpoint reuse
 the existing conversation, run-event, and evidence tables.
 
 Map preparation is a candidate operation. Realtime runs persist the candidate
-as `awaiting_render`, retain the last committed map, and promote only after a
-matching browser `map.render_ack`. A successful acknowledgment also finalizes
-the durable assistant response and stores the committed candidate on that
-message, so reloads cannot regress to transient “awaiting render” text.
-Metadata-only results finalize as data responses without an impossible render
-wait. Failed or stale acknowledgments cannot replace the last-known-good map.
+as `awaiting_render`, retain the last committed map, and resume the same native
+run after a matching browser `map.render_ack`. A successful render observation
+promotes the candidate before finalization and stores the committed candidate
+on the durable assistant message, so reloads cannot regress to transient
+“awaiting render” text. Failed acknowledgments preserve the last-known-good
+map and return a structured observation to the model. Metadata-only results
+finalize as data responses without an impossible render wait. Failed, stale,
+conflicting, or superseded acknowledgments cannot replace the last-known-good
+map.
 
 ## Original plan coverage
 
@@ -192,26 +216,29 @@ wait. Failed or stale acknowledgments cannot replace the last-known-good map.
 ## Remaining validation gates
 
 The implementation is not declared production-complete solely from local
-synthetic success. The following evidence is now recorded:
+synthetic success. Current evidence is recorded in
+`assets/QA/native-agent-loop-remediation-20260917/final-report.md`:
 
-- Full server unit and agent-benchmark suite: rerun after this integration
-  change and recorded in the companion QA report; protected cache warnings are
-  not test failures.
-- Strict Pyright: `0 errors, 0 warnings, 0 informations`.
-- Ruff: passed with no findings. The managed workspace still reports
-  access-denied cache warnings while scanning protected cache residue.
-- Client build: passed.
-- Client tests: `217 SUCCESS`.
-- E2E collection: `51 tests collected`.
-- Controlled browser-driven MapLibre render acknowledgement: passed after a
-  fresh restart. The configured `opencode-go/deepseek-v4-flash` lane resolved
-  Zurich through Nominatim, retrieved a USGS `valid_empty` result, rendered the
-  `USGS Earthquakes` clustered-points layer, and finalized the response as
-  “The map is ready. No results were found in the requested area or time
-  window.” Browser console diagnostics contained no warnings or errors, and a
-  reload preserved the final message and map state.
-- Durable native checkpoint callback/retrieval and active-run startup-resume
-  tests pass; checkpoints are stored as bounded internal run events.
+- Server unit suites: `798 passed, 2 warnings`.
+- Focused native/render suites: `42 passed`; the render-completion subset is
+  `12 passed` and includes same-run resume, last-known-good preservation, and
+  backend-check rejection normalization.
+- Targeted Pyright over changed backend modules: `0 errors, 0 warnings,
+  0 informations`. Full strict Pyright remains blocked by pre-existing
+  provider Optional-access, maintenance-service, transport, and AgentLoop
+  complexity diagnostics.
+- Ruff passed; the managed workspace still reports access-denied warnings for
+  protected cache residue.
+- Angular production build passed. The targeted Karma process was unavailable
+  after the restart and is recorded as blocked rather than inferred from build
+  success.
+- A full repository test attempt was not a clean gate (`699 passed, 147
+  failed, 4 skipped, 75 warnings`); the failures include unavailable backend
+  services/browser E2E and provider/integration suites outside the focused
+  orchestration proof.
+- Browser-driven MapLibre and live-provider validation were not rerun in this
+  continuation because the required services/credentials were unavailable; no
+  provider or browser success is claimed here.
 
 The remaining validation gates are explicitly separated from the local proof.
 The configured OpenCode Go credential was live for the run above; other lanes
@@ -228,10 +255,11 @@ and hosted infrastructure were not silently substituted. The gates are:
    broader gate.
 
 The local trajectory suite covers the core synthetic cases, including
-valid-empty recovery, malformed-call correction, cancellation during model and
-tool work, duplicate replay, bounded multi-iteration context, and checkpoint
-restoration from the durable run event log. The broader external-provider and
-full application matrix remains separate evidence.
+valid-empty recovery, malformed-call correction, render acknowledgement
+continuation, cancellation during model and tool work, duplicate replay,
+bounded multi-iteration context, and checkpoint restoration from the durable
+run event log. The broader external-provider and full application matrix
+remains separate evidence.
 
 Historical QA reports may still mention the removed parser and old tool names;
 they are retained as historical evidence and are not runtime documentation.
