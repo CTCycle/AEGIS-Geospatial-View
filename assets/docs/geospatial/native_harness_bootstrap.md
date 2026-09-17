@@ -220,7 +220,7 @@ synthetic success. Current evidence is recorded in
 `assets/QA/native-agent-loop-remediation-20260917/final-report.md`:
 
 - Server unit suites: `798 passed, 2 warnings`.
-- Focused native/render suites: `42 passed`; the render-completion subset is
+- Focused native/render suites: `43 passed`; the render-completion subset is
   `12 passed` and includes same-run resume, last-known-good preservation, and
   backend-check rejection normalization.
 - Targeted Pyright over changed backend modules: `0 errors, 0 warnings,

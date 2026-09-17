@@ -217,7 +217,7 @@ termination reason. No chain-of-thought is captured.
 ### Passing local gates
 
 - `app/tests/unit`: **798 passed, 2 warnings**.
-- Focused native/render suites: **42 passed**; render-completion subset:
+- Focused native/render suites: **43 passed**; render-completion subset:
   **12 passed**.
 - Targeted Pyright over changed backend modules: **0 errors, 0 warnings,
   0 informations**.
