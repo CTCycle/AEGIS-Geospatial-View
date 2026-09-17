@@ -72,6 +72,8 @@ class AgentExecutionSettings:
     render_ack_seconds: float = 90.0
     max_tool_result_chars: int = 4096
     max_iterations: int = 12
+    max_render_attempts: int = 3
+    max_no_progress_corrections: int = 2
     simple_max_model_calls: int = 4
     complex_max_model_calls: int = 10
     simple_max_tool_calls: int = 6
@@ -206,6 +208,8 @@ class JsonAgentExecutionSettings(StrictJsonSettings):
     render_ack_seconds: float = Field(default=90.0, ge=0.1, le=90.0)
     max_tool_result_chars: int = Field(default=4096, ge=128, le=100000)
     max_iterations: int = Field(default=12, ge=1, le=100)
+    max_render_attempts: int = Field(default=3, ge=1, le=32)
+    max_no_progress_corrections: int = Field(default=2, ge=0, le=8)
     simple_max_model_calls: int = Field(default=4, ge=1, le=100)
     complex_max_model_calls: int = Field(default=10, ge=1, le=100)
     simple_max_tool_calls: int = Field(default=6, ge=1, le=200)
@@ -394,6 +398,8 @@ class AppSettings(BaseSettings):
                 render_ack_seconds=self.agent_execution.render_ack_seconds,
                 max_tool_result_chars=self.agent_execution.max_tool_result_chars,
                 max_iterations=self.agent_execution.max_iterations,
+                max_render_attempts=self.agent_execution.max_render_attempts,
+                max_no_progress_corrections=self.agent_execution.max_no_progress_corrections,
                 simple_max_model_calls=self.agent_execution.simple_max_model_calls,
                 complex_max_model_calls=self.agent_execution.complex_max_model_calls,
                 simple_max_tool_calls=self.agent_execution.simple_max_tool_calls,

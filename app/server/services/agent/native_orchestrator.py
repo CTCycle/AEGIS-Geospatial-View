@@ -164,11 +164,16 @@ class NativeAgentOrchestrator:
             payload.message,
             recent_count + 1,
         )
-        existing = self._load_existing_response(
-            self.history_service, conversation_id, request_id
-        )
-        if existing is not None:
-            return existing
+        # A checkpointed render suspension is intentionally resumable.  The
+        # provisional assistant row is updated after the resumed model turn;
+        # it must never short-circuit execution as if the original turn had
+        # completed.
+        if checkpoint is None:
+            existing = self._load_existing_response(
+                self.history_service, conversation_id, request_id
+            )
+            if existing is not None:
+                return existing
         if (
             self.history_service.find_message_by_request_id(
                 conversation_id=conversation_id,
@@ -186,9 +191,10 @@ class NativeAgentOrchestrator:
 
         recent_messages = self.history_service.list_recent_messages(
             conversation_id,
-            limit=200,
+            limit=10_000,
         )
         self._remove_current_user_message(recent_messages, payload.message)
+        self._remove_provisional_assistant(recent_messages, request_id)
         latest_memory = conversation_state.memory_projection()
         active_map = conversation_state.committed_map_session
         if active_map is not None:
@@ -482,6 +488,22 @@ class NativeAgentOrchestrator:
             if item.get("role") == "user" and item.get("content") == message_text:
                 messages.pop(index)
                 return
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _remove_provisional_assistant(
+        messages: list[dict[str, Any]], request_id: str
+    ) -> None:
+        """Keep a suspended run's draft response out of resumed context."""
+
+        messages[:] = [
+            item
+            for item in messages
+            if not (
+                item.get("role") == "assistant"
+                and str(item.get("request_id") or "") == request_id
+            )
+        ]
 
     # -------------------------------------------------------------------------
     @staticmethod

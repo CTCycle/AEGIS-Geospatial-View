@@ -20,6 +20,7 @@ class CompletionEvaluator:
         "map_state_committed",
         "viewport_contains_results",
         "final_response_ready",
+        "render_verified",
     )
 
     # -------------------------------------------------------------------------
@@ -85,6 +86,7 @@ class CompletionEvaluator:
             "map_state_committed": False,
             "viewport_contains_results": False,
             "final_response_ready": False,
+            "render_verified": False,
         }
         return [
             CompletionRequirement(
@@ -125,6 +127,8 @@ class CompletionEvaluator:
                     else "failed" if not ready else "pending"
                 )
             elif name == "final_response_ready":
+                item["status"] = "satisfied" if ready else "failed"
+            elif name == "render_verified":
                 item["status"] = "satisfied" if ready else "failed"
             updated.append(item)
         return updated

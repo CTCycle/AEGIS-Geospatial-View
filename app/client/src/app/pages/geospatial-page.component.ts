@@ -29,6 +29,7 @@ import { MAX_CHAT_MESSAGE_LENGTH } from '../core/constants';
 import {
   parseRunCompletionPayload,
   parseRunEvent,
+  parseRenderObservationPayload,
   parseToolProgressPayload,
 } from '../core/realtime-parsers';
 import { RealtimeService } from '../core/realtime.service';
@@ -1251,6 +1252,53 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         }
         break;
       }
+      case 'render_observed': {
+        // A render acknowledgment is an observation in the same native run.
+        // Keep the candidate pending until the resumed run reaches a terminal
+        // event, but immediately make failures visible and discard the failed
+        // candidate so a correction can stage a fresh map identity.
+        const observation = parseRenderObservationPayload(event.payload);
+        const status = observation?.status;
+        const sessionId = observation?.map_session_id;
+        const revision = observation?.collection_revision;
+        const pendingRenderContext = this.pendingRenderContext;
+        if ((status !== 'ready' && status !== 'failed')
+          || !pendingRenderContext
+          || !sessionId
+          || sessionId !== pendingRenderContext.mapSessionId
+          || (revision !== undefined && revision !== pendingRenderContext.collectionRevision)) {
+          break;
+        }
+        this.presentationStatus = status === 'ready' ? 'ready' : 'pending';
+        if (status === 'ready') {
+          if (this.pendingMapSession?.session_id === sessionId
+            && this.pendingMapSession.overlay_collection.revision === revision) {
+            // The backend has verified this exact candidate. Promote it before
+            // the resumed model turn so the visible map is last-known-good
+            // even while the agent is still finalizing its response.
+            this.commitMapSession(this.pendingMapSession);
+            this.pendingRenderContext = undefined;
+            this.renderAckQueued = false;
+          }
+          this.mapRenderState = 'ready';
+          this.status = 'Map rendering verified; continuing';
+          this.progressStage = 'render_observed';
+          this.progressLabel = 'Map rendering verified; continuing';
+          this.isLoading = true;
+        } else {
+          const summary = observation.failure_summary
+            ?? 'The map did not render successfully; correcting the request.';
+          this.mapRenderState = 'failed';
+          this.restoreCommittedMap(summary);
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+          this.status = 'Correcting map rendering';
+          this.progressStage = 'correcting_render';
+          this.progressLabel = String(event.payload['label'] ?? 'Correcting the map after a render failure');
+          this.isLoading = true;
+        }
+        break;
+      }
       case 'completed':
         this.isLoading = false;
         this.status = 'Agent ready';
@@ -1337,7 +1385,15 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           this.renderAckQueued = false;
         }
       } else {
-        this.handleMapSession(parsed.mapSession);
+        // A resumable render acknowledgment may have already promoted this
+        // exact candidate while the model was finalizing. Do not stage the
+        // committed map a second time when the terminal payload arrives.
+        const currentRevision = this.mapSession?.overlay_collection?.revision;
+        const nextRevision = parsed.mapSession.overlay_collection?.revision;
+        if (this.mapSession?.session_id !== parsed.mapSession.session_id
+          || currentRevision !== nextRevision) {
+          this.handleMapSession(parsed.mapSession);
+        }
       }
     }
     if (parsed.operation !== undefined) {
@@ -1616,6 +1672,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           checks: change.checks ?? {},
           overlay_results: (change.overlayResults ?? []) as Array<Record<string, import('../core/types').JsonValue>>,
           failure_code: null,
+          failure_stage: null,
+          failure_summary: null,
         };
         this.renderAckQueued = true;
         this.status = 'Map data ready; rendering';
@@ -1640,7 +1698,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           viewport_bounds: change.viewportBounds ?? null,
           checks: change.checks ?? {},
           overlay_results: (change.overlayResults ?? []) as Array<Record<string, import('../core/types').JsonValue>>,
-          failure_code: 'render_failed',
+          failure_code: change.failureCode ?? 'render_failed',
+          failure_stage: change.failureStage ?? 'maplibre',
+          failure_summary: change.failureSummary ?? change.message ?? null,
         };
         this.renderAckQueued = true;
         try {

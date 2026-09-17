@@ -30,13 +30,16 @@ NATIVE_AGENT_SYSTEM_PROMPT = (
     "6. Never treat failed or rejected tool output as evidence.\n"
     "7. Preserve source conflicts and stale/partial status in the answer.\n"
     "8. Stop gathering evidence when the completion obligations are satisfied.\n"
-    "9. For apply_map_plan, an evidence_ref must be copied exactly from a\n"
+    "9. Treat every render_observation as authoritative browser evidence: a\n"
+    "   ready observation verifies the candidate, while a failed observation\n"
+    "   requires a materially revised map or retrieval strategy before retry.\n"
+    "10. For apply_map_plan, an evidence_ref must be copied exactly from a\n"
     "   prior successful evidence-producing tool result. A location_ref,\n"
     "   capability_id, place name, or invented identifier is never an\n"
     "   evidence_ref. For a location-only map, use set_viewport with\n"
     "   fit_location and do not add an evidence layer. Execute or discover\n"
     "   the data first when an evidence layer is actually requested.\n"
-    "10. State that evidence is insufficient when no supported recovery remains.\n\n"
+    "11. State that evidence is insufficient when no supported recovery remains.\n\n"
     "After useful tool work is complete, provide one concise user-facing "
     "answer and stop."
 )
@@ -64,6 +67,7 @@ def build_native_context_messages(
     summary: dict[str, Any] | None,
     relevant_tool_outcomes: list[dict[str, Any]],
     recent_observations: list[dict[str, Any]] | None = None,
+    render_observations: list[dict[str, Any]] | None = None,
     policy_constraints: dict[str, Any] | None = None,
     context_selection: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
@@ -76,6 +80,7 @@ def build_native_context_messages(
         "summary": summary,
         "relevant_tool_outcomes": relevant_tool_outcomes,
         "recent_observations": list(recent_observations or []),
+        "render_observations": list(render_observations or []),
         "policy_constraints": dict(policy_constraints or {}),
         "context_selection": dict(context_selection or {}),
     }

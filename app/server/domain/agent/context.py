@@ -65,6 +65,9 @@ class AgentContextView(BaseModel):
     recent_observations: list[dict[str, Any]] = Field(
         default_factory=lambda: list[dict[str, Any]]()
     )
+    render_observations: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
     policy_constraints: dict[str, Any] = Field(
         default_factory=lambda: dict[str, Any]()
     )
@@ -78,6 +81,7 @@ class AgentContextView(BaseModel):
         state: Any,
         *,
         recent_observations: list[dict[str, Any]] | None = None,
+        render_observations: list[dict[str, Any]] | None = None,
     ) -> "AgentContextView":
         """Build a model view without persisting or mutating state."""
 
@@ -95,6 +99,9 @@ class AgentContextView(BaseModel):
             ],
             recent_observations=[
                 dict(item) for item in (recent_observations or [])
+            ],
+            render_observations=[
+                dict(item) for item in (render_observations or [])
             ],
             policy_constraints=dict(state.policy_constraints),
             context_selection={

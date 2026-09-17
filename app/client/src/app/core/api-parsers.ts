@@ -1175,6 +1175,12 @@ export const parseCompletionContract = (
     map_preparation_required: requireApiBoolean(record, 'map_preparation_required', endpoint),
     temporal_scope_required: requireApiBoolean(record, 'temporal_scope_required', endpoint),
     spatial_scope_required: requireApiBoolean(record, 'spatial_scope_required', endpoint),
+    render_verification_required: record.render_verification_required === undefined
+      ? undefined
+      : requireApiBoolean(record, 'render_verification_required', endpoint),
+    render_verified: record.render_verified === undefined
+      ? undefined
+      : requireApiBoolean(record, 'render_verified', endpoint),
   };
 };
 
@@ -1504,10 +1510,12 @@ export const parseOllamaHealthResponse = (value: unknown): OllamaHealthResponse 
 const NATIVE_PRESENTATION_STATUSES: PresentationStatus[] = [
   'not_required',
   'not_requested',
+  'pending',
   'prepared',
   'prepared_unverified',
   'ready',
   'failed',
+  'render_timeout',
 ];
 
 export const parseNativeToolResult = (

@@ -17,8 +17,8 @@ if TYPE_CHECKING:
     from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 
 # History is a linguistic projection; geometry and execution payloads remain
-# in their authoritative stores. This cap is independent of model capacity.
-KNOWN_MODEL_WORKING_SET_CEILING = 64_000
+# in their authoritative stores.  Known model capacity is the source of truth;
+# only the protocol/output reserve below is deducted.
 UNKNOWN_MODEL_WORKING_SET_CEILING = 32_768
 _MESSAGE_PROJECTION_KEYS = (
     "id",
@@ -111,7 +111,7 @@ class AgentContextAssembler:
         }
         mandatory_tokens = estimate_json_tokens(mandatory)
         application_ceiling = (
-            min(context_window, KNOWN_MODEL_WORKING_SET_CEILING)
+            context_window
             if context_window is not None
             else UNKNOWN_MODEL_WORKING_SET_CEILING
         )
@@ -212,20 +212,58 @@ class AgentContextAssembler:
         ]
         summary_capacity = summary_budget + max(0, raw_capacity - included_tokens)
         summary: dict[str, Any] | None = prior_summary
-        summary_through = 0
+        summary_through = int(
+            prior_summary.get("through_turn_index") or 0
+            if isinstance(prior_summary, dict)
+            else 0
+        )
         if omitted:
-            summary_through = max(int(item.get("turn_index") or 0) for item in omitted)
-            summary = {
-                "source_message_ids": omitted_ids,
-                "through_turn_index": summary_through,
-                "turn_facts": [
+            summary_through = max(
+                summary_through,
+                max(int(item.get("turn_index") or 0) for item in omitted),
+            )
+            prior_facts = (
+                list(json_array(prior_summary.get("turn_facts")))
+                if isinstance(prior_summary, dict)
+                else []
+            )
+            merged_facts = [
+                item for item in [*prior_facts, *omitted[-12:]]
+                if is_json_object(item)
+            ]
+            seen_facts: set[tuple[object, str, str]] = set()
+            facts: list[dict[str, Any]] = []
+            for item in merged_facts:
+                key = (
+                    item.get("turn_index"),
+                    str(item.get("role") or ""),
+                    str(item.get("content") or "")[:500],
+                )
+                if key in seen_facts:
+                    continue
+                seen_facts.add(key)
+                facts.append(
                     {
                         "turn_index": item.get("turn_index"),
                         "role": item.get("role"),
                         "content": str(item.get("content") or "")[:500],
                     }
-                    for item in omitted[-12:]
-                ],
+                )
+            summary = {
+                "source_message_ids": list(
+                    dict.fromkeys(
+                        [
+                            *(
+                                list(json_array(prior_summary.get("source_message_ids")))
+                                if isinstance(prior_summary, dict)
+                                else []
+                            ),
+                            *omitted_ids,
+                        ]
+                    )
+                )[-64:],
+                "through_turn_index": summary_through,
+                "turn_facts": facts[-24:],
             }
         if summary is not None:
             # Never mutate a persisted summary supplied by the caller.

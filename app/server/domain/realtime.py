@@ -111,6 +111,8 @@ class RealtimeRenderAckPayload(BaseModel):
         default_factory=lambda: list[dict[str, Any]]()
     )
     failure_code: str | None = Field(default=None, max_length=120)
+    failure_stage: str | None = Field(default=None, max_length=120)
+    failure_summary: str | None = Field(default=None, max_length=500)
 
     # -------------------------------------------------------------------------
     @model_validator(mode="after")

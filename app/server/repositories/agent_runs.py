@@ -691,10 +691,21 @@ class AgentRunRepository:
 
     # -------------------------------------------------------------------------
     def mark_completed_if_current(
-        self, run_id: str, expected_run_version: int
+        self,
+        run_id: str,
+        expected_run_version: int,
+        *,
+        presentation_status: str | None = None,
     ) -> tuple[AgentRunSnapshot, bool]:
         """Complete only the still-current, non-cancelled run version."""
         with self._session_factory() as session:
+            values: dict[str, Any] = {
+                "state": AgentRunState.COMPLETED.value,
+                "active_slot": None,
+                "completed_at": datetime.now(UTC),
+            }
+            if presentation_status is not None:
+                values["presentation_status"] = presentation_status
             updated = cast(
                 CursorResult[Any],
                 session.execute(
@@ -712,11 +723,7 @@ class AgentRunRepository:
                             ]
                         ),
                     )
-                    .values(
-                        state=AgentRunState.COMPLETED.value,
-                        active_slot=None,
-                        completed_at=datetime.now(UTC),
-                    )
+                    .values(**values)
                 ),
             )
             session.commit()
@@ -733,6 +740,30 @@ class AgentRunRepository:
         """Move a valid map candidate into the durable awaiting-render state."""
         prepared_at = datetime.now(UTC)
         with self._session_factory() as session:
+            record = self._require_run(session, run_id)
+            previous_presentation = _json_object(record.presentation_json)
+            merged_presentation = dict(presentation)
+            previous_attempts = int(
+                previous_presentation.get("render_attempts") or 0
+            )
+            merged_presentation["render_attempts"] = max(
+                previous_attempts,
+                int(presentation.get("render_attempts") or 0),
+            )
+            previous_observations: list[JsonObject] = [
+                item
+                for item in _json_list(previous_presentation.get("render_observations"))
+                if isinstance(item, dict)
+            ]
+            current_observations: list[JsonObject] = [
+                item
+                for item in _json_list(presentation.get("render_observations"))
+                if isinstance(item, dict)
+            ]
+            merged_presentation["render_observations"] = [
+                *previous_observations,
+                *current_observations,
+            ][-8:]
             updated = cast(
                 CursorResult[Any],
                 session.execute(
@@ -754,7 +785,7 @@ class AgentRunRepository:
                         state=AgentRunState.AWAITING_RENDER.value,
                         active_slot=None,
                         presentation_status="pending",
-                        presentation_json=presentation,
+                        presentation_json=merged_presentation,
                         render_prepared_at=prepared_at,
                     )
                 ),
@@ -774,6 +805,8 @@ class AgentRunRepository:
         collection_revision: int,
         status: str,
         acknowledgment: dict[str, Any],
+        resume: bool = False,
+        observation: dict[str, Any] | None = None,
     ) -> tuple[AgentRunSnapshot, bool, dict[str, Any] | None]:
         """Accept one browser acknowledgment and promote its map atomically."""
         with self._session_factory() as session:
@@ -803,6 +836,8 @@ class AgentRunRepository:
                 if previous == acknowledgment:
                     return self._to_snapshot(run), True, presentation
                 raise ValueError("A different render acknowledgment was already accepted.")
+            if resume and presentation.get("acknowledgment") == acknowledgment:
+                return self._to_snapshot(run), True, presentation
             if run.presentation_status != "pending" or run.state != AgentRunState.AWAITING_RENDER.value:
                 raise ValueError("Run is not awaiting map rendering.")
 
@@ -954,6 +989,7 @@ class AgentRunRepository:
                             "map_state_committed",
                             "viewport_contains_results",
                             "final_response_ready",
+                            "render_verified",
                         }
                         and cast(JsonObject, item).get("status")
                         not in {"satisfied", "not_applicable"}
@@ -965,6 +1001,134 @@ class AgentRunRepository:
                         )
             if status not in {"ready", "failed"}:
                 raise ValueError("Unsupported render acknowledgment status.")
+            if resume:
+                # A browser result is an observation in the native run, not a
+                # terminal response.  Persist the observation and updated
+                # checkpoint before releasing the transaction so the lifecycle
+                # service can safely requeue this exact run.
+                checkpoint = _json_object(
+                    _json_object(pending_response.get("execution_trace")).get(
+                        "checkpoint"
+                    )
+                )
+                if not checkpoint:
+                    raise ValueError("Prepared map checkpoint is missing.")
+                render_attempt = max(
+                    int(presentation.get("render_attempts") or 0),
+                    int(checkpoint.get("render_attempts") or 0),
+                ) + 1
+                render_observation = dict(observation or {})
+                render_observation.setdefault("attempt", render_attempt)
+                observations: list[JsonObject] = [
+                    item
+                    for item in _json_list(checkpoint.get("render_observations"))
+                    if isinstance(item, dict)
+                ]
+                observations.append(render_observation)
+                checkpoint["render_observations"] = observations[-8:]
+                checkpoint["render_attempts"] = render_attempt
+                checkpoint["render_verified"] = status == "ready"
+                checkpoint["render_retry_exhausted"] = bool(
+                    render_observation.get("recovery") == "terminal"
+                )
+                prepared_action_fingerprint = str(
+                    checkpoint.get("prepared_map_action_fingerprint") or ""
+                )
+                checkpoint["prepared_map_session"] = None
+                checkpoint["prepared_map_action_fingerprint"] = None
+                checkpoint["phase"] = "update_state"
+                checkpoint["termination_reason"] = None
+                budget_snapshot = _json_object(checkpoint.get("budget_snapshot"))
+                for key in ("terminal_reason", "stopping_reason", "terminal_stage"):
+                    budget_snapshot[key] = None
+                checkpoint["budget_snapshot"] = budget_snapshot
+                if status == "failed":
+                    fingerprint = prepared_action_fingerprint or str(
+                        render_observation.get("fingerprint") or ""
+                    )
+                    if fingerprint:
+                        failed_fingerprints = _json_object(
+                            checkpoint.get("failed_render_fingerprints")
+                        )
+                        failed_fingerprints[fingerprint] = int(
+                            failed_fingerprints.get(fingerprint) or 0
+                        ) + 1
+                        checkpoint["failed_render_fingerprints"] = dict(
+                            list(failed_fingerprints.items())[-32:]
+                        )
+                else:
+                    candidate_map = pending_response.get("map_session")
+                    conversation = session.get(ConversationRecord, conversation_id)
+                    if conversation is None:
+                        raise ValueError("Conversation not found.")
+                    state = ConversationState.from_persisted(
+                        conversation_id,
+                        pending_response.get("conversation_state")
+                        or conversation.conversation_state,
+                        revision=int(conversation.context_revision),
+                    )
+                    conversation.context_revision += 1
+                    if isinstance(candidate_map, dict):
+                        try:
+                            committed_map = MapSession.model_validate(candidate_map)
+                        except (TypeError, ValueError) as exc:
+                            raise ValueError(
+                                "Prepared map does not match the current contract."
+                            ) from exc
+                        state = state.model_copy(
+                            update={
+                                "revision": conversation.context_revision,
+                                "committed_map_session": committed_map,
+                            }
+                        )
+                        checkpoint["active_map_session"] = candidate_map
+                    else:
+                        state = state.model_copy(
+                            update={"revision": conversation.context_revision}
+                        )
+                    conversation.conversation_state = state.model_dump(mode="json")
+                    pending_response["conversation_state"] = state.model_dump(
+                        mode="json"
+                    )
+                    pending_response["context_revision"] = conversation.context_revision
+                    checkpoint["conversation_revision"] = conversation.context_revision
+                execution_trace = _json_object(pending_response.get("execution_trace"))
+                execution_trace["checkpoint"] = checkpoint
+                execution_trace["termination_reason"] = None
+                execution_trace["render_observation"] = render_observation
+                pending_response["execution_trace"] = execution_trace
+                pending_response["presentation_status"] = (
+                    "ready" if status == "ready" else "pending"
+                )
+                run.state = AgentRunState.PENDING.value
+                run.active_slot = 1
+                run.completed_at = None
+                run.error_code = None
+                run.error_message = None
+                run.presentation_status = "ready" if status == "ready" else "pending"
+                updated_presentation = {
+                    **presentation,
+                    "status": "resuming",
+                    "acknowledgment": acknowledgment,
+                    "render_observation": render_observation,
+                    "render_attempts": render_attempt,
+                    # Keep the presentation envelope inspectable between the
+                    # acknowledgement transaction and the resumed worker.
+                    # The checkpoint is the canonical state consumed by the
+                    # agent, but this bounded projection is also returned by
+                    # run-status and must not lag behind the observation that
+                    # was just accepted.
+                    "render_observations": observations[-8:],
+                    "render_retry_exhausted": bool(
+                        render_observation.get("recovery") == "terminal"
+                    ),
+                    "pending_response": pending_response,
+                }
+                run.presentation_json = updated_presentation
+                run.render_prepared_at = None
+                session.commit()
+                session.refresh(run)
+                return self._to_snapshot(run), False, pending_response
             if status == "ready":
                 conversation = session.get(ConversationRecord, conversation_id)
                 if conversation is None:

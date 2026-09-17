@@ -24,6 +24,7 @@ import type {
   NativeToolResultSummary,
   PresentationStatus,
   RealtimeServerMessage,
+  RenderObservation,
   RunEvent,
   RunEventType,
   RunEventVisibility,
@@ -45,6 +46,7 @@ const RUN_EVENT_TYPES: readonly RunEventType[] = [
   'trace',
   'checkpoint',
   'map_prepared',
+  'render_observed',
 ];
 
 const RUN_EVENT_VISIBILITIES: readonly RunEventVisibility[] = ['user', 'internal'];
@@ -122,6 +124,85 @@ export const parseToolProgressPayload = (
   };
 };
 
+/** Normalize bounded browser evidence without exposing arbitrary payloads. */
+export const parseRenderObservationPayload = (
+  value: unknown,
+): RenderObservation | undefined => {
+  if (!isJsonObject(value)) {
+    return undefined;
+  }
+  const mapSessionId = optionalText(value['map_session_id'], 160);
+  const collectionRevision = value['collection_revision'];
+  const attempt = value['attempt'];
+  const status = value['status'];
+  const recovery = value['recovery'];
+  if (!mapSessionId
+    || !isFiniteNumber(collectionRevision)
+    || !Number.isInteger(collectionRevision)
+    || collectionRevision < 0
+    || !isFiniteNumber(attempt)
+    || !Number.isInteger(attempt)
+    || attempt < 1
+    || (status !== 'ready' && status !== 'failed')
+    || !['continue', 'revise_map', 'alternate_source', 'terminal'].includes(String(recovery))) {
+    return undefined;
+  }
+
+  const rawChecks = value['checks'];
+  if (!isJsonObject(rawChecks)) {
+    return undefined;
+  }
+  const checks: Record<string, boolean> = {};
+  for (const [key, item] of Object.entries(rawChecks).slice(0, 32)) {
+    if (typeof item !== 'boolean') {
+      return undefined;
+    }
+    checks[key.slice(0, 160)] = item;
+  }
+
+  const rawOverlayResults = value['overlay_results'];
+  if (!Array.isArray(rawOverlayResults)) {
+    return undefined;
+  }
+  const overlayResults = rawOverlayResults
+    .filter(isJsonObject)
+    .slice(0, 64);
+  if (overlayResults.length !== Math.min(rawOverlayResults.length, 64)) {
+    return undefined;
+  }
+
+  const rawViewport = value['viewport_bounds'];
+  let viewportBounds: [number, number, number, number] | null | undefined;
+  if (rawViewport === null) {
+    viewportBounds = null;
+  } else if (rawViewport === undefined) {
+    viewportBounds = undefined;
+  } else if (Array.isArray(rawViewport)
+    && rawViewport.length === 4
+    && rawViewport.every(isFiniteNumber)) {
+    viewportBounds = rawViewport as [number, number, number, number];
+  } else {
+    return undefined;
+  }
+
+  return {
+    map_session_id: mapSessionId,
+    collection_revision: collectionRevision,
+    attempt,
+    status,
+    viewport_bounds: viewportBounds,
+    checks,
+    overlay_results: overlayResults,
+    failure_code: optionalText(value['failure_code'], 120) ?? null,
+    failure_stage: optionalText(value['failure_stage'], 120) ?? null,
+    failure_summary: optionalText(value['failure_summary'], 500) ?? null,
+    fingerprint: optionalText(value['fingerprint'], 64) ?? null,
+    action_fingerprint: optionalText(value['action_fingerprint'], 64) ?? null,
+    recovery: recovery as RenderObservation['recovery'],
+    observed_at: optionalText(value['observed_at'], 64) ?? null,
+  };
+};
+
 const hasOwn = (value: JsonObject, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(value, key);
 
@@ -138,11 +219,14 @@ const isRunEventVisibility = (value: unknown): value is RunEventVisibility =>
   typeof value === 'string' && RUN_EVENT_VISIBILITIES.includes(value as RunEventVisibility);
 
 const NATIVE_PRESENTATION_STATUSES: readonly PresentationStatus[] = [
+  'not_required',
   'not_requested',
+  'pending',
   'prepared',
   'prepared_unverified',
   'ready',
   'failed',
+  'render_timeout',
 ];
 
 export const parseRealtimeServerMessage = (

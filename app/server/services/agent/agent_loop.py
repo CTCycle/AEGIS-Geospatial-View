@@ -105,6 +105,8 @@ class AgentLoopRequest:
     max_validation_corrections: int = 2
     max_discovery_attempts: int = 2
     max_tool_result_chars: int = 4096
+    max_no_progress_corrections: int = 2
+    max_render_attempts: int = 3
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
     checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None
     trace_callback: Callable[
@@ -134,6 +136,7 @@ class AgentLoopOutcome:
         "cancelled",
         "superseded",
         "failed",
+        "render_recovery_exhausted",
     ]
     model_calls: int
     tool_results: list[ToolResult] = field(default_factory=lambda: list[ToolResult]())
@@ -226,7 +229,76 @@ class AgentLoop:
             self._sync_task_state(state)
             await self._checkpoint(request)
 
-            for iteration in range(state.max_iterations):
+            if state.render_retry_exhausted:
+                final_text = await self._finalize_iteration_exhaustion(
+                    request,
+                    provider,
+                    messages,
+                )
+                state.termination_reason = "render_recovery_exhausted"
+                await self._emit_trace(
+                    request,
+                    AgentTraceEvent(
+                        kind="render_retry_exhausted",
+                        run_id=state.run_id or state.request_id,
+                        run_version=state.run_version,
+                        sequence=self._trace_sequence(state),
+                        iteration=max(1, state.current_iteration),
+                        payload={
+                            "attempts": state.render_attempts,
+                            "max_attempts": request.max_render_attempts,
+                            "last_observation": (
+                                state.render_observations[-1].model_dump(mode="json")
+                                if state.render_observations
+                                else None
+                            ),
+                            "termination_reason": "render_recovery_exhausted",
+                        },
+                    ),
+                )
+                await self._emit_completion_decision(
+                    request,
+                    reason="render_recovery_exhausted",
+                    status="terminal",
+                )
+                return self._outcome(
+                    state,
+                    final_text,
+                    "render_recovery_exhausted",
+                    request,
+                )
+
+            # A render can be acknowledged after the final ordinary
+            # iteration.  It still gets the required tools-disabled response
+            # synthesis; do not turn an otherwise verified map into an
+            # iteration-budget failure merely because no decision slot
+            # remains.
+            if (
+                state.render_verified
+                and state.prepared_map_session is None
+                and not self._pending_native_requirements(state)
+            ):
+                final_text = await self._finalize_verified_render(
+                    request,
+                    provider,
+                    messages,
+                )
+                await self._emit_completion_decision(
+                    request,
+                    reason="goal_satisfied",
+                    status="terminal",
+                )
+                state.termination_reason = "goal_satisfied"
+                return self._outcome(state, final_text, "goal_satisfied", request)
+
+            # A render acknowledgement resumes the same checkpoint.  Continue
+            # from the next unconsumed iteration instead of resetting the
+            # counter and silently extending the run budget.
+            start_iteration = min(
+                state.max_iterations,
+                max(0, int(state.current_iteration)),
+            )
+            for iteration in range(start_iteration, state.max_iterations):
                 self._ensure_run_control(request)
                 state.current_iteration = iteration + 1
                 # Keep the historical ``iteration`` alias synchronized for
@@ -303,6 +375,11 @@ class AgentLoop:
                     )
                     await self._checkpoint(request)
                     if stop is not None:
+                        await self._emit_completion_decision(
+                            request,
+                            reason=stop[0],
+                            status="terminal",
+                        )
                         state.termination_reason = stop[0]
                         return self._outcome(state, stop[1], stop[0], request)
                     await self._emit_iteration_completed(request, "continue")
@@ -321,10 +398,14 @@ class AgentLoop:
                     continue
 
                 final_text = result.content.strip()
-                recovery_results = await self._recover_location_only_map(
-                    request,
-                    route,
-                    state,
+                # Production hydrated runs must let the model choose the
+                # missing action.  The narrow server fallback remains only
+                # for non-hydrated compatibility fixtures, where no native
+                # context/tool contract exists to issue a correction.
+                recovery_results = (
+                    await self._recover_location_only_map(request, route, state)
+                    if not state.context_hydrated
+                    else []
                 )
                 self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
                 stop = (
@@ -353,6 +434,44 @@ class AgentLoop:
                 self._sync_task_state(state)
                 await self._checkpoint(request)
                 if stop is not None:
+                    if (
+                        stop[0] == "no_progress"
+                        and state.no_progress_corrections
+                        < request.max_no_progress_corrections
+                    ):
+                        state.no_progress_corrections += 1
+                        pending = self._pending_native_requirements(state)
+                        correction = {
+                            "observation_type": "pending_requirements",
+                            "status": "action_required",
+                            "pending_requirements": pending,
+                            "message": (
+                                "The response did not complete the deterministic "
+                                "completion contract. Select and execute the "
+                                "next required tool action."
+                            ),
+                        }
+                        state.relevant_tool_outcomes.append(correction)
+                        messages.append(
+                            {
+                                "role": "system",
+                                "content": json.dumps(
+                                    correction, separators=(",", ":")
+                                ),
+                            }
+                        )
+                        await self._emit_completion_decision(
+                            request,
+                            reason="no_progress",
+                            status="continue",
+                        )
+                        await self._emit_iteration_completed(request, "continue")
+                        continue
+                    await self._emit_completion_decision(
+                        request,
+                        reason=stop[0],
+                        status="terminal",
+                    )
                     state.termination_reason = stop[0]
                     return self._outcome(state, final_text, stop[0], request)
                 messages.append({"role": "assistant", "content": final_text})
@@ -454,6 +573,35 @@ class AgentLoop:
         )
 
     # -------------------------------------------------------------------------
+    async def _emit_completion_decision(
+        self,
+        request: AgentLoopRequest,
+        *,
+        reason: str,
+        status: Literal["continue", "terminal"],
+    ) -> None:
+        """Record a bounded completion decision without model reasoning."""
+
+        state = request.state
+        await self._emit_trace(
+            request,
+            AgentTraceEvent(
+                kind="completion_decision",
+                run_id=state.run_id or state.request_id,
+                run_version=state.run_version,
+                sequence=self._trace_sequence(state),
+                iteration=max(1, state.current_iteration),
+                payload={
+                    "status": status,
+                    "reason": reason,
+                    "pending_requirements": self._pending_native_requirements(state),
+                    "render_verified": state.render_verified,
+                    "render_attempts": state.render_attempts,
+                },
+            ),
+        )
+
+    # -------------------------------------------------------------------------
     async def _finalize_iteration_exhaustion(
         self,
         request: AgentLoopRequest,
@@ -499,7 +647,13 @@ class AgentLoop:
                 candidate = ""
 
         pending = self._pending_requirements_for_task_state(state)
-        if pending:
+        if state.render_retry_exhausted:
+            suffix = (
+                "The map renderer did not produce a verified result after "
+                f"{state.render_attempts} attempt(s); the previous map remains "
+                "available."
+            )
+        elif pending:
             suffix = (
                 "The iteration limit was reached before these requirements were "
                 "satisfied: "
@@ -518,6 +672,41 @@ class AgentLoop:
             final = suffix
         await self._emit_iteration_completed(request, "exhausted")
         return final
+
+    # -------------------------------------------------------------------------
+    async def _finalize_verified_render(
+        self,
+        request: AgentLoopRequest,
+        provider: AgentProvider,
+        messages: list[dict[str, Any]],
+    ) -> str:
+        """Synthesize the final answer after a verified browser render."""
+
+        state = request.state
+        candidate = ""
+        model_limit = request.budget.max_model_calls or request.max_model_calls
+        if (
+            not state.finalization_attempted
+            and state.model_calls < model_limit
+            and request.budget.remaining_seconds() > 0.001
+        ):
+            state.finalization_attempted = True
+            try:
+                result = await self._model_step(request, provider, messages, [])
+                if not result.tool_calls:
+                    candidate = (result.content or "").strip()
+            except (AgentRunControlSignal, asyncio.CancelledError):
+                raise
+            except (
+                ExecutionBudgetExceeded,
+                LLMProviderRequestError,
+                LLMStructuredOutputError,
+                TimeoutError,
+            ):
+                candidate = ""
+            except Exception:
+                candidate = ""
+        return candidate or "The map is ready and the rendering was verified."
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -627,8 +816,11 @@ class AgentLoop:
             # alone left their spatial task pending even after a valid
             # candidate had been prepared.
             "spatial_scope_applied": completed_data
-            or state.prepared_map_session is not None,
-            "map_candidate_prepared": state.prepared_map_session is not None,
+            or state.prepared_map_session is not None
+            or (state.active_map_session is not None and state.render_verified),
+            "map_candidate_prepared": state.prepared_map_session is not None
+            or (state.active_map_session is not None and state.render_verified),
+            "render_verified": bool(state.render_verified),
         }
 
     # -------------------------------------------------------------------------
@@ -779,6 +971,7 @@ class AgentLoop:
                 "transition_budget_exhausted",
                 "run_deadline_exhausted",
                 "no_progress",
+                "render_recovery_exhausted",
                 "clarification_required",
             }
             else "failed"
@@ -905,6 +1098,10 @@ class AgentLoop:
         view = AgentContextView.from_state(
             state,
             recent_observations=observations,
+            render_observations=[
+                item.model_dump(mode="json")
+                for item in state.render_observations[-8:]
+            ],
         )
         context = build_native_context_messages(
             current_user_message=state.user_message,
@@ -915,6 +1112,7 @@ class AgentLoop:
             summary=view.summary,
             relevant_tool_outcomes=view.relevant_tool_outcomes,
             recent_observations=view.recent_observations,
+            render_observations=view.render_observations,
             policy_constraints=view.policy_constraints,
             context_selection=view.context_selection,
         )
@@ -1254,6 +1452,21 @@ class AgentLoop:
                     update={"call_id": call.id or cached.call_id}, deep=True
                 )
             failed_count = state.failed_fingerprints.get(fingerprint, 0)
+            render_failed_count = state.failed_render_fingerprints.get(fingerprint, 0)
+            if (
+                call.name == "apply_map_plan"
+                # A failed browser render is already proof that this exact
+                # semantic map action made no progress.  Reject its first
+                # repeat even though ordinary provider-call retries retain
+                # the more permissive shared fingerprint limit.
+                and render_failed_count >= 1
+            ):
+                return self._failure_result(
+                    call,
+                    "repeated_failed_render",
+                    "The same map plan already failed browser rendering and was not repeated.",
+                    recovery="replan",
+                )
             if failed_count >= request.max_same_failed_fingerprint:
                 if len(state.tool_trace) < 128:
                     state.tool_trace.append(
@@ -1308,8 +1521,19 @@ class AgentLoop:
                     "policy_rejection",
                 }:
                     state.validation_corrections += 1
-            else:
+            elif result.tool_name != "apply_map_plan":
                 state.successful_fingerprints[fingerprint] = result
+            elif result.status == "success":
+                # Map candidates are only reusable after the browser proves
+                # that this action rendered.  Keep the semantic action
+                # fingerprint in the checkpoint so a failed candidate can be
+                # rejected even though each retry receives a new session ID.
+                state.prepared_map_action_fingerprint = fingerprint
+            elif result.tool_name == "apply_map_plan":
+                # A map-plan validation/build failure did not create a
+                # candidate, so do not let a stale action fingerprint affect a
+                # later, materially different correction.
+                state.prepared_map_action_fingerprint = None
             self._ensure_run_control(request)
             self._apply_result(state, result)
         return results
@@ -1337,6 +1561,16 @@ class AgentLoop:
                 # model from selecting an equivalent source.
                 state.capability_ids = []
             return
+        if (
+            result.tool_name == "execute_geospatial_capability"
+            and result.status == "valid_empty"
+        ):
+            # An empty result is a useful observation, but it must not lock
+            # the next decision to the same shortlist.  Re-open capability
+            # discovery while retaining exclusions and the bounded result
+            # observation so the model can broaden the query or select an
+            # alternate source.
+            state.capability_ids = []
         state.consecutive_tool_failures = 0
         for evidence_ref in result.evidence_refs:
             if evidence_ref not in state.evidence_refs:
@@ -1354,8 +1588,8 @@ class AgentLoop:
         return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
     # -------------------------------------------------------------------------
+    @staticmethod
     def _evaluate_stop(
-        self,
         state: AgentRunState,
         route: CapabilityRoute,
         results: list[ToolResult],
@@ -1411,8 +1645,8 @@ class AgentLoop:
         return None
 
     # -------------------------------------------------------------------------
+    @staticmethod
     def _evaluate_text_stop(
-        self,
         state: AgentRunState,
         route: CapabilityRoute,
         text: str,
@@ -1425,13 +1659,19 @@ class AgentLoop:
             return "awaiting_render", text
         if text:
             tools = list(available_tools or [])
-            pending = self._pending_native_requirements(state)
+            pending = AgentLoop._pending_native_requirements(state)
             if pending:
                 return (
                     "no_progress" if tools else "insufficient_evidence",
                     text,
                 )
             if route.presentation in {"map", "both"}:
+                # A verified render closes the presentation requirement.  The
+                # finalization-only model call after a render acknowledgement
+                # must be able to terminate successfully instead of being
+                # mistaken for another no-progress map response.
+                if state.render_verified:
+                    return "goal_satisfied", text
                 return (
                     "no_progress"
                     if tools and state.context_hydrated
@@ -1555,26 +1795,10 @@ class AgentLoop:
             return False
         if contract.evidence_required:
             return False
-        normalized_queries = {
-            str(query).strip().casefold()
-            for query in route.capability_queries
-            if str(query).strip()
-        }
-        return (
-            AgentLoop._location_only_map_recovery_ref(state, route) is not None
-            and normalized_queries
-            <= {
-                "basemap",
-                "location map view",
-                "location viewport",
-                "map viewport",
-                "map view",
-                "map rendering",
-                "geocode place name",
-                "place search",
-                "place viewport",
-            }
-        )
+        # The contract, not a vocabulary allow-list, determines whether this
+        # is a location-only presentation.  Capability choice remains the
+        # model's responsibility for hydrated native runs.
+        return AgentLoop._location_only_map_recovery_ref(state, route) is not None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1620,6 +1844,10 @@ class AgentLoop:
                 map_memory=state.map_memory,
                 summary=state.summary,
                 relevant_tool_outcomes=state.relevant_tool_outcomes,
+                render_observations=[
+                    item.model_dump(mode="json")
+                    for item in state.render_observations[-8:]
+                ],
                 policy_constraints=state.policy_constraints,
                 context_selection={
                     "included_message_ids": state.included_message_ids,
@@ -1725,6 +1953,8 @@ class AgentLoop:
                 )
             ),
             spatial_scope_required=bool(spatial_scope),
+            render_verification_required=route.presentation in {"map", "both"},
+            render_verified=state.render_verified,
         )
         AgentLoop._initialize_task_state_for_route(state, route)
 
@@ -1749,6 +1979,16 @@ class AgentLoop:
             and "spatial_scope_applied" not in required_names
         ):
             required_names.append("spatial_scope_applied")
+        if (
+            state.completion_contract.render_verification_required
+            and "render_verified" not in required_names
+            and state.render_observations
+        ):
+            # Before the first candidate is prepared, map_candidate_prepared
+            # is the actionable obligation. Once the browser has reported a
+            # result, expose the explicit render requirement so a failed
+            # observation drives a correction rather than a false completion.
+            required_names.append("render_verified")
         return [
             name
             for name in required_names
@@ -1787,6 +2027,11 @@ class AgentLoop:
             "location_refs": sorted(state.location_refs),
             "evidence_refs": list(state.evidence_refs),
             "prepared_map": bool(state.prepared_map_session),
+            "render_verified": state.render_verified,
+            "render_attempts": state.render_attempts,
+            "render_observations": [
+                item.model_dump(mode="json") for item in state.render_observations[-4:]
+            ],
             "active_map_collection_revision": (
                 state.active_map_session.overlay_collection.revision
                 if state.active_map_session is not None
@@ -1820,6 +2065,11 @@ class AgentLoop:
             "location_refs": sorted(state.location_refs)[:12],
             "evidence_refs": list(state.evidence_refs[-8:]),
             "prepared_map": bool(state.prepared_map_session),
+            "render_verified": state.render_verified,
+            "render_attempts": state.render_attempts,
+            "render_observations": [
+                item.model_dump(mode="json") for item in state.render_observations[-2:]
+            ],
         }
         return json.dumps(minimal, separators=(",", ":"), default=str)
 
@@ -1856,6 +2106,8 @@ class AgentLoop:
             "map_preparation_required": state.completion_contract.map_preparation_required,
             "temporal_scope_required": state.completion_contract.temporal_scope_required,
             "spatial_scope_required": state.completion_contract.spatial_scope_required,
+            "render_verification_required": state.completion_contract.render_verification_required,
+            "render_verified": state.completion_contract.render_verified,
         }
 
     # -------------------------------------------------------------------------

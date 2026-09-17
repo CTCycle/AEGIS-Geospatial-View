@@ -1,4 +1,5 @@
 import {
+  parseRenderObservationPayload,
   parseRealtimeServerMessage,
   parseRunCompletionPayload,
   parseRunEvent,
@@ -91,6 +92,64 @@ describe('realtime parsers', () => {
     expect(phase).toBe('native_loop');
   });
 
+  it('accepts render observations as replayable run events', () => {
+    const event = parseRunEvent({
+      event_id: 'render-1',
+      sequence: 6,
+      conversation_id: 'conversation-1',
+      run_id: 'run-1',
+      run_version: 3,
+      type: 'render_observed',
+      timestamp: '2026-08-17T08:00:00Z',
+      visibility: 'user',
+      payload: {
+        map_session_id: 'map-1',
+        collection_revision: 2,
+        attempt: 1,
+        status: 'ready',
+        checks: { viewport_valid: true },
+        overlay_results: [],
+        recovery: 'continue',
+      },
+    }, 'conversation-1');
+
+    expect(event?.type).toBe('render_observed');
+    expect(parseRenderObservationPayload(event?.payload)?.status).toBe('ready');
+  });
+
+  it('parses bounded render observations and rejects malformed evidence', () => {
+    const observation = parseRenderObservationPayload({
+      map_session_id: 'map-1',
+      collection_revision: 3,
+      attempt: 2,
+      status: 'failed',
+      viewport_bounds: [12, 41, 13, 42],
+      checks: { required_sources_loaded: false, viewport_valid: true },
+      overlay_results: [{ overlay_id: 'roads', layer_present: false }],
+      failure_code: 'render_failed',
+      failure_stage: 'maplibre',
+      failure_summary: 'Required layer was not registered.',
+      recovery: 'revise_map',
+    });
+
+    expect(observation).toEqual(jasmine.objectContaining({
+      map_session_id: 'map-1',
+      attempt: 2,
+      status: 'failed',
+      failure_code: 'render_failed',
+      recovery: 'revise_map',
+    }));
+    expect(parseRenderObservationPayload({
+      map_session_id: 'map-1',
+      collection_revision: 3,
+      attempt: 2,
+      status: 'failed',
+      checks: { required_sources_loaded: 'false' },
+      overlay_results: [],
+      recovery: 'revise_map',
+    })).toBeUndefined();
+  });
+
   it('normalizes valid terminal fields and ignores malformed optional fields', () => {
     const parsed = parseRunCompletionPayload({
       context_revision: 3,
@@ -123,6 +182,17 @@ describe('realtime parsers', () => {
         filters: {},
       },
       presentation_status: 'not_requested',
+      completion_contract: {
+        operation: 'retrieve',
+        requirements: [],
+        location_required: false,
+        evidence_required: true,
+        map_preparation_required: false,
+        temporal_scope_required: false,
+        spatial_scope_required: false,
+        render_verification_required: false,
+        render_verified: false,
+      },
       tool_results: [{
         call_id: 'call-1',
         tool_name: 'execute_geospatial_capability',
@@ -143,6 +213,8 @@ describe('realtime parsers', () => {
     expect(parsed.mapSession).toBeUndefined();
     expect(parsed.route?.primary_domain).toBe('data_retrieval');
     expect(parsed.presentationStatus).toBe('not_requested');
+    expect(parsed.completionContract?.render_verification_required).toBeFalse();
+    expect(parsed.completionContract?.render_verified).toBeFalse();
     expect(parsed.toolResults?.[0].evidence_refs).toEqual(['evidence-1']);
     const executionTrace: Record<string, unknown> = parsed.executionTrace ?? {};
     expect(executionTrace['stopped_reason']).toBe('goal_satisfied');

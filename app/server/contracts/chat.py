@@ -107,6 +107,7 @@ class ChatOperationResult(BaseModel):
             "iteration_budget_exhausted",
             "run_deadline_exhausted",
             "no_progress",
+            "render_recovery_exhausted",
             "cancelled",
             "superseded",
         ]

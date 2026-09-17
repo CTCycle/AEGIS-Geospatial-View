@@ -599,3 +599,185 @@ def test_production_render_ack_persists_terminal_events_atomically() -> None:
     assert snapshot.presentation_status == "ready"
     presentation = snapshot.presentation or {}
     assert len(presentation.get("durable_event_ids", [])) == 3
+
+
+def test_resumable_render_ack_reenters_same_run_and_preserves_attempts(
+    render_context,
+) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,  # type: ignore[arg-type]
+        resume_mode=True,
+        max_render_attempts=3,
+    )
+    first_candidate = _session()
+    checkpoint = {
+        "render_attempts": 0,
+        "render_observations": [],
+        "prepared_map_action_fingerprint": "map-action-1",
+        "budget_snapshot": {},
+    }
+    _presentation, prepared = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={
+            "assistant_message": "Data prepared; the map is loading.",
+            "map_session": first_candidate.model_dump(mode="json"),
+            "conversation_state": {"conversation_id": conversation_id, "revision": 0},
+            "execution_trace": {"checkpoint": checkpoint},
+        },
+    )
+    assert prepared is True
+
+    failed_ack = RealtimeRenderAckPayload(
+        run_id=run_id,
+        run_version=1,
+        map_session_id=first_candidate.session_id,
+        collection_revision=first_candidate.overlay_collection.revision,
+        status="failed",
+        checks={"required_layers_present": False},
+        failure_code="missing_layer",
+        failure_stage="maplibre",
+        failure_summary="The expected layer was not registered.",
+    )
+    failed = run_async_in_thread(service.acknowledge(conversation_id, failed_ack))
+    assert failed.resume_required is True
+    assert failed.duplicate is False
+    assert failed.state == "pending"
+    assert failed.presentation_status == "pending"
+    assert failed.observation is not None
+    assert failed.observation.attempt == 1
+    assert failed.observation.action_fingerprint == "map-action-1"
+
+    after_failure = repository.get_run(run_id)
+    assert after_failure is not None
+    assert (after_failure.presentation or {}).get("render_attempts") == 1
+
+    second_candidate = first_candidate.model_copy(
+        update={"session_id": "map-session-2"}, deep=True
+    )
+    _presentation, prepared = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={
+            "assistant_message": "I revised the map.",
+            "map_session": second_candidate.model_dump(mode="json"),
+            "conversation_state": {"conversation_id": conversation_id, "revision": 0},
+            "execution_trace": {
+                "checkpoint": {
+                    **checkpoint,
+                    "render_attempts": 1,
+                    "render_observations": [failed.observation.model_dump(mode="json")],
+                }
+            },
+        },
+    )
+    assert prepared is True
+
+    ready_ack = RealtimeRenderAckPayload(
+        run_id=run_id,
+        run_version=1,
+        map_session_id=second_candidate.session_id,
+        collection_revision=second_candidate.overlay_collection.revision,
+        status="ready",
+        viewport_bounds=second_candidate.bounds,
+        checks={
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+    )
+    ready = run_async_in_thread(service.acknowledge(conversation_id, ready_ack))
+    assert ready.resume_required is True
+    assert ready.state == "pending"
+    assert ready.presentation_status == "ready"
+    assert ready.observation is not None
+    assert ready.observation.attempt == 2
+    assert any(str(event[0]) == "render_observed" for event in publisher.events)
+
+    duplicate = run_async_in_thread(service.acknowledge(conversation_id, ready_ack))
+    assert duplicate.duplicate is True
+    assert duplicate.resume_required is False
+
+
+def test_resumable_ready_check_rejection_becomes_render_failure_observation(
+    render_context,
+) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,  # type: ignore[arg-type]
+        resume_mode=True,
+        max_render_attempts=3,
+    )
+    candidate = _session(
+        OverlayInstance(
+            instance_id="vector-overlay",
+            capability_id="test-overlay",
+            label="Test overlay",
+            provider="test",
+            overlay_type="geojson",
+            rendering_mode="geojson",
+            descriptor={
+                "result_type": "feature_collection",
+                "data": {
+                    "type": "FeatureCollection",
+                    "features": [{"type": "Feature", "geometry": {"type": "Point"}}],
+                },
+            },
+        )
+    )
+    _presentation, prepared = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={
+            "map_session": candidate.model_dump(mode="json"),
+            "execution_trace": {
+                "checkpoint": {
+                    "render_attempts": 0,
+                    "render_observations": [],
+                    "prepared_map_action_fingerprint": "map-action-validation",
+                    "budget_snapshot": {},
+                }
+            },
+        },
+    )
+    assert prepared is True
+
+    rejected_ready = RealtimeRenderAckPayload(
+        run_id=run_id,
+        run_version=1,
+        map_session_id=candidate.session_id,
+        collection_revision=candidate.overlay_collection.revision,
+        status="ready",
+        viewport_bounds=candidate.bounds,
+        checks={
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+        overlay_results=[
+            {
+                "overlay_id": "vector-overlay",
+                "source_present": True,
+                "layer_present": True,
+                "loaded": True,
+                "visibility_matches": True,
+                "rendered_feature_count": 0,
+            }
+        ],
+    )
+
+    result = run_async_in_thread(
+        service.acknowledge(conversation_id, rejected_ready)
+    )
+
+    assert result.resume_required is True
+    assert result.presentation_status == "pending"
+    assert result.observation is not None
+    assert result.observation.status == "failed"
+    assert result.observation.failure_code == "render_validation_failed"
+    assert result.observation.failure_stage == "backend_validation"
+    assert result.observation.recovery == "revise_map"
+    assert any(str(event[0]) == "render_observed" for event in publisher.events)

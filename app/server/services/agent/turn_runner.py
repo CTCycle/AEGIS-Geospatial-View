@@ -36,6 +36,7 @@ type FailureCategory = Literal[
     "iteration_budget_exhausted",
     "run_deadline_exhausted",
     "no_progress",
+    "render_recovery_exhausted",
     "cancelled",
     "superseded",
 ]
@@ -159,6 +160,12 @@ class AgentTurnRunner:
                 max_tool_result_chars=_setting(
                     self.execution_settings, "max_tool_result_chars", 4096
                 ),
+                max_no_progress_corrections=_setting(
+                    self.execution_settings, "max_no_progress_corrections", 2
+                ),
+                max_render_attempts=_setting(
+                    self.execution_settings, "max_render_attempts", 3
+                ),
                 context_usage_callback=request.context_usage_callback,
                 trace_callback=request.trace_callback,
                 checkpoint_callback=request.checkpoint_callback,
@@ -223,6 +230,12 @@ class AgentResponseBuilder:
                 "context_usage_trace": list(state.context_usage_trace[-16:]),
                 "model_trace": list(state.model_trace[-16:]),
                 "tool_trace": list(state.tool_trace[-32:]),
+                "render_observations": [
+                    item.model_dump(mode="json")
+                    for item in state.render_observations[-8:]
+                ],
+                "render_attempts": state.render_attempts,
+                "render_verified": state.render_verified,
                 "task_state": state.typed_task_state().model_dump(
                     mode="json", exclude_none=True
                 ),
@@ -266,6 +279,7 @@ def _operation(
         "iteration_budget_exhausted",
         "run_deadline_exhausted",
         "no_progress",
+        "render_recovery_exhausted",
         "cancelled",
         "superseded",
     }:
@@ -296,6 +310,8 @@ def _presentation_status(
         return "not_requested"
     if map_session is not None:
         return "prepared" if defer_map_commit else "prepared_unverified"
+    if outcome.state.render_verified:
+        return "ready"
     return "failed"
 
 
@@ -328,6 +344,7 @@ def _response_failure_category(value: str | None) -> FailureCategory | None:
         "iteration_budget_exhausted",
         "run_deadline_exhausted",
         "no_progress",
+        "render_recovery_exhausted",
         "cancelled",
         "superseded",
     }:

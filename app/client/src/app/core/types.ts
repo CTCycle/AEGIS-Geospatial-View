@@ -404,6 +404,26 @@ export interface MapRenderAcknowledgement {
   checks: Record<string, boolean>;
   overlay_results: Array<Record<string, JsonValue>>;
   failure_code?: string | null;
+  failure_stage?: string | null;
+  failure_summary?: string | null;
+}
+
+/** Bounded browser evidence fed back into the native agent run. */
+export interface RenderObservation {
+  map_session_id: string;
+  collection_revision: number;
+  attempt: number;
+  status: 'ready' | 'failed';
+  viewport_bounds?: [number, number, number, number] | null;
+  checks: Record<string, boolean>;
+  overlay_results: Array<Record<string, JsonValue>>;
+  failure_code?: string | null;
+  failure_stage?: string | null;
+  failure_summary?: string | null;
+  fingerprint?: string | null;
+  action_fingerprint?: string | null;
+  recovery: 'continue' | 'revise_map' | 'alternate_source' | 'terminal';
+  observed_at?: string | null;
 }
 
 export interface GeoJsonFeatureCollection {
@@ -524,7 +544,8 @@ export type RunEventType =
   | 'clarification_needed'
   | 'trace'
   | 'checkpoint'
-  | 'map_prepared';
+  | 'map_prepared'
+  | 'render_observed';
 
 export type RunEventVisibility = 'user' | 'internal';
 
@@ -725,6 +746,8 @@ export interface CompletionContract {
   map_preparation_required: boolean;
   temporal_scope_required: boolean;
   spatial_scope_required: boolean;
+  render_verification_required?: boolean;
+  render_verified?: boolean;
 }
 
 export interface ConversationDirective {
