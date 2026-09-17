@@ -165,20 +165,21 @@ def test_router_opens_discovery_when_semantic_shortlist_is_empty() -> None:
 
 
 def test_router_clarifies_broad_infrastructure_category_before_shortlisting() -> None:
-    decision = _router().validate_route(
-        _route(
-            operation="retrieve_infrastructure",
-            capability_queries=["infrastructure"],
-        ),
-        user_message="Show infrastructure.",
-        active_state=_state(),
-    )
+    for query in ("infrastructure", "infrastructure category", "infrastructure type"):
+        decision = _router().validate_route(
+            _route(
+                operation="retrieve_infrastructure",
+                capability_queries=[query],
+            ),
+            user_message=f"Show {query}.",
+            active_state=_state(),
+        )
 
-    assert decision.status == "clarification"
-    assert decision.capability_ids == []
-    assert "ambiguous_infrastructure_category" in decision.reason_codes
-    assert decision.clarification_question is not None
-    assert "EV charging" in decision.clarification_question
+        assert decision.status == "clarification"
+        assert decision.capability_ids == []
+        assert "ambiguous_infrastructure_category" in decision.reason_codes
+        assert decision.clarification_question is not None
+        assert "EV charging" in decision.clarification_question
 
 
 def test_router_returns_boundary_limitation_without_replacing_active_map() -> None:
