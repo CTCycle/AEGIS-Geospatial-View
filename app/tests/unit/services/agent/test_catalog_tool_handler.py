@@ -20,7 +20,7 @@ class _CapabilityRegistry:
 
     # -------------------------------------------------------------------------
     def execution_contract(self, capability_id: str) -> dict[str, Any]:
-        return {"capability_id": capability_id}
+        return {"capability_id": capability_id, "render_support": "vector"}
 
 
 ###############################################################################
@@ -32,6 +32,10 @@ class _RuntimeRegistry:
 
     # -------------------------------------------------------------------------
     def access_available(self, _capability_id: str) -> bool:
+        return True
+
+    # -------------------------------------------------------------------------
+    def supports_mode(self, _capability_id: str, _mode: str) -> bool:
         return True
 
 
@@ -65,7 +69,13 @@ def test_discovery_cursor_returns_a_stable_bounded_page() -> None:
                 "provider": "test",
                 "kind": "unknown",
                 "supports_map": True,
-                "execution_contract": {"capability_id": "second"},
+                "render_support": "vector",
+                "render_ready": True,
+                "render_unavailable_reason": None,
+                "execution_contract": {
+                    "capability_id": "second",
+                    "render_support": "vector",
+                },
             }
         ],
         "provider_id": None,

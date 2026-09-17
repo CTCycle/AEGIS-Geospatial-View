@@ -20,7 +20,7 @@ def test_execution_contract_is_read_from_the_manifest() -> None:
 
     assert contract["supported_operations"] == ["show", "inspect", "forecast"]
     assert contract["supported_scope_kinds"] == ["point", "bbox"]
-    assert contract["render_support"] == "metadata_only"
+    assert contract["render_support"] == "vector"
     assert contract["output_geometry_type"] == "Point"
 
 

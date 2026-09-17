@@ -113,7 +113,10 @@ class CatalogToolHandler:
             ]
         offset = _cursor_offset(request.cursor)
         page = candidates[offset : offset + request.limit]
-        descriptors = [_descriptor(self.capability_registry, item) for item in page]
+        descriptors = [
+            _descriptor(self.capability_registry, self.runtime_registry, item)
+            for item in page
+        ]
         discovered_ids = [str(item["id"]) for item in descriptors if item.get("id")]
         state.capability_ids = list(
             dict.fromkeys([*state.capability_ids, *discovered_ids])
@@ -208,9 +211,25 @@ def _cursor_offset(cursor: str | None) -> int:
 
 ###############################################################################
 def _descriptor(
-    registry: CapabilityRegistry, capability: dict[str, Any]
+    registry: CapabilityRegistry,
+    runtime_registry: RuntimeRegistry,
+    capability: dict[str, Any],
 ) -> dict[str, Any]:
     capability_id = str(capability.get("id") or "").strip()
+    execution_contract = registry.execution_contract(capability_id)
+    render_support = str(
+        execution_contract.get("render_support") or "none"
+    ).casefold()
+    render_ready = render_support in {"vector", "raster"}
+    supports_mode = getattr(runtime_registry, "supports_mode", None)
+    if render_ready and callable(supports_mode):
+        render_ready = bool(supports_mode(capability_id, "map"))
+    render_reason = None
+    if not render_ready:
+        if render_support in {"none", "metadata_only"}:
+            render_reason = "metadata_only_or_non_renderable_contract"
+        else:
+            render_reason = "runtime_map_support_disabled"
     return {
         "id": capability_id,
         "name": str(capability.get("name") or capability_id),
@@ -222,10 +241,11 @@ def _descriptor(
             or capability.get("type")
             or "unknown"
         ),
-        "supports_map": bool(
-            capability.get("supports_map", True)
-        ),
-        "execution_contract": registry.execution_contract(capability_id),
+        "supports_map": render_ready,
+        "render_support": render_support,
+        "render_ready": render_ready,
+        "render_unavailable_reason": render_reason,
+        "execution_contract": execution_contract,
     }
 
 

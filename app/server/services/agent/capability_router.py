@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
     AgentRunState,
@@ -38,6 +40,9 @@ class CapabilityRouter:
         reasons: list[str] = []
         rejected: list[str] = []
         valid_explicit_ids: list[str] = []
+        proposed, semantic_reason = _normalize_route_semantics(proposed)
+        if semantic_reason is not None:
+            reasons.append(semantic_reason)
         proposed, temporal_reason = _normalize_recent_scope(proposed)
         if temporal_reason is not None:
             reasons.append(temporal_reason)
@@ -163,6 +168,20 @@ class CapabilityRouter:
                 if not proposed.explicit_capability_ids
                 else "no_capability"
             )
+            no_candidate_reason = (
+                [
+                    "discovery_required"
+                    if status == "discovery_required"
+                    else "no_eligible_capability",
+                    "no_renderable_capability",
+                ]
+                if proposed.presentation in {"map", "both"}
+                else [
+                    "discovery_required"
+                    if status == "discovery_required"
+                    else "no_eligible_capability"
+                ]
+            )
             return CapabilityRouteDecision(
                 status=status,  # type: ignore[arg-type]
                 route=proposed,
@@ -171,11 +190,7 @@ class CapabilityRouter:
                     *dict.fromkeys(
                         [
                             *reasons,
-                            (
-                                "discovery_required"
-                                if status == "discovery_required"
-                                else "no_eligible_capability"
-                            ),
+                            *no_candidate_reason,
                         ]
                     )
                 ],
@@ -200,7 +215,10 @@ def _is_executable_candidate(capability: dict[str, object]) -> bool:
         or capability.get("capability_kind")
         or ""
     ).strip().casefold()
-    return kind != "basemap"
+    return (
+        kind != "basemap"
+        and capability.get("runtime_render_ready") is not False
+    )
 
 
 def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:
@@ -209,6 +227,43 @@ def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:
     if state.active_map_session is not None:
         return state.active_map_session.resolved_location
     return None
+
+
+###############################################################################
+def _normalize_route_semantics(
+    route: CapabilityRoute,
+) -> tuple[CapabilityRoute, str | None]:
+    """Canonicalize model spelling before registry operation/query matching."""
+
+    raw_operation = route.operation
+    operation = None
+    if raw_operation is not None:
+        operation = re.sub(
+            r"[^a-z0-9]+", "_", str(raw_operation).casefold()
+        ).strip("_")
+    normalized_queries = [
+        re.sub(
+            r"\s+",
+            " ",
+            re.sub(r"[^a-z0-9]+", " ", str(query).casefold()),
+        ).strip()
+        for query in route.capability_queries
+        if str(query).strip()
+    ]
+    changed = operation != raw_operation or normalized_queries != list(
+        route.capability_queries
+    )
+    if not changed:
+        return route, None
+    return (
+        route.model_copy(
+            update={
+                "operation": operation,
+                "capability_queries": normalized_queries,
+            }
+        ),
+        "route_semantics_normalized",
+    )
 
 
 ###############################################################################

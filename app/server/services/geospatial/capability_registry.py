@@ -27,6 +27,60 @@ class RuntimeEligibility(Protocol):
     # -------------------------------------------------------------------------
     def access_available(self, capability_id: str) -> bool: ...
 
+
+###############################################################################
+# These are deliberately small, provider-neutral vocabularies.  They bridge
+# the model's semantic route language to the primitive operation and catalog
+# terms used by manifests; they are not provider selection rules.
+_QUERY_ALIASES: dict[str, set[str]] = {
+    "weather": {"weather", "forecast", "meteo"},
+    "forecast": {"forecast", "weather", "meteo"},
+    "meteo": {"meteo", "weather", "forecast"},
+    "landcover": {"landcover", "land", "cover", "vegetation"},
+    "vegetation": {"vegetation", "landcover", "land", "cover", "ndvi"},
+    "ndvi": {"ndvi", "vegetation", "landcover"},
+    "earthquake": {"earthquake", "seismic", "hazard"},
+    "earthquakes": {"earthquake", "seismic", "hazard"},
+    "seismic": {"seismic", "earthquake", "hazard"},
+    "hazard": {"hazard", "earthquake", "seismic", "flood"},
+    "hazards": {"hazard", "earthquake", "seismic", "flood"},
+    "poi": {"poi", "amenity", "place", "places"},
+    "amenity": {"amenity", "poi", "place", "places"},
+    "amenities": {"amenity", "poi", "place", "places"},
+    "place": {"place", "places", "poi", "amenity"},
+    "places": {"place", "places", "poi", "amenity"},
+    "infrastructure": {
+        "infrastructure",
+        "charging",
+        "charger",
+        "building",
+        "buildings",
+        "residential",
+        "utilities",
+    },
+    "charging": {"charging", "charger", "infrastructure"},
+    "charger": {"charger", "charging", "infrastructure"},
+    "building": {"building", "buildings", "residential", "infrastructure"},
+    "buildings": {"building", "buildings", "residential", "infrastructure"},
+    "worldcover": {"worldcover", "landcover", "land", "cover", "vegetation"},
+    "usgs": {"usgs", "earthquake", "hazard", "water", "gauge"},
+}
+
+_GENERIC_QUERY_TOKENS = {
+    "a",
+    "an",
+    "and",
+    "data",
+    "information",
+    "layer",
+    "map",
+    "of",
+    "on",
+    "the",
+    "to",
+    "with",
+}
+
 ###############################################################################
 def normalized_execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
     """Return the explicit schema-v2 execution semantics for a capability.
@@ -286,6 +340,9 @@ class CapabilityRegistry:
 
         bounded_limit = max(1, min(int(limit), 50))
         normalized_queries = _query_tokens(queries)
+        meaningful_queries = _raw_query_tokens(queries).difference(
+            _GENERIC_QUERY_TOKENS
+        )
         normalized_explicit = [
             str(value).strip() for value in explicit_ids if str(value).strip()
         ]
@@ -324,6 +381,10 @@ class CapabilityRegistry:
                 and _has_explicit_execution_contract(item),
             ):
                 continue
+            if requires_render and not _runtime_supports_render(
+                runtime_registry, capability_id
+            ):
+                continue
             if _avoid_when_conflicts(item, normalized_queries, location):
                 continue
             if location is not None and not _coverage_matches(
@@ -332,7 +393,7 @@ class CapabilityRegistry:
             ):
                 continue
             searchable = _searchable_text(item)
-            query_score = sum(1 for token in normalized_queries if token in searchable)
+            matched_queries = meaningful_queries.intersection(searchable)
             explicit_index = (
                 normalized_explicit.index(capability_id)
                 if capability_id in normalized_explicit
@@ -340,20 +401,32 @@ class CapabilityRegistry:
             )
             if normalized_explicit and explicit_index is None and not normalized_queries:
                 continue
+            # A semantic query is a contract, not a hint.  Without at least
+            # one meaningful match, a broad domain score must not substitute an
+            # unrelated provider or dataset.  Explicit IDs remain authoritative
+            # and are allowed through the normal runtime/contract checks.
+            if meaningful_queries and explicit_index is None and not matched_queries:
+                continue
             score = (
                 1000.0 - float(explicit_index)
                 if explicit_index is not None
                 else 0.0
             )
             score += float(len(declared_domains.intersection(requested_domains))) * 100.0
-            score += float(query_score * 10)
+            score += float(len(matched_queries) * 10)
             if capability_id.casefold() in {item.casefold() for item in normalized_queries}:
                 score += 50.0
             candidate = dict(item)
             candidate["routing_score"] = score
+            candidate["routing_query_matches"] = sorted(matched_queries)
             candidate["routing_domains"] = sorted(domain.value for domain in declared_domains)
             candidate["routing_contract"] = contract
             candidate["runtime_eligible"] = True
+            candidate["runtime_render_ready"] = (
+                _runtime_supports_render(runtime_registry, capability_id)
+                if requires_render
+                else None
+            )
             candidates.append(candidate)
 
         candidates.sort(
@@ -438,32 +511,61 @@ def _operation_candidates(operation: str) -> set[str]:
 
     if not operation:
         return set()
-    aliases = {
-        "display": "show",
-        "find": "search",
-        "get": "search",
-        "locate": "search",
-        "map": "show",
-        "render": "show",
-        "retrieve": "search",
-        "visualize": "show",
+    aliases: dict[str, set[str]] = {
+        "display": {"show", "overlay"},
+        "find": {"search", "near", "within_distance"},
+        "get": {"search", "show", "inspect"},
+        "locate": {"search", "near", "show"},
+        "map": {"show", "overlay"},
+        "render": {"show", "overlay"},
+        "retrieve": {"search", "show", "inspect", "overlay", "forecast"},
+        "visualize": {"show", "overlay"},
+        "weather": {"forecast", "show", "inspect"},
+        "forecast": {"forecast", "show", "inspect"},
+        "land": {"overlay", "show", "inspect"},
+        "cover": {"overlay", "show", "inspect"},
+        "landcover": {"overlay", "show", "inspect"},
+        "vegetation": {"overlay", "show", "inspect"},
+        "hazard": {"search", "near", "around", "show", "inspect"},
+        "earthquake": {"search", "near", "around", "show", "inspect"},
+        "seismic": {"search", "near", "around", "show", "inspect"},
+        "poi": {"search", "near", "within_distance", "show", "inspect"},
+        "amenity": {"search", "near", "within_distance", "show", "inspect"},
+        "infrastructure": {
+            "search",
+            "near",
+            "within_distance",
+            "show",
+            "inspect",
+        },
     }
     tokens = {
         token
         for token in re.findall(r"[a-z0-9]+", operation)
         if token not in {"and", "data", "then"}
     }
-    candidates = {
-        operation,
-        *tokens,
-        *(aliases[token] for token in tokens if token in aliases),
-    }
+    candidates = {operation, *tokens}
+    for token in tokens:
+        candidates.update(aliases.get(token, set()))
     # Basemap manifests expose the canonical render primitive ``show``.  A
     # basemap switch is still a map render, even though the route operation is
     # intentionally more specific than the manifest operation.
     if "basemap" in tokens:
         candidates.add("show")
     return candidates
+
+
+def _runtime_supports_render(
+    runtime_registry: RuntimeEligibility, capability_id: str
+) -> bool:
+    """Honor optional runtime map support without widening the protocol."""
+
+    supports_mode = getattr(runtime_registry, "supports_mode", None)
+    if not callable(supports_mode):
+        # Lightweight test doubles and older callers only expose enabled and
+        # access checks; the manifest contract remains the source of truth.
+        return True
+    return bool(supports_mode(capability_id, "map"))
 
 
 def _has_explicit_execution_contract(capability: dict[str, Any]) -> bool:
@@ -616,6 +718,7 @@ def _searchable_text(capability: dict[str, Any]) -> set[str]:
         capability.get("capabilities"),
         agentic_use.get("plannerHints"),
         agentic_use.get("intentTags"),
+        agentic_use.get("requiredUserAction"),
         metadata.get("keywords"),
         metadata.get("action_tags"),
         metadata.get("supported_categories"),
@@ -632,9 +735,31 @@ def _searchable_text(capability: dict[str, Any]) -> set[str]:
 
 ###############################################################################
 def _query_tokens(values: Sequence[object]) -> set[str]:
-    return {
-        token
-        for value in values
-        for token in re.findall(r"[a-z0-9]+", str(value or "").casefold())
-        if len(token) > 1
-    }
+    tokens: set[str] = set()
+    for value in values:
+        for token in re.findall(r"[a-z0-9]+", str(value or "").casefold()):
+            if len(token) <= 1:
+                continue
+            tokens.add(token)
+            if token.endswith("ies") and len(token) > 4:
+                tokens.add(token[:-3] + "y")
+            elif token.endswith("s") and len(token) > 3:
+                tokens.add(token[:-1])
+            tokens.update(_QUERY_ALIASES.get(token, set()))
+    return tokens
+
+
+def _raw_query_tokens(values: Sequence[object]) -> set[str]:
+    """Return literal query terms for the meaningful-match floor."""
+
+    tokens: set[str] = set()
+    for value in values:
+        for token in re.findall(r"[a-z0-9]+", str(value or "").casefold()):
+            if len(token) <= 1:
+                continue
+            tokens.add(token)
+            if token.endswith("ies") and len(token) > 4:
+                tokens.add(token[:-3] + "y")
+            elif token.endswith("s") and len(token) > 3:
+                tokens.add(token[:-1])
+    return tokens
