@@ -115,6 +115,18 @@ conversation-scoped `agent_evidence` store rather than model messages.
 - `geospatial/ingestion/validation.md`
   Manifest audit, backend, frontend, browser, CI, and live-provider validation workflow.
 
+#### Validation Ledger
+
+- `validation/gate_status.md`
+  Canonical PASS/PARTIAL/FAIL/BLOCKED/NOT RUN ledger for native-loop,
+  presentation, browser-fault, provider, and hosted-CI gates.
+
+#### Validation Ledger
+
+- `validation/gate_status.md`
+  Canonical PASS/PARTIAL/FAIL/BLOCKED/NOT RUN ledger for native-loop,
+  presentation, browser-fault, provider, and hosted-CI gates.
+
 ### UI
 
 - `ui/design_tokens.md`

@@ -16,7 +16,7 @@ from uuid import uuid4
 from server.common.typing import is_json_object
 from server.contracts.chat import ChatTurnRequest, ChatTurnResponse
 from server.domain.agent.context import ConversationDirective
-from server.domain.agent.conversation import ConversationState
+from server.domain.agent.conversation import ConversationState, PendingClarification
 from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.reliability import (
     COMPLEX_RUN_SECONDS,
@@ -217,7 +217,11 @@ class NativeAgentOrchestrator:
                 current_user_message=payload.message,
                 messages=recent_messages,
                 directives=self.instruction_state_service.active(directives),
-                task_state=conversation_state.model_dump(mode="json"),
+                # Clarifications are scoped to the turn that produced them.
+                # The durable record remains in ConversationState for audit
+                # and possible later answers, but unrelated requests must not
+                # inherit it as a blocking task requirement.
+                task_state=conversation_state.context_projection(payload.message),
                 map_memory=latest_memory,
                 prior_summary=conversation_state.summary,
                 relevant_tool_outcomes=relevant_outcomes,
@@ -279,6 +283,33 @@ class NativeAgentOrchestrator:
             committed_map = native_response.map_session
         merged_locations = dict(conversation_state.resolved_locations)
         merged_locations.update(native_response.location_refs)
+        stored_clarification = conversation_state.pending_clarification
+        if stored_clarification is None and conversation_state.unresolved_questions:
+            stored_clarification = PendingClarification.from_legacy(
+                conversation_state.unresolved_questions[0]
+            )
+        if native_response.operation.kind == "clarification":
+            next_clarification = PendingClarification.from_turn(
+                native_response.operation.message,
+                source_turn_index=recent_count + 1,
+                source_request_id=request_id,
+                source_text=payload.message,
+            )
+            next_questions = [native_response.operation.message]
+        elif stored_clarification is not None:
+            next_clarification = stored_clarification.model_copy(
+                update={
+                    "status": (
+                        "answered"
+                        if stored_clarification.applies_to(payload.message)
+                        else "deferred"
+                    )
+                }
+            )
+            next_questions = []
+        else:
+            next_clarification = None
+            next_questions = []
         next_state = conversation_state.model_copy(
             update={
                 "revision": int(persisted.get("context_revision") or 0) + 1,
@@ -304,11 +335,8 @@ class NativeAgentOrchestrator:
                     )
                 ),
                 "committed_map_session": committed_map,
-                "unresolved_questions": (
-                    [native_response.operation.message]
-                    if native_response.operation.kind == "clarification"
-                    else []
-                ),
+                "unresolved_questions": next_questions,
+                "pending_clarification": next_clarification,
             }
         )
         memory_snapshot = next_state.memory_projection()

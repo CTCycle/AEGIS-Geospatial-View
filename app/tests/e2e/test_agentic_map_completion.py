@@ -14,6 +14,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+import pytest
 from playwright.sync_api import ConsoleMessage, Page, Route, WebSocketRoute, expect
 
 from tests.e2e.helpers.chat_stub_payloads import (
@@ -116,10 +117,12 @@ def _map_session() -> dict[str, Any]:
 
 ###############################################################################
 def _prepared_presentation(map_session: dict[str, Any]) -> dict[str, Any]:
+    session_id = str(map_session["session_id"])
+    collection_revision = int(map_session["overlay_collection"]["revision"])
     return {
         "status": "pending",
-        "map_session_id": MAP_SESSION_ID,
-        "collection_revision": COLLECTION_REVISION,
+        "map_session_id": session_id,
+        "collection_revision": collection_revision,
         "required_render_checks": {
             "required_sources_loaded": True,
             "required_layers_present": True,
@@ -140,26 +143,80 @@ def _prepared_presentation(map_session: dict[str, Any]) -> dict[str, Any]:
     }
 
 ###############################################################################
-def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> None:
+def _map_session_variant(attempt: int) -> dict[str, Any]:
+    session = _map_session()
+    session["session_id"] = f"{MAP_SESSION_ID}-attempt-{attempt}"
+    session["overlay_collection"]["revision"] = COLLECTION_REVISION + attempt
+    return session
+
+
+FAULT_SCENARIOS = (
+    "failed_layer",
+    "viewport_mismatch",
+    "stale_ack",
+    "duplicate_ack",
+    "cancelled",
+    "superseded",
+    "retry_exhausted",
+)
+
+
+def _controlled_socket(
+    page: Page,
+    acknowledgments: list[dict[str, Any]],
+    *,
+    scenario: str = "none",
+) -> None:
     map_session = _map_session()
     presentation = _prepared_presentation(map_session)
     sequence = 0
+    render_attempt = 0
+    active_run_version = 1
+    current_map_session = map_session
+    current_presentation = presentation
+    cancelled = False
 
-    def send_event(socket: WebSocketRoute, event_type: str, payload: dict[str, Any]) -> None:
+    def send_event(
+        socket: WebSocketRoute,
+        event_type: str,
+        payload: dict[str, Any],
+        *,
+        run_version: int | None = None,
+    ) -> None:
         nonlocal sequence
         sequence += 1
         event_payload = {"type": event_type, **payload}
-        socket.send(
-            _envelope(
-                message_type="run.event",
-                payload=event_payload,
-                message_id=f"controlled-event-{sequence}",
-                sequence=sequence,
-            )
+        envelope = _envelope(
+            message_type="run.event",
+            payload=event_payload,
+            message_id=f"controlled-event-{sequence}",
+            sequence=sequence,
+        )
+        if run_version is not None:
+            parsed = json.loads(envelope)
+            parsed["payload"]["run_version"] = run_version
+            envelope = json.dumps(parsed)
+        socket.send(envelope)
+
+    def send_prepared(socket: WebSocketRoute) -> None:
+        send_event(
+            socket,
+            "map_prepared",
+            {
+                "presentation": current_presentation,
+                "map_session": current_map_session,
+                "operation": {
+                    "kind": "map_session",
+                    "status": "pending",
+                    "message": "Data prepared; the map is loading.",
+                },
+            },
+            run_version=active_run_version,
         )
 
     def handle_socket(socket: WebSocketRoute) -> None:
         def handle_message(raw: str | bytes) -> None:
+            nonlocal active_run_version, current_map_session, current_presentation, render_attempt, cancelled
             try:
                 request = json.loads(raw)
             except (TypeError, json.JSONDecodeError):
@@ -185,7 +242,7 @@ def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> Non
                             "accepted": True,
                             "duplicate": False,
                             "run_id": RUN_ID,
-                            "run_version": 1,
+                            "run_version": active_run_version,
                             "state": "running",
                         },
                         message_id="controlled-start-ack",
@@ -196,24 +253,52 @@ def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> Non
                     "progress",
                     {"stage": "understanding_request", "label": "Understanding the request"},
                 )
-                send_event(
-                    socket,
-                    "assistant_text_completed",
-                    {"content": "Data prepared; the map is loading."},
-                )
-                send_event(
-                    socket,
-                    "map_prepared",
-                    {
-                        "presentation": presentation,
-                        "map_session": map_session,
-                        "operation": {
-                            "kind": "map_session",
-                            "status": "pending",
-                            "message": "Data prepared; the map is loading.",
+                send_event(socket, "assistant_text_completed", {"content": "Data prepared; the map is loading."})
+                if scenario != "superseded":
+                    send_prepared(socket)
+                return
+            if request_type == "run.cancel" and scenario == "cancelled":
+                cancelled = True
+                socket.send(
+                    _envelope(
+                        message_type="run.ack",
+                        payload={
+                            "command": "run.cancel",
+                            "accepted": True,
+                            "duplicate": False,
+                            "run_id": RUN_ID,
+                            "run_version": active_run_version,
+                            "state": "cancelled",
+                            "presentation_status": "failed",
                         },
-                    },
+                        message_id="controlled-cancel-ack",
+                    )
                 )
+                send_event(socket, "cancelled", {"message": "Map update cancelled."})
+                return
+            if request_type == "run.steer" and scenario == "superseded":
+                active_run_version = 2
+                socket.send(
+                    _envelope(
+                        message_type="run.ack",
+                        payload={
+                            "command": "run.steer",
+                            "accepted": True,
+                            "duplicate": False,
+                            "run_id": RUN_ID,
+                            "run_version": active_run_version,
+                            "state": "running",
+                        },
+                        message_id="controlled-steer-ack",
+                    )
+                )
+                send_event(
+                    socket,
+                    "request_updated",
+                    {"label": "Request updated"},
+                    run_version=active_run_version,
+                )
+                send_prepared(socket)
                 return
             if request_type != "map.render_ack":
                 return
@@ -221,6 +306,148 @@ def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> Non
             if not isinstance(payload, dict):
                 return
             acknowledgments.append(deepcopy(payload))
+            if scenario == "cancelled":
+                if not cancelled:
+                    return
+                socket.send(
+                    _envelope(
+                        message_type="protocol.error",
+                        payload={
+                            "code": "render_ack_rejected",
+                            "message": "The render acknowledgment arrived after cancellation.",
+                            "command": "map.render_ack",
+                            "accepted": False,
+                        },
+                        message_id="controlled-cancelled-render-ack",
+                    )
+                )
+                return
+            render_attempt += 1
+            if scenario == "stale_ack":
+                socket.send(
+                    _envelope(
+                        message_type="protocol.error",
+                        payload={
+                            "code": "render_ack_rejected",
+                            "message": "The render acknowledgment is stale.",
+                            "command": "map.render_ack",
+                            "accepted": False,
+                        },
+                        message_id="controlled-stale-ack",
+                    )
+                )
+                return
+            if scenario in {"failed_layer", "viewport_mismatch"} and render_attempt == 1:
+                failure_code = (
+                    "required_layer_not_visible"
+                    if scenario == "failed_layer"
+                    else "viewport_mismatch"
+                )
+                socket.send(
+                    _envelope(
+                        message_type="run.ack",
+                        payload={
+                            "command": "map.render_ack",
+                            "accepted": True,
+                            "duplicate": False,
+                            "run_id": RUN_ID,
+                            "run_version": active_run_version,
+                            "state": "pending",
+                            "presentation_status": "pending",
+                        },
+                        message_id="controlled-failed-render-ack",
+                    )
+                )
+                send_event(
+                    socket,
+                    "render_observed",
+                    {
+                        "map_session_id": payload.get("map_session_id"),
+                        "collection_revision": payload.get("collection_revision"),
+                        "attempt": render_attempt,
+                        "status": "failed",
+                        "failure_code": failure_code,
+                        "failure_summary": "The controlled fixture rejected this render.",
+                        "checks": {
+                            "required_sources_loaded": True,
+                            "required_layers_present": scenario != "failed_layer",
+                            "viewport_valid": scenario != "viewport_mismatch",
+                        },
+                        "overlay_results": [
+                            {
+                                "overlay_id": "earthquake-rome-1",
+                                "source_loaded": True,
+                                "layer_present": scenario != "failed_layer",
+                                "visibility_matches": scenario != "failed_layer",
+                            }
+                        ],
+                        "recovery": "revise_map",
+                    },
+                    run_version=active_run_version,
+                )
+                current_map_session = _map_session_variant(1)
+                current_presentation = _prepared_presentation(current_map_session)
+                send_prepared(socket)
+                return
+            if scenario == "retry_exhausted" and render_attempt <= 3:
+                if render_attempt < 3:
+                    send_event(
+                        socket,
+                        "render_observed",
+                        {
+                            "map_session_id": payload.get("map_session_id"),
+                            "collection_revision": payload.get("collection_revision"),
+                            "attempt": render_attempt,
+                            "status": "failed",
+                            "failure_code": "controlled_render_failure",
+                            "failure_summary": "The controlled fixture rejected this render.",
+                            "checks": {
+                                "required_sources_loaded": True,
+                                "required_layers_present": False,
+                                "viewport_valid": True,
+                            },
+                            "overlay_results": [
+                                {
+                                    "overlay_id": "earthquake-rome-1",
+                                    "source_loaded": True,
+                                    "layer_present": False,
+                                    "visibility_matches": False,
+                                }
+                            ],
+                            "recovery": "alternate_source",
+                        },
+                        run_version=active_run_version,
+                    )
+                    current_map_session = _map_session_variant(render_attempt)
+                    current_presentation = _prepared_presentation(current_map_session)
+                    send_prepared(socket)
+                    return
+                socket.send(
+                    _envelope(
+                        message_type="run.ack",
+                        payload={
+                            "command": "map.render_ack",
+                            "accepted": True,
+                            "duplicate": False,
+                            "run_id": RUN_ID,
+                            "run_version": active_run_version,
+                            "state": "failed",
+                            "presentation_status": "render_timeout",
+                        },
+                        message_id="controlled-retry-exhausted-ack",
+                    )
+                )
+                send_event(
+                    socket,
+                    "error",
+                    {
+                        "code": "render_retry_exhausted",
+                        "message": "The map renderer did not produce a verified result.",
+                        "presentation_status": "render_timeout",
+                    },
+                    run_version=active_run_version,
+                )
+                return
             socket.send(
                 _envelope(
                     message_type="run.ack",
@@ -229,13 +456,29 @@ def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> Non
                         "accepted": True,
                         "duplicate": False,
                         "run_id": RUN_ID,
-                        "run_version": 1,
+                        "run_version": active_run_version,
                         "state": "completed",
                         "presentation_status": "ready",
                     },
                     message_id="controlled-render-ack",
                 )
             )
+            if scenario == "duplicate_ack":
+                socket.send(
+                    _envelope(
+                        message_type="run.ack",
+                        payload={
+                            "command": "map.render_ack",
+                            "accepted": True,
+                            "duplicate": True,
+                            "run_id": RUN_ID,
+                            "run_version": active_run_version,
+                            "state": "completed",
+                            "presentation_status": "ready",
+                        },
+                        message_id="controlled-duplicate-render-ack",
+                    )
+                )
             send_event(socket, "progress", {"stage": "completed", "label": "Completed"})
             send_event(socket, "assistant_text_completed", {"content": "Map ready."})
             send_event(
@@ -248,7 +491,7 @@ def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> Non
                         "status": "success",
                         "message": "Map ready.",
                     },
-                    "map_session": map_session,
+                    "map_session": current_map_session,
                     "route": _native_route(
                         task_mode="execute",
                         presentation="map",
@@ -273,7 +516,7 @@ def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> Non
                         "temporal_scope_required": False,
                         "spatial_scope_required": True,
                     },
-                    "memory_snapshot": {"active_visualization": map_session},
+                    "memory_snapshot": {"active_visualization": current_map_session},
                     "presentation_status": "ready",
                     "tool_results": [],
                     "execution_trace": {"stopped_reason": "goal_satisfied"},
@@ -294,7 +537,12 @@ def _controlled_socket(page: Page, acknowledgments: list[dict[str, Any]]) -> Non
     )
 
 ###############################################################################
-def _setup_controlled_routes(page: Page, acknowledgments: list[dict[str, Any]]) -> None:
+def _setup_controlled_routes(
+    page: Page,
+    acknowledgments: list[dict[str, Any]],
+    *,
+    scenario: str = "none",
+) -> None:
     def fulfill(route: Route, payload: dict[str, Any]) -> None:
         route.fulfill(
             status=200,
@@ -302,7 +550,7 @@ def _setup_controlled_routes(page: Page, acknowledgments: list[dict[str, Any]]) 
             body=json.dumps(payload),
         )
 
-    _controlled_socket(page, acknowledgments)
+    _controlled_socket(page, acknowledgments, scenario=scenario)
     page.route(
         re.compile(r".*/api/chat/settings$"),
         lambda route: fulfill(route, model_settings_payload()),
@@ -409,3 +657,89 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
         for error in console_errors
         if any(token in error.casefold() for token in ("typeerror", "webgl", "map source"))
     ]
+
+
+@pytest.mark.parametrize("scenario", FAULT_SCENARIOS)
+def test_controlled_render_fault_scenarios_are_observable_and_bounded(
+    page: Page,
+    base_url: str,
+    artifact_root: Path,
+    save_snapshot,
+    scenario: str,
+) -> None:
+    """Exercise browser-visible render faults without production fault flags.
+
+    The WebSocket route is the only injector.  MapLibre still renders the
+    actual candidate and emits the real client acknowledgment; the fixture
+    controls only the server response/observation that follows it.
+    """
+
+    acknowledgments: list[dict[str, Any]] = []
+    _setup_controlled_routes(page, acknowledgments, scenario=scenario)
+    page.goto(base_url)
+    composer = page.get_by_label("Chat message")
+    composer.fill("Show recent earthquakes around Rome")
+    page.get_by_role("button", name="Send message").click()
+
+    if scenario == "superseded":
+        expect(page.get_by_role("status").first).to_contain_text(
+            "Understanding", timeout=15000
+        )
+        composer.fill("Focus on Milan instead")
+        composer.press("Enter")
+    elif scenario == "cancelled":
+        expect(page.get_by_role("status").first).to_contain_text(
+            "Map data ready; rendering", timeout=15000
+        )
+        page.get_by_role("button", name="Stop generating").click()
+    else:
+        expect(page.get_by_role("status").first).to_contain_text(
+            "Map data ready; rendering", timeout=15000
+        )
+
+    if scenario in {"failed_layer", "viewport_mismatch", "duplicate_ack"}:
+        expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
+        expect(page.locator(".chat-message--assistant").last).to_contain_text(
+            "Map ready.", timeout=15000
+        )
+        assert len(acknowledgments) >= (2 if scenario != "duplicate_ack" else 1)
+    elif scenario == "retry_exhausted":
+        expect(page.get_by_role("status").first).to_contain_text(
+            "Agent needs attention", timeout=15000
+        )
+        assert len(acknowledgments) == 3
+    elif scenario == "stale_ack":
+        expect(page.get_by_role("status").first).to_contain_text(
+            "Agent ready", timeout=15000
+        )
+        expect(page.locator(".chat-message--assistant").last).to_contain_text(
+            "real-time connection", timeout=15000
+        )
+        assert len(acknowledgments) == 1
+    elif scenario == "cancelled":
+        expect(page.get_by_role("status").first).to_contain_text(
+            "Agent ready", timeout=15000
+        )
+        assert page.locator(".chat-message--assistant").last.inner_text() != "Map ready."
+    else:
+        expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
+        expect(page.locator(".chat-message--assistant").last).to_contain_text(
+            "Map ready.", timeout=15000
+        )
+
+    screenshot_path = save_snapshot(page, f"controlled-map-{scenario}")
+    report_path = artifact_root / "reports" / f"controlled-map-{scenario}.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "scenario": scenario,
+                "run_id": RUN_ID,
+                "acknowledgment_count": len(acknowledgments),
+                "acknowledgments": acknowledgments,
+                "screenshot": str(screenshot_path),
+                "fault_injection": "WebSocket fixture only",
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )

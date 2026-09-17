@@ -646,8 +646,15 @@ class AgentLoop:
             and state.model_calls < model_limit
             and request.budget.remaining_seconds() > 0.001
         )
+        finalization_reason = "iteration_exhaustion"
         if can_finalize:
             state.finalization_attempted = True
+            await self._emit_finalization_trace(
+                request,
+                reason=finalization_reason,
+                phase="started",
+            )
+            outcome = "empty"
             try:
                 result = await self._model_step(request, provider, messages, [])
                 # A provider violating ``tools=[]`` is treated as an empty
@@ -655,7 +662,11 @@ class AgentLoop:
                 # the safe terminal response.
                 if not result.tool_calls:
                     candidate = (result.content or "").strip()
+                    outcome = "text" if candidate else "empty"
+                else:
+                    outcome = "tool_calls_suppressed"
             except (AgentRunControlSignal, asyncio.CancelledError):
+                outcome = "cancelled"
                 raise
             except (
                 ExecutionBudgetExceeded,
@@ -663,9 +674,29 @@ class AgentLoop:
                 LLMStructuredOutputError,
                 TimeoutError,
             ):
+                outcome = "provider_error"
                 candidate = ""
             except Exception:
+                outcome = "error"
                 candidate = ""
+            finally:
+                await self._emit_finalization_trace(
+                    request,
+                    reason=finalization_reason,
+                    phase="completed",
+                    outcome=outcome,
+                )
+        else:
+            await self._emit_finalization_trace(
+                request,
+                reason=finalization_reason,
+                phase="skipped",
+                outcome=(
+                    "already_attempted"
+                    if state.finalization_attempted
+                    else "budget_unavailable"
+                ),
+            )
 
         pending = self._pending_requirements_for_task_state(state)
         if state.render_retry_exhausted:
@@ -712,11 +743,22 @@ class AgentLoop:
             and request.budget.remaining_seconds() > 0.001
         ):
             state.finalization_attempted = True
+            finalization_reason = "verified_render"
+            await self._emit_finalization_trace(
+                request,
+                reason=finalization_reason,
+                phase="started",
+            )
+            outcome = "empty"
             try:
                 result = await self._model_step(request, provider, messages, [])
                 if not result.tool_calls:
                     candidate = (result.content or "").strip()
+                    outcome = "text" if candidate else "empty"
+                else:
+                    outcome = "tool_calls_suppressed"
             except (AgentRunControlSignal, asyncio.CancelledError):
+                outcome = "cancelled"
                 raise
             except (
                 ExecutionBudgetExceeded,
@@ -724,10 +766,63 @@ class AgentLoop:
                 LLMStructuredOutputError,
                 TimeoutError,
             ):
+                outcome = "provider_error"
                 candidate = ""
             except Exception:
+                outcome = "error"
                 candidate = ""
+            finally:
+                await self._emit_finalization_trace(
+                    request,
+                    reason=finalization_reason,
+                    phase="completed",
+                    outcome=outcome,
+                )
+        else:
+            await self._emit_finalization_trace(
+                request,
+                reason="verified_render",
+                phase="skipped",
+                outcome=(
+                    "already_attempted"
+                    if state.finalization_attempted
+                    else "budget_unavailable"
+                ),
+            )
         return candidate or "The map is ready and the rendering was verified."
+
+    # -------------------------------------------------------------------------
+    async def _emit_finalization_trace(
+        self,
+        request: AgentLoopRequest,
+        *,
+        reason: str,
+        phase: Literal["started", "completed", "skipped"],
+        outcome: str | None = None,
+    ) -> None:
+        """Expose the tools-disabled finalization boundary without content."""
+
+        state = request.state
+        payload: dict[str, Any] = {
+            "phase": phase,
+            "reason": reason,
+            "tools_exposed": 0,
+            "tool_choice": "none",
+            "model_call": state.model_calls,
+        }
+        if outcome is not None:
+            payload["outcome"] = outcome
+        await self._emit_trace(
+            request,
+            AgentTraceEvent(
+                kind="finalization",
+                run_id=state.run_id or state.request_id,
+                run_version=state.run_version,
+                sequence=self._trace_sequence(state),
+                iteration=max(1, state.current_iteration),
+                payload=payload,
+            ),
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

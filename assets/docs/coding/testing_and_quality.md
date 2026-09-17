@@ -1,6 +1,6 @@
 # Testing And Quality
 
-Last updated: 2026-09-09
+Last updated: 2026-09-17
 
 ## Python Quality Gates
 
@@ -57,6 +57,13 @@ Run quality commands from the repository root so the configured relative paths
 resolve to these roots. `app/tests/run_tests.bat`, the Windows launcher, and CI
 also set absolute cache environment variables. Retained QA evidence remains
 under `assets/QA`.
+
+The canonical status of local, browser, provider, migration, and hosted-CI
+gates is maintained in
+[`assets/docs/validation/gate_status.md`](../validation/gate_status.md).
+Every entry must identify the exact command/evidence, date, and one of
+`PASS`, `PARTIAL`, `FAIL`, `BLOCKED`, or `NOT RUN`; a build or catalog probe
+does not promote a completion-path gate.
 
 ## Frontend Quality Gates
 

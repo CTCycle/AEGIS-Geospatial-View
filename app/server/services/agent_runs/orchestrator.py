@@ -353,6 +353,7 @@ class AgentRunOrchestrator:
                     snapshot.active_run_version,
                     "map_preparation_failed",
                     str(exc),
+                    presentation_status="failed",
                 )
                 if transitioned:
                     await self._publish_progress(failed, RunProgressStage.FAILED)
@@ -485,11 +486,21 @@ class AgentRunOrchestrator:
             )
             return
         if self._response_failed(response):
+            terminal_presentation_status = (
+                response.presentation_status
+                if response.presentation_status in {"failed", "render_timeout"}
+                else None
+            )
             failed, transitioned = self.run_repository.mark_failed_if_current(
                 run_id,
                 snapshot.active_run_version,
                 "agent_operation_failed",
                 response.operation.message,
+                **(
+                    {"presentation_status": terminal_presentation_status}
+                    if terminal_presentation_status is not None
+                    else {}
+                ),
             )
             if not transitioned:
                 if failed.cancel_requested_at is not None:

@@ -20,7 +20,7 @@ from server.domain.agent.capability_route import AgentTaskState
 from server.domain.agent.conversation import ConversationState
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.database.sqlite import SQLiteRepository
-from sqlalchemy import and_, func, or_, select, text, update
+from sqlalchemy import and_, case, func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
@@ -650,6 +650,8 @@ class AgentRunRepository:
             record.active_slot = None
             record.cancel_requested_at = record.cancel_requested_at or datetime.now(UTC)
             record.completed_at = record.completed_at or datetime.now(UTC)
+            if record.presentation_status == "pending":
+                record.presentation_status = "failed"
             session.commit()
             session.refresh(record)
             return self._to_snapshot(record)
@@ -682,6 +684,16 @@ class AgentRunRepository:
                         active_slot=None,
                         cancel_requested_at=now,
                         completed_at=now,
+                        # A cancelled browser candidate is no longer pending;
+                        # preserve non-render terminal values for ordinary
+                        # text runs while closing the render lifecycle.
+                        presentation_status=case(
+                            (
+                                AgentRunRecord.presentation_status == "pending",
+                                "failed",
+                            ),
+                            else_=AgentRunRecord.presentation_status,
+                        ),
                     )
                 ),
             )
@@ -1467,10 +1479,32 @@ class AgentRunRepository:
 
     # -------------------------------------------------------------------------
     def mark_failed_if_current(
-        self, run_id: str, expected_run_version: int, code: str, message: str
+        self,
+        run_id: str,
+        expected_run_version: int,
+        code: str,
+        message: str,
+        *,
+        presentation_status: str | None = None,
     ) -> tuple[AgentRunSnapshot, bool]:
         """Fail only the still-current, non-cancelled run version."""
         with self._session_factory() as session:
+            if presentation_status is not None and presentation_status not in {
+                "not_required",
+                "pending",
+                "ready",
+                "failed",
+                "render_timeout",
+            }:
+                raise ValueError("Unsupported terminal presentation status.")
+            status_value: object = (
+                presentation_status
+                if presentation_status is not None
+                else case(
+                    (AgentRunRecord.presentation_status == "pending", "failed"),
+                    else_=AgentRunRecord.presentation_status,
+                )
+            )
             updated = cast(
                 CursorResult[Any],
                 session.execute(
@@ -1494,6 +1528,7 @@ class AgentRunRepository:
                         error_code=code,
                         error_message=message,
                         completed_at=datetime.now(UTC),
+                        presentation_status=status_value,
                     )
                 ),
             )
@@ -1582,6 +1617,8 @@ class AgentRunRepository:
             record.error_code = code
             record.error_message = message
             record.completed_at = datetime.now(UTC)
+            if record.presentation_status == "pending":
+                record.presentation_status = "failed"
             session.commit()
             session.refresh(record)
             return self._to_snapshot(record)

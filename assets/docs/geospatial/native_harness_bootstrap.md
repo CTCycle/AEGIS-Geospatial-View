@@ -273,3 +273,8 @@ path can select legacy or shadow execution. The final architecture must remain
 one model-directed loop, one canonical state model, one registry, one context
 and observation policy, one timeout/budget policy, and one public response
 contract.
+
+The canonical gate ledger for this completion decision is
+[`assets/docs/validation/gate_status.md`](../validation/gate_status.md). Update
+that ledger when a gate changes; do not infer provider, browser, or hosted-CI
+success from a local unit/build result.

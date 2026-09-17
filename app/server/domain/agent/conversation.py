@@ -9,6 +9,7 @@ reconstructing semantic state from a recent-message suffix.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,12 +19,80 @@ from server.domain.agent.capability_route import AgentGoal, CapabilityRoute
 from server.domain.agent.decision import ResolvedLocation
 
 
+_CLARIFICATION_ACTION_MARKERS = re.compile(
+    r"\b(?:add|change|display|find|focus|get|map|move|remove|show|switch|use|"
+    r"weather|environment(?:al)?|traffic|earthquake|satellite|terrain|layer|"
+    r"overlay|zoom|around|near)\b",
+    re.IGNORECASE,
+)
+
+
+class PendingClarification(BaseModel):
+    """A clarification tied to the request that produced it.
+
+    ``unresolved_questions`` predates the native loop and is retained as a
+    small compatibility projection.  This record is the durable source of
+    truth: status and source terms let a later turn consume the clarification
+    without making it a global blocker for unrelated work.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=1, max_length=1_000)
+    source_turn_index: int = Field(default=0, ge=0)
+    source_request_id: str | None = None
+    scope: Literal["current_request"] = "current_request"
+    scope_terms: list[str] = Field(default_factory=list, max_length=24)
+    status: Literal["active", "deferred", "answered"] = "active"
+
+    @classmethod
+    def from_turn(
+        cls,
+        question: str,
+        *,
+        source_turn_index: int,
+        source_request_id: str | None = None,
+        source_text: str = "",
+    ) -> "PendingClarification":
+        terms = [
+            token
+            for token in re.findall(r"[a-z0-9]+", source_text.casefold())
+            if len(token) >= 3
+        ]
+        return cls(
+            question=question,
+            source_turn_index=source_turn_index,
+            source_request_id=source_request_id,
+            scope_terms=list(dict.fromkeys(terms))[:24],
+        )
+
+    @classmethod
+    def from_legacy(cls, question: str) -> "PendingClarification":
+        return cls(question=question.strip(), source_turn_index=0)
+
+    def applies_to(self, message: str) -> bool:
+        """Return whether ``message`` is plausibly answering this question.
+
+        New map/layer requests are deliberately treated as a new scope even
+        when they mention one of the original place terms.  Short, non-action
+        replies remain eligible answers (for example ``Illinois`` or ``the
+        country``), while prose unrelated to the question does not become a
+        sticky clarification blocker.
+        """
+
+        if self.status == "answered" or not message.strip():
+            return False
+        if _CLARIFICATION_ACTION_MARKERS.search(message):
+            return False
+        return len(message.split()) <= 16
+
+
 class ConversationState(BaseModel):
     """Revisioned, durable state shared by all turns in one conversation."""
 
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal[1] = 1
+    schema_version: Literal[1, 2] = 2
     conversation_id: str
     revision: int = Field(default=0, ge=0)
     active_directives: list[dict[str, Any]] = Field(
@@ -40,6 +109,7 @@ class ConversationState(BaseModel):
     evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
     committed_map_session: MapSession | None = None
     unresolved_questions: list[str] = Field(default_factory=lambda: list[str]())
+    pending_clarification: PendingClarification | None = None
 
     @classmethod
     def empty(cls, conversation_id: str, *, revision: int = 0) -> "ConversationState":
@@ -57,10 +127,59 @@ class ConversationState(BaseModel):
 
         if payload is None:
             return cls.empty(conversation_id, revision=revision)
-        state = cls.model_validate(payload)
+        if isinstance(payload, dict):
+            migrated = dict(payload)
+            migrated.setdefault("schema_version", 2)
+            pending = migrated.get("pending_clarification")
+            if pending is None:
+                legacy_questions = migrated.get("unresolved_questions")
+                if isinstance(legacy_questions, list):
+                    first = next(
+                        (
+                            str(item).strip()
+                            for item in legacy_questions
+                            if str(item).strip()
+                        ),
+                        "",
+                    )
+                    if first:
+                        migrated["pending_clarification"] = (
+                            PendingClarification.from_legacy(first).model_dump(
+                                mode="json"
+                            )
+                        )
+            migrated["schema_version"] = 2
+            state = cls.model_validate(migrated)
+        else:
+            state = cls.model_validate(payload)
         if state.conversation_id != conversation_id:
             raise ValueError("Conversation state belongs to another conversation.")
         return state.model_copy(update={"revision": max(state.revision, revision)})
+
+    def pending_clarification_for(
+        self, message: str
+    ) -> PendingClarification | None:
+        """Project only a clarification relevant to the current user turn."""
+
+        pending = self.pending_clarification
+        if pending is None and self.unresolved_questions:
+            pending = PendingClarification.from_legacy(self.unresolved_questions[0])
+        if pending is None or not pending.applies_to(message):
+            return None
+        return pending.model_copy(update={"status": "active"})
+
+    def context_projection(self, message: str) -> dict[str, Any]:
+        """Return the model-visible state with clarification scope applied."""
+
+        result = self.model_dump(mode="json")
+        pending = self.pending_clarification_for(message)
+        result["pending_clarification"] = (
+            pending.model_dump(mode="json") if pending is not None else None
+        )
+        result["unresolved_questions"] = (
+            [pending.question] if pending is not None else []
+        )
+        return result
 
     def memory_projection(self) -> dict[str, Any]:
         """Return the bounded presentation projection used by the UI."""
@@ -76,4 +195,4 @@ class ConversationState(BaseModel):
         return result
 
 
-__all__ = ["ConversationState"]
+__all__ = ["ConversationState", "PendingClarification"]
