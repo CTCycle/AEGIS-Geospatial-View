@@ -81,6 +81,94 @@ _GENERIC_QUERY_TOKENS = {
     "with",
 }
 
+# These aliases are intentionally narrower than ``_QUERY_ALIASES``.  The
+# latter expands primitive operation vocabulary; using it while indexing
+# manifest text turns an airport's ``infrastructure`` capability into a
+# residential/building match, for example.  Routing aliases describe the
+# semantic subject the user asked for instead of widening the catalog entry.
+_ROUTING_QUERY_ALIASES: dict[str, set[str]] = {
+    "weather": {"weather"},
+    "meteo": {"weather"},
+    "forecast": {"forecast"},
+    "vegetation": {"vegetation"},
+    "landcover": {"landcover"},
+    "ndvi": {"vegetation", "ndvi"},
+    "esa": {"esa"},
+    "modis": {"modis"},
+    "worldcover": {"worldcover"},
+    "earthquake": {"earthquake"},
+    "earthquakes": {"earthquake"},
+    "seismic": {"earthquake"},
+    "hazard": {"hazard"},
+    "hazards": {"hazard"},
+    "usgs": {"usgs"},
+    "poi": {"poi"},
+    "amenity": {"poi"},
+    "amenities": {"poi"},
+    "place": {"poi"},
+    "places": {"poi"},
+    "residential": {"residential"},
+    "building": {"building"},
+    "buildings": {"building"},
+    "demographic": {"demographics"},
+    "demographics": {"demographics"},
+    "population": {"demographics"},
+    "infrastructure": {"infrastructure"},
+    "ev": {"ev"},
+    "electric": {"electric"},
+    "charging": {"charging"},
+    "charger": {"charging"},
+    "airport": {"airport"},
+    "airports": {"airport"},
+    "road": {"road"},
+    "roads": {"road"},
+    "transit": {"transit"},
+    "utility": {"utilities"},
+    "utilities": {"utilities"},
+}
+
+_ROUTING_QUERY_PHRASES: tuple[tuple[str, set[str]], ...] = (
+    ("residential building footprints", {"residential_buildings"}),
+    ("residential buildings", {"residential_buildings"}),
+    ("building footprints", {"building"}),
+    ("census demographics", {"census_demographics"}),
+    ("usgs earthquakes", {"usgs_hazard"}),
+    ("usgs earthquake", {"usgs_hazard"}),
+    ("usgs hazards", {"usgs_hazard"}),
+    ("ev charging stations", {"ev_charging"}),
+    ("electric vehicle charging", {"ev_charging"}),
+    ("ev charging", {"ev_charging"}),
+    ("points of interest", {"poi"}),
+    ("point of interest", {"poi"}),
+    ("nearby amenities", {"poi"}),
+    ("nearby places", {"poi"}),
+    ("weather forecast", {"weather"}),
+    ("land cover", {"landcover"}),
+)
+
+_ROUTING_CONTEXT_TOKENS = _GENERIC_QUERY_TOKENS | {
+    "around",
+    "at",
+    "check",
+    "display",
+    "find",
+    "from",
+    "get",
+    "in",
+    "latest",
+    "live",
+    "near",
+    "nearby",
+    "now",
+    "over",
+    "recent",
+    "retrieve",
+    "search",
+    "show",
+    "today",
+    "visualize",
+}
+
 ###############################################################################
 def normalized_execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
     """Return the explicit schema-v2 execution semantics for a capability.
@@ -343,6 +431,7 @@ class CapabilityRegistry:
         meaningful_queries = _raw_query_tokens(queries).difference(
             _GENERIC_QUERY_TOKENS
         )
+        routing_query_terms, has_routing_alias = _routing_query_terms(queries)
         normalized_explicit = [
             str(value).strip() for value in explicit_ids if str(value).strip()
         ]
@@ -394,6 +483,9 @@ class CapabilityRegistry:
                 continue
             searchable = _searchable_text(item)
             matched_queries = meaningful_queries.intersection(searchable)
+            semantic_matches = routing_query_terms.intersection(
+                _routing_searchable_text(item)
+            )
             explicit_index = (
                 normalized_explicit.index(capability_id)
                 if capability_id in normalized_explicit
@@ -405,7 +497,19 @@ class CapabilityRegistry:
             # one meaningful match, a broad domain score must not substitute an
             # unrelated provider or dataset.  Explicit IDs remain authoritative
             # and are allowed through the normal runtime/contract checks.
-            if meaningful_queries and explicit_index is None and not matched_queries:
+            if (
+                has_routing_alias
+                and routing_query_terms
+                and explicit_index is None
+                and not semantic_matches
+            ):
+                continue
+            if (
+                not has_routing_alias
+                and meaningful_queries
+                and explicit_index is None
+                and not matched_queries
+            ):
                 continue
             identity_matches = meaningful_queries.intersection(
                 _identity_searchable_text(item)
@@ -418,12 +522,14 @@ class CapabilityRegistry:
             score += float(len(declared_domains.intersection(requested_domains))) * 100.0
             score += float(len(matched_queries) * 10)
             score += float(len(identity_matches) * 30)
+            score += float(len(semantic_matches) * 60)
             if capability_id.casefold() in {item.casefold() for item in normalized_queries}:
                 score += 50.0
             candidate = dict(item)
             candidate["routing_score"] = score
             candidate["routing_query_matches"] = sorted(matched_queries)
             candidate["routing_identity_matches"] = sorted(identity_matches)
+            candidate["routing_semantic_matches"] = sorted(semantic_matches)
             candidate["routing_domains"] = sorted(domain.value for domain in declared_domains)
             candidate["routing_contract"] = contract
             candidate["runtime_eligible"] = True
@@ -750,8 +856,79 @@ def _identity_searchable_text(capability: dict[str, Any]) -> set[str]:
     return {
         token
         for value in values
-        for token in _query_tokens(value if is_json_array(value) else [value])
+        for token in _raw_query_tokens(value if is_json_array(value) else [value])
     }
+
+
+def _routing_query_terms(values: Sequence[object]) -> tuple[set[str], bool]:
+    """Return bounded semantic terms and whether a routing alias was used."""
+
+    terms: set[str] = set()
+    recognized = False
+    for value in values:
+        normalized = re.sub(
+            r"\s+",
+            " ",
+            re.sub(r"[^a-z0-9]+", " ", str(value or "").casefold()),
+        ).strip()
+        for phrase, aliases in _ROUTING_QUERY_PHRASES:
+            if phrase not in normalized:
+                continue
+            normalized = normalized.replace(phrase, " ")
+            terms.update(aliases)
+            recognized = True
+        for token in _raw_query_tokens([normalized]):
+            aliases = _ROUTING_QUERY_ALIASES.get(token)
+            if aliases is not None:
+                terms.update(aliases)
+                recognized = True
+            elif token not in _ROUTING_CONTEXT_TOKENS:
+                terms.add(token)
+    return terms, recognized
+
+
+def _routing_searchable_text(capability: dict[str, Any]) -> set[str]:
+    """Return explicit catalog terms plus narrowly derived subject aliases."""
+
+    agentic_use = json_object(capability.get("agenticUse"))
+    if not agentic_use:
+        agentic_use = json_object(capability.get("agentic_use"))
+    metadata = json_object(capability.get("metadata"))
+    values: list[object] = [
+        capability.get("id"),
+        capability.get("name"),
+        capability.get("capabilities"),
+        agentic_use.get("intentTags"),
+        metadata.get("semantic_aliases"),
+    ]
+    terms = {
+        token
+        for value in values
+        for token in _raw_query_tokens(value if is_json_array(value) else [value])
+    }
+    if "landcover" in terms or {"land", "cover"}.issubset(terms):
+        terms.update({"landcover", "vegetation"})
+    if terms.intersection({"vegetation", "ndvi"}):
+        terms.add("vegetation")
+    if terms.intersection({"poi", "amenity", "amenities", "place", "places"}):
+        terms.add("poi")
+    if "residential" in terms and terms.intersection(
+        {"building", "buildings", "footprint", "footprints", "housing"}
+    ):
+        terms.add("residential_buildings")
+    if "census" in terms and terms.intersection(
+        {"demographic", "demographics", "population"}
+    ):
+        terms.add("census_demographics")
+    if "ev" in terms and terms.intersection({"charging", "charger"}):
+        terms.add("ev_charging")
+    if "electric" in terms and terms.intersection({"charging", "charger"}):
+        terms.add("ev_charging")
+    if "usgs" in terms and terms.intersection(
+        {"earthquake", "seismic", "hazard"}
+    ):
+        terms.add("usgs_hazard")
+    return terms
 
 ###############################################################################
 def _query_tokens(values: Sequence[object]) -> set[str]:
