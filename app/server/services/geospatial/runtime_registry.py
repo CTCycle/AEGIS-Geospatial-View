@@ -223,7 +223,15 @@ class RuntimeRegistry:
         if not env_name:
             return False
         value = os.getenv(env_name, "").strip()
-        return bool(value) and Path(value).expanduser().is_file()
+        if not value:
+            return False
+        # Configured feed profiles may point to either a local feed file or a
+        # trusted HTTP(S) feed URL.  Other local-source profiles remain
+        # file-backed so a URL cannot masquerade as an ingested index/snapshot.
+        if env_name.casefold().endswith("_feed_url"):
+            if value.casefold().startswith(("http://", "https://")):
+                return True
+        return Path(value).expanduser().is_file()
 
     # -------------------------------------------------------------------------
     def supports_mode(self, capability_id: str, mode: str) -> bool:

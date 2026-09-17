@@ -143,7 +143,9 @@
         "near station"
       ],
       "manual_toggle": false,
-      "auth_required": false
+      "auth_required": false,
+      "availability_mode": "configured_source",
+      "local_source_env": "AEGIS_GTFS_STATIC_FEED_URL"
     },
     {
       "capability_id": "gtfs_realtime",
@@ -165,7 +167,9 @@
         "near station"
       ],
       "manual_toggle": false,
-      "auth_required": false
+      "auth_required": false,
+      "availability_mode": "configured_source",
+      "local_source_env": "AEGIS_GTFS_REALTIME_FEED_URL"
     },
     {
       "capability_id": "mobility_database_feeds",

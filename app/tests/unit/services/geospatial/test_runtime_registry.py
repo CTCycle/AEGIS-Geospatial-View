@@ -117,6 +117,31 @@ def test_openchargemap_is_available_with_saved_access_credential(monkeypatch) ->
     assert registry.access_available("openchargemap_ev_charging")
     assert registry.provider_health("openchargemap_ev_charging") == "healthy"
 
+
+def test_configured_gtfs_feeds_require_a_feed_source(monkeypatch) -> None:
+    feed_profiles = (
+        ("gtfs_static", "AEGIS_GTFS_STATIC_FEED_URL"),
+        ("gtfs_realtime", "AEGIS_GTFS_REALTIME_FEED_URL"),
+    )
+    for capability_id, env_name in feed_profiles:
+        monkeypatch.delenv(env_name, raising=False)
+        unavailable = RuntimeRegistry(
+            manifest_loader=GeospatialManifestLoader(),
+            credentials_repo=_CredentialRepo(False),
+        )  # type: ignore[arg-type]
+
+        assert not unavailable.access_available(capability_id)
+        assert unavailable.provider_health(capability_id) == "missing_access"
+
+        monkeypatch.setenv(env_name, "https://transit.example.test/feed")
+        configured = RuntimeRegistry(
+            manifest_loader=GeospatialManifestLoader(),
+            credentials_repo=_CredentialRepo(False),
+        )  # type: ignore[arg-type]
+
+        assert configured.access_available(capability_id)
+        assert configured.provider_health(capability_id) == "healthy"
+
 ###############################################################################
 def test_restricted_capability_is_disabled_without_explicit_opt_in(monkeypatch) -> None:
     monkeypatch.delenv("AEGIS_ALLOW_RESTRICTED_SOURCES", raising=False)
