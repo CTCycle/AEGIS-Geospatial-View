@@ -27,6 +27,10 @@ from server.domain.agent.map_plan import (
 )
 from server.services.agent.capability_execution import ToolExecutionContext
 from server.services.agent.map_plan_service import MapPlanService
+from server.services.geospatial.map_session_builder import (
+    MapPlanBuildError,
+    MapSessionBuilder,
+)
 
 
 LOCATION = ResolvedLocation(label="Zurich HB", latitude=47.378, longitude=8.540)
@@ -207,6 +211,48 @@ def _service() -> MapPlanService:
         capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
         evidence_repository=FakeEvidenceRepository(),
     )
+
+
+@pytest.mark.parametrize(
+    "descriptor",
+    [
+        {"rendering_mode": "geojson", "url": "not-a-supported-url"},
+        {"rendering_mode": "geojson", "url": "http://["},
+        {
+            "rendering_mode": "geojson",
+            "data": {
+                "type": "FeatureCollection",
+                "features": [{"type": "Feature", "geometry": {}}],
+            },
+        },
+        {
+            "rendering_mode": "geojson",
+            "data": {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {
+                            "type": ["Point"],
+                            "coordinates": [8.54, 47.38],
+                        },
+                    }
+                ],
+            },
+        },
+    ],
+)
+def test_render_descriptor_admission_rejects_unsafe_geojson_sources(
+    descriptor: dict[str, object],
+) -> None:
+    with pytest.raises(MapPlanBuildError):
+        MapSessionBuilder._validate_render_descriptor(descriptor)  # pyright: ignore[reportPrivateUsage]
+
+
+def test_render_descriptor_admission_accepts_relative_geojson_source() -> None:
+    descriptor = {"rendering_mode": "geojson", "url": "/api/geospatial/layer"}
+
+    MapSessionBuilder._validate_render_descriptor(descriptor)  # pyright: ignore[reportPrivateUsage]
 
 
 ###############################################################################

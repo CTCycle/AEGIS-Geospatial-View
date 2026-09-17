@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from math import cos, radians
+from math import cos, isfinite, radians
 from collections.abc import Callable, Sequence
 from typing import Any, cast
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from server.common.typing import json_object
@@ -34,6 +35,17 @@ MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
 MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
 _GEOJSON_RENDERING_MODES = frozenset(
     {"geojson", "arcgis-geojson", "clustered-points", "choropleth", "camera-points"}
+)
+_GEOJSON_GEOMETRY_TYPES = frozenset(
+    {
+        "Point",
+        "MultiPoint",
+        "LineString",
+        "MultiLineString",
+        "Polygon",
+        "MultiPolygon",
+        "GeometryCollection",
+    }
 )
 _RASTER_RENDERING_MODES = frozenset({"xyz", "raster-tile", "wmts", "wms", "tile"})
 _RENDERING_MODE_ALIASES = {"vector": "geojson", "feature-collection": "geojson"}
@@ -372,13 +384,14 @@ class MapSessionBuilder:
                 "The selected evidence has no browser-renderable layer descriptor.",
             )
         if mode in _GEOJSON_RENDERING_MODES:
-            data = json_object(descriptor.get("data"))
-            has_feature_collection = (
-                data.get("type") == "FeatureCollection"
-                and isinstance(data.get("features"), list)
-                and bool(data.get("features"))
-            )
-            has_url = bool(str(descriptor.get("url") or "").strip())
+            data = descriptor.get("data")
+            has_feature_collection = _valid_geojson_feature_collection(data)
+            if data is not None and not has_feature_collection:
+                raise MapPlanBuildError(
+                    "render_descriptor_invalid",
+                    "The GeoJSON layer contains invalid feature data.",
+                )
+            has_url = _usable_render_url(descriptor.get("url"))
             if not has_feature_collection and not has_url:
                 raise MapPlanBuildError(
                     "render_descriptor_unavailable",
@@ -391,11 +404,10 @@ class MapSessionBuilder:
                 if service_url:
                     descriptor["url"] = service_url
             has_source = bool(
-                str(
+                _usable_render_url(
                     descriptor.get("tile_url_template")
                     or descriptor.get("url")
-                    or ""
-                ).strip()
+                )
             )
             if not has_source:
                 raise MapPlanBuildError(
@@ -404,9 +416,9 @@ class MapSessionBuilder:
                 )
             return
         if mode == "vector-tile":
-            if not str(
-                descriptor.get("tile_url_template") or descriptor.get("url") or ""
-            ).strip():
+            if not _usable_render_url(
+                descriptor.get("tile_url_template") or descriptor.get("url")
+            ):
                 raise MapPlanBuildError(
                     "render_descriptor_unavailable",
                     "The vector-tile layer is missing a tile URL template.",
@@ -423,6 +435,115 @@ class MapSessionBuilder:
             "render_descriptor_invalid",
             f"Unsupported browser rendering mode '{mode}'.",
         )
+
+
+###############################################################################
+def _usable_render_url(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    candidate = value.strip()
+    if not candidate or candidate.startswith("//"):
+        return False
+    try:
+        parsed = urlparse(candidate)
+    except ValueError:
+        return False
+    if parsed.scheme in {"http", "https"}:
+        return bool(parsed.netloc)
+    return candidate.startswith("/")
+
+
+def _valid_geojson_feature_collection(value: object) -> bool:
+    data = json_object(value)
+    features = data.get("features")
+    return (
+        data.get("type") == "FeatureCollection"
+        and isinstance(features, list)
+        and bool(features)
+        and all(_valid_geojson_feature(feature) for feature in features)
+    )
+
+
+def _valid_geojson_feature(value: object) -> bool:
+    feature = json_object(value)
+    return feature.get("type") == "Feature" and _valid_geojson_geometry(
+        feature.get("geometry")
+    )
+
+
+def _valid_geojson_geometry(value: object) -> bool:
+    geometry = json_object(value)
+    geometry_type = geometry.get("type")
+    if (
+        not isinstance(geometry_type, str)
+        or geometry_type not in _GEOJSON_GEOMETRY_TYPES
+    ):
+        return False
+    if geometry_type == "GeometryCollection":
+        geometries = geometry.get("geometries")
+        return (
+            isinstance(geometries, list)
+            and bool(geometries)
+            and all(_valid_geojson_geometry(item) for item in geometries)
+        )
+    coordinates = geometry.get("coordinates")
+    if geometry_type == "Point":
+        return _valid_geojson_position(coordinates)
+    if geometry_type == "MultiPoint":
+        return _valid_geojson_sequence(coordinates, _valid_geojson_position)
+    if geometry_type == "LineString":
+        return _valid_geojson_sequence(coordinates, _valid_geojson_position, minimum=2)
+    if geometry_type == "MultiLineString":
+        return _valid_geojson_sequence(
+            coordinates,
+            lambda value: _valid_geojson_sequence(
+                value, _valid_geojson_position, minimum=2
+            ),
+        )
+    if geometry_type == "Polygon":
+        return _valid_geojson_sequence(
+            coordinates,
+            lambda value: _valid_geojson_sequence(
+                value, _valid_geojson_position, minimum=4
+            ),
+        )
+    return _valid_geojson_sequence(
+        coordinates,
+        lambda value: _valid_geojson_sequence(
+            value,
+            lambda ring: _valid_geojson_sequence(
+                ring, _valid_geojson_position, minimum=4
+            ),
+        ),
+    )
+
+
+def _valid_geojson_position(value: object) -> bool:
+    if not isinstance(value, list) or len(value) < 2:
+        return False
+    return all(_finite_number(item) for item in value)
+
+
+def _finite_number(value: object) -> bool:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return isfinite(float(value))
+    except (OverflowError, ValueError):
+        return False
+
+
+def _valid_geojson_sequence(
+    value: object,
+    validator: Callable[[object], bool],
+    *,
+    minimum: int = 1,
+) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) >= minimum
+        and all(validator(item) for item in value)
+    )
 
 
 ###############################################################################
