@@ -61,11 +61,20 @@ describe('pages/geospatial-page.component', () => {
       'sendChatTurn',
       'fetchCatalog',
       'fetchChatSettings',
+      'fetchConversationRunTrace',
+      'fetchConversations',
     ]);
     apiClient.createConversation.and.resolveTo({ conversation_id: 'conv-1', title: 'test' });
     sendChatTurnMock = jasmine.createSpy('sendChatTurn').and.resolveTo(makeTurnResponse());
     apiClient.sendChatTurn.and.callFake((payload) => sendChatTurnMock(payload));
     apiClient.fetchCatalog.and.resolveTo({ capabilities: [], basemaps: [], overlays: [], tools: [] });
+    apiClient.fetchConversationRunTrace.and.resolveTo({
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      entries: [],
+      next_cursor: null,
+    });
+    apiClient.fetchConversations.and.resolveTo({ conversations: [], next_cursor: null });
     apiClient.fetchChatSettings.and.resolveTo({
       active_provider_mode: 'cloud',
       agent_model_provider: 'openai',
@@ -884,12 +893,12 @@ describe('pages/geospatial-page.component', () => {
     expect(component.isLoading).toBeTrue();
   });
 
-  it('does not duplicate an assistant message when the matching error event arrives', () => {
+  it('keeps raw run errors out of the transcript and exposes a human-readable execution summary', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
     component.conversationId = 'conv-1';
-    component.messages = [{ role: 'assistant', content: 'Provider timed out.' }];
+    component.messages = [{ role: 'user', content: 'Show the requested data.' }];
     component['handleRunEvent']({
       event_id: 'event-error',
       sequence: 2,
@@ -900,12 +909,13 @@ describe('pages/geospatial-page.component', () => {
       timestamp: new Date().toISOString(),
       visibility: 'user',
       payload: {
-        message: 'Provider timed out.',
+        message: 'provider_http_502: upstream request failed with internal trace metadata',
         operation: {
           kind: 'error',
           status: 'failed',
-          message: 'Provider timed out.',
+          message: 'Provider request failed.',
           warnings: [],
+          failure_category: 'provider_failure',
         },
         presentation_status: 'not_requested',
         tool_results: [],
@@ -920,7 +930,9 @@ describe('pages/geospatial-page.component', () => {
         },
       },
     });
-    expect(component.messages.length).toBe(1);
+
+    expect(component.messages).toEqual([{ role: 'user', content: 'Show the requested data.' }]);
+    expect(component.messages.some((message) => message.content.includes('provider_http_502'))).toBeFalse();
     expect(component.status).toBe('Agent needs attention');
     expect(component.lastOperation?.kind).toBe('error');
     expect(component.presentationStatus).toBe('not_requested');
@@ -928,10 +940,11 @@ describe('pages/geospatial-page.component', () => {
     expect(component.contextUsageLabel).toBe('Context limit unavailable');
     expect(component.contextUsageDetail).toContain('max context unavailable');
     expect(component.contextUsageDetail.toLowerCase()).not.toContain('token');
+    expect(component.runFailureSummary).toBe('The selected model or data provider could not complete the request.');
     expect(component.agentReadiness).toEqual({
       status: 'needs_attention',
       label: 'Needs attention',
-      message: 'Provider timed out.',
+      message: 'The selected model or data provider could not complete the request.',
     });
   });
 
@@ -1136,13 +1149,88 @@ describe('pages/geospatial-page.component', () => {
     expect(footer).not.toBeNull();
     expect(footer?.textContent).toContain('Agent model');
     expect(footer?.textContent).toContain('Satellite');
-    expect(footer?.textContent).toContain('Weather');
+    expect(footer?.textContent).not.toContain('Weather');
     expect(footer?.textContent).toContain('Optional Keys');
+    expect(footer?.textContent).toContain('Tool activity');
+    expect(footer?.querySelector('app-execution-status')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('.context-window-row')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('.context-window-row progress')).toBeNull();
     expect(fixture.nativeElement.querySelector('.chat-status-strip')).toBeNull();
     expect(fixture.nativeElement.querySelector('.rail-capability-card')).toBeNull();
     expect(fixture.nativeElement.querySelector('.rail-context-strip')).toBeNull();
+  });
+
+  it('keeps execution widgets out of the chat surface', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+
+    const chat = fixture.nativeElement.querySelector('.agent-chat-panel') as HTMLElement;
+    const footer = fixture.nativeElement.querySelector('.workspace-status-bar') as HTMLElement;
+
+    expect(chat.querySelector('.tool-progress-row')).toBeNull();
+    expect(chat.querySelector('app-run-inspector')).toBeNull();
+    expect(chat.querySelector('app-execution-status')).toBeNull();
+    expect(footer.querySelector('app-execution-status')).not.toBeNull();
+  });
+
+  it('keeps canvas icon actions fixed on the right when progress text becomes long', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.isLoading = true;
+    component.progressLabel = 'Searching several geospatial providers and validating a deliberately long execution status that must truncate before the controls.';
+    fixture.detectChanges();
+
+    const header = fixture.nativeElement.querySelector('.canvas-header') as HTMLElement;
+    const status = header.querySelector('.canvas-header__status') as HTMLElement;
+    const actions = header.querySelector('.canvas-header__actions') as HTMLElement;
+    const buttons = actions.querySelectorAll('.canvas-header__icon-button');
+
+    expect(status.textContent).toContain('Searching several geospatial providers');
+    expect(buttons.length).toBe(2);
+    expect(actions.querySelector('.canvas-header__text-button')).toBeNull();
+    expect(actions.querySelector('.canvas-header__alert-button')).toBeNull();
+    expect((buttons[0] as HTMLButtonElement).getAttribute('aria-label')).toBe('Hide chat panel');
+    expect((buttons[1] as HTMLButtonElement).getAttribute('aria-label')).toBe('Alerts');
+
+    component.toggleToolbar();
+    fixture.detectChanges();
+    expect((actions.querySelectorAll('.canvas-header__icon-button')[0] as HTMLButtonElement).getAttribute('aria-label')).toBe('Show chat panel');
+  });
+
+  it('shows tool activity in the footer without adding tool diagnostics to messages', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.isLoading = true;
+    component.messages = [{ role: 'user', content: 'Find parks in Rome.' }];
+
+    component['handleRunEvent']({
+      event_id: 'event-tool-start',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'tool_started',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: {
+        call_id: 'call-1',
+        tool_name: 'discover_geospatial_capabilities',
+        label: 'Discovering capabilities',
+        status: 'running',
+        iteration: 1,
+      },
+    });
+    fixture.detectChanges();
+
+    expect(component.messages).toEqual([{ role: 'user', content: 'Find parks in Rome.' }]);
+    expect(fixture.nativeElement.querySelector('.agent-chat-panel')?.textContent)
+      .not.toContain('discover_geospatial_capabilities');
+    expect(fixture.nativeElement.querySelector('.workspace-status-bar')?.textContent)
+      .toContain('Discovering capabilities');
   });
 
   it('loads the context indicator from current backend model settings', async () => {
