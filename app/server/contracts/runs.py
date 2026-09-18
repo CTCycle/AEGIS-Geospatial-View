@@ -252,6 +252,7 @@ class AgentRunSnapshot(BaseModel):
     error_message: str | None = None
     presentation_status: Literal["not_required", "pending", "ready", "failed", "render_timeout"] = "not_required"
     presentation: dict[str, Any] | None = None
+    response: dict[str, Any] | None = None
     current_iteration: int | None = Field(default=None, ge=0)
     task_state: AgentTaskState | None = None
 

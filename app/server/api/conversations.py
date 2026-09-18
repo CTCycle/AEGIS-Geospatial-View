@@ -5,6 +5,7 @@ from typing import Any, cast
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from server.common.paths import (
+    CONVERSATION_RUN_STATUS_ROUTE,
     CONVERSATIONS_ROOT_ROUTE,
     CONVERSATIONS_ROUTER_PREFIX,
 )
@@ -14,6 +15,7 @@ from server.contracts.runs import (
     ConversationCreateRequest,
     ConversationCreateResponse,
     ConversationSnapshotResponse,
+    AgentRunSnapshot,
     RunTraceEntry,
     RunTraceResponse,
 )
@@ -177,6 +179,50 @@ def get_conversation_snapshot(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found.",
+        ) from exc
+
+
+###############################################################################
+@router.get(
+    CONVERSATION_RUN_STATUS_ROUTE,
+    response_model=AgentRunSnapshot,
+    status_code=status.HTTP_200_OK,
+)
+def get_run_status(
+    conversation_id: str,
+    run_id: str,
+    request: Request,
+    lifecycle_service: RunLifecycleService = Depends(get_run_lifecycle_service),
+    conversation_repository: ConversationRepository = Depends(
+        get_conversation_repository
+    ),
+    run_repository: AgentRunRepository = Depends(get_run_repository),
+) -> AgentRunSnapshot:
+    """Return active or terminal run state for 202 polling clients."""
+
+    try:
+        conversation_repository.verify_conversation_access(
+            conversation_id,
+            _owner_user_id(request),
+        )
+        snapshot = run_repository.get_run(run_id)
+        if snapshot is None or snapshot.conversation_id != conversation_id:
+            raise ValueError("Run not found.")
+        response = lifecycle_service.read_completed_response(conversation_id, run_id)
+        if response is not None:
+            snapshot = snapshot.model_copy(
+                update={"response": response.model_dump(mode="json")}
+            )
+        return snapshot
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Conversation access denied.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Run not found.",
         ) from exc
 
 

@@ -32,6 +32,15 @@ _CLARIFICATION_NON_ANSWER = re.compile(
     re.IGNORECASE,
 )
 
+_INFRASTRUCTURE_OPTION_ALIASES: dict[str, tuple[str, ...]] = {
+    "ev_charging": ("ev", "charging", "charger", "chargers", "electric vehicle"),
+    "residential_buildings": ("building", "buildings", "residential"),
+    "airports": ("airport", "airports"),
+    "roads": ("road", "roads", "highway", "highways"),
+    "transit_amenities": ("transit", "transport", "bus", "rail", "station"),
+    "other": ("other", "another", "different", "something else"),
+}
+
 
 class PendingClarification(BaseModel):
     """A clarification tied to the request that produced it.
@@ -49,6 +58,9 @@ class PendingClarification(BaseModel):
     source_request_id: str | None = None
     scope: Literal["current_request"] = "current_request"
     scope_terms: list[str] = Field(default_factory=list, max_length=24)
+    kind: Literal["generic", "infrastructure_subtype"] = "generic"
+    options: list[str] = Field(default_factory=list, max_length=12)
+    selected_option: str | None = None
     status: Literal["active", "deferred", "answered"] = "active"
 
     @classmethod
@@ -59,17 +71,27 @@ class PendingClarification(BaseModel):
         source_turn_index: int,
         source_request_id: str | None = None,
         source_text: str = "",
+        kind: Literal["generic", "infrastructure_subtype"] = "generic",
+        options: list[str] | None = None,
     ) -> "PendingClarification":
         terms = [
             token
             for token in re.findall(r"[a-z0-9]+", source_text.casefold())
             if len(token) >= 3
         ]
+        inferred_kind = kind
+        inferred_options = list(options or [])
+        if inferred_kind == "generic" and "infrastructure" in terms:
+            inferred_kind = "infrastructure_subtype"
+        if inferred_kind == "infrastructure_subtype" and not inferred_options:
+            inferred_options = list(_INFRASTRUCTURE_OPTION_ALIASES)
         return cls(
             question=question,
             source_turn_index=source_turn_index,
             source_request_id=source_request_id,
             scope_terms=list(dict.fromkeys(terms))[:24],
+            kind=inferred_kind,
+            options=list(dict.fromkeys(inferred_options))[:12],
         )
 
     @classmethod
@@ -95,7 +117,29 @@ class PendingClarification(BaseModel):
             return False
         if "?" in normalized or len(normalized.split()) > 16:
             return False
-        return bool(re.findall(r"[a-z0-9]+", normalized.casefold()))
+        if not re.findall(r"[a-z0-9]+", normalized.casefold()):
+            return False
+        if self.options:
+            return self.match_option(normalized) is not None
+        return True
+
+    def match_option(self, message: str) -> str | None:
+        """Return the canonical option selected by a short clarification reply."""
+
+        if not self.options:
+            return None
+        normalized = " ".join(message.casefold().split())
+        tokens = set(re.findall(r"[a-z0-9]+", normalized))
+        for option in self.options:
+            aliases = _INFRASTRUCTURE_OPTION_ALIASES.get(
+                option, (option.replace("_", " "),)
+            )
+            if any(
+                (alias in normalized if " " in alias else alias in tokens)
+                for alias in aliases
+            ):
+                return option
+        return None
 
 
 class ConversationState(BaseModel):
@@ -198,9 +242,11 @@ class ConversationState(BaseModel):
         pending = self.pending_clarification
         if pending is None or pending.status == "answered":
             return pending
+        selected = pending.match_option(message)
         return pending.model_copy(
             update={
-                "status": "answered" if pending.applies_to(message) else "deferred"
+                "status": "answered" if pending.applies_to(message) else "deferred",
+                "selected_option": selected,
             }
         )
 

@@ -17,6 +17,7 @@ from server.domain.agent.capability_route import (
 from server.domain.agent.conversation import ConversationState
 from server.domain.agent.tool_result import ToolExecutionError
 from server.contracts.geospatial import MapSession
+from server.contracts.runs import AgentRunState
 
 ChatRole = Literal["user", "assistant", "system", "tool"]
 ModelProviderMode = Literal["local", "cloud"]
@@ -185,6 +186,24 @@ class ChatTurnResponse(BaseModel):
         default_factory=lambda: list[AgentToolResultSummary]()
     )
     conversation_state: ConversationState | None = None
+
+
+###############################################################################
+class AgentRunAcceptedResponse(BaseModel):
+    """Stable response for work accepted outside the synchronous window."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str
+    run_id: str
+    run_version: int = Field(..., ge=1)
+    state: AgentRunState
+    presentation_status: Literal[
+        "not_required", "pending", "ready", "failed", "render_timeout"
+    ] = "not_required"
+    status_url: str
+    realtime_url: str | None = None
+    terminal: bool = False
 
 
 ###############################################################################
@@ -374,6 +393,8 @@ class OllamaRefreshResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: str
+    message: str | None = None
+    stale: bool = False
     library_models: list[str] = Field(default_factory=lambda: list[str]())
     local_models: list[str] = Field(default_factory=lambda: list[str]())
     local_model_capabilities: list[ModelCardDescriptor] = Field(

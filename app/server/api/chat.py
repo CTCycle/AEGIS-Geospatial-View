@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from server.common.paths import (
     CHAT_JOBS_ROUTE,
@@ -21,6 +21,7 @@ from server.common.paths import (
     CHAT_TURN_ROUTE,
 )
 from server.contracts.chat import (
+    AgentRunAcceptedResponse,
     ChatStreamEvent,
     ChatTurnRequest,
     ChatTurnResponse,
@@ -34,6 +35,7 @@ from server.contracts.chat import (
     StructuredProbeResponse,
 )
 from server.contracts.runs import AgentRunCreateRequest
+from server.contracts.runs import AgentRunState
 from server.domain.jobs import BackgroundJobCreateResponse
 from server.services.chat.composition import ChatRuntime
 from server.services.chat.model_library import DYNAMIC_CLOUD_PROVIDERS
@@ -103,7 +105,7 @@ async def create_chat_job(
 ###############################################################################
 @router.post(
     CHAT_TURN_ROUTE,
-    response_model=ChatTurnResponse,
+    response_model=ChatTurnResponse | AgentRunAcceptedResponse,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
 )
@@ -111,7 +113,7 @@ async def chat_turn(
     payload: ChatTurnRequest,
     request: Request,
     runtime: ChatRuntime = Depends(get_chat_runtime),
-) -> ChatTurnResponse:
+) -> ChatTurnResponse | AgentRunAcceptedResponse | JSONResponse:
     try:
         if runtime.conversation_repository.get_conversation(payload.conversation_id) is None:
             raise HTTPException(
@@ -145,9 +147,33 @@ async def chat_turn(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=snapshot.error_message,
             )
+        if snapshot is not None and snapshot.state in {
+            AgentRunState.PENDING,
+            AgentRunState.RUNNING,
+            AgentRunState.UPDATING,
+            AgentRunState.AWAITING_RENDER,
+        }:
+            accepted = AgentRunAcceptedResponse(
+                conversation_id=snapshot.conversation_id,
+                run_id=snapshot.run_id,
+                run_version=snapshot.active_run_version,
+                state=snapshot.state,
+                presentation_status=snapshot.presentation_status,
+                status_url=(
+                    f"/api/conversations/{snapshot.conversation_id}/runs/"
+                    f"{snapshot.run_id}"
+                ),
+                realtime_url=(
+                    f"/api/conversations/{snapshot.conversation_id}/realtime"
+                ),
+            )
+            return JSONResponse(
+                status_code=status.HTTP_202_ACCEPTED,
+                content=accepted.model_dump(mode="json"),
+            )
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="The agent run is still in progress; observe it through realtime.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The agent run ended without a terminal response.",
         )
     except (RunNotFoundError, ValueError) as exc:
         raise HTTPException(
