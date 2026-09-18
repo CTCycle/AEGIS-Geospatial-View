@@ -1,6 +1,6 @@
 # Layout And Navigation
 
-Last updated: 2026-09-16
+Last updated: 2026-09-18
 
 ## Desktop Viewport Contract
 
@@ -18,7 +18,8 @@ The main workspace uses a two-pane content grid with a thin footer row:
 - chat and toolbar pane
 - resize handle
 - map pane
-- 24px full-width workspace status footer spanning chat and map
+- compact full-width workspace status footer spanning chat and map, with a
+  Tool activity entry point for expandable execution details
 
 The composer owns a separate 20px context-window progress row directly below
 the send controls. It is not part of the footer. The progress indicator is
@@ -33,6 +34,10 @@ Toolbar width constraints:
 
 The chat rail and map remain side by side at all supported widths. The divider
 is mouse-resizable and the chat rail can be collapsed when map focus is useful.
+
+The map header keeps its status/progress region in a flexible left column and
+its icon actions in a fixed right column. Long status text truncates rather
+than wrapping, resizing, or displacing the controls.
 
 ## Other Page Layouts
 
