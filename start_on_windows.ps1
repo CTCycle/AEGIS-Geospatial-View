@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Launch')]
+    [ValidateSet('Launch', 'ClearCache')]
     [string]$Action
 )
 
@@ -19,8 +19,6 @@ $DefaultRuntimeDataDir = Join-Path $ResourcesDir 'runtime'
 $IngestionDataDir = Join-Path $RootDir 'data'
 $VectorsDir = Join-Path $ResourcesDir 'vectors'
 $RuntimeCacheDir = Join-Path $RuntimesDir 'cache'
-$ToolCacheDir = Join-Path $TestsDir 'cache'
-$LegacyCacheDir = Join-Path $RootDir 'assets\cache'
 $PythonDir = Join-Path $RuntimesDir 'python'
 $PythonExe = Join-Path $PythonDir 'python.exe'
 $PythonPth = Join-Path $PythonDir 'python314._pth'
@@ -34,30 +32,31 @@ $NpmCacheDir = Join-Path $RuntimeCacheDir 'npm'
 $PipCacheDir = Join-Path $RuntimeCacheDir 'pip'
 $PythonBytecodeCacheDir = Join-Path $RuntimeCacheDir 'python'
 $PlaywrightBrowsersDir = Join-Path $RuntimeCacheDir 'playwright-browsers'
-$PytestCacheDir = Join-Path $ToolCacheDir 'pytest'
-$PytestTempDir = Join-Path $ToolCacheDir 'pytest-tmp'
-$RuffCacheDir = Join-Path $ToolCacheDir 'ruff'
-$CoverageDir = Join-Path $ToolCacheDir 'coverage'
-$AngularCacheDir = Join-Path $ToolCacheDir 'angular'
+$PytestCacheDir = Join-Path $RuntimeCacheDir 'pytest'
+$PytestTempDir = Join-Path $RuntimeCacheDir 'pytest-tmp'
+$RuffCacheDir = Join-Path $RuntimeCacheDir 'ruff'
+$CoverageDir = Join-Path $RuntimeCacheDir 'coverage'
+$AngularCacheDir = Join-Path $RuntimeCacheDir 'angular'
+$TestRuntimeCacheDir = Join-Path $RuntimeCacheDir 'test-runtime'
+$CacheDirectories = @(
+    $RuntimeCacheDir,
+    $UvCacheDir,
+    $NpmCacheDir,
+    $PipCacheDir,
+    $PythonBytecodeCacheDir,
+    $PlaywrightBrowsersDir,
+    $PytestCacheDir,
+    $PytestTempDir,
+    $RuffCacheDir,
+    $CoverageDir,
+    $AngularCacheDir,
+    $TestRuntimeCacheDir
+)
 $VenvDir = Join-Path $ServerDir '.venv'
 $DotEnvPath = Join-Path $SettingsDir '.env'
 $DotEnvExamplePath = Join-Path $SettingsDir '.env.example'
 $LogsDir = Join-Path $AppDir 'resources\logs'
 $TestScript = Join-Path $AppDir 'tests\run_tests.bat'
-$LegacyCachePaths = @(
-    $LegacyCacheDir,
-    (Join-Path $RootDir '.pytest_cache'),
-    (Join-Path $RootDir '.ruff_cache'),
-    (Join-Path $RootDir '.tmp_pytest'),
-    (Join-Path $ClientDir '.angular')
-)
-$LegacyUvCachePaths = @(
-    (Join-Path $RootDir '.uv-cache'),
-    (Join-Path $AppDir '.uv-cache'),
-    (Join-Path $ServerDir '.uv-cache'),
-    (Join-Path $ClientDir '.uv-cache'),
-    (Join-Path $TestsDir '.uv-cache')
-)
 $InitializeDatabaseScript = Join-Path $AppDir 'scripts\initialize_database.py'
 $PythonVersion = '3.14.2'
 $PythonArchiveName = "python-$PythonVersion-embed-amd64.zip"
@@ -306,27 +305,13 @@ function Import-EnvironmentFile {
 }
 
 function Set-LauncherEnvironment {
-    foreach ($cachePath in @(
-        $RuntimeCacheDir,
-        $ToolCacheDir,
-        $UvCacheDir,
-        $NpmCacheDir,
-        $PipCacheDir,
-        $PythonBytecodeCacheDir,
-        $PytestCacheDir,
-        $PytestTempDir,
-        $RuffCacheDir,
-        $CoverageDir,
-        $AngularCacheDir,
-        $PlaywrightBrowsersDir
-    )) {
-        try {
-            New-Item -ItemType Directory -Path $cachePath -Force -ErrorAction Stop | Out-Null
-        }
-        catch {
-            Write-Status WARN "Optional cache directory unavailable; continuing without it: $cachePath"
+    foreach ($cachePath in $CacheDirectories) {
+        New-Item -ItemType Directory -Path $cachePath -Force -ErrorAction Stop | Out-Null
+        if (-not (Test-Path -LiteralPath $cachePath -PathType Container)) {
+            throw "Canonical cache directory could not be created: $cachePath"
         }
     }
+    $env:AEGIS_CACHE_ROOT = $RuntimeCacheDir
     $env:UV_CACHE_DIR = $UvCacheDir
     $env:UV_PROJECT_ENVIRONMENT = $VenvDir
     $env:UV_LINK_MODE = 'copy'
@@ -1059,50 +1044,18 @@ function Remove-PythonCaches {
 }
 
 function Clear-ApplicationCache {
-    if (-not (Confirm-DestructiveAction 'clear runtime and test caches')) { return }
+    param(
+        [switch]$SkipConfirmation,
+        [switch]$Strict
+    )
+    if (-not $SkipConfirmation -and -not (Confirm-DestructiveAction 'clear runtime and test caches')) { return }
     Remove-PythonCaches
-    $cacheRoots = @($RuntimeCacheDir, $ToolCacheDir) + $LegacyCachePaths + $LegacyUvCachePaths
-    $skipped = 0
-    $uniqueCacheRoots = @($cacheRoots | Select-Object -Unique)
-    $progressId = Start-LauncherProgress -Activity 'AEGIS: clear caches' -Status "0 of $($uniqueCacheRoots.Count) roots"
-    try {
-        for ($rootIndex = 0; $rootIndex -lt $uniqueCacheRoots.Count; $rootIndex++) {
-            $cacheRoot = $uniqueCacheRoots[$rootIndex]
-            Update-LauncherProgress -Id $progressId -Activity 'AEGIS: clear caches' -Status "Root $($rootIndex + 1) of $($uniqueCacheRoots.Count): $cacheRoot" -PercentComplete ([int](($rootIndex + 1) * 100 / [Math]::Max(1, $uniqueCacheRoots.Count)))
-        try {
-            $cacheRootExists = Test-Path -LiteralPath $cacheRoot -ErrorAction Stop
-        }
-        catch {
-            Write-Status WARN "Skipped inaccessible cache directory: $cacheRoot ($($_.Exception.Message))"
-            $skipped++
-            continue
-        }
-        if (-not $cacheRootExists) {
-            continue
-        }
-        try {
-            $children = @(Get-ChildItem -LiteralPath $cacheRoot -Force -ErrorAction Stop |
-                Sort-Object @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
-        }
-        catch {
-            Write-Status WARN "Skipped inaccessible cache directory: $cacheRoot ($($_.Exception.Message))"
-            $skipped++
-            continue
-        }
-        foreach ($child in $children) {
-            if ($child.Name -eq '.gitkeep') {
-                continue
-            }
-            if (-not (Remove-PathBestEffort -Path $child.FullName)) {
-                $skipped++
-            }
-        }
-        }
+    $result = Remove-LauncherPath -Path $RuntimeCacheDir -KeepRoot -Strict:$Strict -Activity 'AEGIS: clear canonical cache'
+    $skipped = $result.Skipped + $result.EnumerationErrors.Count
+    if ($skipped -gt 0) {
+        Write-Status WARN "Canonical cache cleanup skipped $skipped locked or inaccessible item(s)."
     }
-    finally {
-        Complete-LauncherProgress $progressId
-    }
-    New-Item -ItemType Directory -Path $RuntimeCacheDir, $ToolCacheDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $RuntimeCacheDir -Force -ErrorAction Stop | Out-Null
     Write-Status SUCCESS "Development caches cleared where permitted; skipped $skipped locked or inaccessible item(s)."
 }
 
@@ -1110,13 +1063,9 @@ function Uninstall-Application {
     if (-not (Confirm-DestructiveAction 'remove local runtimes, dependencies, caches, and build outputs')) { return }
     $targets = @(
         $RuntimesDir,
-        $LegacyCacheDir,
-        $LegacyCachePaths,
-        $LegacyUvCachePaths,
         $VenvDir,
         (Join-Path $RootDir '.venv'),
         (Join-Path $ClientDir 'node_modules'),
-        (Join-Path $ClientDir '.angular'),
         (Join-Path $ClientDir 'dist')
     ) | Select-Object -Unique
     $skipped = 0
@@ -1243,6 +1192,19 @@ if ($Action -eq 'Launch') {
     try {
         Invoke-TrackedLauncherAction -Name 'Launch application' -Action {
             Invoke-LaunchApplication
+        }
+        exit 0
+    }
+    catch {
+        Write-Status FATAL $_.Exception.Message
+        exit 1
+    }
+}
+
+if ($Action -eq 'ClearCache') {
+    try {
+        Invoke-TrackedLauncherAction -Name 'Clear canonical cache' -Action {
+            Clear-ApplicationCache -SkipConfirmation -Strict
         }
         exit 0
     }

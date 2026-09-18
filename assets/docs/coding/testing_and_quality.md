@@ -1,6 +1,6 @@
 # Testing And Quality
 
-Last updated: 2026-09-17
+Last updated: 2026-09-18
 
 ## Python Quality Gates
 
@@ -21,9 +21,10 @@ Last updated: 2026-09-17
 The bounded backend validation sequence is:
 
 ```text
-ruff check app/server app/tests
-pyright --project app/server/pyproject.toml
-python -m pytest -c app/server/pyproject.toml app/tests/unit -q
+cd app/server
+ruff check server ../tests
+pyright --project pyproject.toml
+python -m pytest -c pyproject.toml ../tests/unit -q
 ```
 
 The current unit run emits two known upstream deprecation warnings (Google
@@ -36,16 +37,20 @@ depend on the UI runtime.
 
 ## Development Cache And Artifact Locations
 
-Disposable development state is split between runtime and test-tool cache roots:
+`runtimes/cache` is the only disposable cache root. Its subdirectories are
+stable across launchers, CI, development, and tests:
 
-- uv, pip, npm, Python bytecode, and Playwright state: named subdirectories
-  under `runtimes/cache`
-- pytest cache: `app/tests/cache/pytest`
-- pytest temporary directories: `app/tests/cache/pytest-tmp`
-- Ruff cache: `app/tests/cache/ruff`
-- Angular CLI cache and Karma coverage: `app/tests/cache/angular` and
-  `app/tests/cache/coverage`
-- Other test and migration-tool state belongs under `app/tests/cache`
+- `uv`, `npm`, `pip`: package-manager caches
+- `python`: Python bytecode cache prefix
+- `playwright-browsers`: Playwright browser state
+- `pytest`, `pytest-tmp`: pytest's cache provider and temporary roots
+- `ruff`: Ruff's cache
+- `angular`: Angular CLI cache
+- `coverage`: Python and Karma coverage output
+- `test-runtime`: disposable test databases and migration state
+
+Retained QA evidence is not cache data: screenshots, reports, logs, and
+validation notes remain under `assets/QA` and are not removed by cache cleanup.
 
 When `AEGIS_DATA_DIR` is not explicitly supplied, the pytest configuration
 assigns a session-scoped temporary runtime directory. Application-startup unit
@@ -53,10 +58,13 @@ tests therefore never open or mutate `app/resources/runtime/database.db`.
 Source-architecture scans exclude `.venv` and `__pycache__` trees so protected
 dependency files cannot turn a test run into an ACL failure.
 
-Run quality commands from the repository root so the configured relative paths
-resolve to these roots. `app/tests/run_tests.bat`, the Windows launcher, and CI
-also set absolute cache environment variables. Retained QA evidence remains
-under `assets/QA`.
+Run quality commands through `app/tests/run_tests.bat`, the Windows launcher,
+or CI so absolute cache environment variables and pytest's canonical
+`--basetemp` are supplied. Pytest rejects cache or temporary roots outside
+`runtimes/cache`; direct commands must provide the same absolute settings.
+Ruff's project configuration is resolved from `app/server`, or can be
+overridden with the absolute `RUFF_CACHE_DIR` value for a repository-root
+invocation.
 
 The canonical status of local, browser, provider, migration, and hosted-CI
 gates is maintained in

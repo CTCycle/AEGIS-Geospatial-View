@@ -9,7 +9,17 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "cwd": "${workspaceFolder}/app/server",
-      "python": "${workspaceFolder}/app/server/.venv/Scripts/python.exe"
+      "python": "${workspaceFolder}/app/server/.venv/Scripts/python.exe",
+      "env": {
+        "AEGIS_CACHE_ROOT": "${workspaceFolder}/runtimes/cache",
+        "UV_CACHE_DIR": "${workspaceFolder}/runtimes/cache/uv",
+        "PIP_CACHE_DIR": "${workspaceFolder}/runtimes/cache/pip",
+        "PYTHONPYCACHEPREFIX": "${workspaceFolder}/runtimes/cache/python",
+        "PLAYWRIGHT_BROWSERS_PATH": "${workspaceFolder}/runtimes/cache/playwright-browsers",
+        "RUFF_CACHE_DIR": "${workspaceFolder}/runtimes/cache/ruff",
+        "COVERAGE_FILE": "${workspaceFolder}/runtimes/cache/coverage/.coverage",
+        "PYTEST_ADDOPTS": "--basetemp=\"${workspaceFolder}/runtimes/cache/pytest-tmp\""
+      }
     },
     {
       "name": "Debug: Backend",
@@ -30,6 +40,16 @@
         "uriFormat": "%s/docs"
       },
       "envFile": "${workspaceFolder}/settings/.env",
+      "env": {
+        "AEGIS_CACHE_ROOT": "${workspaceFolder}/runtimes/cache",
+        "UV_CACHE_DIR": "${workspaceFolder}/runtimes/cache/uv",
+        "PIP_CACHE_DIR": "${workspaceFolder}/runtimes/cache/pip",
+        "PYTHONPYCACHEPREFIX": "${workspaceFolder}/runtimes/cache/python",
+        "PLAYWRIGHT_BROWSERS_PATH": "${workspaceFolder}/runtimes/cache/playwright-browsers",
+        "RUFF_CACHE_DIR": "${workspaceFolder}/runtimes/cache/ruff",
+        "COVERAGE_FILE": "${workspaceFolder}/runtimes/cache/coverage/.coverage",
+        "PYTEST_ADDOPTS": "--basetemp=\"${workspaceFolder}/runtimes/cache/pytest-tmp\""
+      },
       "cwd": "${workspaceFolder}/app",
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -50,6 +70,11 @@
         "--port",
         "4512"
       ],
+      "env": {
+        "AEGIS_CACHE_ROOT": "${workspaceFolder}/runtimes/cache",
+        "NPM_CONFIG_CACHE": "${workspaceFolder}/runtimes/cache/npm",
+        "PLAYWRIGHT_BROWSERS_PATH": "${workspaceFolder}/runtimes/cache/playwright-browsers"
+      },
       "console": "integratedTerminal",
       "serverReadyAction": {
         "action": "openExternally",

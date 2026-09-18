@@ -1,12 +1,21 @@
 # Startup
 
-Last updated: 2026-09-01
+Last updated: 2026-09-18
 
 ## Local Development Via Launcher
 
 ```powershell
 .\start_on_windows.ps1
 ```
+
+For a non-interactive clean-cache step in setup scripts, use:
+
+```powershell
+.\start_on_windows.ps1 -Action ClearCache
+```
+
+That action strictly clears and recreates `runtimes/cache` and fails if a
+canonical cache item is locked or inaccessible.
 
 The interactive launcher installs or updates portable Python, uv, and Node.js
 runtimes; synchronizes backend and frontend dependencies; optionally builds the
@@ -63,12 +72,13 @@ An existing `app\server\.venv` is reused. The launcher recreates it only when
 repository or runtime folder is moved. An unrelated dependency-sync failure
 does not delete the environment.
 
-The launcher stores uv, npm, pip, Python bytecode, and Playwright state under
-`runtimes/cache`. Ruff, pytest, Angular, coverage, and other test-tool state is
-stored under `app/tests/cache`. Launching preserves the uv cache. Use menu option
-2 to install or update dependencies and prune it, or menu option 9 to clear all
-disposable development caches without reinstalling. Locked or administrator-only
-files are reported and skipped so cleanup can continue.
+The launcher stores every disposable runtime and test cache under
+`runtimes/cache`, including uv, npm, pip, Python bytecode, Playwright, Ruff,
+pytest, Angular, coverage, and test-runtime databases. Launching preserves the
+cache contents. Use menu option 2 to install or update dependencies and prune
+uv, or menu option 9 to clear the complete canonical cache tree without
+reinstalling. Persistent application data under `app/resources/runtime`,
+`data`, and `app/resources/vectors` is outside this cleanup boundary.
 
 ## Local Development Manual
 
@@ -77,15 +87,15 @@ Run the backend and frontend commands in separate PowerShell terminals.
 ```powershell
 Set-Location <repository-root>
 $runtimeCacheRoot = (Resolve-Path 'runtimes\cache').Path
-$testCacheRoot = (Resolve-Path 'app\tests\cache').Path
+$env:AEGIS_CACHE_ROOT = $runtimeCacheRoot
 $env:UV_CACHE_DIR = Join-Path $runtimeCacheRoot 'uv'
 $env:PIP_CACHE_DIR = Join-Path $runtimeCacheRoot 'pip'
 $env:NPM_CONFIG_CACHE = Join-Path $runtimeCacheRoot 'npm'
 $env:PYTHONPYCACHEPREFIX = Join-Path $runtimeCacheRoot 'python'
 $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $runtimeCacheRoot 'playwright-browsers'
-$env:RUFF_CACHE_DIR = Join-Path $testCacheRoot 'ruff'
-$env:COVERAGE_FILE = Join-Path $testCacheRoot 'coverage\.coverage'
-$env:PYTEST_ADDOPTS = '--basetemp="' + (Join-Path $testCacheRoot 'pytest-tmp') + '"'
+$env:RUFF_CACHE_DIR = Join-Path $runtimeCacheRoot 'ruff'
+$env:COVERAGE_FILE = Join-Path $runtimeCacheRoot 'coverage\.coverage'
+$env:PYTEST_ADDOPTS = '--basetemp="' + (Join-Path $runtimeCacheRoot 'pytest-tmp') + '"'
 Set-Location app/server
 uv sync
 uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 5002 --ws-max-size 65536 --ws-ping-interval 15 --ws-ping-timeout 10
@@ -135,6 +145,10 @@ Working path:
 ```cmd
 app\tests\run_tests.bat
 ```
+
+The cache-cleanup menu option can be run before this command from a clean
+machine state. It removes only `runtimes/cache`, recreates the root, and leaves
+persistent application data and retained QA evidence untouched.
 
 For bounded backend-only validation without starting local servers or Angular:
 

@@ -17,6 +17,15 @@ concurrency:
 
 env:
   PYTHONPATH: app
+  AEGIS_CACHE_ROOT: ${{ github.workspace }}/runtimes/cache
+  UV_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/uv
+  NPM_CONFIG_CACHE: ${{ github.workspace }}/runtimes/cache/npm
+  PIP_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/pip
+  PYTHONPYCACHEPREFIX: ${{ github.workspace }}/runtimes/cache/python
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/runtimes/cache/playwright-browsers
+  RUFF_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/ruff
+  COVERAGE_FILE: ${{ github.workspace }}/runtimes/cache/coverage/.coverage
+  PYTEST_ADDOPTS: --basetemp=${{ github.workspace }}/runtimes/cache/pytest-tmp
 
 jobs:
   backend-unit-tests:
@@ -25,6 +34,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Prepare canonical cache tree
+        run: |
+          mkdir -p "$AEGIS_CACHE_ROOT" "$UV_CACHE_DIR" "$NPM_CONFIG_CACHE" "$PIP_CACHE_DIR" "$PYTHONPYCACHEPREFIX" "$PLAYWRIGHT_BROWSERS_PATH" "$RUFF_CACHE_DIR" "$(dirname "$COVERAGE_FILE")" "$AEGIS_CACHE_ROOT/pytest" "$AEGIS_CACHE_ROOT/pytest-tmp"
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -35,8 +48,6 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           version: "0.11.30"
-          enable-cache: true
-          cache-dependency-glob: app/server/uv.lock
 
       - name: Install locked backend test dependencies
         run: uv sync --locked --project app/server --extra test
@@ -48,12 +59,12 @@ jobs:
 
       - name: Compile backend and test Python sources
         run: |
-          uv run --project app/server python -c "from pathlib import Path; excluded={'.venv','__pycache__','.pytest_cache','cache','dist','build'}; files=[p for root in ('app/server','app/tests') for p in Path(root).rglob('*.py') if not any(part in excluded for part in p.parts)]; [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]"
+          uv run --project app/server python -c "from pathlib import Path; excluded={'.venv','__pycache__','dist','build'}; files=[p for root in ('app/server','app/tests') for p in Path(root).rglob('*.py') if not any(part in excluded for part in p.parts)]; [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]"
 
       - name: Verify Alembic migration metadata
         env:
           PYTHONPATH: app
-          AEGIS_DATA_DIR: ${{ github.workspace }}/app/tests/cache/alembic-check-runtime
+          AEGIS_DATA_DIR: ${{ github.workspace }}/runtimes/cache/test-runtime/alembic-check-runtime
         run: |
           mkdir -p "$AEGIS_DATA_DIR"
           uv run --project app/server python -m alembic -c app/server/alembic.ini upgrade head
@@ -76,6 +87,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare canonical cache tree
+        run: |
+          mkdir -p "$AEGIS_CACHE_ROOT" "$UV_CACHE_DIR" "$NPM_CONFIG_CACHE" "$PIP_CACHE_DIR" "$PYTHONPYCACHEPREFIX" "$PLAYWRIGHT_BROWSERS_PATH" "$RUFF_CACHE_DIR" "$(dirname "$COVERAGE_FILE")" "$AEGIS_CACHE_ROOT/pytest" "$AEGIS_CACHE_ROOT/pytest-tmp"
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -85,8 +100,6 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           version: "0.11.30"
-          enable-cache: true
-          cache-dependency-glob: app/server/uv.lock
 
       - name: Install locked backend test dependencies
         run: uv sync --locked --project app/server --extra test
@@ -101,12 +114,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare canonical cache tree
+        run: |
+          mkdir -p "$AEGIS_CACHE_ROOT" "$UV_CACHE_DIR" "$NPM_CONFIG_CACHE" "$PIP_CACHE_DIR" "$PYTHONPYCACHEPREFIX" "$PLAYWRIGHT_BROWSERS_PATH" "$RUFF_CACHE_DIR" "$(dirname "$COVERAGE_FILE")" "$AEGIS_CACHE_ROOT/pytest" "$AEGIS_CACHE_ROOT/pytest-tmp"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version-file: app/client/.nvmrc
-          cache: npm
-          cache-dependency-path: app/client/package-lock.json
 
       - name: Install frontend dependencies
         working-directory: app/client
@@ -131,6 +146,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare canonical cache tree
+        run: |
+          mkdir -p "$AEGIS_CACHE_ROOT" "$UV_CACHE_DIR" "$NPM_CONFIG_CACHE" "$PIP_CACHE_DIR" "$PYTHONPYCACHEPREFIX" "$PLAYWRIGHT_BROWSERS_PATH" "$RUFF_CACHE_DIR" "$(dirname "$COVERAGE_FILE")" "$AEGIS_CACHE_ROOT/pytest" "$AEGIS_CACHE_ROOT/pytest-tmp"
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -140,8 +159,6 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           version: "0.11.30"
-          enable-cache: true
-          cache-dependency-glob: app/server/uv.lock
 
       - name: Install locked backend test dependencies
         run: uv sync --locked --project app/server --extra test
