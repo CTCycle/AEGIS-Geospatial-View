@@ -93,7 +93,11 @@ class LocationToolHandler:
                 target_key=target_key,
                 started=started,
             )
-        query = (request.query or "").strip()
+        # The native model may use target_id for the initial route target,
+        # before any location reference has been stored. Treat that value as
+        # the first resolver query; subsequent calls still use target_id as a
+        # state reference through the early return above.
+        query = (request.query or request.target_id or "").strip()
         if not query:
             return _failure(
                 code="unknown_location_target",
