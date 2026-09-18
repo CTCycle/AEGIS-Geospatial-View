@@ -111,6 +111,7 @@ class CompletionContract(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     operation: str
+    data_requirement: Literal["none", "provider_data"] = "none"
     requirements: list[str] = Field(
         default_factory=lambda: list[str](), max_length=16
     )
@@ -124,6 +125,15 @@ class CompletionContract(BaseModel):
 
 
 CompletionStatus = Literal["pending", "satisfied", "failed", "not_applicable"]
+CompletionRequirementKind = Literal[
+    "location",
+    "provider_data",
+    "temporal_scope",
+    "spatial_scope",
+    "map_candidate",
+    "render_ack",
+    "final_text",
+]
 
 
 class CompletionRequirement(BaseModel):
@@ -132,6 +142,7 @@ class CompletionRequirement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
+    kind: CompletionRequirementKind | None = None
     required: bool = True
     status: CompletionStatus = "pending"
     target_id: str | None = None

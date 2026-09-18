@@ -549,7 +549,7 @@ async def test_malformed_tool_call_is_corrected_in_the_same_native_run() -> None
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_ten_model_turn_native_trajectory_keeps_bounded_state_valid() -> None:
+async def test_successful_native_data_stops_before_redundant_model_turns() -> None:
     calls: list[int] = []
 
     async def execute(
@@ -597,16 +597,16 @@ async def test_ten_model_turn_native_trajectory_keeps_bounded_state_valid() -> N
     )
 
     assert outcome.stopped_reason == "goal_satisfied"
-    assert outcome.model_calls == 10
-    assert outcome.state.tool_calls == 8
-    assert calls == list(range(8))
-    assert len(provider.requests) == 10
-    assert all(
-        any(
-            "CANONICAL_NATIVE_CONTEXT" in str(message.get("content", ""))
-            for message in request.messages
-        )
-        for request in provider.requests[1:]
+    # A successful provider result satisfies the data obligation.  The loop
+    # must reserve one finalizer turn and stop instead of replaying the model's
+    # redundant follow-up calls until the action budget is exhausted.
+    assert outcome.model_calls == 3
+    assert outcome.state.tool_calls == 1
+    assert calls == [0]
+    assert len(provider.requests) == 3
+    assert any(
+        "CANONICAL_NATIVE_CONTEXT" in str(message.get("content", ""))
+        for message in provider.requests[-1].messages
     )
 
 

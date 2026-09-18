@@ -50,6 +50,7 @@ from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.agent.location_resolver import LocationResolver
 from server.domain.agent.decision import ResolvedLocation
 from server.common.identifiers import normalize_target_key
+from server.contracts.geospatial import ExecutionExtent
 
 
 _MODEL_PHASE = frozenset({AgentPhase.BUILD_TOOL_CONTEXT})
@@ -139,7 +140,11 @@ def register_agent_tools(
         ),
         _registration(
             name="resolve_geospatial_location",
-            description="Resolve a user-requested geographic target.",
+            description=(
+                "Resolve a user-requested geographic target. Use this before "
+                "capability discovery or execution whenever the route requires "
+                "a location; it returns the server-owned concrete point/bbox."
+            ),
             input_model=ResolveLocationInput,
             handler=location.resolve,
             domains=frozenset({CapabilityDomain.PLACE_SEARCH}),
@@ -152,12 +157,20 @@ def register_agent_tools(
         ),
         _registration(
             name="discover_geospatial_capabilities",
-            description="Discover eligible capabilities from the validated catalog.",
+            description=(
+                "Discover eligible capabilities from the validated catalog after "
+                "required locations are resolved. Do not use this to guess a "
+                "provider before the route prerequisite is available."
+            ),
             input_model=CapabilityDiscoveryInput,
             handler=catalog.discover,
             domains=_MIXED,
             phases=_MODEL_PHASE,
             visibility="model",
+            # Discovery remains visible during bootstrap so the model can
+            # request it explicitly.  The loop performs a deterministic
+            # post-location refresh as soon as the prerequisite is available;
+            # execution still validates the resolved extent before use.
             prerequisites=frozenset({"route", "capability_shortlist_missing"}),
             idempotent=True,
         ),
@@ -193,7 +206,12 @@ def register_agent_tools(
         ),
         _registration(
             name="execute_geospatial_capability",
-            description="Execute one shortlisted geospatial capability.",
+            description=(
+                "Execute one shortlisted geospatial capability using the resolved "
+                "server-owned extent. Use only after location and shortlist "
+                "prerequisites are satisfied; success or valid_empty satisfies "
+                "the matching provider-data obligation."
+            ),
             input_model=ExecuteCapabilityInput,
             handler=_execute_capability_handler(capability_execution),
             domains=_MIXED,
@@ -385,14 +403,13 @@ def _bind_execute_request(
     distance_m = _positive_float(spatial.get("distance_m"))
     if distance_m is not None:
         bound = bound.model_copy(update={"radius_m": distance_m})
-    if location is not None:
-        radius = distance_m or bound.radius_m
-        if radius is not None:
-            bound = bound.model_copy(
-                update={"bbox": _bbox_for_radius(location, radius)}
-            )
-        elif location.bbox:
-            bound = bound.model_copy(update={"bbox": list(location.bbox)})
+    extent = _lower_execution_extent(
+        spatial,
+        location,
+        radius_m=distance_m or bound.radius_m,
+    )
+    if extent is not None and extent.bbox is not None:
+        bound = bound.model_copy(update={"bbox": list(extent.bbox)})
     return bound
 
 
@@ -450,6 +467,52 @@ def _bbox_for_radius(location: ResolvedLocation, radius_m: float) -> list[float]
         min(180.0, location.longitude + longitude_delta),
         min(90.0, location.latitude + latitude_delta),
     ]
+
+
+def _lower_execution_extent(
+    spatial: dict[str, Any],
+    location: ResolvedLocation | None,
+    *,
+    radius_m: float | None,
+) -> ExecutionExtent | None:
+    """Lower semantic scope to one bounded provider-facing extent."""
+
+    if location is None:
+        return None
+    semantic_kind = str(spatial.get("kind") or "").strip() or None
+    target_ref = _optional_string(spatial.get("target_ref"))
+    if radius_m is not None:
+        bbox = _bbox_for_radius(location, radius_m)
+        return ExecutionExtent(
+            kind="radius",
+            latitude=location.latitude,
+            longitude=location.longitude,
+            bbox=bbox,
+            radius_m=radius_m,
+            provenance_scope_kind=semantic_kind,
+            target_ref=target_ref,
+        )
+    if location.bbox and semantic_kind in {
+        "administrative_geometry",
+        "feature_geometry",
+        "bbox",
+        "viewport",
+    }:
+        return ExecutionExtent(
+            kind="bbox" if semantic_kind not in {"viewport"} else "viewport",
+            latitude=location.latitude,
+            longitude=location.longitude,
+            bbox=list(location.bbox),
+            provenance_scope_kind=semantic_kind,
+            target_ref=target_ref,
+        )
+    return ExecutionExtent(
+        kind="point",
+        latitude=location.latitude,
+        longitude=location.longitude,
+        provenance_scope_kind=semantic_kind,
+        target_ref=target_ref,
+    )
 
 
 ###############################################################################

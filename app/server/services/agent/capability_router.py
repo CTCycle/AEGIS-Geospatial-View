@@ -46,7 +46,9 @@ class CapabilityRouter:
         proposed, temporal_reason = _normalize_recent_scope(proposed)
         if temporal_reason is not None:
             reasons.append(temporal_reason)
-        proposed, location_map_reason = _normalize_location_map_route(proposed)
+        proposed, location_map_reason = _normalize_location_map_route(
+            proposed, user_message=user_message
+        )
         if location_map_reason is not None:
             reasons.append(location_map_reason)
         for capability_id in proposed.explicit_capability_ids:
@@ -66,8 +68,9 @@ class CapabilityRouter:
                 continue
             valid_explicit_ids.append(normalized_id)
 
-        if proposed.task_mode == "execute" and _is_broad_infrastructure_route(
-            proposed
+        if proposed.task_mode == "execute" and (
+            _is_broad_infrastructure_route(proposed)
+            or _is_ambiguous_infrastructure_message(user_message)
         ):
             return CapabilityRouteDecision(
                 status="clarification",
@@ -144,11 +147,7 @@ class CapabilityRouter:
                 runtime_registry=self.runtime_registry,
                 limit=12,
                 operation=proposed.operation,
-                scope_kind=(
-                    proposed.spatial_scope.kind
-                    if proposed.spatial_scope is not None
-                    else None
-                ),
+                scope_kind=_concrete_scope_kind(proposed, active_state),
                 temporal_mode=(
                     proposed.temporal_scope.mode
                     if proposed.temporal_scope.mode != "none"
@@ -312,6 +311,34 @@ def _is_broad_infrastructure_route(route: CapabilityRoute) -> bool:
     return not specific_terms
 
 
+def _is_ambiguous_infrastructure_message(user_message: str) -> bool:
+    """Guard raw generic infrastructure wording before model subtype guesses."""
+
+    terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
+    if "infrastructure" not in terms:
+        return False
+    subtype_terms = {
+        "airport",
+        "airports",
+        "building",
+        "buildings",
+        "charging",
+        "charger",
+        "chargers",
+        "ev",
+        "electric",
+        "electricity",
+        "power",
+        "road",
+        "roads",
+        "transit",
+        "transport",
+        "utility",
+        "utilities",
+    }
+    return not terms.intersection(subtype_terms)
+
+
 def _is_unsupported_boundary_route(route: CapabilityRoute) -> bool:
     if route.spatial_scope is None:
         return False
@@ -404,6 +431,8 @@ def _normalize_recent_scope(
 ###############################################################################
 def _normalize_location_map_route(
     route: CapabilityRoute,
+    *,
+    user_message: str = "",
 ) -> tuple[CapabilityRoute, str | None]:
     """Keep location-only map requests on the map-planning route.
 
@@ -426,6 +455,42 @@ def _normalize_location_map_route(
     ):
         return route, None
     operation = str(route.operation or "").strip().casefold()
+    message_terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
+    display_terms = {
+        "show",
+        "display",
+        "view",
+        "locate",
+        "map",
+        "put",
+        "place",
+        "landmark",
+    }
+    data_terms = {
+        "find",
+        "search",
+        "near",
+        "nearby",
+        "within",
+        "around",
+        "poi",
+        "amenity",
+        "amenities",
+        "cafe",
+        "cafes",
+        "hospital",
+        "hospitals",
+        "station",
+        "stations",
+        "data",
+        "points",
+    }
+    raw_landmark_display = (
+        route.primary_domain is CapabilityDomain.PLACE_SEARCH
+        and route.presentation in {"map", "both"}
+        and bool(message_terms.intersection(display_terms))
+        and not bool(message_terms.intersection(data_terms))
+    )
     location_operations = {
         "geocode",
         "locate",
@@ -448,7 +513,8 @@ def _normalize_location_map_route(
         "reverse geocoding",
     }
     if not (
-        operation in location_operations
+        raw_landmark_display
+        or operation in location_operations
         or (
             location_queries
             and location_queries <= location_query_vocabulary
@@ -466,3 +532,17 @@ def _normalize_location_map_route(
         ),
         "location_map_route_normalized",
     )
+
+
+def _concrete_scope_kind(
+    route: CapabilityRoute, active_state: AgentRunState
+) -> str | None:
+    """Return a concrete provider scope only after location resolution."""
+
+    scope = route.spatial_scope
+    if scope is None:
+        return None
+    if scope.kind in {"administrative_geometry", "feature_geometry"}:
+        location = _single_known_location(active_state)
+        return "bbox" if location is not None and location.bbox else None
+    return scope.kind

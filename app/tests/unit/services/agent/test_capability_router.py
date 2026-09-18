@@ -182,6 +182,21 @@ def test_router_clarifies_broad_infrastructure_category_before_shortlisting() ->
         assert "EV charging" in decision.clarification_question
 
 
+def test_raw_infrastructure_request_cannot_be_silently_guessed_into_subtype() -> None:
+    decision = _router().validate_route(
+        _route(
+            operation="retrieve_infrastructure",
+            capability_queries=["residential buildings"],
+        ),
+        user_message="Show infrastructure in Rome.",
+        active_state=_state(),
+    )
+
+    assert decision.status == "clarification"
+    assert decision.capability_ids == []
+    assert "ambiguous_infrastructure_category" in decision.reason_codes
+
+
 def test_router_returns_boundary_limitation_without_replacing_active_map() -> None:
     state = _state(active_map=True)
     state.location_refs["zurich"] = ResolvedLocation(
