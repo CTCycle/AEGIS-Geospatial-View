@@ -334,7 +334,8 @@ describe('pages/geospatial-page.component', () => {
     expect(component.isLoading).toBeFalse();
     expect(component['pendingMapSession']).toBeUndefined();
     expect(component['pendingRenderContext']).toBeUndefined();
-    expect(component.messages.at(-1)?.content).toContain('real-time connection');
+    expect(component.messages).toEqual([]);
+    expect(component.runFailureSummary).toContain('real-time connection');
   });
 
   it('retries a mismatched render acknowledgment against the expected candidate identity', () => {
@@ -678,18 +679,21 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.find((entry) => entry.content === 'late response')).toBeUndefined();
   });
 
-  it('error path adds fallback assistant message and flags the agent model', async () => {
+  it('error path keeps transport failures out of chat and exposes execution status', async () => {
     sendChatTurnMock.and.rejectWith(new Error('boom'));
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
     component.composerDraft = 'show map';
+
     await component.sendMessage();
+
     expect(component.status).toBe('Agent needs attention');
-    expect(component.messages.at(-1)?.content).toBe('boom');
+    expect(component.messages).toEqual([{ role: 'user', content: 'show map', kind: 'normal' }]);
+    expect(component.runFailureSummary).toBe('boom');
   });
 
-  it('operation-aware alerts include structured failure message', () => {
+  it('operation-aware alerts use the concise execution failure summary', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
@@ -700,9 +704,11 @@ describe('pages/geospatial-page.component', () => {
       message: 'Tool timed out.',
       warnings: [],
     };
-    component.messages = [{ role: 'assistant', content: 'Tool timed out.' }];
+    component.runFailureSummary = 'The selected model or data provider could not complete the request.';
 
-    expect(component.activeAlertItems).toContain('Tool timed out.');
+    expect(component.activeAlertItems)
+      .toContain('The selected model or data provider could not complete the request.');
+    expect(component.activeAlertItems).not.toContain('Tool timed out.');
   });
 
   it('loads typed agent readiness through the core service', async () => {
