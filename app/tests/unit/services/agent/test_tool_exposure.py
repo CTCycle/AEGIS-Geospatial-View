@@ -115,6 +115,16 @@ def test_exposure_is_phase_and_prerequisite_bound() -> None:
         requires_location=True,
     )
     state.evidence_refs = ["evidence:1"]
+    state.tool_results = [
+        ToolResult(
+            call_id="retrieve-1",
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="Retrieved current map evidence.",
+            evidence_refs=["evidence:1"],
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    ]
     exposed = registry.expose(state)
     assert [item.name for item in exposed] == [
         "execute_geospatial_capability",
