@@ -1,6 +1,6 @@
 # Components And Patterns
 
-Last updated: 2026-09-02
+Last updated: 2026-09-18
 
 ## Reusable Components
 
@@ -10,6 +10,7 @@ Last updated: 2026-09-02
 - `settings-api-key-field.component.*`
 - `selected-model-summary.component.*`
 - `chat-message.component.*`
+- `execution-status.component.*`
 - `capability-status-list.component.*`
 - `source-health-badge.component.*`
 - `camera-popup.component.*`
@@ -35,6 +36,11 @@ All interactive components must provide:
 - Use persistent status text for settings operations.
 - Use inline alerts for map and session concerns.
 - Keep progress indicators visible during in-flight chat requests.
+- Keep chat conversational: tool widgets, run traces, retry metadata, and raw
+  execution diagnostics belong in the workspace execution-status surface, not
+  in the transcript.
+- Present failures through concise user-readable summaries while retaining
+  bounded operational detail in Tool activity.
 - Workspace capability indicators expose their description on hover and keyboard focus. Only indicators with a clear destination are interactive; those links open the relevant settings, access, or geodata page rather than mutating map state implicitly.
 - During active agent runs, keep the chat composer enabled. Additional messages are refinements for the active run and should use compact steering presentation.
 - Render assistant messages as sanitized Markdown and user messages as escaped plain text.
