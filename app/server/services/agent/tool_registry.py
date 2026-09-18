@@ -212,7 +212,7 @@ def _evidence_available_for_route(state: "AgentRunState") -> bool:
     """Do not expose stale evidence tools before a new map-data retrieval."""
 
     route = state.route
-    route_domains = (
+    route_domains: set[CapabilityDomain] = (
         {
             route.primary_domain,
             *route.secondary_domains,
