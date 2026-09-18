@@ -170,6 +170,7 @@ _ROUTING_QUERY_PHRASES: tuple[tuple[str, set[str]], ...] = (
 
 _ROUTING_CONTEXT_TOKENS = _GENERIC_QUERY_TOKENS | {
     "around",
+    "activity",
     "at",
     "check",
     "catalog",
