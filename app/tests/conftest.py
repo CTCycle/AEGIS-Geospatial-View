@@ -76,6 +76,36 @@ API_BASE_URL = _pick_first_non_empty(
     BACKEND_URL_FALLBACK,
 )
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+CANONICAL_CACHE_ROOT = (REPOSITORY_ROOT / "runtimes" / "cache").resolve()
+CANONICAL_PYTEST_CACHE = (CANONICAL_CACHE_ROOT / "pytest").resolve()
+CANONICAL_PYTEST_TEMP = (CANONICAL_CACHE_ROOT / "pytest-tmp").resolve()
+
+###############################################################################
+def _is_within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+###############################################################################
+def pytest_configure(config: pytest.Config) -> None:
+    """Reject pytest invocations that would create state outside the cache root."""
+
+    basetemp = config.getoption("basetemp")
+    if basetemp is None or not _is_within(Path(basetemp), CANONICAL_PYTEST_TEMP):
+        raise pytest.UsageError(
+            "pytest requires --basetemp under runtimes/cache/pytest-tmp"
+        )
+
+    cache = getattr(config, "cache", None)
+    cachedir = getattr(cache, "_cachedir", None)
+    if cachedir is not None and Path(cachedir).resolve() != CANONICAL_PYTEST_CACHE:
+        raise pytest.UsageError(
+            "pytest cache_dir must resolve to runtimes/cache/pytest"
+        )
+
 ###############################################################################
 @pytest.fixture(scope="session", autouse=True)
 def isolated_runtime_data(

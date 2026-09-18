@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 
@@ -69,3 +71,90 @@ def test_public_api_exposes_native_routes_without_shadow_or_legacy_routes() -> N
     assert "nativeagentorchestrator" in composition
     assert "shadow" not in composition
     assert "legacy" not in composition
+
+
+def test_all_tooling_resolves_disposable_state_under_canonical_cache_root() -> None:
+    launcher = (REPOSITORY_ROOT / "start_on_windows.ps1").read_text(
+        encoding="utf-8"
+    )
+    batch_runner = (APP_ROOT / "tests" / "run_tests.bat").read_text(
+        encoding="utf-8"
+    )
+    server_config = tomllib.loads(
+        (APP_ROOT / "server" / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    angular_config = json.loads(
+        (APP_ROOT / "client" / "angular.json").read_text(encoding="utf-8")
+    )
+    karma_config = (APP_ROOT / "client" / "karma.conf.cjs").read_text(
+        encoding="utf-8"
+    )
+    workflow_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (REPOSITORY_ROOT / ".github" / "workflows").glob("*.yml")
+    )
+    vscode_launch = (REPOSITORY_ROOT / ".vscode" / "launch.json").read_text(
+        encoding="utf-8"
+    )
+    gitignore_text = (REPOSITORY_ROOT / ".gitignore").read_text(encoding="utf-8")
+
+    active_tooling_text = "\n".join(
+        (
+            launcher,
+            batch_runner,
+            karma_config,
+            workflow_text,
+            vscode_launch,
+            gitignore_text,
+        )
+    ).replace("\\", "/")
+    canonical_root = "runtimes/cache"
+    assert canonical_root in active_tooling_text
+    assert server_config["tool"]["pytest"]["ini_options"]["cache_dir"] == (
+        "../../runtimes/cache/pytest"
+    )
+    assert server_config["tool"]["ruff"]["cache-dir"] == "../../runtimes/cache/ruff"
+    assert angular_config["cli"]["cache"]["path"] == "../../runtimes/cache/angular"
+    assert "../../runtimes/cache/coverage/aegis-client" in karma_config
+    assert "enable-" + "cache:" not in workflow_text
+    assert "cache:" + " npm" not in workflow_text
+    assert "$ToolCacheDir" not in launcher
+    assert "$LegacyCache" not in launcher
+    assert "$LegacyUvCache" not in launcher
+    assert "ValidateSet('Launch', 'ClearCache')" in launcher
+    assert "Clear-ApplicationCache -SkipConfirmation -Strict" in launcher
+
+    forbidden_fragments = (
+        "/".join(("app", "tests", "cache")),
+        "/".join(("assets", "cache")),
+        "." + "pytest_cache",
+        "." + "ruff_cache",
+        "." + "tmp_pytest",
+        "." + "angular",
+    )
+    for fragment in forbidden_fragments:
+        assert fragment not in active_tooling_text
+
+    dot_pytest_cache = "." + "pytest" + "_cache"
+    dot_ruff_cache = "." + "ruff" + "_cache"
+    dot_tmp_pytest = "." + "tmp" + "_pytest"
+    obsolete_roots = (
+        REPOSITORY_ROOT / "assets" / "cache",
+        APP_ROOT / "tests" / "cache",
+        APP_ROOT / "client" / ("." + "angular"),
+        REPOSITORY_ROOT / dot_pytest_cache,
+        REPOSITORY_ROOT / dot_ruff_cache,
+        REPOSITORY_ROOT / dot_tmp_pytest,
+        APP_ROOT / dot_pytest_cache,
+        APP_ROOT / dot_ruff_cache,
+        APP_ROOT / "server" / dot_pytest_cache,
+        APP_ROOT / "server" / "app" / "tests" / "cache",
+        APP_ROOT / "server" / (".pytest" + "-cache-gbif"),
+        APP_ROOT / "server" / (".pytest" + "-cache-tiles"),
+        APP_ROOT / "server" / (".pytest" + "-cache-typing"),
+        APP_ROOT / (".pytest" + "-tmp-canonical-basemap"),
+        APP_ROOT / (".pytest" + "-tmp-lane1-baseline"),
+        APP_ROOT / (".pytest" + "-tmp-native-map"),
+        APP_ROOT / (".pytest" + "-tmp-terrain-catalog"),
+    )
+    assert all(not path.exists() for path in obsolete_roots)

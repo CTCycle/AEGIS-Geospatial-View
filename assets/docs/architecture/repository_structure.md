@@ -1,10 +1,13 @@
 # Repository Structure
 
-Last updated: 2026-08-30
+Last updated: 2026-09-18
 
 ## Purpose
 
-This file inventories the source and operational layout of the repository. Generated directories such as `node_modules`, `dist`, `.angular`, and `__pycache__` are intentionally excluded.
+This file inventories the source and operational layout of the repository.
+Generated directories such as `node_modules`, `dist`, and Python bytecode are
+intentionally excluded. All disposable cache data belongs under
+`runtimes/cache`.
 
 ## Repository Root
 
@@ -43,6 +46,8 @@ AEGIS Geospatial View/
     .env
     .env.example
     configurations.json
+  runtimes/
+    cache/
   start_on_windows.ps1
   README.md
 ```

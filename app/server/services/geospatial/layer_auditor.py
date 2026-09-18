@@ -138,7 +138,7 @@ def _combined_text(paths: list[Path]) -> str:
 def _python_files(root: Path) -> list[Path]:
     if not root.is_dir():
         return []
-    ignored_parts = {"__pycache__", ".pytest_cache", ".angular", "dist", "node_modules"}
+    ignored_parts = {"__pycache__", "dist", "node_modules"}
     return [
         path
         for path in root.rglob("*.py")
@@ -149,7 +149,7 @@ def _python_files(root: Path) -> list[Path]:
 def _client_files(root: Path) -> list[Path]:
     if not root.is_dir():
         return []
-    ignored_parts = {"node_modules", ".angular", "dist"}
+    ignored_parts = {"node_modules", "dist"}
     return [
         path
         for path in root.rglob("*")
