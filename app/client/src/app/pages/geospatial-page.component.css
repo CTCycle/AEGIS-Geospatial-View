@@ -70,90 +70,72 @@
     position: relative;
     flex: 0 0 auto;
     min-width: 0;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
+    gap: 0.75rem;
     padding: 0.42rem 0.85rem;
     border-bottom: 1px solid #263640;
     background: #101c23;
     z-index: 12;
-    flex-wrap: wrap;
 }
 
-.canvas-header__title {
-    display: grid;
-    gap: 0.04rem;
+.canvas-header__status {
     min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    overflow: hidden;
+    color: #9fc9df;
+    font-size: 0.7rem;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
-.canvas-header__title span {
-    margin: 0;
+.canvas-header__status > span:last-child {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.canvas-header__title span {
-    color: #9fb5bf;
-    font-size: 0.7rem;
-}
-
 .canvas-header__actions {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
-    min-width: 0;
+    justify-content: flex-end;
+    gap: 0.42rem;
     flex: 0 0 auto;
 }
 
-.canvas-header__text-button,
-.canvas-header__alert-button {
-    min-height: 2rem;
-    border-radius: 0.35rem;
+.canvas-header__icon-button {
+    width: 2rem;
+    height: 2rem;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    padding: 0;
     border: 1px solid #344953;
+    border-radius: 0.35rem;
     background: #162833;
     color: #d6e3e8;
-    font-size: 0.72rem;
-    font-weight: 700;
+    cursor: pointer;
 }
 
-.canvas-header__text-button {
-    padding: 0.28rem 0.55rem;
-}
-
-.canvas-header__alert-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.28rem 0.55rem;
-}
-
-.canvas-header__text-button:hover,
-.canvas-header__text-button:focus-visible,
-.canvas-header__alert-button:hover,
-.canvas-header__alert-button:focus-visible {
+.canvas-header__icon-button:hover,
+.canvas-header__icon-button:focus-visible {
     border-color: #2f9bd7;
     background: #1b3340;
+}
+
+.canvas-header__icon-button:focus-visible {
+    outline: 2px solid #2f9bd7;
+    outline-offset: 2px;
 }
 
 .canvas-header__icon-button--active {
     border-color: #2f9bd7;
     background: #172f3a;
     color: #e8f7ff;
-}
-
-.canvas-header__status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    max-width: min(18rem, 28vw);
-    overflow: hidden;
-    color: #9fc9df;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .canvas-panel__body {
@@ -379,42 +361,8 @@
     color: #e76f76;
 }
 
-.tool-progress-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: 1.85rem;
-    box-sizing: border-box;
-    overflow: hidden;
-    padding: 0.22rem 0.72rem;
-    border-top: 1px solid rgb(38 58 69 / 70%);
-    background: #0f1a21;
-    color: #b7cbd2;
-    font-size: 0.66rem;
-    white-space: nowrap;
-}
-
-.tool-progress-row__iteration {
-    flex: 0 0 auto;
-    color: #8098a2;
-    font-variant-numeric: tabular-nums;
-}
-
-.tool-progress-row__tool {
-    min-width: 0;
-    overflow: hidden;
-    color: #d9ebf1;
-    font-weight: 700;
-    text-overflow: ellipsis;
-}
-
-.tool-progress-row__status {
-    flex: 0 0 auto;
-    color: #8dc8ea;
-    text-transform: capitalize;
-}
-
 .workspace-status-bar {
+    position: relative;
     grid-column: 1 / -1;
     grid-row: 2;
     min-width: 0;
@@ -422,17 +370,27 @@
     height: 2.1rem;
     display: flex;
     align-items: center;
-    overflow-x: auto;
-    overflow-y: hidden;
+    gap: 0.75rem;
+    overflow: visible;
     padding: 0 0.72rem;
     border-top: 1px solid #263a45;
     background: #101c23;
     color: #c5d3d8;
 }
 
-.workspace-status-bar app-capability-status-list {
+.workspace-status-bar__capabilities {
     min-width: 0;
+    flex: 1 1 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.workspace-status-bar app-capability-status-list {
     min-width: max-content;
+}
+
+.workspace-status-bar app-execution-status {
+    margin-left: auto;
 }
 
 .composer-stop-icon {
@@ -498,11 +456,11 @@
 }
 
 .workspace-alerts {
-    position: static;
-    flex: 1 1 100%;
-    order: 3;
+    position: absolute;
+    top: calc(100% + 0.45rem);
+    right: 0.85rem;
     z-index: 7;
-    width: min(100%, 38rem);
+    width: min(calc(100% - 1.7rem), 38rem);
     display: grid;
     gap: 0.65rem;
     padding: 0.8rem 0.9rem;
