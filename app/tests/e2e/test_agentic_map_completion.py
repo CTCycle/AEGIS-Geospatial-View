@@ -32,6 +32,7 @@ from tests.e2e.helpers.chat_stub_payloads import (
 
 CONVERSATION_ID = "conversation-controlled-map"
 RUN_ID = "controlled-map-run-1"
+SUPERSEDED_RUN_ID = "controlled-map-run-2"
 MAP_SESSION_ID = "rome-earthquake-session"
 COLLECTION_REVISION = 7
 MAX_EVIDENCE_ITEMS = 64
@@ -61,6 +62,7 @@ def _envelope(
     payload: dict[str, Any],
     message_id: str,
     sequence: int | None = None,
+    run_id: str = RUN_ID,
 ) -> str:
     envelope: dict[str, Any] = {
         "protocol_version": 1,
@@ -71,10 +73,10 @@ def _envelope(
     }
     if sequence is not None:
         envelope["payload"] = {
-            "event_id": f"{RUN_ID}-event-{sequence}",
+            "event_id": f"{run_id}-event-{sequence}",
             "sequence": sequence,
             "conversation_id": CONVERSATION_ID,
-            "run_id": RUN_ID,
+            "run_id": run_id,
             "run_version": 1,
             "type": payload.pop("type"),
             "timestamp": "2026-09-05T12:00:00Z",
@@ -168,6 +170,7 @@ FAULT_SCENARIOS = (
     "failed_layer",
     "viewport_mismatch",
     "stale_ack",
+    "mismatched_ack",
     "duplicate_ack",
     "cancelled",
     "superseded",
@@ -332,9 +335,11 @@ def _controlled_socket(
     sequence = 0
     render_attempt = 0
     active_run_version = 1
+    active_run_id = RUN_ID
     current_map_session = map_session
     current_presentation = presentation
     cancelled = False
+    deferred_superseded_ack: dict[str, Any] | None = None
     fixture_state.setdefault("rejected_acknowledgments", [])
 
     def send_event(
@@ -352,6 +357,7 @@ def _controlled_socket(
             payload=event_payload,
             message_id=f"controlled-event-{sequence}",
             sequence=sequence,
+            run_id=active_run_id,
         )
         if run_version is not None:
             effective_run_version = run_version
@@ -361,6 +367,7 @@ def _controlled_socket(
             sequence_entry: dict[str, Any] = {
                 "sequence": sequence,
                 "type": event_type,
+                "run_id": active_run_id,
                 "run_version": effective_run_version,
             }
             for key in ("code", "collection_revision", "map_session_id", "recovery", "status"):
@@ -394,9 +401,29 @@ def _controlled_socket(
             run_version=active_run_version,
         )
 
+    def reject_superseded_ack(socket: WebSocketRoute, payload: dict[str, Any]) -> None:
+        rejected = deepcopy(payload)
+        rejected["rejection_reason"] = "superseded"
+        if len(fixture_state["rejected_acknowledgments"]) < MAX_EVIDENCE_ITEMS:
+            fixture_state["rejected_acknowledgments"].append(rejected)
+        socket.send(
+            _envelope(
+                message_type="protocol.error",
+                payload={
+                    "code": "render_ack_rejected",
+                    "message": "The render acknowledgment is stale after supersession.",
+                    "command": "map.render_ack",
+                    "accepted": False,
+                    "run_id": payload.get("run_id"),
+                    "run_version": payload.get("run_version"),
+                },
+                message_id="controlled-superseded-render-ack",
+            )
+        )
+
     def handle_socket(socket: WebSocketRoute) -> None:
         def handle_message(raw: str | bytes) -> None:
-            nonlocal active_run_version, current_map_session, current_presentation, render_attempt, cancelled
+            nonlocal active_run_id, active_run_version, current_map_session, current_presentation, render_attempt, cancelled, deferred_superseded_ack
             try:
                 request = json.loads(raw)
             except (TypeError, json.JSONDecodeError):
@@ -414,6 +441,14 @@ def _controlled_socket(
                 )
                 return
             if request_type == "run.start":
+                superseding_new_run = scenario == "superseded" and fixture_state.get("started")
+                if superseding_new_run:
+                    fixture_state["superseded"] = True
+                    active_run_id = SUPERSEDED_RUN_ID
+                    active_run_version = 1
+                    current_map_session = _map_session_variant(2)
+                    current_presentation = _prepared_presentation(current_map_session)
+                fixture_state["started"] = True
                 socket.send(
                     _envelope(
                         message_type="run.ack",
@@ -421,7 +456,7 @@ def _controlled_socket(
                             "command": "run.start",
                             "accepted": True,
                             "duplicate": False,
-                            "run_id": RUN_ID,
+                            "run_id": active_run_id,
                             "run_version": active_run_version,
                             "state": "running",
                         },
@@ -435,6 +470,19 @@ def _controlled_socket(
                 )
                 send_event(socket, "assistant_text_completed", {"content": "Data prepared; the map is loading."})
                 send_prepared(socket)
+                if superseding_new_run:
+                    reject_superseded_ack(
+                        socket,
+                        {
+                            "run_id": RUN_ID,
+                            "run_version": 1,
+                            "map_session_id": map_session.get("session_id"),
+                            "collection_revision": map_session.get("overlay_collection", {}).get("revision"),
+                        },
+                    )
+                if deferred_superseded_ack is not None:
+                    reject_superseded_ack(socket, deferred_superseded_ack)
+                    deferred_superseded_ack = None
                 return
             if request_type == "run.cancel" and scenario == "cancelled":
                 cancelled = True
@@ -446,7 +494,7 @@ def _controlled_socket(
                             "command": "run.cancel",
                             "accepted": True,
                             "duplicate": False,
-                            "run_id": RUN_ID,
+                            "run_id": active_run_id,
                             "run_version": active_run_version,
                             "state": "cancelled",
                             "presentation_status": "failed",
@@ -457,6 +505,7 @@ def _controlled_socket(
                 send_event(socket, "cancelled", {"message": "Map update cancelled."})
                 return
             if request_type == "run.steer" and scenario == "superseded":
+                fixture_state["superseded"] = True
                 active_run_version = 2
                 current_map_session = _map_session_variant(2)
                 current_presentation = _prepared_presentation(current_map_session)
@@ -467,7 +516,7 @@ def _controlled_socket(
                             "command": "run.steer",
                             "accepted": True,
                             "duplicate": False,
-                            "run_id": RUN_ID,
+                            "run_id": active_run_id,
                             "run_version": active_run_version,
                             "state": "running",
                         },
@@ -481,6 +530,9 @@ def _controlled_socket(
                     run_version=active_run_version,
                 )
                 send_prepared(socket)
+                if deferred_superseded_ack is not None:
+                    reject_superseded_ack(socket, deferred_superseded_ack)
+                    deferred_superseded_ack = None
                 return
             if request_type != "map.render_ack":
                 return
@@ -504,32 +556,52 @@ def _controlled_socket(
                     )
                 )
                 return
-            if scenario == "superseded" and (
-                payload.get("run_version") != active_run_version
-                or payload.get("run_version") == 1
-                or payload.get("map_session_id")
-                != current_map_session.get("session_id")
-                or payload.get("collection_revision")
-                != current_map_session.get("overlay_collection", {}).get("revision")
-            ):
+            if scenario == "mismatched_ack" and len(acknowledgments) == 1:
                 rejected = deepcopy(payload)
-                rejected["rejection_reason"] = "superseded"
+                rejected["rejection_reason"] = "mismatched_identity"
                 if len(fixture_state["rejected_acknowledgments"]) < MAX_EVIDENCE_ITEMS:
                     fixture_state["rejected_acknowledgments"].append(rejected)
                 socket.send(
                     _envelope(
                         message_type="protocol.error",
                         payload={
-                            "code": "render_ack_rejected",
-                            "message": "The render acknowledgment is stale after supersession.",
+                            "code": "render_ack_mismatch",
+                            "message": "The render acknowledgment identity does not match the prepared map.",
                             "command": "map.render_ack",
                             "accepted": False,
-                            "run_id": RUN_ID,
-                            "run_version": payload.get("run_version"),
+                            "details": {
+                                "expected": {
+                                    "run_id": active_run_id,
+                                    "run_version": active_run_version,
+                                    "map_session_id": current_map_session.get("session_id"),
+                                    "collection_revision": current_map_session.get("overlay_collection", {}).get("revision"),
+                                },
+                                "observed": {
+                                    "run_id": payload.get("run_id"),
+                                    "run_version": payload.get("run_version"),
+                                    "map_session_id": payload.get("map_session_id"),
+                                    "collection_revision": payload.get("collection_revision"),
+                                },
+                            },
                         },
-                        message_id="controlled-superseded-render-ack",
+                        message_id="controlled-mismatched-render-ack",
                     )
                 )
+                return
+            if scenario == "superseded" and (
+                not fixture_state.get("superseded")
+            ):
+                deferred_superseded_ack = deepcopy(payload)
+                return
+            if scenario == "superseded" and (
+                payload.get("run_id") != active_run_id
+                or payload.get("run_version") != active_run_version
+                or payload.get("map_session_id")
+                != current_map_session.get("session_id")
+                or payload.get("collection_revision")
+                != current_map_session.get("overlay_collection", {}).get("revision")
+            ):
+                reject_superseded_ack(socket, payload)
                 return
             render_attempt += 1
             if scenario == "stale_ack":
@@ -560,7 +632,7 @@ def _controlled_socket(
                             "command": "map.render_ack",
                             "accepted": True,
                             "duplicate": False,
-                            "run_id": RUN_ID,
+                            "run_id": active_run_id,
                             "run_version": active_run_version,
                             "state": "pending",
                             "presentation_status": "pending",
@@ -639,7 +711,7 @@ def _controlled_socket(
                             "command": "map.render_ack",
                             "accepted": True,
                             "duplicate": False,
-                            "run_id": RUN_ID,
+                            "run_id": active_run_id,
                             "run_version": active_run_version,
                             "state": "failed",
                             "presentation_status": "render_timeout",
@@ -666,7 +738,7 @@ def _controlled_socket(
                         "command": "map.render_ack",
                         "accepted": True,
                         "duplicate": False,
-                        "run_id": RUN_ID,
+                        "run_id": active_run_id,
                         "run_version": active_run_version,
                         "state": "completed",
                         "presentation_status": "ready",
@@ -683,7 +755,7 @@ def _controlled_socket(
                             "command": "map.render_ack",
                             "accepted": True,
                             "duplicate": True,
-                            "run_id": RUN_ID,
+                            "run_id": active_run_id,
                             "run_version": active_run_version,
                             "state": "completed",
                             "presentation_status": "ready",
@@ -952,9 +1024,11 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
     page.get_by_role("button", name="Send message").click()
 
     if scenario == "superseded":
-        expect(page.get_by_role("status").first).to_contain_text(
-            "Understanding", timeout=15000
-        )
+        # Wait for the first run identity before steering it.  The map
+        # candidate may already be prepared by this point; the fixture holds
+        # its acknowledgement until the superseding command arrives so both
+        # event orderings are exercised deterministically.
+        expect(page.get_by_role("button", name="Stop generating")).to_be_visible(timeout=15000)
         composer.fill("Focus on Milan instead")
         composer.press("Enter")
     elif scenario == "cancelled":
@@ -989,6 +1063,15 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
         assert "Map ready." not in page.locator(".chat-message--assistant").all_inner_texts()[-1]
         assert "Map data ready; rendering" not in _bounded_text(page.locator("body").inner_text())
         assert page.get_by_role("button", name="Stop generating").count() == 0
+    elif scenario == "mismatched_ack":
+        expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
+        expect(page.locator(".chat-message--assistant").last).to_contain_text(
+            "Map ready.", timeout=15000
+        )
+        assert len(acknowledgments) >= 2
+        rejected = fixture_state.get("rejected_acknowledgments", [])
+        assert rejected and rejected[0].get("rejection_reason") == "mismatched_identity"
+        assert fixture_state.get("final_presentation_status") == "ready"
     elif scenario == "cancelled":
         assistant_messages = page.locator(".chat-message--assistant").all_inner_texts()
         assert assistant_messages and assistant_messages[-1] != "Map ready."
@@ -999,13 +1082,22 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
         expect(page.locator(".chat-message--assistant").last).to_contain_text(
             "Map ready.", timeout=15000
         )
-        assert len(acknowledgments) >= 2
-        assert any(item.get("run_version") == 1 for item in acknowledgments)
-        assert any(item.get("run_version") == 2 for item in acknowledgments)
+        assert acknowledgments
+        assert any(
+            item.get("run_id") == SUPERSEDED_RUN_ID and item.get("run_version") == 1
+            for item in acknowledgments
+        ) or any(
+            item.get("run_id") == RUN_ID and item.get("run_version") == 2
+            for item in acknowledgments
+        )
         rejected = fixture_state.get("rejected_acknowledgments", [])
         assert rejected and rejected[0].get("rejection_reason") == "superseded"
         assert any(
-            event.get("type") == "map_prepared" and event.get("run_version") == 2
+            event.get("type") == "map_prepared"
+            and (
+                (event.get("run_id") == SUPERSEDED_RUN_ID and event.get("run_version") == 1)
+                or (event.get("run_id") == RUN_ID and event.get("run_version") == 2)
+            )
             for event in synthetic_events
         )
     else:
