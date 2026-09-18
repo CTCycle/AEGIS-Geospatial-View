@@ -69,7 +69,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ChatTurnResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ChatTurnResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AgentRunAcceptedResponse"
+                    }
+                  ],
+                  "title": "Response Chat Turn Api Chat Turn Post"
                 }
               }
             }
@@ -507,6 +515,58 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConversationSnapshotResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get Run Status",
+        "description": "Return active or terminal run state for 202 polling clients.",
+        "operationId": "get_run_status_api_conversations__conversation_id__runs__run_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunSnapshot"
                 }
               }
             }
@@ -1832,6 +1892,240 @@
         "title": "AgentGoal",
         "description": "Server-owned goal details derived from a validated native route."
       },
+      "AgentRunAcceptedResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "run_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Run Version"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentRunState"
+          },
+          "presentation_status": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "ready",
+              "failed",
+              "render_timeout"
+            ],
+            "title": "Presentation Status",
+            "default": "not_required"
+          },
+          "status_url": {
+            "type": "string",
+            "title": "Status Url"
+          },
+          "realtime_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realtime Url"
+          },
+          "terminal": {
+            "type": "boolean",
+            "title": "Terminal",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "run_id",
+          "run_version",
+          "state",
+          "status_url"
+        ],
+        "title": "AgentRunAcceptedResponse",
+        "description": "Stable response for work accepted outside the synchronous window."
+      },
+      "AgentRunSnapshot": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "original_request": {
+            "type": "string",
+            "title": "Original Request"
+          },
+          "aggregated_request": {
+            "type": "string",
+            "title": "Aggregated Request"
+          },
+          "active_run_version": {
+            "type": "integer",
+            "title": "Active Run Version"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentRunState"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "request_timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Timezone"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "cancel_requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Requested At"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "presentation_status": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "ready",
+              "failed",
+              "render_timeout"
+            ],
+            "title": "Presentation Status",
+            "default": "not_required"
+          },
+          "presentation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presentation"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response"
+          },
+          "current_iteration": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Iteration"
+          },
+          "task_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTaskState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "run_id",
+          "original_request",
+          "aggregated_request",
+          "active_run_version",
+          "state",
+          "created_at"
+        ],
+        "title": "AgentRunSnapshot"
+      },
       "AgentRunState": {
         "type": "string",
         "enum": [
@@ -3017,6 +3311,15 @@
             "type": "string",
             "title": "Operation"
           },
+          "data_requirement": {
+            "type": "string",
+            "enum": [
+              "none",
+              "provider_data"
+            ],
+            "title": "Data Requirement",
+            "default": "none"
+          },
           "requirements": {
             "items": {
               "type": "string"
@@ -3074,6 +3377,26 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "location",
+                  "provider_data",
+                  "temporal_scope",
+                  "spatial_scope",
+                  "map_candidate",
+                  "render_ack",
+                  "final_text"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
           },
           "required": {
             "type": "boolean",
@@ -5914,6 +6237,22 @@
             "type": "string",
             "title": "Status"
           },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          },
           "library_models": {
             "items": {
               "type": "string"
@@ -6116,6 +6455,34 @@
             "type": "array",
             "maxItems": 24,
             "title": "Scope Terms"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "generic",
+              "infrastructure_subtype"
+            ],
+            "title": "Kind",
+            "default": "generic"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Options"
+          },
+          "selected_option": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Option"
           },
           "status": {
             "type": "string",

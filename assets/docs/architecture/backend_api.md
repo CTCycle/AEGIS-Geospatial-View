@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-09-15
+Last updated: 2026-09-18
 
 ## Mounting
 
@@ -68,9 +68,13 @@ environment-variable fallback.
 Defined in `app/server/api/chat.py`:
 
 - `POST /api/chat/turn`
-  Executes a chat turn and returns the structured result. `conversation_id` is required.
-  This direct path retains its immediate response behavior; no second headless
-  render-ack transport is provided for it.
+  Executes a chat turn and returns the structured result when the run reaches a
+  terminal response within the request window. `conversation_id` is required.
+  A run that has been accepted but is still `pending`, `running`, `updating`,
+  or `awaiting_render` returns `202 AgentRunAcceptedResponse`; it is not a
+  conflict. The response includes `run_id`, `run_version`, `state`,
+  `presentation_status`, a status URL, and the realtime URL. A `409` is reserved
+  for a genuine active-run/idempotency/ownership conflict.
 - `POST /api/chat/jobs`
   Starts an asynchronous chat turn and returns `BackgroundJobCreateResponse`. `conversation_id` is required.
 - `POST /api/chat/stream`
@@ -106,7 +110,8 @@ Defined in `app/server/api/chat.py`:
 
 ### Chat Turn Response
 
-`POST /api/chat/turn` returns `ChatTurnResponse`.
+`POST /api/chat/turn` returns `ChatTurnResponse` (`200`) or
+`AgentRunAcceptedResponse` (`202`).
 
 High-level fields:
 
@@ -154,6 +159,14 @@ Supported `operation.status` values:
 - `success`
 - `partial`
 - `failed`
+
+An accepted active run is polled with:
+
+- `GET /api/conversations/{conversation_id}/runs/{run_id}`
+  Returns the typed `AgentRunSnapshot`. For a terminal run, `response` contains
+  the same serialized terminal chat response that a synchronous `200` would
+  have returned. The snapshot remains the source of truth when realtime events
+  arrive out of order or a websocket reconnects.
 
 ### Chat Stream Events
 

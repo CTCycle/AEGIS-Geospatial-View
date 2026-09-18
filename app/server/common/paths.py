@@ -55,3 +55,4 @@ CONVERSATIONS_ROUTER_PREFIX = "/conversations"
 CONVERSATIONS_ROOT_ROUTE = ""
 
 CONVERSATION_REALTIME_ROUTE = "/{conversation_id}/realtime"
+CONVERSATION_RUN_STATUS_ROUTE = "/{conversation_id}/runs/{run_id}"

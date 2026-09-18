@@ -243,6 +243,8 @@ class GoogleProvider(LLMProvider):
         client: Any | None = None
         try:
             client = self._client_for_request(effective_request, stage="chat")
+            if client is None:
+                raise RuntimeError("Google client was not initialized.")
             response = client.models.generate_content(
                 model=effective_request.model,
                 contents=self._contents_from_messages(effective_request.messages),
@@ -282,6 +284,8 @@ class GoogleProvider(LLMProvider):
             client: Any | None = None
             try:
                 client = self._client_for_request(request, stage="stream")
+                if client is None:
+                    raise RuntimeError("Google client was not initialized.")
                 response_stream = client.models.generate_content_stream(
                     model=request.model,
                     contents=self._contents_from_messages(request.messages),
@@ -341,6 +345,8 @@ class GoogleProvider(LLMProvider):
         client: Any | None = None
         try:
             client = self._client_for_request(request, stage="structured_output")
+            if client is None:
+                raise RuntimeError("Google client was not initialized.")
             response = client.models.generate_content(
                 model=request.model,
                 contents=self._contents_from_messages(request.messages),
@@ -394,6 +400,8 @@ class GoogleProvider(LLMProvider):
         client: Any | None = None
         try:
             client = self._client(stage="embeddings")
+            if client is None:
+                raise RuntimeError("Google client was not initialized.")
             response = client.models.embed_content(model=model, contents=input_text)
         except LLMProviderRequestError:
             raise

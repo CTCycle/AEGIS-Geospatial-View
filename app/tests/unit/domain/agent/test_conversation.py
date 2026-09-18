@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.domain.agent.conversation import ConversationState
+from server.domain.agent.conversation import ConversationState, PendingClarification
 
 
 def test_legacy_unresolved_question_migrates_and_is_scoped() -> None:
@@ -98,3 +98,14 @@ def test_direct_answer_resolves_and_preserves_terminal_clarification() -> None:
     preserved = answered_state.clarification_after_turn("Hello")
     assert preserved is not None
     assert preserved.status == "answered"
+
+
+def test_infrastructure_option_matching_uses_word_boundaries() -> None:
+    clarification = PendingClarification.from_turn(
+        "Which infrastructure category do you need?",
+        source_turn_index=1,
+        source_text="Show infrastructure in Rome",
+    )
+
+    assert clarification.match_option("EV charging stations") == "ev_charging"
+    assert clarification.match_option("level crossings") is None

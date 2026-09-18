@@ -367,6 +367,8 @@ class OpenAIProvider(LLMProvider):
         client: Any | None = None
         try:
             client = self._client_for_request(effective_request, stage="chat")
+            if client is None:
+                raise RuntimeError("OpenAI client was not initialized.")
             response = client.responses.create(
                 model=effective_request.model,
                 input=self.normalize_tool_messages(effective_request.messages),
@@ -407,6 +409,8 @@ class OpenAIProvider(LLMProvider):
             client: Any | None = None
             try:
                 client = self._client_for_request(request, stage="stream")
+                if client is None:
+                    raise RuntimeError("OpenAI client was not initialized.")
                 response_stream = client.responses.create(
                     model=request.model,
                     input=request.messages,
@@ -473,6 +477,8 @@ class OpenAIProvider(LLMProvider):
         client: Any | None = None
         try:
             client = self._client_for_request(request, stage="structured_output")
+            if client is None:
+                raise RuntimeError("OpenAI client was not initialized.")
             response = client.responses.parse(
                 model=request.model,
                 input=request.messages,
@@ -547,6 +553,8 @@ class OpenAIProvider(LLMProvider):
         client: Any | None = None
         try:
             client = self._client(stage="embeddings")
+            if client is None:
+                raise RuntimeError("OpenAI client was not initialized.")
             response = client.embeddings.create(model=model, input=input_text)
         except LLMProviderRequestError:
             raise

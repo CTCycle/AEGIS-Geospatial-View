@@ -308,6 +308,8 @@ class DeepSeekProvider(LLMProvider):
         client: Any | None = None
         try:
             client = self._client_for_request(effective_request, stage="chat")
+            if client is None:
+                raise RuntimeError("DeepSeek client was not initialized.")
             response = client.chat.completions.create(
                 model=effective_request.model,
                 messages=self.normalize_tool_messages(effective_request.messages),
@@ -449,6 +451,8 @@ class DeepSeekProvider(LLMProvider):
             client: Any | None = None
             try:
                 client = self._client_for_request(request, stage="stream")
+                if client is None:
+                    raise RuntimeError("DeepSeek client was not initialized.")
                 max_tokens = self._request_max_tokens(request)
                 response_stream = client.chat.completions.create(
                     model=request.model,
@@ -666,6 +670,8 @@ class DeepSeekProvider(LLMProvider):
         client: Any | None = None
         try:
             client = self._client_for_request(request, stage="structured_output")
+            if client is None:
+                raise RuntimeError("DeepSeek client was not initialized.")
             max_tokens = self._request_max_tokens(request)
             request_kwargs: dict[str, Any] = {
                 "model": request.model,

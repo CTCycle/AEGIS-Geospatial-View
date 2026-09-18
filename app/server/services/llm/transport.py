@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 
 @dataclass(frozen=True)
@@ -32,9 +32,10 @@ class LLMTransportPolicy:
                 raise ValueError(f"{name} must be finite and positive")
         if self.max_attempts < 1:
             raise ValueError("max_attempts must be positive")
-        if self.proxy is not None and (
-            not isinstance(self.proxy, str) or not self.proxy.strip()
-        ):
+        proxy = cast(object, self.proxy)
+        if proxy is not None and not isinstance(proxy, str):
+            raise ValueError("proxy must be a string when configured")
+        if isinstance(proxy, str) and not proxy.strip():
             raise ValueError("proxy must be a non-empty string when configured")
         for name in (
             "retry_backoff_base_seconds",

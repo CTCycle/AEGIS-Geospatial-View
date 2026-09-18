@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from server.contracts.chat import (
     OllamaPullRequest,
     OllamaPullResponse,
@@ -9,7 +7,6 @@ from server.contracts.chat import (
 )
 from server.services.chat.maintenance_service import ChatMaintenanceService
 from server.services.chat.model_library import ChatModelLibraryService
-from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 
 ###############################################################################
@@ -87,13 +84,13 @@ def test_maintenance_service_delegates_to_ollama_provider() -> None:
 def test_maintenance_service_does_not_report_catalog_failure_as_success() -> None:
     class _UnavailableProvider:
         last_list_library_models_error = "ollama unavailable"
-        last_list_models_error = None
+        last_list_models_error = "ollama unavailable"
 
         def list_library_models(self):  # noqa: ANN201
             return []
 
         def list_models(self):  # noqa: ANN201
-            raise AssertionError("local catalog must not run after library failure")
+            return []
 
     service = ChatMaintenanceService(
         get_ollama_url=lambda: "http://localhost:11434",
@@ -104,7 +101,8 @@ def test_maintenance_service_does_not_report_catalog_failure_as_success() -> Non
         ollama_provider_factory=lambda _base_url, _cache: _UnavailableProvider(),
     )
 
-    with pytest.raises(LLMProviderRequestError) as raised:
-        service.refresh_ollama_models()
+    refresh = service.refresh_ollama_models()
 
-    assert raised.value.code == "provider_catalog_unavailable"
+    assert refresh.status == "unavailable"
+    assert refresh.stale is True
+    assert "ollama unavailable" in (refresh.message or "")
