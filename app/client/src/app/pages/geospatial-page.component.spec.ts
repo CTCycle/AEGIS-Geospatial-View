@@ -7,7 +7,7 @@ import { defaultAppState } from '../core/app-state';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { FakeRealtimeService } from '../core/realtime.test-support';
 import { RealtimeService } from '../core/realtime.service';
-import { ChatTurnResponse, MapSession } from '../core/types';
+import { ChatTurnResponse, MapRenderAcknowledgement, MapSession } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { GeospatialPageComponent } from './geospatial-page.component';
 
@@ -328,6 +328,61 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.at(-1)?.content).toContain('real-time connection');
   });
 
+  it('retries a mismatched render acknowledgment against the expected candidate identity', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    const acknowledgement: MapRenderAcknowledgement = {
+      run_id: 'old-run',
+      run_version: 1,
+      map_session_id: 'old-candidate',
+      collection_revision: 3,
+      status: 'ready',
+      viewport_bounds: [-1, 41, 1, 43],
+      checks: { viewport_valid: true },
+      overlay_results: [],
+    };
+    component['pendingRenderAcknowledgement'] = acknowledgement;
+    const sendMapRenderAck = jasmine.createSpy('sendMapRenderAck').and.returnValue('retry-1');
+    Object.assign(realtime, { sendMapRenderAck });
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'protocol.error',
+      message_id: 'mismatch',
+      conversation_id: 'conv-1',
+      payload: {
+        code: 'render_ack_mismatch',
+        command: 'map.render_ack',
+        details: {
+          expected: {
+            run_id: 'run-1',
+            run_version: 1,
+            map_session_id: 'candidate-map',
+            collection_revision: 4,
+          },
+          observed: {
+            run_id: 'old-run',
+            run_version: 1,
+            map_session_id: 'old-candidate',
+            collection_revision: 3,
+          },
+        },
+      },
+    } as never);
+
+    expect(sendMapRenderAck).toHaveBeenCalledWith(jasmine.objectContaining({
+      run_id: 'run-1',
+      run_version: 1,
+      map_session_id: 'candidate-map',
+      collection_revision: 4,
+    }));
+    expect(component.status).toBe('Map data ready; rendering');
+    expect(component.isLoading).toBeTrue();
+    expect(component['pendingRenderContext']?.mapSessionId).toBe('candidate-map');
+  });
+
   it('ignores a stale render rejection after a newer run version is staged', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
@@ -373,6 +428,39 @@ describe('pages/geospatial-page.component', () => {
     expect(pendingMapSession?.session_id).toBe('new-candidate-map');
     expect(component['pendingRenderContext']?.runVersion).toBe(2);
     expect(component.messages.at(-1)?.content).not.toContain('real-time connection');
+  });
+
+  it('ignores an old render rejection that arrives before the steer acknowledgment', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    component['pendingSupersession'] = {
+      runId: 'run-1',
+      previousVersion: 1,
+      expectedVersion: 2,
+    };
+    component.status = 'Request updated';
+    component.progressLabel = 'Request updated';
+    component.messages = [{ role: 'assistant', content: 'Request updated' }];
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'protocol.error',
+      message_id: 'old-render-rejected-before-steer-ack',
+      conversation_id: 'conv-1',
+      payload: {
+        code: 'render_ack_rejected',
+        command: 'map.render_ack',
+        run_id: 'run-1',
+        run_version: 1,
+      },
+    } as never);
+
+    expect(component.status).toBe('Request updated');
+    expect(component.isLoading).toBeTrue();
+    expect(component['pendingRenderContext']?.runVersion).toBe(1);
+    expect(component.messages.at(-1)?.content).toBe('Request updated');
   });
 
   it('ignores an older render rejection after the accepted run has completed', () => {

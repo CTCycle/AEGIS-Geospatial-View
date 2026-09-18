@@ -21,7 +21,10 @@ from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.schemas.models import Base, ConversationRecord
 from server.services.agent.completion import CompletionEvaluator
 from server.services.agent_runs.events import RunEventPublisher
-from server.services.agent_runs.render_completion import RenderCompletionService
+from server.services.agent_runs.render_completion import (
+    RenderAcknowledgementError,
+    RenderCompletionService,
+)
 
 ###############################################################################
 class _EventPublisher:
@@ -468,7 +471,7 @@ def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
             }
         ],
     }
-    with pytest.raises(ValueError, match="does not match"):
+    with pytest.raises(RenderAcknowledgementError, match="does not match") as error:
         run_async_in_thread(
             service.acknowledge(
                 conversation_id,
@@ -477,6 +480,16 @@ def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
                 ),
             )
         )
+    assert error.value.code == "render_ack_mismatch"
+    assert error.value.details["expected"] == {
+        "run_id": run_id,
+        "run_version": 1,
+        "map_session_id": candidate.session_id,
+        "collection_revision": candidate.overlay_collection.revision,
+    }
+    assert error.value.details["observed"]["collection_revision"] == (
+        candidate.overlay_collection.revision + 1
+    )
     with pytest.raises(ValueError, match="visible"):
         run_async_in_thread(
             service.acknowledge(

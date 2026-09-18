@@ -5,6 +5,7 @@ import {
   API_CHAT_SETTINGS_PATH,
   API_CHAT_TURN_PATH,
   API_CONVERSATION_PATH,
+  API_CONVERSATION_RUN_STATUS_PATH,
   API_CONVERSATIONS_PATH,
   API_GEOSPATIAL_CAMERAS_PATH,
   API_GEOSPATIAL_CAPABILITIES_PATH,
@@ -17,7 +18,7 @@ import {
 } from './constants';
 import {
   parseCatalogResponse,
-  parseChatTurnResponse,
+  parseChatTurnApiResponse,
   parseConversationCreateResponse,
   parseConversationListResponse,
   parseConversationSnapshotResponse,
@@ -32,11 +33,12 @@ import {
   parseOllamaRefreshResponse,
   parseStructuredProbeResponse,
   parseRunTraceResponse,
+  parseAgentRunSnapshot,
 } from './api-parsers';
 import {
   CatalogResponse,
   ChatTurnRequest,
-  ChatTurnResponse,
+  ChatTurnApiResponse,
   ConversationCreateRequest,
   ConversationCreateResponse,
   ConversationListResponse,
@@ -50,6 +52,7 @@ import {
   ModelSettingsUpdateRequest,
   StructuredProbeResponse,
   RunTraceResponse,
+  AgentRunSnapshot,
   OllamaHealthResponse,
 } from './types';
 import { ApiRequestError } from './api-errors';
@@ -192,13 +195,13 @@ export const fetchGeospatialProviderAccountSetups = async (): Promise<Geospatial
   return parseGeospatialProviderAccountSetups(data);
 };
 
-export const sendChatTurn = async (payload: ChatTurnRequest): Promise<ChatTurnResponse> => {
+export const sendChatTurn = async (payload: ChatTurnRequest): Promise<ChatTurnApiResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_TURN_PATH}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return parseChatTurnResponse(data);
+  return parseChatTurnApiResponse(data);
 };
 
 export const createConversation = async (
@@ -249,6 +252,17 @@ export const fetchConversationRunTrace = async (
     cache: 'no-store',
   });
   return parseRunTraceResponse(data);
+};
+
+export const fetchConversationRunStatus = async (
+  conversationId: string,
+  runId: string,
+): Promise<AgentRunSnapshot> => {
+  const data = await executeApiRequest(
+    `${API_BASE_URL}${API_CONVERSATION_RUN_STATUS_PATH(conversationId, runId)}`,
+    { method: 'GET', cache: 'no-store' },
+  );
+  return parseAgentRunSnapshot(data);
 };
 
 export const fetchChatModels = async (

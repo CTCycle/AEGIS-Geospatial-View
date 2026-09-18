@@ -7,6 +7,7 @@ import {
   fetchChatModels,
   fetchStructuredProbe,
   fetchConversationSnapshot,
+  fetchConversationRunStatus,
   fetchConversations,
   fetchConversationRunTrace,
   fetchChatSettings,
@@ -23,8 +24,9 @@ import {
 } from './api';
 import {
   CatalogResponse,
+  AgentRunSnapshot,
   ChatTurnRequest,
-  ChatTurnResponse,
+  ChatTurnApiResponse,
   ConversationCreateRequest,
   ConversationCreateResponse,
   ConversationSnapshotResponse,
@@ -72,7 +74,7 @@ export class ApiClientService {
     return fetchGeospatialProviderAccountSetups();
   }
 
-  sendChatTurn(payload: ChatTurnRequest): Promise<ChatTurnResponse> {
+  sendChatTurn(payload: ChatTurnRequest): Promise<ChatTurnApiResponse> {
     return sendChatTurn(payload);
   }
 
@@ -82,6 +84,10 @@ export class ApiClientService {
 
   fetchConversationSnapshot(conversationId: string): Promise<ConversationSnapshotResponse> {
     return fetchConversationSnapshot(conversationId);
+  }
+
+  fetchConversationRunStatus(conversationId: string, runId: string): Promise<AgentRunSnapshot> {
+    return fetchConversationRunStatus(conversationId, runId);
   }
 
   fetchConversations(

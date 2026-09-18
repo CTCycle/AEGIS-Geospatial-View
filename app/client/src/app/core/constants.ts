@@ -55,6 +55,8 @@ export const API_OLLAMA_HEALTH_PATH = '/chat/models/ollama/health';
 export const API_CONVERSATIONS_PATH = '/conversations';
 export const API_CONVERSATION_PATH = (conversationId: string): string =>
   `${API_CONVERSATIONS_PATH}/${encodeURIComponent(conversationId)}`;
+export const API_CONVERSATION_RUN_STATUS_PATH = (conversationId: string, runId: string): string =>
+  `${API_CONVERSATION_PATH(conversationId)}/runs/${encodeURIComponent(runId)}`;
 export const API_CONVERSATION_REALTIME_PATH = (conversationId: string): string =>
   `/conversations/${encodeURIComponent(conversationId)}/realtime`;
 

@@ -1,11 +1,12 @@
 import {
+  ChatTurnApiResponse,
   ChatTurnResponse,
   JsonObject,
   RealtimeConnectionState,
   RealtimeServerMessage,
 } from './types';
 
-type ResponseProvider = (request: { conversation_id: string; message: string }) => Promise<ChatTurnResponse>;
+type ResponseProvider = (request: { conversation_id: string; message: string }) => Promise<ChatTurnApiResponse>;
 
 /**
  * Deterministic in-process transport used by component/browser specs.  It
@@ -88,7 +89,16 @@ export class FakeRealtimeService {
     return commandId;
   }
 
-  private emitResponse(conversationId: string, runId: string, response: ChatTurnResponse): void {
+  private emitResponse(conversationId: string, runId: string, response: ChatTurnApiResponse): void {
+    if (!('assistant_message' in response)) {
+      this.emitEvent(conversationId, runId, 1, 'status', {
+        state: response.state,
+        run_id: response.run_id,
+        run_version: response.run_version,
+        status_url: response.status_url,
+      });
+      return;
+    }
     this.emitEvent(conversationId, runId, 1, 'assistant_text_completed', {
       content: response.assistant_message,
     });
