@@ -690,7 +690,8 @@ describe('pages/geospatial-page.component', () => {
 
     expect(component.status).toBe('Agent needs attention');
     expect(component.messages).toEqual([{ role: 'user', content: 'show map', kind: 'normal' }]);
-    expect(component.runFailureSummary).toBe('boom');
+    expect(component.runFailureSummary)
+      .toBe('The request could not be completed. Open Tool activity for execution details.');
   });
 
   it('operation-aware alerts use the concise execution failure summary', () => {
