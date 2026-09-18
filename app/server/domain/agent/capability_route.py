@@ -364,6 +364,19 @@ class AgentPhase(StrEnum):
     FINALIZE = "finalize"
     FAILED = "failed"
 
+
+class LoopDecision(StrEnum):
+    """Authoritative outcome of one route/tool/render control observation."""
+
+    CONTINUE = "continue"
+    REQUEST_CLARIFICATION = "request_clarification"
+    AWAIT_RENDER = "await_render"
+    FINALIZE = "finalize"
+    COMPLETE = "complete"
+    FAIL = "fail"
+    CANCEL = "cancel"
+    SUPERSEDE = "supersede"
+
 ###############################################################################
 class AgentRunState(BaseModel):
     """Canonical mutable/checkpointable state for one native agent run."""

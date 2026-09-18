@@ -25,6 +25,7 @@ from server.domain.agent.capability_route import (
     CompletionContract,
     CompletionRequirementKind,
     CompletionRequirement,
+    LoopDecision,
     TaskStatus,
 )
 from server.domain.agent.context import AgentContextView
@@ -612,6 +613,7 @@ class AgentLoop:
         """Record a bounded completion decision without model reasoning."""
 
         state = request.state
+        decision = self._loop_decision(reason, status)
         await self._emit_trace(
             request,
             AgentTraceEvent(
@@ -621,6 +623,7 @@ class AgentLoop:
                 sequence=self._trace_sequence(state),
                 iteration=max(1, state.current_iteration),
                 payload={
+                    "decision": decision.value,
                     "status": status,
                     "reason": reason,
                     "pending_requirements": self._pending_native_requirements(state),
@@ -629,6 +632,25 @@ class AgentLoop:
                 },
             ),
         )
+
+    @staticmethod
+    def _loop_decision(
+        reason: str,
+        status: Literal["continue", "terminal"],
+    ) -> LoopDecision:
+        if status == "continue":
+            return LoopDecision.CONTINUE
+        if reason == "clarification_required":
+            return LoopDecision.REQUEST_CLARIFICATION
+        if reason == "awaiting_render":
+            return LoopDecision.AWAIT_RENDER
+        if reason == "cancelled":
+            return LoopDecision.CANCEL
+        if reason == "superseded":
+            return LoopDecision.SUPERSEDE
+        if reason == "goal_satisfied":
+            return LoopDecision.COMPLETE
+        return LoopDecision.FAIL
 
     # -------------------------------------------------------------------------
     async def _finalize_iteration_exhaustion(
@@ -2079,6 +2101,7 @@ class AgentLoop:
                 ],
             },
         )
+
         return await self._execute_calls(request, [recovery_call], state)
 
     # -------------------------------------------------------------------------
@@ -2461,6 +2484,7 @@ class AgentLoop:
             return None
         return {
             "operation": state.completion_contract.operation,
+            "data_requirement": state.completion_contract.data_requirement,
             "requirements": list(state.completion_contract.requirements[:16]),
             "location_required": state.completion_contract.location_required,
             "evidence_required": state.completion_contract.evidence_required,
