@@ -409,6 +409,19 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
         )
         assert usgs[0]["id"] == "usgs_earthquakes"
 
+    earthquake_catalog = registry.shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        queries=["earthquakes seismic events earthquake catalog"],
+        explicit_ids=[],
+        runtime_registry=runtime,
+        operation="retrieve_earthquakes",
+        scope_kind="bbox",
+        temporal_mode="current",
+        requires_render=True,
+        location=location,
+    )
+    assert earthquake_catalog[0]["id"] == "usgs_earthquakes"
+
 
 def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> None:
     registry = CapabilityRegistry()
