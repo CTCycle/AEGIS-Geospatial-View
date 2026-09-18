@@ -79,6 +79,54 @@ describe('components/execution-status.component', () => {
     expect(expandedChange).toHaveBeenCalledWith(false);
   });
 
+  it('renders multiple tool calls and retry trace metadata in the expanded panel', () => {
+    const fixture = TestBed.createComponent(ExecutionStatusComponent);
+    const component = fixture.componentInstance;
+    component.runId = 'run-1';
+    component.expanded = true;
+    component.toolProgress = [
+      {
+        call_id: 'call-1',
+        tool_name: 'discover_geospatial_capabilities',
+        status: 'success',
+        summary: 'Capabilities discovered.',
+        duration_ms: 30,
+        error: null,
+      },
+      {
+        call_id: 'call-2',
+        tool_name: 'execute_geospatial_capability',
+        status: 'partial',
+        summary: 'Primary source was unavailable; recovery continued.',
+        duration_ms: 225,
+        error: null,
+      },
+    ];
+    component.traceEntries = [{
+      event_id: 'trace-retry',
+      sequence: 4,
+      run_id: 'run-1',
+      run_version: 1,
+      kind: 'tool_retry',
+      timestamp: '2026-09-18T10:00:00Z',
+      tool_name: 'execute_geospatial_capability',
+      call_id: 'call-2',
+      iteration: 2,
+      summary: 'Retrying with a compatible source.',
+      duration_ms: 225,
+      evidence_refs: [],
+      retryable: true,
+      error: null,
+    }];
+    fixture.detectChanges();
+
+    const panel = fixture.nativeElement.querySelector('.execution-status__panel') as HTMLElement;
+    expect(panel.textContent).toContain('discover_geospatial_capabilities');
+    expect(panel.textContent).toContain('execute_geospatial_capability');
+    expect(panel.textContent).toContain('tool_retry');
+    expect(panel.textContent).toContain('Retrying with a compatible source.');
+  });
+
   it('closes the expanded panel with Escape', () => {
     const fixture = TestBed.createComponent(ExecutionStatusComponent);
     const component = fixture.componentInstance;
