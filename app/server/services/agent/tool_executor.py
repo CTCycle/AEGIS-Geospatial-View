@@ -506,6 +506,7 @@ class ToolExecutor:
             if (
                 CapabilityDomain.MIXED not in route_domains
                 and tool.domains
+                and CapabilityDomain.MIXED not in tool.domains
                 and not tool.domains.intersection(route_domains)
             ):
                 return False, "Tool is outside the validated capability route."

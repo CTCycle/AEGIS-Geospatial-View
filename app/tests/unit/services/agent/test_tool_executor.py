@@ -7,7 +7,11 @@ import pytest
 from pydantic import BaseModel, ConfigDict
 
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentPhase, AgentRunState
+from server.domain.agent.capability_route import (
+    AgentPhase,
+    AgentRunState,
+    CapabilityRoute,
+)
 from server.domain.agent.reliability import (
     AgentExecutionBudget,
     ExecutionBudgetExceeded,
@@ -69,6 +73,7 @@ def _tool(
     handler: Any,
     *,
     name: str = "test_tool",
+    domains: frozenset[CapabilityDomain] | None = None,
     semantic_validator: Any | None = None,
     argument_schema_provider: Any | None = None,
     input_model: type[BaseModel] = _Input,
@@ -90,7 +95,7 @@ def _tool(
         ),
         input_model=input_model,
         handler=handler,
-        domains=frozenset({CapabilityDomain.DATA_RETRIEVAL}),
+        domains=domains or frozenset({CapabilityDomain.DATA_RETRIEVAL}),
         phases=frozenset({AgentPhase.MODEL_STEP}),
         visibility="model",
         prerequisites=frozenset(),
@@ -125,6 +130,37 @@ def test_executor_validates_once_and_normalizes_success() -> None:
     assert calls == [3]
     assert state.tool_results == [result]
     assert state.tool_trace[0]["boundary"] == "tool_executor"
+
+
+def test_mixed_domain_tool_is_authorized_for_a_mixed_map_data_route() -> None:
+    async def handler(arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
+        return {"value": arguments.value}
+
+    registry = ToolRegistry(runtime_registry=cast(Any, None))
+    registry.register(
+        _tool(
+            handler,
+            domains=frozenset({CapabilityDomain.MIXED}),
+        )
+    )
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        secondary_domains=[CapabilityDomain.DATA_RETRIEVAL],
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+    )
+
+    result = asyncio.run(
+        ToolExecutor(tool_registry=registry).execute_tool(
+            LLMToolCall(id="mixed-route", name="test_tool", arguments={"value": 3}),
+            state,
+            _budget(),
+        )
+    )
+
+    assert result.status == "success"
 
 
 ###############################################################################

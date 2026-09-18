@@ -238,6 +238,60 @@ def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools
     assert "osm_default" not in decision.capability_ids
 
 
+def test_router_uses_active_map_for_layer_lifecycle_updates() -> None:
+    state = _state(active_map=True)
+    state.location_refs["current map"] = ResolvedLocation(
+        label="Current map",
+        latitude=35.0,
+        longitude=139.0,
+    )
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.MAP_STATE,
+            requires_location=True,
+            capability_queries=["remove overlay layer", "map layer management"],
+            operation="remove_layer",
+            target_refs=["earthquake layer"],
+        ),
+        user_message="Remove the earthquake layer.",
+        active_state=state,
+    )
+
+    assert decision.status in {"accepted", "discovery_required"}
+    assert decision.route.requires_location is False
+    assert "active_map_update_uses_current_map" in decision.reason_codes
+
+
+def test_router_normalizes_data_bearing_add_layer_routes_after_active_map() -> None:
+    state = _state(active_map=True)
+    state.location_refs["japan"] = ResolvedLocation(
+        label="Japan",
+        latitude=36.5748,
+        longitude=139.2394,
+        bbox=[122.7, 20.2, 154.2, 45.7],
+    )
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.MAP_STATE,
+            operation="add_layer",
+            capability_queries=["traffic"],
+            target_refs=["Traffic"],
+            spatial_scope={
+                "kind": "administrative_geometry",
+                "relationship": "around",
+                "target_refs": ["Japan"],
+            },
+        ),
+        user_message="Add traffic around Japan.",
+        active_state=state,
+    )
+
+    assert decision.status in {"accepted", "discovery_required"}
+    assert decision.route.primary_domain is CapabilityDomain.MAP_RENDERING
+    assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
+    assert "data_bearing_map_route_normalized" in decision.reason_codes
+
+
 ###############################################################################
 def test_router_normalizes_geocoding_route_for_location_only_map() -> None:
     decision = _router().validate_route(

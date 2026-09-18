@@ -518,9 +518,13 @@ def _response_summary(
         "result_status": response.result_status,
         "result_type": response.result_type,
         "feature_count": len(features) if is_json_array(features) else None,
+        "map_eligibility": _map_eligibility(response),
         "stale": response.stale,
         "fetched_at": response.fetched_at.isoformat(),
     }
+    feature_bbox = _feature_bbox(features)
+    if feature_bbox is not None:
+        summary["bbox"] = feature_bbox
     if response.attribution:
         summary["attribution"] = [str(item)[:200] for item in response.attribution[:8]]
     if response.warnings:
@@ -575,6 +579,115 @@ def _response_summary(
             "filter_keys": sorted(str(key) for key in request.filters)[:32],
         }
     return summary
+
+
+###############################################################################
+def _map_eligibility(response: ProviderResponse) -> str:
+    """Classify provider evidence before it is admitted to a map plan."""
+
+    if response.result_status == "valid_empty":
+        return "not_renderable"
+
+    payload = response.payload
+    features = payload.get("features")
+    if is_json_array(features):
+        if any(_feature_has_geometry(item) for item in features):
+            return "renderable"
+        return "not_renderable"
+
+    if response.result_type == "raster" and _has_render_source(payload):
+        return "renderable"
+
+    render = payload.get("render")
+    if is_json_object(render) and _has_render_source(render):
+        return "renderable"
+
+    if response.result_type == "metadata":
+        return "not_renderable"
+    return "unknown"
+
+
+###############################################################################
+def _feature_has_geometry(value: object) -> bool:
+    feature = value if is_json_object(value) else {}
+    if feature.get("type") == "Feature":
+        geometry = feature.get("geometry")
+        return is_json_object(geometry) and bool(geometry.get("type")) and (
+            geometry.get("coordinates") is not None
+            or geometry.get("geometries") is not None
+        )
+    latitude = feature.get("latitude")
+    longitude = feature.get("longitude")
+    return (
+        isinstance(latitude, (int, float))
+        and not isinstance(latitude, bool)
+        and isinstance(longitude, (int, float))
+        and not isinstance(longitude, bool)
+    )
+
+
+###############################################################################
+def _has_render_source(value: object) -> bool:
+    payload = value if is_json_object(value) else {}
+    mode = str(
+        payload.get("renderingMode")
+        or payload.get("rendering_mode")
+        or ""
+    ).strip().casefold()
+    if mode in {"metadata-only", "metadata_only"}:
+        return False
+    return any(
+        isinstance(payload.get(key), str) and payload[key].strip()
+        for key in (
+            "url",
+            "tileUrl",
+            "tile_url_template",
+            "tileUrlTemplate",
+            "url_template",
+            "serviceUrl",
+            "service_url",
+            "featuresUrl",
+            "features_url",
+        )
+    )
+
+
+###############################################################################
+def _feature_bbox(value: object) -> list[float] | None:
+    if not is_json_array(value):
+        return None
+    coordinates: list[tuple[float, float]] = []
+    for raw_feature in value:
+        feature = raw_feature if is_json_object(raw_feature) else {}
+        latitude = feature.get("latitude")
+        longitude = feature.get("longitude")
+        if (
+            isinstance(latitude, (int, float))
+            and not isinstance(latitude, bool)
+            and isinstance(longitude, (int, float))
+            and not isinstance(longitude, bool)
+        ):
+            coordinates.append((float(longitude), float(latitude)))
+            continue
+        geometry = feature.get("geometry")
+        if not is_json_object(geometry) or geometry.get("type") != "Point":
+            continue
+        position = geometry.get("coordinates")
+        if not is_json_array(position) or len(position) < 2:
+            continue
+        longitude, latitude = position[0], position[1]
+        if (
+            isinstance(latitude, (int, float))
+            and not isinstance(latitude, bool)
+            and isinstance(longitude, (int, float))
+            and not isinstance(longitude, bool)
+        ):
+            coordinates.append((float(longitude), float(latitude)))
+    if not coordinates:
+        return None
+    longitudes = [item[0] for item in coordinates]
+    latitudes = [item[1] for item in coordinates]
+    return [min(longitudes), min(latitudes), max(longitudes), max(latitudes)]
 
 
 ###############################################################################

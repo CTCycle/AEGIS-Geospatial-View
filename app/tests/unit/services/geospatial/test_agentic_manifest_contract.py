@@ -125,6 +125,10 @@ def test_basemap_switch_operations_include_the_manifest_render_primitive() -> No
     assert "show" in _operation_candidates("switch_basemap_to_satellite")
 
 
+def test_add_layer_operations_include_the_manifest_render_primitives() -> None:
+    assert {"show", "overlay"}.issubset(_operation_candidates("add_layer"))
+
+
 def test_dated_historical_intent_does_not_match_current_only_feed() -> None:
     candidates = _registry().shortlist(
         domains={CapabilityDomain.DATA_RETRIEVAL},

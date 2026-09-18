@@ -301,10 +301,16 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (this.destroyed) {
       return;
     }
-    if (changes['payload'] || changes['renderIdentity'] || changes['initialOverlayVisibility'] || changes['initialOverlayOpacity']) {
-      this.syncSessionFromPayload();
-      this.rebuildOverlayStateFromSession();
-      this.recreateMapIfPossible();
+    const sessionChanged = Boolean(changes['payload'] || changes['renderIdentity']);
+    const overlayStateChanged = Boolean(changes['initialOverlayVisibility'] || changes['initialOverlayOpacity']);
+    if (sessionChanged || overlayStateChanged) {
+      if (sessionChanged) {
+        this.syncSessionFromPayload();
+      }
+      this.rebuildOverlayStateFromSession(!sessionChanged);
+      if (sessionChanged) {
+        this.recreateMapIfPossible();
+      }
       this.applyOverlayStateToMap();
     }
   }
@@ -448,7 +454,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     ));
   }
 
-  private rebuildOverlayStateFromSession(): void {
+  private rebuildOverlayStateFromSession(preferInitialState = false): void {
     const overlays = this.overlays;
     const overlayIds = new Set(overlays.map((overlay) => overlay.id));
     const staleVisibilityKeys = Object.keys(this.initialOverlayVisibility).filter((key) => !overlayIds.has(key));
@@ -465,7 +471,9 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       // preferences are only fallbacks for payloads without an explicit
       // visibility value.
       nextVisibility[overlay.id] =
-        typeof overlay.visible === 'boolean'
+        preferInitialState && typeof this.initialOverlayVisibility[overlay.id] === 'boolean'
+          ? this.initialOverlayVisibility[overlay.id]
+          : typeof overlay.visible === 'boolean'
           ? overlay.visible
           : this.overlayVisibility[overlay.id] ?? this.initialOverlayVisibility[overlay.id] ?? true;
     });

@@ -43,6 +43,9 @@ class CapabilityRouter:
         proposed, semantic_reason = _normalize_route_semantics(proposed)
         if semantic_reason is not None:
             reasons.append(semantic_reason)
+        proposed, map_data_reason = _normalize_data_bearing_map_route(proposed)
+        if map_data_reason is not None:
+            reasons.append(map_data_reason)
         proposed, temporal_reason = _normalize_recent_scope(proposed)
         if temporal_reason is not None:
             reasons.append(temporal_reason)
@@ -51,6 +54,10 @@ class CapabilityRouter:
         )
         if location_map_reason is not None:
             reasons.append(location_map_reason)
+        active_map_update = _is_active_map_update(proposed, active_state)
+        if active_map_update and proposed.requires_location:
+            proposed = proposed.model_copy(update={"requires_location": False})
+            reasons.append("active_map_update_uses_current_map")
         for capability_id in proposed.explicit_capability_ids:
             normalized_id = capability_id.strip()
             capability = self.capability_registry.get_capability(normalized_id)
@@ -100,6 +107,7 @@ class CapabilityRouter:
             proposed.task_mode == "execute"
             and (proposed.target_refs or proposed.spatial_scope is not None)
             and not proposed.requires_location
+            and not active_map_update
         ):
             proposed = proposed.model_copy(update={"requires_location": True})
             reasons.append("location_required_for_semantic_scope")
@@ -265,6 +273,32 @@ def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:
     return None
 
 
+_ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
+    {
+        "remove_layer",
+        "set_layer_visibility",
+        "set_layer_opacity",
+        "set_basemap",
+        "keep_only_layers",
+        "fit_layer",
+        "reset_view",
+    }
+)
+
+
+def _is_active_map_update(route: CapabilityRoute, state: AgentRunState) -> bool:
+    """Return whether the route mutates the already-rendered map session."""
+
+    return (
+        route.task_mode == "execute"
+        and route.primary_domain is CapabilityDomain.MAP_STATE
+        and state.active_map_session is not None
+        and str(route.operation or "").strip().casefold()
+        in _ACTIVE_MAP_UPDATE_OPERATIONS
+        and route.spatial_scope is None
+    )
+
+
 ###############################################################################
 def _route_terms(route: CapabilityRoute) -> set[str]:
     values = [route.operation or "", *route.capability_queries]
@@ -393,6 +427,34 @@ def _normalize_route_semantics(
             }
         ),
         "route_semantics_normalized",
+    )
+
+
+def _normalize_data_bearing_map_route(
+    route: CapabilityRoute,
+) -> tuple[CapabilityRoute, str | None]:
+    """Keep layer-add requests on the data-plus-map execution route."""
+
+    operation = str(route.operation or "").strip().casefold()
+    if (
+        route.task_mode != "execute"
+        or route.presentation not in {"map", "both"}
+        or route.primary_domain is not CapabilityDomain.MAP_STATE
+        or operation != "add_layer"
+        or not (route.capability_queries or route.explicit_capability_ids)
+    ):
+        return route, None
+    secondary_domains = list(route.secondary_domains)
+    if CapabilityDomain.DATA_RETRIEVAL not in secondary_domains:
+        secondary_domains.append(CapabilityDomain.DATA_RETRIEVAL)
+    return (
+        route.model_copy(
+            update={
+                "primary_domain": CapabilityDomain.MAP_RENDERING,
+                "secondary_domains": secondary_domains[:3],
+            }
+        ),
+        "data_bearing_map_route_normalized",
     )
 
 

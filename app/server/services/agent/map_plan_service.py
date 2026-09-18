@@ -415,8 +415,31 @@ class MapPlanService:
             return None
 
         route = state.route
-        if route is not None and route.target_refs:
-            for target_ref in route.target_refs:
+        if (
+            route is not None
+            and route.primary_domain.value == "map_state"
+            and str(route.operation or "").strip().casefold()
+            in {
+                "remove_layer",
+                "set_layer_visibility",
+                "set_layer_opacity",
+                "set_basemap",
+                "keep_only_layers",
+                "fit_layer",
+                "reset_view",
+            }
+            and active_session is not None
+        ):
+            return active_session.resolved_location
+        route_target_refs = (
+            list(route.spatial_scope.target_refs)
+            if route is not None
+            and route.spatial_scope is not None
+            and route.spatial_scope.target_refs
+            else list(route.target_refs) if route is not None else []
+        )
+        if route_target_refs:
+            for target_ref in route_target_refs:
                 target = " ".join(str(target_ref).casefold().split())
                 for key, location in state.location_refs.items():
                     if " ".join(str(key).casefold().split()) == target:

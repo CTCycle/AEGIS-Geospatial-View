@@ -362,6 +362,22 @@ describe('components/map-preview.component', () => {
     expect(component.overlayVisibility['weather']).toBeFalse();
   });
 
+  it('keeps a local visibility toggle when the parent echoes map state', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true }],
+      }) as never,
+    };
+    fixture.detectChanges();
+
+    component.setOverlayVisibility('weather', false);
+    fixture.componentRef.setInput('initialOverlayVisibility', { weather: false });
+    fixture.detectChanges();
+
+    expect(component.overlayVisibility['weather']).toBeFalse();
+    expect(fakeMap.setLayoutProperty).toHaveBeenCalledWith('overlay-layer-weather', 'visibility', 'none');
+  });
+
   it('emits visibility and opacity updates', () => {
     const emitted: Array<{ overlayVisibility: Record<string, boolean>; overlayOpacity: Record<string, number> }> = [];
     component.overlayStateChange.subscribe((value) => emitted.push(value));
