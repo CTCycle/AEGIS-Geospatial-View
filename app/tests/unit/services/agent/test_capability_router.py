@@ -282,6 +282,24 @@ def test_router_normalizes_named_landmark_map_route() -> None:
     assert "location_map_route_normalized" in decision.reason_codes
 
 
+def test_router_preserves_explicit_poi_landmark_lookup() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.PLACE_SEARCH,
+            secondary_domains=[CapabilityDomain.MAP_RENDERING],
+            operation="locate",
+            capability_queries=["place search", "poi"],
+        ),
+        user_message="Locate the Acropolis Museum in Athens, Greece.",
+        active_state=_state(),
+    )
+
+    assert decision.route.primary_domain is CapabilityDomain.PLACE_SEARCH
+    assert decision.route.operation == "locate"
+    assert decision.route.capability_queries == ["place search", "poi"]
+    assert "location_map_route_normalized" not in decision.reason_codes
+
+
 ###############################################################################
 def test_router_normalizes_undated_recent_historical_scope_to_current() -> None:
     decision = _router().validate_route(

@@ -480,6 +480,22 @@ def _normalize_location_map_route(
         "cafes",
         "hospital",
         "hospitals",
+        "museum",
+        "museums",
+        "monument",
+        "monuments",
+        "temple",
+        "temples",
+        "cathedral",
+        "cathedrals",
+        "church",
+        "churches",
+        "castle",
+        "castles",
+        "palace",
+        "palaces",
+        "attraction",
+        "attractions",
         "station",
         "stations",
         "data",
@@ -496,6 +512,13 @@ def _normalize_location_map_route(
         "locate",
         "resolve_location",
         "resolve_place",
+    }
+    route_data_queries = {
+        "amenities",
+        "amenity search",
+        "overpass_poi_amenities",
+        "poi",
+        "points of interest",
     }
     location_queries = {
         str(query).strip().casefold()
@@ -514,7 +537,11 @@ def _normalize_location_map_route(
     }
     if not (
         raw_landmark_display
-        or operation in location_operations
+        or (
+            operation in location_operations
+            and not bool(location_queries.intersection(route_data_queries))
+            and not bool(message_terms.intersection(data_terms))
+        )
         or (
             location_queries
             and location_queries <= location_query_vocabulary
