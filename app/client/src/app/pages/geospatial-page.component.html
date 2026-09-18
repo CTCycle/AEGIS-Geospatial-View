@@ -243,8 +243,8 @@
         [traceLoading]="runTraceLoading"
         [runError]="runFailureSummary"
         [traceError]="runTraceError"
-        [expanded]="isRunInspectorOpen"
-        (expandedChange)="toggleRunInspector($event)"
+        [expanded]="isExecutionStatusOpen"
+        (expandedChange)="toggleExecutionStatus($event)"
         (refresh)="refreshRunTrace()"
       ></app-execution-status>
     </footer>
