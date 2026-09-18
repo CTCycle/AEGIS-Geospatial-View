@@ -14,7 +14,7 @@ import {
   MapRenderIdentity,
   MapRenderStateChange,
 } from '../components/map-preview.component';
-import { RunInspectorComponent } from '../components/run-inspector.component';
+import { ExecutionStatusComponent } from '../components/execution-status.component';
 import {
   AgentReadinessService,
   AgentReadinessState,
@@ -70,7 +70,7 @@ import { mapSessionOverlayEntries } from '../components/map-preview-rendering';
     ChatMessageComponent,
     ConversationHistoryComponent,
     MapPreviewComponent,
-    RunInspectorComponent,
+    ExecutionStatusComponent,
   ],
   templateUrl: './geospatial-page.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -102,6 +102,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   isRunInspectorOpen = false;
   runTraceLoading = false;
   runTraceError = '';
+  runFailureSummary = '';
   conversationHistory: ConversationSummary[] = [];
   conversationHistoryQuery = '';
   conversationHistoryCursor?: string | null;
@@ -249,7 +250,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (this.status === 'Failed') {
       alerts.push('The last request failed before the map session updated.');
     }
-    if (operationMessage && (this.lastOperation?.kind === 'error' || this.lastOperation?.kind === 'rejection')) {
+    if (this.runFailureSummary) {
+      alerts.push(this.runFailureSummary);
+    } else if (operationMessage && this.lastOperation?.kind === 'rejection') {
       alerts.push(operationMessage);
     }
     if (latestAssistantMessage && this.looksLikeRuntimeFailure(latestAssistantMessage)) {
@@ -279,19 +282,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     return this.activeRunId ?? this.lastHandledRunId;
   }
 
-  get iterationLabel(): string | undefined {
-    const iteration = this.taskState?.current_iteration;
-    if (iteration === undefined) {
-      return undefined;
-    }
-    const max = this.taskState?.max_iterations;
-    return max === undefined ? `Iteration ${iteration}` : `Iteration ${iteration} of ${max}`;
-  }
-
-  get latestToolProgress(): ToolProgressItem | undefined {
-    return this.toolProgress.at(-1);
-  }
-
   get capabilityStatusItems(): CapabilityStatusItem[] {
     const satellite = this.catalog?.basemaps?.find((item) => item.id === 'esri_world_imagery');
     const satelliteStatus = !this.catalog
@@ -303,9 +293,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         : satellite?.is_available && satellite.render?.status === 'available'
           ? { statusLabel: 'Available', tone: 'ok' as CapabilityStatusTone, detail: 'Select Satellite from the map basemap control.' }
           : { statusLabel: 'Unavailable', tone: 'error' as CapabilityStatusTone, detail: 'No usable public satellite render descriptor is available.' };
-    const weather = this.catalog?.capabilities?.find((item) => (
-      item.id.toLowerCase().includes('weather') || item.task_tags.some((tag) => tag.toLowerCase().includes('weather'))
-    ));
     return [
       {
         label: 'Agent model',
@@ -313,12 +300,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         tone: this.agentStatusTone,
       },
       { label: 'Satellite', ...satelliteStatus },
-      {
-        label: 'Weather',
-        statusLabel: !this.catalog ? 'Checking' : weather?.is_available ? 'Available' : 'Unavailable',
-        tone: !this.catalog ? 'none' : weather?.is_available ? 'ok' : 'warn',
-        detail: weather?.description || 'Weather intelligence is derived from the live capability catalog.',
-      },
       { label: 'Optional Keys', statusLabel: 'Optional', tone: 'warn', detail: 'Optional provider credentials are configured in Settings under Geospatial Access.' },
     ];
   }
@@ -453,6 +434,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.isRunInspectorOpen = false;
     this.runTraceLoading = false;
     this.runTraceError = '';
+    this.runFailureSummary = '';
     this.messages = [];
     this.lastRoute = undefined;
     this.lastGoal = undefined;
@@ -695,6 +677,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.traceEntries = [];
       this.runTraceLoading = false;
       this.runTraceError = '';
+      this.runFailureSummary = '';
       this.pendingRun = undefined;
       this.cancelRequested = false;
       this.seenEventIds.clear();
@@ -805,6 +788,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.isRunInspectorOpen = false;
     this.runTraceLoading = false;
     this.runTraceError = '';
+    this.runFailureSummary = '';
     this.seenEventIds.clear();
     this.messages = [];
     this.lastRoute = undefined;
@@ -915,6 +899,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.toolProgress = [];
     this.traceEntries = [];
     this.runTraceError = '';
+    this.runFailureSummary = '';
     this.messages = [...this.messages, { role: 'user', content: message, kind: 'normal' }];
     this.assistantDraft = '';
     this.syncState();
@@ -961,7 +946,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.status = 'Agent ready';
       this.progressLabel = undefined;
       this.assistantDraft = '';
-      this.messages = [...this.messages, { role: 'assistant', content: fallback }];
+      this.runFailureSummary = fallback;
       this.progressPercent = 0;
       this.isLoading = false;
     } finally {
@@ -997,7 +982,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         error,
         'Could not apply that refinement.',
       );
-      this.messages = [...this.messages, { role: 'assistant', content: fallback }];
+      this.runFailureSummary = fallback;
     } finally {
       this.syncState();
       this.queueTranscriptScroll();
@@ -1020,7 +1005,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         error,
         'Could not cancel the active run.',
       );
-      this.messages = [...this.messages, { role: 'assistant', content: fallback }];
+      this.runFailureSummary = fallback;
       this.cancelRequested = false;
     } finally {
       this.syncState();
@@ -1183,9 +1168,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.status = 'Agent ready';
       this.progressLabel = undefined;
       const messageText = 'The real-time connection could not apply that request.';
-      if (this.messages.at(-1)?.content !== messageText) {
-        this.messages = [...this.messages, { role: 'assistant', content: messageText }];
-      }
+      this.runFailureSummary = messageText;
       this.syncState();
       this.changeDetectorRef.detectChanges();
     }
@@ -1272,7 +1255,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         {
           const parsed = parseRunCompletionPayload(event.payload);
           this.applyContextUsage(parsed.contextUsage);
-          const message = String(event.payload['message'] ?? 'Failed');
           const errorCode = this.readString(event.payload['code']);
           const presentationStatus = this.readString(event.payload['presentation_status']);
           if (parsed.operation !== undefined) {
@@ -1299,14 +1281,16 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
             this.renderAckQueued = false;
             this.pendingRenderAckMessageId = undefined;
           }
+          this.runFailureSummary = this.summarizeRunFailure(
+            parsed.operation,
+            errorCode,
+            presentationStatus,
+          );
           this.agentReadiness = {
             status: 'needs_attention',
             label: 'Needs attention',
-            message,
+            message: this.runFailureSummary,
           };
-          if (this.messages.at(-1)?.content !== message) {
-            this.messages = [...this.messages, { role: 'assistant', content: message }];
-          }
         }
         this.isLoading = false;
         this.activeRunId = undefined;
@@ -1406,6 +1390,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.streamState = 'closed';
         this.pendingRenderAckMessageId = undefined;
         this.applyRunCompletionPayload(event.payload);
+        this.runFailureSummary = '';
         this.agentReadiness = {
           status: 'active',
           label: 'Verified',
@@ -1426,6 +1411,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.pendingRun = undefined;
         this.cancelRequested = false;
         this.streamState = 'closed';
+        this.runFailureSummary = '';
         break;
       case 'clarification_needed':
         this.isLoading = false;
@@ -1437,6 +1423,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.cancelRequested = false;
         this.streamState = 'closed';
         this.applyRunCompletionPayload(event.payload);
+        this.runFailureSummary = '';
         break;
     }
     this.syncState();
@@ -1509,6 +1496,44 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.taskState = parsed.taskState;
     }
     this.applyContextUsage(parsed.contextUsage);
+  }
+
+  private summarizeRunFailure(
+    operation: ChatOperationResult | null | undefined,
+    errorCode: string | undefined,
+    presentationStatus: string | undefined,
+  ): string {
+    if (presentationStatus === 'failed'
+      || presentationStatus === 'render_timeout'
+      || errorCode === 'render_failed'
+      || errorCode === 'render_timeout') {
+      return 'The map update could not be completed. The previous map was retained when available.';
+    }
+
+    const category = operation?.failure_category ?? errorCode;
+    switch (category) {
+      case 'context_limit':
+        return 'The selected model could not complete the request within its available context window.';
+      case 'model_budget_exhausted':
+      case 'tool_budget_exhausted':
+      case 'transition_budget_exhausted':
+      case 'iteration_budget_exhausted':
+      case 'run_deadline_exhausted':
+      case 'no_progress':
+        return 'The request stopped before completion because the agent reached an execution limit.';
+      case 'model_capability':
+      case 'provider_api':
+      case 'provider_failure':
+      case 'schema_definition':
+      case 'response_parsing':
+      case 'insufficient_evidence':
+        return 'The selected model or data provider could not complete the request.';
+      case 'cancelled':
+      case 'superseded':
+        return 'The request stopped before completion.';
+      default:
+        return 'The request could not be completed. Open Tool activity for execution details.';
+    }
   }
 
   private readString(value: unknown): string | undefined {
@@ -1930,9 +1955,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (change.state === 'failed') {
       this.restoreCommittedMap();
       const message = change.message || 'The map update could not be rendered; the previous map remains available.';
-      if (this.messages.at(-1)?.content !== message) {
-        this.messages = [...this.messages, { role: 'assistant', content: message }];
-      }
+      this.runFailureSummary = 'The map update could not be rendered. The previous map remains available.';
       this.lastOperation = this.lastOperation
         ? { ...this.lastOperation, status: 'partial', message }
         : this.lastOperation;
