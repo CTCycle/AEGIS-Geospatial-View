@@ -99,7 +99,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   taskState?: AgentTaskState | null;
   toolProgress: ToolProgressItem[] = [];
   traceEntries: RunTraceEntry[] = [];
-  isRunInspectorOpen = false;
+  isExecutionStatusOpen = false;
   runTraceLoading = false;
   runTraceError = '';
   runFailureSummary = '';
@@ -431,7 +431,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.taskState = undefined;
     this.toolProgress = [];
     this.traceEntries = [];
-    this.isRunInspectorOpen = false;
+    this.isExecutionStatusOpen = false;
     this.runTraceLoading = false;
     this.runTraceError = '';
     this.runFailureSummary = '';
@@ -500,9 +500,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     await this.hydrateConversation(conversation.conversation_id);
   }
 
-  toggleRunInspector(expanded?: boolean): void {
-    this.isRunInspectorOpen = expanded === undefined ? !this.isRunInspectorOpen : expanded;
-    if (this.isRunInspectorOpen && this.inspectedRunId) {
+  toggleExecutionStatus(expanded?: boolean): void {
+    this.isExecutionStatusOpen = expanded === undefined ? !this.isExecutionStatusOpen : expanded;
+    if (this.isExecutionStatusOpen && this.inspectedRunId) {
       void this.loadRunTrace(this.inspectedRunId, true);
     }
   }
@@ -785,7 +785,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.taskState = undefined;
     this.toolProgress = [];
     this.traceEntries = [];
-    this.isRunInspectorOpen = false;
+    this.isExecutionStatusOpen = false;
     this.runTraceLoading = false;
     this.runTraceError = '';
     this.runFailureSummary = '';
