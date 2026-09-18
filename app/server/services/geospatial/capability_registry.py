@@ -880,8 +880,12 @@ def _avoid_when_conflicts(
         }
         if not phrase_tokens:
             continue
+        # A missing location is a prerequisite state, not a catalog conflict.
+        # The native tool registry withholds discovery/execution until the
+        # resolver has produced one.  Filtering here permanently removed
+        # otherwise valid candidates before that prerequisite could run.
         if "no geographic context" in phrase and location is None:
-            return True
+            continue
         if phrase_tokens.intersection(query_tokens):
             return True
     return False

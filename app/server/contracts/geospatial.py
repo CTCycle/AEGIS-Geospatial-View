@@ -78,6 +78,27 @@ class CapabilityExecutionContract(BaseModel):
 
 
 ###############################################################################
+class ExecutionExtent(BaseModel):
+    """Concrete, provider-facing extent lowered from semantic route scope.
+
+    ``AgentSpatialScope`` remains the intent vocabulary.  This contract is the
+    only representation allowed at the provider execution boundary, so a
+    semantic value such as ``administrative_geometry`` cannot leak into a
+    manifest or adapter that expects a bounded bbox/point/radius.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["point", "bbox", "radius", "viewport"]
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
+    bbox: list[float] | None = Field(default=None, min_length=4, max_length=4)
+    radius_m: float | None = Field(default=None, gt=0.0)
+    provenance_scope_kind: str | None = None
+    target_ref: str | None = None
+
+
+###############################################################################
 class ProviderAuthType(str, Enum):
     NONE = "none"
     API_KEY = "api-key"

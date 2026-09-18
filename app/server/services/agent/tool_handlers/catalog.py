@@ -68,11 +68,7 @@ class CatalogToolHandler:
             # always addresses the same catalog snapshot.
             limit=50,
             operation=route.operation if route is not None else None,
-            scope_kind=(
-                route.spatial_scope.kind
-                if route is not None and route.spatial_scope is not None
-                else None
-            ),
+            scope_kind=_resolved_scope_kind(route, location),
             temporal_mode=(
                 route.temporal_scope.mode
                 if route is not None and route.temporal_scope.mode != "none"
@@ -198,6 +194,17 @@ class CatalogToolHandler:
                 duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
             ),
         )
+
+
+def _resolved_scope_kind(route: Any, location: Any) -> str | None:
+    """Lower semantic route scope to the concrete catalog scope."""
+
+    if route is None or route.spatial_scope is None:
+        return None
+    kind = str(route.spatial_scope.kind)
+    if kind in {"administrative_geometry", "feature_geometry"}:
+        return "bbox" if location is not None and location.bbox else None
+    return kind
 
 
 def _cursor_offset(cursor: str | None) -> int:

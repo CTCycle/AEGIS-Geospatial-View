@@ -291,6 +291,36 @@ def test_execute_binding_preserves_semantics_but_owns_scope_and_coordinates() ->
     assert bound.filters == {"amenity": "hospital", "emergency": True}
 
 
+def test_execute_binding_lowers_administrative_scope_to_resolved_bbox() -> None:
+    state = _state()
+    state.location_refs["sicily"] = ResolvedLocation(
+        label="Sicily",
+        latitude=37.6,
+        longitude=14.0,
+        bbox=[11.4, 36.6, 15.7, 38.4],
+    )
+    state.goal = AgentGoal(
+        goal="Show satellite imagery in Sicily",
+        task_mode="execute",
+        presentation="map",
+        operation="show_basemap",
+        requires_location=True,
+        target_ids=["sicily"],
+        spatial_scope=[{"kind": "administrative_geometry", "relationship": "in"}],
+    )
+
+    bound = _bind_execute_request(
+        ExecuteCapabilityInput(
+            capability_id="esri_world_imagery",
+            location_ref="sicily",
+            bbox=[-180, -90, 180, 90],
+        ),
+        state,
+    )
+
+    assert bound.bbox == [11.4, 36.6, 15.7, 38.4]
+
+
 def test_goal_target_reference_is_required_and_cannot_be_replaced() -> None:
     state = _state()
     state.goal = AgentGoal(

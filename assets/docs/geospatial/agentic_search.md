@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-09-17
+Last updated: 2026-09-18
 
 ## Summary
 
@@ -76,6 +76,21 @@ spatial and temporal filtering, renderable geometry, map-state commit, viewport
 evidence, and final response readiness. A valid empty result remains data with
 an explicit no-results outcome, not a provider failure.
 
+Provider-data is an explicit obligation, not a synonym for every execute route.
+Named-place display and basemap requests can therefore resolve a location and
+prepare a map candidate without inventing a POI/data dependency. Requests that
+actually ask for provider data compile `data_requirement=provider_data` and are
+not complete until an intended, bounded capability returns `success`,
+`valid_empty`, or an explicitly supported `partial` result.
+
+Semantic scopes such as an administrative area are retained for intent and
+provenance, but are lowered once into the concrete `ExecutionExtent` required
+by the selected capability. Provider adapters receive only that concrete
+point, bbox, radius, or viewport; they never receive the raw semantic scope
+label. Location resolution automatically refreshes the capability shortlist so
+the model does not spend a second planning turn rediscovering candidates that
+were unavailable before geography was known.
+
 ## Capability catalogue and tools
 
 Manifest v2 metadata is authoritative. Agent-facing entries must declare an
@@ -102,6 +117,11 @@ The registry has one `RegisteredTool` contract and one `ToolExecutor` boundary.
 The executor validates policy and arguments, binds server-owned geography/time
 parameters, checks and accounts for budgets, applies the resolved timeout,
 records a trace span, invokes the handler, and normalizes the result.
+
+After each tool batch the loop evaluates the completion contract before asking
+the model to plan again. When all non-presentation obligations are satisfied,
+one finalization-only model turn is reserved and the run terminates; successful
+provider work is not replayed until the action budget is exhausted.
 
 The model selects a capability, operation, evidence references, and allowed
 user-semantic filters. AEGIS binds resolved coordinates, canonical bbox/radius,
