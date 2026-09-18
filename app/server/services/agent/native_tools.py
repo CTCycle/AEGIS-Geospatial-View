@@ -430,6 +430,7 @@ def _user_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
         "start",
         "start_time",
         "start_time_iso",
+        "temporal_mode",
         "temporal_scope",
         "time",
     }
@@ -684,6 +685,7 @@ def _manifest_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
         "start",
         "start_time",
         "start_time_iso",
+        "temporal_mode",
         "temporal_scope",
         "time",
         "live",

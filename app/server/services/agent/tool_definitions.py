@@ -82,6 +82,14 @@ class DescribeCapabilityInput(StrictToolInput):
 class ExecuteCapabilityInput(StrictToolInput):
     capability_id: str = Field(min_length=1, max_length=200)
     operation: str | None = Field(default=None, max_length=80)
+    temporal_mode: str | None = Field(
+        default=None,
+        max_length=40,
+        description=(
+            "Optional route temporal hint. The server binds the effective "
+            "temporal scope from the compiled route."
+        ),
+    )
     location_ref: str | None = Field(default=None, max_length=200)
     evidence_refs: list[str] = Field(default_factory=list, max_length=16)
     radius_m: float | None = Field(default=None, gt=0, le=1_000_000)
