@@ -263,7 +263,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     const warnings = this.payload?.compliance_warnings ?? this.payload?.map_session?.compliance_warnings ?? [];
     warnings.forEach((warning) => alerts.push(String(warning)));
-    return alerts;
+    return [...new Set(alerts)];
   }
 
   get alertsSummary(): string {
