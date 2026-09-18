@@ -108,6 +108,15 @@ async def create_chat_job(
     response_model=ChatTurnResponse | AgentRunAcceptedResponse,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_202_ACCEPTED: {
+            "model": AgentRunAcceptedResponse,
+            "description": "The run was accepted and is still executing.",
+        },
+        status.HTTP_409_CONFLICT: {
+            "description": "The request conflicts with an active run.",
+        },
+    },
 )
 async def chat_turn(
     payload: ChatTurnRequest,

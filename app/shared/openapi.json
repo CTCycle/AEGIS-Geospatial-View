@@ -82,6 +82,19 @@
               }
             }
           },
+          "202": {
+            "description": "The run was accepted and is still executing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunAcceptedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with an active run."
+          },
           "422": {
             "description": "Validation Error",
             "content": {
