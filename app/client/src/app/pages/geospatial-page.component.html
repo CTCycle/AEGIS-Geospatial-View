@@ -112,33 +112,6 @@
             }
             <span class="context-window-row__value">{{ contextUsageLabel }}</span>
           </div>
-          @if (isLoading && (latestToolProgress || iterationLabel)) {
-            <section class="tool-progress-row" aria-live="polite" aria-label="Agent progress">
-              @if (iterationLabel) {
-                <span class="tool-progress-row__iteration">{{ iterationLabel }}</span>
-              }
-              @if (latestToolProgress) {
-                <span class="tool-progress-row__tool">
-                  {{ latestToolProgress.label || latestToolProgress.tool_name }}
-                </span>
-                <span class="tool-progress-row__status">{{ latestToolProgress.status.replaceAll('_', ' ') }}</span>
-              }
-            </section>
-          }
-          @if (inspectedRunId) {
-            <app-run-inspector
-              [runId]="inspectedRunId"
-              [runVersion]="activeRunVersion"
-              [taskState]="taskState"
-              [toolProgress]="toolProgress"
-              [traceEntries]="traceEntries"
-              [loading]="runTraceLoading"
-              [error]="runTraceError"
-              [expanded]="isRunInspectorOpen"
-              (expandedChange)="toggleRunInspector($event)"
-              (refresh)="refreshRunTrace()"
-            ></app-run-inspector>
-          }
           @if (composerError) {
             <p class="chat-composer-error" role="alert">{{ composerError }}</p>
           }
@@ -157,24 +130,43 @@
 
     <section class="canvas-panel" aria-label="Map canvas">
       <header class="canvas-header" aria-label="Workspace header">
-        <div class="canvas-header__title">
-          <span>{{ mapSession?.resolved_location?.label || 'Ready for a location or data request' }}</span>
+        <div class="canvas-header__status" role="status" aria-live="polite">
+          @if (isLoading) {
+            <span class="chat-progress-spinner" aria-hidden="true"></span>
+          }
+          <span>
+            {{ showProgressIndicator
+              ? (progressLabel || status)
+              : (mapSession?.resolved_location?.label || 'Ready for a location or data request') }}
+          </span>
         </div>
         <div class="canvas-header__actions">
           <button
             type="button"
-            class="canvas-header__text-button"
+            class="canvas-header__icon-button"
             [attr.aria-pressed]="!isToolbarCollapsed"
             [attr.aria-label]="isToolbarCollapsed ? 'Show chat panel' : 'Hide chat panel'"
+            [attr.title]="isToolbarCollapsed ? 'Show chat' : 'Hide chat'"
             (click)="toggleToolbar()"
           >
-            {{ isToolbarCollapsed ? 'Show chat' : 'Hide chat' }}
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+              <path
+                d="M4 5.5h16v13H4zM9 5.5v13M6.2 8.3h.8M6.2 11.3h.8M6.2 14.3h.8"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="sr-only">{{ isToolbarCollapsed ? 'Show chat' : 'Hide chat' }}</span>
           </button>
           <button
             type="button"
-            class="canvas-header__alert-button"
+            class="canvas-header__icon-button"
             [class.canvas-header__icon-button--active]="isAlertsOpen"
             aria-label="Alerts"
+            title="Alerts"
             [attr.aria-expanded]="isAlertsOpen"
             (click)="toggleAlerts()"
           >
@@ -184,16 +176,8 @@
                 fill="currentColor"
               />
             </svg>
-            <span>Alerts</span>
+            <span class="sr-only">Alerts</span>
           </button>
-          @if (showProgressIndicator) {
-            <div class="canvas-header__status" role="status" aria-live="polite">
-              @if (isLoading) {
-                <span class="chat-progress-spinner" aria-hidden="true"></span>
-              }
-              <span>{{ progressLabel || status }}</span>
-            </div>
-          }
         </div>
         @if (isAlertsOpen) {
           <section class="workspace-alerts" role="status" aria-live="polite">
@@ -230,27 +214,39 @@
     </section>
 
     <footer class="workspace-status-bar" aria-label="Workspace status">
-      <app-capability-status-list
-        [items]="capabilityStatusItems"
-        [nowrap]="true"
-        [interactions]="{
-          'Agent model': {
-            route: '/settings',
-            actionLabel: 'Open agent settings',
-            description: agentReadiness.message || 'Review the configured agent model and provider.'
-          },
-          'Weather': {
-            route: '/geodata',
-            actionLabel: 'Browse geodata'
-          },
-          'Optional Keys': {
-            route: '/settings',
-            queryParams: { tab: 'geospatial-access' },
-            actionLabel: 'Open geospatial access settings',
-            description: 'Optional provider credentials are managed in Settings under Geospatial Access.'
-          }
-        }"
-      ></app-capability-status-list>
+      <div class="workspace-status-bar__capabilities">
+        <app-capability-status-list
+          [items]="capabilityStatusItems"
+          [nowrap]="true"
+          [interactions]="{
+            'Agent model': {
+              route: '/settings',
+              actionLabel: 'Open agent settings',
+              description: agentReadiness.message || 'Review the configured agent model and provider.'
+            },
+            'Optional Keys': {
+              route: '/settings',
+              queryParams: { tab: 'geospatial-access' },
+              actionLabel: 'Open geospatial access settings',
+              description: 'Optional provider credentials are managed in Settings under Geospatial Access.'
+            }
+          }"
+        ></app-capability-status-list>
+      </div>
+      <app-execution-status
+        [runId]="inspectedRunId"
+        [runVersion]="activeRunVersion"
+        [taskState]="taskState"
+        [toolProgress]="toolProgress"
+        [traceEntries]="traceEntries"
+        [active]="isLoading"
+        [traceLoading]="runTraceLoading"
+        [runError]="runFailureSummary"
+        [traceError]="runTraceError"
+        [expanded]="isRunInspectorOpen"
+        (expandedChange)="toggleRunInspector($event)"
+        (refresh)="refreshRunTrace()"
+      ></app-execution-status>
     </footer>
 
   </div>
