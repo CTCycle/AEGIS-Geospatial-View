@@ -676,6 +676,39 @@ export interface ConversationSnapshotResponse {
   recent_runs?: ConversationRunSummary[];
 }
 
+/** Response returned when the direct chat request is accepted asynchronously. */
+export interface AgentRunAcceptedResponse {
+  conversation_id: string;
+  run_id: string;
+  run_version: number;
+  state: AgentRunState;
+  presentation_status: PresentationStatus;
+  status_url: string;
+  realtime_url?: string | null;
+  terminal: boolean;
+}
+
+export interface AgentRunSnapshot {
+  conversation_id: string;
+  run_id: string;
+  original_request: string;
+  aggregated_request: string;
+  active_run_version: number;
+  state: AgentRunState;
+  created_at: string;
+  request_timezone?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  cancel_requested_at?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  presentation_status: PresentationStatus;
+  presentation?: Record<string, JsonValue> | null;
+  response?: ChatTurnResponse | null;
+  current_iteration?: number | null;
+  task_state?: AgentTaskState | null;
+}
+
 export interface ChatTurnRequest {
   conversation_id: string;
   title?: string;
@@ -741,6 +774,7 @@ export interface AgentGoal {
 export interface CompletionContract {
   operation: string;
   requirements: string[];
+  data_requirement?: 'none' | 'provider_data';
   location_required: boolean;
   evidence_required: boolean;
   map_preparation_required: boolean;
@@ -764,6 +798,9 @@ export interface PendingClarification {
   source_request_id?: string | null;
   scope: 'current_request';
   scope_terms: string[];
+  kind?: 'generic' | 'infrastructure_subtype';
+  options?: string[];
+  selected_option?: string | null;
   status: 'active' | 'deferred' | 'answered';
 }
 
@@ -854,6 +891,8 @@ export interface ChatTurnResponse {
   conversation_state?: ConversationState | null;
   task_state?: AgentTaskState | null;
 }
+
+export type ChatTurnApiResponse = ChatTurnResponse | AgentRunAcceptedResponse;
 
 export type ChatStreamEventType =
   | 'status'

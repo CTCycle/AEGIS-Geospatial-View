@@ -2,12 +2,14 @@ import {
   API_BASE_URL,
   API_CHAT_TURN_PATH,
   API_CONVERSATION_PATH,
+  API_CONVERSATION_RUN_STATUS_PATH,
 } from './constants';
 import {
   ApiRequestError,
   buildApiError,
   executeApiRequest,
   fetchConversationSnapshot,
+  fetchConversationRunStatus,
   fetchGeospatialCameras,
   fetchGeospatialLayerFeatures,
   sendChatTurn,
@@ -18,6 +20,8 @@ import {
   normalizeMapSession,
   parseCatalogResponse,
   parseChatTurnResponse,
+  parseChatTurnApiResponse,
+  parseAgentRunAcceptedResponse,
   parseConversationSnapshotResponse,
   parseGeospatialProviderPayload,
   parseModelSettingsResponse,
@@ -263,6 +267,70 @@ describe('core/api', () => {
       memory_snapshot: {},
       presentation_status: 'pending',
     })).toThrowError(/Invalid chat turn API response/);
+  });
+
+  it('parses an accepted active chat run without treating it as a terminal response', () => {
+    const parsed = parseChatTurnApiResponse({
+      conversation_id: 'conv-abc',
+      run_id: 'run-abc',
+      run_version: 1,
+      state: 'running',
+      presentation_status: 'not_required',
+      status_url: '/api/conversations/conv-abc/runs/run-abc',
+      realtime_url: '/api/conversations/conv-abc/realtime',
+      terminal: false,
+    });
+
+    expect('status_url' in parsed).toBeTrue();
+    if ('status_url' in parsed) {
+      expect(parsed.run_id).toBe('run-abc');
+      expect(parsed.state).toBe('running');
+      expect(parsed.terminal).toBeFalse();
+    }
+    expect(() => parseAgentRunAcceptedResponse({
+      conversation_id: 'conv-abc',
+      run_id: 'run-abc',
+      run_version: 0,
+      state: 'running',
+      presentation_status: 'not_required',
+      status_url: '/status',
+      terminal: false,
+    })).toThrowError(/positive integer/);
+  });
+
+  it('fetches an accepted run status from the canonical polling route', async () => {
+    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
+      new Response(JSON.stringify({
+        conversation_id: 'conv-abc',
+        run_id: 'run-abc',
+        original_request: 'Show weather in Rome',
+        aggregated_request: 'Show weather in Rome',
+        active_run_version: 1,
+        state: 'running',
+        created_at: '2026-09-18T09:00:00Z',
+        request_timezone: null,
+        started_at: null,
+        completed_at: null,
+        cancel_requested_at: null,
+        error_code: null,
+        error_message: null,
+        presentation_status: 'not_required',
+        presentation: null,
+        response: null,
+        current_iteration: 1,
+        task_state: null,
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    (window.fetch as unknown) = fetchSpy;
+
+    const parsed = await fetchConversationRunStatus('conv-abc', 'run-abc');
+
+    expect(parsed.state).toBe('running');
+    expect(fetchSpy.calls.mostRecent().args[0] as string)
+      .toBe(`${API_BASE_URL}${API_CONVERSATION_RUN_STATUS_PATH('conv-abc', 'run-abc')}`);
   });
 
   it('preserves provider provenance metadata instead of dropping it at the API boundary', () => {

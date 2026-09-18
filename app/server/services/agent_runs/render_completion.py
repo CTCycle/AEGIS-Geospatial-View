@@ -23,6 +23,17 @@ from server.services.agent_runs.events import RunEventPublisher
 class RenderAcknowledgementError(ValueError):
     """Raised when browser evidence cannot be applied to the prepared run."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "render_ack_rejected",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.details = dict(details or {})
+
 ###############################################################################
 def _json_object(value: object) -> dict[str, Any]:
     return cast(dict[str, Any], value) if isinstance(value, dict) else {}
@@ -271,6 +282,29 @@ class RenderCompletionService:
                 observation=observation.model_dump(mode="json"),
             )
         except ValueError as exc:
+            if "does not match the prepared map" in str(exc):
+                expected_identity: dict[str, Any] = {}
+                if prior_snapshot is not None:
+                    expected_identity = {
+                        "run_id": prior_snapshot.run_id,
+                        "run_version": prior_snapshot.active_run_version,
+                        "map_session_id": prior_presentation.get("map_session_id"),
+                        "collection_revision": prior_presentation.get("collection_revision"),
+                    }
+                observed_identity = {
+                    "run_id": payload.run_id,
+                    "run_version": payload.run_version,
+                    "map_session_id": payload.map_session_id,
+                    "collection_revision": payload.collection_revision,
+                }
+                raise RenderAcknowledgementError(
+                    str(exc),
+                    code="render_ack_mismatch",
+                    details={
+                        "expected": expected_identity,
+                        "observed": observed_identity,
+                    },
+                ) from exc
             # A browser can report ``ready`` while a deterministic server
             # check still rejects the candidate (for example a missing layer,
             # invisible feature set, or viewport mismatch). In resumable mode

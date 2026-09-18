@@ -312,9 +312,10 @@ class RealtimeConnection:
             )
             await self._protocol_error(
                 message.message_id,
-                "render_ack_rejected",
+                exc.code,
                 fatal=False,
                 command=message.type,
+                details=exc.details,
             )
         except Exception:
             LOGGER.exception(
@@ -584,11 +585,14 @@ class RealtimeConnection:
         *,
         fatal: bool,
         command: str | None = None,
+        details: dict[str, Any] | None = None,
     ) -> None:
         self.metrics.protocol_error()
         payload: dict[str, Any] = {"code": code, "fatal": fatal}
         if command is not None:
             payload["command"] = command
+        if details:
+            payload["details"] = details
         await self._send(
             "protocol.error",
             correlation_id=correlation_id,

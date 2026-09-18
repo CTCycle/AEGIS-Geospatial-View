@@ -1,4 +1,6 @@
 import {
+  AgentRunAcceptedResponse,
+  AgentRunSnapshot,
   ActiveConversationRunSnapshot,
   AgentTask,
   AgentTaskState,
@@ -13,6 +15,7 @@ import {
   ChatMessage,
   ChatRole,
   ChatTurnResponse,
+  ChatTurnApiResponse,
   ConversationCreateResponse,
   ConversationListResponse,
   ConversationRunSummary,
@@ -1168,9 +1171,16 @@ export const parseCompletionContract = (
   endpoint = 'native agent',
 ): CompletionContract => {
   const record = requireApiRecord(value, endpoint, 'completion_contract');
+  const dataRequirement = record.data_requirement === undefined
+    ? undefined
+    : requireApiString(record, 'data_requirement', endpoint);
+  if (dataRequirement !== undefined && !['none', 'provider_data'].includes(dataRequirement)) {
+    return apiContract(endpoint, 'completion_contract.data_requirement is unsupported', dataRequirement);
+  }
   return {
     operation: requireApiString(record, 'operation', endpoint),
     requirements: requireApiStringArray(record, 'requirements', endpoint),
+    data_requirement: dataRequirement as CompletionContract['data_requirement'],
     location_required: requireApiBoolean(record, 'location_required', endpoint),
     evidence_required: requireApiBoolean(record, 'evidence_required', endpoint),
     map_preparation_required: requireApiBoolean(record, 'map_preparation_required', endpoint),
@@ -1198,6 +1208,16 @@ const parsePendingClarification = (
   if (!['active', 'deferred', 'answered'].includes(status)) {
     return apiContract(endpoint, 'pending_clarification.status is unsupported', status);
   }
+  const kind = record.kind === undefined ? undefined : requireApiString(record, 'kind', endpoint);
+  if (kind !== undefined && !['generic', 'infrastructure_subtype'].includes(kind)) {
+    return apiContract(endpoint, 'pending_clarification.kind is unsupported', kind);
+  }
+  const options = record.options === undefined
+    ? undefined
+    : requireApiStringArray(record, 'options', endpoint);
+  const selectedOption = record.selected_option === undefined
+    ? undefined
+    : requireApiStringOrNull(record, 'selected_option', endpoint);
   return {
     question: requireApiString(record, 'question', endpoint),
     source_turn_index: requireApiNumber(record, 'source_turn_index', endpoint),
@@ -1206,6 +1226,9 @@ const parsePendingClarification = (
       : requireApiStringOrNull(record, 'source_request_id', endpoint),
     scope: 'current_request',
     scope_terms: requireApiStringArray(record, 'scope_terms', endpoint),
+    kind: kind as PendingClarification['kind'],
+    options,
+    selected_option: selectedOption,
     status: status as PendingClarification['status'],
   };
 };
@@ -1732,6 +1755,42 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   };
 };
 
+export const parseAgentRunAcceptedResponse = (
+  value: unknown,
+): AgentRunAcceptedResponse => {
+  const endpoint = 'accepted chat turn';
+  const record = requireApiRecord(value, endpoint);
+  const state = requireApiString(record, 'state', endpoint);
+  if (!RUN_STATES.includes(state as AgentRunState)) {
+    return apiContract(endpoint, 'state is unsupported', state);
+  }
+  const presentationStatus = requireApiString(record, 'presentation_status', endpoint);
+  if (!NATIVE_PRESENTATION_STATUSES.includes(presentationStatus as PresentationStatus)) {
+    return apiContract(endpoint, 'presentation_status is unsupported', presentationStatus);
+  }
+  const runVersion = requireApiNumber(record, 'run_version', endpoint);
+  if (!Number.isInteger(runVersion) || runVersion < 1) {
+    return apiContract(endpoint, 'run_version must be a positive integer', runVersion);
+  }
+  return {
+    conversation_id: requireApiString(record, 'conversation_id', endpoint),
+    run_id: requireApiString(record, 'run_id', endpoint),
+    run_version: runVersion,
+    state: state as AgentRunState,
+    presentation_status: presentationStatus as PresentationStatus,
+    status_url: requireApiString(record, 'status_url', endpoint),
+    realtime_url: optionalApiString(record, 'realtime_url', endpoint),
+    terminal: requireApiBoolean(record, 'terminal', endpoint),
+  };
+};
+
+export const parseChatTurnApiResponse = (value: unknown): ChatTurnApiResponse => {
+  if (isRecord(value) && typeof value.assistant_message === 'string') {
+    return parseChatTurnResponse(value);
+  }
+  return parseAgentRunAcceptedResponse(value);
+};
+
 const normalizeConversationMessage = (value: unknown): ChatMessage | undefined => {
   if (!isRecord(value)
     || !isNonEmptyString(value.role)
@@ -2103,5 +2162,56 @@ export const parseConversationSnapshotResponse = (
     map_session: mapSession,
     active_run: activeRun,
     recent_runs: recentRuns,
+  };
+};
+
+export const parseAgentRunSnapshot = (value: unknown): AgentRunSnapshot => {
+  const endpoint = 'conversation run status';
+  const record = requireApiRecord(value, endpoint);
+  const state = requireApiString(record, 'state', endpoint);
+  if (!RUN_STATES.includes(state as AgentRunState)) {
+    return apiContract(endpoint, 'state is unsupported', state);
+  }
+  const presentationStatus = requireApiString(record, 'presentation_status', endpoint);
+  if (!NATIVE_PRESENTATION_STATUSES.includes(presentationStatus as PresentationStatus)) {
+    return apiContract(endpoint, 'presentation_status is unsupported', presentationStatus);
+  }
+  const presentation = record.presentation === undefined || record.presentation === null
+    ? record.presentation ?? null
+    : requireApiJsonObject(record.presentation, endpoint, 'presentation');
+  const response = record.response === undefined || record.response === null
+    ? record.response ?? null
+    : parseChatTurnResponse(record.response);
+  const taskState = record.task_state === undefined || record.task_state === null
+    ? record.task_state ?? null
+    : parseAgentTaskState(record.task_state, endpoint);
+  const currentIteration = optionalApiNumber(record, 'current_iteration', endpoint);
+  if (currentIteration !== undefined && currentIteration !== null
+    && (!Number.isInteger(currentIteration) || currentIteration < 0)) {
+    return apiContract(endpoint, 'current_iteration must be a non-negative integer or null', currentIteration);
+  }
+  const activeRunVersion = requireApiNumber(record, 'active_run_version', endpoint);
+  if (!Number.isInteger(activeRunVersion) || activeRunVersion < 1) {
+    return apiContract(endpoint, 'active_run_version must be a positive integer', activeRunVersion);
+  }
+  return {
+    conversation_id: requireApiString(record, 'conversation_id', endpoint),
+    run_id: requireApiString(record, 'run_id', endpoint),
+    original_request: requireApiString(record, 'original_request', endpoint),
+    aggregated_request: requireApiString(record, 'aggregated_request', endpoint),
+    active_run_version: activeRunVersion,
+    state: state as AgentRunState,
+    created_at: requireApiString(record, 'created_at', endpoint),
+    request_timezone: optionalApiString(record, 'request_timezone', endpoint),
+    started_at: optionalApiString(record, 'started_at', endpoint),
+    completed_at: optionalApiString(record, 'completed_at', endpoint),
+    cancel_requested_at: optionalApiString(record, 'cancel_requested_at', endpoint),
+    error_code: optionalApiString(record, 'error_code', endpoint),
+    error_message: optionalApiString(record, 'error_message', endpoint),
+    presentation_status: presentationStatus as PresentationStatus,
+    presentation: presentation as Record<string, JsonValue> | null,
+    response: response as ChatTurnResponse | null,
+    current_iteration: currentIteration,
+    task_state: taskState,
   };
 };
