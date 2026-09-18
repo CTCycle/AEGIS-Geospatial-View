@@ -36,6 +36,39 @@ async def test_coordinate_query_is_resolved_without_geocoder_egress() -> None:
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_unresolved_target_id_is_resolved_as_initial_location_query() -> None:
+    captured: list[tuple[str, str]] = []
+
+    class CapturingResolver:
+        async def resolve_location_signals(self, signals, _memory):  # noqa: ANN001
+            signal = signals[0]
+            captured.append((signal.raw_value, signal.signal_type))
+            return ResolvedLocation(
+                label="Japan",
+                latitude=36.2048,
+                longitude=138.2529,
+                source="geocoder",
+            )
+
+    state = AgentRunState(
+        request_id="request-1",
+        conversation_id="conversation-1",
+        phase=AgentPhase.BUILD_TOOL_CONTEXT,
+        user_message="Show me earthquakes around Japan.",
+    )
+
+    result = await LocationToolHandler(resolver=CapturingResolver()).resolve(
+        ResolveLocationInput(target_id="Japan", expected_location_type="country"),
+        state,
+    )
+
+    assert result.status == "success"
+    assert captured == [("Japan", "country")]
+    assert state.location_refs["japan"].label == "Japan"
+
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_ambiguous_location_is_a_typed_semantic_outcome() -> None:
     class AmbiguousResolver(LocationResolver):
         async def resolve_location_signals(self, _signals, _memory):  # noqa: ANN001
