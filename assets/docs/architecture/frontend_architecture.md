@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-09-16
+Last updated: 2026-09-18
 
 ## Route-Level Pages
 
@@ -109,10 +109,20 @@ and the same settings update service; child panel controls do not create a
 second settings store.
 
 The Search workspace keeps context usage in a separate compact progress row
-below the composer. A 24px, non-wrapping workspace footer spans the chat and
-map panes and exposes Agent model, Satellite, Weather, and Optional Keys;
-Optional Keys opens `/settings?tab=geospatial-access` and Agent model opens
-`/settings`.
+below the composer. The chat transcript contains only user and assistant
+conversation messages; tool progress, run failures, retries, trace events, and
+other operational diagnostics are presented outside the transcript.
+
+A compact full-width workspace footer spans the chat and map panes and exposes
+Agent model, Satellite, Optional Keys, and a reusable Tool activity control.
+Tool activity opens bounded execution details for the active or latest run,
+including sanitized task, tool, timing, error-summary, and trace information.
+Raw provider payloads and model reasoning are not rendered there. Optional Keys
+opens `/settings?tab=geospatial-access` and Agent model opens `/settings`.
+
+The map canvas header uses a stable two-column layout: progress or location
+status occupies the truncating left column, while chat visibility and Alerts
+remain fixed icon actions in the right column.
 
 ## Routing Rule
 
