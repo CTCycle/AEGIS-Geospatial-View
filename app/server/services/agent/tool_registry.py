@@ -56,6 +56,7 @@ class ToolRegistry:
         """Return only tools valid for the current native run state."""
 
         exposed: list[LLMToolDefinition] = []
+        active_map_update = _is_active_map_update(state)
         for registered in self._registered_tools.values():
             if (
                 registered.visibility == "internal"
@@ -63,6 +64,14 @@ class ToolRegistry:
             ):
                 continue
             if state.phase not in registered.phases:
+                continue
+            if active_map_update and registered.definition.name in {
+                "discover_geospatial_capabilities",
+                "discover_geospatial_provider_layers",
+                "describe_geospatial_capability",
+                "inspect_evidence",
+                "transform_evidence",
+            }:
                 continue
             if not self._prerequisites_satisfied(registered.prerequisites, state):
                 continue
@@ -117,7 +126,7 @@ class ToolRegistry:
                 and not has_location
             ):
                 return False
-            if prerequisite == "evidence" and not state.evidence_refs:
+            if prerequisite == "evidence" and not _evidence_available_for_route(state):
                 return False
             if prerequisite == "active_map" and state.active_map_session is None:
                 return False
@@ -131,10 +140,16 @@ class ToolRegistry:
                 if CapabilityDomain.PROVIDER_DISCOVERY not in route_domains:
                     return False
             if prerequisite == "data_route":
-                if state.route is None or state.route.primary_domain in {
-                    CapabilityDomain.MAP_RENDERING,
-                    CapabilityDomain.MAP_STATE,
-                }:
+                if state.route is None:
+                    return False
+                route_domains = {
+                    state.route.primary_domain,
+                    *state.route.secondary_domains,
+                }
+                if state.route.primary_domain is CapabilityDomain.MAP_STATE or (
+                    state.route.primary_domain is CapabilityDomain.MAP_RENDERING
+                    and CapabilityDomain.DATA_RETRIEVAL not in route_domains
+                ):
                     return False
             if prerequisite == "map_presentation":
                 if state.route is None or state.route.presentation not in {"map", "both"}:
@@ -147,7 +162,15 @@ class ToolRegistry:
         """Check the validated route targets, not merely any prior map state."""
 
         route = state.route
-        target_refs = list(route.target_refs) if route is not None else []
+        if _is_active_map_update(state):
+            return state.active_map_session is not None
+        target_refs = (
+            list(route.spatial_scope.target_refs)
+            if route is not None
+            and route.spatial_scope is not None
+            and route.spatial_scope.target_refs
+            else list(route.target_refs) if route is not None else []
+        )
         if not target_refs:
             return bool(state.location_refs) or state.active_map_session is not None
         resolved_keys = {
@@ -157,6 +180,59 @@ class ToolRegistry:
             " ".join(str(target).casefold().split()) in resolved_keys
             for target in target_refs
         )
+
+
+_ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
+    {
+        "remove_layer",
+        "set_layer_visibility",
+        "set_layer_opacity",
+        "set_basemap",
+        "keep_only_layers",
+        "fit_layer",
+        "reset_view",
+    }
+)
+
+
+def _is_active_map_update(state: "AgentRunState") -> bool:
+    route = state.route
+    return bool(
+        route is not None
+        and route.task_mode == "execute"
+        and route.primary_domain is CapabilityDomain.MAP_STATE
+        and state.active_map_session is not None
+        and str(route.operation or "").strip().casefold()
+        in _ACTIVE_MAP_UPDATE_OPERATIONS
+        and route.spatial_scope is None
+    )
+
+
+def _evidence_available_for_route(state: "AgentRunState") -> bool:
+    """Do not expose stale evidence tools before a new map-data retrieval."""
+
+    route = state.route
+    route_domains = (
+        {
+            route.primary_domain,
+            *route.secondary_domains,
+        }
+        if route is not None
+        else set()
+    )
+    if (
+        route is not None
+        and CapabilityDomain.DATA_RETRIEVAL in route_domains
+        and route.presentation in {"map", "both"}
+        and str(route.operation or "").strip().casefold()
+        in {"", "retrieve", "search", "query", "add_layer"}
+    ):
+        return any(
+            result.status in {"success", "valid_empty", "partial"}
+            and bool(result.evidence_refs)
+            for result in state.tool_results
+        )
+    return bool(state.evidence_refs)
 
 
 __all__ = ["ToolRegistry"]

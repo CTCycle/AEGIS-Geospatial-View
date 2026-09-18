@@ -21,6 +21,7 @@ def test_native_system_prompt_owns_loop_safety_and_grounding_rules() -> None:
 
     assert "Do not repeat a successful equivalent call." in prompt
     assert "Preserve source conflicts and stale/partial status" in prompt
+    assert "Never use transform_evidence to" in prompt
     assert "State that evidence is insufficient" in prompt
 
 

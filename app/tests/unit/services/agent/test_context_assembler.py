@@ -129,6 +129,48 @@ def test_oversized_newest_history_is_compacted_without_losing_location_state() -
     assert estimate_json_tokens(package.model_dump(mode="json")) < 3072
 
 
+def test_active_overlay_identity_survives_context_bounding() -> None:
+    package = AgentContextAssembler(_ExplicitProfileResolver()).assemble(
+        provider="opencode-go",
+        model="deepseek-v4.1-flash",
+        current_user_message="Remove the earthquake layer.",
+        messages=[],
+        directives=[],
+        task_state={},
+        map_memory={
+            "active_visualization": {
+                "overlay_collection": {
+                    "revision": 1,
+                    "instances": [
+                        {
+                            "instance_id": "evidence:usgs:earthquakes",
+                            "capability_id": "usgs_earthquakes",
+                            "descriptor": {"label": "USGS Earthquakes"},
+                            "visible": True,
+                            "opacity": 1.0,
+                            "payload": {"features": ["large renderer payload"]},
+                        }
+                    ],
+                }
+            }
+        },
+    )
+
+    collection = package.map_memory["active_visualization"]["overlay_collection"]
+    assert collection == {
+        "revision": 1,
+        "instances": [
+            {
+                "instance_id": "evidence:usgs:earthquakes",
+                "capability_id": "usgs_earthquakes",
+                "label": "USGS Earthquakes",
+                "visible": True,
+                "opacity": 1.0,
+            }
+        ],
+    }
+
+
 ###############################################################################
 def test_oversized_history_item_does_not_hide_smaller_relevant_messages() -> None:
     package = AgentContextAssembler(_ExplicitProfileResolver()).assemble(

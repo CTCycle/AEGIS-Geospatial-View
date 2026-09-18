@@ -88,7 +88,7 @@ class AgentContextAssembler:
                 raw_outcomes.append(bounded_outcome)
         constraints = _bounded_object(policy_constraints or {})
         bounded_task_state = _bounded_object(task_state)
-        bounded_map_memory = _bounded_object(map_memory)
+        bounded_map_memory = _bounded_map_memory(map_memory)
         outcomes = _select_relevant_outcomes(
             raw_outcomes,
             current_user_message=current_user_message,
@@ -315,6 +315,64 @@ class AgentContextAssembler:
 def _bounded_object(value: object) -> dict[str, Any]:
     bounded = _bounded_json_value(value, depth=0)
     return bounded if is_json_object(bounded) else {}
+
+
+def _bounded_map_memory(value: object) -> dict[str, Any]:
+    """Keep active overlay identity usable for typed map lifecycle actions."""
+
+    bounded = _bounded_object(value)
+    if not is_json_object(value):
+        return bounded
+    active = value.get("active_visualization")
+    if not is_json_object(active):
+        return bounded
+    overlay_collection = active.get("overlay_collection")
+    if not is_json_object(overlay_collection):
+        return bounded
+    active_bounded = bounded.get("active_visualization")
+    if not is_json_object(active_bounded):
+        active_bounded = {}
+    compact_instances: list[dict[str, Any]] = []
+    raw_instances = overlay_collection.get("instances")
+    if is_json_array(raw_instances):
+        for raw_instance in list(raw_instances)[:32]:
+            if not is_json_object(raw_instance):
+                continue
+            descriptor = raw_instance.get("descriptor")
+            descriptor = descriptor if is_json_object(descriptor) else {}
+            instance_id = str(
+                raw_instance.get("instance_id")
+                or descriptor.get("instance_id")
+                or ""
+            ).strip()
+            if not instance_id:
+                continue
+            capability_id = str(
+                raw_instance.get("capability_id")
+                or descriptor.get("capability_id")
+                or ""
+            ).strip()
+            label = str(
+                descriptor.get("label")
+                or raw_instance.get("label")
+                or capability_id
+                or instance_id
+            ).strip()
+            compact_instances.append(
+                {
+                    "instance_id": instance_id,
+                    "capability_id": capability_id,
+                    "label": label,
+                    "visible": bool(raw_instance.get("visible", True)),
+                    "opacity": raw_instance.get("opacity", 1.0),
+                }
+            )
+    active_bounded["overlay_collection"] = {
+        "revision": overlay_collection.get("revision", 0),
+        "instances": compact_instances,
+    }
+    bounded["active_visualization"] = active_bounded
+    return bounded
 
 
 def select_pair_safe_messages(

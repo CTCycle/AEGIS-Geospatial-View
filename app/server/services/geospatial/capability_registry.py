@@ -709,6 +709,7 @@ def _operation_candidates(operation: str) -> set[str]:
         return set()
     aliases: dict[str, set[str]] = {
         "display": {"show", "overlay"},
+        "add_layer": {"show", "overlay"},
         "find": {"search", "near", "within_distance"},
         "get": {"search", "show", "inspect"},
         "locate": {"search", "near", "show"},
@@ -743,6 +744,8 @@ def _operation_candidates(operation: str) -> set[str]:
     candidates = {operation, *tokens}
     for token in tokens:
         candidates.update(aliases.get(token, set()))
+    candidates.update(aliases.get(operation, set()))
+    candidates.update(aliases.get(operation, set()))
     # Basemap manifests expose the canonical render primitive ``show``.  A
     # basemap switch is still a map render, even though the route operation is
     # intentionally more specific than the manifest operation.

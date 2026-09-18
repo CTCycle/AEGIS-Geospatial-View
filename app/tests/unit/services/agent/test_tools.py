@@ -204,6 +204,28 @@ def test_new_route_target_requires_location_resolution_even_with_active_map() ->
     assert "resolve_geospatial_location" in exposed
 
 
+def test_active_map_layer_lifecycle_exposes_only_map_plan_for_mutation() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_STATE,
+        task_mode="execute",
+        presentation="map",
+        requires_location=False,
+        operation="remove_layer",
+        target_refs=["earthquake layer"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.active_map_session = object()  # type: ignore[assignment]
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    assert "apply_map_plan" in exposed
+    assert "transform_evidence" not in exposed
+    assert "inspect_evidence" not in exposed
+    assert "discover_geospatial_capabilities" not in exposed
+
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_capability_handler_uses_persisted_run_id_not_request_id() -> None:
@@ -407,6 +429,16 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
     ]
 
     state.evidence_refs.append("evidence-1")
+    state.tool_results.append(
+        ToolResult(
+            call_id="execute-1",
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="Retrieved current evidence.",
+            evidence_refs=["evidence-1"],
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    )
     assert {
         tool.name for tool in registry.expose(state)
     } == {
@@ -416,6 +448,94 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
         "transform_evidence",
         "apply_map_plan",
     }
+
+
+def test_new_map_retrieval_does_not_expose_stale_evidence_tools() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        operation="retrieve",
+        capability_queries=["earthquakes"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["places:hospitals"]
+    state.location_refs["japan"] = ResolvedLocation(
+        label="Japan",
+        latitude=35.0,
+        longitude=139.0,
+    )
+    state.evidence_refs = ["evidence-from-an-earlier-turn"]
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    assert "execute_geospatial_capability" in exposed
+    assert "apply_map_plan" in exposed
+    assert "inspect_evidence" not in exposed
+    assert "transform_evidence" not in exposed
+
+
+def test_map_rendering_add_layer_does_not_expose_stale_evidence_tools() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        secondary_domains=(CapabilityDomain.DATA_RETRIEVAL,),
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        operation="add_layer",
+        capability_queries=["earthquakes"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["places:hospitals"]
+    state.location_refs["japan"] = ResolvedLocation(
+        label="Japan",
+        latitude=35.0,
+        longitude=139.0,
+    )
+    state.evidence_refs = ["evidence-from-an-earlier-turn"]
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    assert "apply_map_plan" in exposed
+    assert "inspect_evidence" not in exposed
+    assert "transform_evidence" not in exposed
+
+
+def test_map_add_route_ignores_capability_target_for_location_prerequisite() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        secondary_domains=(CapabilityDomain.DATA_RETRIEVAL,),
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        operation="add_layer",
+        target_refs=["earthquakes", "Japan"],
+        spatial_scope={
+            "kind": "administrative_geometry",
+            "relationship": "around",
+            "target_refs": ["Japan"],
+        },
+        capability_queries=["earthquakes"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["traffic"]
+    state.location_refs["japan"] = ResolvedLocation(
+        label="Japan",
+        latitude=35.0,
+        longitude=139.0,
+    )
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    assert "execute_geospatial_capability" in exposed
+    assert "resolve_geospatial_location" not in exposed
 
 
 ###############################################################################

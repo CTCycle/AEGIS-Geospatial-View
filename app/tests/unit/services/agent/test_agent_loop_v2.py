@@ -544,6 +544,31 @@ def test_native_goal_compiles_deterministic_completion_contract() -> None:
     assert state.completion_contract.spatial_scope_required is True
 
 
+def test_map_add_route_requires_provider_data_when_data_retrieval_is_secondary() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        secondary_domains=[CapabilityDomain.DATA_RETRIEVAL],
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        capability_queries=["earthquakes"],
+        operation="add_layer",
+        target_refs=["earthquakes", "Japan"],
+        spatial_scope={
+            "kind": "administrative_geometry",
+            "relationship": "around",
+            "target_refs": ["Japan"],
+        },
+    )
+
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+
+    assert state.completion_contract is not None
+    assert state.completion_contract.data_requirement == "provider_data"
+    assert "required_data_retrieved" in state.completion_contract.requirements
+
+
 def test_text_geocode_resolution_satisfies_data_and_spatial_completion() -> None:
     state = _state()
     route = CapabilityRoute(

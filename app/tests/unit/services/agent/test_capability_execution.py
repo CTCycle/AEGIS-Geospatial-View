@@ -101,7 +101,17 @@ async def test_execute_capability_persists_full_payload_and_returns_bounded_summ
     response = ProviderResponse(
         capability_id="places:hospitals",
         provider_id="overpass",
-        payload={"type": "FeatureCollection", "features": [{"id": "a"}]},
+        payload={
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": "a",
+                    "geometry": {"type": "Point", "coordinates": [8.54, 47.37]},
+                    "properties": {"name": "Hospital"},
+                }
+            ],
+        },
         result_type="features",
     )
     evidence = FakeEvidenceRepository()
@@ -133,7 +143,9 @@ async def test_execute_capability_persists_full_payload_and_returns_bounded_summ
         "result_status": "ok",
         "result_type": "features",
         "feature_count": 1,
+        "map_eligibility": "renderable",
         "stale": False,
+        "bbox": [8.54, 47.37, 8.54, 47.37],
     }.items()
     assert result.data["query"] == {
         "operation": "within_distance",
@@ -302,3 +314,25 @@ def test_weather_summary_exposes_bounded_current_observations() -> None:
         "wind_speed_10m": 9.5,
     }
     assert summary["timezone"] == "Europe/Rome"
+
+
+def test_raster_summary_is_renderable_only_with_a_source() -> None:
+    renderable = _response_summary(
+        ProviderResponse(
+            capability_id="esa_worldcover",
+            provider_id="esa",
+            payload={"renderingMode": "wmts", "serviceUrl": "https://example.test/wmts"},
+            result_type="raster",
+        )
+    )
+    unavailable = _response_summary(
+        ProviderResponse(
+            capability_id="esa_worldcover",
+            provider_id="esa",
+            payload={"renderingMode": "wmts"},
+            result_type="raster",
+        )
+    )
+
+    assert renderable["map_eligibility"] == "renderable"
+    assert unavailable["map_eligibility"] == "unknown"

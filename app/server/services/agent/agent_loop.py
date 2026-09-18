@@ -2344,10 +2344,12 @@ class AgentLoop:
         requirements: list[str] = []
         if route.requires_location:
             requirements.append("location_resolved")
-        data_route = route.primary_domain not in {
-            CapabilityDomain.MAP_RENDERING,
-            CapabilityDomain.MAP_STATE,
-        }
+        route_domains = {route.primary_domain, *route.secondary_domains}
+        data_route = (
+            CapabilityDomain.DATA_RETRIEVAL in route_domains
+            or route.primary_domain
+            not in {CapabilityDomain.MAP_RENDERING, CapabilityDomain.MAP_STATE}
+        )
         requires_provider_data = (
             route.task_mode == "execute"
             and data_route

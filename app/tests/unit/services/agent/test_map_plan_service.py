@@ -22,6 +22,7 @@ from server.domain.agent.evidence import AgentEvidenceSummary
 from server.domain.agent.map_plan import (
     AddEvidenceLayerAction,
     MapPlan,
+    RemoveLayerAction,
     SetLayerVisibilityAction,
     SetViewportAction,
 )
@@ -438,6 +439,49 @@ async def test_active_map_move_does_not_fall_back_to_prior_location() -> None:
     assert state.prepared_map_session is None
 
 
+@pytest.mark.asyncio
+async def test_data_layer_plan_uses_spatial_scope_location_target() -> None:
+    location = ResolvedLocation(
+        label="Japan",
+        latitude=36.5748,
+        longitude=139.2394,
+    )
+    state = _state(active_map_session=_active_session())
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        secondary_domains=[CapabilityDomain.DATA_RETRIEVAL],
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        operation="add_layer",
+        target_refs=["USGS Earthquakes"],
+        spatial_scope={
+            "kind": "administrative_geometry",
+            "relationship": "around",
+            "target_refs": ["Japan"],
+        },
+    )
+    state.location_refs = {"japan": location}
+
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                SetViewportAction(
+                    action="set_viewport",
+                    strategy="fit_location",
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert state.prepared_map_session.resolved_location == location
+
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_missing_evidence_is_rejected() -> None:
@@ -575,3 +619,24 @@ async def test_visibility_mutation_increments_candidate_revision() -> None:
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.overlay_collection.revision == 3
     assert state.prepared_map_session.overlay_collection.instances[0].visible is False
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_remove_layer_mutation_removes_instance_and_increments_revision() -> None:
+    state = _state(active_map_session=_active_session())
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                RemoveLayerAction(action="remove_layer", instance_id="traffic-1")
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert state.prepared_map_session.overlay_collection.revision == 3
+    assert state.prepared_map_session.overlay_collection.instances == []
