@@ -172,6 +172,7 @@ _ROUTING_CONTEXT_TOKENS = _GENERIC_QUERY_TOKENS | {
     "around",
     "at",
     "check",
+    "catalog",
     "condition",
     "conditions",
     "current",
