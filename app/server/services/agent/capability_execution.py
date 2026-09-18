@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import uuid4
 
-from server.common.typing import is_json_array
+from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.evidence import EvidenceKind, EvidenceStatus
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.tool_result import (
@@ -537,6 +537,30 @@ def _response_summary(
         summary["source_url"] = response.source_url[:500]
     if response.partial:
         summary["partial"] = True
+    if payload.get("kind") == "weather_forecast":
+        current = payload.get("current")
+        if is_json_object(current):
+            observations = {
+                key: current[key]
+                for key in (
+                    "temperature_2m",
+                    "precipitation",
+                    "weather_code",
+                    "relative_humidity_2m",
+                    "surface_pressure",
+                    "wind_speed_10m",
+                    "wind_direction_10m",
+                    "wind_gusts_10m",
+                )
+                if key in current
+            }
+            if observations:
+                # Keep current weather values available for bounded answer
+                # synthesis without exposing the complete provider payload.
+                summary["observations"] = observations
+        timezone = payload.get("timezone")
+        if isinstance(timezone, str) and timezone:
+            summary["timezone"] = timezone[:80]
     if request is not None:
         # Keep the semantic query visible to the model without exposing the
         # provider payload or trusting model-owned geometry/time fields.

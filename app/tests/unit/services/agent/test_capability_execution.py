@@ -9,6 +9,7 @@ from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.capability_execution import (
     CapabilityExecutionService,
     ToolExecutionContext,
+    _response_summary,
 )
 from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.geospatial.providers.base import (
@@ -275,3 +276,29 @@ async def test_resolved_location_is_forwarded_as_provider_coordinates() -> None:
     request = provider.requests[0][1]
     assert request.params["latitude"] == 47.3769  # type: ignore[attr-defined]
     assert request.params["longitude"] == 8.5417  # type: ignore[attr-defined]
+
+
+def test_weather_summary_exposes_bounded_current_observations() -> None:
+    summary = _response_summary(
+        ProviderResponse(
+            capability_id="get_weather_forecast",
+            provider_id="openmeteo",
+            payload={
+                "kind": "weather_forecast",
+                "current": {
+                    "temperature_2m": 27.3,
+                    "relative_humidity_2m": 62,
+                    "wind_speed_10m": 9.5,
+                    "secret": "must not be copied",
+                },
+                "timezone": "Europe/Rome",
+            },
+        )
+    )
+
+    assert summary["observations"] == {
+        "temperature_2m": 27.3,
+        "relative_humidity_2m": 62,
+        "wind_speed_10m": 9.5,
+    }
+    assert summary["timezone"] == "Europe/Rome"

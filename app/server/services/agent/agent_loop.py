@@ -869,7 +869,66 @@ class AgentLoop:
                     kind="finalization_completed",
                     outcome=outcome,
                 )
-        return candidate or "The requested information is ready."
+        return (
+            candidate
+            or self._completed_request_fallback(state)
+            or "The requested information is ready."
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _completed_request_fallback(state: AgentRunState) -> str:
+        """Render a bounded direct answer when no final model slot remains."""
+
+        for result in reversed(state.tool_results):
+            if result.status not in {"success", "partial"}:
+                continue
+            data = result.data if is_json_object(result.data) else None
+            if data is None or data.get("capability_id") != "get_weather_forecast":
+                continue
+            observations = data.get("observations")
+            if not is_json_object(observations) or not observations:
+                continue
+            query = data.get("query")
+            resolved_location = (
+                query.get("resolved_location")
+                if is_json_object(query)
+                else None
+            )
+            location = str(
+                resolved_location
+                or (query.get("location_ref") if is_json_object(query) else None)
+                or "the requested location"
+            )
+            fields = (
+                ("temperature_2m", "temperature", "°C"),
+                ("relative_humidity_2m", "humidity", "%"),
+                ("precipitation", "precipitation", "mm"),
+                ("wind_speed_10m", "wind", "km/h"),
+                ("surface_pressure", "pressure", "hPa"),
+            )
+            values = [
+                f"{label} {observations[key]}{unit}"
+                for key, label, unit in fields
+                if observations.get(key) is not None
+            ]
+            weather_code = observations.get("weather_code")
+            if weather_code is not None:
+                values.append(f"WMO weather code {weather_code}")
+            if not values:
+                continue
+            answer = f"Current weather for {location}: " + "; ".join(values) + "."
+            observation_time = data.get("observation_time")
+            timezone = data.get("timezone")
+            if observation_time:
+                suffix = f"Observation time: {observation_time}"
+                if timezone:
+                    suffix += f" ({timezone})"
+                answer += f" {suffix}."
+            if result.status == "partial" or data.get("partial"):
+                answer += " The provider marked this result as partial."
+            return answer
+        return ""
 
     # -------------------------------------------------------------------------
     async def _emit_finalization_trace(

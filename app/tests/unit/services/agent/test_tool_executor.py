@@ -308,6 +308,44 @@ def test_manifest_validation_correction_contains_bounded_applicable_schema() -> 
     assert len(correction["validation_errors"]) == 1
 
 
+def test_execute_capability_accepts_route_temporal_hint() -> None:
+    calls: list[ExecuteCapabilityInput] = []
+
+    async def handler(
+        arguments: ExecuteCapabilityInput, _state: AgentRunState
+    ) -> dict[str, Any]:
+        calls.append(arguments)
+        return {"ok": True}
+
+    registry = ToolRegistry(runtime_registry=cast(Any, None))
+    registry.register(
+        _tool(
+            handler,
+            name="execute_geospatial_capability",
+            input_model=ExecuteCapabilityInput,
+        )
+    )
+    result = asyncio.run(
+        ToolExecutor(tool_registry=registry).execute_tool(
+            LLMToolCall(
+                id="temporal-hint",
+                name="execute_geospatial_capability",
+                arguments={
+                    "capability_id": "openmeteo_weather_forecast",
+                    "location_ref": "rome",
+                    "operation": "forecast",
+                    "temporal_mode": "current",
+                },
+            ),
+            _state(),
+            _budget(),
+        )
+    )
+
+    assert result.status == "success"
+    assert [item.temporal_mode for item in calls] == ["current"]
+
+
 def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
     calls: list[int] = []
     manifest_schema = {

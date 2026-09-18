@@ -1093,6 +1093,58 @@ async def test_successful_tool_is_followed_by_one_final_model_step() -> None:
     assert assistant_message["tool_calls"][0]["arguments"] == {}
 
 
+@pytest.mark.asyncio
+async def test_weather_completion_has_bounded_fallback_when_model_budget_is_exhausted() -> None:
+    provider = FakeProvider([])
+    state = _state()
+    state.tool_results.append(
+        ToolResult(
+            call_id="weather-1",
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="weather fetched",
+            data={
+                "capability_id": "get_weather_forecast",
+                "observations": {
+                    "temperature_2m": 27.3,
+                    "relative_humidity_2m": 62,
+                    "precipitation": 0.0,
+                    "wind_speed_10m": 9.5,
+                    "surface_pressure": 1010.0,
+                    "weather_code": 3,
+                },
+                "observation_time": "2026-09-18T14:00",
+                "timezone": "Europe/Rome",
+                "query": {
+                    "location_ref": "rome",
+                    "resolved_location": "Rome, Italy",
+                },
+            },
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    )
+    request = AgentLoopRequest(
+        provider="fake",
+        model="fake-model",
+        state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        max_model_calls=1,
+    )
+    request.budget.configure_limits(max_model_calls=1)
+    state.model_calls = 1
+
+    answer = await _loop(provider)._finalize_completed_request(  # pyright: ignore[reportPrivateUsage]
+        request,
+        provider,
+        [],
+    )
+
+    assert "Current weather for Rome, Italy" in answer
+    assert "temperature 27.3°C" in answer
+    assert "humidity 62%" in answer
+    assert "Observation time: 2026-09-18T14:00 (Europe/Rome)" in answer
+
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_hydrated_context_is_rebuilt_with_the_latest_observation() -> None:
