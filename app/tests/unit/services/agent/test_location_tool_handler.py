@@ -36,6 +36,54 @@ async def test_coordinate_query_is_resolved_without_geocoder_egress() -> None:
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_invalid_coordinate_query_is_rejected_with_bounds() -> None:
+    state = AgentRunState(
+        request_id="request-1",
+        conversation_id="conversation-1",
+        phase=AgentPhase.BUILD_TOOL_CONTEXT,
+        user_message="Go to 91, 181.",
+    )
+
+    result = await LocationToolHandler(resolver=LocationResolver()).resolve(
+        ResolveLocationInput(query="91, 181", expected_location_type="coordinates"),
+        state,
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "invalid_coordinates"
+    assert result.data == {
+        "resolution_status": "invalid_coordinates",
+        "query": "91, 181",
+        "latitude_bounds": [-90, 90],
+        "longitude_bounds": [-180, 180],
+    }
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_invalid_coordinates_in_user_text_override_context_target() -> None:
+    state = AgentRunState(
+        request_id="request-1",
+        conversation_id="conversation-1",
+        phase=AgentPhase.BUILD_TOOL_CONTEXT,
+        user_message="Go to 91, 181.",
+    )
+
+    result = await LocationToolHandler(resolver=LocationResolver()).resolve(
+        ResolveLocationInput(query="Zurich", expected_location_type="city"),
+        state,
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "invalid_coordinates"
+    assert result.data is not None
+    assert result.data["query"] == "91, 181"
+
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_unresolved_target_id_is_resolved_as_initial_location_query() -> None:
     captured: list[tuple[str, str]] = []
 

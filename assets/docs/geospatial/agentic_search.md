@@ -71,6 +71,11 @@ location reference must resolve exactly. Ambiguous candidates become an
 explicit clarification transition; an unavailable reference is a typed
 validation/replan outcome and never silently falls back to another geography.
 
+Plain map-oriented place wording has a bounded server-owned route rescue when
+the model's route bootstrap misses the request. The rescue is limited to
+non-data display/navigation language and still enters the normal location
+resolver, so it cannot select a place or suppress a required clarification.
+
 The completion contract can require location resolution, data retrieval,
 spatial and temporal filtering, renderable geometry, map-state commit, viewport
 evidence, and final response readiness. A valid empty result remains data with

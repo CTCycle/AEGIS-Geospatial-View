@@ -44,7 +44,10 @@ from server.domain.agent.tool_result import (
 from server.domain.llm.types import LLMRequest, LLMResult, LLMToolCall, LLMToolDefinition
 from server.prompts.agent import build_native_context_messages
 from server.prompts.capability_route import build_capability_route_prompt
-from server.services.agent.capability_router import CapabilityRouter
+from server.services.agent.capability_router import (
+    CapabilityRouter,
+    build_location_map_fallback_route,
+)
 from server.services.agent.context_assembler import select_pair_safe_messages
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
@@ -1365,6 +1368,16 @@ class AgentLoop:
                     "content": "Return one valid route_request call matching the supplied schema.",
                 }
             )
+        fallback = build_location_map_fallback_route(request.state.user_message)
+        if fallback is not None:
+            decision = self.capability_router.validate_route(
+                fallback,
+                user_message=request.state.user_message,
+                active_state=request.state,
+            )
+            if decision.status in {"accepted", "discovery_required"}:
+                request.state.capability_ids = list(decision.capability_ids)
+                return None, "", decision.route
         return None, "", None
 
     # -------------------------------------------------------------------------

@@ -55,22 +55,6 @@ _COORDINATE_PAIR_SEARCH_RE = re.compile(
     r"(?![\d])",
     re.IGNORECASE,
 )
-_COORDINATE_INTENT_TERMS = frozenset(
-    {
-        "approximate",
-        "approximately",
-        "around",
-        "center",
-        "centered",
-        "centred",
-        "coordinate",
-        "coordinates",
-        "latitude",
-        "longitude",
-    }
-)
-
-
 ###############################################################################
 class LocationToolHandler:
 
@@ -119,9 +103,37 @@ class LocationToolHandler:
 
         coordinates = _parse_coordinate_pair(query)
         coordinate_source = "model"
-        if coordinates is None and _has_coordinate_intent(state.user_message):
+        text_coordinate_match = _COORDINATE_PAIR_SEARCH_RE.search(state.user_message)
+        if coordinates is None and text_coordinate_match is not None:
             coordinates = _parse_coordinate_pair_from_text(state.user_message)
             coordinate_source = "text"
+        if coordinates is None and (
+            _COORDINATE_PAIR_RE.fullmatch(query) is not None
+            or text_coordinate_match is not None
+        ):
+            invalid_coordinate_text = (
+                query
+                if _COORDINATE_PAIR_RE.fullmatch(query) is not None
+                else text_coordinate_match.group(0).strip().rstrip(".,;")
+            )
+            return _failure(
+                code="invalid_coordinates",
+                message=(
+                    f'"{invalid_coordinate_text}" is outside coordinate bounds. '
+                    "Latitude must be between -90 and 90, and longitude "
+                    "must be between -180 and 180. Provide a valid pair "
+                    "or a place name."
+                ),
+                recovery="request_user_input",
+                semantic_outcome="failed",
+                data={
+                    "resolution_status": "invalid_coordinates",
+                    "query": invalid_coordinate_text,
+                    "latitude_bounds": [-90, 90],
+                    "longitude_bounds": [-180, 180],
+                },
+                started=started,
+            )
         if coordinates is not None:
             latitude, longitude = coordinates
             signal = LocationSignal(
@@ -200,11 +212,6 @@ def _parse_coordinate_pair_from_text(text: str) -> tuple[float, float] | None:
     if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
         return None
     return latitude, longitude
-
-
-def _has_coordinate_intent(text: str) -> bool:
-    terms = set(re.findall(r"[a-z]+", text.casefold()))
-    return bool(terms.intersection(_COORDINATE_INTENT_TERMS))
 
 
 ###############################################################################

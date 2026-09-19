@@ -1515,4 +1515,72 @@ describe('pages/geospatial-page.component', () => {
     expect(component.availableBasemaps.map((item) => item.id)).toEqual(['esri_world_imagery']);
   });
 
+  it('preserves a manual basemap choice when the next location candidate uses the default', async () => {
+    apiClient.fetchCatalog.and.resolveTo({
+      capabilities: [],
+      basemaps: [
+        {
+          id: 'osm_default',
+          name: 'OpenStreetMap',
+          provider: 'openstreetmap',
+          kind: 'basemap',
+          type: 'tile',
+          description: 'Public street map',
+          requires_credentials: false,
+          is_available: true,
+          supports_map: true,
+          supports_direct_text: false,
+          coverage: 'global',
+          render: { status: 'available', tile_url: '/tiles/osm/{z}/{x}/{y}.png', attribution: 'OSM' },
+          action_tags: [],
+          task_tags: [],
+          metadata: {},
+        },
+        {
+          id: 'osm_dark',
+          name: 'Dark Basemap',
+          provider: 'openstreetmap',
+          kind: 'basemap',
+          type: 'tile',
+          description: 'Dark street map',
+          requires_credentials: false,
+          is_available: true,
+          supports_map: true,
+          supports_direct_text: false,
+          coverage: 'global',
+          render: { status: 'available', tile_url: '/tiles/osm/{z}/{x}/{y}.png', attribution: 'OSM' },
+          action_tags: [],
+          task_tags: [],
+          metadata: {},
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    component.mapSession = {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      basemap: { id: 'osm_default', label: 'OpenStreetMap', render_status: 'available' },
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
+    } as MapSession;
+    component.onBasemapChange('osm_dark');
+
+    component['handleMapSession']({
+      session_id: 'map-2',
+      resolved_location: { label: 'Zurich', latitude: 47.4, longitude: 8.5 },
+      basemap_id: 'osm_default',
+      basemap: { id: 'osm_default', label: 'OpenStreetMap', render_status: 'available' },
+      viewport: { center_latitude: 47.4, center_longitude: 8.5, radius_m: 2500 },
+      overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
+    });
+
+    expect(component.payload?.map_session?.basemap_id).toBe('osm_dark');
+    expect(component.payload?.map_session?.basemap?.label).toBe('Dark Basemap');
+    expect(component.payload?.map_session?.resolved_location.label).toBe('Zurich');
+  });
+
 });

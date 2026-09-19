@@ -145,6 +145,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   private isDestroyed = false;
   private pendingMapSession?: MapSession;
   private committedMapSession?: MapSession;
+  private manualBasemapPreference?: NonNullable<MapSession['basemap']>;
   private pendingRenderContext?: {
     runId: string;
     runVersion: number;
@@ -443,6 +444,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.memorySnapshot = {};
     this.contextUsage = undefined;
     this.mapSession = undefined;
+    this.manualBasemapPreference = undefined;
     this.presentationStatus = undefined;
     this.pendingMapSession = undefined;
     this.committedMapSession = undefined;
@@ -798,6 +800,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.memorySnapshot = {};
     this.contextUsage = undefined;
     this.mapSession = undefined;
+    this.manualBasemapPreference = undefined;
     this.presentationStatus = undefined;
     this.pendingMapSession = undefined;
     this.committedMapSession = undefined;
@@ -1757,14 +1760,34 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (!mapSession) {
       return;
     }
+    const preferredBasemap = this.manualBasemapPreference;
+    const preserveManualBasemap = preferredBasemap
+      && mapSession.basemap_id === 'osm_default'
+      && preferredBasemap.id !== 'osm_default';
+    if (preferredBasemap && !preserveManualBasemap && mapSession.basemap_id !== preferredBasemap.id) {
+      this.manualBasemapPreference = mapSession.basemap
+        ? {
+          ...mapSession.basemap,
+          id: mapSession.basemap_id,
+          render_status: mapSession.basemap.render_status ?? 'available',
+        }
+        : undefined;
+    }
+    const effectiveMapSession = preserveManualBasemap
+      ? {
+        ...mapSession,
+        basemap_id: preferredBasemap.id,
+        basemap: { ...preferredBasemap },
+      }
+      : mapSession;
     if (!this.pendingMapSession && this.mapSession && this.mapSession.session_id !== mapSession.session_id) {
       this.committedMapSession = this.mapSession;
     }
-    this.pendingMapSession = mapSession;
-    this.synchronizeOverlayState(mapSession);
+    this.pendingMapSession = effectiveMapSession;
+    this.synchronizeOverlayState(effectiveMapSession);
     this.payload = {
-      map_session: mapSession,
-      compliance_warnings: mapSession.compliance_warnings,
+      map_session: effectiveMapSession,
+      compliance_warnings: effectiveMapSession.compliance_warnings,
     };
   }
 
@@ -2108,6 +2131,15 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return;
     }
     const render = descriptor.render;
+    this.manualBasemapPreference = {
+      id: descriptor.id,
+      label: descriptor.name,
+      provider: descriptor.provider,
+      tile_url: render?.tile_url ?? null,
+      style_url: render?.style_url ?? null,
+      attribution: render?.attribution || '',
+      render_status: 'available',
+    };
     const next: MapSession = {
       ...current,
       basemap_id: descriptor.id,

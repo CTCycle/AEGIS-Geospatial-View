@@ -15,6 +15,87 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
+_LOCATION_MAP_DISPLAY_TERMS = frozenset(
+    {
+        "show",
+        "display",
+        "view",
+        "locate",
+        "map",
+        "put",
+        "place",
+        "landmark",
+        "go",
+        "take",
+        "move",
+        "bring",
+        "navigate",
+        "look",
+        "mostrami",
+        "portami",
+        "montre",
+        "montrez",
+        "mappa",
+    }
+)
+_LOCATION_MAP_DATA_TERMS = frozenset(
+    {
+        "find",
+        "search",
+        "near",
+        "nearby",
+        "within",
+        "around",
+        "poi",
+        "amenity",
+        "amenities",
+        "cafe",
+        "cafes",
+        "hospital",
+        "hospitals",
+        "museum",
+        "museums",
+        "monument",
+        "monuments",
+        "temple",
+        "temples",
+        "cathedral",
+        "cathedrals",
+        "church",
+        "churches",
+        "castle",
+        "castles",
+        "palace",
+        "palaces",
+        "attraction",
+        "attractions",
+        "station",
+        "stations",
+        "data",
+        "points",
+    }
+)
+
+
+def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | None:
+    """Build a bounded map route when route bootstrap misses a plain place request."""
+
+    terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
+    if not terms.intersection(_LOCATION_MAP_DISPLAY_TERMS):
+        return None
+    if terms.intersection(_LOCATION_MAP_DATA_TERMS):
+        return None
+    return CapabilityRoute(
+        primary_domain=CapabilityDomain.PLACE_SEARCH,
+        secondary_domains=[CapabilityDomain.MAP_RENDERING],
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        capability_queries=["place search", "map viewport"],
+        operation="show_location_on_map",
+    )
+
+
 class CapabilityRouter:
 
     # -------------------------------------------------------------------------
@@ -566,51 +647,8 @@ def _normalize_location_map_route(
         return route, None
     operation = str(route.operation or "").strip().casefold()
     message_terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
-    display_terms = {
-        "show",
-        "display",
-        "view",
-        "locate",
-        "map",
-        "put",
-        "place",
-        "landmark",
-    }
-    data_terms = {
-        "find",
-        "search",
-        "near",
-        "nearby",
-        "within",
-        "around",
-        "poi",
-        "amenity",
-        "amenities",
-        "cafe",
-        "cafes",
-        "hospital",
-        "hospitals",
-        "museum",
-        "museums",
-        "monument",
-        "monuments",
-        "temple",
-        "temples",
-        "cathedral",
-        "cathedrals",
-        "church",
-        "churches",
-        "castle",
-        "castles",
-        "palace",
-        "palaces",
-        "attraction",
-        "attractions",
-        "station",
-        "stations",
-        "data",
-        "points",
-    }
+    display_terms = _LOCATION_MAP_DISPLAY_TERMS
+    data_terms = _LOCATION_MAP_DATA_TERMS
     raw_landmark_display = (
         route.primary_domain is CapabilityDomain.PLACE_SEARCH
         and route.presentation in {"map", "both"}
