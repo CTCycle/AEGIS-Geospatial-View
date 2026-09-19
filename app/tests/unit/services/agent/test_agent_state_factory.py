@@ -5,7 +5,6 @@ import pytest
 from server.domain.agent.context import AgentContextPackage, ConversationDirective
 from server.services.agent.agent_state_factory import AgentStateFactory
 
-
 ###############################################################################
 def test_factory_creates_bounded_receive_state() -> None:
     state = AgentStateFactory.create(
@@ -18,7 +17,6 @@ def test_factory_creates_bounded_receive_state() -> None:
     assert state.user_message == "show traffic"
     assert state.phase.value == "receive_request"
     assert state.evidence_refs == ["evidence:1"]
-
 
 ###############################################################################
 def test_factory_hydrates_the_complete_native_context_package() -> None:
@@ -61,7 +59,6 @@ def test_factory_hydrates_the_complete_native_context_package() -> None:
     assert state.included_message_ids == [1, 3]
     assert state.omitted_message_ids == [2]
     assert state.summarized_through_turn_index == 2
-
 
 ###############################################################################
 @pytest.mark.parametrize(

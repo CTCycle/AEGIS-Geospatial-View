@@ -6,6 +6,7 @@ import re
 import unicodedata
 
 
+###############################################################################
 def normalize_target_key(value: str) -> str:
     """Return a punctuation- and accent-insensitive target identity."""
 

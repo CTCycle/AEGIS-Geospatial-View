@@ -36,7 +36,6 @@ from server.services.geospatial.map_session_builder import (
 
 LOCATION = ResolvedLocation(label="Zurich HB", latitude=47.378, longitude=8.540)
 
-
 ###############################################################################
 class FakeCapabilityRegistry:
 
@@ -70,7 +69,6 @@ class FakeCapabilityRegistry:
             },
         }
         return values.get(capability_id)
-
 
 ###############################################################################
 class FakeEvidenceRepository:
@@ -127,12 +125,15 @@ class FakeEvidenceRepository:
         ).encode()
 
 
+###############################################################################
 class _AdmissionEvidenceRepository(FakeEvidenceRepository):
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, status: str, map_eligibility: str) -> None:
         self.status = status
         self.map_eligibility = map_eligibility
 
+    # -------------------------------------------------------------------------
     def get_summary(
         self,
         evidence_id: str,
@@ -150,6 +151,7 @@ class _AdmissionEvidenceRepository(FakeEvidenceRepository):
             map_eligibility=self.map_eligibility,  # type: ignore[arg-type]
         )
 
+    # -------------------------------------------------------------------------
     def get_payload(
         self,
         evidence_id: str,
@@ -160,7 +162,6 @@ class _AdmissionEvidenceRepository(FakeEvidenceRepository):
         if summary is None:
             return None
         return summary, json.dumps({"features": [{"id": "hospital-1"}]}).encode()
-
 
 ###############################################################################
 def _state(
@@ -177,7 +178,6 @@ def _state(
         evidence_refs=["evidence:hospitals"],
         active_map_session=active_map_session,
     )
-
 
 ###############################################################################
 def _active_session() -> MapSession:
@@ -205,7 +205,6 @@ def _active_session() -> MapSession:
         ),
     )
 
-
 ###############################################################################
 def _service() -> MapPlanService:
     return MapPlanService(
@@ -214,6 +213,7 @@ def _service() -> MapPlanService:
     )
 
 
+###############################################################################
 @pytest.mark.parametrize(
     "descriptor",
     [
@@ -250,11 +250,11 @@ def test_render_descriptor_admission_rejects_unsafe_geojson_sources(
         MapSessionBuilder._validate_render_descriptor(descriptor)  # pyright: ignore[reportPrivateUsage]
 
 
+###############################################################################
 def test_render_descriptor_admission_accepts_relative_geojson_source() -> None:
     descriptor = {"rendering_mode": "geojson", "url": "/api/geospatial/layer"}
 
     MapSessionBuilder._validate_render_descriptor(descriptor)  # pyright: ignore[reportPrivateUsage]
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -320,7 +320,6 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
     }
     assert "features" not in result.model_dump(mode="json")
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_location_only_plan_gets_catalog_default_basemap() -> None:
@@ -341,7 +340,6 @@ async def test_location_only_plan_gets_catalog_default_basemap() -> None:
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.basemap_id == "basemap:osm"
     assert state.prepared_map_session.overlay_collection.instances == []
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -368,6 +366,7 @@ async def test_stale_revision_is_rejected_without_candidate() -> None:
     assert state.prepared_map_session is None
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_active_map_move_uses_the_validated_new_route_target() -> None:
     salta = ResolvedLocation(
@@ -407,6 +406,7 @@ async def test_active_map_move_uses_the_validated_new_route_target() -> None:
     }
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_active_map_move_does_not_fall_back_to_prior_location() -> None:
     state = _state(active_map_session=_active_session())
@@ -439,6 +439,7 @@ async def test_active_map_move_does_not_fall_back_to_prior_location() -> None:
     assert state.prepared_map_session is None
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_data_layer_plan_uses_spatial_scope_location_target() -> None:
     location = ResolvedLocation(
@@ -481,7 +482,6 @@ async def test_data_layer_plan_uses_spatial_scope_location_target() -> None:
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.resolved_location == location
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_missing_evidence_is_rejected() -> None:
@@ -507,6 +507,7 @@ async def test_missing_evidence_is_rejected() -> None:
     assert result.error.code == "unknown_evidence"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_not_renderable_evidence_is_rejected_before_candidate_build() -> None:
     state = _state(active_map_session=_active_session())
@@ -532,6 +533,7 @@ async def test_not_renderable_evidence_is_rejected_before_candidate_build() -> N
     assert state.prepared_map_session is None
 
 
+###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("status", "map_eligibility"),
@@ -572,6 +574,7 @@ async def test_non_usable_evidence_cannot_satisfy_a_requested_layer(
     assert state.prepared_map_session is None
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_vector_tile_descriptor_without_source_metadata_is_rejected() -> None:
     state = _state(active_map_session=_active_session())
@@ -594,7 +597,6 @@ async def test_vector_tile_descriptor_without_source_metadata_is_rejected() -> N
     assert result.error is not None
     assert result.error.code == "render_descriptor_unavailable"
     assert state.prepared_map_session is None
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -619,7 +621,6 @@ async def test_visibility_mutation_increments_candidate_revision() -> None:
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.overlay_collection.revision == 3
     assert state.prepared_map_session.overlay_collection.instances[0].visible is False
-
 
 ###############################################################################
 @pytest.mark.asyncio

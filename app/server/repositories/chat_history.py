@@ -11,7 +11,6 @@ from server.domain.agent.conversation import ConversationState
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ChatMessageRecord, ConversationRecord
 
-
 ###############################################################################
 class ChatHistoryRepository:
     """Persist and retrieve conversation messages.
@@ -25,6 +24,7 @@ class ChatHistoryRepository:
     MAX_SEARCH_LIMIT = 50
     MAX_QUERY_CHARS = 300
     MAX_EXCERPT_CHARS = 480
+
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
@@ -416,7 +416,6 @@ class ChatHistoryRepository:
             "total": 0,
         }
 
-
 ###############################################################################
 def _sqlite_contains_pattern(value: str) -> str:
     """Build a case-insensitive SQLite LIKE pattern with escaped wildcards."""
@@ -424,7 +423,6 @@ def _sqlite_contains_pattern(value: str) -> str:
     escaped = value.casefold().replace("\\", "\\\\")
     escaped = escaped.replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
-
 
 ###############################################################################
 def _parse_offset_cursor(cursor: str | None) -> int:
@@ -434,7 +432,6 @@ def _parse_offset_cursor(cursor: str | None) -> int:
     if not value.isdigit():
         raise ValueError("Invalid history cursor.")
     return max(0, int(value))
-
 
 ###############################################################################
 def _message_excerpt(content: str, query: str, limit: int) -> str:

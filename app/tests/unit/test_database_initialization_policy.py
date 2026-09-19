@@ -25,14 +25,12 @@ from server.repositories.schemas import (
 from server.repositories.schemas.models import ConversationRecord
 from server.services.catalog.loader import load_reference_catalog
 
-
 ###############################################################################
 def _settings(database_path: Path, *, timeout: int = 60) -> DatabaseSettings:
     return DatabaseSettings(
         database_path=str(database_path),
         sqlite_lock_timeout_seconds=timeout,
     )
-
 
 ###############################################################################
 def _initialize(repository: SQLiteRepository):
@@ -43,7 +41,6 @@ def _initialize(repository: SQLiteRepository):
         ),
     )
 
-
 ###############################################################################
 def _downgrade(repository: SQLiteRepository, revision: str) -> None:
     config = Config(str(ALEMBIC_CONFIG_PATH))
@@ -51,7 +48,6 @@ def _downgrade(repository: SQLiteRepository, revision: str) -> None:
         config.attributes["connection"] = connection
         command.downgrade(config, revision)
         connection.commit()
-
 
 ###############################################################################
 def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> None:
@@ -66,7 +62,6 @@ def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> No
     assert "alembic_version" in inspect(repository.engine).get_table_names()
     assert repository.count_records(CredentialEncryptionMaterial) == 1
     assert repository.count_records(ReferenceCountryRecord) > 0
-
 
 ###############################################################################
 def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
@@ -87,7 +82,6 @@ def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
         second_repository.count_records(CredentialEncryptionMaterial),
         second_repository.count_records(ReferenceCountryRecord),
     ) == first_counts
-
 
 ###############################################################################
 def test_native_state_migration_preserves_legacy_context_and_settings(
@@ -168,7 +162,6 @@ def test_native_state_migration_preserves_legacy_context_and_settings(
         == encryption_material_count
     )
 
-
 ###############################################################################
 def test_populated_unversioned_sqlite_database_is_rejected_without_stamping(
     tmp_path: Path,
@@ -191,7 +184,6 @@ def test_populated_unversioned_sqlite_database_is_rejected_without_stamping(
         not in inspect(verification_repository.engine).get_table_names()
     )
     assert verification_repository.count_records(ConversationRecord) == 1
-
 
 ###############################################################################
 def test_unknown_revision_is_rejected_and_original_file_is_restored(
@@ -221,7 +213,6 @@ def test_unknown_revision_is_rejected_and_original_file_is_restored(
     assert version == "unknown-revision"
     verification_repository.engine.dispose()
 
-
 ###############################################################################
 def test_seeding_failure_restores_existing_sqlite_database(
     monkeypatch,
@@ -244,7 +235,6 @@ def test_seeding_failure_restores_existing_sqlite_database(
     assert verification_repository.count_records(CredentialEncryptionMaterial) == 1
     assert verification_repository.count_records(ReferenceCountryRecord) > 0
 
-
 ###############################################################################
 def test_corrupt_sqlite_file_is_not_replaced(tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
@@ -255,7 +245,6 @@ def test_corrupt_sqlite_file_is_not_replaced(tmp_path: Path) -> None:
         _initialize(SQLiteRepository(_settings(database_path)))
 
     assert database_path.read_bytes() == original
-
 
 ###############################################################################
 def test_sqlite_migration_lock_timeout_is_reported(monkeypatch, tmp_path: Path) -> None:

@@ -145,6 +145,7 @@ def test_event_repository_replay_orders_and_filters_visibility(
     assert all(event.visibility == RunEventVisibility.USER for event in replay)
 
 
+###############################################################################
 def test_event_repository_loads_latest_native_checkpoint_for_run_version(
     run_repositories,
 ) -> None:
@@ -278,6 +279,7 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
     assert first.state == "pending"
 
 
+###############################################################################
 def test_terminal_render_failure_and_cancellation_close_pending_presentation(
     run_repositories,
 ) -> None:
@@ -338,6 +340,7 @@ def test_terminal_render_failure_and_cancellation_close_pending_presentation(
     assert "pending_response" not in cancelled.presentation
 
 
+###############################################################################
 def test_explicit_pending_failure_status_is_normalized_atomically(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
     conversation = lifecycle.create_conversation(title="Explicit pending failure")
@@ -368,6 +371,7 @@ def test_explicit_pending_failure_status_is_normalized_atomically(run_repositori
     assert failed.presentation_status == "failed"
 
 
+###############################################################################
 def test_superseding_pending_render_closes_the_old_presentation(
     run_repositories,
 ) -> None:
@@ -412,6 +416,7 @@ def test_superseding_pending_render_closes_the_old_presentation(
     assert superseded.presentation is None
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_lifecycle_resumes_persisted_active_native_run(run_repositories) -> None:
     lifecycle, _, _, fake_orchestrator = _services(run_repositories)
@@ -495,6 +500,7 @@ def test_conversation_context_state_survives_repository_restart(
         )
 
 
+###############################################################################
 def test_conversation_repository_canonicalizes_legacy_state_on_write(
     run_repositories,
 ) -> None:
@@ -671,18 +677,19 @@ def test_shutdown_cancels_in_flight_tasks_and_clears_task_registry(
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_cancel_run_cancels_the_matching_in_flight_task(run_repositories) -> None:
+
+    ###############################################################################
     class _BlockingOrchestrator:
 
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------------
         def __init__(self) -> None:
             self.started = asyncio.Event()
             self.cancelled = False
             self.release = asyncio.Event()
 
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------------
         async def execute_run(self, _run_id: str) -> None:
             self.started.set()
             try:

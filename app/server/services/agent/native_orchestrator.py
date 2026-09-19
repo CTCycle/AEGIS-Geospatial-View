@@ -39,11 +39,11 @@ from server.services.llm.context_profile_resolver import ModelContextProfileReso
 from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.provider_contract import require_canonical_provider
 
-
 ###############################################################################
 class NativeAgentOrchestrator:
     """Hydrate, run, and persist one canonical native agent turn."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -627,6 +627,7 @@ class NativeAgentOrchestrator:
             yield
 
 
+###############################################################################
 def _native_tool_payload(response: AgentTurnResponse) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     for item in response.tool_results:
@@ -659,6 +660,7 @@ def _native_tool_payload(response: AgentTurnResponse) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _native_constraints(response: AgentTurnResponse) -> dict[str, Any]:
     """Persist only native route obligations needed by the next turn."""
 

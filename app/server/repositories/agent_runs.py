@@ -50,6 +50,7 @@ def _json_list(value: object) -> list[Any]:
     return []
 
 
+###############################################################################
 def _finalize_pending_presentation(
     value: object,
     *,
@@ -72,7 +73,6 @@ def _finalize_pending_presentation(
         presentation["error_code"] = error_code
     presentation.pop("pending_response", None)
     return presentation
-
 
 ###############################################################################
 class AgentRunRepository:
@@ -1752,7 +1752,6 @@ class AgentRunRepository:
             presentation=record.presentation_json,
         )
 
-
 ###############################################################################
 def _task_state_from_payload(payload: JsonObject) -> dict[str, Any] | None:
     """Locate a bounded task ledger in a known native event envelope."""
@@ -1771,6 +1770,7 @@ def _task_state_from_payload(payload: JsonObject) -> dict[str, Any] | None:
     return None
 
 
+###############################################################################
 def _terminal_task_state_payload(
     value: object,
     *,
@@ -1803,7 +1803,6 @@ def _terminal_task_state_payload(
             "completion_requirements": requirements,
         }
     ).model_dump(mode="json", exclude_none=True)
-
 
 ###############################################################################
 def _final_render_message(pending_response: JsonObject) -> str:
@@ -1886,7 +1885,6 @@ _NAMED_SECRET_PATTERN = re.compile(
     r"\s*[:=]\s*[^\s,;]+"
 )
 
-
 ###############################################################################
 def redact_trace_payload(
     value: object,
@@ -1916,7 +1914,6 @@ def redact_trace_payload(
     if isinstance(safe, list):
         return {"items": safe}
     return {"value": safe}
-
 
 ###############################################################################
 def _redact_trace_value(
@@ -1985,11 +1982,9 @@ def _redact_trace_value(
         return safe_value
     return value
 
-
 ###############################################################################
 def _is_trace_secret_key(normalized_key: str) -> bool:
     return any(marker in normalized_key for marker in _TRACE_SECRET_MARKERS)
-
 
 ###############################################################################
 def _safe_trace_string(value: str | None) -> str | None:
@@ -2005,11 +2000,9 @@ def _safe_trace_string(value: str | None) -> str | None:
         )
     )
 
-
 ###############################################################################
 def _iso_datetime(value: datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
-
 
 ###############################################################################
 def _aware_datetime(value: datetime | None) -> datetime | None:
@@ -2017,13 +2010,11 @@ def _aware_datetime(value: datetime | None) -> datetime | None:
         return None
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value
 
-
 ###############################################################################
 def _sqlite_contains_pattern(value: str) -> str:
     escaped = value.casefold().replace("\\", "\\\\")
     escaped = escaped.replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
-
 
 ###############################################################################
 def _encode_run_cursor(row: AgentRunRecord) -> str:
@@ -2034,7 +2025,6 @@ def _encode_run_cursor(row: AgentRunRecord) -> str:
         sort_keys=True,
     ).encode("utf-8")
     return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
-
 
 ###############################################################################
 def _decode_run_cursor(cursor: str | None) -> tuple[datetime, str] | None:
@@ -2054,7 +2044,6 @@ def _decode_run_cursor(cursor: str | None) -> tuple[datetime, str] | None:
     if timestamp.tzinfo is not None:
         timestamp = timestamp.astimezone(UTC).replace(tzinfo=None)
     return timestamp, run_id
-
 
 ###############################################################################
 def _parse_sequence_cursor(cursor: str | None) -> int | None:

@@ -178,6 +178,7 @@ FAULT_SCENARIOS = (
 )
 
 
+###############################################################################
 def _tested_commit() -> str:
     configured = os.environ.get("APP_TEST_COMMIT")
     if configured and configured.strip():
@@ -196,6 +197,7 @@ def _tested_commit() -> str:
     return commit
 
 
+###############################################################################
 def _sanitize_evidence(value: Any) -> Any:
     if isinstance(value, dict):
         sanitized: dict[str, Any] = {}
@@ -213,10 +215,12 @@ def _sanitize_evidence(value: Any) -> Any:
     return value
 
 
+###############################################################################
 def _bounded_text(value: str) -> str:
     return " ".join(value.split())[:MAX_EVIDENCE_TEXT]
 
 
+###############################################################################
 def _capture_console_output(page: Page) -> list[dict[str, str]]:
     console_output: list[dict[str, str]] = []
 
@@ -228,6 +232,7 @@ def _capture_console_output(page: Page) -> list[dict[str, str]]:
     return console_output
 
 
+###############################################################################
 def _candidate_refs(
     acknowledgments: list[dict[str, Any]],
     synthetic_events: list[dict[str, Any]],
@@ -272,6 +277,7 @@ def _candidate_refs(
     return candidates
 
 
+###############################################################################
 def _final_run_version(
     acknowledgments: list[dict[str, Any]],
     synthetic_events: list[dict[str, Any]],
@@ -285,6 +291,7 @@ def _final_run_version(
     return None
 
 
+###############################################################################
 def _scenario_evidence(
     *,
     page: Page,
@@ -322,6 +329,7 @@ def _scenario_evidence(
     }
 
 
+###############################################################################
 def _controlled_socket(
     page: Page,
     acknowledgments: list[dict[str, Any]],
@@ -973,6 +981,7 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
     ]
 
 
+###############################################################################
 @pytest.mark.parametrize("scenario", FAULT_SCENARIOS)
 def test_controlled_render_fault_scenarios_are_observable_and_bounded(
     page: Page,
@@ -1108,5 +1117,6 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
 
     assert re.fullmatch(r"[0-9a-f]{40}", _tested_commit())
 
+###############################################################################
 def test_controlled_evidence_resolves_an_exact_commit() -> None:
     assert re.fullmatch(r"[0-9a-f]{40}", _tested_commit())

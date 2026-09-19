@@ -81,14 +81,19 @@ def test_maintenance_service_delegates_to_ollama_provider() -> None:
     assert ("pull_model", "llama3.2") in provider_calls
 
 
+###############################################################################
 def test_maintenance_service_does_not_report_catalog_failure_as_success() -> None:
+
+    ###############################################################################
     class _UnavailableProvider:
         last_list_library_models_error = "ollama unavailable"
         last_list_models_error = "ollama unavailable"
 
+        # -------------------------------------------------------------------------
         def list_library_models(self):  # noqa: ANN201
             return []
 
+        # -------------------------------------------------------------------------
         def list_models(self):  # noqa: ANN201
             return []
 

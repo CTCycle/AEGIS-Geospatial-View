@@ -10,7 +10,6 @@ from server.domain.llm.types import LLMResult, LLMToolCall
 from server.services.llm.errors import LLMProviderRequestError
 from server.services.chat.structured_probe import StructuredProbeService
 
-
 ###############################################################################
 def _settings() -> SimpleNamespace:
     return SimpleNamespace(
@@ -24,7 +23,6 @@ def _settings() -> SimpleNamespace:
         credential_health={"opencode-go": {"api_key": "healthy"}},
     )
 
-
 ###############################################################################
 class _SettingsService:
 
@@ -35,7 +33,6 @@ class _SettingsService:
     # -------------------------------------------------------------------------
     def get_settings(self) -> SimpleNamespace:
         return self.settings
-
 
 ###############################################################################
 class _Provider:
@@ -69,7 +66,6 @@ class _Provider:
             raise RuntimeError("missing probe result")
         return self.result
 
-
 ###############################################################################
 class _ProviderFactory:
 
@@ -86,6 +82,7 @@ class _ProviderFactory:
         return "openai-compatible"
 
 
+###############################################################################
 def _parser_result() -> LLMResult:
     return LLMResult(
         content="",
@@ -104,12 +101,12 @@ def _parser_result() -> LLMResult:
     )
 
 
+###############################################################################
 def _service(provider: _Provider) -> StructuredProbeService:
     return StructuredProbeService(
         provider_factory=_ProviderFactory(provider),
         settings_service=_SettingsService(),
     )
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -128,7 +125,6 @@ async def test_probe_is_not_tested_then_passed_and_cached() -> None:
     assert service.latest() == result
     assert parser.calls == 1
     assert parser.requests[0].metadata["thinking_mode"] == "disabled"
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -166,7 +162,6 @@ async def test_probe_sanitizes_provider_failures_and_expires() -> None:
     )
     assert service.latest().status == "not_tested"
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_transient_probe_failure_can_recover_and_success_remains_cached() -> None:
@@ -197,7 +192,6 @@ async def test_transient_probe_failure_can_recover_and_success_remains_cached() 
     service.clear()
     assert service.latest().status == "not_tested"
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_probe_timeout_does_not_retry_or_expose_provider_detail() -> None:
@@ -210,7 +204,6 @@ async def test_probe_timeout_does_not_retry_or_expose_provider_detail() -> None:
     assert result.parse_status == "timeout"
     assert result.message == "Native tool probe timed out."
     assert parser.calls == 1
-
 
 ###############################################################################
 @pytest.mark.asyncio

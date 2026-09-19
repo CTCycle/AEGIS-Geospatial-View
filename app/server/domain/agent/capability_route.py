@@ -40,6 +40,7 @@ class CapabilityRoute(BaseModel):
     filters: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 
+###############################################################################
 class AgentTemporalScope(BaseModel):
     """Provider-neutral temporal intent selected during route bootstrap."""
 
@@ -53,6 +54,7 @@ class AgentTemporalScope(BaseModel):
     aggregation: str = Field(default="none", max_length=40)
 
 
+###############################################################################
 class AgentSpatialScope(BaseModel):
     """Provider-neutral spatial intent; coordinates remain server-owned."""
 
@@ -105,6 +107,7 @@ class AgentGoal(BaseModel):
     )
 
 
+###############################################################################
 class CompletionContract(BaseModel):
     """Deterministic obligations the native loop must satisfy."""
 
@@ -136,6 +139,7 @@ CompletionRequirementKind = Literal[
 ]
 
 
+###############################################################################
 class CompletionRequirement(BaseModel):
     """One server-owned obligation in a native run or render handshake."""
 
@@ -148,7 +152,6 @@ class CompletionRequirement(BaseModel):
     target_id: str | None = None
     evidence_ref: str | None = None
     failure_code: str | None = None
-
 
 ###############################################################################
 class RenderObservation(BaseModel):
@@ -188,6 +191,7 @@ TaskStatus = Literal[
 ]
 
 
+###############################################################################
 class AgentTask(BaseModel):
     """One lightweight, run-scoped obligation.
 
@@ -208,6 +212,7 @@ class AgentTask(BaseModel):
     result: dict[str, object] | None = None
     failure_code: str | None = Field(default=None, max_length=120)
 
+    # -------------------------------------------------------------------------
     @property
     def id(self) -> str:
         """Compatibility/readability alias for consumers that call it ``id``."""
@@ -215,6 +220,7 @@ class AgentTask(BaseModel):
         return self.task_id
 
 
+###############################################################################
 class AgentTaskState(BaseModel):
     """Typed projection of the run-scoped task ledger.
 
@@ -239,6 +245,7 @@ class AgentTaskState(BaseModel):
         default_factory=lambda: list[CompletionRequirement](), max_length=16
     )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def create(
         cls,
@@ -290,6 +297,7 @@ class AgentTaskState(BaseModel):
             completion_requirements=[CompletionRequirement(name=name) for name in names],
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def from_payload(
         cls,
@@ -317,10 +325,12 @@ class AgentTaskState(BaseModel):
             max_iterations=max_iterations,
         )
 
+    # -------------------------------------------------------------------------
     def to_payload(self) -> dict[str, object]:
         return self.model_dump(mode="json", exclude_none=True)
 
 
+###############################################################################
 def _safe_task_id(value: str) -> str:
     normalized = "-".join(str(value).strip().casefold().split())
     safe = "".join(char if char.isalnum() or char in "-_" else "-" for char in normalized)
@@ -365,6 +375,7 @@ class AgentPhase(StrEnum):
     FAILED = "failed"
 
 
+###############################################################################
 class LoopDecision(StrEnum):
     """Authoritative outcome of one route/tool/render control observation."""
 
@@ -493,6 +504,7 @@ class AgentRunState(BaseModel):
     )
     termination_reason: str | None = None
 
+    # -------------------------------------------------------------------------
     def typed_task_state(self) -> AgentTaskState:
         """Return the validated task ledger for this run.
 
@@ -508,11 +520,13 @@ class AgentRunState(BaseModel):
             max_iterations=self.max_iterations,
         )
 
+    # -------------------------------------------------------------------------
     def set_typed_task_state(self, value: AgentTaskState) -> None:
         """Persist a typed ledger as the checkpoint-compatible JSON object."""
 
         self.task_state = value.to_payload()
 
+    # -------------------------------------------------------------------------
     def checkpoint(self) -> dict[str, Any]:
         """Return a bounded JSON-safe checkpoint for durable resume."""
 
@@ -540,6 +554,7 @@ class AgentRunState(BaseModel):
         )
         return payload
 
+    # -------------------------------------------------------------------------
     @classmethod
     def from_checkpoint(cls, payload: dict[str, Any]) -> "AgentRunState":
         """Restore one validated native run checkpoint."""
@@ -561,6 +576,7 @@ class AgentRunState(BaseModel):
         return state
 
 
+###############################################################################
 def _checkpoint_tool_result(value: ToolResult) -> dict[str, Any]:
     """Keep model-facing result data without embedding raw provider payloads."""
 

@@ -22,7 +22,6 @@ from server.services.geospatial.capability_registry import (
 )
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 class CatalogToolHandler:
 
@@ -204,6 +203,7 @@ class CatalogToolHandler:
         )
 
 
+###############################################################################
 def _resolved_scope_kind(route: Any, location: Any) -> str | None:
     """Lower semantic route scope to the concrete catalog scope."""
 
@@ -215,6 +215,7 @@ def _resolved_scope_kind(route: Any, location: Any) -> str | None:
     return kind
 
 
+###############################################################################
 def _cursor_offset(cursor: str | None) -> int | None:
     if cursor is None or not cursor.strip():
         return 0
@@ -222,7 +223,6 @@ def _cursor_offset(cursor: str | None) -> int | None:
         return max(0, int(cursor))
     except ValueError:
         return None
-
 
 ###############################################################################
 def _descriptor(
@@ -249,7 +249,6 @@ def _descriptor(
         ],
         "render_support": render_support,
     }
-
 
 ###############################################################################
 def _failure(

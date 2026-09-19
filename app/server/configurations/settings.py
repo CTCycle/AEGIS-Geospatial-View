@@ -56,7 +56,6 @@ class ChatRuntimeSettings:
     max_history_messages: int
     application_timezone: str = "UTC"
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class AgentExecutionSettings:
@@ -192,7 +191,6 @@ class JsonJobsSettings(StrictJsonSettings):
 class JsonChatRuntimeSettings(StrictJsonSettings):
     max_history_messages: int = Field(ge=1, le=100)
     application_timezone: str = "UTC"
-
 
 ###############################################################################
 class JsonAgentExecutionSettings(StrictJsonSettings):

@@ -19,6 +19,7 @@ EvidenceKind = Literal[
 ]
 
 
+###############################################################################
 class AgentEvidenceSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -34,6 +35,7 @@ class AgentEvidenceSummary(BaseModel):
     map_eligibility: Literal["renderable", "not_renderable", "unknown"] = "unknown"
 
 
+###############################################################################
 class AgentEvidenceEnvelope(BaseModel):
     """Normalized result shape used by map preparation and evidence tools."""
 

@@ -14,11 +14,11 @@ from server.domain.agent.tool_result import (
 from server.repositories.chat_history import ChatHistoryRepository
 from server.services.agent.tool_definitions import SearchConversationHistoryInput
 
-
 ###############################################################################
 class HistoryToolHandler:
     """Search original messages in the active conversation only."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, repository: ChatHistoryRepository) -> None:
         self.repository = repository
 

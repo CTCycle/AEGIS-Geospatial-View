@@ -77,6 +77,7 @@ _LOCATION_MAP_DATA_TERMS = frozenset(
 )
 
 
+###############################################################################
 def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | None:
     """Build a bounded map route when route bootstrap misses a plain place request."""
 
@@ -96,6 +97,7 @@ def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | No
     )
 
 
+###############################################################################
 class CapabilityRouter:
 
     # -------------------------------------------------------------------------
@@ -338,7 +340,6 @@ class CapabilityRouter:
             reason_codes=list(dict.fromkeys(reasons)),
         )
 
-
 ###############################################################################
 def _is_executable_candidate(capability: dict[str, object]) -> bool:
     """Keep renderer-only descriptors out of the generic provider tool."""
@@ -354,6 +355,7 @@ def _is_executable_candidate(capability: dict[str, object]) -> bool:
     )
 
 
+###############################################################################
 def _route_contract_reason_codes(route: CapabilityRoute) -> list[str]:
     """Enforce the route contract before any capability discovery or execution."""
 
@@ -394,6 +396,7 @@ def _route_contract_reason_codes(route: CapabilityRoute) -> list[str]:
     return reasons
 
 
+###############################################################################
 def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:
     if len(state.location_refs) == 1:
         return next(iter(state.location_refs.values()))
@@ -415,6 +418,7 @@ _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
 )
 
 
+###############################################################################
 def _is_active_map_update(route: CapabilityRoute, state: AgentRunState) -> bool:
     """Return whether the route mutates the already-rendered map session."""
 
@@ -427,7 +431,6 @@ def _is_active_map_update(route: CapabilityRoute, state: AgentRunState) -> bool:
         and route.spatial_scope is None
     )
 
-
 ###############################################################################
 def _route_terms(route: CapabilityRoute) -> set[str]:
     values = [route.operation or "", *route.capability_queries]
@@ -439,6 +442,7 @@ def _route_terms(route: CapabilityRoute) -> set[str]:
     }
 
 
+###############################################################################
 def _is_broad_infrastructure_route(route: CapabilityRoute) -> bool:
     terms = _route_terms(route)
     if "infrastructure" not in terms:
@@ -474,6 +478,7 @@ def _is_broad_infrastructure_route(route: CapabilityRoute) -> bool:
     return not specific_terms
 
 
+###############################################################################
 def _is_ambiguous_infrastructure_message(user_message: str) -> bool:
     """Guard raw generic infrastructure wording before model subtype guesses."""
 
@@ -502,6 +507,7 @@ def _is_ambiguous_infrastructure_message(user_message: str) -> bool:
     return not terms.intersection(subtype_terms)
 
 
+###############################################################################
 def _is_unsupported_boundary_route(route: CapabilityRoute) -> bool:
     if route.spatial_scope is None:
         return False
@@ -520,7 +526,6 @@ def _is_unsupported_boundary_route(route: CapabilityRoute) -> bool:
             }
         )
     )
-
 
 ###############################################################################
 def _normalize_route_semantics(
@@ -559,6 +564,7 @@ def _normalize_route_semantics(
     )
 
 
+###############################################################################
 def _normalize_data_bearing_map_route(
     route: CapabilityRoute,
 ) -> tuple[CapabilityRoute, str | None]:
@@ -585,7 +591,6 @@ def _normalize_data_bearing_map_route(
         ),
         "data_bearing_map_route_normalized",
     )
-
 
 ###############################################################################
 def _normalize_recent_scope(
@@ -617,7 +622,6 @@ def _normalize_recent_scope(
             "recent_scope_normalized_to_current",
         )
     return route, None
-
 
 ###############################################################################
 def _normalize_location_map_route(
@@ -709,6 +713,7 @@ def _normalize_location_map_route(
     )
 
 
+###############################################################################
 def _concrete_scope_kind(
     route: CapabilityRoute, active_state: AgentRunState
 ) -> str | None:

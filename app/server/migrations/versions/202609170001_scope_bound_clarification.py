@@ -17,6 +17,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+###############################################################################
 def _state(value: object) -> dict[str, Any] | None:
     if isinstance(value, dict):
         return dict(cast(dict[str, Any], value))
@@ -33,6 +34,7 @@ def _state(value: object) -> dict[str, Any] | None:
     return None
 
 
+###############################################################################
 def upgrade() -> None:
     bind = op.get_bind()
     conversations = sa.table(
@@ -65,6 +67,7 @@ def upgrade() -> None:
             )
 
 
+###############################################################################
 def downgrade() -> None:
     # The schema-v2 record is backward readable through ConversationState's
     # migration path.  Keep the data intact on downgrade rather than dropping

@@ -327,19 +327,16 @@ class ConversationRepository:
             raise ValueError("Conversation not found.")
         return record
 
-
 ###############################################################################
 def _sqlite_contains_pattern(value: str) -> str:
     escaped = value.casefold().replace("\\", "\\\\")
     escaped = escaped.replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
 
-
 ###############################################################################
 def _preview(value: object, *, limit: int = 240) -> str:
     text_value = " ".join(str(value or "").split())
     return text_value if len(text_value) <= limit else f"{text_value[: limit - 1]}…"
-
 
 ###############################################################################
 def _encode_conversation_cursor(row: ConversationRecord) -> str:
@@ -350,7 +347,6 @@ def _encode_conversation_cursor(row: ConversationRecord) -> str:
         sort_keys=True,
     ).encode("utf-8")
     return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
-
 
 ###############################################################################
 def _decode_conversation_cursor(

@@ -137,7 +137,6 @@ def test_location_scoped_remove_does_not_remove_other_scope() -> None:
     assert [item.instance_id for item in updated.instances] == ["weather-switzerland"]
     assert result.removed_instance_ids == ["weather-zurich"]
 
-
 ###############################################################################
 def test_location_scope_matches_partial_canonical_place_without_coordinates() -> None:
     bologna = _instance(

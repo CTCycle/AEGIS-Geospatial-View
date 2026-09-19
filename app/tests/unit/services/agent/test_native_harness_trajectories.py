@@ -30,7 +30,6 @@ from server.services.agent.tool_handlers.catalog import CatalogToolHandler
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
 
-
 ###############################################################################
 class _Provider:
 
@@ -43,7 +42,6 @@ class _Provider:
     async def achat(self, request: Any, **_kwargs: Any) -> LLMResult:
         self.requests.append(request)
         return self.results.popleft()
-
 
 ###############################################################################
 class _BlockingProvider:
@@ -63,7 +61,6 @@ class _BlockingProvider:
             raise
         raise AssertionError("The cancelled provider call unexpectedly returned.")
 
-
 ###############################################################################
 class _Factory:
 
@@ -75,7 +72,6 @@ class _Factory:
     def get_provider(self, _provider: str) -> _Provider:
         return self.provider
 
-
 ###############################################################################
 class _Runtime:
 
@@ -86,7 +82,6 @@ class _Runtime:
     # -------------------------------------------------------------------------
     def access_available(self, _capability_id: str) -> bool:
         return True
-
 
 ###############################################################################
 class _Catalog:
@@ -130,7 +125,6 @@ class _Catalog:
             "supported_scope_kinds": ["point", "bbox"],
         }
 
-
 ###############################################################################
 def _route_call(*, complex_route: bool = False) -> LLMResult:
     arguments: dict[str, Any] = {
@@ -153,7 +147,6 @@ def _route_call(*, complex_route: bool = False) -> LLMResult:
         ],
     )
 
-
 ###############################################################################
 def _state() -> AgentRunState:
     return AgentRunState(
@@ -162,7 +155,6 @@ def _state() -> AgentRunState:
         phase=AgentPhase.RECEIVE_REQUEST,
         user_message="Find obscure geospatial data.",
     )
-
 
 ###############################################################################
 def _registration(
@@ -192,7 +184,6 @@ def _registration(
             update={"call_id": call_id}
         ),
     )
-
 
 ###############################################################################
 def _loop(
@@ -249,7 +240,6 @@ def _loop(
         ),
     )
 
-
 ###############################################################################
 def _success(call_id: str, capability_id: str) -> ToolResult:
     return ToolResult(
@@ -267,7 +257,6 @@ def _success(call_id: str, capability_id: str) -> ToolResult:
             result_status="success",
         ),
     )
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -323,7 +312,6 @@ async def test_empty_shortlist_exposes_discovery_and_observes_descriptors() -> N
         "primary-source" in json.dumps(request.messages)
         for request in provider.requests[1:]
     )
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -416,7 +404,6 @@ async def test_replan_reopens_discovery_and_selects_an_alternate_source() -> Non
         for request in provider.requests
     )
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_valid_empty_result_allows_a_materially_different_alternate_query() -> None:
@@ -507,7 +494,6 @@ async def test_valid_empty_result_allows_a_materially_different_alternate_query(
         "success",
     ]
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_malformed_tool_call_is_corrected_in_the_same_native_run() -> None:
@@ -569,7 +555,6 @@ async def test_malformed_tool_call_is_corrected_in_the_same_native_run() -> None
         "failed",
         "success",
     ]
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -633,7 +618,6 @@ async def test_successful_native_data_stops_before_redundant_model_turns() -> No
         for message in provider.requests[-1].messages
     )
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_cancellation_during_model_call_returns_a_cancelled_outcome() -> None:
@@ -664,7 +648,6 @@ async def test_cancellation_during_model_call_returns_a_cancelled_outcome() -> N
     assert outcome.stopped_reason == "cancelled"
     assert outcome.state.termination_reason == "cancelled"
     assert outcome.state.tool_calls == 0
-
 
 ###############################################################################
 @pytest.mark.asyncio

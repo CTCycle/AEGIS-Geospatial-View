@@ -20,6 +20,7 @@ class _DeepSeekProviderStub:
         return self.models
 
 
+###############################################################################
 @dataclass
 class _FlakyDynamicProvider:
     responses: list[list[ModelDescriptor] | Exception]
@@ -32,7 +33,6 @@ class _FlakyDynamicProvider:
         if isinstance(response, Exception):
             raise response
         return response
-
 
 ###############################################################################
 class _ProviderFactoryStub:
@@ -145,7 +145,6 @@ def test_list_models_reports_deepseek_failure_in_sources(monkeypatch) -> None:
     assert response["sources"]["deepseek"]["ok"] is False
     assert "DeepSeek credentials" in str(response["sources"]["deepseek"]["message"])
 
-
 ###############################################################################
 def test_dynamic_catalog_failure_can_recover_and_success_remains_cached(
     monkeypatch,
@@ -202,7 +201,6 @@ def test_dynamic_catalog_failure_can_recover_and_success_remains_cached(
 
     assert fourth["sources"]["deepseek"]["ok"] is True
     assert dynamic_provider.calls == 3
-
 
 ###############################################################################
 def test_find_model_raises_when_deepseek_catalog_cannot_be_loaded(monkeypatch) -> None:
@@ -314,6 +312,7 @@ def test_find_cached_model_returns_none_without_catalog_refresh() -> None:
     )
 
 
+###############################################################################
 def test_expired_dynamic_catalog_failure_does_not_reuse_stale_model() -> None:
     service = ChatModelLibraryService(
         provider_factory=_ProviderFactoryStub(

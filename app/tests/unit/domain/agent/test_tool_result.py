@@ -11,7 +11,6 @@ from server.domain.agent.tool_result import (
     ValidationIssue,
 )
 
-
 ###############################################################################
 def test_tool_result_has_one_strict_model_visible_shape() -> None:
     result = ToolResult(
@@ -44,7 +43,6 @@ def test_tool_result_has_one_strict_model_visible_shape() -> None:
             unexpected=True,
         )
 
-
 ###############################################################################
 def test_tool_execution_error_restricts_recovery_and_issue_shape() -> None:
     error = ToolExecutionError(
@@ -67,7 +65,6 @@ def test_tool_execution_error_restricts_recovery_and_issue_shape() -> None:
             retryable=False,
             recovery="retry_forever",
         )
-
 
 ###############################################################################
 def test_model_observation_keeps_semantic_outcome_and_caps_raw_features() -> None:

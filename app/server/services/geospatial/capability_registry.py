@@ -17,7 +17,6 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 class CapabilityArgumentSchemaError(ValueError):
     """Raised when an executable manifest lacks a safe argument schema."""
 
-
 ###############################################################################
 class RuntimeEligibility(Protocol):
 
@@ -263,7 +262,6 @@ def normalized_execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
         str(raw.get("coverage")).strip() if raw.get("coverage") is not None else None
     )
     return contract
-
 
 ###############################################################################
 def capability_argument_schema(capability: dict[str, Any]) -> dict[str, Any]:
@@ -636,6 +634,7 @@ class CapabilityRegistry:
         return candidates[:bounded_limit]
 
 
+###############################################################################
 def _contract_supports(
     contract: dict[str, Any],
     *,
@@ -704,6 +703,7 @@ def _contract_supports(
     return True
 
 
+###############################################################################
 def _operation_candidates(operation: str) -> set[str]:
     """Map compound user-semantic operations to manifest primitives."""
 
@@ -756,6 +756,7 @@ def _operation_candidates(operation: str) -> set[str]:
     return candidates
 
 
+###############################################################################
 def _runtime_supports_render(
     runtime_registry: RuntimeEligibility, capability_id: str
 ) -> bool:
@@ -769,6 +770,7 @@ def _runtime_supports_render(
     return bool(supports_mode(capability_id, "map"))
 
 
+###############################################################################
 def _has_explicit_execution_contract(capability: dict[str, Any]) -> bool:
     if is_json_object(capability.get("executionContract")):
         return True
@@ -778,6 +780,7 @@ def _has_explicit_execution_contract(capability: dict[str, Any]) -> bool:
     return is_json_object(metadata.get("execution_contract"))
 
 
+###############################################################################
 def _coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
     """Reject a known incompatible jurisdiction, but preserve unknown coverage."""
 
@@ -842,6 +845,7 @@ def _coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
     return True
 
 
+###############################################################################
 def _avoid_when_conflicts(
     capability: dict[str, Any],
     query_tokens: set[str],
@@ -939,6 +943,7 @@ def _searchable_text(capability: dict[str, Any]) -> set[str]:
     }
 
 
+###############################################################################
 def _identity_searchable_text(capability: dict[str, Any]) -> set[str]:
     """Return high-signal identity terms used only for deterministic ranking."""
 
@@ -954,6 +959,7 @@ def _identity_searchable_text(capability: dict[str, Any]) -> set[str]:
     }
 
 
+###############################################################################
 def _routing_query_terms(values: Sequence[object]) -> tuple[set[str], bool]:
     """Return bounded semantic terms and whether a routing alias was used."""
 
@@ -981,6 +987,7 @@ def _routing_query_terms(values: Sequence[object]) -> tuple[set[str], bool]:
     return terms, recognized
 
 
+###############################################################################
 def _routing_searchable_text(
     capability: dict[str, Any], *, include_hints: bool = True
 ) -> set[str]:
@@ -1052,6 +1059,7 @@ def _query_tokens(values: Sequence[object]) -> set[str]:
     return tokens
 
 
+###############################################################################
 def _raw_query_tokens(values: Sequence[object]) -> set[str]:
     """Return literal query terms for the meaningful-match floor."""
 

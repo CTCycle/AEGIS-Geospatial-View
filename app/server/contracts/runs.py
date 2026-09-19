@@ -61,7 +61,6 @@ class ActiveConversationRunSnapshot(BaseModel):
     current_iteration: int | None = Field(default=None, ge=0)
     task_state: AgentTaskState | None = None
 
-
 ###############################################################################
 class ConversationRunSummary(BaseModel):
     """Bounded operational summary of one persisted native run."""
@@ -89,7 +88,6 @@ class ConversationRunSummary(BaseModel):
     current_iteration: int | None = Field(default=None, ge=0)
     task_state: AgentTaskState | None = None
 
-
 ###############################################################################
 class ConversationSummary(BaseModel):
     """Searchable, bounded conversation listing item."""
@@ -106,7 +104,6 @@ class ConversationSummary(BaseModel):
     active_run: ActiveConversationRunSnapshot | None = None
     latest_run: ConversationRunSummary | None = None
 
-
 ###############################################################################
 class ConversationListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -120,7 +117,6 @@ class ConversationListResponse(BaseModel):
     pagination: dict[str, Any] = Field(
         default_factory=lambda: dict[str, Any]()
     )
-
 
 ###############################################################################
 class RunTraceEntry(BaseModel):
@@ -150,7 +146,6 @@ class RunTraceEntry(BaseModel):
     error: Any | None = None
     payload: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
-
 ###############################################################################
 class RunTraceResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -168,6 +163,7 @@ class RunTraceResponse(BaseModel):
         default_factory=lambda: dict[str, Any]()
     )
 
+    # -------------------------------------------------------------------------
     @property
     def entries(self) -> list[RunTraceEntry]:
         """Alias for clients that call trace rows entries."""

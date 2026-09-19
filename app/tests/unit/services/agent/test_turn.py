@@ -27,7 +27,6 @@ from server.services.agent.tool_definitions import RouteRequestInput
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 
-
 ###############################################################################
 class _Provider:
 
@@ -41,7 +40,6 @@ class _Provider:
         self.calls += 1
         return self.results.popleft()
 
-
 ###############################################################################
 class _Factory:
 
@@ -52,7 +50,6 @@ class _Factory:
     # -------------------------------------------------------------------------
     def get_provider(self, _provider: str) -> _Provider:
         return self.provider
-
 
 ###############################################################################
 class _CapabilityRegistry:
@@ -65,7 +62,6 @@ class _CapabilityRegistry:
     def shortlist(self, **_kwargs: Any) -> list[dict[str, Any]]:
         return [{"id": "places:hospitals"}]
 
-
 ###############################################################################
 class _RuntimeRegistry:
 
@@ -77,11 +73,9 @@ class _RuntimeRegistry:
     def access_available(self, _capability_id: str) -> bool:
         return True
 
-
 ###############################################################################
 class _Input(BaseModel):
     pass
-
 
 ###############################################################################
 async def _handler(_arguments: BaseModel, _state: Any) -> ToolResult:
@@ -92,7 +86,6 @@ async def _handler(_arguments: BaseModel, _state: Any) -> ToolResult:
         summary="ok",
         metadata=ToolExecutionMetadata(duration_ms=0),
     )
-
 
 ###############################################################################
 def _runner(provider: _Provider) -> AgentTurnRunner:
@@ -149,7 +142,6 @@ def _runner(provider: _Provider) -> AgentTurnRunner:
     )
     return AgentTurnRunner(agent_loop=loop)
 
-
 ###############################################################################
 def _route_call() -> LLMResult:
     return LLMResult(
@@ -169,7 +161,6 @@ def _route_call() -> LLMResult:
         ],
     )
 
-
 ###############################################################################
 async def _run(provider: _Provider):
     return await _runner(provider).run(
@@ -183,7 +174,6 @@ async def _run(provider: _Provider):
         )
     )
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_native_runner_returns_bounded_response_contract() -> None:
@@ -195,7 +185,6 @@ async def test_native_runner_returns_bounded_response_contract() -> None:
     assert response.presentation_status == "not_requested"
     assert response.execution_trace is not None
     assert response.execution_trace["transition_trace"]
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -215,7 +204,6 @@ async def test_native_runner_marks_map_text_without_candidate_failed() -> None:
 
     assert response.operation.status == "failed"
     assert response.presentation_status == "failed"
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -247,6 +235,7 @@ async def test_native_runner_preserves_location_refs_in_response() -> None:
     assert response.location_refs["rome"] == location
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_native_runner_exposes_control_stops_as_failed_operations() -> None:
     response = await _runner(_Provider([])).run(
@@ -264,7 +253,6 @@ async def test_native_runner_exposes_control_stops_as_failed_operations() -> Non
     assert response.operation.kind == "error"
     assert response.operation.status == "failed"
     assert response.operation.failure_category == "cancelled"
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -306,6 +294,7 @@ async def test_native_runner_resumes_a_valid_checkpoint_without_rerouting() -> N
     assert provider.calls == 1
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_native_runner_persists_safe_checkpoint_boundaries() -> None:
     checkpoints: list[AgentRunState] = []

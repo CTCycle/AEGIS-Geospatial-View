@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 
+###############################################################################
 @dataclass(frozen=True)
 class LLMTransportPolicy:
     """Canonical transport and retry policy shared by every LLM adapter."""
@@ -20,6 +21,7 @@ class LLMTransportPolicy:
     proxy: str | None = None
     trust_env: bool = False
 
+    # -------------------------------------------------------------------------
     def __post_init__(self) -> None:
         for name in (
             "request_timeout_seconds",
@@ -45,6 +47,7 @@ class LLMTransportPolicy:
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and non-negative")
 
+    # -------------------------------------------------------------------------
     @classmethod
     def from_execution_settings(cls, settings: Any | None = None) -> "LLMTransportPolicy":
         """Build one policy from the existing native execution settings."""
@@ -71,6 +74,7 @@ class LLMTransportPolicy:
             ),
         )
 
+    # -------------------------------------------------------------------------
     def httpx_options(self, stage: str) -> dict[str, Any]:
         options: dict[str, Any] = {
             "timeout": self.timeout_for(stage),
@@ -80,12 +84,14 @@ class LLMTransportPolicy:
             options["proxy"] = self.proxy
         return options
 
+    # -------------------------------------------------------------------------
     def client_args(self) -> dict[str, Any]:
         options: dict[str, Any] = {"trust_env": self.trust_env}
         if self.proxy:
             options["proxy"] = self.proxy
         return options
 
+    # -------------------------------------------------------------------------
     def timeout_for(self, stage: str) -> float:
         if stage == "catalog":
             return self.catalog_timeout_seconds
@@ -95,6 +101,7 @@ class LLMTransportPolicy:
             return self.structured_timeout_seconds
         return self.request_timeout_seconds
 
+    # -------------------------------------------------------------------------
     def retry_delay(self, attempt: int) -> float:
         """Return the delay before the next attempt, using bounded exponential backoff."""
 
@@ -105,6 +112,7 @@ class LLMTransportPolicy:
         )
 
 
+###############################################################################
 def close_sync_client(client: object) -> None:
     close = getattr(client, "close", None)
     if not callable(close):
@@ -115,6 +123,7 @@ def close_sync_client(client: object) -> None:
         return
 
 
+###############################################################################
 def _positive_float(value: object, *, default: float) -> float:
     if isinstance(value, bool):
         return default
@@ -125,6 +134,7 @@ def _positive_float(value: object, *, default: float) -> float:
     return parsed if math.isfinite(parsed) and parsed > 0 else default
 
 
+###############################################################################
 def _non_negative_float(value: object, *, default: float) -> float:
     if isinstance(value, bool):
         return default
@@ -135,6 +145,7 @@ def _non_negative_float(value: object, *, default: float) -> float:
     return parsed if math.isfinite(parsed) and parsed >= 0 else default
 
 
+###############################################################################
 def _positive_int(value: object, *, default: int) -> int:
     if isinstance(value, bool):
         return default

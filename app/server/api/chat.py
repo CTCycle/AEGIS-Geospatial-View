@@ -69,7 +69,6 @@ def get_job_service(request: Request) -> BackgroundJobService:
 def get_chat_streaming_service(request: Request) -> ChatStreamingService:
     return request.app.state.chat_streaming_service
 
-
 ###############################################################################
 def get_run_lifecycle_service(request: Request) -> RunLifecycleService | None:
     return getattr(request.app.state, "run_lifecycle_service", None)
@@ -199,6 +198,7 @@ async def chat_turn(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
+
 ###############################################################################
 @router.post(
     CHAT_STREAM_ROUTE,

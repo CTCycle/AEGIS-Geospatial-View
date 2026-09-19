@@ -17,7 +17,6 @@ from server.services.geospatial.providers.base import (
     ProviderTimeoutError,
 )
 
-
 ###############################################################################
 class FakeCapabilityRegistry:
 
@@ -28,7 +27,6 @@ class FakeCapabilityRegistry:
     # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, object] | None:
         return self.manifest if capability_id == "places:hospitals" else None
-
 
 ###############################################################################
 class FakeRuntimeRegistry:
@@ -46,7 +44,6 @@ class FakeRuntimeRegistry:
     def access_available(self, capability_id: str) -> bool:
         return self.available
 
-
 ###############################################################################
 class FakeProviderRegistry:
 
@@ -61,7 +58,6 @@ class FakeProviderRegistry:
         if isinstance(self.response, Exception):
             raise self.response
         return self.response
-
 
 ###############################################################################
 class FakeEvidenceRepository:
@@ -78,7 +74,6 @@ class FakeEvidenceRepository:
         self.calls.append(kwargs)
         return SimpleNamespace(evidence_id="evidence:provider-1")
 
-
 ###############################################################################
 def _service(
     provider: FakeProviderRegistry,
@@ -93,7 +88,6 @@ def _service(
         provider_registry=provider,  # type: ignore[arg-type]
         evidence_repository=evidence,
     )
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -162,7 +156,6 @@ async def test_execute_capability_persists_full_payload_and_returns_bounded_summ
     assert request.params["filters"] == {"category": "hospital"}  # type: ignore[attr-defined]
     assert request.params["radius_m"] == 5000  # type: ignore[attr-defined]
 
-
 ###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -187,7 +180,6 @@ async def test_provider_statuses_are_normalized(
     )
 
     assert result.status == expected_status
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -217,7 +209,6 @@ async def test_provider_failures_remain_typed(
     assert result.error.error_type == error_type
     assert result.error.recovery == recovery
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_disabled_capability_is_rejected_before_provider_execution() -> None:
@@ -240,7 +231,6 @@ async def test_disabled_capability_is_rejected_before_provider_execution() -> No
     assert result.error.code == "capability_disabled"
     assert provider.requests == []
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_evidence_persistence_failure_is_a_typed_result() -> None:
@@ -261,7 +251,6 @@ async def test_evidence_persistence_failure_is_a_typed_result() -> None:
     assert result.status == "failed"
     assert result.error is not None
     assert result.error.error_type == "provider_malformed_response"
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -290,6 +279,7 @@ async def test_resolved_location_is_forwarded_as_provider_coordinates() -> None:
     assert request.params["longitude"] == 8.5417  # type: ignore[attr-defined]
 
 
+###############################################################################
 def test_weather_summary_exposes_bounded_current_observations() -> None:
     summary = _response_summary(
         ProviderResponse(
@@ -316,6 +306,7 @@ def test_weather_summary_exposes_bounded_current_observations() -> None:
     assert summary["timezone"] == "Europe/Rome"
 
 
+###############################################################################
 def test_raster_summary_is_renderable_only_with_a_source() -> None:
     renderable = _response_summary(
         ProviderResponse(

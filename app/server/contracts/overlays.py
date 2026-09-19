@@ -12,6 +12,7 @@ OverlayScopeKind = Literal["global", "current_view", "location"]
 OverlayVisibility = Literal["any", "visible", "hidden"]
 
 
+###############################################################################
 class OverlaySelector(BaseModel):
     """Independent selectors for capabilities and rendered instances."""
 
@@ -28,6 +29,7 @@ class OverlaySelector(BaseModel):
     visibility: OverlayVisibility = "any"
 
 
+###############################################################################
 class OverlayScope(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -36,6 +38,7 @@ class OverlayScope(BaseModel):
     label: str | None = None
 
 
+###############################################################################
 class OverlayPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -45,6 +48,7 @@ class OverlayPatch(BaseModel):
     format: str | None = None
 
 
+###############################################################################
 class OverlayStateReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -52,6 +56,7 @@ class OverlayStateReference(BaseModel):
     revision: int = Field(default=0, ge=0)
 
 
+###############################################################################
 class OverlayCommand(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

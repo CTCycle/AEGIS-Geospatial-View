@@ -7,7 +7,6 @@ from server.domain.agent.capability_route import AgentPhase, AgentRunState
 from server.services.agent.tool_definitions import CapabilityDiscoveryInput
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
 
-
 ###############################################################################
 class _CapabilityRegistry:
 
@@ -21,7 +20,6 @@ class _CapabilityRegistry:
     # -------------------------------------------------------------------------
     def execution_contract(self, capability_id: str) -> dict[str, Any]:
         return {"capability_id": capability_id, "render_support": "vector"}
-
 
 ###############################################################################
 class _RuntimeRegistry:
@@ -37,7 +35,6 @@ class _RuntimeRegistry:
     # -------------------------------------------------------------------------
     def supports_mode(self, _capability_id: str, _mode: str) -> bool:
         return True
-
 
 ###############################################################################
 def test_discovery_cursor_returns_a_stable_bounded_page() -> None:

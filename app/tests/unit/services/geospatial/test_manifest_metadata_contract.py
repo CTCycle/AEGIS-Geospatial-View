@@ -34,7 +34,6 @@ def test_all_manifest_entries_expose_source_traits() -> None:
                     missing.append(f"{collection_name}:{item['id']}:metadata.{field}")
     assert not missing
 
-
 ###############################################################################
 def test_enabled_executable_manifests_declare_execution_contracts() -> None:
     payload = GeospatialManifestLoader().load_all()
