@@ -28,11 +28,11 @@ DEFAULT_STAGE_LIMITS: dict[str, float] = {
 class ExecutionBudgetExceeded(RuntimeError):
     """Raised when a bounded run cannot start another counted operation."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, reason: str, stage: str) -> None:
         self.reason = reason
         self.stage = stage
         super().__init__(f"The {stage} budget was exhausted.")
-
 
 ###############################################################################
 def _new_stage_metadata() -> dict[str, Any]:
@@ -66,7 +66,6 @@ class StageObservation:
 ###############################################################################
 def _new_stage_observations() -> list[StageObservation]:
     return []
-
 
 ###############################################################################
 @dataclass

@@ -763,6 +763,7 @@ class AgentRunOrchestrator:
         return snapshot.aggregated_request
 
 
+###############################################################################
 def _hash_json(value: dict[str, Any]) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode(
@@ -771,6 +772,7 @@ def _hash_json(value: dict[str, Any]) -> str:
     ).hexdigest()
 
 
+###############################################################################
 def _tool_label(tool_name: str | None) -> str:
     normalized = " ".join(str(tool_name or "tool").replace("_", " ").split())
     return normalized[:1].upper() + normalized[1:]

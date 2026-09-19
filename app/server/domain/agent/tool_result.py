@@ -107,7 +107,6 @@ class ToolResult(BaseModel):
     truncated: bool = False
     continuation: str | None = None
 
-
 ###############################################################################
 class ModelObservation(BaseModel):
     """Bounded observation projected from one application tool result.
@@ -137,6 +136,7 @@ class ModelObservation(BaseModel):
     truncated: bool = False
     continuation: str | None = None
 
+    # -------------------------------------------------------------------------
     @classmethod
     def from_tool_result(cls, value: ToolResult, *, max_chars: int = 4096) -> "ModelObservation":
         projected, projected_truncated = _project_result_data(
@@ -184,7 +184,6 @@ class ModelObservation(BaseModel):
             truncated=value.truncated or projected_truncated,
             continuation=value.continuation,
         )
-
 
 ###############################################################################
 def _project_result_data(
@@ -345,6 +344,7 @@ def _project_result_data(
     return _fit_projection(bounded, max_chars=max_chars)
 
 
+###############################################################################
 def _fit_projection(
     value: dict[str, Any] | list[Any] | None,
     *,
@@ -399,6 +399,7 @@ def _fit_projection(
     return bounded, truncated
 
 
+###############################################################################
 def _bounded_json_value(
     value: Any,
     *,
@@ -450,6 +451,7 @@ def _bounded_json_value(
     return str(value)[:string_limit]
 
 
+###############################################################################
 def _bounded_strings(value: Any, *, limit: int, item_chars: int) -> list[str]:
     if not is_json_array(value):
         return []

@@ -9,7 +9,6 @@ from server.services.agent.location_resolver import LocationResolver
 from server.services.agent.tool_definitions import ResolveLocationInput
 from server.services.agent.tool_handlers.location import LocationToolHandler
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_coordinate_query_is_resolved_without_geocoder_egress() -> None:
@@ -32,7 +31,6 @@ async def test_coordinate_query_is_resolved_without_geocoder_egress() -> None:
     location = state.location_refs["46.0037, 8.9511"]
     assert location.latitude == 46.0037
     assert location.longitude == 8.9511
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -59,7 +57,6 @@ async def test_invalid_coordinate_query_is_rejected_with_bounds() -> None:
         "longitude_bounds": [-180, 180],
     }
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_invalid_coordinates_in_user_text_override_context_target() -> None:
@@ -81,13 +78,15 @@ async def test_invalid_coordinates_in_user_text_override_context_target() -> Non
     assert result.data is not None
     assert result.data["query"] == "91, 181"
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_unresolved_target_id_is_resolved_as_initial_location_query() -> None:
     captured: list[tuple[str, str]] = []
 
+    ###############################################################################
     class CapturingResolver:
+
+        # -------------------------------------------------------------------------
         async def resolve_location_signals(self, signals, _memory):  # noqa: ANN001
             signal = signals[0]
             captured.append((signal.raw_value, signal.signal_type))
@@ -114,11 +113,14 @@ async def test_unresolved_target_id_is_resolved_as_initial_location_query() -> N
     assert captured == [("Japan", "country")]
     assert state.location_refs["japan"].label == "Japan"
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_ambiguous_location_is_a_typed_semantic_outcome() -> None:
+
+    ###############################################################################
     class AmbiguousResolver(LocationResolver):
+
+        # -------------------------------------------------------------------------
         async def resolve_location_signals(self, _signals, _memory):  # noqa: ANN001
             return ClarificationRequest(
                 question="Which Springfield do you mean?",
@@ -147,13 +149,15 @@ async def test_ambiguous_location_is_a_typed_semantic_outcome() -> None:
     assert result.error is not None
     assert result.error.recovery == "request_user_input"
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_administrative_geometry_type_reaches_the_native_resolver() -> None:
     captured: list[str] = []
 
+    ###############################################################################
     class CapturingResolver:
+
+        # -------------------------------------------------------------------------
         async def resolve_location_signals(self, signals, _memory):  # noqa: ANN001
             captured.append(signals[0].signal_type)
             return ResolvedLocation(
@@ -179,13 +183,15 @@ async def test_administrative_geometry_type_reaches_the_native_resolver() -> Non
     assert result.status == "success"
     assert captured == ["administrative_geometry"]
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_explicit_coordinates_in_clarification_text_override_unresolved_name() -> None:
     captured: list[tuple[str, float | None, float | None, str]] = []
 
+    ###############################################################################
     class CapturingResolver:
+
+        # -------------------------------------------------------------------------
         async def resolve_location_signals(self, signals, _memory):  # noqa: ANN001
             signal = signals[0]
             captured.append(
@@ -216,11 +222,14 @@ async def test_explicit_coordinates_in_clarification_text_override_unresolved_na
     assert result.status == "success"
     assert captured == [("coordinates", 45.0, -69.0, "text")]
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_coordinate_text_supports_hemisphere_notation() -> None:
+
+    ###############################################################################
     class CapturingResolver:
+
+        # -------------------------------------------------------------------------
         async def resolve_location_signals(self, signals, _memory):  # noqa: ANN001
             signal = signals[0]
             return ResolvedLocation(
@@ -243,7 +252,6 @@ async def test_coordinate_text_supports_hemisphere_notation() -> None:
     assert result.status == "success"
     assert result.data is not None
     assert result.data["coordinates"] == [-69.0, -45.0]
-
 
 ###############################################################################
 def test_unknown_location_type_is_not_accepted_as_a_legacy_alias() -> None:

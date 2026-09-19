@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-
 ###############################################################################
 class CapabilityDomain(StrEnum):
     CONVERSATION = "conversation"

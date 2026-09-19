@@ -160,6 +160,7 @@ class CompletionEvaluator:
         return False
 
 
+###############################################################################
 def _native_flag(name: str) -> str:
     return {
         "location_resolved": "location",
@@ -170,6 +171,7 @@ def _native_flag(name: str) -> str:
     }.get(name, name)
 
 
+###############################################################################
 def _native_temporal_scope_applied(
     goal: AgentGoal | None, map_session: MapSession
 ) -> bool:
@@ -192,6 +194,7 @@ def _native_temporal_scope_applied(
     )
 
 
+###############################################################################
 def _native_spatial_scope_applied(
     goal: AgentGoal | None, map_session: MapSession
 ) -> bool:

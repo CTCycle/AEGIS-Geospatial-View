@@ -32,6 +32,7 @@ LocationSignalType = Literal[
 ]
 
 
+###############################################################################
 class LocationSignal(BaseModel):
     """One bounded location signal passed to the resolver."""
 

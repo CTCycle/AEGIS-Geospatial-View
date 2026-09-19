@@ -30,7 +30,6 @@ from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.transport import LLMTransportPolicy
 
-
 ###############################################################################
 class FakeProvider:
 
@@ -44,7 +43,6 @@ class FakeProvider:
         self.requests.append({"request": request, "kwargs": kwargs})
         return self.results.popleft()
 
-
 ###############################################################################
 class FakeFactory:
 
@@ -55,7 +53,6 @@ class FakeFactory:
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> FakeProvider:
         return self.provider
-
 
 ###############################################################################
 class FakeCapabilityRegistry:
@@ -70,7 +67,6 @@ class FakeCapabilityRegistry:
     def shortlist(self, **kwargs: Any) -> list[dict[str, object]]:
         return [{"id": "places:hospitals"}]
 
-
 ###############################################################################
 class FakeRuntimeRegistry:
 
@@ -82,11 +78,9 @@ class FakeRuntimeRegistry:
     def access_available(self, capability_id: str) -> bool:
         return True
 
-
 ###############################################################################
 class EmptyInput(BaseModel):
     pass
-
 
 ###############################################################################
 async def _answer_handler(arguments: BaseModel, state: AgentRunState) -> ToolResult:
@@ -97,7 +91,6 @@ async def _answer_handler(arguments: BaseModel, state: AgentRunState) -> ToolRes
         summary="tool completed",
         metadata=ToolExecutionMetadata(duration_ms=0),
     )
-
 
 ###############################################################################
 def _loop(
@@ -158,7 +151,6 @@ def _loop(
         transport_policy=transport_policy,
     )
 
-
 ###############################################################################
 def _state() -> AgentRunState:
     return AgentRunState(
@@ -167,7 +159,6 @@ def _state() -> AgentRunState:
         phase=AgentPhase.RECEIVE_REQUEST,
         user_message="find hospitals",
     )
-
 
 ###############################################################################
 def _route_call() -> LLMResult:
@@ -187,7 +178,6 @@ def _route_call() -> LLMResult:
             )
         ],
     )
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -223,7 +213,6 @@ async def test_loop_routes_exposes_tools_and_finishes_from_final_model_text() ->
     assert provider.requests[0]["request"].provider_session_id == state.conversation_id
     assert state.transition_trace
 
-
 ###############################################################################
 def test_native_route_promotes_the_execution_profile_once() -> None:
     simple_budget = AgentExecutionBudget(
@@ -256,6 +245,7 @@ def test_native_route_promotes_the_execution_profile_once() -> None:
     assert complex_budget.total_seconds == 300
 
 
+###############################################################################
 def test_verified_render_closes_map_completion_contract() -> None:
     state = _state()
     state.context_hydrated = True
@@ -295,6 +285,7 @@ def test_verified_render_closes_map_completion_contract() -> None:
     assert stop == ("goal_satisfied", "The map is ready.")
 
 
+###############################################################################
 def test_render_recovery_exhaustion_preserves_first_failure_cause() -> None:
     state = _state()
     state.render_attempts = 2
@@ -341,6 +332,7 @@ def test_render_recovery_exhaustion_preserves_first_failure_cause() -> None:
     assert "generic_validation" not in outcome.final_text
 
 
+###############################################################################
 def test_failed_render_requires_a_new_map_candidate_for_tool_progress() -> None:
     state = _state()
     state.route = CapabilityRoute(
@@ -401,6 +393,7 @@ def test_failed_render_requires_a_new_map_candidate_for_tool_progress() -> None:
     ) == expected
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_tool_turn_no_progress_after_render_failure_gets_bounded_correction() -> None:
     provider = FakeProvider(
@@ -462,6 +455,7 @@ async def test_tool_turn_no_progress_after_render_failure_gets_bounded_correctio
     assert provider.requests[1]["kwargs"]["tool_choice"] == "auto"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_verified_render_emits_tools_disabled_finalization_trace() -> None:
     provider = FakeProvider([LLMResult(content="Verified map summary.")])
@@ -517,7 +511,6 @@ async def test_verified_render_emits_tools_disabled_finalization_trace() -> None
     assert provider.requests[0]["kwargs"]["tool_choice"] == "none"
     assert provider.requests[0]["kwargs"]["tools"] is None
 
-
 ###############################################################################
 def test_native_goal_compiles_deterministic_completion_contract() -> None:
     state = _state()
@@ -565,6 +558,7 @@ def test_native_goal_compiles_deterministic_completion_contract() -> None:
     assert state.completion_contract.spatial_scope_required is True
 
 
+###############################################################################
 def test_map_add_route_requires_provider_data_when_data_retrieval_is_secondary() -> None:
     state = _state()
     route = CapabilityRoute(
@@ -590,6 +584,7 @@ def test_map_add_route_requires_provider_data_when_data_retrieval_is_secondary()
     assert "required_data_retrieved" in state.completion_contract.requirements
 
 
+###############################################################################
 def test_text_geocode_resolution_satisfies_data_and_spatial_completion() -> None:
     state = _state()
     route = CapabilityRoute(
@@ -639,6 +634,7 @@ def test_text_geocode_resolution_satisfies_data_and_spatial_completion() -> None
     ) == []
 
 
+###############################################################################
 def test_location_only_map_recovery_requires_a_single_resolved_location() -> None:
     state = _state()
     route = CapabilityRoute(
@@ -680,6 +676,7 @@ def test_location_only_map_recovery_requires_a_single_resolved_location() -> Non
     assert AgentLoop._completion_checks(state)["required_data_retrieved"] is False  # pyright: ignore[reportPrivateUsage]
 
 
+###############################################################################
 def test_location_only_map_recovery_accepts_duplicate_same_location_results() -> None:
     state = _state()
     route = CapabilityRoute(
@@ -717,6 +714,7 @@ def test_location_only_map_recovery_accepts_duplicate_same_location_results() ->
     )
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_location_only_map_recovery_replaces_stale_failure_text(
     monkeypatch: pytest.MonkeyPatch,
@@ -777,6 +775,7 @@ async def test_location_only_map_recovery_replaces_stale_failure_text(
     assert outcome.final_text == "The map is ready."
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_location_only_map_recovery_runs_after_a_location_tool_result(
     monkeypatch: pytest.MonkeyPatch,
@@ -873,7 +872,6 @@ async def test_location_only_map_recovery_runs_after_a_location_tool_result(
     )
     assert outcome.state.prepared_map_session is not None
 
-
 ###############################################################################
 def test_location_only_map_recovery_uses_the_current_location_result() -> None:
     state = _state()
@@ -917,7 +915,6 @@ def test_location_only_map_recovery_uses_the_current_location_result() -> None:
         state
     ) == "kolkata, india"
 
-
 ###############################################################################
 def test_location_only_map_recovery_can_reuse_one_close_current_route_ref() -> None:
     state = _state()
@@ -949,7 +946,6 @@ def test_location_only_map_recovery_can_reuse_one_close_current_route_ref() -> N
         state, route
     ) == "kolkata, india"
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_model_budget_exhaustion_has_a_distinct_terminal_reason() -> None:
@@ -969,7 +965,6 @@ async def test_model_budget_exhaustion_has_a_distinct_terminal_reason() -> None:
     assert outcome.state.model_calls == 1
     assert outcome.state.transitions == 1
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_transition_budget_exhaustion_has_a_distinct_terminal_reason() -> None:
@@ -987,7 +982,6 @@ async def test_transition_budget_exhaustion_has_a_distinct_terminal_reason() -> 
     assert outcome.stopped_reason == "transition_budget_exhausted"
     assert outcome.state.termination_reason == "transition_budget_exhausted"
     assert outcome.state.transitions == 1
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1014,20 +1008,24 @@ async def test_opencode_go_native_calls_use_conversation_session_and_compatible_
     assert captured.provider_session_id == state.conversation_id
     assert captured.metadata["thinking_mode"] == "disabled"
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_model_retry_uses_same_provider_and_records_safe_transport_trace() -> None:
+
+    ###############################################################################
     class _RetryingProvider(FakeProvider):
         provider_name = "opencode-go"
         base_url = "https://opencode.example/v1"
 
+        # -------------------------------------------------------------------------
         def __init__(self) -> None:
             super().__init__([LLMResult(content="ready")])
 
+        # -------------------------------------------------------------------------
         def protocol_for_model(self, _model: str) -> str:
             return "openai-chat-completions"
 
+        # -------------------------------------------------------------------------
         async def achat(self, request: Any, **kwargs: Any) -> LLMResult:
             self.requests.append({"request": request, "kwargs": kwargs})
             if len(self.requests) == 1:
@@ -1076,7 +1074,6 @@ async def test_model_retry_uses_same_provider_and_records_safe_transport_trace()
     assert failure["exception_class"] == "ConnectError"
     assert failure["retryable"] is True
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_native_model_context_usage_is_recorded_and_emitted() -> None:
@@ -1120,6 +1117,7 @@ async def test_native_model_context_usage_is_recorded_and_emitted() -> None:
     assert request.state.model_trace[0]["status"] == "observed"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_run_control_stops_before_a_superseded_model_result_is_applied() -> None:
     provider = FakeProvider(
@@ -1150,6 +1148,7 @@ async def test_run_control_stops_before_a_superseded_model_result_is_applied() -
     assert outcome.state.termination_reason == "superseded"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_run_control_stops_cancelled_request_before_provider_call() -> None:
     provider = FakeProvider([_route_call()])
@@ -1165,7 +1164,6 @@ async def test_run_control_stops_cancelled_request_before_provider_call() -> Non
 
     assert outcome.stopped_reason == "cancelled"
     assert provider.requests == []
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1198,7 +1196,6 @@ async def test_loop_preserves_malformed_tool_call_as_failure() -> None:
 
     assert outcome.tool_results[0].error is not None
     assert outcome.tool_results[0].error.error_type == "malformed_call"
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1237,6 +1234,7 @@ async def test_successful_tool_is_followed_by_one_final_model_step() -> None:
     assert assistant_message["tool_calls"][0]["arguments"] == {}
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_weather_completion_has_bounded_fallback_when_model_budget_is_exhausted() -> None:
     provider = FakeProvider([])
@@ -1287,7 +1285,6 @@ async def test_weather_completion_has_bounded_fallback_when_model_budget_is_exha
     assert "temperature 27.3°C" in answer
     assert "humidity 62%" in answer
     assert "Observation time: 2026-09-18T14:00 (Europe/Rome)" in answer
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1358,7 +1355,6 @@ async def test_hydrated_context_is_rebuilt_with_the_latest_observation() -> None
         for message in latest_request.messages
     )
 
-
 ###############################################################################
 def test_tool_observation_preserves_bounded_result_data() -> None:
     result = ToolResult(
@@ -1389,7 +1385,6 @@ def test_tool_observation_preserves_bounded_result_data() -> None:
     assert observation["status"] == "success"
     assert observation["result"]["capabilities"][0]["id"] == "rainfall"
     assert observation["pagination"]["next_cursor"] == "1"
-
 
 ###############################################################################
 def test_capability_description_observation_preserves_contract_and_schema() -> None:
@@ -1432,7 +1427,6 @@ def test_capability_description_observation_preserves_contract_and_schema() -> N
         "forecast",
     ]
 
-
 ###############################################################################
 def test_working_state_remains_valid_json_when_compacted() -> None:
     state = _state()
@@ -1460,7 +1454,6 @@ def test_working_state_remains_valid_json_when_compacted() -> None:
     assert payload["phase"] == state.phase.value
     assert payload["goal"] is None
     assert payload["completion_contract"] is None
-
 
 ###############################################################################
 def test_compacted_working_state_retains_goal_and_completion_invariants() -> None:
@@ -1500,7 +1493,6 @@ def test_compacted_working_state_retains_goal_and_completion_invariants() -> Non
     ]
     assert payload["route"]["primary_domain"] == "data_retrieval"
 
-
 ###############################################################################
 def test_responses_protocol_items_are_retained_for_the_next_model_turn() -> None:
     result = LLMResult(
@@ -1524,7 +1516,6 @@ def test_responses_protocol_items_are_retained_for_the_next_model_turn() -> None
     )
 
     assert [item["type"] for item in messages] == ["reasoning", "function_call"]
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1560,7 +1551,6 @@ async def test_successful_duplicate_call_replays_without_external_tool_execution
     assert outcome.state.tool_calls == 1
     assert len(outcome.tool_results) == 2
 
-
 ###############################################################################
 class RetryThenUnexpectedProvider:
 
@@ -1580,7 +1570,6 @@ class RetryThenUnexpectedProvider:
                 retryable=True,
             )
         raise AssertionError("The model retry exceeded the run deadline.")
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1604,7 +1593,6 @@ async def test_model_retry_cannot_restart_after_run_deadline() -> None:
         )
 
     assert provider.calls == 1
-
 
 ###############################################################################
 @pytest.mark.asyncio

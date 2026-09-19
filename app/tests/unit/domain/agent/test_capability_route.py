@@ -10,7 +10,6 @@ from server.domain.agent.capability_route import (
     CapabilityRoute,
 )
 
-
 ###############################################################################
 def test_capability_route_is_bounded_and_strict() -> None:
     route = CapabilityRoute(
@@ -42,7 +41,6 @@ def test_capability_route_is_bounded_and_strict() -> None:
             unexpected=True,
         )
 
-
 ###############################################################################
 def test_agent_state_tracks_native_loop_counters() -> None:
     state = AgentRunState(
@@ -62,7 +60,6 @@ def test_agent_state_tracks_native_loop_counters() -> None:
             user_message="Find Zurich.",
             unexpected=True,
         )
-
 
 ###############################################################################
 def test_agent_run_state_is_the_single_checkpointable_native_state() -> None:

@@ -56,6 +56,7 @@ def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str, dict
     ), evidence
 
 
+###############################################################################
 def _record_provider_preflight(dirs: dict[str, Path], evidence: dict[str, Any]) -> None:
     write_http_capture(
         dirs["http"],

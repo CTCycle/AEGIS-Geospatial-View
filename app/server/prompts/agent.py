@@ -52,6 +52,7 @@ NATIVE_AGENT_SYSTEM_PROMPT = (
 )
 
 
+###############################################################################
 def build_native_agent_system_prompt() -> str:
     return "\n\n".join(
         [
@@ -64,6 +65,7 @@ def build_native_agent_system_prompt() -> str:
     )
 
 
+###############################################################################
 def build_native_context_messages(
     *,
     current_user_message: str,

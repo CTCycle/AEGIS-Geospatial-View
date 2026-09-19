@@ -26,7 +26,6 @@ from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 
-
 ###############################################################################
 class _Input(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -34,12 +33,12 @@ class _Input(BaseModel):
     value: int
 
 
+###############################################################################
 class _ManifestInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     value: int
     arguments: dict[str, Any] = {}
-
 
 ###############################################################################
 class _Policy:
@@ -52,7 +51,6 @@ class _Policy:
     def authorize(self, _tool: RegisteredTool, _arguments: BaseModel, _state: AgentRunState):
         return cast(Any, type("Authorization", (), {"allowed": self.allowed, "reason": "blocked"})())
 
-
 ###############################################################################
 def _state() -> AgentRunState:
     return AgentRunState(
@@ -62,11 +60,9 @@ def _state() -> AgentRunState:
         user_message="Use the tool.",
     )
 
-
 ###############################################################################
 def _budget() -> AgentExecutionBudget:
     return AgentExecutionBudget(total_seconds=5.0)
-
 
 ###############################################################################
 def _tool(
@@ -106,7 +102,6 @@ def _tool(
         argument_schema_provider=argument_schema_provider,
     )
 
-
 ###############################################################################
 def test_executor_validates_once_and_normalizes_success() -> None:
     calls: list[int] = []
@@ -132,6 +127,7 @@ def test_executor_validates_once_and_normalizes_success() -> None:
     assert state.tool_trace[0]["boundary"] == "tool_executor"
 
 
+###############################################################################
 def test_mixed_domain_tool_is_authorized_for_a_mixed_map_data_route() -> None:
     async def handler(arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
         return {"value": arguments.value}
@@ -162,7 +158,6 @@ def test_mixed_domain_tool_is_authorized_for_a_mixed_map_data_route() -> None:
 
     assert result.status == "success"
 
-
 ###############################################################################
 def test_malformed_call_never_reaches_the_handler() -> None:
     calls: list[int] = []
@@ -191,6 +186,7 @@ def test_malformed_call_never_reaches_the_handler() -> None:
     assert calls == []
 
 
+###############################################################################
 def test_registered_tool_call_outside_exact_exposure_set_is_rejected() -> None:
     calls: list[int] = []
 
@@ -213,7 +209,6 @@ def test_registered_tool_call_outside_exact_exposure_set_is_rejected() -> None:
     assert result.error.error_type == "tool_not_exposed"
     assert result.error.code == "tool_not_exposed"
     assert calls == []
-
 
 ###############################################################################
 def test_tool_budget_is_enforced_by_the_execution_boundary() -> None:
@@ -245,7 +240,6 @@ def test_tool_budget_is_enforced_by_the_execution_boundary() -> None:
         )
     assert error.value.reason == "tool_budget_exhausted"
     assert budget.tool_calls == 1
-
 
 ###############################################################################
 def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
@@ -318,6 +312,7 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     assert [item.stage for item in map_budget.observations] == ["map_assembly"]
 
 
+###############################################################################
 def test_manifest_validation_correction_contains_bounded_applicable_schema() -> None:
     calls: list[int] = []
 
@@ -368,6 +363,7 @@ def test_manifest_validation_correction_contains_bounded_applicable_schema() -> 
     assert len(correction["validation_errors"]) == 1
 
 
+###############################################################################
 def test_execute_capability_accepts_route_temporal_hint() -> None:
     calls: list[ExecuteCapabilityInput] = []
 
@@ -406,6 +402,7 @@ def test_execute_capability_accepts_route_temporal_hint() -> None:
     assert [item.temporal_mode for item in calls] == ["current"]
 
 
+###############################################################################
 def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
     calls: list[int] = []
     manifest_schema = {
@@ -422,7 +419,10 @@ def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
         calls.append(1)
         return {"ok": True}
 
+    ###############################################################################
     class _CapabilityRegistry:
+
+        # -------------------------------------------------------------------------
         def argument_schema(self, _capability_id: str) -> dict[str, Any]:
             return manifest_schema
 
@@ -465,7 +465,6 @@ def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
     assert result.error.validation_errors[0].path == "$"
     assert "exclusive minimum" in result.error.validation_errors[0].message
     assert calls == []
-
 
 ###############################################################################
 @pytest.mark.asyncio

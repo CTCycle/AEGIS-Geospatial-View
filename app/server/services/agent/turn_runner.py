@@ -41,7 +41,6 @@ type FailureCategory = Literal[
     "superseded",
 ]
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class AgentTurnRequest:
@@ -69,7 +68,6 @@ class AgentTurnRequest:
     trace_callback: Callable[[Any], Awaitable[None] | None] | None = None
     checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None
     run_state_check: Callable[[], str | None] | None = None
-
 
 ###############################################################################
 class AgentTurnRunner:
@@ -177,7 +175,6 @@ class AgentTurnRunner:
             outcome=outcome,
         )
 
-
 ###############################################################################
 class AgentResponseBuilder:
 
@@ -244,7 +241,6 @@ class AgentResponseBuilder:
             location_refs=dict(state.location_refs),
         )
 
-
 ###############################################################################
 def _operation(
     outcome: AgentLoopOutcome,
@@ -297,7 +293,6 @@ def _operation(
         message=message,
     )
 
-
 ###############################################################################
 def _presentation_status(
     outcome: AgentLoopOutcome,
@@ -314,7 +309,6 @@ def _presentation_status(
         return "ready"
     return "failed"
 
-
 ###############################################################################
 def _fallback_message(outcome: AgentLoopOutcome) -> str:
     if outcome.failure_detail:
@@ -324,7 +318,6 @@ def _fallback_message(outcome: AgentLoopOutcome) -> str:
     if outcome.stopped_reason == "insufficient_evidence":
         return "I could not verify enough evidence to complete the request."
     return "The agent completed without a final response."
-
 
 ###############################################################################
 def _response_failure_category(value: str | None) -> FailureCategory | None:
@@ -350,7 +343,6 @@ def _response_failure_category(value: str | None) -> FailureCategory | None:
     }:
         return cast(FailureCategory, value)
     return None
-
 
 ###############################################################################
 def _setting(settings: Any, name: str, default: int | float) -> Any:

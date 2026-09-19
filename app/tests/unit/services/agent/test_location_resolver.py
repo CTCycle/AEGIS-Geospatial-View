@@ -79,12 +79,14 @@ def test_location_resolver_uses_coordinates_without_geocoder() -> None:
 
     run_async_in_thread(_run())
 
-
 ###############################################################################
 def test_location_resolver_accepts_native_administrative_geometry_target() -> None:
     calls: list[dict[str, object]] = []
 
+    ###############################################################################
     class Geocoder:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003
             calls.append(kwargs)
             return {
@@ -122,7 +124,11 @@ def test_location_resolver_accepts_native_administrative_geometry_target() -> No
 
 ###############################################################################
 def test_location_resolver_accepts_localized_hierarchical_city_boundary_target() -> None:
+
+    ###############################################################################
     class Geocoder:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003
             return {
                 "display_name": "Milan, Rodano, Milan, Lombardy, Italy",

@@ -42,6 +42,7 @@ _INFRASTRUCTURE_OPTION_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 
+###############################################################################
 class PendingClarification(BaseModel):
     """A clarification tied to the request that produced it.
 
@@ -63,6 +64,7 @@ class PendingClarification(BaseModel):
     selected_option: str | None = None
     status: Literal["active", "deferred", "answered"] = "active"
 
+    # -------------------------------------------------------------------------
     @classmethod
     def from_turn(
         cls,
@@ -94,10 +96,12 @@ class PendingClarification(BaseModel):
             options=list(dict.fromkeys(inferred_options))[:12],
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def from_legacy(cls, question: str) -> "PendingClarification":
         return cls(question=question.strip(), source_turn_index=0)
 
+    # -------------------------------------------------------------------------
     def applies_to(self, message: str) -> bool:
         """Return whether ``message`` is plausibly answering this question.
 
@@ -123,6 +127,7 @@ class PendingClarification(BaseModel):
             return self.match_option(normalized) is not None
         return True
 
+    # -------------------------------------------------------------------------
     def match_option(self, message: str) -> str | None:
         """Return the canonical option selected by a short clarification reply."""
 
@@ -142,6 +147,7 @@ class PendingClarification(BaseModel):
         return None
 
 
+###############################################################################
 class ConversationState(BaseModel):
     """Revisioned, durable state shared by all turns in one conversation."""
 
@@ -165,10 +171,12 @@ class ConversationState(BaseModel):
     committed_map_session: MapSession | None = None
     pending_clarification: PendingClarification | None = None
 
+    # -------------------------------------------------------------------------
     @classmethod
     def empty(cls, conversation_id: str, *, revision: int = 0) -> "ConversationState":
         return cls(conversation_id=conversation_id, revision=max(0, revision))
 
+    # -------------------------------------------------------------------------
     @classmethod
     def from_persisted(
         cls,
@@ -221,6 +229,7 @@ class ConversationState(BaseModel):
             raise ValueError("Conversation state belongs to another conversation.")
         return state.model_copy(update={"revision": max(state.revision, revision)})
 
+    # -------------------------------------------------------------------------
     def pending_clarification_for(
         self, message: str
     ) -> PendingClarification | None:
@@ -231,6 +240,7 @@ class ConversationState(BaseModel):
             return None
         return pending.model_copy(update={"status": "active"})
 
+    # -------------------------------------------------------------------------
     def clarification_after_turn(self, message: str) -> PendingClarification | None:
         """Advance the durable clarification record for one user turn.
 
@@ -250,6 +260,7 @@ class ConversationState(BaseModel):
             }
         )
 
+    # -------------------------------------------------------------------------
     def context_projection(self, message: str) -> dict[str, Any]:
         """Return the model-visible state with clarification scope applied."""
 
@@ -260,6 +271,7 @@ class ConversationState(BaseModel):
         )
         return result
 
+    # -------------------------------------------------------------------------
     def memory_projection(self) -> dict[str, Any]:
         """Return the bounded presentation projection used by the UI."""
 

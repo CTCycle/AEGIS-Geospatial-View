@@ -20,7 +20,6 @@ from server.services.agent.tool_definitions import (
     TransformEvidenceInput,
 )
 
-
 ###############################################################################
 class EvidenceToolHandler:
 
@@ -173,14 +172,12 @@ class EvidenceToolHandler:
             ),
         )
 
-
 ###############################################################################
 def _decode_json(raw: bytes) -> Any:
     try:
         return json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
         return {"byte_size": len(raw)}
-
 
 ###############################################################################
 def _records_from_payload(payload: Any) -> list[dict[str, Any]]:
@@ -191,7 +188,6 @@ def _records_from_payload(payload: Any) -> list[dict[str, Any]]:
                 return [item for item in value if is_json_object(item)]
         return [payload]
     return [item for item in payload if is_json_object(item)] if is_json_array(payload) else []
-
 
 ###############################################################################
 def _inspect_payload(
@@ -245,7 +241,6 @@ def _inspect_payload(
             "total": len(records),
         },
     }
-
 
 ###############################################################################
 def _apply_operations(
@@ -334,7 +329,6 @@ def _apply_operations(
                 return result, error
     return result, None
 
-
 ###############################################################################
 def _matches(actual: Any, operator: str, expected: Any) -> bool:
     if operator == "eq":
@@ -350,7 +344,6 @@ def _matches(actual: Any, operator: str, expected: Any) -> bool:
     if operator == "gte":
         return isinstance(actual, (int, float)) and isinstance(expected, (int, float)) and actual >= expected
     return isinstance(actual, (int, float)) and isinstance(expected, (int, float)) and actual <= expected
-
 
 ###############################################################################
 def _spatial_filter(
@@ -393,7 +386,6 @@ def _spatial_filter(
         return distance <= radius_value
 
     return [item for item in records if within(item)], None
-
 
 ###############################################################################
 def _failure(

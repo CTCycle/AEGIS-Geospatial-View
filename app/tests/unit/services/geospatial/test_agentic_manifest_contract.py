@@ -8,7 +8,6 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.capability_registry import _operation_candidates
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 class _RuntimeEligibility:
 
@@ -23,7 +22,6 @@ class _RuntimeEligibility:
     # -------------------------------------------------------------------------
     def access_available(self, capability_id: str) -> bool:
         return capability_id not in self.disabled
-
 
 ###############################################################################
 def _registry() -> CapabilityRegistry:
@@ -74,7 +72,6 @@ def _registry() -> CapabilityRegistry:
     )
     return CapabilityRegistry.from_catalog_snapshot(snapshot)
 
-
 ###############################################################################
 def test_shortlist_is_domain_aware_and_bounded() -> None:
     candidates = _registry().shortlist(
@@ -89,7 +86,6 @@ def test_shortlist_is_domain_aware_and_bounded() -> None:
     assert len(candidates) <= 12
     assert candidates[0]["routing_domains"] == ["data_retrieval"]
 
-
 ###############################################################################
 def test_explicit_shortlist_ids_are_ranked_and_disabled_ids_are_filtered() -> None:
     candidates = _registry().shortlist(
@@ -101,7 +97,6 @@ def test_explicit_shortlist_ids_are_ranked_and_disabled_ids_are_filtered() -> No
     )
 
     assert [item["id"] for item in candidates] == ["weather"]
-
 
 ###############################################################################
 def test_compound_retrieval_and_undated_recent_intent_match_current_feed() -> None:
@@ -121,14 +116,17 @@ def test_compound_retrieval_and_undated_recent_intent_match_current_feed() -> No
     assert candidates[0]["id"] == "traffic"
 
 
+###############################################################################
 def test_basemap_switch_operations_include_the_manifest_render_primitive() -> None:
     assert "show" in _operation_candidates("switch_basemap_to_satellite")
 
 
+###############################################################################
 def test_add_layer_operations_include_the_manifest_render_primitives() -> None:
     assert {"show", "overlay"}.issubset(_operation_candidates("add_layer"))
 
 
+###############################################################################
 def test_dated_historical_intent_does_not_match_current_only_feed() -> None:
     candidates = _registry().shortlist(
         domains={CapabilityDomain.DATA_RETRIEVAL},
@@ -144,7 +142,6 @@ def test_dated_historical_intent_does_not_match_current_only_feed() -> None:
 
     assert candidates == []
 
-
 ###############################################################################
 def test_route_contract_remains_independent_of_provider_arguments() -> None:
     route = CapabilityRoute(
@@ -156,7 +153,6 @@ def test_route_contract_remains_independent_of_provider_arguments() -> None:
     )
 
     assert "radius_m" not in route.model_dump()
-
 
 ###############################################################################
 def test_missing_agentic_domains_are_not_inferred_from_capability_kind() -> None:
@@ -195,6 +191,7 @@ def test_missing_agentic_domains_are_not_inferred_from_capability_kind() -> None
     assert candidates == []
 
 
+###############################################################################
 def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
     snapshot = GeospatialManifestSnapshot(
         providers=(),
@@ -262,6 +259,7 @@ def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
     assert [item["id"] for item in candidate] == ["us-parcels"]
 
 
+###############################################################################
 def test_semantic_routing_uses_manifest_hints_and_rejects_domain_only_matches() -> None:
     snapshot = GeospatialManifestSnapshot(
         providers=(),
@@ -328,6 +326,7 @@ def test_semantic_routing_uses_manifest_hints_and_rejects_domain_only_matches() 
     assert context_only == []
 
 
+###############################################################################
 def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> None:
     registry = CapabilityRegistry()
     runtime = RuntimeRegistry()
@@ -436,6 +435,7 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
     assert earthquake_route[0]["id"] == "usgs_earthquakes"
 
 
+###############################################################################
 def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> None:
     registry = CapabilityRegistry()
     runtime = RuntimeRegistry()

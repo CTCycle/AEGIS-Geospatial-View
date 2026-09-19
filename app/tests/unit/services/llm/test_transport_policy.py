@@ -8,6 +8,7 @@ from server.services.llm.errors import LLMProviderRequestError, safe_failure_det
 from server.services.llm.transport import LLMTransportPolicy
 
 
+###############################################################################
 def test_transport_policy_controls_timeout_retry_proxy_and_environment() -> None:
     policy = LLMTransportPolicy(
         request_timeout_seconds=11.0,
@@ -38,6 +39,7 @@ def test_transport_policy_controls_timeout_retry_proxy_and_environment() -> None
     }
 
 
+###############################################################################
 def test_transport_policy_rejects_invalid_values() -> None:
     with pytest.raises(ValueError, match="max_attempts"):
         LLMTransportPolicy(max_attempts=0)
@@ -45,6 +47,7 @@ def test_transport_policy_rejects_invalid_values() -> None:
         LLMTransportPolicy(proxy=42)  # type: ignore[arg-type]
 
 
+###############################################################################
 def test_transport_policy_can_be_built_from_native_execution_settings() -> None:
     policy = LLMTransportPolicy.from_execution_settings(
         SimpleNamespace(
@@ -61,7 +64,10 @@ def test_transport_policy_can_be_built_from_native_execution_settings() -> None:
     assert policy.retry_delay(1) == 0.0
 
 
+###############################################################################
 def test_winerror_10013_is_safe_and_not_retryable() -> None:
+
+    ###############################################################################
     class _PermissionDenied(OSError):
         winerror = 10013
 

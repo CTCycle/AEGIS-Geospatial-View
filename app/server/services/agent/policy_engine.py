@@ -15,6 +15,7 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
+###############################################################################
 class PolicyEngine:
     """Authorize model actions after route and schema validation.
 
@@ -23,6 +24,7 @@ class PolicyEngine:
     geography coverage checks.
     """
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -35,6 +37,7 @@ class PolicyEngine:
         self.runtime_registry = runtime_registry
         self.location_resolver = location_resolver
 
+    # -------------------------------------------------------------------------
     def authorize(
         self,
         tool: RegisteredTool,
@@ -158,6 +161,7 @@ class PolicyEngine:
 
         return ToolAuthorizationResult(allowed=True)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _route_allows_tool(tool: RegisteredTool, route: Any) -> bool:
         if tool.definition.name == "execute_geospatial_capability" and route.primary_domain in {
@@ -179,6 +183,7 @@ class PolicyEngine:
             return route.presentation in {"map", "both"}
         return bool(tool.domains.intersection(route_domains))
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _location_for_arguments(arguments: BaseModel, state: AgentRunState) -> Any | None:
         location_ref = str(getattr(arguments, "location_ref", "") or "").strip()

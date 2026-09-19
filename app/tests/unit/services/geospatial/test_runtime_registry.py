@@ -118,6 +118,7 @@ def test_openchargemap_is_available_with_saved_access_credential(monkeypatch) ->
     assert registry.provider_health("openchargemap_ev_charging") == "healthy"
 
 
+###############################################################################
 def test_configured_gtfs_feeds_require_a_feed_source(monkeypatch) -> None:
     feed_profiles = (
         ("gtfs_static", "AEGIS_GTFS_STATIC_FEED_URL"),

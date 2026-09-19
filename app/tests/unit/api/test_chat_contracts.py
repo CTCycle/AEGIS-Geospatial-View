@@ -59,7 +59,6 @@ def test_chat_turn_request_rejects_missing_conversation_id() -> None:
     else:
         raise AssertionError("conversation_id must be required")
 
-
 ###############################################################################
 def test_chat_turn_does_not_expose_map_commit_switch_over_http() -> None:
     response = TestClient(_app()).post(
@@ -75,7 +74,6 @@ def test_chat_turn_does_not_expose_map_commit_switch_over_http() -> None:
     assert any(
         error["loc"][-1] == "defer_map_commit" for error in response.json()["detail"]
     )
-
 
 ###############################################################################
 def test_native_turn_response_does_not_require_legacy_parser_projections() -> None:
@@ -93,7 +91,6 @@ def test_native_turn_response_does_not_require_legacy_parser_projections() -> No
     assert response.route is None
     assert response.goal is None
     assert "turn_contract" not in response.model_dump(mode="json")
-
 
 ###############################################################################
 def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
@@ -125,7 +122,6 @@ def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     assert response.status_code == 404
     assert response.json()["detail"] == "Conversation not found."
     assert orchestrator_called is False
-
 
 ###############################################################################
 def test_structured_probe_routes_return_latest_and_run_results() -> None:

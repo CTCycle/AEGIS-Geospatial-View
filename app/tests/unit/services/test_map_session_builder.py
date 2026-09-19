@@ -4,6 +4,7 @@ from server.domain.agent.decision import ResolvedLocation
 from server.services.geospatial.map_session_builder import _viewport_for_location
 
 
+###############################################################################
 def test_city_with_parent_scale_bbox_keeps_point_centered_viewport() -> None:
     location = ResolvedLocation(
         label="Tokyo, Japan",
@@ -20,6 +21,7 @@ def test_city_with_parent_scale_bbox_keeps_point_centered_viewport() -> None:
     assert viewport.bbox is None
 
 
+###############################################################################
 def test_point_like_feature_bbox_keeps_a_usable_context_viewport() -> None:
     location = ResolvedLocation(
         label="Great Barrier Reef, Australia",

@@ -55,6 +55,7 @@ _COORDINATE_PAIR_SEARCH_RE = re.compile(
     r"(?![\d])",
     re.IGNORECASE,
 )
+
 ###############################################################################
 class LocationToolHandler:
 
@@ -175,12 +176,10 @@ class LocationToolHandler:
         state.location_refs[target_key] = result
         return _success(location=result, target_key=target_key, started=started)
 
-
 ###############################################################################
 def _target_key(request: ResolveLocationInput) -> str:
     value = request.target_id or request.candidate_id or request.query or "location"
     return " ".join(value.casefold().split())
-
 
 ###############################################################################
 def _parse_coordinate_pair(query: str) -> tuple[float, float] | None:
@@ -193,6 +192,7 @@ def _parse_coordinate_pair(query: str) -> tuple[float, float] | None:
     return latitude, longitude
 
 
+###############################################################################
 def _parse_coordinate_pair_from_text(text: str) -> tuple[float, float] | None:
     match = _COORDINATE_PAIR_SEARCH_RE.search(text)
     if match is None:
@@ -213,7 +213,6 @@ def _parse_coordinate_pair_from_text(text: str) -> tuple[float, float] | None:
         return None
     return latitude, longitude
 
-
 ###############################################################################
 def _memory_snapshot(state: AgentRunState) -> dict[str, object]:
     location: ResolvedLocation | None = None
@@ -224,7 +223,6 @@ def _memory_snapshot(state: AgentRunState) -> dict[str, object]:
     return {
         "active_location": location.model_dump(mode="json") if location else None
     }
-
 
 ###############################################################################
 def _success(
@@ -248,7 +246,6 @@ def _success(
             duration_ms=max(0, int((time.perf_counter() - started) * 1000))
         ),
     )
-
 
 ###############################################################################
 def _failure(

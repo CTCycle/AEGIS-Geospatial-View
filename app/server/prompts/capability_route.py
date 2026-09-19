@@ -36,7 +36,6 @@ CAPABILITY_ROUTE_SYSTEM_PROMPT = (
     "8. Return the tool call immediately without explanations or deliberation."
 )
 
-
 ###############################################################################
 def build_capability_route_prompt() -> str:
     return "\n\n".join(

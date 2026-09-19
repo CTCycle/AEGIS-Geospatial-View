@@ -16,7 +16,6 @@ from server.services.agent.capability_router import (
 )
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
-
 ###############################################################################
 class _Runtime:
 
@@ -31,7 +30,6 @@ class _Runtime:
     # -------------------------------------------------------------------------
     def access_available(self, capability_id: str) -> bool:
         return capability_id not in self.disabled
-
 
 ###############################################################################
 def _router(runtime: _Runtime | None = None) -> CapabilityRouter:
@@ -76,7 +74,6 @@ def _router(runtime: _Runtime | None = None) -> CapabilityRouter:
         runtime_registry=cast(Any, runtime or _Runtime()),
     )
 
-
 ###############################################################################
 def _state(*, active_map: bool = False) -> AgentRunState:
     state = AgentRunState(
@@ -88,7 +85,6 @@ def _state(*, active_map: bool = False) -> AgentRunState:
     if active_map:
         state.active_map_session = cast(Any, object())
     return state
-
 
 ###############################################################################
 def _route(**overrides: Any) -> CapabilityRoute:
@@ -102,7 +98,6 @@ def _route(**overrides: Any) -> CapabilityRoute:
     values.update(overrides)
     return CapabilityRoute.model_validate(values)
 
-
 ###############################################################################
 def test_router_shortlists_without_selecting_final_arguments() -> None:
     decision = _router().validate_route(
@@ -114,6 +109,7 @@ def test_router_shortlists_without_selecting_final_arguments() -> None:
     assert "radius_m" not in decision.route.model_dump()
 
 
+###############################################################################
 def test_router_rejects_answer_route_with_execution_intent() -> None:
     decision = _router().validate_route(
         CapabilityRoute(
@@ -132,6 +128,7 @@ def test_router_rejects_answer_route_with_execution_intent() -> None:
     assert "route_task_mode_disallows_capability_queries" in decision.reason_codes
 
 
+###############################################################################
 def test_router_rejects_clarify_route_that_attempts_execution() -> None:
     decision = _router().validate_route(
         CapabilityRoute(
@@ -149,7 +146,6 @@ def test_router_rejects_clarify_route_that_attempts_execution() -> None:
     assert decision.status == "rejected"
     assert "route_task_mode_disallows_capability_queries" in decision.reason_codes
 
-
 ###############################################################################
 def test_router_rejects_hallucinated_ids_and_reports_no_capability() -> None:
     decision = _router().validate_route(
@@ -162,7 +158,6 @@ def test_router_rejects_hallucinated_ids_and_reports_no_capability() -> None:
     assert decision.rejected_capability_ids == ["not-in-catalog"]
     assert "unknown_capability_id" in decision.reason_codes
 
-
 ###############################################################################
 def test_router_requires_active_map_for_map_state_follow_up() -> None:
     decision = _router().validate_route(
@@ -173,7 +168,6 @@ def test_router_requires_active_map_for_map_state_follow_up() -> None:
 
     assert decision.status == "clarification"
     assert "active_map_required" in decision.reason_codes
-
 
 ###############################################################################
 def test_router_handles_runtime_disabled_explicit_candidate() -> None:
@@ -186,7 +180,6 @@ def test_router_handles_runtime_disabled_explicit_candidate() -> None:
     assert decision.status == "no_capability"
     assert decision.rejected_capability_ids == ["traffic"]
     assert "capability_disabled" in decision.reason_codes
-
 
 ###############################################################################
 def test_router_opens_discovery_when_semantic_shortlist_is_empty() -> None:
@@ -203,6 +196,7 @@ def test_router_opens_discovery_when_semantic_shortlist_is_empty() -> None:
     assert "discovery_required" in decision.reason_codes
 
 
+###############################################################################
 def test_router_clarifies_broad_infrastructure_category_before_shortlisting() -> None:
     for query in ("infrastructure", "infrastructure category", "infrastructure type"):
         decision = _router().validate_route(
@@ -221,6 +215,7 @@ def test_router_clarifies_broad_infrastructure_category_before_shortlisting() ->
         assert "EV charging" in decision.clarification_question
 
 
+###############################################################################
 def test_raw_infrastructure_request_cannot_be_silently_guessed_into_subtype() -> None:
     decision = _router().validate_route(
         _route(
@@ -236,6 +231,7 @@ def test_raw_infrastructure_request_cannot_be_silently_guessed_into_subtype() ->
     assert "ambiguous_infrastructure_category" in decision.reason_codes
 
 
+###############################################################################
 def test_router_returns_boundary_limitation_without_replacing_active_map() -> None:
     state = _state(active_map=True)
     state.location_refs["zurich"] = ResolvedLocation(
@@ -262,7 +258,6 @@ def test_router_returns_boundary_limitation_without_replacing_active_map() -> No
     assert "left the active map unchanged" in decision.clarification_question
     assert state.active_map_session is active_map
 
-
 ###############################################################################
 def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools() -> None:
     decision = _router().validate_route(
@@ -277,6 +272,7 @@ def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools
     assert "osm_default" not in decision.capability_ids
 
 
+###############################################################################
 def test_location_map_fallback_route_is_limited_to_non_data_map_wording() -> None:
     fallback = build_location_map_fallback_route("Show me Springfield")
 
@@ -289,6 +285,7 @@ def test_location_map_fallback_route_is_limited_to_non_data_map_wording() -> Non
     assert build_location_map_fallback_route("Show hospitals near Springfield") is None
 
 
+###############################################################################
 def test_router_uses_active_map_for_layer_lifecycle_updates() -> None:
     state = _state(active_map=True)
     state.location_refs["current map"] = ResolvedLocation(
@@ -313,6 +310,7 @@ def test_router_uses_active_map_for_layer_lifecycle_updates() -> None:
     assert "active_map_update_uses_current_map" in decision.reason_codes
 
 
+###############################################################################
 def test_router_normalizes_data_bearing_add_layer_routes_after_active_map() -> None:
     state = _state(active_map=True)
     state.location_refs["japan"] = ResolvedLocation(
@@ -342,7 +340,6 @@ def test_router_normalizes_data_bearing_add_layer_routes_after_active_map() -> N
     assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
     assert "data_bearing_map_route_normalized" in decision.reason_codes
 
-
 ###############################################################################
 def test_router_normalizes_geocoding_route_for_location_only_map() -> None:
     decision = _router().validate_route(
@@ -365,6 +362,7 @@ def test_router_normalizes_geocoding_route_for_location_only_map() -> None:
     assert "location_map_route_normalized" in decision.reason_codes
 
 
+###############################################################################
 def test_router_normalizes_named_landmark_map_route() -> None:
     decision = _router().validate_route(
         _route(
@@ -387,6 +385,7 @@ def test_router_normalizes_named_landmark_map_route() -> None:
     assert "location_map_route_normalized" in decision.reason_codes
 
 
+###############################################################################
 def test_router_preserves_explicit_poi_landmark_lookup() -> None:
     decision = _router().validate_route(
         _route(
@@ -404,7 +403,6 @@ def test_router_preserves_explicit_poi_landmark_lookup() -> None:
     assert decision.route.capability_queries == ["place search", "poi"]
     assert "location_map_route_normalized" not in decision.reason_codes
 
-
 ###############################################################################
 def test_router_normalizes_undated_recent_historical_scope_to_current() -> None:
     decision = _router().validate_route(
@@ -418,7 +416,6 @@ def test_router_normalizes_undated_recent_historical_scope_to_current() -> None:
     assert decision.status == "accepted"
     assert decision.route.temporal_scope.mode == "current"
     assert "recent_scope_normalized_to_current" in decision.reason_codes
-
 
 ###############################################################################
 def test_router_preserves_dated_historical_scope() -> None:

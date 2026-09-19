@@ -623,7 +623,6 @@ class ToolExecutor:
             )
         return payload
 
-
 ###############################################################################
 def _bounded_correction_value(value: Any, *, depth: int, max_depth: int = 4) -> Any:
     """Bound schemas and arguments before exposing them to a model retry."""

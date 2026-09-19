@@ -51,6 +51,7 @@ _RASTER_RENDERING_MODES = frozenset({"xyz", "raster-tile", "wmts", "wms", "tile"
 _RENDERING_MODE_ALIASES = {"vector": "geojson", "feature-collection": "geojson"}
 
 
+###############################################################################
 class MapPlanBuildError(ValueError):
 
     # -------------------------------------------------------------------------
@@ -436,7 +437,6 @@ class MapSessionBuilder:
             f"Unsupported browser rendering mode '{mode}'.",
         )
 
-
 ###############################################################################
 def _usable_render_url(value: object) -> bool:
     if not isinstance(value, str):
@@ -453,6 +453,7 @@ def _usable_render_url(value: object) -> bool:
     return candidate.startswith("/")
 
 
+###############################################################################
 def _valid_geojson_feature_collection(value: object) -> bool:
     data = json_object(value)
     features = data.get("features")
@@ -464,6 +465,7 @@ def _valid_geojson_feature_collection(value: object) -> bool:
     )
 
 
+###############################################################################
 def _valid_geojson_feature(value: object) -> bool:
     feature = json_object(value)
     return feature.get("type") == "Feature" and _valid_geojson_geometry(
@@ -471,6 +473,7 @@ def _valid_geojson_feature(value: object) -> bool:
     )
 
 
+###############################################################################
 def _valid_geojson_geometry(value: object) -> bool:
     geometry = json_object(value)
     geometry_type = geometry.get("type")
@@ -519,6 +522,7 @@ def _valid_geojson_geometry(value: object) -> bool:
     )
 
 
+###############################################################################
 def _valid_geojson_position(value: object) -> bool:
     if not isinstance(value, list):
         return False
@@ -526,6 +530,7 @@ def _valid_geojson_position(value: object) -> bool:
     return len(position) >= 2 and all(_finite_number(item) for item in position)
 
 
+###############################################################################
 def _finite_number(value: object) -> bool:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         return False
@@ -535,6 +540,7 @@ def _finite_number(value: object) -> bool:
         return False
 
 
+###############################################################################
 def _valid_geojson_sequence(
     value: object,
     validator: Callable[[object], bool],
@@ -545,7 +551,6 @@ def _valid_geojson_sequence(
         return False
     items = cast(list[object], value)
     return len(items) >= minimum and all(validator(item) for item in items)
-
 
 ###############################################################################
 def _with_viewport(session: MapSession, viewport: ViewportPolicy) -> MapSession:
@@ -561,7 +566,6 @@ def _with_viewport(session: MapSession, viewport: ViewportPolicy) -> MapSession:
         deep=True,
     )
 
-
 ###############################################################################
 def _viewport_for_location(location: ResolvedLocation) -> ViewportPolicy:
     bbox = _usable_location_bbox(location)
@@ -572,6 +576,7 @@ def _viewport_for_location(location: ResolvedLocation) -> ViewportPolicy:
     )
 
 
+###############################################################################
 def _usable_location_bbox(location: ResolvedLocation) -> list[float] | None:
     bbox = _valid_bbox(location.bbox)
     if bbox is None:
@@ -587,7 +592,6 @@ def _usable_location_bbox(location: ResolvedLocation) -> list[float] | None:
     ):
         return None
     return bbox
-
 
 ###############################################################################
 def _viewport_for_bbox(bbox: list[float], previous: ViewportPolicy) -> ViewportPolicy:
@@ -608,7 +612,6 @@ def _viewport_for_bbox(bbox: list[float], previous: ViewportPolicy) -> ViewportP
         radius_m=max(lat_radius, lon_radius, previous.radius_m * 0.1),
         bbox=bbox,
     )
-
 
 ###############################################################################
 def _valid_bbox(value: object) -> list[float] | None:
@@ -633,7 +636,6 @@ def _valid_bbox(value: object) -> list[float] | None:
         return None
     return result
 
-
 ###############################################################################
 def _evidence_bbox(evidence: list[AgentEvidenceEnvelope]) -> list[float] | None:
     for item in evidence:
@@ -650,6 +652,7 @@ def _evidence_bbox(evidence: list[AgentEvidenceEnvelope]) -> list[float] | None:
     return None
 
 
+###############################################################################
 def _geojson_render_data(value: object) -> dict[str, Any] | None:
     """Convert a bounded provider feature payload to client GeoJSON."""
 

@@ -39,16 +39,13 @@ def get_conversation_snapshot_service(
 ) -> ConversationSnapshotService:
     return request.app.state.conversation_snapshot_service
 
-
 ###############################################################################
 def get_conversation_repository(request: Request) -> ConversationRepository:
     return request.app.state.conversation_repository
 
-
 ###############################################################################
 def get_run_repository(request: Request) -> AgentRunRepository:
     return request.app.state.run_repository
-
 
 ###############################################################################
 def _owner_user_id(request: Request) -> str | None:
@@ -72,7 +69,6 @@ def create_conversation(
         title=payload.title,
         owner_user_id=_owner_user_id(request),
     )
-
 
 ###############################################################################
 @router.get(
@@ -181,7 +177,6 @@ def get_conversation_snapshot(
             detail="Conversation not found.",
         ) from exc
 
-
 ###############################################################################
 @router.get(
     CONVERSATION_RUN_STATUS_ROUTE,
@@ -224,7 +219,6 @@ def get_run_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Run not found.",
         ) from exc
-
 
 ###############################################################################
 @router.get(

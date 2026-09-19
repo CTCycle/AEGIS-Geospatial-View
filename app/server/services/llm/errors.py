@@ -15,6 +15,7 @@ TimeoutOrigin = Literal[
 ]
 
 
+###############################################################################
 def _exception_chain(exc: BaseException) -> list[BaseException]:
     chain: list[BaseException] = []
     current: BaseException | None = exc
@@ -26,6 +27,7 @@ def _exception_chain(exc: BaseException) -> list[BaseException]:
     return chain
 
 
+###############################################################################
 def transport_diagnostics(
     exc: BaseException,
     *,
@@ -53,6 +55,7 @@ def transport_diagnostics(
     return diagnostics
 
 
+###############################################################################
 def safe_failure_detail(exc: BaseException, fallback: str) -> str:
     """Return a user-facing failure detail without raw provider text."""
 

@@ -21,7 +21,6 @@ from server.services.chat.conversation_snapshot import ConversationSnapshotServi
 from server.services.chat.history_service import ChatHistoryService
 from server.domain.agent.conversation import ConversationState
 
-
 ###############################################################################
 class _InMemoryBackend:
     db_path = None
@@ -35,7 +34,6 @@ class _InMemoryBackend:
             future=True,
         )
         self.session = sessionmaker(bind=self.engine, future=True)
-
 
 ###############################################################################
 @pytest.fixture()
@@ -63,7 +61,6 @@ def conversations_api_client() -> TestClient:
     client = TestClient(app)
     yield client
     client.close()
-
 
 ###############################################################################
 def test_create_conversation_returns_persisted_conversation(
@@ -97,7 +94,6 @@ def test_create_conversation_returns_persisted_conversation(
     assert snapshot_payload["map_session"] is None
     assert snapshot_payload["active_run"] is None
 
-
 ###############################################################################
 def test_get_conversation_snapshot_returns_not_found_for_unknown_conversation(
     conversations_api_client: TestClient,
@@ -105,7 +101,6 @@ def test_get_conversation_snapshot_returns_not_found_for_unknown_conversation(
     response = conversations_api_client.get("/api/conversations/missing")
 
     assert response.status_code == 404
-
 
 ###############################################################################
 def test_terminal_assistant_message_and_state_rollback_together() -> None:
@@ -149,6 +144,7 @@ def test_terminal_assistant_message_and_state_rollback_together() -> None:
     ] == ["First response"]
 
 
+###############################################################################
 def test_native_provisional_assistant_is_upserted_on_resume() -> None:
     backend = _InMemoryBackend()
     Base.metadata.create_all(backend.engine)
@@ -191,6 +187,7 @@ def test_native_provisional_assistant_is_upserted_on_resume() -> None:
     ] == ["The map is ready."]
 
 
+###############################################################################
 def test_assistant_state_write_migrates_legacy_clarification() -> None:
     backend = _InMemoryBackend()
     Base.metadata.create_all(backend.engine)

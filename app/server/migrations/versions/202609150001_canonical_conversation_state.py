@@ -19,6 +19,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+###############################################################################
 def _json_value(value: Any) -> dict[str, Any] | list[Any] | None:
     if is_json_object(value) or is_json_array(value):
         return value
@@ -32,6 +33,7 @@ def _json_value(value: Any) -> dict[str, Any] | list[Any] | None:
     return None
 
 
+###############################################################################
 def _migrate_state(row: dict[str, Any]) -> dict[str, Any]:
     conversation_id = str(row["id"])
     revision = max(0, int(row.get("context_revision") or 0))
@@ -78,6 +80,7 @@ def _migrate_state(row: dict[str, Any]) -> dict[str, Any]:
     return state.model_dump(mode="json")
 
 
+###############################################################################
 def upgrade() -> None:
     bind = op.get_bind()
     conversations = sa.table(
@@ -123,6 +126,7 @@ def upgrade() -> None:
             batch.drop_column(column)
 
 
+###############################################################################
 def downgrade() -> None:
     with op.batch_alter_table("conversations") as batch:
         batch.add_column(sa.Column("active_instructions", sa.JSON(), nullable=True))

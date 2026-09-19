@@ -12,7 +12,6 @@ from server.services.llm.types import LLMToolDefinition
 if TYPE_CHECKING:
     from server.domain.agent.capability_route import AgentRunState
 
-
 ###############################################################################
 class ToolRegistry:
     """Register, expose, and retrieve the typed native tool catalogue.
@@ -191,6 +190,7 @@ _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
 )
 
 
+###############################################################################
 def _route_target_location_available(state: "AgentRunState") -> bool:
     """Check the validated route targets, not merely any prior map state."""
 
@@ -213,6 +213,7 @@ def _route_target_location_available(state: "AgentRunState") -> bool:
     )
 
 
+###############################################################################
 def _is_active_map_update(state: "AgentRunState") -> bool:
     route = state.route
     return bool(
@@ -226,6 +227,7 @@ def _is_active_map_update(state: "AgentRunState") -> bool:
     )
 
 
+###############################################################################
 def _evidence_available_for_route(state: "AgentRunState") -> bool:
     """Do not expose stale evidence tools before a new map-data retrieval."""
 
@@ -253,6 +255,7 @@ def _evidence_available_for_route(state: "AgentRunState") -> bool:
     return bool(state.evidence_refs)
 
 
+###############################################################################
 def _task_mode_allows_tool(
     registered: RegisteredTool, state: "AgentRunState"
 ) -> bool:
@@ -265,6 +268,7 @@ def _task_mode_allows_tool(
     return state.route is not None and state.route.task_mode == "execute"
 
 
+###############################################################################
 def _route_domains(state: "AgentRunState") -> set[CapabilityDomain]:
     route = state.route
     if route is None:
@@ -272,6 +276,7 @@ def _route_domains(state: "AgentRunState") -> set[CapabilityDomain]:
     return {route.primary_domain, *route.secondary_domains}
 
 
+###############################################################################
 def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> bool:
     """Expose only tools that can satisfy the validated route's domains."""
 
@@ -303,6 +308,7 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
     return bool(registered.domains.intersection(route_domains))
 
 
+###############################################################################
 def _evidence_analysis_required(state: "AgentRunState") -> bool:
     route = state.route
     if route is None:
@@ -319,6 +325,7 @@ def _evidence_analysis_required(state: "AgentRunState") -> bool:
     )
 
 
+###############################################################################
 def _history_recall_required(state: "AgentRunState") -> bool:
     route = state.route
     if route is None:
@@ -332,6 +339,7 @@ def _history_recall_required(state: "AgentRunState") -> bool:
     )
 
 
+###############################################################################
 def _data_obligation_unmet(state: "AgentRunState") -> bool:
     contract = state.completion_contract
     if contract is not None and contract.data_requirement != "provider_data":

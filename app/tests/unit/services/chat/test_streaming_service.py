@@ -22,13 +22,11 @@ from server.domain.agent.conversation import ConversationState
 from server.services.chat.streaming import ChatStreamingService
 from server.services.llm.errors import LLMConfigurationError
 
-
 ###############################################################################
 async def collect_stream_events(
     stream: AsyncIterator[ChatStreamEvent],
 ) -> list[ChatStreamEvent]:
     return [event async for event in stream]
-
 
 ###############################################################################
 def native_response(payload: ChatTurnRequest) -> ChatTurnResponse:
@@ -60,7 +58,6 @@ def native_response(payload: ChatTurnRequest) -> ChatTurnResponse:
         conversation_state=ConversationState.empty(payload.conversation_id),
     )
 
-
 ###############################################################################
 class ToolStatusAgentOrchestrator:
 
@@ -83,7 +80,6 @@ class ToolStatusAgentOrchestrator:
             {"map_session": {"session_id": "map-1"}},
         )
         return native_response(payload)
-
 
 ###############################################################################
 class ContextUsageAgentOrchestrator:
@@ -111,7 +107,6 @@ class ContextUsageAgentOrchestrator:
         )
         return native_response(payload)
 
-
 ###############################################################################
 class ConfigurationErrorAgentOrchestrator:
 
@@ -124,7 +119,6 @@ class ConfigurationErrorAgentOrchestrator:
         del payload, progress_callback
         raise LLMConfigurationError("provider unavailable")
 
-
 ###############################################################################
 class UnexpectedErrorAgentOrchestrator:
 
@@ -136,7 +130,6 @@ class UnexpectedErrorAgentOrchestrator:
     ) -> ChatTurnResponse:
         del payload, progress_callback
         raise RuntimeError("boom")
-
 
 ###############################################################################
 class CancellableAgentOrchestrator:
@@ -160,7 +153,6 @@ class CancellableAgentOrchestrator:
             self.cancelled = True
             raise
 
-
 ###############################################################################
 def stream_events(agent_orchestrator: object) -> list[ChatStreamEvent]:
     service = ChatStreamingService(agent_orchestrator)  # type: ignore[arg-type]
@@ -168,7 +160,6 @@ def stream_events(agent_orchestrator: object) -> list[ChatStreamEvent]:
         conversation_id="test-conversation", message="hi", request_id="chat-123"
     )
     return run_async_in_thread(collect_stream_events(service.stream_turn(payload)))
-
 
 ###############################################################################
 async def cancel_stream_and_check_orchestrator() -> bool:
@@ -183,7 +174,6 @@ async def cancel_stream_and_check_orchestrator() -> bool:
     await asyncio.gather(consumer, return_exceptions=True)
     return orchestrator.cancelled
 
-
 ###############################################################################
 async def consume_stream(
     service: ChatStreamingService,
@@ -191,7 +181,6 @@ async def consume_stream(
 ) -> None:
     async for _event in service.stream_turn(payload):
         pass
-
 
 ###############################################################################
 def test_stream_turn_emits_native_lifecycle_and_map_events() -> None:
@@ -211,7 +200,6 @@ def test_stream_turn_emits_native_lifecycle_and_map_events() -> None:
     assert "turn_contract" not in events[-1].data
     assert "decision" not in events[-1].data
 
-
 ###############################################################################
 def test_stream_turn_emits_context_usage_before_final_event() -> None:
     events = stream_events(ContextUsageAgentOrchestrator())
@@ -220,7 +208,6 @@ def test_stream_turn_emits_context_usage_before_final_event() -> None:
     assert events[1].data["phase"] == "native_loop"
     assert events[1].data["context_usage"]["usage_percent"] == 17.1
 
-
 ###############################################################################
 def test_stream_turn_configuration_error_maps_to_service_unavailable() -> None:
     events = stream_events(ConfigurationErrorAgentOrchestrator())
@@ -228,14 +215,12 @@ def test_stream_turn_configuration_error_maps_to_service_unavailable() -> None:
     assert events[-1].event == "error"
     assert events[-1].data["status"] == 503
 
-
 ###############################################################################
 def test_stream_turn_unexpected_exception_maps_to_internal_error() -> None:
     events = stream_events(UnexpectedErrorAgentOrchestrator())
 
     assert events[-1].event == "error"
     assert events[-1].data["status"] == 500
-
 
 ###############################################################################
 def test_stream_turn_cancels_backend_work_when_consumer_disconnects() -> None:

@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from server.domain.agent.map_plan import MapPlan
 
-
 ###############################################################################
 def test_map_plan_parses_discriminated_actions() -> None:
     plan = MapPlan.model_validate(
@@ -27,7 +26,6 @@ def test_map_plan_parses_discriminated_actions() -> None:
 
     assert plan.actions[0].action == "set_layer_opacity"
     assert plan.actions[1].action == "set_viewport"
-
 
 ###############################################################################
 @pytest.mark.parametrize(

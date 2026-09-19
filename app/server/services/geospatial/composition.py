@@ -78,7 +78,6 @@ def build_provider_execution_policy(
         ),
     )
 
-
 ###############################################################################
 def build_geospatial_runtime(
     database: SQLiteRepository,

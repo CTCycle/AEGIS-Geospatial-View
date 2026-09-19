@@ -92,7 +92,6 @@ def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
     finally:
         shutil.rmtree(manifests, ignore_errors=True)
 
-
 ###############################################################################
 def test_manifest_loader_rejects_empty_agentic_domains() -> None:
     loader = GeospatialManifestLoader()
@@ -110,7 +109,6 @@ def test_manifest_loader_rejects_empty_agentic_domains() -> None:
             source="missing_domains.json",
             require_agentic_domains=True,
         )
-
 
 ###############################################################################
 def test_loaded_manifests_expose_v2_capability_kinds() -> None:

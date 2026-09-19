@@ -16,7 +16,6 @@ from server.domain.agent.evidence import AgentEvidenceSummary, EvidenceStatus
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import AgentEvidenceRecord, ConversationRecord
 
-
 ###############################################################################
 class AgentEvidenceRepository:
     """Store bounded evidence and expose only verified payloads to services."""

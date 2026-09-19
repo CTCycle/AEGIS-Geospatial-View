@@ -23,7 +23,6 @@ PROBE_TTL_SECONDS = 15 * 60
 PROBE_TIMEOUT_SECONDS = 30.0
 PROBE_REQUEST = "Show a map of Italy"
 
-
 ###############################################################################
 class StructuredProbeService:
     """Probe the native route/tool contract without creating conversation state."""

@@ -421,18 +421,15 @@ class CapabilityExecutionService:
             ),
         )
 
-
 ###############################################################################
 def _provider_id(manifest: dict[str, Any]) -> str:
     return str(manifest.get("provider") or manifest.get("provider_id") or "").strip()
-
 
 ###############################################################################
 def _bbox(value: list[float] | None) -> tuple[float, float, float, float] | None:
     if value is None:
         return None
     return tuple(float(item) for item in value)  # type: ignore[return-value]
-
 
 ###############################################################################
 def _provider_params(
@@ -462,7 +459,6 @@ def _provider_params(
         params.setdefault("end_time_iso", request.end_time_iso)
     return params
 
-
 ###############################################################################
 def _parse_request_time(value: str | None) -> tuple[datetime | None, str | None]:
     if not value:
@@ -475,7 +471,6 @@ def _parse_request_time(value: str | None) -> tuple[datetime | None, str | None]
         parsed = parsed.replace(tzinfo=UTC)
     return parsed, None
 
-
 ###############################################################################
 def _tool_status(response: ProviderResponse) -> Any:
     if response.result_status == "valid_empty":
@@ -483,7 +478,6 @@ def _tool_status(response: ProviderResponse) -> Any:
     if response.result_status in {"partial", "stale"} or response.partial:
         return "partial"
     return "success"
-
 
 ###############################################################################
 def _evidence_status(response: ProviderResponse) -> EvidenceStatus:
@@ -493,7 +487,6 @@ def _evidence_status(response: ProviderResponse) -> EvidenceStatus:
         return "partial"
     return "available"
 
-
 ###############################################################################
 def _evidence_kind(result_type: str) -> EvidenceKind:
     if result_type == "features":
@@ -501,7 +494,6 @@ def _evidence_kind(result_type: str) -> EvidenceKind:
     if result_type == "raster":
         return "raster_descriptor"
     return "capability_result"
-
 
 ###############################################################################
 def _response_summary(
@@ -580,7 +572,6 @@ def _response_summary(
         }
     return summary
 
-
 ###############################################################################
 def _map_eligibility(response: ProviderResponse) -> str:
     """Classify provider evidence before it is admitted to a map plan."""
@@ -606,7 +597,6 @@ def _map_eligibility(response: ProviderResponse) -> str:
         return "not_renderable"
     return "unknown"
 
-
 ###############################################################################
 def _feature_has_geometry(value: object) -> bool:
     feature = value if is_json_object(value) else {}
@@ -624,7 +614,6 @@ def _feature_has_geometry(value: object) -> bool:
         and isinstance(longitude, (int, float))
         and not isinstance(longitude, bool)
     )
-
 
 ###############################################################################
 def _has_render_source(value: object) -> bool:
@@ -650,7 +639,6 @@ def _has_render_source(value: object) -> bool:
             "features_url",
         )
     )
-
 
 ###############################################################################
 def _feature_bbox(value: object) -> list[float] | None:
@@ -689,7 +677,6 @@ def _feature_bbox(value: object) -> list[float] | None:
     latitudes = [item[1] for item in coordinates]
     return [min(longitudes), min(latitudes), max(longitudes), max(latitudes)]
 
-
 ###############################################################################
 def _summary_text(response: ProviderResponse, summary: dict[str, Any]) -> str:
     count = summary.get("feature_count")
@@ -705,14 +692,12 @@ def _summary_text(response: ProviderResponse, summary: dict[str, Any]) -> str:
         f"{response.result_type} result from provider '{response.provider_id}'."
     )
 
-
 ###############################################################################
 def _json_size(value: Any) -> int | None:
     try:
         return len(json.dumps(value, ensure_ascii=False, default=str).encode("utf-8"))
     except (TypeError, ValueError):
         return None
-
 
 ###############################################################################
 def _duration_ms(started: float) -> int:

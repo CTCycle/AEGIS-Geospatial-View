@@ -86,6 +86,7 @@ class AgentCheckpoint(BaseModel):
     completion_reason: str | None = None
 
 
+###############################################################################
 def redact_trace_value(value: object, *, path: str = "$") -> tuple[object, list[str]]:
     """Return a bounded trace-safe value and the fields redacted from it.
 
@@ -144,6 +145,7 @@ def redact_trace_value(value: object, *, path: str = "$") -> tuple[object, list[
     return result, list(dict.fromkeys(redacted))
 
 
+###############################################################################
 def redact_trace_url(value: str, *, path: str = "$") -> tuple[str, list[str]]:
     """Redact sensitive query parameters while retaining the URL shape."""
 

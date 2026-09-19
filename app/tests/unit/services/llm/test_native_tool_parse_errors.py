@@ -7,7 +7,6 @@ from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.openai_provider import OpenAIProvider
 
-
 ###############################################################################
 def test_openai_preserves_invalid_json_and_real_empty_object() -> None:
     calls = OpenAIProvider._parse_tool_calls(
@@ -33,7 +32,6 @@ def test_openai_preserves_invalid_json_and_real_empty_object() -> None:
     assert calls[0].parse_error == "invalid_json"
     assert calls[1].arguments == {}
     assert calls[1].parse_error is None
-
 
 ###############################################################################
 def test_google_and_ollama_reject_non_object_arguments() -> None:
@@ -70,7 +68,6 @@ def test_google_and_ollama_reject_non_object_arguments() -> None:
     assert google_calls[0].parse_error == "arguments_not_object"
     assert ollama_calls[0].arguments is None
     assert ollama_calls[0].parse_error == "arguments_not_object"
-
 
 ###############################################################################
 def test_deepseek_preserves_missing_name_as_a_parse_error() -> None:

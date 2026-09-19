@@ -12,9 +12,11 @@ from server.repositories.conversations import ConversationRepository
 from server.repositories.schemas.models import Base
 
 
+###############################################################################
 class _InMemoryBackend:
     db_path = None
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.engine = sqlalchemy.create_engine(
             "sqlite://",
@@ -25,12 +27,14 @@ class _InMemoryBackend:
         self.session = sessionmaker(bind=self.engine, future=True)
 
 
+###############################################################################
 def _backend() -> _InMemoryBackend:
     backend = _InMemoryBackend()
     Base.metadata.create_all(backend.engine)
     return backend
 
 
+###############################################################################
 def test_history_search_is_scoped_bounded_and_deterministic() -> None:
     backend = _backend()
     conversations = ConversationRepository(backend)
@@ -85,6 +89,7 @@ def test_history_search_is_scoped_bounded_and_deterministic() -> None:
     assert [item["turn_index"] for item in before_current["messages"]] == [1, 2]
 
 
+###############################################################################
 def test_conversation_page_searches_original_messages_and_uses_keyset_cursor() -> None:
     backend = _backend()
     conversations = ConversationRepository(backend)
@@ -115,6 +120,7 @@ def test_conversation_page_searches_original_messages_and_uses_keyset_cursor() -
     ]
 
 
+###############################################################################
 def test_run_trace_is_paged_and_redacts_secrets_and_reasoning() -> None:
     backend = _backend()
     conversations = ConversationRepository(backend)
@@ -165,6 +171,7 @@ def test_run_trace_is_paged_and_redacts_secrets_and_reasoning() -> None:
     assert [event["sequence"] for event in remaining["events"]] == [2]
 
 
+###############################################################################
 def test_run_summary_page_supports_request_search() -> None:
     backend = _backend()
     conversations = ConversationRepository(backend)

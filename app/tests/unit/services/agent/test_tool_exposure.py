@@ -21,11 +21,9 @@ from server.services.agent.tool_definitions import (
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.types import LLMToolDefinition
 
-
 ###############################################################################
 async def _handler(_arguments: BaseModel, _state: AgentRunState) -> dict[str, Any]:
     return {"ok": True}
-
 
 ###############################################################################
 def _result(_value: Any, call_id: str) -> ToolResult:
@@ -36,7 +34,6 @@ def _result(_value: Any, call_id: str) -> ToolResult:
         summary="ok",
         metadata=ToolExecutionMetadata(duration_ms=0),
     )
-
 
 ###############################################################################
 def _registered(
@@ -63,7 +60,6 @@ def _registered(
         result_normalizer=_result,
     )
 
-
 ###############################################################################
 def _state(phase: AgentPhase, *, capability_ids: list[str] | None = None) -> AgentRunState:
     return AgentRunState(
@@ -73,7 +69,6 @@ def _state(phase: AgentPhase, *, capability_ids: list[str] | None = None) -> Age
         user_message="Find data.",
         capability_ids=capability_ids or [],
     )
-
 
 ###############################################################################
 def test_exposure_is_phase_and_prerequisite_bound() -> None:
@@ -135,7 +130,6 @@ def test_exposure_is_phase_and_prerequisite_bound() -> None:
         "traffic",
         "weather",
     ]
-
 
 ###############################################################################
 def test_typed_tool_inputs_reject_unknown_fields() -> None:

@@ -208,6 +208,7 @@ def test_update_settings_rejects_blank_agent_selection() -> None:
         )
 
 
+###############################################################################
 @pytest.mark.parametrize(
     "provider",
     ["OpenAI", " openai", "openai ", "openai-compatible", "opencode_go"],

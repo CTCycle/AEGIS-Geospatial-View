@@ -116,6 +116,7 @@ def _contract(*requirements: str) -> CompletionContract:
     )
 
 
+###############################################################################
 def _goal(
     *,
     temporal_scope: dict[str, object] | None = None,
@@ -616,6 +617,7 @@ def test_production_render_ack_persists_terminal_events_atomically() -> None:
     assert len(presentation.get("durable_event_ids", [])) == 3
 
 
+###############################################################################
 def test_resumable_render_ack_reenters_same_run_and_preserves_attempts(
     render_context,
 ) -> None:
@@ -716,6 +718,7 @@ def test_resumable_render_ack_reenters_same_run_and_preserves_attempts(
     assert duplicate.resume_required is False
 
 
+###############################################################################
 def test_resumable_ready_check_rejection_becomes_render_failure_observation(
     render_context,
 ) -> None:

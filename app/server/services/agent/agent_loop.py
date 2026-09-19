@@ -69,7 +69,6 @@ class AgentProvider(Protocol):
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult: ...
 
-
 ###############################################################################
 class AgentProviderFactory(Protocol):
 
@@ -77,13 +76,14 @@ class AgentProviderFactory(Protocol):
     def get_provider(self, provider: str) -> AgentProvider: ...
 
 
+###############################################################################
 class AgentRunControlSignal(RuntimeError):
     """Internal stop signal for cancellation or version supersession."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, reason: Literal["cancelled", "superseded"]) -> None:
         self.reason = reason
         super().__init__(reason)
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -120,7 +120,6 @@ class AgentLoopRequest:
     ] | None = None
     run_state_check: Callable[[], str | None] | None = None
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class AgentLoopOutcome:
@@ -150,6 +149,7 @@ class AgentLoopOutcome:
     failure_detail: str | None = None
 
 
+###############################################################################
 class AgentLoop:
     """Own routing, progressive tool exposure, execution, and stopping."""
 
@@ -643,6 +643,7 @@ class AgentLoop:
             ),
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _loop_decision(
         reason: str,
@@ -831,6 +832,7 @@ class AgentLoop:
             )
         return candidate or "The map is ready and the rendering was verified."
 
+    # -------------------------------------------------------------------------
     async def _finalize_completed_request(
         self,
         request: AgentLoopRequest,
@@ -1889,6 +1891,7 @@ class AgentLoop:
             results.append(refreshed)
         return results
 
+    # -------------------------------------------------------------------------
     async def _refresh_capabilities_after_location(
         self,
         request: AgentLoopRequest,
@@ -2848,6 +2851,7 @@ class AgentLoop:
         return f"{text.rstrip()}\n\n{suffix}" if text.strip() else suffix
 
 
+###############################################################################
 def _is_location_only_map_request(
     user_message: str, route: CapabilityRoute
 ) -> bool:

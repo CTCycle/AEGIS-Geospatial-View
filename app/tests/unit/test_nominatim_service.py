@@ -294,7 +294,6 @@ def test_nominatim_deduplicates_city_boundary_and_centroid() -> None:
     assert len(ranked) == 2
     assert "ambiguous_candidates" not in ranked[0]
 
-
 ###############################################################################
 def test_nominatim_deduplicates_city_boundary_without_parent_fields() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)

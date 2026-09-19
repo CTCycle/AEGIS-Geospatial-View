@@ -8,7 +8,6 @@ from server.contracts.location import LocationSignal
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.location_resolver import LocationResolver
 
-
 ###############################################################################
 class _CountryGeocoder:
 
@@ -38,7 +37,6 @@ class _CountryGeocoder:
             },
         }
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     ("country", "code"),
@@ -65,7 +63,6 @@ def test_country_administrative_boundary_requires_matching_country_identity(
     assert isinstance(result, ResolvedLocation)
     assert result.location_type == "country"
 
-
 ###############################################################################
 def test_country_rejects_subordinate_administrative_region() -> None:
     resolver = LocationResolver(
@@ -80,7 +77,6 @@ def test_country_rejects_subordinate_administrative_region() -> None:
 
     assert not isinstance(result, ResolvedLocation)
     assert result.missing_fields == ["location"]
-
 
 ###############################################################################
 def test_country_rejects_mismatched_country_code() -> None:

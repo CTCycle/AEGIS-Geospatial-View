@@ -23,6 +23,7 @@ from server.services.agent_runs.events import RunEventPublisher
 class RenderAcknowledgementError(ValueError):
     """Raised when browser evidence cannot be applied to the prepared run."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         message: str,

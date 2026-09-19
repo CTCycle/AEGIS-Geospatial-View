@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.domain.agent.conversation import ConversationState, PendingClarification
 
 
+###############################################################################
 def test_legacy_unresolved_question_migrates_and_is_scoped() -> None:
     state = ConversationState.from_persisted(
         "conversation-1",
@@ -27,6 +28,7 @@ def test_legacy_unresolved_question_migrates_and_is_scoped() -> None:
     assert "unresolved_questions" not in state.model_dump(mode="json")
 
 
+###############################################################################
 def test_future_conversation_state_schema_is_rejected() -> None:
     try:
         ConversationState.from_persisted(
@@ -42,6 +44,7 @@ def test_future_conversation_state_schema_is_rejected() -> None:
         raise AssertionError("Future conversation state schema was accepted.")
 
 
+###############################################################################
 def test_unrelated_turn_defers_but_does_not_delete_clarification() -> None:
     state = ConversationState.from_persisted(
         "conversation-2",
@@ -61,6 +64,7 @@ def test_unrelated_turn_defers_but_does_not_delete_clarification() -> None:
     assert state.pending_clarification.question.endswith("Bracciano?")
 
 
+###############################################################################
 def test_generic_unrelated_turn_does_not_answer_clarification() -> None:
     state = ConversationState.from_persisted(
         "conversation-3",
@@ -79,6 +83,7 @@ def test_generic_unrelated_turn_does_not_answer_clarification() -> None:
     assert deferred.status == "deferred"
 
 
+###############################################################################
 def test_direct_answer_resolves_and_preserves_terminal_clarification() -> None:
     state = ConversationState.from_persisted(
         "conversation-4",
@@ -100,6 +105,7 @@ def test_direct_answer_resolves_and_preserves_terminal_clarification() -> None:
     assert preserved.status == "answered"
 
 
+###############################################################################
 def test_infrastructure_option_matching_uses_word_boundaries() -> None:
     clarification = PendingClarification.from_turn(
         "Which infrastructure category do you need?",

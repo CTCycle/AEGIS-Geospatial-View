@@ -71,7 +71,6 @@ type JsonValue = (
 )
 type JsonSchema = dict[str, JsonValue]
 
-
 ###############################################################################
 def _validated_basemap_ids(capability_registry: CapabilityRegistry) -> list[str]:
     """Return the exact canonical basemap IDs exposed by the active catalog."""
@@ -85,6 +84,7 @@ def _validated_basemap_ids(capability_registry: CapabilityRegistry) -> list[str]
     )
 
 
+###############################################################################
 def _map_plan_schema(
     input_model: type[BaseModel], basemap_ids: list[str]
 ) -> dict[str, Any]:
@@ -112,7 +112,6 @@ def _map_plan_schema(
 
     specialize(schema)
     return schema
-
 
 ###############################################################################
 def register_agent_tools(
@@ -332,7 +331,6 @@ def register_agent_tools(
     for tool in registrations:
         registry.register(tool)
 
-
 ###############################################################################
 def _registration(
     *,
@@ -369,7 +367,6 @@ def _registration(
         argument_schema_provider=argument_schema_provider,
     )
 
-
 ###############################################################################
 def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
     async def execute(
@@ -392,6 +389,7 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
     return execute
 
 
+###############################################################################
 def _bind_execute_request(
     request: ExecuteCapabilityInput, state: AgentRunState
 ) -> ExecuteCapabilityInput:
@@ -447,6 +445,7 @@ def _bind_execute_request(
     return bound
 
 
+###############################################################################
 def _user_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     """Keep semantic provider arguments while removing invariant aliases."""
 
@@ -475,6 +474,7 @@ def _user_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _optional_string(value: Any) -> str | None:
     if value is None:
         return None
@@ -482,6 +482,7 @@ def _optional_string(value: Any) -> str | None:
     return text or None
 
 
+###############################################################################
 def _positive_float(value: Any) -> float | None:
     try:
         number = float(value)
@@ -490,6 +491,7 @@ def _positive_float(value: Any) -> float | None:
     return number if math.isfinite(number) and number > 0 else None
 
 
+###############################################################################
 def _bbox_for_radius(location: ResolvedLocation, radius_m: float) -> list[float]:
     """Create a bounded approximate bbox from a resolved point and radius."""
 
@@ -504,6 +506,7 @@ def _bbox_for_radius(location: ResolvedLocation, radius_m: float) -> list[float]
     ]
 
 
+###############################################################################
 def _lower_execution_extent(
     spatial: dict[str, Any],
     location: ResolvedLocation | None,
@@ -549,7 +552,6 @@ def _lower_execution_extent(
         target_ref=target_ref,
     )
 
-
 ###############################################################################
 def _location_for_request(
     request: ExecuteCapabilityInput, state: AgentRunState
@@ -575,7 +577,6 @@ def _location_for_request(
         return state.active_map_session.resolved_location
     return None
 
-
 ###############################################################################
 def _apply_map_plan_handler(service: MapPlanService) -> Any:
     async def apply(request: ApplyMapPlanInput, state: AgentRunState) -> ToolResult:
@@ -595,7 +596,6 @@ def _apply_map_plan_handler(service: MapPlanService) -> Any:
         )
 
     return apply
-
 
 ###############################################################################
 def _map_plan_semantic_validator(
@@ -625,7 +625,6 @@ def _map_plan_semantic_validator(
         )
     return errors[:8]
 
-
 ###############################################################################
 async def _route_handler(_request: RouteRequestInput, _state: AgentRunState) -> ToolResult:
     return ToolResult(
@@ -643,13 +642,11 @@ async def _route_handler(_request: RouteRequestInput, _state: AgentRunState) -> 
         metadata=ToolExecutionMetadata(duration_ms=0),
     )
 
-
 ###############################################################################
 def _normalize_result(value: Any, call_id: str) -> ToolResult:
     if not isinstance(value, ToolResult):
         raise TypeError("Native handlers must return ToolResult.")
     return value.model_copy(update={"call_id": call_id})
-
 
 ###############################################################################
 def _capability_semantic_validator(
@@ -703,6 +700,7 @@ def _capability_semantic_validator(
     return errors[:8]
 
 
+###############################################################################
 def _manifest_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     """Remove route-owned aliases before applying the manifest schema."""
 
@@ -731,6 +729,7 @@ def _manifest_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _json_schema_errors(value: Any, schema: Any, *, path: str) -> list[str]:
     """Validate the bounded manifest subset used at the execute boundary."""
 
@@ -820,6 +819,7 @@ def _json_schema_errors(value: Any, schema: Any, *, path: str) -> list[str]:
     return errors[:8]
 
 
+###############################################################################
 def _json_type_matches(value: Any, schema_type: Any) -> bool:
     if schema_type == "object":
         return isinstance(value, dict)
@@ -838,6 +838,7 @@ def _json_type_matches(value: Any, schema_type: Any) -> bool:
     return True
 
 
+###############################################################################
 def _execute_argument_schema_provider(
     capability_registry: CapabilityRegistry,
 ) -> Any:
@@ -859,7 +860,6 @@ def _execute_argument_schema_provider(
 
     return provide
 
-
 ###############################################################################
 def _evidence_semantic_validator(
     request: Any, state: AgentRunState
@@ -868,7 +868,6 @@ def _evidence_semantic_validator(
     refs.extend(getattr(request, "evidence_refs", []) or [])
     missing = [str(ref) for ref in refs if str(ref) not in state.evidence_refs]
     return [f"Unknown evidence reference: {ref}." for ref in missing[:8]]
-
 
 ###############################################################################
 def _provider_layer_semantic_validator(
@@ -881,7 +880,6 @@ def _provider_layer_semantic_validator(
         if normalized not in permitted:
             return ["provider_id is outside the validated provider allowlist."]
     return []
-
 
 ###############################################################################
 def _describe_semantic_validator(

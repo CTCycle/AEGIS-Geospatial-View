@@ -41,7 +41,6 @@ class AgentContextPackage(BaseModel):
     omitted_message_ids: list[int] = Field(default_factory=lambda: list[int]())
     context_allocation: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
-
 ###############################################################################
 class AgentContextView(BaseModel):
     """Ephemeral, bounded semantic projection for one model decision.
@@ -75,6 +74,7 @@ class AgentContextView(BaseModel):
         default_factory=lambda: dict[str, Any]()
     )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def from_state(
         cls,
