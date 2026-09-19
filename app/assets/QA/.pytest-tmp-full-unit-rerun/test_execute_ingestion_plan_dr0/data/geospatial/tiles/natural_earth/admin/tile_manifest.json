@@ -1,7 +1,0 @@
-{
-  "capabilityId": "natural_earth_admin",
-  "featureCount": 1,
-  "requiresOptionalTiler": true,
-  "source": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\assets\\QA\\.pytest-tmp-full-unit-rerun\\test_execute_ingestion_plan_dr0\\data\\geospatial\\normalized\\natural_earth\\admin\\natural_earth_admin.geojson",
-  "tileFormat": "geojson-vector-tile-ready"
-}
