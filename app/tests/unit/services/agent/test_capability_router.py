@@ -10,7 +10,10 @@ from server.domain.agent.capability_route import (
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
-from server.services.agent.capability_router import CapabilityRouter
+from server.services.agent.capability_router import (
+    CapabilityRouter,
+    build_location_map_fallback_route,
+)
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
 
@@ -272,6 +275,18 @@ def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools
     assert decision.route.requires_location is True
     assert "location_required_for_new_map" in decision.reason_codes
     assert "osm_default" not in decision.capability_ids
+
+
+def test_location_map_fallback_route_is_limited_to_non_data_map_wording() -> None:
+    fallback = build_location_map_fallback_route("Show me Springfield")
+
+    assert fallback is not None
+    assert fallback.primary_domain is CapabilityDomain.PLACE_SEARCH
+    assert fallback.secondary_domains == [CapabilityDomain.MAP_RENDERING]
+    assert fallback.presentation == "map"
+    assert fallback.requires_location is True
+
+    assert build_location_map_fallback_route("Show hospitals near Springfield") is None
 
 
 def test_router_uses_active_map_for_layer_lifecycle_updates() -> None:

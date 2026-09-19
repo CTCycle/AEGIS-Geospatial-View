@@ -40,6 +40,10 @@ Persisted map UI state includes:
 - stable overlay instance IDs and the active collection revision carried by the
   current `mapSession`
 
+The basemap selector is a live session preference: a manual choice is retained
+when subsequent location requests prepare a new map candidate, while a new
+chat or browser reload starts from the catalog default basemap.
+
 The v5 boundary invalidates pre-collection active-map/task snapshots. A small
 one-time migration retains conversation ID and messages, while old map/task
 state is discarded; messages are never removed solely because the map schema
