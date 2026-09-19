@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "countries": [
+    {
+      "iso2": "US",
+      "name": "United States"
+    }
+  ],
+  "aliases": [
+    {
+      "alias": "USA",
+      "iso2": "US"
+    },
+    {
+      "alias": " usa ",
+      "iso2": "US"
+    }
+  ]
+}

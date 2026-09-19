@@ -1,0 +1,11 @@
+{
+  "capabilityId": "natural_earth_admin",
+  "checksumSource": null,
+  "compression": "none",
+  "expectedFormat": "csv",
+  "rawFile": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\assets\\QA\\.pytest-tmp-full-unit-rerun\\test_execute_ingestion_plan_no0\\data\\geospatial\\raw\\natural_earth\\admin\\airports.csv",
+  "sha256": "32a3bc54bbca65342bcc83cb16003c10f534e4b6e3b01572fd9e97628117a30e",
+  "sourceTimestamp": "2026-09-18T15:09:27.950172+00:00",
+  "sourceUrl": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\assets\\QA\\.pytest-tmp-full-unit-rerun\\test_execute_ingestion_plan_no0\\airports.csv",
+  "targetCrs": "EPSG:4326"
+}

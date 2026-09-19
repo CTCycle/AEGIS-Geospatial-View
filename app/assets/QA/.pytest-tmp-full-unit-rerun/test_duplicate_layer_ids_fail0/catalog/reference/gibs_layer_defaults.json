@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "layerDefaults": [
+    {
+      "layerId": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+      "nativeResolutionM": 375.0,
+      "dateFallbackDays": 7
+    }
+  ]
+}

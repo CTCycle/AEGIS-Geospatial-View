@@ -1,0 +1,21 @@
+{
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          -122.401,
+          37.789
+        ],
+        "type": "Point"
+      },
+      "id": "overture-place-1",
+      "properties": {
+        "category": "healthcare",
+        "id": "overture-place-1",
+        "name": "Fixture Clinic"
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

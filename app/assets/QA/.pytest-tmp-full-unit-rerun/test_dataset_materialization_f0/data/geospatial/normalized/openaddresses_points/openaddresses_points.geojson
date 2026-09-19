@@ -1,0 +1,39 @@
+{
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          -122.3958,
+          37.7936
+        ],
+        "type": "Point"
+      },
+      "id": "oa-1",
+      "properties": {
+        "city": "San Francisco",
+        "id": "oa-1",
+        "number": "1",
+        "street": "Market Street"
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": {
+        "coordinates": [
+          -122.39,
+          37.79
+        ],
+        "type": "Point"
+      },
+      "id": "oa-2",
+      "properties": {
+        "city": "San Francisco",
+        "id": "oa-2",
+        "number": "2",
+        "street": "Main Street"
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

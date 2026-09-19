@@ -1,0 +1,29 @@
+{
+  "indexType": "term-to-feature",
+  "terms": {
+    "field": [
+      "1"
+    ],
+    "harbor": [
+      "2"
+    ],
+    "heliport": [
+      "2"
+    ],
+    "khpt": [
+      "2"
+    ],
+    "ktst": [
+      "1"
+    ],
+    "pad": [
+      "2"
+    ],
+    "small_airport": [
+      "1"
+    ],
+    "test": [
+      "1"
+    ]
+  }
+}

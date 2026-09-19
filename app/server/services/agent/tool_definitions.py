@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -99,6 +99,17 @@ class ExecuteCapabilityInput(StrictToolInput):
     filters: dict[str, Any] = Field(default_factory=dict)
     arguments: dict[str, Any] = Field(default_factory=dict)
 
+
+class ExecuteCapabilityToolInput(StrictToolInput):
+    """Model intent for execution; geography and time remain server-owned."""
+
+    capability_id: str = Field(min_length=1, max_length=200)
+    operation: str | None = Field(default=None, max_length=80)
+    location_ref: str | None = Field(default=None, max_length=200)
+    evidence_refs: list[str] = Field(default_factory=list, max_length=16)
+    filters: dict[str, Any] = Field(default_factory=dict)
+    arguments: dict[str, Any] = Field(default_factory=dict)
+
 ###############################################################################
 class InspectEvidenceInput(StrictToolInput):
     evidence_ref: str = Field(min_length=1, max_length=200)
@@ -107,10 +118,65 @@ class InspectEvidenceInput(StrictToolInput):
     cursor: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=20, ge=1, le=100)
 
-###############################################################################
+class AttributeFilterOperation(StrictToolInput):
+    op: Literal["attribute_filter"]
+    field: str = Field(min_length=1, max_length=200)
+    operator: Literal["eq", "neq", "in", "contains", "gte", "lte"] = "eq"
+    value: Any
+
+
+class TemporalFilterOperation(StrictToolInput):
+    op: Literal["temporal_filter"]
+    field: str = Field(default="timestamp", min_length=1, max_length=200)
+    start: str | None = Field(default=None, max_length=80)
+    end: str | None = Field(default=None, max_length=80)
+
+
+class SpatialFilterOperation(StrictToolInput):
+    op: Literal["spatial_filter"]
+    field: str = Field(default="geometry", min_length=1, max_length=200)
+    center: list[float] = Field(min_length=2, max_length=2)
+    radius_km: float = Field(gt=0, le=20_000)
+
+
+class SortOperation(StrictToolInput):
+    op: Literal["sort"]
+    field: str = Field(min_length=1, max_length=200)
+    descending: bool = False
+
+
+class LimitOperation(StrictToolInput):
+    op: Literal["limit"]
+    value: int = Field(ge=1, le=10_000)
+
+
+class FieldProjectionOperation(StrictToolInput):
+    op: Literal["field_projection"]
+    fields: list[str] = Field(min_length=1, max_length=64)
+
+
+class AggregateOperation(StrictToolInput):
+    op: Literal["aggregate"]
+    field: str = Field(min_length=1, max_length=200)
+    group_by: str = Field(min_length=1, max_length=200)
+
+
+EvidenceOperation = Annotated[
+    AttributeFilterOperation
+    | TemporalFilterOperation
+    | SpatialFilterOperation
+    | SortOperation
+    | LimitOperation
+    | FieldProjectionOperation
+    | AggregateOperation,
+    Field(discriminator="op"),
+]
+
+
 class TransformEvidenceInput(StrictToolInput):
     evidence_refs: list[str] = Field(min_length=1, max_length=8)
-    operations: list[dict[str, Any]] = Field(min_length=1, max_length=8)
+    operations: list[EvidenceOperation] = Field(min_length=1, max_length=8)
+
 
 ###############################################################################
 class SearchConversationHistoryInput(StrictToolInput):
@@ -141,6 +207,8 @@ __all__ = [
     "CapabilityDiscoveryInput",
     "DescribeCapabilityInput",
     "ExecuteCapabilityInput",
+    "ExecuteCapabilityToolInput",
+    "EvidenceOperation",
     "HistorySearchInput",
     "InspectEvidenceInput",
     "ProviderLayerDiscoveryInput",

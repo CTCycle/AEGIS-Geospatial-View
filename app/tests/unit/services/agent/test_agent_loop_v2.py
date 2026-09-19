@@ -24,6 +24,7 @@ from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
 from server.services.agent.agent_loop import AgentLoop, AgentLoopRequest
 from server.services.agent.capability_router import CapabilityRouter
+from server.services.agent.tool_definitions import RouteRequestInput
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.errors import LLMProviderRequestError
@@ -109,13 +110,33 @@ def _loop(
     registry.register(
         RegisteredTool(
             definition=LLMToolDefinition(
+                name="route_request",
+                description="test route",
+                parameters_json_schema=RouteRequestInput.model_json_schema(),
+            ),
+            input_model=RouteRequestInput,
+            handler=_answer_handler,
+            domains=frozenset({CapabilityDomain.MIXED}),
+            phases=frozenset({AgentPhase.ROUTE_REQUEST}),
+            visibility="internal",
+            prerequisites=frozenset(),
+            timeout_key="tool_execution_seconds",
+            idempotent=True,
+            result_normalizer=lambda value, call_id: value.model_copy(
+                update={"call_id": call_id}
+            ),
+        )
+    )
+    registry.register(
+        RegisteredTool(
+            definition=LLMToolDefinition(
                 name="test_tool",
                 description="test",
                 parameters_json_schema={"type": "object"},
             ),
             input_model=EmptyInput,
             handler=_answer_handler,
-            domains=frozenset({CapabilityDomain.DATA_RETRIEVAL}),
+            domains=frozenset({CapabilityDomain.MIXED}),
             phases=frozenset({AgentPhase.BUILD_TOOL_CONTEXT}),
             visibility="model",
             prerequisites=frozenset({"route"}),
@@ -1182,8 +1203,8 @@ async def test_hydrated_context_is_rebuilt_with_the_latest_observation() -> None
                         id="route-1",
                         name="route_request",
                         arguments={
-                            "primary_domain": "data_retrieval",
-                            "task_mode": "answer",
+                            "primary_domain": "map_rendering",
+                            "task_mode": "execute",
                             "presentation": "text",
                             "requires_location": False,
                             "capability_queries": ["hospitals"],
@@ -1520,4 +1541,5 @@ async def test_map_route_text_cannot_stop_before_a_map_candidate_exists() -> Non
         )
     )
 
-    assert outcome.stopped_reason == "insufficient_evidence"
+    assert outcome.stopped_reason == "failed"
+    assert outcome.failure_category == "model_capability"

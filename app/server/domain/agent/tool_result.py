@@ -13,6 +13,7 @@ from server.common.typing import is_json_array, is_json_object
 ToolErrorType = Literal[
     "malformed_call",
     "unknown_tool",
+    "tool_not_exposed",
     "schema_validation",
     "semantic_validation",
     "policy_rejection",

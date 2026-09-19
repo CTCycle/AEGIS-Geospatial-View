@@ -1,0 +1,7 @@
+{
+  "capabilityId": "census_cartographic_boundaries",
+  "featureCount": 1,
+  "requiresOptionalTiler": true,
+  "source": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\assets\\QA\\.pytest-tmp-full-unit-rerun\\test_dataset_materialization_f0\\data\\geospatial\\normalized\\census_cartographic_boundaries\\census_cartographic_boundaries.geojson",
+  "tileFormat": "geojson-vector-tile-ready"
+}

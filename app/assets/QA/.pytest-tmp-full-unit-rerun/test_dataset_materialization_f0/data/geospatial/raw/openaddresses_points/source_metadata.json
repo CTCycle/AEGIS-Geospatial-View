@@ -1,0 +1,11 @@
+{
+  "capabilityId": "openaddresses_points",
+  "checksumSource": null,
+  "compression": "none",
+  "expectedFormat": "csv",
+  "rawFile": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\assets\\QA\\.pytest-tmp-full-unit-rerun\\test_dataset_materialization_f0\\data\\geospatial\\raw\\openaddresses_points\\openaddresses_points.csv",
+  "sha256": "ed0bb0db5fa8b0587af1b9462c014d7e3f0213397176b3a81c28bfd12c1abb5c",
+  "sourceTimestamp": "2026-09-18T15:09:27.997679+00:00",
+  "sourceUrl": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\tests\\fixtures\\geospatial\\openaddresses_points.csv",
+  "targetCrs": "EPSG:4326"
+}

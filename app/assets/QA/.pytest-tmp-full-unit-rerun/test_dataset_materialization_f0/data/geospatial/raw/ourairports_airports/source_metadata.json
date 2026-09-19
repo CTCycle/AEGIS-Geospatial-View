@@ -1,0 +1,11 @@
+{
+  "capabilityId": "ourairports_airports",
+  "checksumSource": null,
+  "compression": "none",
+  "expectedFormat": "csv",
+  "rawFile": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\assets\\QA\\.pytest-tmp-full-unit-rerun\\test_dataset_materialization_f0\\data\\geospatial\\raw\\ourairports_airports\\ourairports_airports.csv",
+  "sha256": "08a766fdcdb800a516321136d29e6377107d36602971c2f1c09dfccd16a54e3e",
+  "sourceTimestamp": "2026-09-18T15:09:28.006608+00:00",
+  "sourceUrl": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\tests\\fixtures\\geospatial\\ourairports_airports.csv",
+  "targetCrs": "EPSG:4326"
+}

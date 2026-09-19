@@ -1,0 +1,19 @@
+{
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          7.0,
+          45.0
+        ],
+        "type": "Point"
+      },
+      "id": "outside",
+      "properties": {
+        "name": "Outside"
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

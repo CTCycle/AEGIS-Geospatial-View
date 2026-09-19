@@ -1,0 +1,11 @@
+{
+  "capabilityId": "dataset_b",
+  "checksumSource": null,
+  "compression": "none",
+  "expectedFormat": "geojson",
+  "rawFile": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\assets\\QA\\.pytest-tmp-full-unit-rerun\\test_materialize_datasets_filt0\\data\\raw\\dataset_b\\b.geojson",
+  "sha256": "cb4ec3315f4de76c76756792fa5e0440357c5e5dee7e57a31966b57c48fec290",
+  "sourceTimestamp": "2026-09-18T15:09:28.447288+00:00",
+  "sourceUrl": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\assets\\QA\\.pytest-tmp-full-unit-rerun\\test_materialize_datasets_filt0\\b.geojson",
+  "targetCrs": "EPSG:4326"
+}

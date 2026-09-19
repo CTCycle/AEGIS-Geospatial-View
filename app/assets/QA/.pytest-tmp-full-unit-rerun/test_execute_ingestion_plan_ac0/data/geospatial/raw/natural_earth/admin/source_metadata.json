@@ -1,0 +1,11 @@
+{
+  "capabilityId": "natural_earth_admin",
+  "checksumSource": "checksumUrl",
+  "compression": "zip",
+  "expectedFormat": "geojson",
+  "rawFile": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\assets\\QA\\.pytest-tmp-full-unit-rerun\\test_execute_ingestion_plan_ac0\\data\\geospatial\\raw\\natural_earth\\admin\\source.geojson",
+  "sha256": "ed778c73ea51338d6576fb5992b189f2b94d9f3d5e199f46c1af520d6b0b3e6c",
+  "sourceTimestamp": "2026-09-18T15:09:27.965055+00:00",
+  "sourceUrl": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\assets\\QA\\.pytest-tmp-full-unit-rerun\\test_execute_ingestion_plan_ac0\\source.geojson",
+  "targetCrs": "EPSG:4326"
+}

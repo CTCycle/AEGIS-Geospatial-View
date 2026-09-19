@@ -54,6 +54,14 @@ class CapabilityRouter:
         )
         if location_map_reason is not None:
             reasons.append(location_map_reason)
+        contract_reasons = _route_contract_reason_codes(proposed)
+        if contract_reasons:
+            return CapabilityRouteDecision(
+                status="rejected",
+                route=proposed,
+                rejected_capability_ids=[],
+                reason_codes=list(dict.fromkeys([*reasons, *contract_reasons])),
+            )
         active_map_update = _is_active_map_update(proposed, active_state)
         if active_map_update and proposed.requires_location:
             proposed = proposed.model_copy(update={"requires_location": False})
@@ -263,6 +271,46 @@ def _is_executable_candidate(capability: dict[str, object]) -> bool:
         kind != "basemap"
         and capability.get("runtime_render_ready") is not False
     )
+
+
+def _route_contract_reason_codes(route: CapabilityRoute) -> list[str]:
+    """Enforce the route contract before any capability discovery or execution."""
+
+    if route.task_mode not in {"answer", "clarify"}:
+        return []
+    reasons: list[str] = []
+    if route.primary_domain is not CapabilityDomain.CONVERSATION:
+        reasons.append("route_task_mode_requires_conversation_domain")
+    if route.secondary_domains:
+        reasons.append("route_task_mode_disallows_secondary_domains")
+    if route.requires_location:
+        reasons.append("route_task_mode_disallows_location_requirement")
+    if route.presentation != "text":
+        reasons.append("route_task_mode_disallows_map_presentation")
+    if route.capability_queries:
+        reasons.append("route_task_mode_disallows_capability_queries")
+    if route.explicit_capability_ids:
+        reasons.append("route_task_mode_disallows_capability_ids")
+    if route.operation:
+        reasons.append("route_task_mode_disallows_operation")
+    if route.target_refs:
+        reasons.append("route_task_mode_disallows_target_refs")
+    if route.spatial_scope is not None:
+        reasons.append("route_task_mode_disallows_spatial_scope")
+    if route.filters:
+        reasons.append("route_task_mode_disallows_filters")
+    if route.temporal_scope.mode != "none" or any(
+        value is not None
+        for value in (
+            route.temporal_scope.reference_time_iso,
+            route.temporal_scope.start_time_iso,
+            route.temporal_scope.end_time_iso,
+        )
+    ):
+        reasons.append("route_task_mode_disallows_temporal_scope")
+    if route.clarification_question is not None and route.task_mode == "answer":
+        reasons.append("answer_route_disallows_clarification_question")
+    return reasons
 
 
 def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:

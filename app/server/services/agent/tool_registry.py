@@ -65,6 +65,10 @@ class ToolRegistry:
                 continue
             if state.phase not in registered.phases:
                 continue
+            if not _task_mode_allows_tool(registered, state):
+                continue
+            if not _domain_allows_tool(registered, state):
+                continue
             if active_map_update and registered.definition.name in {
                 "discover_geospatial_capabilities",
                 "discover_geospatial_provider_layers",
@@ -82,6 +86,18 @@ class ToolRegistry:
                 capability_schema = dict(properties.get("capability_id") or {})
                 capability_schema["enum"] = list(state.capability_ids)
                 properties["capability_id"] = capability_schema
+                if len(state.capability_ids) == 1 and registered.argument_schema_provider:
+                    try:
+                        request = registered.input_model.model_validate(
+                            {"capability_id": state.capability_ids[0]}
+                        )
+                        argument_schema = registered.argument_schema_provider(
+                            request, state
+                        )
+                    except Exception:
+                        argument_schema = None
+                    if isinstance(argument_schema, dict):
+                        properties["arguments"] = dict(argument_schema)
                 schema["properties"] = properties
                 definition = LLMToolDefinition(
                     name=definition.name,
@@ -94,7 +110,7 @@ class ToolRegistry:
                     {
                         "phase": state.phase.value,
                         "tool": definition.name,
-                        "reason": "phase_and_prerequisites_satisfied",
+                        "reason": "task_mode_domain_phase_and_prerequisites_satisfied",
                     }
                 )
         return exposed
@@ -104,7 +120,7 @@ class ToolRegistry:
     def _prerequisites_satisfied(
         prerequisites: frozenset[str], state: "AgentRunState"
     ) -> bool:
-        has_location = ToolRegistry._route_target_location_available(state)
+        has_location = _route_target_location_available(state)
         for prerequisite in prerequisites:
             if prerequisite == "route" and state.route is None:
                 return False
@@ -127,6 +143,12 @@ class ToolRegistry:
             ):
                 return False
             if prerequisite == "evidence" and not _evidence_available_for_route(state):
+                return False
+            if prerequisite == "evidence_analysis_required" and not _evidence_analysis_required(state):
+                return False
+            if prerequisite == "history_recall_required" and not _history_recall_required(state):
+                return False
+            if prerequisite == "data_obligation_unmet" and not _data_obligation_unmet(state):
                 return False
             if prerequisite == "active_map" and state.active_map_session is None:
                 return False
@@ -156,32 +178,6 @@ class ToolRegistry:
                     return False
         return True
 
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _route_target_location_available(state: "AgentRunState") -> bool:
-        """Check the validated route targets, not merely any prior map state."""
-
-        route = state.route
-        if _is_active_map_update(state):
-            return state.active_map_session is not None
-        target_refs = (
-            list(route.spatial_scope.target_refs)
-            if route is not None
-            and route.spatial_scope is not None
-            and route.spatial_scope.target_refs
-            else list(route.target_refs) if route is not None else []
-        )
-        if not target_refs:
-            return bool(state.location_refs) or state.active_map_session is not None
-        resolved_keys = {
-            " ".join(str(key).casefold().split()) for key in state.location_refs
-        }
-        return all(
-            " ".join(str(target).casefold().split()) in resolved_keys
-            for target in target_refs
-        )
-
-
 _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
     {
         "remove_layer",
@@ -193,6 +189,28 @@ _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
         "reset_view",
     }
 )
+
+
+def _route_target_location_available(state: "AgentRunState") -> bool:
+    """Check the validated route targets, not merely any prior map state."""
+
+    route = state.route
+    if _is_active_map_update(state):
+        return state.active_map_session is not None
+    target_refs = (
+        list(route.spatial_scope.target_refs)
+        if route is not None
+        and route.spatial_scope is not None
+        and route.spatial_scope.target_refs
+        else list(route.target_refs) if route is not None else []
+    )
+    if not target_refs:
+        return bool(state.location_refs) or state.active_map_session is not None
+    resolved_keys = {" ".join(str(key).casefold().split()) for key in state.location_refs}
+    return all(
+        " ".join(str(target).casefold().split()) in resolved_keys
+        for target in target_refs
+    )
 
 
 def _is_active_map_update(state: "AgentRunState") -> bool:
@@ -233,6 +251,107 @@ def _evidence_available_for_route(state: "AgentRunState") -> bool:
             for result in state.tool_results
         )
     return bool(state.evidence_refs)
+
+
+def _task_mode_allows_tool(
+    registered: RegisteredTool, state: "AgentRunState"
+) -> bool:
+    """Keep execution tools out of answer/clarify model turns."""
+
+    if registered.visibility == "internal":
+        return True
+    if state.route is None and state.phase.value == "route_request":
+        return True
+    return state.route is not None and state.route.task_mode == "execute"
+
+
+def _route_domains(state: "AgentRunState") -> set[CapabilityDomain]:
+    route = state.route
+    if route is None:
+        return set()
+    return {route.primary_domain, *route.secondary_domains}
+
+
+def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> bool:
+    """Expose only tools that can satisfy the validated route's domains."""
+
+    if registered.visibility == "internal" or state.route is None:
+        return True
+    route = state.route
+    route_domains = _route_domains(state)
+    if registered.definition.name == "resolve_geospatial_location":
+        return route.requires_location and not _route_target_location_available(state)
+    if registered.definition.name == "apply_map_plan":
+        return route.presentation in {"map", "both"}
+    if route.primary_domain is CapabilityDomain.MAP_STATE:
+        return registered.definition.name == "apply_map_plan"
+    if (
+        route.primary_domain is CapabilityDomain.MAP_RENDERING
+        and route.presentation in {"map", "both"}
+        and not (
+            CapabilityDomain.DATA_RETRIEVAL in route_domains
+            or CapabilityDomain.SPATIAL_ANALYSIS in route_domains
+        )
+    ):
+        return registered.definition.name == "apply_map_plan"
+    if not registered.domains:
+        return True
+    if CapabilityDomain.MIXED in registered.domains:
+        return True
+    if CapabilityDomain.MIXED in route_domains:
+        return True
+    return bool(registered.domains.intersection(route_domains))
+
+
+def _evidence_analysis_required(state: "AgentRunState") -> bool:
+    route = state.route
+    if route is None:
+        return False
+    domains = _route_domains(state)
+    if CapabilityDomain.SPATIAL_ANALYSIS in domains:
+        return True
+    terms = " ".join(
+        [str(route.operation or ""), *[str(value) for value in route.capability_queries]]
+    ).casefold()
+    return any(
+        marker in terms
+        for marker in ("analy", "aggregate", "statistic", "transform", "inspect")
+    )
+
+
+def _history_recall_required(state: "AgentRunState") -> bool:
+    route = state.route
+    if route is None:
+        return False
+    terms = " ".join(
+        [str(route.operation or ""), *[str(value) for value in route.capability_queries]]
+    ).casefold()
+    return CapabilityDomain.CONVERSATION in _route_domains(state) and any(
+        marker in terms
+        for marker in ("history", "conversation", "earlier", "previous", "remember")
+    )
+
+
+def _data_obligation_unmet(state: "AgentRunState") -> bool:
+    contract = state.completion_contract
+    if contract is not None and contract.data_requirement != "provider_data":
+        return True
+    successful_data_tools = {
+        "execute_geospatial_capability",
+        "inspect_evidence",
+        "transform_evidence",
+    }
+    return not any(
+        (
+            result.status in {"success", "partial"}
+            or (
+                result.status == "valid_empty"
+                and result.semantic_outcome != "not_found"
+            )
+        )
+        and result.tool_name in successful_data_tools
+        for result in state.tool_results
+    )
 
 
 __all__ = ["ToolRegistry"]

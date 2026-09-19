@@ -130,7 +130,10 @@ class EvidenceToolHandler:
                     started=started,
                 )
             records.extend(_records_from_payload(_decode_json(raw)))
-        transformed, error = _apply_operations(records, request.operations)
+        transformed, error = _apply_operations(
+            records,
+            [operation.model_dump(mode="python") for operation in request.operations],
+        )
         if error is not None:
             return _failure(
                 tool_name="transform_evidence",
