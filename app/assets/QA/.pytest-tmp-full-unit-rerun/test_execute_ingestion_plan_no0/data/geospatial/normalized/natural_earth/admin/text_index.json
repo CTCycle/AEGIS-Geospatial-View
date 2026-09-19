@@ -1,0 +1,14 @@
+{
+  "indexType": "term-to-feature",
+  "terms": {
+    "airport": [
+      "1"
+    ],
+    "small_airport": [
+      "1"
+    ],
+    "test": [
+      "1"
+    ]
+  }
+}

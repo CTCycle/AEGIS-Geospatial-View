@@ -23,6 +23,7 @@ from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.tool_definitions import (
     CapabilityDiscoveryInput,
     ExecuteCapabilityInput,
+    RouteRequestInput,
 )
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
@@ -170,6 +171,8 @@ def _registration(
     input_model: type[BaseModel],
     handler: Any,
     prerequisites: frozenset[str],
+    phase: AgentPhase = AgentPhase.BUILD_TOOL_CONTEXT,
+    visibility: str = "model",
 ) -> RegisteredTool:
     return RegisteredTool(
         definition=LLMToolDefinition(
@@ -180,8 +183,8 @@ def _registration(
         input_model=input_model,
         handler=handler,
         domains=frozenset({CapabilityDomain.MIXED}),
-        phases=frozenset({AgentPhase.BUILD_TOOL_CONTEXT}),
-        visibility="model",
+        phases=frozenset({phase}),
+        visibility=visibility,  # type: ignore[arg-type]
         prerequisites=prerequisites,
         timeout_key="tool_execution_seconds",
         idempotent=name.startswith("discover_"),
@@ -203,6 +206,16 @@ def _loop(
     catalog_handler = CatalogToolHandler(
         capability_registry=catalog,  # type: ignore[arg-type]
         runtime_registry=runtime,  # type: ignore[arg-type]
+    )
+    registry.register(
+        _registration(
+            name="route_request",
+            input_model=RouteRequestInput,
+            handler=execute_handler,
+            prerequisites=frozenset(),
+            phase=AgentPhase.ROUTE_REQUEST,
+            visibility="internal",
+        )
     )
     registry.register(
         _registration(
@@ -448,6 +461,16 @@ async def test_valid_empty_result_allows_a_materially_different_alternate_query(
                 content="",
                 tool_calls=[
                     LLMToolCall(
+                        id="discover-alternate",
+                        name="discover_geospatial_capabilities",
+                        arguments={"query": "widened hospitals"},
+                    )
+                ],
+            ),
+            LLMResult(
+                content="",
+                tool_calls=[
+                    LLMToolCall(
                         id="execute-alternate",
                         name="execute_geospatial_capability",
                         arguments={
@@ -480,6 +503,7 @@ async def test_valid_empty_result_allows_a_materially_different_alternate_query(
     assert calls == ["primary-source", "alternate-source"]
     assert [result.status for result in outcome.tool_results] == [
         "valid_empty",
+        "success",
         "success",
     ]
 

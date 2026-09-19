@@ -1,0 +1,29 @@
+{
+  "indexType": "term-to-feature",
+  "terms": {
+    "francisco": [
+      "oa-1",
+      "oa-2"
+    ],
+    "main": [
+      "oa-2"
+    ],
+    "market": [
+      "oa-1"
+    ],
+    "oa-1": [
+      "oa-1"
+    ],
+    "oa-2": [
+      "oa-2"
+    ],
+    "san": [
+      "oa-1",
+      "oa-2"
+    ],
+    "street": [
+      "oa-1",
+      "oa-2"
+    ]
+  }
+}

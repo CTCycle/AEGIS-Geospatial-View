@@ -191,6 +191,30 @@ def test_malformed_call_never_reaches_the_handler() -> None:
     assert calls == []
 
 
+def test_registered_tool_call_outside_exact_exposure_set_is_rejected() -> None:
+    calls: list[int] = []
+
+    async def handler(arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
+        calls.append(arguments.value)
+        return {"value": arguments.value}
+
+    registry = ToolRegistry(runtime_registry=cast(Any, None))
+    registry.register(_tool(handler))
+    result = asyncio.run(
+        ToolExecutor(tool_registry=registry).execute_tool(
+            LLMToolCall(id="hidden", name="test_tool", arguments={"value": 1}),
+            _state(),
+            _budget(),
+            exposed_tool_names={"another_tool"},
+        )
+    )
+
+    assert result.error is not None
+    assert result.error.error_type == "tool_not_exposed"
+    assert result.error.code == "tool_not_exposed"
+    assert calls == []
+
+
 ###############################################################################
 def test_tool_budget_is_enforced_by_the_execution_boundary() -> None:
     async def handler(_arguments: _Input, _state: AgentRunState) -> dict[str, Any]:

@@ -1,0 +1,21 @@
+{
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          7.0,
+          45.0
+        ],
+        "type": "Point"
+      },
+      "id": "1",
+      "properties": {
+        "id": "1",
+        "name": "Test Airport",
+        "type": "small_airport"
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

@@ -108,6 +108,14 @@ class CatalogToolHandler:
                 if str(item.get("provider") or "").casefold() == provider_id
             ]
         offset = _cursor_offset(request.cursor)
+        if offset is None:
+            return _failure(
+                tool_name="discover_geospatial_capabilities",
+                code="invalid_cursor",
+                message="The discovery cursor must be a non-negative integer.",
+                recovery="correct_arguments",
+                started=started,
+            )
         page = candidates[offset : offset + request.limit]
         descriptors = [
             _descriptor(self.capability_registry, self.runtime_registry, item)
@@ -207,13 +215,13 @@ def _resolved_scope_kind(route: Any, location: Any) -> str | None:
     return kind
 
 
-def _cursor_offset(cursor: str | None) -> int:
+def _cursor_offset(cursor: str | None) -> int | None:
     if cursor is None or not cursor.strip():
         return 0
     try:
         return max(0, int(cursor))
     except ValueError:
-        return 0
+        return None
 
 
 ###############################################################################
@@ -227,38 +235,26 @@ def _descriptor(
     render_support = str(
         execution_contract.get("render_support") or "none"
     ).casefold()
-    render_ready = render_support in {"vector", "raster"}
-    supports_mode = getattr(runtime_registry, "supports_mode", None)
-    if render_ready and callable(supports_mode):
-        render_ready = bool(supports_mode(capability_id, "map"))
-    render_reason = None
-    if not render_ready:
-        if render_support in {"none", "metadata_only"}:
-            render_reason = "metadata_only_or_non_renderable_contract"
-        else:
-            render_reason = "runtime_map_support_disabled"
     return {
         "id": capability_id,
         "name": str(capability.get("name") or capability_id),
-        "description": str(capability.get("description") or "")[:500],
+        "summary": str(
+            capability.get("summary") or capability.get("description") or ""
+        )[:240],
         "provider": str(capability.get("provider") or ""),
-        "kind": str(
-            capability.get("capabilityKind")
-            or capability.get("capability_kind")
-            or capability.get("type")
-            or "unknown"
-        ),
-        "supports_map": render_ready,
+        "operations": [
+            str(operation)
+            for operation in execution_contract.get("supported_operations", [])
+            if str(operation).strip()
+        ],
         "render_support": render_support,
-        "render_ready": render_ready,
-        "render_unavailable_reason": render_reason,
-        "execution_contract": execution_contract,
     }
 
 
 ###############################################################################
 def _failure(
     *,
+    tool_name: str = "describe_geospatial_capability",
     code: str,
     message: str,
     recovery: str,
@@ -266,7 +262,7 @@ def _failure(
 ) -> ToolResult:
     return ToolResult(
         call_id="handler-call",
-        tool_name="describe_geospatial_capability",
+        tool_name=tool_name,
         status="failed",
         summary=message,
         error=ToolExecutionError(

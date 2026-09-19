@@ -1,0 +1,11 @@
+{
+  "capabilityId": "local_parcel_template",
+  "checksumSource": null,
+  "compression": "none",
+  "expectedFormat": "geojson",
+  "rawFile": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\assets\\QA\\.pytest-tmp-full-unit-rerun\\test_dataset_materialization_f0\\data\\geospatial\\raw\\local_parcel_template\\local_parcel_template.geojson",
+  "sha256": "06b556204f74f9c289f6a41d90fa88bcb31011c10d9c25029d10d6b2d4e23b56",
+  "sourceTimestamp": "2026-09-18T15:09:28.011412+00:00",
+  "sourceUrl": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\app\\tests\\fixtures\\geospatial\\local_parcel_template.geojson",
+  "targetCrs": "EPSG:4326"
+}

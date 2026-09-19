@@ -1,0 +1,13 @@
+
+        {
+          "type": "FeatureCollection",
+          "features": [
+            {
+              "type": "Feature",
+              "id": "outside",
+              "properties": {"name": "Outside"},
+              "geometry": {"type": "Point", "coordinates": [7.0, 45.0]}
+            }
+          ]
+        }
+        

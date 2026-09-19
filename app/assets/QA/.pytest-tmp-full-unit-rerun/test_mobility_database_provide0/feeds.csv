@@ -1,0 +1,2 @@
+mdb_source_id,provider,name,urls.latest,urls.license,urls.authentication_type
+f-test,Example Transit,Example Transit,https://agency.example/gtfs.zip,https://agency.example/license,1

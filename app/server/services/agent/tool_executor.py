@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection
 from typing import Any, cast
 from uuid import uuid4
 
@@ -61,6 +61,7 @@ class ToolExecutor:
         ] | None = None,
         iteration: int | None = None,
         task_id: str | None = None,
+        exposed_tool_names: Collection[str] | None = None,
     ) -> ToolResult:
         call_id = tool_call.id or f"call_{uuid4().hex}"
         await self._emit_tool_selected(
@@ -76,6 +77,7 @@ class ToolExecutor:
             state,
             budget,
             call_id=call_id,
+            exposed_tool_names=exposed_tool_names,
         )
         if not any(item.call_id == result.call_id for item in state.tool_results):
             # The executor is the only application boundary that may publish a
@@ -264,6 +266,7 @@ class ToolExecutor:
         budget: AgentExecutionBudget,
         *,
         call_id: str | None = None,
+        exposed_tool_names: Collection[str] | None = None,
     ) -> ToolResult:
         started = time.perf_counter()
         call_id = call_id or tool_call.id or f"call_{uuid4().hex}"
@@ -275,6 +278,24 @@ class ToolExecutor:
         if callable(record_tool_call):
             record_tool_call()
         state.tool_calls += 1
+        registered = self.tool_registry.get(tool_call.name)
+        if (
+            exposed_tool_names is not None
+            and registered is not None
+            and tool_call.name not in set(exposed_tool_names)
+        ):
+            return self._failure(
+                call_id=call_id,
+                tool_name=tool_call.name,
+                started=started,
+                error=ToolExecutionError(
+                    error_type="tool_not_exposed",
+                    code="tool_not_exposed",
+                    message=f"Tool '{tool_call.name}' was not exposed for this model step.",
+                    retryable=False,
+                    recovery="choose_alternate_tool",
+                ),
+            )
         if tool_call.parse_error is not None or tool_call.arguments is None:
             return self._failure(
                 call_id=call_id,
@@ -295,7 +316,6 @@ class ToolExecutor:
                 },
             )
 
-        registered = self.tool_registry.get(tool_call.name)
         if registered is None:
             return self._failure(
                 call_id=call_id,

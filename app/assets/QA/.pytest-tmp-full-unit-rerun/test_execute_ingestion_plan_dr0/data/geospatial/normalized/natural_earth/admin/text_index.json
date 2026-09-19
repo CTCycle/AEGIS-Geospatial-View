@@ -1,0 +1,11 @@
+{
+  "indexType": "term-to-feature",
+  "terms": {
+    "line": [
+      "valid-line"
+    ],
+    "valid": [
+      "valid-line"
+    ]
+  }
+}

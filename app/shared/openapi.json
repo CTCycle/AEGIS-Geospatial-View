@@ -7045,6 +7045,7 @@
             "enum": [
               "malformed_call",
               "unknown_tool",
+              "tool_not_exposed",
               "schema_validation",
               "semantic_validation",
               "policy_rejection",

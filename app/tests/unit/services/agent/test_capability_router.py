@@ -111,6 +111,42 @@ def test_router_shortlists_without_selecting_final_arguments() -> None:
     assert "radius_m" not in decision.route.model_dump()
 
 
+def test_router_rejects_answer_route_with_execution_intent() -> None:
+    decision = _router().validate_route(
+        CapabilityRoute(
+            primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+            task_mode="answer",
+            presentation="text",
+            requires_location=False,
+            capability_queries=["traffic"],
+        ),
+        user_message="Show traffic.",
+        active_state=_state(),
+    )
+
+    assert decision.status == "rejected"
+    assert "route_task_mode_requires_conversation_domain" in decision.reason_codes
+    assert "route_task_mode_disallows_capability_queries" in decision.reason_codes
+
+
+def test_router_rejects_clarify_route_that_attempts_execution() -> None:
+    decision = _router().validate_route(
+        CapabilityRoute(
+            primary_domain=CapabilityDomain.CONVERSATION,
+            task_mode="clarify",
+            presentation="text",
+            requires_location=False,
+            capability_queries=["traffic"],
+            clarification_question="Which region do you mean?",
+        ),
+        user_message="Show traffic.",
+        active_state=_state(),
+    )
+
+    assert decision.status == "rejected"
+    assert "route_task_mode_disallows_capability_queries" in decision.reason_codes
+
+
 ###############################################################################
 def test_router_rejects_hallucinated_ids_and_reports_no_capability() -> None:
     decision = _router().validate_route(

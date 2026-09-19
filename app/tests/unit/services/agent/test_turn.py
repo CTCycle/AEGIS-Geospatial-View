@@ -23,6 +23,7 @@ from server.services.agent.turn_runner import (
     AgentTurnRequest,
     AgentTurnRunner,
 )
+from server.services.agent.tool_definitions import RouteRequestInput
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 
@@ -97,6 +98,26 @@ async def _handler(_arguments: BaseModel, _state: Any) -> ToolResult:
 def _runner(provider: _Provider) -> AgentTurnRunner:
     runtime = _RuntimeRegistry()
     registry = ToolRegistry(runtime_registry=runtime)  # type: ignore[arg-type]
+    registry.register(
+        RegisteredTool(
+            definition=LLMToolDefinition(
+                name="route_request",
+                description="Test route",
+                parameters_json_schema=RouteRequestInput.model_json_schema(),
+            ),
+            input_model=RouteRequestInput,
+            handler=_handler,
+            domains=frozenset({CapabilityDomain.MIXED}),
+            phases=frozenset({AgentPhase.ROUTE_REQUEST}),
+            visibility="internal",
+            prerequisites=frozenset(),
+            timeout_key="tool_execution_seconds",
+            idempotent=True,
+            result_normalizer=lambda value, call_id: value.model_copy(
+                update={"call_id": call_id}
+            ),
+        )
+    )
     registry.register(
         RegisteredTool(
             definition=LLMToolDefinition(

@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-09-18
+Last updated: 2026-09-19
 
 ## Summary
 
@@ -103,7 +103,9 @@ rendering support, known limitations, and semantic relevance. If no confident
 candidate is available but the request may be supported, the route enters
 `discovery_required` and exposes discovery rather than stopping prematurely.
 
-The permanent native meta-tool surface is deliberately small:
+The native runtime has one fixed typed registry, but the model-visible surface
+is progressive rather than fixed. `route_request` is the internal bootstrap
+tool. The model-visible action names are:
 
 - `resolve_geospatial_location`
 - `discover_geospatial_capabilities`
@@ -112,11 +114,56 @@ The permanent native meta-tool surface is deliberately small:
 - `inspect_evidence`
 - `transform_evidence`
 - `apply_map_plan`
+- `search_conversation_history` (conditional history-repository registration)
+
+`transform_evidence` is the runtime name. `discover_geospatial_capabilities`
+is the single model-facing capability-discovery boundary. Provider-layer
+discovery remains a server-owned internal handler used to enrich that generic
+result; it is not a second model-facing catalog choice.
 
 The registry has one `RegisteredTool` contract and one `ToolExecutor` boundary.
 The executor validates policy and arguments, binds server-owned geography/time
 parameters, checks and accounts for budgets, applies the resolved timeout,
 records a trace span, invokes the handler, and normalizes the result.
+
+### Responsibility-driven exposure
+
+At every model decision, `ToolRegistry.expose(state)` should project only the
+tools needed by the currently unmet route and completion responsibilities.
+Registration alone does not make a tool available:
+
+```text
+route bootstrap
+  -> route_request (internal only)
+
+plain answer, clarification, or finalization
+  -> no model-facing tools
+
+location required and unresolved
+  -> resolve_geospatial_location
+
+shortlist missing after required locations are resolved
+  -> discover_geospatial_capabilities
+
+shortlist selected
+  -> describe_geospatial_capability (only when detail is needed)
+  -> execute_geospatial_capability (when data is required)
+
+evidence analysis or transformation required
+  -> inspect_evidence, transform_evidence
+
+map presentation pending
+  -> apply_map_plan
+
+history recall explicitly required
+  -> search_conversation_history
+```
+
+This is a state projection, not a mandatory linear workflow. After each typed
+tool result, the loop updates the run state, reevaluates the completion
+contract, and rebuilds the eligible set. Location-dependent discovery is not
+offered alongside unresolved location resolution, and stored evidence or
+history does not by itself justify exposing the corresponding tools.
 
 After each tool batch the loop evaluates the completion contract before asking
 the model to plan again. When all non-presentation obligations are satisfied,
@@ -128,8 +175,10 @@ user-semantic filters. AEGIS binds resolved coordinates, canonical bbox/radius,
 temporal boundaries, task-owned filters, and provider argument names.
 
 Discovery responses implement bounded deterministic pagination. Provider-layer
-descriptors, where required by the catalog contract, are exposed through the
-same discovery boundary rather than a second live-provider catalog service.
+descriptors, where required by the catalog contract, remain bounded normalized
+observations behind the generic discovery responsibility. They are never
+unrestricted provider browsing, and the model is not offered two
+interchangeable discovery choices for the same unmet responsibility.
 
 ## Observations and evidence
 

@@ -7,7 +7,7 @@ import hashlib
 import inspect
 import json
 import re
-from collections.abc import Awaitable, Sequence
+from collections.abc import Awaitable, Collection, Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Any, Callable, Literal, Protocol
@@ -149,12 +149,6 @@ class AgentLoopOutcome:
 
 class AgentLoop:
     """Own routing, progressive tool exposure, execution, and stopping."""
-
-    ROUTE_TOOL = LLMToolDefinition(
-        name="route_request",
-        description="Select one bounded high-level AEGIS capability route.",
-        parameters_json_schema=CapabilityRoute.model_json_schema(),
-    )
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -413,6 +407,7 @@ class AgentLoop:
             return self._budget_outcome(state, request, "model_budget_exhausted")
         self._transition(state, AgentPhase.BUILD_TOOL_CONTEXT, request.budget)
         tools = self.tool_registry.expose(state)
+        exposed_tool_names = frozenset(item.name for item in tools)
         if not tools and route.task_mode == "execute" and not state.tool_results:
             return self._failed(
                 state,
@@ -424,7 +419,12 @@ class AgentLoop:
         result = await self._model_step(request, provider, messages, tools)
         if result.tool_calls:
             messages.extend(self._assistant_and_tool_messages(result))
-            tool_results = await self._execute_calls(request, result.tool_calls, state)
+            tool_results = await self._execute_calls(
+                request,
+                result.tool_calls,
+                state,
+                exposed_tool_names=exposed_tool_names,
+            )
             self._ensure_run_control(request)
             messages.extend(
                 self._tool_result_messages(
@@ -1050,7 +1050,13 @@ class AgentLoop:
     @staticmethod
     def _completion_checks(state: AgentRunState) -> dict[str, bool]:
         completed_data = any(
-            result.status in {"success", "valid_empty", "partial"}
+            (
+                result.status in {"success", "partial"}
+                or (
+                    result.status == "valid_empty"
+                    and result.semantic_outcome != "not_found"
+                )
+            )
             and result.tool_name
             in {
                 "execute_geospatial_capability",
@@ -1282,6 +1288,10 @@ class AgentLoop:
         provider: AgentProvider,
         messages: list[dict[str, Any]],
     ) -> tuple[str | None, str, CapabilityRoute | None]:
+        registered_route_tool = self.tool_registry.get("route_request")
+        if registered_route_tool is None:
+            return "Routing is unavailable for this request.", "provider_error", None
+        route_tool = registered_route_tool.definition
         correction_messages = [
             {"role": "system", "content": build_capability_route_prompt()},
             *messages,
@@ -1291,14 +1301,14 @@ class AgentLoop:
                 request,
                 provider,
                 correction_messages,
-                [self.ROUTE_TOOL],
+                [route_tool],
                 tool_choice="required",
                 budget_stage="route_request",
             )
             call = result.tool_calls[0] if result.tool_calls else None
             if (
                 call is not None
-                and call.name == self.ROUTE_TOOL.name
+                and call.name == route_tool.name
                 and call.parse_error is None
                 and call.arguments is not None
             ):
@@ -1328,6 +1338,26 @@ class AgentLoop:
                             "insufficient_evidence",
                             None,
                         )
+                    if decision.status == "rejected":
+                        correction_messages.append(
+                            {
+                                "role": "user",
+                                "content": json.dumps(
+                                    {
+                                        "route_rejected": True,
+                                        "reason_codes": decision.reason_codes,
+                                        "instruction": (
+                                            "Return a corrected route_request call "
+                                            "with no execution fields for answer or "
+                                            "clarify task modes."
+                                        ),
+                                    },
+                                    separators=(",", ":"),
+                                ),
+                            }
+                        )
+                        request.state.route_corrections = attempt + 1
+                        continue
             request.state.route_corrections = attempt + 1
             correction_messages.append(
                 {
@@ -1706,6 +1736,8 @@ class AgentLoop:
         request: AgentLoopRequest,
         calls: list[LLMToolCall],
         state: AgentRunState,
+        *,
+        exposed_tool_names: Collection[str] | None = None,
     ) -> list[ToolResult]:
         tool_limit = request.budget.max_tool_calls or request.max_tool_calls
         remaining_tool_calls = tool_limit - state.tool_calls
@@ -1713,6 +1745,13 @@ class AgentLoop:
             raise ExecutionBudgetExceeded("tool_budget_exhausted", "tool_call")
         bounded_calls = calls[: min(request.max_parallel_tool_calls, remaining_tool_calls)]
         semaphore = asyncio.Semaphore(max(1, request.max_parallel_tool_calls))
+        if any(call.name == "discover_geospatial_capabilities" for call in bounded_calls):
+            state.discovery_attempts += sum(
+                1
+                for call in bounded_calls
+                if call.name == "discover_geospatial_capabilities"
+            )
+        self._transition(state, AgentPhase.VALIDATE_ACTION, request.budget)
 
         async def execute(call: LLMToolCall) -> ToolResult:
             self._ensure_run_control(request)
@@ -1774,9 +1813,6 @@ class AgentLoop:
                     recovery="replan",
                 )
             async with semaphore:
-                if call.name == "discover_geospatial_capabilities":
-                    state.discovery_attempts += 1
-                self._transition(state, AgentPhase.VALIDATE_ACTION, request.budget)
                 result = await self.tool_executor.execute_tool(
                     call,
                     state,
@@ -1784,9 +1820,9 @@ class AgentLoop:
                     trace_callback=request.trace_callback,
                     iteration=state.current_iteration,
                     task_id=self._active_task_id(state),
+                    exposed_tool_names=exposed_tool_names,
                 )
                 self._ensure_run_control(request)
-                self._transition(state, AgentPhase.NORMALIZE_RESULT, request.budget)
                 return result
 
         if any(call.name == "apply_map_plan" for call in bounded_calls):
@@ -1795,6 +1831,7 @@ class AgentLoop:
                 results.append(await execute(call))
         else:
             results = await asyncio.gather(*(execute(call) for call in bounded_calls))
+        self._transition(state, AgentPhase.NORMALIZE_RESULT, request.budget)
         for call, result in zip(bounded_calls, results, strict=False):
             self._ensure_run_control(request)
             fingerprint = self._fingerprint(call)
@@ -1804,6 +1841,7 @@ class AgentLoop:
                 )
                 if result.error and result.error.error_type in {
                     "malformed_call",
+                    "tool_not_exposed",
                     "schema_validation",
                     "semantic_validation",
                     "policy_rejection",
@@ -1878,6 +1916,7 @@ class AgentLoop:
             trace_callback=request.trace_callback,
             iteration=state.current_iteration,
             task_id=self._active_task_id(state),
+            exposed_tool_names={"discover_geospatial_capabilities"},
         )
         self._ensure_run_control(request)
         self._transition(state, AgentPhase.NORMALIZE_RESULT, request.budget)
@@ -2161,7 +2200,12 @@ class AgentLoop:
             },
         )
 
-        return await self._execute_calls(request, [recovery_call], state)
+        return await self._execute_calls(
+            request,
+            [recovery_call],
+            state,
+            exposed_tool_names={"apply_map_plan"},
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

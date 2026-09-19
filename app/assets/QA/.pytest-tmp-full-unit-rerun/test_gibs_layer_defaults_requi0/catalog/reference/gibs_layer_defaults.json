@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "layerDefaults": [
+    {
+      "layerId": "layer-1",
+      "nativeResolutionM": null,
+      "dateFallbackDays": null
+    }
+  ]
+}

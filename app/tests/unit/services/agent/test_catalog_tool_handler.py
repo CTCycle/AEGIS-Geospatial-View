@@ -62,21 +62,14 @@ def test_discovery_cursor_returns_a_stable_bounded_page() -> None:
     assert result.status == "success"
     assert result.data == {
         "capabilities": [
-            {
-                "id": "second",
-                "name": "Second",
-                "description": "",
-                "provider": "test",
-                "kind": "unknown",
-                "supports_map": True,
-                "render_support": "vector",
-                "render_ready": True,
-                "render_unavailable_reason": None,
-                "execution_contract": {
-                    "capability_id": "second",
+                {
+                    "id": "second",
+                    "name": "Second",
+                    "summary": "",
+                    "provider": "test",
+                    "operations": [],
                     "render_support": "vector",
-                },
-            }
+                }
         ],
         "provider_id": None,
         "next_cursor": None,

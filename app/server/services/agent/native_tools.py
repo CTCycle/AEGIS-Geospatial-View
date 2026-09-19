@@ -31,6 +31,7 @@ from server.services.agent.tool_definitions import (
     CapabilityDiscoveryInput,
     DescribeCapabilityInput,
     ExecuteCapabilityInput,
+    ExecuteCapabilityToolInput,
     InspectEvidenceInput,
     ProviderLayerDiscoveryInput,
     ResolveLocationInput,
@@ -84,6 +85,35 @@ def _validated_basemap_ids(capability_registry: CapabilityRegistry) -> list[str]
     )
 
 
+def _map_plan_schema(
+    input_model: type[BaseModel], basemap_ids: list[str]
+) -> dict[str, Any]:
+    """Specialize the public map schema with the active canonical basemaps."""
+
+    schema: JsonSchema = input_model.model_json_schema()
+
+    def specialize(value: JsonValue) -> None:
+        if isinstance(value, dict):
+            properties = value.get("properties")
+            if isinstance(properties, dict):
+                action = properties.get("action")
+                capability_id = properties.get("capability_id")
+                if (
+                    isinstance(action, dict)
+                    and action.get("const") == "set_basemap"
+                    and isinstance(capability_id, dict)
+                ):
+                    capability_id["enum"] = list(basemap_ids)
+            for child in value.values():
+                specialize(child)
+        elif isinstance(value, list):
+            for child in value:
+                specialize(child)
+
+    specialize(schema)
+    return schema
+
+
 ###############################################################################
 def register_agent_tools(
     registry: ToolRegistry,
@@ -124,7 +154,6 @@ def register_agent_tools(
         else None
     )
     basemap_ids = _validated_basemap_ids(capability_registry)
-    basemap_catalog = ", ".join(basemap_ids) or "no basemap IDs"
 
     registrations = (
         _registration(
@@ -158,20 +187,18 @@ def register_agent_tools(
         _registration(
             name="discover_geospatial_capabilities",
             description=(
-                "Discover eligible capabilities from the validated catalog after "
-                "required locations are resolved. Do not use this to guess a "
-                "provider before the route prerequisite is available."
+                "Discover eligible geospatial capabilities from the validated "
+                "route and catalog. Use describe_geospatial_capability for the "
+                "full execution contract."
             ),
             input_model=CapabilityDiscoveryInput,
             handler=catalog.discover,
             domains=_MIXED,
             phases=_MODEL_PHASE,
             visibility="model",
-            # Discovery remains visible during bootstrap so the model can
-            # request it explicitly.  The loop performs a deterministic
-            # post-location refresh as soon as the prerequisite is available;
-            # execution still validates the resolved extent before use.
-            prerequisites=frozenset({"route", "capability_shortlist_missing"}),
+            prerequisites=frozenset(
+                {"route", "capability_shortlist_missing", "location_if_required"}
+            ),
             idempotent=True,
         ),
         _registration(
@@ -184,7 +211,7 @@ def register_agent_tools(
             handler=provider_layers.discover,
             domains=frozenset({CapabilityDomain.PROVIDER_DISCOVERY}),
             phases=_MODEL_PHASE,
-            visibility="model",
+            visibility="internal",
             prerequisites=frozenset({"route", "provider_discovery_route"}),
             idempotent=True,
             semantic_validator=_provider_layer_semantic_validator,
@@ -200,7 +227,9 @@ def register_agent_tools(
             domains=_MIXED,
             phases=_MODEL_PHASE,
             visibility="model",
-            prerequisites=frozenset({"route", "capability_shortlist"}),
+            prerequisites=frozenset(
+                {"route", "capability_shortlist", "location_if_required"}
+            ),
             idempotent=True,
             semantic_validator=_describe_semantic_validator,
         ),
@@ -212,7 +241,7 @@ def register_agent_tools(
                 "prerequisites are satisfied; success or valid_empty satisfies "
                 "the matching provider-data obligation."
             ),
-            input_model=ExecuteCapabilityInput,
+            input_model=ExecuteCapabilityToolInput,
             handler=_execute_capability_handler(capability_execution),
             domains=_MIXED,
             phases=_MODEL_PHASE,
@@ -223,6 +252,7 @@ def register_agent_tools(
                     "capability_shortlist",
                     "location_if_required",
                     "data_route",
+                    "data_obligation_unmet",
                 }
             ),
             idempotent=False,
@@ -242,7 +272,9 @@ def register_agent_tools(
             domains=_DATA,
             phases=_MODEL_PHASE,
             visibility="model",
-            prerequisites=frozenset({"route", "evidence"}),
+            prerequisites=frozenset(
+                {"route", "evidence", "evidence_analysis_required"}
+            ),
             idempotent=True,
         ),
         _registration(
@@ -253,26 +285,21 @@ def register_agent_tools(
             domains=_DATA,
             phases=_MODEL_PHASE,
             visibility="model",
-            prerequisites=frozenset({"route", "evidence"}),
+            prerequisites=frozenset(
+                {"route", "evidence", "evidence_analysis_required"}
+            ),
             idempotent=False,
             semantic_validator=_evidence_semantic_validator,
         ),
         _registration(
             name="apply_map_plan",
             description=(
-                "Prepare a typed map candidate from validated location and evidence; "
-                "the server supplies the catalog default basemap when a new map "
-                "omits one. If setting a basemap, use only one of these exact "
-                f"canonical catalog IDs: {basemap_catalog}. Never invent, "
-                "translate, or alias a basemap ID; if the requested style is "
-                "unsupported, leave the current map unchanged and report that. "
-                "For add_evidence_layer, evidence_ref must be copied exactly "
-                "from a prior successful evidence-producing tool result; never "
-                "use a location_ref, place name, or capability ID as evidence. "
-                "A location-only map uses set_viewport with fit_location and no "
-                "evidence layer."
+                "Prepare a typed map candidate from resolved location and valid "
+                "evidence. Use only the enumerated canonical basemap IDs and "
+                "exact evidence references from successful tool results."
             ),
             input_model=ApplyMapPlanInput,
+            parameters_json_schema=_map_plan_schema(ApplyMapPlanInput, basemap_ids),
             handler=_apply_map_plan_handler(map_plan),
             domains=_MAP,
             phases=_MODEL_PHASE,
@@ -298,7 +325,7 @@ def register_agent_tools(
                 domains=_MIXED,
                 phases=_MODEL_PHASE,
                 visibility="model",
-                prerequisites=frozenset({"route"}),
+                prerequisites=frozenset({"route", "history_recall_required"}),
                 idempotent=True,
             ),
         )
@@ -320,12 +347,14 @@ def _registration(
     idempotent: bool,
     semantic_validator: Any = None,
     argument_schema_provider: Any = None,
+    parameters_json_schema: dict[str, Any] | None = None,
 ) -> RegisteredTool:
     return RegisteredTool(
         definition=LLMToolDefinition(
             name=name,
             description=description,
-            parameters_json_schema=input_model.model_json_schema(),
+            parameters_json_schema=parameters_json_schema
+            or input_model.model_json_schema(),
         ),
         input_model=input_model,
         handler=handler,
@@ -343,8 +372,13 @@ def _registration(
 
 ###############################################################################
 def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
-    async def execute(request: ExecuteCapabilityInput, state: AgentRunState) -> ToolResult:
-        bound_request = _bind_execute_request(request, state)
+    async def execute(
+        request: ExecuteCapabilityToolInput, state: AgentRunState
+    ) -> ToolResult:
+        internal_request = ExecuteCapabilityInput.model_validate(
+            request.model_dump(mode="python")
+        )
+        bound_request = _bind_execute_request(internal_request, state)
         location = _location_for_request(bound_request, state)
         return await service.execute_capability(
             bound_request,

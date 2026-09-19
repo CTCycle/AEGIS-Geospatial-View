@@ -148,13 +148,36 @@ def _state() -> AgentRunState:
     )
 
 
+@pytest.mark.parametrize("task_mode", ["answer", "clarify"])
+def test_answer_and_clarify_routes_expose_no_execution_tools(task_mode: str) -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.CONVERSATION,
+        task_mode=task_mode,  # type: ignore[arg-type]
+        presentation="text",
+        requires_location=False,
+        clarification_question=("Which source should I use?" if task_mode == "clarify" else None),
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+
+    assert registry.expose(state) == []
+
+
 def test_apply_map_plan_describes_only_canonical_basemap_ids() -> None:
     registry = _registry()
     tool = registry.get("apply_map_plan")
 
     assert tool is not None
-    assert "esri_world_imagery, osm_dark, osm_default" in tool.definition.description
-    assert "Never invent, translate, or alias a basemap ID" in tool.definition.description
+    assert "enumerated canonical basemap IDs" in tool.definition.description
+    basemap_schema = tool.definition.parameters_json_schema["$defs"][
+        "SetBasemapAction"
+    ]
+    assert basemap_schema["properties"]["capability_id"]["enum"] == [
+        "esri_world_imagery",
+        "osm_dark",
+        "osm_default",
+    ]
 
 
 def test_map_only_routes_expose_map_preparation_without_data_execution() -> None:
@@ -409,12 +432,11 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
     assert {
         tool.name for tool in registry.expose(state)
-    } == {"resolve_geospatial_location", "discover_geospatial_capabilities"}
+    } == {"resolve_geospatial_location"}
 
     state.capability_ids = ["places:hospitals"]
     assert [tool.name for tool in registry.expose(state)] == [
-        "resolve_geospatial_location",
-        "describe_geospatial_capability",
+        "resolve_geospatial_location"
     ]
 
     state.location_refs["zurich"] = ResolvedLocation(
@@ -443,9 +465,6 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
         tool.name for tool in registry.expose(state)
     } == {
         "describe_geospatial_capability",
-        "execute_geospatial_capability",
-        "inspect_evidence",
-        "transform_evidence",
         "apply_map_plan",
     }
 
@@ -560,6 +579,12 @@ def test_capability_schema_is_specialized_to_validated_shortlist() -> None:
         "capability_id"
     ]
     assert capability_schema["enum"] == ["places:hospitals"]
+    assert definition.parameters_json_schema["properties"]["arguments"] == {
+        "type": "object",
+        "required": ["query"],
+        "properties": {"query": {"type": "string", "minLength": 1}},
+        "additionalProperties": False,
+    }
 
 
 ###############################################################################
@@ -713,10 +738,7 @@ def test_provider_layer_discovery_is_only_exposed_for_provider_route() -> None:
 
     assert {
         tool.name for tool in registry.expose(state)
-    } == {
-        "discover_geospatial_capabilities",
-        "discover_geospatial_provider_layers",
-    }
+    } == {"discover_geospatial_capabilities"}
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,17 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "06075",
+      "properties": {
+        "GEOID": "06075",
+        "NAME": "San Francisco County"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-122.55, 37.70], [-122.35, 37.70], [-122.35, 37.82], [-122.55, 37.82], [-122.55, 37.70]]]
+      }
+    }
+  ]
+}
