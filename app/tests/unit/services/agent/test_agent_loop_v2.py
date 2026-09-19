@@ -731,6 +731,7 @@ async def test_location_only_map_recovery_replaces_stale_failure_text(
         capability_queries=["basemap", "location map view"],
     )
     state = _state()
+    state.context_hydrated = True
     state.route = route
     state.location_refs["great barrier reef, australia"] = ResolvedLocation(
         label="Great Barrier Reef, Australia",
@@ -774,6 +775,103 @@ async def test_location_only_map_recovery_replaces_stale_failure_text(
 
     assert outcome.stopped_reason == "awaiting_render"
     assert outcome.final_text == "The map is ready."
+
+
+@pytest.mark.asyncio
+async def test_location_only_map_recovery_runs_after_a_location_tool_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeProvider(
+        [
+            LLMResult(
+                content="",
+                tool_calls=[
+                    LLMToolCall(
+                        id="lookup-1",
+                        name="test_tool",
+                        arguments={},
+                    )
+                ],
+            )
+        ]
+    )
+    loop = _loop(provider)
+    state = _state()
+    state.context_hydrated = True
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        capability_queries=["location map"],
+    )
+    state.location_refs["florence, tuscany, italy"] = ResolvedLocation(
+        label="Florence, Tuscany, Italy",
+        latitude=43.7698,
+        longitude=11.2556,
+        confidence=0.84,
+        source="test",
+    )
+    state.completion_contract = CompletionContract(
+        operation="map",
+        requirements=["location_resolved", "map_candidate_prepared"],
+        map_preparation_required=True,
+        render_verification_required=True,
+    )
+
+    monkeypatch.setattr(
+        loop.tool_registry,
+        "expose",
+        lambda _state: [
+            LLMToolDefinition(
+                name="test_tool",
+                description="test",
+                parameters_json_schema={"type": "object"},
+            )
+        ],
+    )
+
+    async def execute_tool(*args: Any, **kwargs: Any) -> list[ToolResult]:
+        return [
+            ToolResult(
+                call_id="lookup-1",
+                tool_name="test_tool",
+                status="success",
+                summary="location resolved",
+                metadata=ToolExecutionMetadata(duration_ms=0),
+            )
+        ]
+
+    monkeypatch.setattr(loop, "_execute_calls", execute_tool)
+
+    async def recover_map(*args: Any, **kwargs: Any) -> list[ToolResult]:
+        state.prepared_map_session = object()  # type: ignore[assignment]
+        return [
+            ToolResult(
+                call_id="recovery-1",
+                tool_name="apply_map_plan",
+                status="success",
+                summary="map candidate prepared",
+                metadata=ToolExecutionMetadata(duration_ms=0),
+            )
+        ]
+
+    monkeypatch.setattr(loop, "_recover_location_only_map", recover_map)
+    outcome = await loop.run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        )
+    )
+
+    assert outcome.stopped_reason == "awaiting_render", (
+        outcome.final_text,
+        outcome.failure_category,
+        outcome.failure_detail,
+    )
+    assert outcome.state.prepared_map_session is not None
 
 
 ###############################################################################

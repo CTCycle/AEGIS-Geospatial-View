@@ -428,6 +428,17 @@ class AgentLoop:
                 state,
                 exposed_tool_names=exposed_tool_names,
             )
+            location_map_recovery = await self._recover_location_only_map(
+                request,
+                route,
+                state,
+            )
+            if location_map_recovery:
+                # A successful location lookup is enough to complete a
+                # location-only map contract.  Providers can otherwise keep
+                # repeating the same lookup until the iteration budget is
+                # exhausted instead of issuing the required map plan.
+                tool_results.extend(location_map_recovery)
             self._ensure_run_control(request)
             messages.extend(
                 self._tool_result_messages(
@@ -486,11 +497,7 @@ class AgentLoop:
             return None
 
         final_text = result.content.strip()
-        recovery_results = (
-            await self._recover_location_only_map(request, route, state)
-            if not state.context_hydrated
-            else []
-        )
+        recovery_results = await self._recover_location_only_map(request, route, state)
         self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
         stop = (
             self._evaluate_stop(
