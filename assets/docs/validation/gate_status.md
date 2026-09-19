@@ -1,13 +1,14 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-18 (authorized remote push pending hosted verification)
+Last updated: 2026-09-19 (live browser diary updated; hosted verification remains separate)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
 provider lane, migrations, and hosted-CI boundary. Status values are limited
 to `PASS`, `PARTIAL`, `FAIL`, `BLOCKED`, and `UNRUN`.
 
-Final tested repository head: `a33642a29c4353a760aac34bf1234b8121211da6` on `develop`.
+Latest live-browser diary checkout: `77bf7e999a58a53fd6fbe99bee5c01b5d96060dc` on `loop-dev` (working tree; not committed or pushed).
+Historical final tested repository head: `a33642a29c4353a760aac34bf1234b8121211da6` on `develop`.
 Production behavior commit: `558f1966afc3cef4b6e755d4edfdc87dfd258c11`;
 the final tested head adds only controlled-harness evidence capture and
 documentation reconciliation.
@@ -26,6 +27,7 @@ documentation reconciliation.
 | CONTROLLED-FAULT — recovery and acknowledgement matrix | Browser / MapLibre | Local controlled fixture; six fault cases pass, supersession case fails | PARTIAL | 2026-09-17 | `bf5a7cfa` | [controlled-browser-bf5-warm-final.log](../../QA/native-agent-loop-evaluation-20260917-final/controlled-browser-bf5-warm-final.log) and [superseded report](../../QA/native-agent-loop-evaluation-20260917-final/controlled-browser-bf5-warm-final/reports/controlled-map-superseded.json) | Fix the late superseded rejection ordering, then rerun the entire controlled module. |
 | PROVIDER-READY — exact configured lane readiness | Provider | `opencode-go / deepseek-v4.1-flash`, `openai-chat-completions` | PASS | 2026-09-17 | `558f1966` | [final structured probe](../../QA/native-agent-loop-evaluation-20260917-final/live-browser-558f-final/http/CHAT-LIVE-01/provider-structured-probe.json) | Preserve this exact lane; no fallback is permitted. |
 | LIVE-BROWSER-SMOKE — realtime UI smoke | Browser / realtime | Local services 4512/7059, exact provider lane, isolated runtime data | PASS | 2026-09-17 | `558f1966` | [live-browser-558f-final.log](../../QA/native-agent-loop-evaluation-20260917-final/live-browser-558f-final.log) | Four tests passed: three exact-lane UI flows plus one intentional degraded-path stub; do not promote this subset to complete 22-scenario proof. |
+| LIVE-DIARY-20260919 — representative geospatial browser diary | Browser / realtime / MapLibre | Local services 4512/7059, exact `opencode-go / deepseek-v4.1-flash`, real chat workflow | PARTIAL | 2026-09-19 | `77bf7e9` + working tree | [validation diary](../../QA/aegis-geospatial-e2e-validation-20260919/report.md) | Rome-to-Florence recovery is browser-verified after the surgical loop fix; coordinate reverse geocoding, landmark/catalog coverage, provider availability, and the complete scenario matrix remain open. |
 | LIVE-API — orchestration and ambiguity smoke | API orchestration | Exact provider lane, isolated runtime | PARTIAL | 2026-09-17 | `558f1966` | [api-live-final.log](../../QA/native-agent-loop-evaluation-20260917-final/api-live-final.log) | Investigate the typed 409 while `/api/chat/turn` is still running; keep the Ollama-unavailable 502 as a separate non-fallback boundary. |
 | SYNC-CHAT-TURN — terminal hydration response | Backend API | Exact provider lane, isolated runtime | PARTIAL | 2026-09-17 | `558f1966` | [api-live-final.log](../../QA/native-agent-loop-evaluation-20260917-final/api-live-final.log) | Make the synchronous endpoint boundary explicit or await completion before returning; current 409 is not a generic catalog error. |
 | BACKEND-UNIT — full unit suite | Backend | `app/server/.venv`, isolated basetemp | PASS | 2026-09-17 | `558f1966` | [backend-unit-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/backend-unit-final-commit.log) | Retain the 832-test result and rerun when backend sources change. |
@@ -38,6 +40,31 @@ documentation reconciliation.
 | MATRIX-22 — complete required scenario matrix | Coverage | Exact live provider plus controlled browser | PARTIAL | 2026-09-17 | `bf5a7cfa` | [final-report.md](../../QA/native-agent-loop-evaluation-20260917-final/final-report.md) | Complete the explicit PARTIAL and UNRUN rows, including a separate mismatched-ack case, before any overall PASS claim. |
 | HOSTED-CI — exact tested head | Hosted CI | GitHub Actions push workflows on `develop` | UNRUN | 2026-09-18 | `a33642a` | [push boundary record](../../QA/native-agent-loop-evaluation-20260918/push-status.md) | The current head is being pushed under explicit user authorization; inspect the resulting exact-head workflow run before changing this gate to PASS or FAIL. |
 | PROCESS-CLEANUP — task-owned services and browser | Test harness | Local host, ports 4512/7059/9876 | PASS | 2026-09-17 | `bf5a7cfa` | [process-cleanup-final.md](../../QA/native-agent-loop-evaluation-20260917-final/process-cleanup-final.md) | Final harness services and browser tab stopped; ports verified free; unrelated services and caches preserved. |
+
+## 2026-09-19 live browser diary
+
+The representative browser run covered Lugano, Springfield, direct
+coordinates, Mount Etna, Tokyo, overlay lifecycle actions, and the Rome to
+Florence multi-turn path. The exact provider/model lane was visible in the UI;
+the agent model reached `Verified` after the first successful request.
+
+The most important reproducible defect was a hydrated multi-turn location
+request that could repeat location resolution until the execution limit while
+retaining the previous map. The working tree now invokes the existing typed
+location-only `apply_map_plan` recovery after a successful location tool cycle
+and no longer suppresses the same recovery for hydrated state. The focused
+agent-loop suite is `35 passed`, and the browser retest rendered Florence after
+a safe clarification, with header `Florence, Tuscany, Italy`, center
+`11.2556°E, 43.7698°N`, verified render status, and two calls.
+
+The diary remains `PARTIAL`: direct coordinate rendering passed but reverse
+geocoding was unavailable; Mount Etna terrain/weather/catalog coverage was
+not available; the MODIS request encountered a non-retryable upstream provider
+failure; and assistant narration can still name OpenStreetMap after a manual
+Satellite selection even when the rendered map state is correct. Cambridge,
+typo, and multilingual rows were not run in this diary. See the [full
+validation diary](../../QA/aegis-geospatial-e2e-validation-20260919/report.md)
+for the scenario-by-scenario evidence and exact boundaries.
 
 ## Browser fault acceptance contract
 
