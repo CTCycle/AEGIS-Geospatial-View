@@ -1,9 +1,0 @@
-{
-  "version": 1,
-  "tileMatrixSets": [
-    {
-      "tileMatrixSetId": "250m",
-      "metersPerPixel": 250.0
-    }
-  ]
-}

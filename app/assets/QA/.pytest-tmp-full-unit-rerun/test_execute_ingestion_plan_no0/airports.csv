@@ -1,3 +1,0 @@
-id,name,latitude_deg,longitude_deg,type
-1,Test Airport,45.0,7.0,small_airport
-2,Bad Airport,not-a-number,7.1,closed

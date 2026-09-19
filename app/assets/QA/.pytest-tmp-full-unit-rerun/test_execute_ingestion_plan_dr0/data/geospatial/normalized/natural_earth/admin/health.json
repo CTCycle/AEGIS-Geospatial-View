@@ -1,9 +1,0 @@
-{
-  "capabilityId": "natural_earth_admin",
-  "featureCount": 1,
-  "lastIngested": "2026-09-18T15:09:27.974884+00:00",
-  "status": "functional",
-  "warnings": [
-    "Dropped 1 GeoJSON feature(s) with invalid geometry."
-  ]
-}
