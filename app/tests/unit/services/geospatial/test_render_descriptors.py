@@ -255,6 +255,8 @@ def test_catalog_raster_overlays_expose_provider_tile_templates(
     assert descriptor["rendering_mode"] == "raster-tile"
     tile_url_template = str(descriptor["tile_url_template"])
     assert expected_host in tile_url_template
+    if overlay_id == "fema_nfhl_flood_zones":
+        assert "/arcgis/rest/services/public/NFHL/MapServer/export" in tile_url_template
     assert "{bbox-epsg-3857}" in tile_url_template
     assert descriptor["render"]["tile_url_template"] == tile_url_template
 

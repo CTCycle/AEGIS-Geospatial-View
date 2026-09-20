@@ -5,7 +5,10 @@ from tests.conftest import run_async_in_thread
 import pytest
 
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest
-from server.services.geospatial.providers.fema import FEMAProvider
+from server.services.geospatial.providers.fema import (
+    FEMA_NFHL_EXPORT_URL,
+    FEMAProvider,
+)
 from server.services.geospatial.providers.nasa_firms import NASAFIRMSProvider
 from server.services.geospatial.providers.noaa import NOAAProvider
 from server.services.geospatial.providers.usgs import USGSProvider
@@ -210,7 +213,10 @@ def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
     assert response.result_status == "ok"
     assert response.result_type == "raster"
     assert response.payload["renderingMode"] == "raster-tile"
-    assert "hazards.fema.gov" in response.payload["tileUrl"]
+    assert response.payload["tileUrl"] == FEMA_NFHL_EXPORT_URL
+    assert "/arcgis/rest/services/public/NFHL/MapServer/export" in response.payload[
+        "tileUrl"
+    ]
     assert response.payload["legend"]["type"]
 
 ###############################################################################
