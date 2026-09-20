@@ -69,16 +69,20 @@ class CompletionEvaluator:
             in {"unavailable", "error", "failed", "invalid"}
             for instance in map_session.overlay_collection.instances
         )
+        valid_empty = (
+            str(
+                map_session.payload.get("result_status")
+                or map_session.payload.get("resultStatus")
+                or ""
+            ).casefold()
+            == "valid_empty"
+        )
         values = {
             "location_resolved": True,
             "required_data_retrieved": not data_failure
             and bool(
                 map_session.overlay_collection.instances
-                or (
-                    map_session.payload.get("result_status")
-                    or map_session.payload.get("resultStatus")
-                )
-                == "valid_empty"
+                or valid_empty
             ),
             "temporal_scope_applied": _native_temporal_scope_applied(goal, map_session),
             "spatial_scope_applied": _native_spatial_scope_applied(goal, map_session),
@@ -182,7 +186,14 @@ def _native_temporal_scope_applied(
         return True
     instances = map_session.overlay_collection.instances
     if not instances:
-        return False
+        return (
+            str(
+                map_session.payload.get("result_status")
+                or map_session.payload.get("resultStatus")
+                or ""
+            ).casefold()
+            == "valid_empty"
+        )
     return all(
         str(
             instance.descriptor.get("temporal_mode")

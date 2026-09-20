@@ -524,12 +524,6 @@ class CapabilityRegistry:
             matched_queries = meaningful_queries.intersection(searchable)
             routing_searchable = _routing_searchable_text(item)
             semantic_matches = routing_query_terms.intersection(routing_searchable)
-            required_routing_terms = routing_query_terms.intersection(
-                _ROUTING_CANONICAL_TERMS
-            )
-            unmapped_routing_terms = routing_query_terms.difference(
-                _ROUTING_CANONICAL_TERMS
-            )
             explicit_index = (
                 normalized_explicit.index(capability_id)
                 if capability_id in normalized_explicit
@@ -552,13 +546,7 @@ class CapabilityRegistry:
                 has_routing_alias
                 and routing_query_terms
                 and explicit_index is None
-                and (
-                    not required_routing_terms.issubset(routing_searchable)
-                    or (
-                        unmapped_routing_terms
-                        and not unmapped_routing_terms.issubset(searchable)
-                    )
-                )
+                and not _routing_variant_matches(item, queries)
             ):
                 continue
             if (
@@ -569,14 +557,9 @@ class CapabilityRegistry:
             ):
                 continue
             if has_routing_alias and routing_query_terms:
-                strong_routing_searchable = _routing_searchable_text(
-                    item, include_hints=False
-                )
                 if (
-                    required_routing_terms.issubset(strong_routing_searchable)
-                    and (
-                        not unmapped_routing_terms
-                        or unmapped_routing_terms.issubset(searchable)
+                    _routing_variant_matches(
+                        item, queries, include_hints=False
                     )
                 ):
                     strong_semantic_candidate_ids.add(capability_id)
@@ -985,6 +968,29 @@ def _routing_query_terms(values: Sequence[object]) -> tuple[set[str], bool]:
             elif token not in _ROUTING_CONTEXT_TOKENS:
                 terms.add(token)
     return terms, recognized
+
+
+###############################################################################
+def _routing_variant_matches(
+    capability: dict[str, Any],
+    values: Sequence[object],
+    *,
+    include_hints: bool = True,
+) -> bool:
+    """Match any semantic query variant against one catalog capability."""
+
+    searchable = _routing_searchable_text(capability, include_hints=include_hints)
+    for value in values:
+        terms, recognized = _routing_query_terms([value])
+        if not recognized:
+            continue
+        required = terms.intersection(_ROUTING_CANONICAL_TERMS)
+        unmapped = terms.difference(_ROUTING_CANONICAL_TERMS)
+        if required.issubset(searchable) and (
+            not unmapped or unmapped.issubset(searchable)
+        ):
+            return True
+    return False
 
 
 ###############################################################################

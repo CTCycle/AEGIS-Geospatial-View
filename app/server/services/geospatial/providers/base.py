@@ -137,7 +137,13 @@ def _redact_url_query(value: str) -> str:
         else:
             query.append((key, nested))
     return urlunsplit(
-        (parsed.scheme, parsed.netloc, parsed.path, urlencode(query), parsed.fragment)
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            urlencode(query, safe="{}"),
+            parsed.fragment,
+        )
     )
 
 ###############################################################################

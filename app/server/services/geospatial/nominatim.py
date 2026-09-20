@@ -129,6 +129,22 @@ class NominatimService:
             )
             if not candidate_ranked:
                 continue
+            if str(expected_location_type or "").strip().lower() in {
+                "city",
+                "municipality",
+            }:
+                qualified_candidates = [
+                    candidate
+                    for candidate in candidate_ranked
+                    if self._city_candidate_matches_query(candidate, candidate_query)
+                ]
+                if qualified_candidates:
+                    qualified_ids = {id(candidate) for candidate in qualified_candidates}
+                    candidate_ranked = qualified_candidates + [
+                        candidate
+                        for candidate in candidate_ranked
+                        if id(candidate) not in qualified_ids
+                    ]
             if (
                 query_index == 0
                 and len(queries) > 1
@@ -319,6 +335,13 @@ class NominatimService:
             same_level_candidates = [
                 candidate for candidate in ranked if city_level(candidate)
             ]
+            qualified_candidates = [
+                candidate
+                for candidate in same_level_candidates
+                if self._city_candidate_matches_query(candidate, query)
+            ]
+            if qualified_candidates:
+                same_level_candidates = qualified_candidates
         elif expected in {"region", "state", "province", "county"}:
             same_level_candidates = [
                 candidate
@@ -419,6 +442,27 @@ class NominatimService:
             if is_json_object(values):
                 parts.extend(str(value) for value in values.values())
         return " ".join(part for part in parts if part).strip()
+
+    # -------------------------------------------------------------------------
+    def _city_candidate_matches_query(
+        self, candidate: dict[str, Any], query: str
+    ) -> bool:
+        """Match explicit city qualifiers to candidate parent components."""
+
+        query_components = [
+            self.normalize_component(part)
+            for part in query.split(",")
+            if self.normalize_component(part)
+        ]
+        if len(query_components) < 2:
+            return False
+        address = json_object(candidate.get("address"))
+        parent_values = {
+            self.normalize_component(str(address.get(key) or ""))
+            for key in ("state", "region", "province", "county", "country")
+            if address.get(key)
+        }
+        return all(component in parent_values for component in query_components[1:])
 
     # -------------------------------------------------------------------------
     @staticmethod

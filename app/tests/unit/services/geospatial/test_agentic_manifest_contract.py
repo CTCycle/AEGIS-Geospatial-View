@@ -434,6 +434,28 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
     )
     assert earthquake_route[0]["id"] == "usgs_earthquakes"
 
+    water_gauges = registry.shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        queries=[
+            "USGS water gauges",
+            "streamflow monitoring stations",
+            "active hydrologic sensors",
+        ],
+        explicit_ids=[],
+        runtime_registry=runtime,
+        operation="retrieve_features",
+        scope_kind="bbox",
+        temporal_mode="current",
+        requires_render=True,
+        location=ResolvedLocation(
+            label="Austin, Texas",
+            latitude=30.2711,
+            longitude=-97.7437,
+            country="United States",
+        ),
+    )
+    assert water_gauges[0]["id"] == "usgs_water_gauges"
+
 
 ###############################################################################
 def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> None:

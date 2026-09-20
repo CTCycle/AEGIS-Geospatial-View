@@ -109,6 +109,34 @@ def test_router_shortlists_without_selecting_final_arguments() -> None:
     assert "radius_m" not in decision.route.model_dump()
 
 
+def test_router_normalizes_radius_scope_to_provider_bbox_after_location_resolution() -> None:
+    state = _state()
+    state.location_refs["austin"] = ResolvedLocation(
+        label="Austin, Texas",
+        latitude=30.2672,
+        longitude=-97.7431,
+        bbox=[-98.1, 29.9, -97.4, 30.6],
+        country="United States",
+    )
+
+    decision = _router().validate_route(
+        _route(
+            operation="retrieve_features",
+            spatial_scope={
+                "kind": "radius",
+                "relationship": "around",
+                "target_refs": ["Austin"],
+                "distance_m": 25000,
+            },
+        ),
+        user_message="Show traffic around Austin.",
+        active_state=state,
+    )
+
+    assert decision.status == "accepted"
+    assert decision.capability_ids == ["traffic"]
+
+
 ###############################################################################
 def test_router_rejects_answer_route_with_execution_intent() -> None:
     decision = _router().validate_route(

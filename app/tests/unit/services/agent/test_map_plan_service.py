@@ -26,6 +26,7 @@ from server.domain.agent.map_plan import (
     SetLayerVisibilityAction,
     SetViewportAction,
 )
+from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.services.agent.capability_execution import ToolExecutionContext
 from server.services.agent.map_plan_service import MapPlanService
 from server.services.geospatial.map_session_builder import (
@@ -60,6 +61,14 @@ class FakeCapabilityRegistry:
                 "capabilityKind": "overlay",
                 "renderingMode": "vector",
             },
+            "fema_nfhl_flood_zones": {
+                "id": "fema_nfhl_flood_zones",
+                "name": "FEMA Flood Zones",
+                "provider": "fema",
+                "capabilityKind": "raster-overlay",
+                "renderingMode": "raster-tile",
+                "metadata": {"label": "FEMA Flood Zones"},
+            },
             "broken:vector-tile": {
                 "id": "broken:vector-tile",
                 "name": "Broken vector tile",
@@ -80,6 +89,15 @@ class FakeEvidenceRepository:
         *,
         conversation_id: str | None = None,
     ) -> AgentEvidenceSummary | None:
+        if evidence_id == "evidence:fema":
+            return AgentEvidenceSummary(
+                evidence_id=evidence_id,
+                kind="raster_descriptor",
+                media_type="application/json",
+                status="available",
+                summary={"result_status": "ok", "result_type": "raster"},
+                map_eligibility="renderable",
+            )
         if evidence_id != "evidence:hospitals":
             if evidence_id == "evidence:metadata":
                 return AgentEvidenceSummary(
@@ -106,6 +124,15 @@ class FakeEvidenceRepository:
         *,
         conversation_id: str | None = None,
     ) -> tuple[AgentEvidenceSummary, bytes] | None:
+        if evidence_id == "evidence:fema":
+            summary = self.get_summary(evidence_id, conversation_id=conversation_id)
+            assert summary is not None
+            return summary, json.dumps(
+                {
+                    "renderingMode": "raster-tile",
+                    "tileUrl": "https://hazards.fema.gov/export?bbox={bbox-epsg-3857}",
+                }
+            ).encode()
         if evidence_id != "evidence:hospitals":
             return None
         summary = self.get_summary(evidence_id, conversation_id=conversation_id)
@@ -258,6 +285,35 @@ def test_render_descriptor_admission_accepts_relative_geojson_source() -> None:
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_raster_tile_provider_url_is_normalized_for_candidate_rendering() -> None:
+    state = _state(active_map_session=_active_session())
+    state.evidence_refs = ["evidence:fema"]
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                AddEvidenceLayerAction(
+                    action="add_evidence_layer",
+                    evidence_ref="evidence:fema",
+                    capability_id="fema_nfhl_flood_zones",
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    overlay = state.prepared_map_session.overlay_collection.instances[-1]
+    assert overlay.capability_id == "fema_nfhl_flood_zones"
+    assert (
+        overlay.descriptor["tile_url_template"]
+        == "https://hazards.fema.gov/export?bbox={bbox-epsg-3857}"
+    )
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
     state = _state(active_map_session=_active_session())
     state.goal = AgentGoal(
@@ -340,6 +396,40 @@ async def test_location_only_plan_gets_catalog_default_basemap() -> None:
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.basemap_id == "basemap:osm"
     assert state.prepared_map_session.overlay_collection.instances == []
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_valid_empty_location_only_plan_carries_completion_status() -> None:
+    state = _state()
+    state.evidence_refs = []
+    state.tool_results.append(
+        ToolResult(
+            call_id="execute-empty",
+            tool_name="execute_geospatial_capability",
+            status="valid_empty",
+            summary="No alerts matched the requested extent.",
+            metadata=ToolExecutionMetadata(
+                capability_id="noaa_weather_alerts",
+                result_status="valid_empty",
+                duration_ms=0,
+            ),
+        )
+    )
+
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=0,
+            actions=[
+                SetViewportAction(action="set_viewport", strategy="fit_location"),
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert state.prepared_map_session.payload["result_status"] == "valid_empty"
 
 ###############################################################################
 @pytest.mark.asyncio
