@@ -44,12 +44,24 @@ class _ManifestInput(BaseModel):
 class _Policy:
 
     # -------------------------------------------------------------------------
-    def __init__(self, allowed: bool = True) -> None:
+    def __init__(
+        self,
+        allowed: bool = True,
+        reason: str = "blocked",
+    ) -> None:
         self.allowed = allowed
+        self.reason = reason
 
     # -------------------------------------------------------------------------
     def authorize(self, _tool: RegisteredTool, _arguments: BaseModel, _state: AgentRunState):
-        return cast(Any, type("Authorization", (), {"allowed": self.allowed, "reason": "blocked"})())
+        return cast(
+            Any,
+            type(
+                "Authorization",
+                (),
+                {"allowed": self.allowed, "reason": self.reason},
+            )(),
+        )
 
 ###############################################################################
 def _state() -> AgentRunState:
@@ -281,6 +293,22 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     assert correction["validation_errors"]
     assert policy_result.error is not None
     assert policy_result.error.error_type == "policy_rejection"
+
+    coverage_result = asyncio.run(
+        ToolExecutor(
+            tool_registry=policy_registry,
+            policy_engine=_Policy(
+                False,
+                reason="Capability is outside its declared geographic coverage.",
+            ),
+        ).execute_tool(
+            LLMToolCall(id="coverage", name="test_tool", arguments={"value": 1}),
+            _state(),
+            _budget(),
+        )
+    )
+    assert coverage_result.error is not None
+    assert coverage_result.error.recovery == "request_user_input"
 
     timeout_registry = ToolRegistry(runtime_registry=cast(Any, None))
     timeout_registry.register(_tool(handler))

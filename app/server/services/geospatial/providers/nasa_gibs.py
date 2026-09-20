@@ -119,6 +119,7 @@ class NASAGIBSProvider(GeospatialProvider):
                 "layer": layer.model_dump(mode="json"),
                 "render": render.model_dump(mode="json") if render else None,
             },
+            result_type="raster",
             attribution=[NASA_ATTRIBUTION],
             warnings=list(layer.warnings),
         )

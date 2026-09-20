@@ -574,7 +574,8 @@ def _normalize_data_bearing_map_route(
     if (
         route.task_mode != "execute"
         or route.presentation not in {"map", "both"}
-        or route.primary_domain is not CapabilityDomain.MAP_STATE
+        or route.primary_domain
+        not in {CapabilityDomain.MAP_STATE, CapabilityDomain.MAP_RENDERING}
         or operation != "add_layer"
         or not (route.capability_queries or route.explicit_capability_ids)
     ):

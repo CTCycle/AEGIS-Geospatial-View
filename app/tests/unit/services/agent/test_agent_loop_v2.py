@@ -7,6 +7,11 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    ViewportPolicy,
+)
 from server.domain.agent.context import AgentContextPackage
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
@@ -510,6 +515,53 @@ async def test_verified_render_emits_tools_disabled_finalization_trace() -> None
     )
     assert provider.requests[0]["kwargs"]["tool_choice"] == "none"
     assert provider.requests[0]["kwargs"]["tools"] is None
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_verified_map_state_finalization_uses_committed_overlays() -> None:
+    provider = FakeProvider(
+        [LLMResult(content="The FEMA flood zones were retained successfully.")]
+    )
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_STATE,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        operation="remove_layer",
+    )
+    state.active_map_session = MapSession(
+        session_id="map-2",
+        resolved_location=ResolvedLocation(
+            label="New Orleans",
+            latitude=29.9511,
+            longitude=-90.0715,
+        ),
+        basemap_id="osm_default",
+        viewport=ViewportPolicy(
+            center_latitude=29.9511,
+            center_longitude=-90.0715,
+        ),
+        basemap={"id": "osm_default", "label": "OpenStreetMap"},
+        overlay_collection=OverlayCollectionState(revision=2),
+    )
+
+    answer = await _loop(provider)._finalize_verified_render(  # pyright: ignore[reportPrivateUsage]
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        ),
+        provider,
+        [],
+    )
+
+    assert answer == (
+        "Map state update verified in the browser. "
+        "Basemap: OpenStreetMap. Visible overlays: none."
+    )
 
 ###############################################################################
 def test_native_goal_compiles_deterministic_completion_contract() -> None:

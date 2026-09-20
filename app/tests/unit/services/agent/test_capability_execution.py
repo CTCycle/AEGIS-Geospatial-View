@@ -79,10 +79,11 @@ def _service(
     provider: FakeProviderRegistry,
     evidence: FakeEvidenceRepository | None = None,
     runtime: FakeRuntimeRegistry | None = None,
+    manifest: dict[str, object] | None = None,
 ) -> CapabilityExecutionService:
     return CapabilityExecutionService(
         capability_registry=FakeCapabilityRegistry(
-            {"id": "places:hospitals", "provider": "overpass"}
+            manifest or {"id": "places:hospitals", "provider": "overpass"}
         ),
         runtime_registry=runtime or FakeRuntimeRegistry(),
         provider_registry=provider,  # type: ignore[arg-type]
@@ -277,6 +278,40 @@ async def test_resolved_location_is_forwarded_as_provider_coordinates() -> None:
     request = provider.requests[0][1]
     assert request.params["latitude"] == 47.3769  # type: ignore[attr-defined]
     assert request.params["longitude"] == 8.5417  # type: ignore[attr-defined]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_manifest_metadata_is_forwarded_to_descriptor_provider() -> None:
+    response = ProviderResponse(
+        capability_id="esa_worldcover",
+        provider_id="esa",
+        payload={"renderingMode": "wmts", "serviceUrl": "https://example.test/wmts"},
+        result_type="raster",
+    )
+    provider = FakeProviderRegistry(response)
+    service = _service(
+        provider,
+        manifest={
+            "id": "places:hospitals",
+            "provider": "esa",
+            "metadata": {
+                "url": "https://example.test/wmts",
+                "layer_id": "WORLDCOVER_2021_MAP",
+            },
+        },
+    )
+
+    await service.execute_capability(
+        ExecuteCapabilityInput(capability_id="places:hospitals"),
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    request = provider.requests[0][1]
+    assert request.params["metadata"] == {  # type: ignore[attr-defined]
+        "url": "https://example.test/wmts",
+        "layer_id": "WORLDCOVER_2021_MAP",
+    }
 
 
 ###############################################################################

@@ -830,7 +830,49 @@ class AgentLoop:
                     else "budget_unavailable"
                 ),
             )
+        verified_map_state = self._verified_map_state_summary(state)
+        if verified_map_state is not None:
+            return verified_map_state
         return candidate or "The map is ready and the rendering was verified."
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _verified_map_state_summary(state: AgentRunState) -> str | None:
+        """Ground map-lifecycle narration in the committed browser state."""
+
+        route = state.route
+        session = state.active_map_session
+        if (
+            route is None
+            or route.primary_domain is not CapabilityDomain.MAP_STATE
+            or session is None
+        ):
+            return None
+
+        basemap = session.basemap or {}
+        basemap_label = str(
+            basemap.get("label") or basemap.get("name") or session.basemap_id
+        ).strip()
+        visible = [
+            str(instance.label or instance.capability_id).strip()
+            for instance in session.overlay_collection.instances
+            if instance.visible
+        ]
+        hidden = [
+            str(instance.label or instance.capability_id).strip()
+            for instance in session.overlay_collection.instances
+            if not instance.visible
+        ]
+        visible_text = ", ".join(item for item in visible if item) or "none"
+        summary = (
+            "Map state update verified in the browser. "
+            f"Basemap: {basemap_label}. Visible overlays: {visible_text}."
+        )
+        if hidden:
+            hidden_text = ", ".join(item for item in hidden if item)
+            if hidden_text:
+                summary += f" Hidden retained overlays: {hidden_text}."
+        return summary
 
     # -------------------------------------------------------------------------
     async def _finalize_completed_request(

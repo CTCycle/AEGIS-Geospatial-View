@@ -368,6 +368,30 @@ def test_router_normalizes_data_bearing_add_layer_routes_after_active_map() -> N
     assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
     assert "data_bearing_map_route_normalized" in decision.reason_codes
 
+
+###############################################################################
+def test_router_normalizes_new_data_bearing_map_routes() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.MAP_RENDERING,
+            operation="add_layer",
+            capability_queries=["land cover"],
+            target_refs=["Mount Etna"],
+            spatial_scope={
+                "kind": "administrative_geometry",
+                "relationship": "around",
+                "target_refs": ["Mount Etna"],
+            },
+        ),
+        user_message="Show land cover around Mount Etna.",
+        active_state=_state(),
+    )
+
+    assert decision.status in {"accepted", "discovery_required"}
+    assert decision.route.primary_domain is CapabilityDomain.MAP_RENDERING
+    assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
+    assert "data_bearing_map_route_normalized" in decision.reason_codes
+
 ###############################################################################
 def test_router_normalizes_geocoding_route_for_location_only_map() -> None:
     decision = _router().validate_route(
