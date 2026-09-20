@@ -203,6 +203,16 @@ class MapSessionBuilder:
             ):
                 if key in evidence_payload and key not in descriptor:
                     descriptor[key] = evidence_payload[key]
+            if (
+                "tile_url_template" not in descriptor
+                and isinstance(descriptor.get("tileUrl"), str)
+            ):
+                descriptor["tile_url_template"] = descriptor["tileUrl"]
+            if (
+                "url" not in descriptor
+                and isinstance(descriptor.get("serviceUrl"), str)
+            ):
+                descriptor["url"] = descriptor["serviceUrl"]
             render_data = _geojson_render_data(evidence.payload)
             if render_data is not None:
                 descriptor["data"] = render_data

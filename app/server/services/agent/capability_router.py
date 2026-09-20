@@ -725,4 +725,8 @@ def _concrete_scope_kind(
     if scope.kind in {"administrative_geometry", "feature_geometry"}:
         location = _single_known_location(active_state)
         return "bbox" if location is not None and location.bbox else None
+    if scope.kind == "radius":
+        # Radius is a user-facing semantic scope. Provider contracts receive
+        # the bounded bbox produced from it after location binding.
+        return "bbox" if _single_known_location(active_state) is not None else None
     return scope.kind

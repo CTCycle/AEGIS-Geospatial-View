@@ -530,6 +530,19 @@ def _lower_execution_extent(
             provenance_scope_kind=semantic_kind,
             target_ref=target_ref,
         )
+    if location.bbox and semantic_kind == "radius":
+        # "Around <place>" is a bounded user-semantic request even when the
+        # route does not include an explicit distance.  Use the resolver's
+        # place extent rather than allowing a provider to fall back to an
+        # unbounded national collection query.
+        return ExecutionExtent(
+            kind="bbox",
+            latitude=location.latitude,
+            longitude=location.longitude,
+            bbox=list(location.bbox),
+            provenance_scope_kind=semantic_kind,
+            target_ref=target_ref,
+        )
     if location.bbox and semantic_kind in {
         "administrative_geometry",
         "feature_geometry",
@@ -618,12 +631,33 @@ def _map_plan_semantic_validator(
             )
 
     contract = state.completion_contract
-    if contract is not None and contract.evidence_required and not evidence_actions:
+    if (
+        contract is not None
+        and contract.evidence_required
+        and not evidence_actions
+        and not _valid_empty_data_only(state)
+    ):
         errors.append(
             "Data-bearing map plans must include add_evidence_layer with an exact "
-            "evidence_ref from successful evidence-producing output."
+            "evidence_ref from successful evidence-producing output; use a "
+            "location-only map when the provider result is valid_empty."
         )
     return errors[:8]
+
+
+###############################################################################
+def _valid_empty_data_only(state: AgentRunState) -> bool:
+    """Allow a location-only map when the provider found no matching data."""
+
+    data_results = [
+        result
+        for result in state.tool_results
+        if result.tool_name == "execute_geospatial_capability"
+    ]
+    return bool(data_results) and all(
+        result.status == "valid_empty" for result in data_results
+    )
+
 
 ###############################################################################
 async def _route_handler(_request: RouteRequestInput, _state: AgentRunState) -> ToolResult:

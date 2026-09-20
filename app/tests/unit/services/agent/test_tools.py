@@ -10,6 +10,7 @@ from server.domain.agent.capability_route import (
     AgentPhase,
     AgentRunState,
     CapabilityRoute,
+    CompletionContract,
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
@@ -23,8 +24,12 @@ from server.services.agent.native_tools import _execute_capability_handler
 from server.services.agent.native_tools import _bind_execute_request
 from server.services.agent.native_tools import _location_for_request
 from server.services.agent.native_tools import _capability_semantic_validator
+from server.services.agent.native_tools import _map_plan_semantic_validator
 from server.services.agent.policy_engine import PolicyEngine
-from server.services.agent.tool_definitions import ExecuteCapabilityInput
+from server.services.agent.tool_definitions import (
+    ApplyMapPlanInput,
+    ExecuteCapabilityInput,
+)
 from server.services.agent.tool_definitions import ProviderLayerDiscoveryInput
 from server.services.agent.tool_handlers.provider_layers import ProviderLayerToolHandler
 from server.services.agent.tool_registry import ToolRegistry
@@ -362,6 +367,94 @@ def test_execute_binding_lowers_administrative_scope_to_resolved_bbox() -> None:
     )
 
     assert bound.bbox == [11.4, 36.6, 15.7, 38.4]
+
+
+###############################################################################
+def test_execute_binding_lowers_implicit_radius_to_resolved_place_bbox() -> None:
+    state = _state()
+    state.location_refs["austin, texas"] = ResolvedLocation(
+        label="Austin, Travis County, Texas, United States",
+        latitude=30.2711286,
+        longitude=-97.7436995,
+        bbox=[-97.9367663, 30.0985133, -97.5605288, 30.5166255],
+    )
+    state.goal = AgentGoal(
+        goal="Show active water gauges around Austin, Texas",
+        task_mode="execute",
+        presentation="both",
+        operation="retrieve_active_water_gauges",
+        requires_location=True,
+        target_ids=["USGS water gauges", "Austin, Texas"],
+        spatial_scope=[
+            {
+                "kind": "radius",
+                "relationship": "around",
+                "target_refs": ["Austin, Texas"],
+            }
+        ],
+    )
+
+    bound = _bind_execute_request(
+        ExecuteCapabilityInput(
+            capability_id="usgs_water_gauges",
+            location_ref="austin, texas",
+        ),
+        state,
+    )
+
+    assert bound.radius_m is None
+    assert bound.bbox == [-97.9367663, 30.0985133, -97.5605288, 30.5166255]
+
+
+###############################################################################
+def test_map_plan_allows_location_only_candidate_after_valid_empty_data() -> None:
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="both",
+        requires_location=True,
+        operation="show",
+    )
+    state.completion_contract = CompletionContract(
+        operation="show",
+        data_requirement="provider_data",
+        requirements=["required_data_retrieved", "map_candidate_prepared"],
+        evidence_required=True,
+        map_preparation_required=True,
+    )
+    state.capability_ids = ["noaa_weather_alerts"]
+    state.evidence_refs = ["evidence-empty"]
+    state.tool_results.append(
+        ToolResult(
+            call_id="execute-empty",
+            tool_name="execute_geospatial_capability",
+            status="valid_empty",
+            summary="No active alerts matched the requested extent.",
+            evidence_refs=["evidence-empty"],
+            metadata=ToolExecutionMetadata(
+                capability_id="noaa_weather_alerts",
+                result_status="valid_empty",
+                duration_ms=0,
+            ),
+        )
+    )
+
+    plan = ApplyMapPlanInput.model_validate(
+        {
+            "expected_collection_revision": 0,
+            "actions": [
+                {"action": "set_basemap", "capability_id": "osm_default"},
+                {
+                    "action": "set_viewport",
+                    "strategy": "fit_location",
+                    "location_ref": "houston",
+                },
+            ],
+        }
+    )
+
+    assert _map_plan_semantic_validator(plan, state) == []
 
 
 ###############################################################################

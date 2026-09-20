@@ -111,6 +111,13 @@ class MapPlanService:
                 state=state,
                 actions=effective_actions,
             )
+            if self._valid_empty_data_only(state):
+                payload = dict(candidate.payload)
+                payload["result_status"] = "valid_empty"
+                candidate = candidate.model_copy(
+                    update={"payload": payload},
+                    deep=True,
+                )
         except MapPlanBuildError as exc:
             return self._failure(
                 context=context,
@@ -182,6 +189,20 @@ class MapPlanService:
                 duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
                 evidence_refs=list(dict.fromkeys(evidence_refs)),
             ),
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _valid_empty_data_only(state: AgentRunState) -> bool:
+        """Mark a location-only candidate when data retrieval was valid-empty."""
+
+        data_results = [
+            result
+            for result in state.tool_results
+            if result.tool_name == "execute_geospatial_capability"
+        ]
+        return bool(data_results) and all(
+            result.status == "valid_empty" for result in data_results
         )
 
     # -------------------------------------------------------------------------

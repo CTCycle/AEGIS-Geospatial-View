@@ -22,5 +22,6 @@ class FEMAProvider(GeospatialProvider):
                 "legend": {"type": "flood-zone", "label": "NFHL flood hazard zone"},
                 "freshnessLabel": "FEMA NFHL public map service",
             },
+            result_type="raster",
             attribution=["Federal Emergency Management Agency"],
         )

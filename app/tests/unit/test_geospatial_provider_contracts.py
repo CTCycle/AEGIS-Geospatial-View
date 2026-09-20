@@ -9,6 +9,7 @@ from server.services.geospatial.providers.base import (
     ProviderResponse,
     ProviderResult,
     provider_cache_key,
+    response_without_credentials,
     safe_request_params,
 )
 from server.services.geospatial.providers.nominatim import NominatimProvider
@@ -71,6 +72,26 @@ def test_safe_request_params_redacts_credentials() -> None:
         "category": "parks",
         "token": "<redacted>",
     }
+
+###############################################################################
+def test_response_redaction_preserves_map_url_template_tokens() -> None:
+    response = response_without_credentials(
+        ProviderResponse(
+            capability_id="fema_nfhl_flood_zones",
+            provider_id="fema",
+            payload={
+                "tileUrl": (
+                    "https://hazards.example/export?"
+                    "bbox={bbox-epsg-3857}&format=png32"
+                )
+            },
+        )
+    )
+
+    assert response.payload["tileUrl"] == (
+        "https://hazards.example/export?"
+        "bbox={bbox-epsg-3857}&format=png32"
+    )
 
 ###############################################################################
 def test_nominatim_provider_geocodes_live_contract_payload() -> None:

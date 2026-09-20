@@ -202,6 +202,27 @@ def test_valid_empty_result_with_bounds_can_render_analysis_area() -> None:
     assert renderable.status == "satisfied"
 
 ###############################################################################
+def test_valid_empty_result_satisfies_explicit_data_and_time_checks() -> None:
+    goal = _goal(
+        temporal_scope={"mode": "current", "reference_time_iso": "2026-09-20T07:00:00Z"},
+        spatial_scope=[{"kind": "bbox", "relationship": "within"}],
+    )
+    requirements = CompletionEvaluator.native_candidate_requirements(
+        completion_contract=_contract(
+            "required_data_retrieved",
+            "temporal_scope_applied",
+            "spatial_scope_applied",
+        ),
+        goal=goal,
+        map_session=_session(payload={"result_status": "valid_empty"}),
+    )
+
+    statuses = {item.name: item.status for item in requirements}
+    assert statuses["required_data_retrieved"] == "satisfied"
+    assert statuses["temporal_scope_applied"] == "satisfied"
+    assert statuses["spatial_scope_applied"] == "satisfied"
+
+###############################################################################
 def test_explicit_scope_and_time_require_descriptor_evidence() -> None:
     goal = _goal(
         temporal_scope={

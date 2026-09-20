@@ -243,6 +243,93 @@ def test_nominatim_accepts_a_dominant_unqualified_city_candidate() -> None:
     ) == []
 
 ###############################################################################
+def test_nominatim_uses_exact_parent_for_qualified_city_ambiguity() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    ranked = [
+        {
+            "display_name": "Houston, Harris County, Texas, United States",
+            "lat": 29.76,
+            "lon": -95.37,
+            "confidence": 0.76,
+            "selected_result_type": "city",
+            "address": {
+                "city": "Houston",
+                "county": "Harris County",
+                "state": "Texas",
+                "country": "United States",
+            },
+        },
+        {
+            "display_name": "Houston, Texas County, Missouri, United States",
+            "lat": 37.33,
+            "lon": -91.96,
+            "confidence": 0.75,
+            "selected_result_type": "city",
+            "address": {
+                "city": "Houston",
+                "county": "Texas County",
+                "state": "Missouri",
+                "country": "United States",
+            },
+        },
+    ]
+
+    assert service._find_ambiguous_candidates(
+        ranked,
+        expected_location_type="city",
+        query="Houston, Texas",
+        has_parent_context=True,
+    ) == []
+
+###############################################################################
+def test_nominatim_prioritizes_exact_qualified_city_parent() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+
+    service.perform_request = lambda params: [  # type: ignore[method-assign]
+        {
+            "display_name": "Houston, Texas County, Missouri, United States",
+            "lat": "37.33",
+            "lon": "-91.96",
+            "class": "place",
+            "type": "city",
+            "importance": 0.9,
+            "address": {
+                "city": "Houston",
+                "county": "Texas County",
+                "state": "Missouri",
+                "country": "United States",
+            },
+        },
+        {
+            "display_name": "Houston, Harris County, Texas, United States",
+            "lat": "29.76",
+            "lon": "-95.37",
+            "class": "place",
+            "type": "city",
+            "importance": 0.6,
+            "address": {
+                "city": "Houston",
+                "county": "Harris County",
+                "state": "Texas",
+                "country": "United States",
+            },
+        },
+    ]
+
+    async def _run() -> None:
+        result = await service.extract_coordinates(
+            address="Houston",
+            city=None,
+            country_name="Texas",
+            country_code=None,
+            expected_location_type="city",
+        )
+        assert result is not None
+        assert result["display_name"].startswith("Houston, Harris County, Texas")
+
+    run_async_in_thread(_run())
+
+###############################################################################
 def test_nominatim_deduplicates_city_boundary_and_centroid() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
     ranked = service.rank_candidates(
