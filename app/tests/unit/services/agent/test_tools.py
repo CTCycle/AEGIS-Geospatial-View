@@ -754,6 +754,36 @@ def test_policy_rejects_capability_execution_on_map_only_routes() -> None:
     assert rejected.allowed is False
     assert rejected.metadata["code"] == "route_domain_mismatch"
 
+
+###############################################################################
+def test_policy_allows_capability_execution_on_data_bearing_map_routes() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        secondary_domains=[CapabilityDomain.DATA_RETRIEVAL],
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["places:hospitals"]
+    tool = registry.get("execute_geospatial_capability")
+    assert tool is not None
+    policy = PolicyEngine(
+        location_resolver=FakeResolver(),  # type: ignore[arg-type]
+        capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
+        runtime_registry=FakeRuntimeRegistry(),  # type: ignore[arg-type]
+    )
+
+    allowed = policy.authorize(
+        tool,
+        ExecuteCapabilityInput(capability_id="places:hospitals"),
+        state,
+    )
+
+    assert allowed.allowed is True
+
 ###############################################################################
 def test_location_reference_never_falls_back_to_another_resolved_location() -> None:
     state = _state()

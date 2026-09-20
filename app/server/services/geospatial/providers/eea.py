@@ -145,6 +145,7 @@ class EEAProvider(GeospatialProvider):
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload=payload,
+            result_type="raster",
             attribution=[
                 str(metadata.get("attribution") or "European Environment Agency")
             ],

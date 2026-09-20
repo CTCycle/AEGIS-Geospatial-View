@@ -426,6 +426,12 @@ class ToolExecutor:
 
         authorization = self._authorize(registered, arguments, state)
         if not authorization[0]:
+            recovery = (
+                "request_user_input"
+                if authorization[1]
+                == "Capability is outside its declared geographic coverage."
+                else "choose_alternate_tool"
+            )
             return self._failure(
                 call_id=call_id,
                 tool_name=tool_call.name,
@@ -435,7 +441,7 @@ class ToolExecutor:
                     code="policy_rejection",
                     message=authorization[1] or "Tool call was rejected by policy.",
                     retryable=False,
-                    recovery="choose_alternate_tool",
+                    recovery=recovery,
                 ),
             )
 

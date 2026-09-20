@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tests.conftest import run_async_in_thread
+from server.domain.geospatial.providers import ProviderRequest
 from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
 
 WMTS_XML = """<?xml version="1.0"?>
@@ -80,3 +81,22 @@ def test_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
 ###############################################################################
 def test_nasa_gibs_provider_describes_one_layer() -> None:
     run_async_in_thread(_assert_nasa_gibs_provider_describes_one_layer())
+
+
+###############################################################################
+def test_nasa_gibs_provider_returns_renderable_raster_result() -> None:
+    async def fetcher(url: str, headers: dict[str, str] | None) -> str:
+        del headers
+        return WMTS_XML if "wmts" in url else WMS_XML
+
+    response = run_async_in_thread(
+        NASAGIBSProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="MODIS_Terra_NDVI_8Day",
+                params={"layer_id": "MODIS_Terra_NDVI_8Day"},
+            )
+        )
+    )
+
+    assert response.result_type == "raster"
+    assert response.payload["render"] is not None

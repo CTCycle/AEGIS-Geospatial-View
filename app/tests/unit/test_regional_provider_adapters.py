@@ -32,6 +32,7 @@ def test_eea_provider_returns_wms_descriptor() -> None:
     assert response.payload["renderingMode"] == "wms"
     assert response.payload["serviceUrl"] == "https://example.test/wms"
     assert response.payload["layers"] == ["0"]
+    assert response.result_type == "raster"
     assert response.attribution == ["EEA"]
 
 ###############################################################################
@@ -106,6 +107,7 @@ def test_esa_provider_returns_wmts_descriptor() -> None:
     assert response.payload["renderingMode"] == "wmts"
     assert response.payload["layerId"] == "WORLDCOVER_2021_MAP"
     assert response.payload["serviceUrl"] == "https://example.test/wmts"
+    assert response.result_type == "raster"
     assert response.attribution == ["ESA"]
 
 ###############################################################################

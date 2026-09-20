@@ -182,11 +182,15 @@ class CapabilityExecutionService:
                 retryable=True,
             )
 
+        provider_params = _provider_params(request, location=location)
+        manifest_metadata = manifest.get("metadata")
+        if is_json_object(manifest_metadata):
+            provider_params.setdefault("metadata", dict(manifest_metadata))
         provider_request = ProviderRequest(
             capability_id=capability_id,
             bbox=_bbox(request.bbox),
             time=request_time,
-            params=_provider_params(request, location=location),
+            params=provider_params,
         )
         try:
             response = await self.provider_registry.fetch(
