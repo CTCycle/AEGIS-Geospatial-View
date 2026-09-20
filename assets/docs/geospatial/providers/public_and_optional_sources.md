@@ -89,6 +89,9 @@ Use `fema_nfhl_flood_zones` for National Flood Hazard Layer map context.
 
 - The public FEMA MapServer export is exposed through an explicit bounded
   `{bbox-epsg-3857}` raster template in the catalog.
+- The current service base is
+  `https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer`; the
+  browser template uses its bounded `export` operation.
 - Keep FEMA attribution visible; authoritative flood-zone interpretation still
   requires FEMA source context and applicable local regulation.
 
