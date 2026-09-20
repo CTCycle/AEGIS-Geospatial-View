@@ -1,10 +1,10 @@
 # Project Overview
 
-Last updated: 2026-09-17
+Last updated: 2026-09-20
 
 ## Purpose
 
-This file is the root index for `assets/docs`. Read it first, then open the smallest leaf document that answers the current question.
+This file is the root index for `assets/docs`. Read it first, then open the smallest leaf document that answers the current question. For the current operational project state, read [`project_status_ledger.md`](project_status_ledger.md); detailed reports explain how each status was established.
 
 ## Current Implementation Snapshot
 
@@ -35,6 +35,13 @@ conversation-scoped `agent_evidence` store rather than model messages.
 
 - `project_index.md`
   Root index, reading rules, and documentation governance.
+
+### Operational Status
+
+- [`project_status_ledger.md`](project_status_ledger.md)
+  Canonical current operational status catalog for project components, active
+  issues, resolved findings, and validation debt. Update it when implementation
+  status, evidence, blockers, or remediation state changes.
 
 ### Architecture
 
@@ -119,7 +126,9 @@ conversation-scoped `agent_evidence` store rather than model messages.
 
 - [validation/gate_status.md](validation/gate_status.md)
   Canonical PASS/PARTIAL/FAIL/BLOCKED/UNRUN ledger for native-loop,
-  presentation, browser-fault, provider, and hosted-CI gates.
+  presentation, browser-fault, provider, and hosted-CI gates. It is the
+  detailed evidence ledger beneath the current component summary in
+  `project_status_ledger.md`.
 
 ### UI
 
@@ -155,6 +164,9 @@ conversation-scoped `agent_evidence` store rather than model messages.
 - Keep file and folder names lower-case.
 - Prefer narrow topic files over large omnibus documents.
 - Update affected docs in the same change set as behavior changes.
+- Update `project_status_ledger.md` whenever a component status, active issue,
+  blocker, validation result, or revalidation requirement changes. Keep detailed
+  reports in `assets/QA/` and link them instead of duplicating their narratives.
 - Include `Last updated: YYYY-MM-DD` whenever a document changes.
 - Remove obsolete docs and QA artifacts from `assets/docs`; keep validation artifacts under root-level `assets/QA/` when they must be preserved.
 
