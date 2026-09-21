@@ -1,6 +1,6 @@
 # Experience And Accessibility
 
-Last updated: 2026-09-16
+Last updated: 2026-09-21
 
 ## Core User Journeys
 
@@ -37,9 +37,10 @@ Last updated: 2026-09-16
 - Maintain keyboard navigability for all controls.
 - Preserve `:focus-visible` outlines.
 - Maintain semantic containers and labels for form elements.
-- Settings tabs use `tablist`/`tab`/`tabpanel` semantics, `aria-selected`, and
-  roving focus. Arrow keys, Home, and End move between tabs and browser
-  history restores the selected panel.
+- Settings uses a persistent semantic navigation landmark with
+  `aria-current="page"` on the active section. The `tab` query parameter keeps
+  deep links and browser history stable without using tab-panel semantics for
+  page-level settings sections.
 - Keep exactly one `main` landmark in the routed application shell.
 - Modal dialogs must receive focus on open, trap Tab and Shift+Tab, close with Escape, and restore focus to the invoking control.
 - Do not encode status solely by color.

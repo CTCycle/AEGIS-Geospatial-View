@@ -75,6 +75,7 @@ def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
         in route_paths
     )
     assert f"{FASTAPI_API_PREFIX}/chat/turn" in route_paths
+    assert f"{FASTAPI_API_PREFIX}/settings/runtime" in route_paths
     assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}" in route_paths
     assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}/cancel" in route_paths
 
@@ -96,6 +97,12 @@ def test_openapi_declares_stable_response_models(monkeypatch) -> None:
             schema, f"{FASTAPI_API_PREFIX}/chat/settings", "get", "200"
         )
         == "#/components/schemas/ModelSettingsResponse"
+    )
+    assert (
+        _response_schema_ref(
+            schema, f"{FASTAPI_API_PREFIX}/settings/runtime", "get", "200"
+        )
+        == "#/components/schemas/RuntimeSettingsResponse"
     )
     assert (
         _response_schema_ref(schema, f"{FASTAPI_API_PREFIX}/chat/models", "get", "200")
@@ -129,7 +136,18 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         stop=lambda: call_order.append("job_service.stop"),
     )
 
-    monkeypatch.setattr(app_module, "get_server_settings", _settings)
+    monkeypatch.setattr(app_module, "ensure_environment_loaded", lambda: None)
+    monkeypatch.setattr(app_module, "build_database_settings", lambda: object())
+    monkeypatch.setattr(
+        app_module,
+        "RuntimeSettingsRepository",
+        lambda database: SimpleNamespace(
+            get_required=lambda: SimpleNamespace(
+                to_server_settings=lambda database_settings: _settings()
+            )
+        ),
+    )
+    monkeypatch.setattr(app_module, "RuntimeSettingsService", lambda repository: object())
     monkeypatch.setattr(app_module, "SQLiteRepository", lambda settings: object())
     monkeypatch.setattr(
         app_module,
@@ -203,7 +221,18 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
         stop=lambda: call_order.append("job_service.stop"),
     )
 
-    monkeypatch.setattr(app_module, "get_server_settings", _settings)
+    monkeypatch.setattr(app_module, "ensure_environment_loaded", lambda: None)
+    monkeypatch.setattr(app_module, "build_database_settings", lambda: object())
+    monkeypatch.setattr(
+        app_module,
+        "RuntimeSettingsRepository",
+        lambda database: SimpleNamespace(
+            get_required=lambda: SimpleNamespace(
+                to_server_settings=lambda database_settings: _settings()
+            )
+        ),
+    )
+    monkeypatch.setattr(app_module, "RuntimeSettingsService", lambda repository: object())
     monkeypatch.setattr(app_module, "SQLiteRepository", lambda settings: object())
     monkeypatch.setattr(
         app_module, "initialize_database", lambda backend, **kwargs: None

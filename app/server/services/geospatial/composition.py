@@ -15,8 +15,19 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.catalog import GeospatialCatalogService
 from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
-from server.services.geospatial.provider_registry import ProviderRegistry
+from server.services.geospatial.nominatim import NominatimService
+from server.services.geospatial.openmeteo import OpenMeteoService
+from server.services.geospatial.overpass import OverpassService
+from server.services.geospatial.provider_registry import (
+    PROVIDER_FACTORIES,
+    ProviderRegistry,
+)
 from server.services.geospatial.runtime_registry import RuntimeRegistry
+from server.services.geospatial.providers.nominatim import NominatimProvider
+from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
+from server.services.geospatial.providers.overpass import OverpassProvider
+from server.services.geospatial.providers.rainviewer import RainViewerProvider
+from server.services.geospatial.rainviewer import RainViewerService
 from server.services.cryptography import CredentialEncryptionService
 
 ###############################################################################
@@ -31,6 +42,10 @@ class GeospatialRuntime:
     credential_resolver: GeospatialCredentialResolver
     credentials_repo: CredentialRepository
     crypto_service: CredentialEncryptionService
+    nominatim_service: NominatimService
+    openmeteo_service: OpenMeteoService
+    overpass_service: OverpassService
+    rainviewer_service: RainViewerService
 
 ###############################################################################
 def build_provider_execution_policy(
@@ -106,10 +121,34 @@ def build_geospatial_runtime(
         capability_registry=capability_registry,
         runtime_registry=runtime_registry,
     )
+    nominatim_service = NominatimService(settings=getattr(settings, "nominatim", None))
+    openmeteo_service = OpenMeteoService(settings=getattr(settings, "openmeteo", None))
+    overpass_service = OverpassService(settings=getattr(settings, "overpass", None))
+    rainviewer_service = RainViewerService(
+        settings=getattr(settings, "rainviewer", None)
+    )
+    provider_factories = dict(PROVIDER_FACTORIES)
+    provider_factories.update(
+        {
+            "nominatim": lambda _credential: NominatimProvider(
+                settings=getattr(settings, "nominatim", None)
+            ),
+            "openmeteo": lambda _credential: OpenMeteoProvider(
+                service=openmeteo_service
+            ),
+            "overpass": lambda _credential: OverpassProvider(
+                service=overpass_service
+            ),
+            "rainviewer": lambda _credential: RainViewerProvider(
+                service=rainviewer_service
+            ),
+        }
+    )
     provider_registry = ProviderRegistry(
         catalog_snapshot=catalog_snapshot,
         credential_resolver=credential_resolver,
         execution_policy=build_provider_execution_policy(settings),
+        provider_factories=provider_factories,
     )
     api_service = GeospatialApiService(
         catalog_service=catalog_service,
@@ -128,4 +167,8 @@ def build_geospatial_runtime(
         credential_resolver=credential_resolver,
         credentials_repo=credentials_repo,
         crypto_service=crypto_service,
+        nominatim_service=nominatim_service,
+        openmeteo_service=openmeteo_service,
+        overpass_service=overpass_service,
+        rainviewer_service=rainviewer_service,
     )

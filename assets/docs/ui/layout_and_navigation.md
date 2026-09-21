@@ -1,6 +1,6 @@
 # Layout And Navigation
 
-Last updated: 2026-09-18
+Last updated: 2026-09-21
 
 ## Desktop Viewport Contract
 
@@ -41,7 +41,9 @@ than wrapping, resizing, or displacing the controls.
 
 ## Other Page Layouts
 
-- Settings page uses a two-column `7fr/3fr` desktop layout.
+- Settings page uses a narrow persistent left navigation and a scrollable right
+  content area; runtime forms use responsive three-, two-, and one-column field
+  groups.
 - The app shell uses an Operations Bar for top-level navigation and status.
 
 ## Primary Screens
@@ -50,8 +52,9 @@ than wrapping, resizing, or displacing the controls.
   chat workspace, map pane, resizable divider, inline alerts, context progress,
   and full-width status footer
 - `/settings`
-  sticky header, accessible Models/Model Providers/Geospatial Access tabs,
-  model cards, inline provider credentials, and local Ollama controls
+  persistent Models, Model Providers, Geospatial Access, Application,
+  Map & Search, Data Sources, and Agent Runtime navigation; model cards,
+  inline provider credentials, local Ollama controls, and typed runtime forms
 - `/geodata`
   grouped manifest-backed capability tables
 
@@ -59,9 +62,10 @@ than wrapping, resizing, or displacing the controls.
 
 - top-level Operations Bar routes: Search (`/`), Geodata (`/geodata`), and
   Settings (`/settings`)
-- Settings tab query values: `models`, `model-providers`, and
-  `geospatial-access`; missing and invalid values normalize to `models`.
-- Settings tab transitions use router history so browser Back/Forward restores
+- Settings section query values: `models`, `model-providers`,
+  `geospatial-access`, `application`, `map-search`, `data-sources`, and
+  `agent-runtime`; missing and invalid values normalize to `models`.
+- Settings section transitions use router history so browser Back/Forward restores
   the previous panel. Leaving Settings returns to the workspace without
   carrying its query parameters.
 - unknown routes redirect to workspace

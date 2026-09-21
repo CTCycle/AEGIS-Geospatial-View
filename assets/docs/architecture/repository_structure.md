@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-09-18
+Last updated: 2026-09-21
 
 ## Purpose
 
@@ -45,7 +45,6 @@ AEGIS Geospatial View/
   settings/
     .env
     .env.example
-    configurations.json
   runtimes/
     cache/
   start_on_windows.ps1
@@ -75,11 +74,15 @@ Key backend directories under `app/server`:
   responsibilities; builders perform composition.
 - `repositories/`
   Persistence, serialization, database helpers, credential encryption material, and reference catalog seeding.
+- `repositories/runtime_settings.py`
+  Typed SQLite ownership and atomic partial updates for application runtime
+  settings.
 - `repositories/database/`
   Concrete SQLite engine/session setup, repository holder, initializer, and
   Alembic migration runner.
 - `migrations/`
-  Alembic environment and reviewed schema revisions.
+  Alembic environment and reviewed schema revisions, including the
+  `application_runtime_settings` table.
 - `services/`
   Runtime orchestration for agent, chat, geospatial, LLM, and search workflows.
   The agent orchestration area includes focused helpers such as

@@ -18,6 +18,7 @@ from server.api.realtime import metrics_router as realtime_metrics_router
 from server.api.realtime import router as realtime_router
 from server.api.geospatial import router as geospatial_router
 from server.api.jobs import router as jobs_router
+from server.api.settings import router as settings_router
 from server.common.constants import AEGIS_VERSION
 from server.common.paths import (
     CLIENT_ASSETS_PATH,
@@ -29,7 +30,8 @@ from server.common.paths import (
     FASTAPI_ROOT_ENDPOINT,
     FASTAPI_SPA_FALLBACK_ENDPOINT,
 )
-from server.configurations import get_server_settings
+from server.configurations import build_database_settings, ensure_environment_loaded
+from server.repositories.runtime_settings import RuntimeSettingsRepository
 from server.repositories.database.initializer import initialize_database
 from server.repositories.database.sqlite import SQLiteRepository
 from server.services.chat.composition import build_chat_runtime
@@ -51,6 +53,7 @@ from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.credentials import CredentialRepository
 from server.services.catalog.startup import seed_reference_catalog
 from server.services.startup_validation import run_startup_validations
+from server.services.settings.runtime_settings import RuntimeSettingsService
 
 ###############################################################################
 def health_check() -> dict[str, str]:
@@ -99,8 +102,9 @@ def redirect_root_to_docs() -> RedirectResponse:
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     _application_logger.debug("Application logging configured.")
-    settings = get_server_settings()
-    database = SQLiteRepository(settings.database)
+    ensure_environment_loaded()
+    database_settings = build_database_settings()
+    database = SQLiteRepository(database_settings)
 
     try:
         initialize_database(
@@ -111,6 +115,10 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         _dispose_sqlite_engine(database)
         raise
 
+    runtime_repository = RuntimeSettingsRepository(database)
+    runtime_app_settings = runtime_repository.get_required()
+    settings = runtime_app_settings.to_server_settings(database_settings)
+    runtime_settings_service = RuntimeSettingsService(runtime_repository)
     geospatial_runtime = build_geospatial_runtime(database, settings=settings)
     chat_runtime = build_chat_runtime(
         database,
@@ -192,6 +200,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     application.state.realtime_connections = realtime_connections
     application.state.realtime_metrics = realtime_metrics
     application.state.job_service = job_service
+    application.state.runtime_settings_service = runtime_settings_service
 
     try:
         job_service.start()
@@ -221,6 +230,7 @@ def create_app() -> FastAPI:
     application.include_router(realtime_metrics_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(jobs_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(geospatial_router, prefix=FASTAPI_API_PREFIX)
+    application.include_router(settings_router, prefix=FASTAPI_API_PREFIX)
     application.add_api_route(
         f"{FASTAPI_API_PREFIX}/health",
         health_check,

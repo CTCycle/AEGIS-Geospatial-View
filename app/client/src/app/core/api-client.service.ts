@@ -11,6 +11,7 @@ import {
   fetchConversations,
   fetchConversationRunTrace,
   fetchChatSettings,
+  fetchRuntimeSettings,
   fetchGeospatialCameras,
   fetchGeospatialCredentialStatus,
   fetchGeospatialProviderAccountSetups,
@@ -20,6 +21,7 @@ import {
   refreshOllamaModels,
   sendChatTurn,
   updateChatSettings,
+  updateRuntimeSettings,
   runStructuredProbe,
 } from './api';
 import {
@@ -39,6 +41,8 @@ import {
   ModelLibraryResponse,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
+  RuntimeSettingsResponse,
+  RuntimeSettingsUpdateRequest,
   StructuredProbeResponse,
   OllamaHealthResponse,
 } from './types';
@@ -114,6 +118,14 @@ export class ApiClientService {
 
   updateChatSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {
     return updateChatSettings(payload);
+  }
+
+  fetchRuntimeSettings(): Promise<RuntimeSettingsResponse> {
+    return fetchRuntimeSettings();
+  }
+
+  updateRuntimeSettings(payload: RuntimeSettingsUpdateRequest): Promise<RuntimeSettingsResponse> {
+    return updateRuntimeSettings(payload);
   }
 
   fetchStructuredProbe(): Promise<StructuredProbeResponse> {

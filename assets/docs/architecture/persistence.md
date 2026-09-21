@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-09-09
+Last updated: 2026-09-21
 
 ## SQLite-only relational storage
 
@@ -18,21 +18,22 @@ There is no backend selector, provider registry, or generic database contract.
 ```mermaid
 flowchart TD
     ENV[settings/.env or process environment]
-    CONFIG[ConfigurationManager]
     SETTINGS[DatabaseSettings]
     DB[SQLiteRepository]
     ENGINE[SQLite engine and sessionmaker]
     MIG[SQLite FileLock and Alembic]
-    SEED[Credential and reference seeding]
+    SEED[Credential, model, runtime, and reference seeding]
+    RUNTIME[RuntimeSettingsRepository]
     REPOS[Domain repositories]
     SERVICES[Services and application runtimes]
 
-    ENV --> CONFIG
-    CONFIG --> SETTINGS
+    ENV --> SETTINGS
     SETTINGS --> DB
     DB --> ENGINE
     DB --> MIG
     MIG --> SEED
+    SEED --> RUNTIME
+    RUNTIME --> SERVICES
     DB --> REPOS
     REPOS --> SERVICES
 ```
@@ -70,7 +71,7 @@ runtime code never calls `Base.metadata.create_all()`.
 Operators must back up a database before deployment. A failed startup never
 silently replaces an existing database file.
 
-The canonical schema contains 16 application tables plus `alembic_version`.
+The canonical schema contains 17 application tables plus `alembic_version`.
 Conversations own their context state, message history, message sequence, and
 active-run relationship directly; there are no `chat_sessions` or
 `conversation_contexts` tables.
@@ -78,8 +79,9 @@ active-run relationship directly; there are no `chat_sessions` or
 ## Stored domains
 
 Core relational storage covers conversations and messages, agent runs and
-events, steering messages, model settings, encrypted model credentials, and
-seeded geospatial reference data. Conversation-scoped native-agent evidence is
+events, steering messages, model settings, encrypted model credentials,
+application runtime settings, and seeded geospatial reference data.
+Conversation-scoped native-agent evidence is
 stored in compressed `agent_evidence` rows with bounded summaries, provenance,
 checksums, and parent references; conversation deletion cascades metadata and
 payload. Sequencing, identity, active-run slots,
@@ -89,7 +91,9 @@ constraints. Payload columns use SQLAlchemy `JSON` directly.
 The repository/service boundary remains intentional: repositories translate
 SQLite/ORM records into domain snapshots, while services own orchestration and
 business behavior. Persistence construction remains explicit at the
-application composition root.
+application composition root. `application_runtime_settings` is the sole
+persisted owner for application-editable runtime blocks; `.env` remains the
+bootstrap/deployment boundary.
 
 ### Native conversation and presentation contracts
 

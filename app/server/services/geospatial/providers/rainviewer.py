@@ -4,6 +4,7 @@ from server.common.typing import is_json_object
 
 from typing import Any
 
+from server.configurations.settings import RainViewerSettings
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
@@ -24,11 +25,12 @@ class RainViewerProvider(GeospatialProvider):
         self,
         *,
         service: RainViewerService | None = None,
+        settings: RainViewerSettings | None = None,
         cache: GeospatialCache | None = None,
         cache_ttl_seconds: int = 300,
         stale_while_revalidate_seconds: int = 3600,
     ) -> None:
-        self.service = service or RainViewerService()
+        self.service = service or RainViewerService(settings=settings)
         self.cache = cache or GeospatialCache()
         self.cache_ttl_seconds = cache_ttl_seconds
         self.stale_while_revalidate_seconds = stale_while_revalidate_seconds

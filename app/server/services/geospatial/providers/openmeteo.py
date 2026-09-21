@@ -5,6 +5,7 @@ from server.common.typing import is_json_object, json_array, json_object
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
+from server.configurations.settings import OpenMeteoSettings
 from server.services.geospatial.openmeteo import OpenMeteoService, OpenMeteoServiceError
 from server.services.geospatial.providers._request import request_center
 from server.services.geospatial.providers.base import (
@@ -22,8 +23,13 @@ class OpenMeteoProvider(GeospatialProvider):
     provider_id = "openmeteo"
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, service: OpenMeteoService | None = None) -> None:
-        self.service = service or OpenMeteoService()
+    def __init__(
+        self,
+        *,
+        service: OpenMeteoService | None = None,
+        settings: OpenMeteoSettings | None = None,
+    ) -> None:
+        self.service = service or OpenMeteoService(settings=settings)
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:

@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-09-18
+Last updated: 2026-09-21
 
 ## Route-Level Pages
 
@@ -9,10 +9,10 @@ Last updated: 2026-09-18
 - `CapabilitiesPageComponent` at `/geodata`
   Manifest-backed geodata catalog.
 - `SettingsPageComponent` at `/settings`
-  Unified model selection, model-provider credentials, local runtime, and
-  optional geospatial provider credential management. The public query
-  contract is `tab=models`, `tab=model-providers`, or
-  `tab=geospatial-access`; an omitted or invalid tab resolves to `models`.
+  Persistent left navigation for Models, Model Providers, Geospatial Access,
+  Application, Map & Search, Data Sources, and Agent Runtime. The public query
+  contract remains `tab=<section-id>` for deep links; omitted or invalid values
+  resolve to `models`.
 
 ## Core Frontend Boundaries
 
@@ -27,6 +27,8 @@ Last updated: 2026-09-18
 - Dynamic-provider narrowing and model-library merging: `core/model-library.ts`
 - Selected agent readiness checks: `core/agent-readiness.service.ts`
 - Credential settings update orchestration: `core/credential-settings.service.ts` and `core/chat-settings-update.ts`
+- Runtime settings API and typed response parsing: `core/api.ts`,
+  `core/api-parsers.ts`, and `core/types.ts`
 - Map rendering surface: `components/map-preview.component.*` and `components/map-preview-rendering.ts`
 - Map inspection normalization and display: `MapInspection` contracts in
   `core/types.ts`, feature popups, and the keyboard-dismissible details panel
@@ -102,11 +104,10 @@ Reusable component examples include:
 - `capability-status-list.component.*`
 
 Settings uses card-level model selection for one selected agent model.
-The single Settings page shell owns the authoritative `ModelSettingsResponse`
-and exposes three accessible URL-backed panels: Models, Model Providers, and
-Geospatial Access. Credential updates reuse the existing encrypted repository
-and the same settings update service; child panel controls do not create a
-second settings store.
+The single Settings page shell owns the authoritative model response and the
+typed runtime-settings draft. Credential updates reuse the existing encrypted
+repository; runtime blocks use `/api/settings/runtime` and are persisted by
+SQLite. Child sections do not create a second settings store.
 
 The Search workspace keeps context usage in a separate compact progress row
 below the composer. The chat transcript contains only user and assistant

@@ -1759,6 +1759,66 @@
           }
         }
       }
+    },
+    "/api/settings/runtime": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Runtime Settings",
+        "operationId": "get_runtime_settings_api_settings_runtime_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Runtime Settings",
+        "operationId": "update_runtime_settings_api_settings_runtime_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuntimeSettingsUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5340,6 +5400,592 @@
         ],
         "title": "JobCancelResponse"
       },
+      "JsonAgentExecutionSettings": {
+        "properties": {
+          "initial_run_seconds": {
+            "type": "number",
+            "maximum": 300.0,
+            "minimum": 1.0,
+            "title": "Initial Run Seconds",
+            "default": 90.0
+          },
+          "simple_seconds": {
+            "type": "number",
+            "maximum": 300.0,
+            "minimum": 1.0,
+            "title": "Simple Seconds",
+            "default": 150.0
+          },
+          "complex_seconds": {
+            "type": "number",
+            "maximum": 300.0,
+            "minimum": 1.0,
+            "title": "Complex Seconds",
+            "default": 300.0
+          },
+          "context_assembly_seconds": {
+            "type": "number",
+            "minimum": 0.1,
+            "title": "Context Assembly Seconds",
+            "default": 5.0
+          },
+          "native_model_call_seconds": {
+            "type": "number",
+            "minimum": 0.1,
+            "title": "Native Model Call Seconds",
+            "default": 60.0
+          },
+          "tool_execution_seconds": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": 0.1,
+            "title": "Tool Execution Seconds",
+            "default": 45.0
+          },
+          "tool_absolute_seconds": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": 0.1,
+            "title": "Tool Absolute Seconds",
+            "default": 90.0
+          },
+          "map_assembly_seconds": {
+            "type": "number",
+            "minimum": 0.1,
+            "title": "Map Assembly Seconds",
+            "default": 20.0
+          },
+          "persistence_seconds": {
+            "type": "number",
+            "minimum": 0.1,
+            "title": "Persistence Seconds",
+            "default": 5.0
+          },
+          "render_ack_seconds": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": 0.1,
+            "title": "Render Ack Seconds",
+            "default": 90.0
+          },
+          "max_tool_result_chars": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 128.0,
+            "title": "Max Tool Result Chars",
+            "default": 4096
+          },
+          "max_iterations": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Iterations",
+            "default": 12
+          },
+          "max_render_attempts": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Max Render Attempts",
+            "default": 3
+          },
+          "max_no_progress_corrections": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 0.0,
+            "title": "Max No Progress Corrections",
+            "default": 2
+          },
+          "simple_max_model_calls": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Simple Max Model Calls",
+            "default": 4
+          },
+          "complex_max_model_calls": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Complex Max Model Calls",
+            "default": 10
+          },
+          "simple_max_tool_calls": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Simple Max Tool Calls",
+            "default": 6
+          },
+          "complex_max_tool_calls": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Complex Max Tool Calls",
+            "default": 20
+          },
+          "simple_max_state_transitions": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Simple Max State Transitions",
+            "default": 32
+          },
+          "complex_max_state_transitions": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Complex Max State Transitions",
+            "default": 64
+          },
+          "max_parallel_tool_calls": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Max Parallel Tool Calls",
+            "default": 8
+          },
+          "max_consecutive_tool_failures": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Consecutive Tool Failures",
+            "default": 3
+          },
+          "max_same_failed_fingerprint": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Same Failed Fingerprint",
+            "default": 2
+          },
+          "max_route_corrections": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Max Route Corrections",
+            "default": 1
+          },
+          "max_validation_corrections": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Max Validation Corrections",
+            "default": 2
+          },
+          "model_max_attempts": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Model Max Attempts",
+            "default": 2
+          },
+          "provider_max_attempts": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Provider Max Attempts",
+            "default": 2
+          },
+          "retry_backoff_base_seconds": {
+            "type": "number",
+            "maximum": 60.0,
+            "minimum": 0.0,
+            "title": "Retry Backoff Base Seconds",
+            "default": 0.25
+          },
+          "retry_backoff_max_seconds": {
+            "type": "number",
+            "maximum": 120.0,
+            "minimum": 0.0,
+            "title": "Retry Backoff Max Seconds",
+            "default": 2.0
+          },
+          "provider_request_seconds": {
+            "type": "number",
+            "maximum": 120.0,
+            "minimum": 0.1,
+            "title": "Provider Request Seconds",
+            "default": 10.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonAgentExecutionSettings"
+      },
+      "JsonChatRuntimeSettings": {
+        "properties": {
+          "max_history_messages": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max History Messages",
+            "default": 12
+          },
+          "application_timezone": {
+            "type": "string",
+            "title": "Application Timezone",
+            "default": "UTC"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonChatRuntimeSettings"
+      },
+      "JsonGIBSSettings": {
+        "properties": {
+          "user_agent": {
+            "type": "string",
+            "title": "User Agent",
+            "default": "AEGIS-GIBS/1.0"
+          },
+          "timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Timeout",
+            "default": 20.0
+          },
+          "capabilities_ttl_s": {
+            "type": "number",
+            "minimum": 60.0,
+            "title": "Capabilities Ttl S",
+            "default": 21600.0
+          },
+          "max_cache_entries": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Cache Entries",
+            "default": 24
+          },
+          "bbox_precision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Bbox Precision",
+            "default": 6
+          },
+          "wms_base_endpoints": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "minProperties": 1,
+            "title": "Wms Base Endpoints"
+          },
+          "retry_backoff_s": {
+            "type": "number",
+            "minimum": 0.1,
+            "title": "Retry Backoff S",
+            "default": 2.0
+          },
+          "min_visual_radius_m": {
+            "type": "number",
+            "minimum": 1000.0,
+            "title": "Min Visual Radius M",
+            "default": 20000.0
+          },
+          "image_width": {
+            "type": "integer",
+            "maximum": 2048.0,
+            "minimum": 512.0,
+            "title": "Image Width",
+            "default": 1024
+          },
+          "image_height": {
+            "type": "integer",
+            "maximum": 2048.0,
+            "minimum": 512.0,
+            "title": "Image Height",
+            "default": 1024
+          },
+          "default_layer": {
+            "type": "string",
+            "title": "Default Layer",
+            "default": "VIIRS_SNPP_CorrectedReflectance_TrueColor"
+          },
+          "capabilities_endpoints": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "minProperties": 1,
+            "title": "Capabilities Endpoints"
+          },
+          "ows_namespaces": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "minProperties": 1,
+            "title": "Ows Namespaces"
+          },
+          "layer_sync_user_agent": {
+            "type": "string",
+            "title": "Layer Sync User Agent",
+            "default": "AEGIS-GIBS-LayerSync/1.0"
+          },
+          "layer_sync_timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Layer Sync Timeout",
+            "default": 30.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonGIBSSettings"
+      },
+      "JsonGeospatialSettings": {
+        "properties": {
+          "min_timeline_year": {
+            "type": "integer",
+            "maximum": 9999.0,
+            "minimum": 1.0,
+            "title": "Min Timeline Year",
+            "default": 1900
+          },
+          "max_lat": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Max Lat",
+            "default": 90.0
+          },
+          "min_lat": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Min Lat",
+            "default": -90.0
+          },
+          "max_lon": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Max Lon",
+            "default": 180.0
+          },
+          "min_lon": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Min Lon",
+            "default": -180.0
+          },
+          "max_mercator_extent": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Mercator Extent",
+            "default": 20037508.3427892
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonGeospatialSettings"
+      },
+      "JsonJobsSettings": {
+        "properties": {
+          "polling_interval": {
+            "type": "number",
+            "minimum": 0.1,
+            "title": "Polling Interval",
+            "default": 1.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonJobsSettings"
+      },
+      "JsonMapSettings": {
+        "properties": {
+          "default_size_m": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Default Size M",
+            "default": 500.0
+          },
+          "render_delay_s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Render Delay S",
+            "default": 1.0
+          },
+          "tiles": {
+            "type": "string",
+            "title": "Tiles",
+            "default": "OpenStreetMap"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonMapSettings"
+      },
+      "JsonNominatimSettings": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url",
+            "default": "https://nominatim.openstreetmap.org/search"
+          },
+          "user_agent": {
+            "type": "string",
+            "title": "User Agent",
+            "default": "AEGIS-Geographics/1.0 (contact: support@aegis-geographics.local)"
+          },
+          "timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Timeout",
+            "default": 10.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonNominatimSettings"
+      },
+      "JsonOpenMeteoSettings": {
+        "properties": {
+          "weather_base_url": {
+            "type": "string",
+            "title": "Weather Base Url",
+            "default": "https://api.open-meteo.com/v1/forecast"
+          },
+          "air_quality_base_url": {
+            "type": "string",
+            "title": "Air Quality Base Url",
+            "default": "https://air-quality-api.open-meteo.com/v1/air-quality"
+          },
+          "user_agent": {
+            "type": "string",
+            "title": "User Agent",
+            "default": "AEGIS-OpenMeteo/1.0"
+          },
+          "timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Timeout",
+            "default": 15.0
+          },
+          "cache_ttl_s": {
+            "type": "number",
+            "minimum": 30.0,
+            "title": "Cache Ttl S",
+            "default": 600.0
+          },
+          "min_call_interval_s": {
+            "type": "number",
+            "minimum": 0.05,
+            "title": "Min Call Interval S",
+            "default": 0.15
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonOpenMeteoSettings"
+      },
+      "JsonOverpassSettings": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url",
+            "default": "https://overpass-api.de/api/interpreter"
+          },
+          "user_agent": {
+            "type": "string",
+            "title": "User Agent",
+            "default": "AEGIS-Overpass/1.0"
+          },
+          "timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Timeout",
+            "default": 20.0
+          },
+          "cache_ttl_s": {
+            "type": "number",
+            "minimum": 30.0,
+            "title": "Cache Ttl S",
+            "default": 600.0
+          },
+          "min_call_interval_s": {
+            "type": "number",
+            "minimum": 0.05,
+            "title": "Min Call Interval S",
+            "default": 0.2
+          },
+          "default_radius_m": {
+            "type": "number",
+            "minimum": 100.0,
+            "title": "Default Radius M",
+            "default": 2500.0
+          },
+          "default_limit": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Default Limit",
+            "default": 30
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonOverpassSettings"
+      },
+      "JsonRainViewerSettings": {
+        "properties": {
+          "metadata_url": {
+            "type": "string",
+            "title": "Metadata Url",
+            "default": "https://api.rainviewer.com/public/weather-maps.json"
+          },
+          "user_agent": {
+            "type": "string",
+            "title": "User Agent",
+            "default": "AEGIS-RainViewer/1.0"
+          },
+          "timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Timeout",
+            "default": 15.0
+          },
+          "cache_ttl_s": {
+            "type": "number",
+            "minimum": 30.0,
+            "title": "Cache Ttl S",
+            "default": 300.0
+          },
+          "min_call_interval_s": {
+            "type": "number",
+            "minimum": 0.05,
+            "title": "Min Call Interval S",
+            "default": 0.2
+          },
+          "tile_color_scheme": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Tile Color Scheme",
+            "default": 2
+          },
+          "tile_smooth": {
+            "type": "integer",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Tile Smooth",
+            "default": 1
+          },
+          "tile_snow": {
+            "type": "integer",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Tile Snow",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonRainViewerSettings"
+      },
       "LayerAuditIssue": {
         "properties": {
           "path": {
@@ -6926,6 +7572,205 @@
           "run_id"
         ],
         "title": "RunTraceResponse"
+      },
+      "RuntimeSettingsResponse": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "nominatim": {
+            "$ref": "#/components/schemas/JsonNominatimSettings"
+          },
+          "geospatial": {
+            "$ref": "#/components/schemas/JsonGeospatialSettings"
+          },
+          "map": {
+            "$ref": "#/components/schemas/JsonMapSettings"
+          },
+          "jobs": {
+            "$ref": "#/components/schemas/JsonJobsSettings"
+          },
+          "chat": {
+            "$ref": "#/components/schemas/JsonChatRuntimeSettings"
+          },
+          "openmeteo": {
+            "$ref": "#/components/schemas/JsonOpenMeteoSettings"
+          },
+          "overpass": {
+            "$ref": "#/components/schemas/JsonOverpassSettings"
+          },
+          "rainviewer": {
+            "$ref": "#/components/schemas/JsonRainViewerSettings"
+          },
+          "gibs": {
+            "$ref": "#/components/schemas/JsonGIBSSettings"
+          },
+          "agent_execution": {
+            "$ref": "#/components/schemas/JsonAgentExecutionSettings"
+          },
+          "restart_required": {
+            "type": "boolean",
+            "title": "Restart Required",
+            "default": false
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nominatim",
+          "geospatial",
+          "map",
+          "jobs",
+          "chat",
+          "openmeteo",
+          "overpass",
+          "rainviewer",
+          "gibs",
+          "agent_execution"
+        ],
+        "title": "RuntimeSettingsResponse"
+      },
+      "RuntimeSettingsUpdateRequest": {
+        "properties": {
+          "nominatim": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nominatim"
+          },
+          "geospatial": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geospatial"
+          },
+          "map": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Map"
+          },
+          "jobs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobs"
+          },
+          "chat": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat"
+          },
+          "openmeteo": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openmeteo"
+          },
+          "overpass": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overpass"
+          },
+          "rainviewer": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rainviewer"
+          },
+          "gibs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gibs"
+          },
+          "agent_execution": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Execution"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RuntimeSettingsUpdateRequest",
+        "description": "A strict top-level partial update; nested values are validated atomically."
       },
       "SelectedModelContextResponse": {
         "properties": {

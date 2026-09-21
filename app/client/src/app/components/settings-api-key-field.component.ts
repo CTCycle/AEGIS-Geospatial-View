@@ -26,6 +26,24 @@ export class SettingsApiKeyFieldComponent {
     return `${this.label} API key`;
   }
 
+  get inputId(): string {
+    return `settings-key-${this.inputName}`;
+  }
+
+  get descriptionIds(): string | null {
+    const ids: string[] = [];
+    if (this.hint) {
+      ids.push(`${this.inputId}-hint`);
+    }
+    if (this.credentialHealth) {
+      ids.push(`${this.inputId}-health`);
+    }
+    if (this.validationError) {
+      ids.push(`${this.inputId}-error`);
+    }
+    return ids.length ? ids.join(' ') : null;
+  }
+
   onValueChange(value: string): void {
     this.valueChange.emit(value);
   }

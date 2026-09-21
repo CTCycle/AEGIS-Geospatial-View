@@ -1,6 +1,7 @@
-<label>
+<label [attr.for]="inputId">
   {{ labelText }}
   <input
+    [id]="inputId"
     type="password"
     autocomplete="off"
     [ngModel]="value"
@@ -8,16 +9,18 @@
     [name]="inputName"
     [placeholder]="placeholder"
     [class.input-invalid]="!!validationError"
+    [attr.aria-invalid]="validationError ? 'true' : null"
+    [attr.aria-describedby]="descriptionIds"
   />
   @if (hint) {
-    <small class="settings-api-key-field__hint">{{ hint }}</small>
+    <small [id]="inputId + '-hint'" class="settings-api-key-field__hint">{{ hint }}</small>
   }
   @if (credentialHealth === 'unreadable') {
-    <span class="settings-api-key-field__error">Saved key cannot be decrypted. Re-enter the key.</span>
+    <span [id]="inputId + '-health'" class="settings-api-key-field__error">Saved key cannot be decrypted. Re-enter the key.</span>
   } @else if (credentialHealth === 'healthy') {
-    <span class="settings-api-key-field__health">Saved key is readable.</span>
+    <span [id]="inputId + '-health'" class="settings-api-key-field__health">Saved key is readable.</span>
   }
   @if (validationError) {
-    <span class="settings-api-key-field__error">{{ validationError }}</span>
+    <span [id]="inputId + '-error'" class="settings-api-key-field__error" role="alert">{{ validationError }}</span>
   }
 </label>

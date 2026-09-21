@@ -23,7 +23,7 @@ from server.common.constants import (
     NOMINATIM_SEARCH_PATH,
 )
 from server.common.logger import logger
-from server.configurations import get_server_settings
+from server.configurations.settings import JsonNominatimSettings, NominatimSettings
 
 ###############################################################################
 class NominatimService:
@@ -60,12 +60,18 @@ class NominatimService:
 
     # -------------------------------------------------------------------------
     def __init__(
-        self, user_agent: str | None = None, timeout: float | None = None
+        self,
+        user_agent: str | None = None,
+        timeout: float | None = None,
+        *,
+        settings: NominatimSettings | None = None,
     ) -> None:
-        settings = get_server_settings().nominatim
-        self.base_url = settings.base_url
-        self.user_agent = user_agent or settings.user_agent
-        default_timeout = settings.timeout
+        configured = settings or NominatimSettings(
+            **JsonNominatimSettings().model_dump()
+        )
+        self.base_url = configured.base_url
+        self.user_agent = user_agent or configured.user_agent
+        default_timeout = configured.timeout
         self.timeout = timeout if timeout is not None else default_timeout
         self._request_lock = threading.Lock()
         self._last_request_started_at = 0.0

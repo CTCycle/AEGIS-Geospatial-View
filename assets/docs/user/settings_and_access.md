@@ -1,10 +1,10 @@
 # Settings And Access
 
-Last updated: 2026-09-16
+Last updated: 2026-09-21
 
 ## Geospatial Access
 
-The Geospatial Access tab at `/settings?tab=geospatial-access` is for optional
+The Geospatial Access section at `/settings?tab=geospatial-access` is for optional
 geospatial provider keys such as TomTom and OpenAQ. The default workflow
 remains usable without them. Setup notes, official documentation links, and
 the guided signup workflow remain manifest-driven; documentation-only
@@ -51,6 +51,13 @@ and credential presence.
 
 ## User-Facing Controls
 
+### Runtime Settings
+
+The Settings sidebar also exposes Application, Map & Search, Data Sources, and
+Agent Runtime. These sections edit typed, SQLite-backed runtime blocks through
+the runtime settings API. Saves are atomic and display a restart-required
+notice; credentials remain in the separate encrypted credential workflow.
+
 ### Chat Composer
 
 - `Enter`: send message
@@ -64,13 +71,13 @@ and credential presence.
 
 ### Settings Controls
 
-- Models tab: model search, provider filters, model cards, selected-agent
+- Models section: model search, provider filters, model cards, selected-agent
   summary, native structured probe, and Ollama model pull actions.
-- Model Providers tab: inline masked credentials for OpenAI, Google, DeepSeek,
+- Model Providers section: inline masked credentials for OpenAI, Google, DeepSeek,
   OpenCode Zen, and OpenCode Go, each with explicit Save and Clear actions;
   Ollama URL, health, refresh, and save controls. The default local loopback
   URL is `http://127.0.0.1:11434`.
-- Geospatial Access tab: manifest-driven provider setup notes, documentation
+- Geospatial Access section: manifest-driven provider setup notes, documentation
   links, guided setup, and explicit masked credential Save/Clear controls.
 - Blank credential drafts do not change saved keys. Clearing a credential is
   an explicit action. Saved values are never returned to or repopulated in the

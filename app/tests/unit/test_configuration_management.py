@@ -6,164 +6,105 @@ from pathlib import Path
 import pytest
 
 from server import configurations
-from server.common.paths import CONFIGURATIONS_FILE
-from server.configurations.environment import (
-    ensure_environment_loaded,
-    reset_environment_bootstrap_for_tests,
+from server.configurations.legacy_runtime_settings import (
+    LegacyRuntimeSettingsError,
+    load_legacy_runtime_settings,
 )
-from server.configurations.management import ConfigurationManager
-from server.configurations.startup import (
-    get_configuration_manager,
-    get_server_settings,
-    reload_settings_for_tests,
-)
+from server.configurations.settings import AppSettings, DatabaseSettings
+from server.repositories.database.sqlite import SQLiteRepository
+from server.repositories.runtime_settings import RuntimeSettingsRepository
+from server.repositories.schemas import Base
 
-###############################################################################
+
 def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
-###############################################################################
-def _base_configuration() -> dict:
-    return json.loads(CONFIGURATIONS_FILE.read_text(encoding="utf-8"))
 
-###############################################################################
-def test_configuration_manager_loads_blocks_and_values(tmp_path: Path) -> None:
-    config_file = tmp_path / "configurations.json"
-    payload = _base_configuration()
+def _runtime_payload() -> dict:
+    return AppSettings().runtime_payload()
+
+
+def _runtime_repository(tmp_path: Path) -> RuntimeSettingsRepository:
+    database = SQLiteRepository(DatabaseSettings(str(tmp_path / "runtime.db")))
+    Base.metadata.create_all(database.engine)
+    return RuntimeSettingsRepository(database)
+
+
+def test_legacy_runtime_settings_are_validated_without_global_state(tmp_path: Path) -> None:
+    source = tmp_path / "configurations.json"
+    payload = _runtime_payload()
     payload["map"]["tiles"] = "CartoDB Positron"
     payload["jobs"]["polling_interval"] = 2.5
-    _write_json(config_file, payload)
+    _write_json(source, payload)
 
-    manager = ConfigurationManager(config_path=config_file)
-    manager.load()
-    app_settings = manager.configuration
+    settings = load_legacy_runtime_settings(source)
 
-    assert app_settings.map.tiles == "CartoDB Positron"
-    assert manager.get_block("jobs") == {"polling_interval": 2.5}
-    assert manager.get_value("jobs", "polling_interval") == 2.5
-    assert manager.get_value("jobs", "missing", 99) == 99
-
-###############################################################################
-def test_configuration_manager_reload_updates_values(tmp_path: Path) -> None:
-    config_file = tmp_path / "configurations.json"
-    payload = _base_configuration()
-    payload["jobs"]["polling_interval"] = 1.0
-    _write_json(config_file, payload)
-    manager = ConfigurationManager(config_path=config_file)
-    manager.load()
-
-    payload["jobs"]["polling_interval"] = 3.0
-    _write_json(config_file, payload)
-    manager.reload()
-    app_settings = manager.configuration
-
-    assert app_settings.jobs.polling_interval == 3.0
-    assert manager.server_settings.jobs.polling_interval == 3.0
-
-###############################################################################
-def test_configuration_manager_rejects_database_block_on_update(tmp_path: Path) -> None:
-    config_file = tmp_path / "configurations.json"
-    _write_json(config_file, _base_configuration())
-    manager = ConfigurationManager(config_path=config_file)
-
-    payload = _base_configuration()
-    payload["database"] = {"path": "should-not-persist"}
-    with pytest.raises(RuntimeError, match="Unsupported configuration blocks: database"):
-        manager.update(payload)
-
-###############################################################################
-def test_configuration_manager_rejects_database_block_on_load(tmp_path: Path) -> None:
-    config_file = tmp_path / "configurations.json"
-    payload = _base_configuration()
-    payload["database"] = {"path": "ignored"}
-    _write_json(config_file, payload)
-
-    manager = ConfigurationManager(config_path=config_file)
-    with pytest.raises(RuntimeError, match="Unsupported configuration blocks: database"):
-        manager.load()
-
-###############################################################################
-def test_configuration_manager_rejects_missing_application_block(
-    tmp_path: Path,
-) -> None:
-    config_file = tmp_path / "configurations.json"
-    payload = _base_configuration()
-    del payload["gibs"]
-    _write_json(config_file, payload)
-
-    with pytest.raises(RuntimeError, match="Missing required configuration blocks: gibs"):
-        ConfigurationManager(config_path=config_file).load()
-
-###############################################################################
-def test_configuration_manager_rejects_unknown_nested_setting(tmp_path: Path) -> None:
-    config_file = tmp_path / "configurations.json"
-    payload = _base_configuration()
-    payload["map"]["legacy_tiles"] = "ignored"
-    _write_json(config_file, payload)
-
-    with pytest.raises(RuntimeError, match="Invalid application settings"):
-        ConfigurationManager(config_path=config_file).load()
-
-###############################################################################
-def test_configuration_manager_fails_on_missing_file(tmp_path: Path) -> None:
-    manager = ConfigurationManager(config_path=tmp_path / "missing.json")
-    with pytest.raises(RuntimeError, match="Configuration file not found"):
-        manager.load()
-
-###############################################################################
-def test_startup_loads_environment_before_settings(monkeypatch, tmp_path: Path) -> None:
-    env_file = tmp_path / ".env"
-    env_file.write_text("FASTAPI_PORT=6100\n", encoding="utf-8")
-    config_file = tmp_path / "configurations.json"
-    _write_json(config_file, _base_configuration())
-
-    monkeypatch.delenv("FASTAPI_PORT", raising=False)
-    monkeypatch.setattr(
-        "server.configurations.environment.ENV_FILE_PATH", str(env_file)
-    )
-    reset_environment_bootstrap_for_tests()
-
-    app_settings = get_configuration_manager(config_path=config_file).configuration
-    assert app_settings.fastapi_port == 6100
-
-###############################################################################
-def test_no_server_settings_global_export() -> None:
+    assert settings is not None
+    assert settings.map.tiles == "CartoDB Positron"
+    assert settings.jobs.polling_interval == 2.5
     assert not hasattr(configurations, "server_settings")
 
-###############################################################################
-def test_environment_loader_is_idempotent(monkeypatch, tmp_path: Path) -> None:
-    env_file = tmp_path / ".env"
-    config_file = tmp_path / "configurations.json"
-    env_file.write_text("UI_PORT=4555\n", encoding="utf-8")
-    _write_json(config_file, _base_configuration())
-    monkeypatch.delenv("UI_PORT", raising=False)
-    reset_environment_bootstrap_for_tests()
-    monkeypatch.setattr(
-        "server.configurations.environment.ENV_FILE_PATH", str(env_file)
-    )
 
-    ensure_environment_loaded()
-    ensure_environment_loaded()
+def test_legacy_runtime_settings_reject_unknown_or_missing_blocks(tmp_path: Path) -> None:
+    source = tmp_path / "configurations.json"
+    payload = _runtime_payload()
+    payload["database"] = {"path": "must not be accepted"}
+    _write_json(source, payload)
 
-    assert (
-        get_configuration_manager(
-            config_path=config_file, force=True
-        ).configuration.ui_port
-        == 4555
-    )
-    reload_settings_for_tests()
+    with pytest.raises(LegacyRuntimeSettingsError, match="Unsupported legacy"):
+        load_legacy_runtime_settings(source)
 
-###############################################################################
-def test_get_server_settings_returns_runtime_settings(
-    monkeypatch, tmp_path: Path
-) -> None:
-    config_file = tmp_path / "configurations.json"
-    payload = _base_configuration()
-    payload["jobs"]["polling_interval"] = 4.0
-    _write_json(config_file, payload)
-    reset_environment_bootstrap_for_tests()
-    monkeypatch.setattr(
-        "server.configurations.environment.ENV_FILE_PATH", str(tmp_path / ".env")
-    )
+    del payload["database"]
+    del payload["gibs"]
+    _write_json(source, payload)
+    with pytest.raises(LegacyRuntimeSettingsError, match="Missing legacy"):
+        load_legacy_runtime_settings(source)
 
-    assert get_server_settings(config_file).jobs.polling_interval == 4.0
+
+def test_runtime_repository_imports_and_retires_legacy_settings(tmp_path: Path) -> None:
+    source = tmp_path / "configurations.json"
+    payload = _runtime_payload()
+    payload["chat"]["max_history_messages"] = 24
+    _write_json(source, payload)
+    repository = _runtime_repository(tmp_path)
+
+    imported = repository.initialize_defaults(legacy_path=source)
+
+    assert imported.chat.max_history_messages == 24
+    assert repository.get_required().chat.max_history_messages == 24
+    assert not source.exists()
+
+
+def test_runtime_repository_preserves_invalid_legacy_source(tmp_path: Path) -> None:
+    source = tmp_path / "configurations.json"
+    payload = _runtime_payload()
+    del payload["gibs"]
+    _write_json(source, payload)
+    repository = _runtime_repository(tmp_path)
+
+    with pytest.raises(LegacyRuntimeSettingsError, match="Missing legacy"):
+        repository.initialize_defaults(legacy_path=source)
+
+    assert source.exists()
+    assert repository.get() is None
+
+
+def test_runtime_repository_uses_defaults_when_legacy_source_is_absent(tmp_path: Path) -> None:
+    repository = _runtime_repository(tmp_path)
+
+    settings = repository.initialize_defaults(legacy_path=tmp_path / "missing.json")
+
+    assert settings.runtime_payload() == AppSettings().runtime_payload()
+
+
+def test_runtime_repository_updates_one_block_atomically(tmp_path: Path) -> None:
+    repository = _runtime_repository(tmp_path)
+    repository.initialize_defaults(legacy_path=tmp_path / "missing.json")
+
+    updated = repository.update({"map": {"tiles": "CartoDB Positron"}})
+    assert updated.map.tiles == "CartoDB Positron"
+
+    with pytest.raises(ValueError, match="Unsupported runtime settings in map"):
+        repository.update({"map": {"legacy_tiles": "ignored"}})
+
+    assert repository.get_required().map.tiles == "CartoDB Positron"

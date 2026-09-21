@@ -18,7 +18,7 @@ The app is most useful when you want to:
 - zoom in or narrow a previous result
 - explore available geospatial layers
 - manage access for external map-related services
-- adjust which models or assistants the app should use
+- adjust which models, runtime limits, and provider endpoints the app should use
 
 ## Desktop Browser Requirement
 
@@ -53,8 +53,9 @@ The app is organized around a few main places. Each one has a clear purpose.
 - `Workspace` is the main place to ask questions and review results.
 - `Geodata` is where you can browse the available map and data capabilities.
 - `Settings` is where you choose how the assistant should behave and manage
-  optional provider access. Use the Models, Model Providers, and Geospatial
-  Access tabs for the appropriate workflow.
+  optional provider access. Use the persistent sidebar for Models, Model
+  Providers, Geospatial Access, Application, Map & Search, Data Sources, and
+  Agent Runtime.
 
 The top navigation bar is the quickest way to move between these areas. If you are unsure where something lives, start in the workspace and use the top-level navigation from there.
 
@@ -126,8 +127,10 @@ Use this page to understand what kinds of geospatial capabilities are available.
 ### Settings
 
 Use this page to choose how the assistant should operate and configure optional
-provider access. Settings is organized into Models, Model Providers, and
-Geospatial Access tabs.
+provider access. Runtime blocks are saved to SQLite through the runtime settings
+API; `.env` remains for bootstrap and deployment values. Settings is organized
+into Models, Model Providers, Geospatial Access, Application, Map & Search,
+Data Sources, and Agent Runtime sections.
 
 Typical tasks here include:
 
@@ -139,6 +142,8 @@ Typical tasks here include:
 - pulling a model when needed
 - saving or clearing masked model-provider credentials
 - adding optional geospatial provider keys or opening their setup guidance
+- changing application, map/search, data-source, or agent-runtime limits; saved
+  changes show when a restart is required
 
 If you are not sure what to change, keep the defaults and return to the
 workspace. Most users only need Settings when they want to change behavior or

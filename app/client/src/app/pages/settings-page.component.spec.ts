@@ -6,6 +6,7 @@ import { ApiClientService } from '../core/api-client.service';
 import { defaultAppState } from '../core/app-state';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
+import { RuntimeSettingsResponse } from '../core/types';
 import { SettingsPageComponent } from './settings-page.component';
 
 @Component({ changeDetection: ChangeDetectionStrategy.Eager,
@@ -30,6 +31,40 @@ describe('pages/settings-page.component', () => {
   let refreshOllamaModelsMock: jasmine.Spy;
   let pullOllamaModelMock: jasmine.Spy;
   let fetchGeospatialProviderAccountSetupsMock: jasmine.Spy;
+  let fetchRuntimeSettingsMock: jasmine.Spy;
+  let updateRuntimeSettingsMock: jasmine.Spy;
+
+  const runtimeSettingsResponse = (): RuntimeSettingsResponse => ({
+    schema_version: 1,
+    nominatim: { base_url: 'https://nominatim.example/search', user_agent: 'AEGIS-test', timeout: 10 },
+    geospatial: { min_timeline_year: 1900, max_lat: 90, min_lat: -90, max_lon: 180, min_lon: -180, max_mercator_extent: 20037508 },
+    map: { default_size_m: 500, render_delay_s: 1, tiles: 'OpenStreetMap' },
+    jobs: { polling_interval: 1 },
+    chat: { max_history_messages: 12, application_timezone: 'UTC' },
+    openmeteo: { weather_base_url: 'https://weather.example', air_quality_base_url: 'https://air.example', user_agent: 'AEGIS-test', timeout: 15, cache_ttl_s: 600, min_call_interval_s: 0.15 },
+    overpass: { base_url: 'https://overpass.example', user_agent: 'AEGIS-test', timeout: 20, cache_ttl_s: 600, min_call_interval_s: 0.2, default_radius_m: 2500, default_limit: 30 },
+    rainviewer: { metadata_url: 'https://rain.example', user_agent: 'AEGIS-test', timeout: 15, cache_ttl_s: 300, min_call_interval_s: 0.2, tile_color_scheme: 2, tile_smooth: 1, tile_snow: 1 },
+    gibs: {
+      user_agent: 'AEGIS-test', timeout: 20, capabilities_ttl_s: 21600, max_cache_entries: 24, bbox_precision: 6,
+      wms_base_endpoints: { 'EPSG:3857': 'https://gibs.example/3857', 'EPSG:4326': 'https://gibs.example/4326' },
+      retry_backoff_s: 2, min_visual_radius_m: 20000, image_width: 1024, image_height: 1024,
+      default_layer: 'VIIRS', capabilities_endpoints: { 'EPSG:4326': 'https://gibs.example/4326-cap' },
+      ows_namespaces: { ows: 'https://ows.example' }, layer_sync_user_agent: 'AEGIS-test', layer_sync_timeout: 30,
+    },
+    agent_execution: {
+      initial_run_seconds: 90, simple_seconds: 150, complex_seconds: 300, context_assembly_seconds: 5,
+      native_model_call_seconds: 60, tool_execution_seconds: 45, tool_absolute_seconds: 90, map_assembly_seconds: 20,
+      persistence_seconds: 5, render_ack_seconds: 90, max_tool_result_chars: 4096, max_iterations: 12,
+      max_render_attempts: 3, max_no_progress_corrections: 2, simple_max_model_calls: 4, complex_max_model_calls: 10,
+      simple_max_tool_calls: 6, complex_max_tool_calls: 20, simple_max_state_transitions: 32,
+      complex_max_state_transitions: 64, max_parallel_tool_calls: 8, max_consecutive_tool_failures: 3,
+      max_same_failed_fingerprint: 2, max_route_corrections: 1, max_validation_corrections: 2,
+      model_max_attempts: 2, provider_max_attempts: 2, retry_backoff_base_seconds: 0.25,
+      retry_backoff_max_seconds: 2, provider_request_seconds: 10,
+    },
+    restart_required: false,
+    message: null,
+  });
 
   beforeEach(async () => {
     store = jasmine.createSpyObj<AppStateStoreService>('AppStateStoreService', ['getSettingsPage', 'updateSettingsPage']);
@@ -47,6 +82,8 @@ describe('pages/settings-page.component', () => {
       'refreshOllamaModels',
       'pullOllamaModel',
       'fetchGeospatialProviderAccountSetups',
+      'fetchRuntimeSettings',
+      'updateRuntimeSettings',
     ]);
     fetchChatSettingsMock = jasmine.createSpy('fetchChatSettings').and.resolveTo({
       active_provider_mode: 'cloud',
@@ -69,6 +106,8 @@ describe('pages/settings-page.component', () => {
     refreshOllamaModelsMock = jasmine.createSpy('refreshOllamaModels').and.resolveTo({});
     pullOllamaModelMock = jasmine.createSpy('pullOllamaModel').and.resolveTo({});
     fetchGeospatialProviderAccountSetupsMock = jasmine.createSpy('fetchGeospatialProviderAccountSetups').and.resolveTo({ providers: [] });
+    fetchRuntimeSettingsMock = jasmine.createSpy('fetchRuntimeSettings').and.resolveTo(runtimeSettingsResponse());
+    updateRuntimeSettingsMock = jasmine.createSpy('updateRuntimeSettings').and.callFake(async () => runtimeSettingsResponse());
 
     apiClient.fetchChatSettings.and.callFake(() => fetchChatSettingsMock());
     apiClient.fetchChatModels.and.callFake((provider) => fetchChatModelsMock(provider));
@@ -77,6 +116,8 @@ describe('pages/settings-page.component', () => {
     apiClient.refreshOllamaModels.and.callFake(() => refreshOllamaModelsMock());
     apiClient.pullOllamaModel.and.callFake((model) => pullOllamaModelMock(model));
     apiClient.fetchGeospatialProviderAccountSetups.and.callFake(() => fetchGeospatialProviderAccountSetupsMock());
+    apiClient.fetchRuntimeSettings.and.callFake(() => fetchRuntimeSettingsMock());
+    apiClient.updateRuntimeSettings.and.callFake((payload) => updateRuntimeSettingsMock(payload));
 
     await TestBed.configureTestingModule({
       imports: [SettingsPageComponent],
@@ -654,6 +695,22 @@ describe('pages/settings-page.component', () => {
     expect(input?.getAttribute('aria-label')).toBe('Search models');
   });
 
+  it('gives credential fields unique label associations', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance.activeSection = 'model-providers';
+    fixture.detectChanges();
+
+    const inputs = Array.from(fixture.nativeElement.querySelectorAll('input[type="password"]')) as HTMLInputElement[];
+    const ids = inputs.map((input) => input.id);
+    expect(ids.length).toBeGreaterThan(0);
+    expect(new Set(ids).size).toBe(ids.length);
+    ids.forEach((id) => {
+      expect(fixture.nativeElement.querySelector(`label[for="${id}"]`)).not.toBeNull();
+    });
+  });
+
   it('renders model cards through the extracted model card component host', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
@@ -662,39 +719,36 @@ describe('pages/settings-page.component', () => {
     expect(fixture.nativeElement.querySelectorAll('article.model-card').length).toBeGreaterThan(0);
   });
 
-  it('normalizes the Settings tab query and exposes accessible tab relationships', async () => {
+  it('normalizes the Settings query and exposes the persistent sidebar sections', async () => {
     window.history.replaceState({}, '', '/settings?tab=unknown');
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const tabs = Array.from(fixture.nativeElement.querySelectorAll('[role="tab"]')) as HTMLButtonElement[];
-    expect(fixture.componentInstance.activeTab).toBe('models');
-    expect(tabs).toHaveSize(3);
-    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
-    expect(tabs[0].getAttribute('aria-controls')).toBe('settings-panel-models');
-    expect(fixture.nativeElement.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby')).toBe('settings-tab-models');
+    const sections = Array.from(fixture.nativeElement.querySelectorAll('.settings-sidebar__item')) as HTMLButtonElement[];
+    expect(fixture.componentInstance.activeSection).toBe('models');
+    expect(sections).toHaveSize(7);
+    expect(sections[0].getAttribute('aria-current')).toBe('page');
+    expect(fixture.nativeElement.querySelector('[role="tab"]')).toBeNull();
   });
 
-  it('moves Settings tabs with keyboard navigation and router history', async () => {
+  it('moves Settings sections with clicks and router history', async () => {
     window.history.replaceState({}, '', '/settings');
     const navigateSpy = spyOn(router, 'navigateByUrl').and.resolveTo(true);
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
-    const firstTab = fixture.nativeElement.querySelector('#settings-tab-models') as HTMLButtonElement;
-
-    firstTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    const sections = Array.from(fixture.nativeElement.querySelectorAll('.settings-sidebar__item')) as HTMLButtonElement[];
+    sections[1].click();
     fixture.detectChanges();
-    expect(fixture.componentInstance.activeTab).toBe('model-providers');
+    expect(fixture.componentInstance.activeSection).toBe('model-providers');
     expect(navigateSpy).toHaveBeenCalledWith('/settings?tab=model-providers');
 
-    const secondTab = fixture.nativeElement.querySelector('#settings-tab-model-providers') as HTMLButtonElement;
-    secondTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'End' }));
+    sections[6].click();
     fixture.detectChanges();
-    expect(fixture.componentInstance.activeTab).toBe('geospatial-access');
-    expect(navigateSpy).toHaveBeenCalledWith('/settings?tab=geospatial-access');
+    expect(fixture.componentInstance.activeSection).toBe('agent-runtime');
+    expect(navigateSpy).toHaveBeenCalledWith('/settings?tab=agent-runtime');
   });
 
   it('renders manifest-driven geospatial access providers in the shared Settings page', async () => {
@@ -727,7 +781,7 @@ describe('pages/settings-page.component', () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
-    fixture.componentInstance.activeTab = 'geospatial-access';
+    fixture.componentInstance.activeSection = 'geospatial-access';
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('TomTom');

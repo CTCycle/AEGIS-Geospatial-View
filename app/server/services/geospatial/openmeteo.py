@@ -13,7 +13,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from server.configurations import get_server_settings
+from server.configurations.settings import JsonOpenMeteoSettings, OpenMeteoSettings
 
 OPENMETEO_ELEVATION_BASE_URL = "https://api.open-meteo.com/v1/elevation"
 
@@ -61,6 +61,7 @@ class OpenMeteoService:
     def __init__(
         self,
         *,
+        settings: OpenMeteoSettings | None = None,
         weather_base_url: str | None = None,
         air_quality_base_url: str | None = None,
         elevation_base_url: str | None = None,
@@ -69,21 +70,24 @@ class OpenMeteoService:
         cache_ttl_s: float | None = None,
         min_call_interval_s: float | None = None,
     ) -> None:
-        settings = get_server_settings().openmeteo
-        self.weather_base_url = weather_base_url or settings.weather_base_url
+        configured = settings or OpenMeteoSettings(
+            **JsonOpenMeteoSettings().model_dump()
+        )
+        self.weather_base_url = weather_base_url or configured.weather_base_url
         self.air_quality_base_url = (
-            air_quality_base_url or settings.air_quality_base_url
+            air_quality_base_url or configured.air_quality_base_url
         )
         self.elevation_base_url = elevation_base_url or OPENMETEO_ELEVATION_BASE_URL
-        self.user_agent = user_agent or settings.user_agent
-        self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
+        self.user_agent = user_agent or configured.user_agent
+        self.timeout_s = timeout_s if timeout_s is not None else configured.timeout
         self.cache_ttl_s = max(
-            cache_ttl_s if cache_ttl_s is not None else settings.cache_ttl_s, 30.0
+            cache_ttl_s if cache_ttl_s is not None else configured.cache_ttl_s,
+            30.0,
         )
         self.min_call_interval_s = max(
             min_call_interval_s
             if min_call_interval_s is not None
-            else settings.min_call_interval_s,
+            else configured.min_call_interval_s,
             0.05,
         )
         self._lock = threading.Lock()
