@@ -1,0 +1,21 @@
+{
+  "slice_id": "T1",
+  "name": "application-foundations",
+  "tier": 1,
+  "status": "PARTIAL",
+  "date": "2026-09-21",
+  "branch": "loop-dev",
+  "commit": "c615c5799e1d5fb01e0af0eccaab5c6490d554c0",
+  "environment": {
+    "launcher": "start_on_windows.ps1 -Action Launch",
+    "backend_url": "http://127.0.0.1:7059",
+    "frontend_url": "http://127.0.0.1:4512",
+    "browser": "Codex in-app Browser with desktop-width Chrome follow-up",
+    "provider_model": "opencode-go / deepseek-v4.1-flash"
+  },
+  "counts": {"pass": 6, "partial": 6, "fail": 0, "blocked": 0, "unknown": 0, "untested": 0},
+  "artifacts": ["ledger.json", "ledger.md", "report.md", "browser-evidence.md", "test-results.md"],
+  "screenshot": {"available": false, "note": "Screenshots were inspected inline; no local export API was available."},
+  "secrets_recorded": false,
+  "source_changes": false
+}

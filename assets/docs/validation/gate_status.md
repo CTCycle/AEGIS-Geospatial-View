@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-20 (hazard/hydrology rerun updated; hosted verification remains separate)
+Last updated: 2026-09-21 (Tier 1 application-foundations baseline added; hosted verification remains separate)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -12,6 +12,28 @@ Historical final tested repository head: `a33642a29c4353a760aac34bf1234b8121211d
 Production behavior commit: `558f1966afc3cef4b6e755d4edfdc87dfd258c11`;
 the final tested head adds only controlled-harness evidence capture and
 documentation reconciliation.
+
+## Comprehensive validation campaign
+
+The long-term Tier 0–5 campaign is defined in the
+[validation strategy](strategy.md). Its first opened package is the
+[Tier 1 application-foundations baseline](../../QA/tier1-application-foundations-20260921/report.md)
+at exact `loop-dev` commit `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`.
+This campaign ledger is orthogonal to the native-agent rows below: a native
+gate can pass while its broader application-foundation slice remains partial.
+
+| Tier | Focus | Slice count | Campaign status | Evidence / hand-off |
+| --- | --- | ---: | --- | --- |
+| Tier 0 | Environment, schema, current-HEAD reconciliation | 5 | `UNRUN` | Open `T0-01` through `T0-05` in [strategy](strategy.md). |
+| Tier 1 | Application foundations | 12 | `PARTIAL` | [Tier 1 ledger](../../QA/tier1-application-foundations-20260921/ledger.md); 6 `PASS`, 6 `PARTIAL`. |
+| Tier 2 | Core agent workflows | 7 | `UNRUN` | Preserve exact-location and no-fallback boundaries. |
+| Tier 3 | Rendering and geospatial feature families | 18 | `UNRUN` | Require browser-authoritative source/layer/render-ack evidence. |
+| Tier 4A | Ingestion, local sources, optional integrations | 8 | `UNRUN` | Use isolated data and approved credentials/snapshots. |
+| Tier 4B | Model-provider parity | 5 | `UNRUN` | Never substitute provider or model. |
+| Tier 5 | Recovery, races, difficult boundaries, hosted CI | 13 | `UNRUN` | Open only after lower-tier contracts are classified. |
+
+Tier 1 is not promoted to complete: the remaining boundaries are listed in
+the dated report and must stay visible to future agents.
 
 ## Current ledger
 

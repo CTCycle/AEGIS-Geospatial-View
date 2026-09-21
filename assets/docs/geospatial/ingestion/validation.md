@@ -1,6 +1,13 @@
 # Validation
 
-Last updated: 2026-09-08
+Last updated: 2026-09-21
+
+The ordered long-term campaign is documented in the
+[comprehensive validation strategy](../../validation/strategy.md). The current
+application-foundations hand-off is the
+[Tier 1 QA package](../../../QA/tier1-application-foundations-20260921/report.md);
+its statuses are intentionally separate from this document's provider and
+ingestion contracts.
 
 ## Static Validation
 
