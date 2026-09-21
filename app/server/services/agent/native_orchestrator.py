@@ -350,6 +350,7 @@ class NativeAgentOrchestrator:
             goal=native_response.goal,
             completion_contract=native_response.completion_contract,
             task_state=native_response.task_state,
+            context_usage=native_response.context_usage,
             presentation_status=native_response.presentation_status,
             tool_results=native_response.tool_results,
             conversation_state=next_state,
@@ -388,6 +389,11 @@ class NativeAgentOrchestrator:
                     "task_state": (
                         response.task_state.model_dump(mode="json")
                         if response.task_state is not None
+                        else None
+                    ),
+                    "context_usage": (
+                        response.context_usage.model_dump(mode="json")
+                        if response.context_usage is not None
                         else None
                     ),
                     "memory_snapshot": memory_snapshot,
@@ -556,6 +562,7 @@ class NativeAgentOrchestrator:
                     "tool_results": payload.get("tool_results") or [],
                     "conversation_state": payload.get("conversation_state"),
                     "task_state": payload.get("task_state"),
+                    "context_usage": payload.get("context_usage"),
                 }
             )
         except Exception:

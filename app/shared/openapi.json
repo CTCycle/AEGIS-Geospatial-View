@@ -3607,6 +3607,17 @@
             "title": "Context Profile Source",
             "default": "unknown"
           },
+          "context_metadata_authority": {
+            "type": "string",
+            "enum": [
+              "provider",
+              "configured",
+              "inferred",
+              "unknown"
+            ],
+            "title": "Context Metadata Authority",
+            "default": "unknown"
+          },
           "compaction_applied": {
             "type": "boolean",
             "title": "Compaction Applied",
@@ -5874,6 +5885,17 @@
             "title": "Context Profile Source",
             "default": "unknown"
           },
+          "context_metadata_authority": {
+            "type": "string",
+            "enum": [
+              "provider",
+              "configured",
+              "inferred",
+              "unknown"
+            ],
+            "title": "Context Metadata Authority",
+            "default": "unknown"
+          },
           "metadata": {
             "additionalProperties": true,
             "type": "object",
@@ -6940,6 +6962,17 @@
           "context_profile_source": {
             "type": "string",
             "title": "Context Profile Source",
+            "default": "unknown"
+          },
+          "context_metadata_authority": {
+            "type": "string",
+            "enum": [
+              "provider",
+              "configured",
+              "inferred",
+              "unknown"
+            ],
+            "title": "Context Metadata Authority",
             "default": "unknown"
           }
         },

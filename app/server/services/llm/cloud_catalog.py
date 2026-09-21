@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from server.services.llm.types import ModelContextProfile, ModelDescriptor
+from typing import cast
+
+from server.services.llm.types import (
+    ContextMetadataAuthority,
+    ModelContextProfile,
+    ModelDescriptor,
+)
 
 ###############################################################################
 def _catalog_model(
@@ -31,6 +37,7 @@ def _catalog_model(
             "supports_context_caching": supports_context_caching,
             "supports_server_compaction": False,
             "supports_temperature": supports_temperature,
+            "context_metadata_authority": "configured",
             "protocol": (
                 "openai-responses" if provider == "openai" else "google-model"
             ),
@@ -185,6 +192,13 @@ def get_model_context_profile(provider: str, model: str) -> ModelContextProfile 
                 ),
                 metadata_source=str(
                     metadata.get("context_profile_source") or "catalog"
+                ),
+                metadata_authority=cast(
+                    ContextMetadataAuthority,
+                    metadata.get("context_metadata_authority")
+                    if metadata.get("context_metadata_authority")
+                    in {"provider", "configured", "inferred", "unknown"}
+                    else "configured",
                 ),
             )
     return None

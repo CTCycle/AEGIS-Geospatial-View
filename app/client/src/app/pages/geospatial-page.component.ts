@@ -26,6 +26,7 @@ import { LocalCommandService } from '../core/local-command.service';
 import { normalizeMapSession, parseAgentTaskState, parseContextUsage } from '../core/api-parsers';
 import { PersistedChatPageState } from '../core/app-state';
 import { MAX_CHAT_MESSAGE_LENGTH } from '../core/constants';
+import { formatCompactTokenCount } from '../core/token-format';
 import {
   parseRunCompletionPayload,
   parseRunEvent,
@@ -56,6 +57,7 @@ import {
   ConversationSummary,
   RunTraceEntry,
   ToolProgressItem,
+  SelectedModelContext,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
@@ -117,6 +119,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   lastOperation?: ChatOperationResult | null;
   memorySnapshot: Record<string, unknown> = {};
   contextUsage?: ContextUsage;
+  selectedModelContext?: SelectedModelContext;
+  isContextProfileLoading = false;
   mapSession?: MapSession;
   status = 'Agent ready';
   composerError = '';
@@ -306,41 +310,64 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   get contextUsagePercent(): number {
-    return Math.max(0, Math.min(100, Math.round(this.contextUsage?.usage_percent ?? 0)));
+    return Math.max(0, Math.min(100, Math.round(this.effectiveContextUsagePercent ?? 0)));
+  }
+
+  get effectiveContextUsagePercent(): number | null {
+    const usage = this.contextUsage;
+    if (!usage) {
+      return null;
+    }
+    if (typeof usage.usage_percent === 'number' && Number.isFinite(usage.usage_percent)) {
+      return usage.usage_percent;
+    }
+    const measured = this.contextUsageTokens(usage);
+    const limit = this.contextLimitForUsage(usage);
+    return measured !== null && limit !== null && limit > 0
+      ? measured / limit * 100
+      : null;
+  }
+
+  get contextLimit(): number | null {
+    const value = this.selectedModelContext?.context_window_tokens;
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+      ? value
+      : null;
   }
 
   get contextUsageLabel(): string {
-    if (!this.contextUsage) {
-      return 'No request measured';
+    if (this.isContextProfileLoading) {
+      return 'Loading…';
     }
-    const source = this.contextUsage.usage_source || 'estimated';
     const peak = this.contextUsageTokens(this.contextUsage);
-    if (peak === null) {
-      if (source === 'not_measured' || this.contextUsage.usage_percent === null) {
-        return 'No request measured';
+    const percent = this.effectiveContextUsagePercent;
+    if (peak !== null) {
+      if (percent === null) {
+        return 'Unavailable';
       }
-      return 'Context limit unavailable';
+      const source = this.contextUsage?.usage_source || 'estimated';
+      return `${source === 'provider_reported' ? '' : '~'}${Math.round(percent)}%`;
     }
-    if (this.contextUsage.usage_percent === null) {
-      return 'Context limit unavailable';
+    if (this.contextLimit !== null) {
+      return `${formatCompactTokenCount(this.contextLimit)} tokens`;
     }
-    const approximate = source !== 'provider_reported';
-    return `${approximate ? '~' : ''}${Math.round(this.contextUsage.usage_percent)}%`;
+    return 'Unavailable';
   }
 
   get contextUsageDetail(): string {
-    if (!this.contextUsage) {
-      return 'No request measured';
-    }
-    const modelLimit = this.contextUsage.model_context_limit;
-    const selected = this.contextUsage.selected_context_window;
-    const model = [this.contextUsage.provider, this.contextUsage.model].filter(Boolean).join(' / ');
-    const source = this.contextUsage.usage_source || 'estimated';
-    const peak = this.contextUsageTokens(this.contextUsage);
+    const usage = this.contextUsage;
+    const modelLimit = this.contextLimitForUsage(usage);
+    const selected = usage?.selected_context_window ?? null;
+    const model = [
+      this.selectedModelContext?.provider,
+      this.selectedModelContext?.model,
+    ].filter(Boolean).join(' / ');
+    const source = usage?.usage_source || this.selectedModelContext?.context_profile_source || 'unknown';
+    const peak = this.contextUsageTokens(usage);
     const approximate = source !== 'provider_reported';
     const estimateText = approximate ? 'approximate' : 'provider-reported';
     const limitText = modelLimit
-      ? `max context ${modelLimit.toLocaleString()}`
+      ? `max context ${modelLimit.toLocaleString()} (${formatCompactTokenCount(modelLimit)})`
       : 'max context unavailable';
     const usageText = peak === null
       ? 'no request measured'
@@ -348,11 +375,15 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     const remainingText = peak !== null && modelLimit
       ? `; remaining ${Math.max(0, modelLimit - peak).toLocaleString()}`
       : '';
-    const utilizationText = peak !== null && this.contextUsage.usage_percent !== null
-      ? ` (${this.contextUsage.usage_percent}%)`
+    const detailPercent = typeof usage?.usage_percent === 'number'
+      && Number.isFinite(usage.usage_percent)
+      ? usage.usage_percent
+      : this.effectiveContextUsagePercent;
+    const utilizationText = peak !== null && detailPercent !== null
+      ? ` (${detailPercent}%)`
       : '';
-    const phases = this.contextUsage.phases && Object.keys(this.contextUsage.phases).length > 0
-      ? `; phases: ${Object.entries(this.contextUsage.phases).map(([name, value]) => {
+    const phases = usage?.phases && Object.keys(usage.phases).length > 0
+      ? `; phases: ${Object.entries(usage.phases).map(([name, value]) => {
         const phase = value && typeof value === 'object' ? value as Record<string, unknown> : {};
         const phaseInput = typeof phase['peak_request_tokens'] === 'number'
           ? phase['peak_request_tokens']
@@ -365,7 +396,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         return `${name}${phaseInput === undefined ? '' : ` ${phaseInput.toLocaleString()} peak`}${phaseSource ? ` (${phaseSource})` : ''}`;
       }).join(', ')}`
       : '';
-    const compaction = this.contextUsage.compaction_applied ? '; compaction applied' : '';
+    const compaction = usage?.compaction_applied ? '; compaction applied' : '';
     const selectedText = selected && selected !== modelLimit
       ? `; selected context ${selected.toLocaleString()}`
       : '';
@@ -395,7 +426,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   get contextUsageTone(): 'neutral' | 'warning' | 'critical' {
-    if (!this.contextUsage || this.contextUsage.usage_percent === null) {
+    if (this.effectiveContextUsagePercent === null) {
       return 'neutral';
     }
     if (this.contextUsagePercent >= 95) {
@@ -1683,10 +1714,45 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private applyContextUsage(usage: ContextUsage | null | undefined): void {
-    if (usage !== null && usage !== undefined
-      && (this.contextUsageTokens(usage) !== null || !this.hasMeasuredContextUsage())) {
-      this.contextUsage = usage;
+    const profile = this.selectedModelContext;
+    if (!usage || !profile
+      || usage.provider !== profile.provider
+      || usage.model !== profile.model) {
+      return;
     }
+    if (this.contextUsageTokens(usage) === null && this.hasMeasuredContextUsage()) {
+      return;
+    }
+    const profileLimit = this.contextLimit;
+    const modelLimit = this.validPositiveNumber(usage.model_context_limit) ?? profileLimit;
+    const selectedLimit = this.validPositiveNumber(usage.selected_context_window) ?? profileLimit;
+    this.contextUsage = {
+      ...usage,
+      model_context_limit: modelLimit,
+      selected_context_window: selectedLimit,
+      expected_output_tokens: usage.expected_output_tokens
+        ?? profile.maximum_output_tokens,
+      context_profile_source: usage.context_profile_source
+        && usage.context_profile_source !== 'unknown'
+        ? usage.context_profile_source
+        : profile.context_profile_source,
+      context_metadata_authority: usage.context_metadata_authority
+        && usage.context_metadata_authority !== 'unknown'
+        ? usage.context_metadata_authority
+        : profile.context_metadata_authority,
+    };
+  }
+
+  private contextLimitForUsage(usage: ContextUsage | null | undefined): number | null {
+    return this.validPositiveNumber(usage?.model_context_limit)
+      ?? this.validPositiveNumber(usage?.selected_context_window)
+      ?? this.contextLimit;
+  }
+
+  private validPositiveNumber(value: number | null | undefined): number | null {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+      ? value
+      : null;
   }
 
   private newClientRequestId(): string {
@@ -2064,34 +2130,33 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private async loadModelContext(): Promise<void> {
+    this.isContextProfileLoading = true;
+    this.changeDetectorRef.detectChanges();
     try {
       const settings = await this.apiClient.fetchChatSettings();
       if (this.isDestroyed) {
         return;
       }
-      const profile = settings.selected_model_context || {};
-      const contextLimit = typeof profile.context_window_tokens === 'number'
-        ? profile.context_window_tokens
-        : null;
-      const maximumOutput = typeof profile.maximum_output_tokens === 'number'
-        ? profile.maximum_output_tokens
-        : null;
-      this.contextUsage = {
-        estimated_input_tokens: 0,
-        selected_context_window: contextLimit,
-        model_context_limit: contextLimit,
-        usage_percent: null,
-        provider: settings.agent_model_provider,
-        model: settings.agent_model_name,
-        expected_output_tokens: maximumOutput,
-        context_profile_source: typeof profile.context_profile_source === 'string'
-          ? profile.context_profile_source
-          : 'unknown',
-        usage_source: 'not_measured',
-      };
+      const profile = settings.selected_model_context;
+      const identityChanged = !this.selectedModelContext
+        || this.selectedModelContext.provider !== profile.provider
+        || this.selectedModelContext.model !== profile.model;
+      this.selectedModelContext = profile;
+      if (identityChanged) {
+        this.contextUsage = undefined;
+      }
       this.changeDetectorRef.detectChanges();
     } catch {
-      // The chat remains usable; unknown limits are shown explicitly.
+      if (!this.isDestroyed) {
+        this.selectedModelContext = undefined;
+        this.contextUsage = undefined;
+        this.changeDetectorRef.detectChanges();
+      }
+    } finally {
+      if (!this.isDestroyed) {
+        this.isContextProfileLoading = false;
+        this.changeDetectorRef.detectChanges();
+      }
     }
   }
 

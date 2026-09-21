@@ -98,17 +98,24 @@ class ChatSettingsService:
                     if item.provider in {"openai", "google", *DYNAMIC_CLOUD_PROVIDERS}
                     else "stored"
                 )
-        profile = (
-            self.context_profile_resolver.resolve(
-                record.agent_model_provider,
-                record.agent_model_name,
-            )
-            if self.context_profile_resolver is not None
-            else resolve_model_context_profile(
-                record.agent_model_provider,
-                record.agent_model_name,
-            )
-        )
+        profile = None
+        if record.agent_model_provider and record.agent_model_name:
+            try:
+                profile = (
+                    self.context_profile_resolver.resolve_selected(
+                        record.agent_model_provider,
+                        record.agent_model_name,
+                    )
+                    if self.context_profile_resolver is not None
+                    else resolve_model_context_profile(
+                        record.agent_model_provider,
+                        record.agent_model_name,
+                    )
+                )
+            except Exception:
+                # Selected-model metadata is advisory. A provider lookup
+                # failure must not make a usable model assignment disappear.
+                profile = None
         selected_model_context = SelectedModelContextResponse(
             provider=record.agent_model_provider,
             model=record.agent_model_name,
@@ -120,6 +127,9 @@ class ChatSettingsService:
             ),
             context_profile_source=(
                 profile.metadata_source if profile is not None else "unknown"
+            ),
+            context_metadata_authority=(
+                profile.metadata_authority if profile is not None else "unknown"
             ),
         )
         return ModelSettingsResponse(

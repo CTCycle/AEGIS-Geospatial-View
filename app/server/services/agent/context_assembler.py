@@ -9,6 +9,7 @@ from server.common.typing import is_json_array, is_json_object, json_array
 from server.domain.agent.context import AgentContextPackage, ConversationDirective
 from server.services.llm.context_budget import (
     estimate_json_tokens,
+    profile_to_request_metadata,
     resolve_model_context_profile,
 )
 from server.services.llm.errors import LLMContextLimitError
@@ -309,6 +310,9 @@ class AgentContextAssembler:
                 "message_groups": len(groups),
                 "mandatory_overflow": False,
             },
+            context_profile_metadata=(
+                profile_to_request_metadata(profile) if profile is not None else {}
+            ),
         )
 
 

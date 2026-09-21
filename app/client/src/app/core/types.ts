@@ -740,6 +740,7 @@ export interface ContextUsage {
   current_conversation_tokens?: number | null;
   expected_output_tokens?: number | null;
   context_profile_source?: string;
+  context_metadata_authority?: 'provider' | 'configured' | 'inferred' | 'unknown' | string;
   compaction_applied?: boolean;
 }
 
@@ -927,6 +928,7 @@ export interface ModelCardDescriptor {
   context_window_tokens?: number | null;
   maximum_output_tokens?: number | null;
   context_profile_source?: string;
+  context_metadata_authority?: 'provider' | 'configured' | 'inferred' | 'unknown' | string;
   metadata: Record<string, JsonValue>;
 }
 
@@ -980,6 +982,7 @@ export interface SelectedModelContext {
   context_window_tokens: number | null;
   maximum_output_tokens: number | null;
   context_profile_source: string;
+  context_metadata_authority?: 'provider' | 'configured' | 'inferred' | 'unknown' | string;
 }
 
 export interface ModelSettingsUpdateRequest {

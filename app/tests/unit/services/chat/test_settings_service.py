@@ -271,6 +271,7 @@ def test_get_settings_uses_canonical_static_context_without_live_catalog() -> No
         "context_window_tokens": 1_047_576,
         "maximum_output_tokens": 32_768,
         "context_profile_source": "openai_model_catalog",
+        "context_metadata_authority": "configured",
     }
 
 ###############################################################################

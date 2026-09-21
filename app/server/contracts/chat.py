@@ -64,6 +64,9 @@ class ContextUsageResponse(BaseModel):
     current_conversation_tokens: int | None = None
     expected_output_tokens: int | None = None
     context_profile_source: str = "unknown"
+    context_metadata_authority: Literal[
+        "provider", "configured", "inferred", "unknown"
+    ] = "unknown"
     compaction_applied: bool = False
     phases: dict[str, dict[str, Any]] = Field(
         default_factory=lambda: dict[str, dict[str, Any]]()
@@ -148,6 +151,7 @@ class AgentTurnResponse(BaseModel):
     completion_contract: CompletionContract | None = None
     task_state: AgentTaskState | None = None
     execution_trace: dict[str, Any] | None = None
+    context_usage: ContextUsageResponse | None = None
     location_refs: dict[str, ResolvedLocation] = Field(
         default_factory=lambda: dict[str, ResolvedLocation]()
     )
@@ -234,6 +238,9 @@ class ModelCardDescriptor(BaseModel):
     context_window_tokens: int | None = None
     maximum_output_tokens: int | None = None
     context_profile_source: str = "unknown"
+    context_metadata_authority: Literal[
+        "provider", "configured", "inferred", "unknown"
+    ] = "unknown"
     metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
@@ -274,6 +281,9 @@ class SelectedModelContextResponse(BaseModel):
     context_window_tokens: int | None = None
     maximum_output_tokens: int | None = None
     context_profile_source: str = "unknown"
+    context_metadata_authority: Literal[
+        "provider", "configured", "inferred", "unknown"
+    ] = "unknown"
 
 ###############################################################################
 class ModelSettingsResponse(BaseModel):

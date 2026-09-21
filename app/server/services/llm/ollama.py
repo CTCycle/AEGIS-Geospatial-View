@@ -4,6 +4,7 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 
 import asyncio
 import json
+import logging
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import replace
 from html.parser import HTMLParser
@@ -39,6 +40,8 @@ from server.services.llm.types import (
     LLMToolDefinition,
     ModelDescriptor,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 class _OllamaLibraryParser(HTMLParser):
@@ -411,16 +414,32 @@ class OllamaProvider(LLMProvider):
         for key in ("context_window_tokens", "context_length"):
             if payload.get(key) is not None:
                 candidates.append(payload[key])
+        valid_values: list[int] = []
         for value in candidates:
-            try:
-                context_window = int(value)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, int):
+                context_window = value
+            elif isinstance(value, str) and value.strip().isdigit():
+                context_window = int(value.strip())
+            else:
                 continue
             if context_window > 0:
-                return {
-                    "context_window_tokens": context_window,
-                    "context_profile_source": "ollama_show_model_info",
-                }
+                valid_values.append(context_window)
+        distinct_values = set(valid_values)
+        if len(distinct_values) > 1:
+            _LOGGER.warning(
+                "Ignoring conflicting Ollama context metadata for %s: %s",
+                model,
+                sorted(distinct_values),
+            )
+            return {}
+        if valid_values:
+            return {
+                "context_window_tokens": valid_values[0],
+                "context_profile_source": "ollama_show_model_info",
+                "context_metadata_authority": "provider",
+            }
         return {}
 
     # -------------------------------------------------------------------------
