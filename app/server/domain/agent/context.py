@@ -40,6 +40,9 @@ class AgentContextPackage(BaseModel):
     summarized_through_turn_index: int = 0
     omitted_message_ids: list[int] = Field(default_factory=lambda: list[int]())
     context_allocation: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    context_profile_metadata: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]()
+    )
 
 ###############################################################################
 class AgentContextView(BaseModel):

@@ -51,7 +51,10 @@ from server.services.agent.capability_router import (
 from server.services.agent.context_assembler import select_pair_safe_messages
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
-from server.services.llm.context_budget import compute_context_usage
+from server.services.llm.context_budget import (
+    compute_context_usage,
+    merge_provider_context_usage,
+)
 from server.services.llm.errors import LLMProviderRequestError, LLMStructuredOutputError
 from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
 from server.services.llm.transport import LLMTransportPolicy
@@ -94,6 +97,9 @@ class AgentLoopRequest:
     budget: AgentExecutionBudget
     messages: list[dict[str, Any]] = field(
         default_factory=lambda: list[dict[str, Any]]()
+    )
+    context_profile_metadata: dict[str, Any] = field(
+        default_factory=lambda: dict[str, Any]()
     )
     temperature: float = 0.2
     max_model_call_seconds: float = 60.0
@@ -1548,6 +1554,12 @@ class AgentLoop:
             # provider's compatible native-tool contract without changing the
             # configured provider or model.
             metadata["thinking_mode"] = "disabled"
+        profile_metadata = dict(request.context_profile_metadata)
+        if (
+            profile_metadata.get("context_profile_provider") == request.provider
+            and profile_metadata.get("context_profile_model") == request.model
+        ):
+            metadata.update(profile_metadata)
         llm_request = LLMRequest(
             model=request.model,
             provider=request.provider,
@@ -1589,17 +1601,12 @@ class AgentLoop:
                 self._ensure_run_control(request)
                 self._record_context_usage(
                     request,
-                    result.context_usage
-                    or compute_context_usage(
-                        llm_request, provider=request.provider
-                    ).to_dict(),
+                    self._context_usage_for_request(llm_request, result.context_usage),
                     attempts,
                 )
                 return result
             except asyncio.TimeoutError as exc:
-                usage = compute_context_usage(
-                    llm_request, provider=request.provider
-                ).to_dict()
+                usage = self._context_usage_for_request(llm_request)
                 self._record_context_usage(request, usage, attempts)
                 error = LLMProviderRequestError(
                     provider=request.provider,
@@ -1627,10 +1634,7 @@ class AgentLoop:
             except LLMProviderRequestError as exc:
                 self._record_context_usage(
                     request,
-                    exc.context_usage
-                    or compute_context_usage(
-                        llm_request, provider=request.provider
-                    ).to_dict(),
+                    self._context_usage_for_request(llm_request, exc.context_usage),
                     attempts,
                 )
                 self._record_provider_failure(
@@ -1660,9 +1664,7 @@ class AgentLoop:
                     provider=request.provider,
                     model=request.model,
                     stage="model_call",
-                    context_usage=compute_context_usage(
-                        llm_request, provider=request.provider
-                    ).to_dict(),
+                    context_usage=self._context_usage_for_request(llm_request),
                 )
                 self._record_provider_failure(
                     request,
@@ -1693,6 +1695,17 @@ class AgentLoop:
             return
         request.state.budget_snapshot = request.budget.snapshot()
         await callback(request.state)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _context_usage_for_request(
+        llm_request: LLMRequest,
+        provider_usage: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        base_usage = compute_context_usage(
+            llm_request, provider=llm_request.provider or "unknown"
+        )
+        return merge_provider_context_usage(base_usage, provider_usage).to_dict()
 
     # -------------------------------------------------------------------------
     @staticmethod

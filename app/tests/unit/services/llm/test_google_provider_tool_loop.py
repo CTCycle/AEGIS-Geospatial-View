@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from types import SimpleNamespace
 
 from server.services.llm.errors import LLMRequestSchemaError
 from server.services.llm.google_provider import GoogleProvider
@@ -29,6 +30,27 @@ def test_google_converts_aegis_tools_into_declarations() -> None:
             "required": ["capability_id"],
         },
     }
+
+
+###############################################################################
+def test_google_reads_selected_model_limits_from_models_api(monkeypatch) -> None:
+    client = SimpleNamespace(
+        models=SimpleNamespace(
+            get=lambda **_kwargs: {
+                "inputTokenLimit": 1_048_576,
+                "outputTokenLimit": 65_536,
+            }
+        ),
+        close=lambda: None,
+    )
+    provider = GoogleProvider(api_key="test")
+    monkeypatch.setattr(provider, "_client", lambda **_kwargs: client)
+
+    metadata = provider.get_model_context_metadata("gemini-2.5-flash")
+
+    assert metadata["context_window_tokens"] == 1_048_576
+    assert metadata["maximum_output_tokens"] == 65_536
+    assert metadata["context_metadata_authority"] == "provider"
 
 ###############################################################################
 def test_google_parses_function_calls() -> None:

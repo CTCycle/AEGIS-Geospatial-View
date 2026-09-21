@@ -6,7 +6,7 @@ import asyncio
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
-from typing import Any
+from typing import Any, cast
 
 from google import genai
 from google.genai import types as genai_types
@@ -125,6 +125,63 @@ class GoogleProvider(LLMProvider):
         return [
             entry for entry in get_cloud_model_catalog() if entry.provider == "google"
         ]
+
+    # -------------------------------------------------------------------------
+    def get_model_context_metadata(self, model: str) -> dict[str, Any]:
+        """Read the selected model's documented GenAI token limits."""
+
+        client: Any | None = None
+        try:
+            client = self._client(stage="catalog")
+            if client is None:
+                return {}
+            try:
+                descriptor: object = client.models.get(model=model)
+            except TypeError:
+                descriptor = client.models.get(name=model)
+            metadata: dict[str, Any] = {
+                "context_profile_source": "google_models_api",
+                "context_metadata_authority": "provider",
+            }
+            for index, value in enumerate(
+                self._model_fields(
+                    descriptor, "input_token_limit", "inputTokenLimit"
+                ).values()
+            ):
+                metadata["context_window_tokens" if index == 0 else "context_length"] = value
+            for index, value in enumerate(
+                self._model_fields(
+                    descriptor, "output_token_limit", "outputTokenLimit"
+                ).values()
+            ):
+                metadata[
+                    "maximum_output_tokens" if index == 0 else "max_output_tokens"
+                ] = value
+            return metadata if len(metadata) > 2 else {}
+        finally:
+            if client is not None:
+                close_sync_client(client)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _model_fields(
+        value: object, snake_key: str, camel_key: str
+    ) -> dict[str, object]:
+        if isinstance(value, dict):
+            mapping = cast(dict[str, object], value)
+            return {
+                key: mapping[key]
+                for key in (snake_key, camel_key)
+                if key in mapping
+            }
+        result: dict[str, object] = {}
+        snake_value = getattr(value, snake_key, None)
+        camel_value = getattr(value, camel_key, None)
+        if snake_value is not None:
+            result[snake_key] = snake_value
+        if camel_value is not None:
+            result[camel_key] = camel_value
+        return result
 
     # -------------------------------------------------------------------------
     def supports_tools(self, model: str) -> bool | None:

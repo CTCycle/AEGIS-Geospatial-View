@@ -328,6 +328,27 @@ class OpenCodeProvider(DeepSeekProvider):
         ):
             if item.get(key) is not None:
                 metadata[key] = item[key]
+        limit = item.get("limit")
+        if is_json_object(limit):
+            if not any(
+                key in metadata
+                for key in (
+                    "context_window_tokens",
+                    "context_length",
+                    "context_window",
+                    "max_context_tokens",
+                )
+            ) and limit.get("context") is not None:
+                metadata["context_window_tokens"] = limit["context"]
+            if not any(
+                key in metadata
+                for key in (
+                    "maximum_output_tokens",
+                    "max_output_tokens",
+                    "max_completion_tokens",
+                )
+            ) and limit.get("output") is not None:
+                metadata["maximum_output_tokens"] = limit["output"]
         if any(
             key in metadata
             for key in (
@@ -341,6 +362,7 @@ class OpenCodeProvider(DeepSeekProvider):
             )
         ):
             metadata["context_profile_source"] = "provider_models_api"
+            metadata["context_metadata_authority"] = "provider"
         raw_capabilities = item.get("capabilities")
         if is_json_array(raw_capabilities):
             normalized = {

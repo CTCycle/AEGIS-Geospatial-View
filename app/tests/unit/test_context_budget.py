@@ -11,10 +11,13 @@ from server.services.llm.context_budget import (
     compute_context_usage,
     compute_ollama_context_usage,
     estimate_message_tokens,
+    merge_provider_context_usage,
+    normalize_model_context_profile,
     prepare_request,
+    profile_to_request_metadata,
     resolve_model_context_profile,
 )
-from server.services.llm.types import LLMRequest, LLMToolDefinition
+from server.services.llm.types import LLMRequest, LLMToolDefinition, ModelContextProfile
 
 ###############################################################################
 def _request(
@@ -86,6 +89,86 @@ def test_provider_metadata_supplies_the_local_cap_and_schema_reservation() -> No
     assert usage.reserved_output_tokens == 4096
     assert usage.context_profile_source == "ollama_show_model_info"
     assert usage.usable_prompt_budget_tokens == 36_352
+
+###############################################################################
+@pytest.mark.parametrize("value", [True, False, 0, -1, 1.5, "not-a-number"])
+def test_context_profile_normalizer_rejects_malformed_token_counts(value: object) -> None:
+    assert (
+        normalize_model_context_profile(
+            "ollama",
+            "local-alias",
+            metadata={
+                "context_window_tokens": value,
+                "context_profile_source": "ollama_show_model_info",
+            },
+        )
+        is None
+    )
+
+
+###############################################################################
+def test_context_profile_normalizer_rejects_conflicting_aliases_and_preserves_authority() -> None:
+    assert (
+        normalize_model_context_profile(
+            "opencode",
+            "runtime-model",
+            metadata={
+                "context_window_tokens": 8192,
+                "context_length": 16_384,
+                "context_profile_source": "provider_models_api",
+                "context_metadata_authority": "provider",
+            },
+        )
+        is None
+    )
+
+    profile = normalize_model_context_profile(
+        "opencode",
+        "runtime-model",
+        metadata={
+            "context_window": 8192,
+            "max_output_tokens": 512,
+            "context_profile_source": "provider_models_api",
+            "context_metadata_authority": "provider",
+        },
+    )
+
+    assert profile is not None
+    assert profile.context_window_tokens == 8192
+    assert profile.maximum_output_tokens == 512
+    assert profile.metadata_authority == "provider"
+    assert profile_to_request_metadata(profile)["context_profile_model"] == "runtime-model"
+
+
+###############################################################################
+def test_provider_usage_cannot_erase_canonical_model_limit() -> None:
+    profile = ModelContextProfile(
+        provider="ollama",
+        model="local-alias",
+        context_window_tokens=40_960,
+        maximum_output_tokens=4096,
+        default_output_reserve=4096,
+        metadata_source="ollama_show_model_info",
+        metadata_authority="provider",
+    )
+    usage = compute_context_usage(
+        _request(
+            "hello",
+            model="local-alias",
+            metadata=profile_to_request_metadata(profile),
+        ),
+        provider="ollama",
+    )
+
+    merged = merge_provider_context_usage(
+        usage,
+        {"reported_input_tokens": 640, "reported_output_tokens": 32},
+    )
+
+    assert merged.model_context_limit == 40_960
+    assert merged.selected_context_window == 40_960
+    assert merged.reported_input_tokens == 640
+    assert merged.reported_output_tokens == 32
 
 ###############################################################################
 def test_complete_request_counts_messages_tools_and_response_schema_before_compaction() -> (

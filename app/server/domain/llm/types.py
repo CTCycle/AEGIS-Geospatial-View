@@ -11,6 +11,7 @@ ContextUsageSource = Literal[
     "provider_reported",
     "hybrid",
 ]
+ContextMetadataAuthority = Literal["provider", "configured", "inferred", "unknown"]
 FailureCategory = Literal[
     "model_capability",
     "provider_api",
@@ -40,6 +41,7 @@ class ModelContextProfile:
     supports_context_caching: bool = False
     supports_server_compaction: bool = False
     metadata_source: str = "catalog"
+    metadata_authority: ContextMetadataAuthority = "unknown"
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -179,6 +181,7 @@ class ContextUsage:
     current_conversation_tokens: int | None = None
     expected_output_tokens: int | None = None
     context_profile_source: str = "unknown"
+    context_metadata_authority: ContextMetadataAuthority = "unknown"
     compaction_applied: bool = False
     peak_request_tokens: int | None = None
     total_input_tokens: int | None = None
@@ -215,6 +218,7 @@ class ContextUsage:
             "current_conversation_tokens": self.current_conversation_tokens,
             "expected_output_tokens": self.expected_output_tokens,
             "context_profile_source": self.context_profile_source,
+            "context_metadata_authority": self.context_metadata_authority,
             "compaction_applied": self.compaction_applied,
             "peak_request_tokens": self.peak_request_tokens,
             "total_input_tokens": self.total_input_tokens,

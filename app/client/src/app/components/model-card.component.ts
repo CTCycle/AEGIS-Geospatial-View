@@ -1,12 +1,12 @@
-import { DecimalPipe } from '@angular/common';
 import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 
 import { ModelCardDescriptor } from '../core/types';
+import { formatCompactTokenCount } from '../core/token-format';
 
 @Component({
   selector: 'article[appModelCard]',
   standalone: true,
-  imports: [DecimalPipe],
+  imports: [],
   templateUrl: './model-card.component.html',
   styleUrl: './model-card.component.css',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -27,6 +27,10 @@ export class ModelCardComponent {
 
   @Output() modelSelected = new EventEmitter<ModelCardDescriptor>();
   @Output() pullRequested = new EventEmitter<ModelCardDescriptor>();
+
+  formatContextWindow(value: number | null | undefined): string {
+    return formatCompactTokenCount(value);
+  }
 
   onCardSelected(): void {
     if (this.disabledReason) {

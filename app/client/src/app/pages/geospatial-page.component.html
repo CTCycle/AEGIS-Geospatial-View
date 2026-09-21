@@ -99,7 +99,7 @@
             [attr.title]="contextUsageDetail"
           >
             <span class="context-window-row__label">Context</span>
-            @if (hasContextMeasurement && contextUsage?.usage_percent !== null && contextUsage?.usage_percent !== undefined) {
+            @if (hasContextMeasurement && effectiveContextUsagePercent !== null) {
               <progress
                 class="context-window-row__progress"
                 max="100"

@@ -209,6 +209,7 @@ def test_ollama_reads_context_window_only_from_show_metadata() -> None:
     assert provider.get_model_context_metadata("runtime-model") == {
         "context_window_tokens": 8192,
         "context_profile_source": "ollama_show_model_info",
+        "context_metadata_authority": "provider",
     }
 
 ###############################################################################
@@ -231,3 +232,22 @@ def test_ollama_does_not_infer_context_from_missing_or_malformed_metadata() -> N
     assert _Provider(
         {"model_info": {"general.context_length": "not-a-number"}}
     ).get_model_context_metadata("custom-4k") == {}
+
+
+###############################################################################
+def test_ollama_rejects_conflicting_show_context_metadata() -> None:
+
+    ###############################################################################
+    class _Provider(OllamaProvider):
+
+        # ---------------------------------------------------------------------
+        def _post_json(self, path: str, payload: dict):
+            assert path == "/api/show"
+            return {
+                "context_length": 8192,
+                "model_info": {"general.context_length": 16_384},
+            }
+
+    assert _Provider(base_url="http://ollama-context-conflict.test").get_model_context_metadata(
+        "runtime-model"
+    ) == {}

@@ -10,6 +10,7 @@ from server.contracts.chat import (
     ChatOperationResult,
     AgentToolResultSummary,
     AgentTurnResponse,
+    ContextUsageResponse,
 )
 from server.contracts.geospatial import MapSession
 from server.domain.agent.context import AgentContextPackage
@@ -113,6 +114,11 @@ class AgentTurnRunner:
                 state=state,
                 budget=request.budget,
                 messages=list(request.messages),
+                context_profile_metadata=(
+                    dict(request.context_package.context_profile_metadata)
+                    if request.context_package is not None
+                    else {}
+                ),
                 max_model_call_seconds=_setting(
                     self.execution_settings, "native_model_call_seconds", 60.0
                 ),
@@ -214,6 +220,7 @@ class AgentResponseBuilder:
                 map_session,
                 defer_map_commit=request.defer_map_commit,
             ),
+            context_usage=_latest_context_usage(state.context_usage_trace),
             tool_results=summaries,
             execution_trace={
                 "stopped_reason": outcome.stopped_reason,
@@ -240,6 +247,43 @@ class AgentResponseBuilder:
             },
             location_refs=dict(state.location_refs),
         )
+
+
+def _latest_context_usage(
+    trace: list[dict[str, Any]],
+) -> ContextUsageResponse | None:
+    for item in reversed(trace):
+        allowed = {
+            "estimated_input_tokens",
+            "selected_context_window",
+            "model_context_limit",
+            "usage_percent",
+            "provider",
+            "model",
+            "reported_input_tokens",
+            "reported_output_tokens",
+            "reserved_output_tokens",
+            "tool_schema_tokens",
+            "response_schema_tokens",
+            "safety_margin_tokens",
+            "usage_source",
+            "usable_prompt_budget_tokens",
+            "current_conversation_tokens",
+            "expected_output_tokens",
+            "context_profile_source",
+            "context_metadata_authority",
+            "compaction_applied",
+            "phases",
+            "peak_request_tokens",
+            "total_input_tokens",
+            "total_output_tokens",
+        }
+        payload = {key: value for key, value in item.items() if key in allowed}
+        try:
+            return ContextUsageResponse.model_validate(payload)
+        except Exception:
+            continue
+    return None
 
 ###############################################################################
 def _operation(

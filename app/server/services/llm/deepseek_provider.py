@@ -917,6 +917,7 @@ class DeepSeekProvider(LLMProvider):
             )
         ):
             metadata["context_profile_source"] = "provider_models_api"
+            metadata["context_metadata_authority"] = "provider"
         raw_capabilities = item.get("capabilities")
         if is_json_array(raw_capabilities):
             normalized = {

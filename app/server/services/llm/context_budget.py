@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
+import re
 from dataclasses import replace
 from typing import Any
 
 from server.common.typing import json_object
 from server.services.llm.cloud_catalog import get_model_context_profile
 from server.services.llm.errors import LLMContextLimitError
-from server.services.llm.types import ContextUsage, LLMRequest, ModelContextProfile
+from server.services.llm.types import (
+    ContextMetadataAuthority,
+    ContextUsage,
+    LLMRequest,
+    ModelContextProfile,
+)
 from server.prompts.context import build_compacted_history_summary
 
 CONTEXT_HEADROOM_TOKENS = 512
@@ -16,14 +23,140 @@ CONTEXT_HEADROOM_TOKENS = 512
 UNKNOWN_MODEL_INPUT_CEILING = 32_768
 KNOWN_APPLICATION_INPUT_CEILING = 64_000
 RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY = "_response_schema_embedded_in_messages"
+_LOGGER = logging.getLogger(__name__)
+_CONTEXT_WINDOW_ALIASES = (
+    "context_window_tokens",
+    "context_length",
+    "context_window",
+    "max_context_tokens",
+)
+_MAXIMUM_OUTPUT_ALIASES = (
+    "maximum_output_tokens",
+    "max_output_tokens",
+    "max_completion_tokens",
+)
+_AUTHORITY_RANK: dict[ContextMetadataAuthority, int] = {
+    "unknown": 0,
+    "inferred": 1,
+    "configured": 2,
+    "provider": 3,
+}
 
 ###############################################################################
 def _positive_int(value: object) -> int | None:
-    try:
-        number = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    if isinstance(value, bool):
         return None
-    return number if number > 0 else None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, str) and re.fullmatch(r"\+?[0-9]+", value.strip()):
+        number = int(value.strip())
+        return number if number > 0 else None
+    return None
+
+
+###############################################################################
+def _normalized_alias_value(
+    metadata: dict[str, Any], aliases: tuple[str, ...], *, field_name: str
+) -> int | None:
+    present = [
+        (key, _positive_int(metadata[key]))
+        for key in aliases
+        if key in metadata and metadata[key] is not None
+    ]
+    if not present:
+        return None
+    invalid = [key for key, value in present if value is None]
+    if invalid:
+        _LOGGER.warning(
+            "Ignoring malformed %s metadata aliases: %s", field_name, invalid
+        )
+        return None
+    values = {value for _, value in present if value is not None}
+    if len(values) > 1:
+        _LOGGER.warning(
+            "Ignoring conflicting %s metadata aliases: %s",
+            field_name,
+            {key: value for key, value in present},
+        )
+        return None
+    return next(iter(values))
+
+
+###############################################################################
+def normalize_model_context_profile(
+    provider: str,
+    model: str,
+    *,
+    metadata: dict[str, Any] | None = None,
+    default_metadata_source: str = "provider_metadata",
+    default_metadata_authority: ContextMetadataAuthority = "unknown",
+) -> ModelContextProfile | None:
+    """Normalize provider-extracted context metadata into one profile.
+
+    Provider adapters own extraction of their raw payloads.  This function is
+    intentionally strict about the canonical token fields so an invalid or
+    conflicting provider response cannot become a guessed context limit.
+    """
+
+    payload = dict(metadata or {})
+    context_window = _normalized_alias_value(
+        payload, _CONTEXT_WINDOW_ALIASES, field_name="context window"
+    )
+    maximum_output = _normalized_alias_value(
+        payload, _MAXIMUM_OUTPUT_ALIASES, field_name="maximum output"
+    )
+    default_output_reserve = _positive_int(payload.get("default_output_reserve"))
+    if (
+        context_window is None
+        and maximum_output is None
+        and default_output_reserve is None
+    ):
+        return None
+
+    raw_authority = payload.get(
+        "context_metadata_authority",
+        payload.get("metadata_authority", default_metadata_authority),
+    )
+    authority = (
+        raw_authority
+        if raw_authority in _AUTHORITY_RANK
+        else default_metadata_authority
+        if default_metadata_authority in _AUTHORITY_RANK
+        else "unknown"
+    )
+    if raw_authority not in _AUTHORITY_RANK:
+        _LOGGER.warning("Ignoring unsupported context metadata authority: %r", raw_authority)
+    source = payload.get("context_profile_source") or default_metadata_source
+    return ModelContextProfile(
+        provider=provider,
+        model=model,
+        context_window_tokens=context_window,
+        maximum_output_tokens=maximum_output,
+        default_output_reserve=default_output_reserve or maximum_output or 0,
+        tokenizer_strategy=str(payload.get("tokenizer_strategy") or "chars_per_token_4"),
+        supports_context_caching=bool(payload.get("supports_context_caching")),
+        supports_server_compaction=bool(payload.get("supports_server_compaction")),
+        metadata_source=str(source),
+        metadata_authority=authority,
+    )
+
+
+###############################################################################
+def profile_to_request_metadata(profile: ModelContextProfile) -> dict[str, Any]:
+    """Return the canonical metadata snapshot used by request budgeting."""
+
+    return {
+        "context_window_tokens": profile.context_window_tokens,
+        "maximum_output_tokens": profile.maximum_output_tokens,
+        "default_output_reserve": profile.default_output_reserve,
+        "tokenizer_strategy": profile.tokenizer_strategy,
+        "supports_context_caching": profile.supports_context_caching,
+        "supports_server_compaction": profile.supports_server_compaction,
+        "context_profile_source": profile.metadata_source,
+        "context_metadata_authority": profile.metadata_authority,
+        "context_profile_provider": profile.provider,
+        "context_profile_model": profile.model,
+    }
 
 ###############################################################################
 def estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
@@ -75,53 +208,48 @@ def _profile_for_request(
     normalized_provider = provider
     metadata = _request_metadata(request)
     static_profile = get_model_context_profile(normalized_provider, request.model)
-    context_limit = _positive_int(
-        metadata.get("context_window_tokens")
-        or metadata.get("context_length")
-        or metadata.get("context_window")
-        or metadata.get("max_context_tokens")
-    )
-    maximum_output = _positive_int(
-        metadata.get("maximum_output_tokens")
-        or metadata.get("max_output_tokens")
-        or metadata.get("max_completion_tokens")
-    )
     if static_profile is not None:
-        if context_limit is None:
-            context_limit = static_profile.context_window_tokens
-        if maximum_output is None:
-            maximum_output = static_profile.maximum_output_tokens
+        normalized = normalize_model_context_profile(
+            normalized_provider,
+            request.model,
+            metadata=metadata,
+            default_metadata_source=static_profile.metadata_source,
+            default_metadata_authority=static_profile.metadata_authority,
+        )
+        if normalized is None:
+            return static_profile
         return replace(
             static_profile,
-            context_window_tokens=context_limit,
-            maximum_output_tokens=maximum_output,
-            metadata_source=str(
-                metadata.get("context_profile_source") or static_profile.metadata_source
+            context_window_tokens=(
+                normalized.context_window_tokens
+                if normalized.context_window_tokens is not None
+                else static_profile.context_window_tokens
             ),
+            maximum_output_tokens=(
+                normalized.maximum_output_tokens
+                if normalized.maximum_output_tokens is not None
+                else static_profile.maximum_output_tokens
+            ),
+            default_output_reserve=(
+                normalized.default_output_reserve
+                or static_profile.default_output_reserve
+            ),
+            tokenizer_strategy=normalized.tokenizer_strategy,
+            supports_context_caching=(
+                normalized.supports_context_caching
+                or static_profile.supports_context_caching
+            ),
+            supports_server_compaction=(
+                normalized.supports_server_compaction
+                or static_profile.supports_server_compaction
+            ),
+            metadata_source=normalized.metadata_source,
+            metadata_authority=normalized.metadata_authority,
         )
-    if context_limit is None:
-        context_limit = None
-    default_output_reserve = _positive_int(metadata.get("default_output_reserve"))
-    if (
-        context_limit is None
-        and maximum_output is None
-        and default_output_reserve is None
-    ):
-        return None
-    return ModelContextProfile(
-        provider=normalized_provider,
-        model=request.model,
-        context_window_tokens=context_limit,
-        maximum_output_tokens=maximum_output,
-        default_output_reserve=(default_output_reserve or maximum_output or 0),
-        tokenizer_strategy=str(
-            metadata.get("tokenizer_strategy") or "chars_per_token_4"
-        ),
-        supports_context_caching=bool(metadata.get("supports_context_caching")),
-        supports_server_compaction=bool(metadata.get("supports_server_compaction")),
-        metadata_source=str(
-            metadata.get("context_profile_source") or "provider_metadata"
-        ),
+    return normalize_model_context_profile(
+        normalized_provider,
+        request.model,
+        metadata=metadata,
     )
 
 ###############################################################################
@@ -242,11 +370,119 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
         context_profile_source=profile.metadata_source
         if profile is not None
         else "unknown",
+        context_metadata_authority=profile.metadata_authority
+        if profile is not None
+        else "unknown",
         compaction_applied=bool(
             _request_metadata(request).get("_context_compaction_applied")
         ),
         peak_request_tokens=estimated,
         total_input_tokens=estimated,
+    )
+
+###############################################################################
+def merge_provider_context_usage(
+    usage: ContextUsage,
+    provider_usage: dict[str, Any] | None,
+) -> ContextUsage:
+    """Merge provider telemetry without discarding the canonical profile.
+
+    Providers commonly return token counts without repeating model metadata.
+    Those counts are useful, but a partial payload must not turn a known
+    context window into ``null``.  A reported limit is accepted only when it
+    carries an authority stronger than the canonical request profile.
+    """
+
+    payload = provider_usage if isinstance(provider_usage, dict) else {}
+
+    def non_negative_int(value: object) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int) and value >= 0:
+            return value
+        if isinstance(value, str) and re.fullmatch(r"\+?[0-9]+", value.strip()):
+            parsed = int(value.strip())
+            return parsed if parsed >= 0 else None
+        return None
+
+    reported_input = non_negative_int(payload.get("reported_input_tokens"))
+    reported_output = non_negative_int(payload.get("reported_output_tokens"))
+    reported_limit = _positive_int(
+        payload.get("model_context_limit")
+        if payload.get("model_context_limit") is not None
+        else payload.get("selected_context_window")
+    )
+    raw_authority = payload.get("context_metadata_authority")
+    reported_authority: ContextMetadataAuthority = (
+        raw_authority if raw_authority in _AUTHORITY_RANK else "unknown"
+    )
+    can_replace_limit = (
+        reported_limit is not None
+        and reported_authority != "unknown"
+        and (
+            usage.model_context_limit is None
+            or _AUTHORITY_RANK[reported_authority]
+            > _AUTHORITY_RANK[usage.context_metadata_authority]
+        )
+    )
+
+    next_limit = reported_limit if can_replace_limit else usage.model_context_limit
+    next_percent = calculate_context_usage_percent(
+        reported_input
+        if reported_input is not None
+        else usage.effective_input_tokens,
+        next_limit,
+    )
+    if reported_input is None and reported_output is None and not can_replace_limit:
+        return usage
+
+    if reported_input is not None:
+        source = "provider_reported"
+    elif reported_output is not None:
+        source = "hybrid"
+    else:
+        source = usage.usage_source
+    return replace(
+        usage,
+        reported_input_tokens=(
+            reported_input
+            if reported_input is not None
+            else usage.reported_input_tokens
+        ),
+        reported_output_tokens=(
+            reported_output
+            if reported_output is not None
+            else usage.reported_output_tokens
+        ),
+        selected_context_window=next_limit if can_replace_limit else usage.selected_context_window,
+        model_context_limit=next_limit,
+        usage_percent=next_percent,
+        usage_source=source,
+        context_profile_source=(
+            str(payload.get("context_profile_source"))
+            if can_replace_limit and isinstance(payload.get("context_profile_source"), str)
+            else usage.context_profile_source
+        ),
+        context_metadata_authority=(
+            reported_authority
+            if can_replace_limit
+            else usage.context_metadata_authority
+        ),
+        peak_request_tokens=(
+            reported_input
+            if reported_input is not None
+            else usage.peak_request_tokens
+        ),
+        total_input_tokens=(
+            reported_input
+            if reported_input is not None
+            else usage.total_input_tokens
+        ),
+        total_output_tokens=(
+            reported_output
+            if reported_output is not None
+            else usage.total_output_tokens
+        ),
     )
 
 ###############################################################################

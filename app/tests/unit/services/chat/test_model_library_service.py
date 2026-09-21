@@ -345,3 +345,58 @@ def test_normalize_ollama_url_rewrites_localhost() -> None:
         ChatModelLibraryService.normalize_ollama_url("http://localhost:11434")
         == "http://127.0.0.1:11434"
     )
+
+
+###############################################################################
+def test_ollama_selected_context_enrichment_updates_the_shared_model_cache(
+    monkeypatch,
+) -> None:
+    class _OllamaProviderWithContext:
+
+        # ---------------------------------------------------------------------
+        def __init__(self, **_kwargs) -> None:  # noqa: ANN003
+            self.last_list_models_error = None
+
+        # ---------------------------------------------------------------------
+        def list_models(self) -> list[ModelDescriptor]:
+            return [
+                ModelDescriptor(
+                    name="local-alias",
+                    description="Local model",
+                    provider="ollama",
+                )
+            ]
+
+        # ---------------------------------------------------------------------
+        def get_model_context_metadata(self, model: str) -> dict[str, object]:
+            assert model == "local-alias"
+            return {
+                "context_window_tokens": 40_960,
+                "context_profile_source": "ollama_show_model_info",
+                "context_metadata_authority": "provider",
+            }
+
+    monkeypatch.setattr(
+        model_library_module, "OllamaProvider", _OllamaProviderWithContext
+    )
+    service = _build_service()
+    ollama_url = "http://127.0.0.1:11434"
+
+    service.list_models(ollama_url=ollama_url, include_probe_status=False)
+    selected = service.find_model(
+        provider="ollama",
+        model_name="local-alias",
+        ollama_url=ollama_url,
+        include_probe_status=False,
+    )
+    cached = service.find_cached_model(
+        provider="ollama",
+        model_name="local-alias",
+        ollama_url=ollama_url,
+    )
+
+    assert selected is not None
+    assert selected["context_window_tokens"] == 40_960
+    assert selected["context_metadata_authority"] == "provider"
+    assert cached is not None
+    assert cached["context_window_tokens"] == 40_960

@@ -1335,6 +1335,7 @@ export const parseContextUsage = (input: unknown): ChatTurnResponse['context_usa
     current_conversation_tokens: isFiniteNumber(input.current_conversation_tokens) ? input.current_conversation_tokens : null,
     expected_output_tokens: isFiniteNumber(input.expected_output_tokens) ? input.expected_output_tokens : null,
     context_profile_source: typeof input.context_profile_source === 'string' ? input.context_profile_source : 'unknown',
+    context_metadata_authority: typeof input.context_metadata_authority === 'string' ? input.context_metadata_authority : 'unknown',
     compaction_applied: Boolean(input.compaction_applied),
     phases: isRecord(input.phases) ? input.phases : undefined,
     peak_request_tokens: isFiniteNumber(input.peak_request_tokens) ? input.peak_request_tokens : null,
@@ -1388,6 +1389,7 @@ export const normalizeModelCards = (
     context_window_tokens: optionalApiNumber(item, 'context_window_tokens', endpoint) ?? null,
     maximum_output_tokens: optionalApiNumber(item, 'maximum_output_tokens', endpoint) ?? null,
     context_profile_source: requireApiString(item, 'context_profile_source', endpoint),
+    context_metadata_authority: optionalApiString(item, 'context_metadata_authority', endpoint) ?? 'unknown',
     metadata: requireApiJsonObject(item.metadata, endpoint, `${field}[${index}].metadata`),
   };
 });
@@ -1472,6 +1474,7 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
     'selected_model_context',
   );
   const agentModelProvider = requireApiString(record, 'agent_model_provider', endpoint);
+  const agentModelName = requireApiString(record, 'agent_model_name', endpoint);
   if (agentModelProvider && !CANONICAL_LLM_PROVIDERS.has(agentModelProvider)) {
     return apiContract(
       endpoint,
@@ -1498,9 +1501,17 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
       selectedContextProvider,
     );
   }
+  const selectedContextModel = requireApiString(selectedModelContextRecord, 'model', endpoint);
+  if (selectedContextModel !== agentModelName) {
+    return apiContract(
+      endpoint,
+      'selected_model_context.model must match agent_model_name',
+      selectedContextModel,
+    );
+  }
   const selectedModelContext: SelectedModelContext = {
     provider: selectedContextProvider,
-    model: requireApiString(selectedModelContextRecord, 'model', endpoint),
+    model: selectedContextModel,
     context_window_tokens: optionalApiNumber(
       selectedModelContextRecord,
       'context_window_tokens',
@@ -1516,11 +1527,16 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
       'context_profile_source',
       endpoint,
     ),
+    context_metadata_authority: optionalApiString(
+      selectedModelContextRecord,
+      'context_metadata_authority',
+      endpoint,
+    ) ?? 'unknown',
   };
   return {
     active_provider_mode: activeProviderMode,
     agent_model_provider: agentModelProvider,
-    agent_model_name: requireApiString(record, 'agent_model_name', endpoint),
+    agent_model_name: agentModelName,
     ollama_url: requireApiString(record, 'ollama_url', endpoint),
     openai_base_url: requireApiStringOrNull(record, 'openai_base_url', endpoint),
     google_base_url: requireApiStringOrNull(record, 'google_base_url', endpoint),

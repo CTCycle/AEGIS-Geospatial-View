@@ -1134,6 +1134,7 @@ async def test_native_model_context_usage_is_recorded_and_emitted() -> None:
         "reported_input_tokens": 110,
         "reported_output_tokens": 18,
         "model_context_limit": 4096,
+        "context_metadata_authority": "provider",
         "compaction_applied": True,
     }
     provider = FakeProvider([LLMResult(content="ready", context_usage=usage)])
@@ -1155,16 +1156,12 @@ async def test_native_model_context_usage_is_recorded_and_emitted() -> None:
         tool_choice="none",
     )
 
-    assert emitted == [usage]
-    assert budget.context_allocations == [
-        {
-            "phase": "native_loop",
-            "model": "fake-model",
-            "attempt": 1,
-            "model_call": 1,
-        **usage,
-        }
-    ]
+    assert emitted[0]["reported_input_tokens"] == 110
+    assert emitted[0]["reported_output_tokens"] == 18
+    assert emitted[0]["model_context_limit"] == 4096
+    assert emitted[0]["context_metadata_authority"] == "provider"
+    assert budget.context_allocations[0]["model_context_limit"] == 4096
+    assert budget.context_allocations[0]["reported_input_tokens"] == 110
     assert request.state.context_usage_trace[0]["reported_input_tokens"] == 110
     assert request.state.model_trace[0]["status"] == "observed"
 

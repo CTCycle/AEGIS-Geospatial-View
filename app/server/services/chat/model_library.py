@@ -160,19 +160,17 @@ class ChatModelLibraryService:
             item.name,
             metadata=metadata,
         )
-        context_window_tokens = ChatModelLibraryService._positive_int(
-            metadata.get("context_window_tokens")
-            or metadata.get("context_length")
-            or metadata.get("context_window")
-        ) or (profile.context_window_tokens if profile is not None else None)
-        maximum_output_tokens = ChatModelLibraryService._positive_int(
-            metadata.get("maximum_output_tokens")
-            or metadata.get("max_output_tokens")
-            or metadata.get("max_tokens")
-        ) or (profile.maximum_output_tokens if profile is not None else None)
-        context_profile_source = str(
-            metadata.get("context_profile_source")
-            or (profile.metadata_source if profile is not None else "unknown")
+        context_window_tokens = (
+            profile.context_window_tokens if profile is not None else None
+        )
+        maximum_output_tokens = (
+            profile.maximum_output_tokens if profile is not None else None
+        )
+        context_profile_source = (
+            profile.metadata_source if profile is not None else "unknown"
+        )
+        context_metadata_authority = (
+            profile.metadata_authority if profile is not None else "unknown"
         )
         return {
             "id": item.name,
@@ -198,6 +196,7 @@ class ChatModelLibraryService:
             "context_window_tokens": context_window_tokens,
             "maximum_output_tokens": maximum_output_tokens,
             "context_profile_source": context_profile_source,
+            "context_metadata_authority": context_metadata_authority,
             "metadata": metadata,
         }
 
@@ -311,6 +310,65 @@ class ChatModelLibraryService:
             # provider I/O into the request context boundary.
             return self.model_payload(item)
         return None
+
+    # -------------------------------------------------------------------------
+    def refresh_selected_model(
+        self,
+        *,
+        provider: str,
+        model_name: str,
+        ollama_url: str,
+    ) -> dict[str, object] | None:
+        """Hydrate one selected model through the provider's bounded path.
+
+        The resolver calls this explicitly for settings hydration.  Context
+        assembly continues to use ``find_cached_model`` and therefore never
+        performs provider I/O.
+        """
+
+        normalized_provider = require_canonical_provider(provider)
+        normalized_model = model_name.strip()
+        if not normalized_model:
+            return None
+        normalized_ollama_url = self.normalize_ollama_url(ollama_url)
+        if normalized_provider == "google":
+            google = self.provider_factory.get_provider(normalized_provider)
+            get_metadata = getattr(google, "get_model_context_metadata", None)
+            metadata_result: object = (
+                get_metadata(normalized_model) if callable(get_metadata) else {}
+            )
+            if not is_json_object(metadata_result):
+                return None
+            metadata = metadata_result
+            descriptor = next(
+                (
+                    item
+                    for item in get_cloud_model_catalog()
+                    if item.provider == normalized_provider and item.name == normalized_model
+                ),
+                None,
+            )
+            if descriptor is None:
+                descriptor = ModelDescriptor(
+                    name=normalized_model,
+                    description="Google model discovered from the configured provider account.",
+                    provider=normalized_provider,
+                    capabilities=["chat", "stream"],
+                )
+            descriptor.metadata.update(metadata)
+            return self.model_payload(descriptor)
+        if normalized_provider in {*DYNAMIC_CLOUD_PROVIDERS, "ollama"}:
+            return self.find_model(
+                provider=normalized_provider,
+                model_name=normalized_model,
+                ollama_url=normalized_ollama_url,
+                include_probe_status=False,
+            )
+        return self.find_cached_model(
+            provider=normalized_provider,
+            model_name=normalized_model,
+            ollama_url=normalized_ollama_url,
+        )
 
     # -------------------------------------------------------------------------
     def _refresh_dynamic_catalog(
@@ -440,14 +498,42 @@ class ChatModelLibraryService:
         item_metadata = item.get("metadata")
         merged = dict(item_metadata) if is_json_object(item_metadata) else {}
         merged.update(metadata)
+        self._merge_cached_context_metadata(
+            provider="ollama",
+            model_name=model_name,
+            ollama_url=ollama_url,
+            metadata=dict(metadata),
+        )
         item["metadata"] = merged
         for key in (
             "context_window_tokens",
             "maximum_output_tokens",
             "context_profile_source",
+            "context_metadata_authority",
         ):
             if metadata.get(key) is not None:
                 item[key] = metadata[key]
+
+    # -------------------------------------------------------------------------
+    def _merge_cached_context_metadata(
+        self,
+        *,
+        provider: str,
+        model_name: str,
+        ollama_url: str,
+        metadata: dict[str, object],
+    ) -> None:
+        normalized_url = self.normalize_ollama_url(ollama_url)
+        with self._catalog_lock:
+            caches = [self._dynamic_catalog_cache.get(provider)]
+            if provider == "ollama":
+                caches.append(self._ollama_model_cache.get(normalized_url))
+            for cached in caches:
+                if cached is None:
+                    continue
+                for descriptor in cached.models:
+                    if descriptor.provider == provider and descriptor.name == model_name:
+                        descriptor.metadata.update(metadata)
 
     # -------------------------------------------------------------------------
     @staticmethod

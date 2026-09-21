@@ -31,6 +31,23 @@ describe('pages/geospatial-page.component', () => {
     ...overrides,
   });
 
+  const selectContextProfile = (
+    component: GeospatialPageComponent,
+    provider = 'test',
+    model = 'runtime-model',
+    contextWindow: number | null = 4096,
+  ): void => {
+    component.isContextProfileLoading = false;
+    component.selectedModelContext = {
+      provider,
+      model,
+      context_window_tokens: contextWindow,
+      maximum_output_tokens: null,
+      context_profile_source: contextWindow === null ? 'unknown' : 'provider_metadata',
+      context_metadata_authority: contextWindow === null ? 'unknown' : 'provider',
+    };
+  };
+
   const stagePendingRender = (component: GeospatialPageComponent): void => {
     component.conversationId = 'conv-1';
     component.activeRunId = 'run-1';
@@ -180,13 +197,14 @@ describe('pages/geospatial-page.component', () => {
         selected_context_window: 2048,
         model_context_limit: 8192,
         usage_percent: 5.9,
-        provider: 'ollama',
-        model: 'llama3.2',
+        provider: 'openai',
+        model: 'gpt-4.1',
       },
     }));
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    selectContextProfile(component, 'openai', 'gpt-4.1', 1_047_576);
     component.composerDraft = 'show map';
     await component.sendMessage();
     expect(component.status).toBe('Agent ready');
@@ -904,6 +922,7 @@ describe('pages/geospatial-page.component', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    selectContextProfile(component, 'opencode-go', 'deepseek-v4-flash', null);
     component.conversationId = 'conv-1';
     component.messages = [{ role: 'user', content: 'Show the requested data.' }];
     component['handleRunEvent']({
@@ -944,7 +963,7 @@ describe('pages/geospatial-page.component', () => {
     expect(component.lastOperation?.kind).toBe('error');
     expect(component.presentationStatus).toBe('not_requested');
     expect(component.contextUsage?.estimated_input_tokens).toBe(321);
-    expect(component.contextUsageLabel).toBe('Context limit unavailable');
+    expect(component.contextUsageLabel).toBe('Unavailable');
     expect(component.contextUsageDetail).toContain('max context unavailable');
     expect(component.contextUsageDetail.toLowerCase()).not.toContain('token');
     expect(component.runFailureSummary).toBe('The selected model or data provider could not complete the request.');
@@ -1150,7 +1169,8 @@ describe('pages/geospatial-page.component', () => {
     await fixture.whenStable();
     const component = fixture.componentInstance;
 
-    expect(component.contextUsage?.selected_context_window).toBe(1_047_576);
+    expect(component.selectedModelContext?.context_window_tokens).toBe(1_047_576);
+    expect(component.contextUsageLabel).toBe('1.05M tokens');
     expect(component.contextUsageDetail).toMatch(/max context 1[,.]047[,.]576/);
     const footer = fixture.nativeElement.querySelector('.workspace-status-bar') as HTMLElement | null;
     expect(footer).not.toBeNull();
@@ -1260,9 +1280,9 @@ describe('pages/geospatial-page.component', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    expect(fixture.componentInstance.contextUsage?.selected_context_window).toBe(40_960);
-    expect(fixture.componentInstance.contextUsage?.provider).toBe('ollama');
-    expect(fixture.componentInstance.contextUsage?.model).toBe('qwen3.5:2b');
+    expect(fixture.componentInstance.selectedModelContext?.context_window_tokens).toBe(40_960);
+    expect(fixture.componentInstance.selectedModelContext?.provider).toBe('ollama');
+    expect(fixture.componentInstance.selectedModelContext?.model).toBe('qwen3.5:2b');
   });
 
   it('distinguishes estimated, provider-reported, unknown-cap, and unmeasured states', async () => {
@@ -1270,6 +1290,7 @@ describe('pages/geospatial-page.component', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
+    selectContextProfile(component);
 
     component.contextUsage = {
       estimated_input_tokens: 300,
@@ -1294,6 +1315,7 @@ describe('pages/geospatial-page.component', () => {
     };
     expect(component.contextUsageLabel).toBe('9%');
 
+    selectContextProfile(component, 'test', 'runtime-model', null);
     component.contextUsage = {
       estimated_input_tokens: 321,
       selected_context_window: null,
@@ -1304,11 +1326,12 @@ describe('pages/geospatial-page.component', () => {
       usage_source: 'estimated',
     };
     fixture.detectChanges();
-    expect(component.contextUsageLabel).toBe('Context limit unavailable');
+    expect(component.contextUsageLabel).toBe('Unavailable');
     expect(component.contextUsageDetail).toContain('max context unavailable');
     expect(component.contextUsageDetail.toLowerCase()).not.toContain('token');
     expect(fixture.nativeElement.querySelector('.context-window-row progress')).toBeNull();
 
+    selectContextProfile(component);
     component.contextUsage = {
       estimated_input_tokens: 0,
       selected_context_window: 4096,
@@ -1318,7 +1341,7 @@ describe('pages/geospatial-page.component', () => {
       model: 'runtime-model',
       usage_source: 'not_measured',
     };
-    expect(component.contextUsageLabel).toBe('No request measured');
+    expect(component.contextUsageLabel).toBe('4.1K tokens');
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.context-window-row progress')).toBeNull();
   });
@@ -1327,6 +1350,7 @@ describe('pages/geospatial-page.component', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    selectContextProfile(component);
 
     component.contextUsage = {
       estimated_input_tokens: 300,
@@ -1352,6 +1376,7 @@ describe('pages/geospatial-page.component', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    selectContextProfile(component);
 
     component.contextUsage = {
       estimated_input_tokens: 5000,
@@ -1374,6 +1399,7 @@ describe('pages/geospatial-page.component', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    selectContextProfile(component);
     component.conversationId = 'conv-1';
     component.activeRunId = 'run-1';
     component.status = 'Calling a relevant tool';
@@ -1413,6 +1439,7 @@ describe('pages/geospatial-page.component', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    selectContextProfile(component);
     const previous = {
       estimated_input_tokens: 240,
       reported_input_tokens: 220,

@@ -174,6 +174,31 @@ def test_go_catalog_marks_deepseek_v41_flash_as_live_chat_model(monkeypatch) -> 
     assert models[1].metadata["supports_tools"] is False
     assert captured["url"] == "https://opencode.ai/zen/go/v1/models"
 
+
+###############################################################################
+def test_opencode_normalizes_nested_documented_limits(monkeypatch) -> None:
+    def fake_get(url: str, **kwargs):  # noqa: ANN001, ARG001
+        return _Response(
+            {
+                "data": [
+                    {
+                        "id": "runtime-model",
+                        "owned_by": "opencode",
+                        "limit": {"context": 32_768, "output": 4096},
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr("server.services.llm.opencode_provider.httpx.get", fake_get)
+    model = OpenCodeProvider(
+        api_key="test-key", provider_name=OPENCODE_PROVIDER
+    ).list_models()[0]
+
+    assert model.metadata["context_window_tokens"] == 32_768
+    assert model.metadata["maximum_output_tokens"] == 4096
+    assert model.metadata["context_metadata_authority"] == "provider"
+
 ###############################################################################
 def test_structured_output_uses_single_function_mode(monkeypatch) -> None:
     client = _Client()
