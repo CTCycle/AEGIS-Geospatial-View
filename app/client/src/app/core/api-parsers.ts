@@ -45,6 +45,7 @@ import {
   ResolvedLocation,
   RunTraceEntry,
   RunTraceResponse,
+  RuntimeSettingsResponse,
   SelectedModelContext,
   StructuredProbeResponse,
   StructuredProbeStatus,
@@ -1572,6 +1573,117 @@ export const parseOllamaHealthResponse = (value: unknown): OllamaHealthResponse 
     ...record,
     ok: record.ok as boolean | null,
     detail: requireApiStringOrNull(record, 'detail', endpoint),
+  };
+};
+
+const requireApiStringMap = (
+  record: Record<string, unknown>,
+  field: string,
+  endpoint: string,
+): Record<string, string> => {
+  const mapRecord = requireApiRecord(record[field], endpoint, field);
+  const result: Record<string, string> = {};
+  Object.keys(mapRecord).forEach((key) => {
+    result[key] = requireApiString(mapRecord, key, endpoint);
+  });
+  return result;
+};
+
+const parseRuntimeBlock = <T extends object>(
+  value: unknown,
+  endpoint: string,
+  field: string,
+  stringFields: readonly string[],
+  numberFields: readonly string[],
+  mapFields: readonly string[] = [],
+): T => {
+  const record = requireApiRecord(value, endpoint, field);
+  const result: Record<string, unknown> = {};
+  stringFields.forEach((name) => {
+    result[name] = requireApiString(record, name, endpoint);
+  });
+  numberFields.forEach((name) => {
+    result[name] = requireApiNumber(record, name, endpoint);
+  });
+  mapFields.forEach((name) => {
+    result[name] = requireApiStringMap(record, name, endpoint);
+  });
+  return result as T;
+};
+
+export const parseRuntimeSettingsResponse = (value: unknown): RuntimeSettingsResponse => {
+  const endpoint = 'runtime settings';
+  const record = requireApiRecord(value, endpoint);
+  return {
+    schema_version: requireApiNumber(record, 'schema_version', endpoint),
+    nominatim: parseRuntimeBlock<RuntimeSettingsResponse['nominatim']>(
+      record.nominatim,
+      endpoint,
+      'nominatim',
+      ['base_url', 'user_agent'],
+      ['timeout'],
+    ),
+    geospatial: parseRuntimeBlock<RuntimeSettingsResponse['geospatial']>(
+      record.geospatial,
+      endpoint,
+      'geospatial',
+      [],
+      ['min_timeline_year', 'max_lat', 'min_lat', 'max_lon', 'min_lon', 'max_mercator_extent'],
+    ),
+    map: parseRuntimeBlock<RuntimeSettingsResponse['map']>(record.map, endpoint, 'map', ['tiles'], ['default_size_m', 'render_delay_s']),
+    jobs: parseRuntimeBlock<RuntimeSettingsResponse['jobs']>(record.jobs, endpoint, 'jobs', [], ['polling_interval']),
+    chat: parseRuntimeBlock<RuntimeSettingsResponse['chat']>(record.chat, endpoint, 'chat', ['application_timezone'], ['max_history_messages']),
+    openmeteo: parseRuntimeBlock<RuntimeSettingsResponse['openmeteo']>(
+      record.openmeteo,
+      endpoint,
+      'openmeteo',
+      ['weather_base_url', 'air_quality_base_url', 'user_agent'],
+      ['timeout', 'cache_ttl_s', 'min_call_interval_s'],
+    ),
+    overpass: parseRuntimeBlock<RuntimeSettingsResponse['overpass']>(
+      record.overpass,
+      endpoint,
+      'overpass',
+      ['base_url', 'user_agent'],
+      ['timeout', 'cache_ttl_s', 'min_call_interval_s', 'default_radius_m', 'default_limit'],
+    ),
+    rainviewer: parseRuntimeBlock<RuntimeSettingsResponse['rainviewer']>(
+      record.rainviewer,
+      endpoint,
+      'rainviewer',
+      ['metadata_url', 'user_agent'],
+      ['timeout', 'cache_ttl_s', 'min_call_interval_s', 'tile_color_scheme', 'tile_smooth', 'tile_snow'],
+    ),
+    gibs: parseRuntimeBlock<RuntimeSettingsResponse['gibs']>(
+      record.gibs,
+      endpoint,
+      'gibs',
+      ['user_agent', 'default_layer', 'layer_sync_user_agent'],
+      [
+        'timeout', 'capabilities_ttl_s', 'max_cache_entries', 'bbox_precision', 'retry_backoff_s',
+        'min_visual_radius_m', 'image_width', 'image_height', 'layer_sync_timeout',
+      ],
+      ['wms_base_endpoints', 'capabilities_endpoints', 'ows_namespaces'],
+    ),
+    agent_execution: parseRuntimeBlock<RuntimeSettingsResponse['agent_execution']>(
+      record.agent_execution,
+      endpoint,
+      'agent_execution',
+      [],
+      [
+        'initial_run_seconds', 'simple_seconds', 'complex_seconds', 'context_assembly_seconds',
+        'native_model_call_seconds', 'tool_execution_seconds', 'tool_absolute_seconds',
+        'map_assembly_seconds', 'persistence_seconds', 'render_ack_seconds', 'max_tool_result_chars',
+        'max_iterations', 'max_render_attempts', 'max_no_progress_corrections', 'simple_max_model_calls',
+        'complex_max_model_calls', 'simple_max_tool_calls', 'complex_max_tool_calls',
+        'simple_max_state_transitions', 'complex_max_state_transitions', 'max_parallel_tool_calls',
+        'max_consecutive_tool_failures', 'max_same_failed_fingerprint', 'max_route_corrections',
+        'max_validation_corrections', 'model_max_attempts', 'provider_max_attempts',
+        'retry_backoff_base_seconds', 'retry_backoff_max_seconds', 'provider_request_seconds',
+      ],
+    ),
+    restart_required: requireApiBoolean(record, 'restart_required', endpoint),
+    message: optionalApiString(record, 'message', endpoint) ?? null,
   };
 };
 

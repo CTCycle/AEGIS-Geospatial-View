@@ -1,6 +1,6 @@
 # State Preservation
 
-Last updated: 2026-09-05
+Last updated: 2026-09-21
 
 ## Overview
 
@@ -66,6 +66,13 @@ State is restored only when:
 - payload shape remains valid
 
 Otherwise the app falls back to `defaultAppState()`.
+
+Settings section selection is URL-owned rather than session-storage-owned. The
+`tab` query parameter deep-links to any Settings section (`models`,
+`model-providers`, `geospatial-access`, `application`, `map-search`,
+`data-sources`, or `agent-runtime`); missing and invalid values resolve to
+`models`. Runtime form drafts remain local to the active Settings page until an
+explicit save commits them through the runtime settings API.
 
 Late completion payloads with older context revisions are discarded. Numeric
 backend chat-session identifiers are neither restored nor transmitted.

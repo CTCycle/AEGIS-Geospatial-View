@@ -1,21 +1,18 @@
 <div class="settings-page">
   <div class="settings-page__content">
-    <nav class="settings-tabs" role="tablist" aria-label="Settings sections">
-      @for (tab of settingsTabs; track tab.id) {
+    <nav class="settings-sidebar" aria-label="Settings sections">
+      @for (section of settingsSections; track section.id) {
         <button
           type="button"
-          class="settings-tab"
-          [class.settings-tab--active]="isActiveTab(tab.id)"
-          [id]="'settings-tab-' + tab.id"
-          role="tab"
-          [attr.aria-selected]="isActiveTab(tab.id)"
-          [attr.aria-controls]="'settings-panel-' + tab.id"
-          [attr.tabindex]="isActiveTab(tab.id) ? 0 : -1"
-          (click)="setSettingsTab(tab.id)"
-          (keydown)="onSettingsTabKeydown($event, tab.id)"
-        >{{ tab.label }}</button>
+          class="settings-sidebar__item"
+          [class.settings-sidebar__item--active]="isActiveSection(section.id)"
+          [attr.aria-current]="isActiveSection(section.id) ? 'page' : null"
+          (click)="setSettingsSection(section.id)"
+        >{{ section.label }}</button>
       }
     </nav>
+
+    <main class="settings-page__main">
 
     @if (unavailableAssignedOllamaModels.length > 0) {
       <section
@@ -28,7 +25,7 @@
         [message]="unavailableAssignedOllamaModelsMessage"
       ></section>
     }
-    @if (dynamicProviderLoadFailed && activeTab === 'models') {
+    @if (dynamicProviderLoadFailed && activeSection === 'models') {
       <section
         appSettingsWarning
         class="settings-page__warning"
@@ -40,13 +37,10 @@
       ></section>
     }
 
-    @if (activeTab === 'models') {
+    @if (activeSection === 'models') {
       <section
         id="settings-panel-models"
-        class="settings-page__tab-panel settings-page__tab-panel--models"
-        role="tabpanel"
-        aria-labelledby="settings-tab-models"
-        tabindex="0"
+        class="settings-page__section-panel settings-page__section-panel--models"
       >
         <div class="settings-page__layout">
           <section class="settings-page__left-column">
@@ -104,7 +98,7 @@
                   <h2>{{ dynamicProviderLoadFailed ? dynamicProviderLabel + ' models unavailable' : 'No models match this filter' }}</h2>
                   <p>{{ dynamicProviderLoadFailed ? dynamicProviderFailureMessage : 'Adjust the provider tabs or search query to show available models.' }}</p>
                   @if (dynamicProviderLoadFailed) {
-                    <button type="button" class="settings-page__inline-link" (click)="setSettingsTab('model-providers')">Open Model Providers</button>
+                    <button type="button" class="settings-page__inline-link" (click)="setSettingsSection('model-providers')">Open Model Providers</button>
                   }
                 </section>
               } @else {
@@ -161,13 +155,10 @@
       </section>
     }
 
-    @if (activeTab === 'model-providers') {
+    @if (activeSection === 'model-providers') {
       <section
         id="settings-panel-model-providers"
-        class="settings-page__tab-panel settings-page__tab-panel--providers"
-        role="tabpanel"
-        aria-labelledby="settings-tab-model-providers"
-        tabindex="0"
+        class="settings-page__section-panel settings-page__section-panel--providers"
       >
         <section class="settings-section" aria-labelledby="model-provider-heading">
           <header class="settings-section__header">
@@ -177,7 +168,7 @@
               <p>Save provider credentials to discover account-visible models. A readable saved key is not proof that a provider endpoint is reachable.</p>
             </div>
           </header>
-          <div class="settings-provider-grid">
+          <div class="settings-provider-list">
             @for (provider of cloudProviders; track provider.id) {
               <article class="settings-provider-card">
                 <header class="settings-provider-card__header">
@@ -237,13 +228,10 @@
       </section>
     }
 
-    @if (activeTab === 'geospatial-access') {
+    @if (activeSection === 'geospatial-access') {
       <section
         id="settings-panel-geospatial-access"
-        class="settings-page__tab-panel settings-page__tab-panel--providers"
-        role="tabpanel"
-        aria-labelledby="settings-tab-geospatial-access"
-        tabindex="0"
+        class="settings-page__section-panel settings-page__section-panel--providers"
       >
         <section class="settings-section" aria-labelledby="geospatial-access-heading">
           <header class="settings-section__header">
@@ -317,7 +305,318 @@
       </section>
     }
 
+    @if (activeSection === 'application') {
+      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="application-settings-heading">
+        <section class="settings-section">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Runtime settings</p>
+              <h2 id="application-settings-heading">Application</h2>
+              <p>Control conversation history, timezone handling, and background job polling. Changes are validated and stored atomically.</p>
+            </div>
+          </header>
+          <div class="runtime-settings__fields">
+            <label>Maximum history messages
+              <input class="settings-control" type="number" min="1" max="100" [(ngModel)]="runtimeSettingsDraft.chat.max_history_messages" />
+            </label>
+            <label>Application timezone
+              <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.chat.application_timezone" />
+            </label>
+            <label>Job polling interval (seconds)
+              <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.jobs.polling_interval" />
+            </label>
+          </div>
+          <div class="settings-actions">
+            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save application settings' }}</button>
+          </div>
+        </section>
+      </section>
+    }
+
+    @if (activeSection === 'map-search') {
+      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="map-search-settings-heading">
+        <section class="settings-section">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Runtime settings</p>
+              <h2 id="map-search-settings-heading">Map &amp; Search</h2>
+              <p>Configure the default map request, geospatial bounds, and the Nominatim search endpoint used by location resolution.</p>
+            </div>
+          </header>
+          <div class="runtime-settings__group">
+            <h3>Map defaults</h3>
+            <div class="runtime-settings__fields">
+              <label>Default map size (m)
+                <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.map.default_size_m" />
+              </label>
+              <label>Render delay (seconds)
+                <input class="settings-control" type="number" min="0" step="0.1" [(ngModel)]="runtimeSettingsDraft.map.render_delay_s" />
+              </label>
+              <label>Tile source
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.map.tiles" />
+              </label>
+            </div>
+          </div>
+          <div class="runtime-settings__group">
+            <h3>Search endpoint</h3>
+            <div class="runtime-settings__fields">
+              <label>Nominatim base URL
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.nominatim.base_url" />
+              </label>
+              <label>User agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.nominatim.user_agent" />
+              </label>
+              <label>Request timeout (seconds)
+                <input class="settings-control" type="number" min="1" step="0.1" [(ngModel)]="runtimeSettingsDraft.nominatim.timeout" />
+              </label>
+            </div>
+          </div>
+          <div class="runtime-settings__group">
+            <h3>Geospatial bounds</h3>
+            <div class="runtime-settings__fields">
+              <label>Minimum timeline year
+                <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.geospatial.min_timeline_year" />
+              </label>
+              <label>Minimum latitude
+                <input class="settings-control" type="number" min="-90" max="90" step="0.01" [(ngModel)]="runtimeSettingsDraft.geospatial.min_lat" />
+              </label>
+              <label>Maximum latitude
+                <input class="settings-control" type="number" min="-90" max="90" step="0.01" [(ngModel)]="runtimeSettingsDraft.geospatial.max_lat" />
+              </label>
+              <label>Minimum longitude
+                <input class="settings-control" type="number" min="-180" max="180" step="0.01" [(ngModel)]="runtimeSettingsDraft.geospatial.min_lon" />
+              </label>
+              <label>Maximum longitude
+                <input class="settings-control" type="number" min="-180" max="180" step="0.01" [(ngModel)]="runtimeSettingsDraft.geospatial.max_lon" />
+              </label>
+              <label>Maximum Mercator extent
+                <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.geospatial.max_mercator_extent" />
+              </label>
+            </div>
+          </div>
+          <div class="settings-actions">
+            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save map &amp; search settings' }}</button>
+          </div>
+        </section>
+      </section>
+    }
+
+    @if (activeSection === 'data-sources') {
+      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="data-source-settings-heading">
+        <section class="settings-section">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Runtime settings</p>
+              <h2 id="data-source-settings-heading">Data Sources</h2>
+              <p>Keep provider endpoints, request pacing, cache lifetimes, and GIBS layer mappings in one auditable settings surface.</p>
+            </div>
+          </header>
+          <div class="runtime-settings__group">
+            <h3>Open-Meteo</h3>
+            <div class="runtime-settings__fields">
+              <label>Weather base URL
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.openmeteo.weather_base_url" />
+              </label>
+              <label>Air quality base URL
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.openmeteo.air_quality_base_url" />
+              </label>
+              <label>User agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.openmeteo.user_agent" />
+              </label>
+              <label>Timeout (seconds)
+                <input class="settings-control" type="number" min="1" step="0.1" [(ngModel)]="runtimeSettingsDraft.openmeteo.timeout" />
+              </label>
+              <label>Cache TTL (seconds)
+                <input class="settings-control" type="number" min="30" [(ngModel)]="runtimeSettingsDraft.openmeteo.cache_ttl_s" />
+              </label>
+              <label>Minimum call interval (seconds)
+                <input class="settings-control" type="number" min="0.05" step="0.05" [(ngModel)]="runtimeSettingsDraft.openmeteo.min_call_interval_s" />
+              </label>
+            </div>
+          </div>
+          <div class="runtime-settings__group">
+            <h3>Overpass</h3>
+            <div class="runtime-settings__fields">
+              <label>Base URL
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.overpass.base_url" />
+              </label>
+              <label>User agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.overpass.user_agent" />
+              </label>
+              <label>Timeout (seconds)
+                <input class="settings-control" type="number" min="1" step="0.1" [(ngModel)]="runtimeSettingsDraft.overpass.timeout" />
+              </label>
+              <label>Cache TTL (seconds)
+                <input class="settings-control" type="number" min="30" [(ngModel)]="runtimeSettingsDraft.overpass.cache_ttl_s" />
+              </label>
+              <label>Minimum call interval (seconds)
+                <input class="settings-control" type="number" min="0.05" step="0.05" [(ngModel)]="runtimeSettingsDraft.overpass.min_call_interval_s" />
+              </label>
+              <label>Default radius (m)
+                <input class="settings-control" type="number" min="100" [(ngModel)]="runtimeSettingsDraft.overpass.default_radius_m" />
+              </label>
+              <label>Default result limit
+                <input class="settings-control" type="number" min="1" max="200" [(ngModel)]="runtimeSettingsDraft.overpass.default_limit" />
+              </label>
+            </div>
+          </div>
+          <div class="runtime-settings__group">
+            <h3>RainViewer</h3>
+            <div class="runtime-settings__fields">
+              <label>Metadata URL
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.rainviewer.metadata_url" />
+              </label>
+              <label>User agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.rainviewer.user_agent" />
+              </label>
+              <label>Timeout (seconds)
+                <input class="settings-control" type="number" min="1" step="0.1" [(ngModel)]="runtimeSettingsDraft.rainviewer.timeout" />
+              </label>
+              <label>Cache TTL (seconds)
+                <input class="settings-control" type="number" min="30" [(ngModel)]="runtimeSettingsDraft.rainviewer.cache_ttl_s" />
+              </label>
+              <label>Minimum call interval (seconds)
+                <input class="settings-control" type="number" min="0.05" step="0.05" [(ngModel)]="runtimeSettingsDraft.rainviewer.min_call_interval_s" />
+              </label>
+              <label>Tile color scheme
+                <input class="settings-control" type="number" min="0" max="6" [(ngModel)]="runtimeSettingsDraft.rainviewer.tile_color_scheme" />
+              </label>
+              <label class="settings-checkbox">Smooth tiles
+                <input type="checkbox" [ngModel]="runtimeSettingsDraft.rainviewer.tile_smooth === 1" (ngModelChange)="runtimeSettingsDraft.rainviewer.tile_smooth = $event ? 1 : 0" />
+              </label>
+              <label class="settings-checkbox">Show snow tiles
+                <input type="checkbox" [ngModel]="runtimeSettingsDraft.rainviewer.tile_snow === 1" (ngModelChange)="runtimeSettingsDraft.rainviewer.tile_snow = $event ? 1 : 0" />
+              </label>
+            </div>
+          </div>
+          <div class="runtime-settings__group">
+            <h3>GIBS layer mappings</h3>
+            <div class="runtime-settings__mapping-list">
+              <label>WMS EPSG:3857
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.wms_base_endpoints['EPSG:3857']" />
+              </label>
+              <label>WMS EPSG:4326
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.wms_base_endpoints['EPSG:4326']" />
+              </label>
+              <label>WMTS EPSG:4326 capabilities
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.capabilities_endpoints['EPSG:4326']" />
+              </label>
+              <label>WMTS EPSG:3857 capabilities
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.capabilities_endpoints['EPSG:3857']" />
+              </label>
+              <label>WMTS EPSG:3413 capabilities
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.capabilities_endpoints['EPSG:3413']" />
+              </label>
+              <label>WMTS EPSG:3031 capabilities
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.capabilities_endpoints['EPSG:3031']" />
+              </label>
+              <label>OWS namespace
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.ows_namespaces.ows" />
+              </label>
+            </div>
+            <div class="runtime-settings__fields">
+              <label>GIBS user agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.gibs.user_agent" />
+              </label>
+              <label>GIBS request timeout (seconds)
+                <input class="settings-control" type="number" min="1" step="0.1" [(ngModel)]="runtimeSettingsDraft.gibs.timeout" />
+              </label>
+              <label>Capabilities cache TTL (seconds)
+                <input class="settings-control" type="number" min="60" [(ngModel)]="runtimeSettingsDraft.gibs.capabilities_ttl_s" />
+              </label>
+              <label>Maximum cached entries
+                <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.gibs.max_cache_entries" />
+              </label>
+              <label>Bounding-box precision
+                <input class="settings-control" type="number" min="0" [(ngModel)]="runtimeSettingsDraft.gibs.bbox_precision" />
+              </label>
+              <label>Retry backoff (seconds)
+                <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.gibs.retry_backoff_s" />
+              </label>
+              <label>Minimum visual radius (m)
+                <input class="settings-control" type="number" min="1000" [(ngModel)]="runtimeSettingsDraft.gibs.min_visual_radius_m" />
+              </label>
+              <label>Image width
+                <input class="settings-control" type="number" min="256" [(ngModel)]="runtimeSettingsDraft.gibs.image_width" />
+              </label>
+              <label>Image height
+                <input class="settings-control" type="number" min="256" [(ngModel)]="runtimeSettingsDraft.gibs.image_height" />
+              </label>
+              <label>Default layer
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.gibs.default_layer" />
+              </label>
+              <label>Layer sync user agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.gibs.layer_sync_user_agent" />
+              </label>
+              <label>Layer sync timeout (seconds)
+                <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.gibs.layer_sync_timeout" />
+              </label>
+            </div>
+          </div>
+          <div class="settings-actions">
+            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save data source settings' }}</button>
+          </div>
+        </section>
+      </section>
+    }
+
+    @if (activeSection === 'agent-runtime') {
+      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="agent-runtime-settings-heading">
+        <section class="settings-section">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Runtime settings</p>
+              <h2 id="agent-runtime-settings-heading">Agent Runtime</h2>
+              <p>Adjust execution budgets, correction limits, and retry behavior used by the native agent loop.</p>
+            </div>
+          </header>
+          <div class="runtime-settings__fields runtime-settings__fields--wide">
+            <label>Initial run seconds <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.initial_run_seconds" /></label>
+            <label>Simple run seconds <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_seconds" /></label>
+            <label>Complex run seconds <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_seconds" /></label>
+            <label>Context assembly seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.context_assembly_seconds" /></label>
+            <label>Native model call seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.native_model_call_seconds" /></label>
+            <label>Tool execution seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_execution_seconds" /></label>
+            <label>Tool absolute seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_absolute_seconds" /></label>
+            <label>Map assembly seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.map_assembly_seconds" /></label>
+            <label>Persistence seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.persistence_seconds" /></label>
+            <label>Render acknowledgement seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.render_ack_seconds" /></label>
+            <label>Maximum tool result characters <input class="settings-control" type="number" min="128" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_tool_result_chars" /></label>
+            <label>Maximum iterations <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_iterations" /></label>
+            <label>Maximum render attempts <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_render_attempts" /></label>
+            <label>No-progress corrections <input class="settings-control" type="number" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_no_progress_corrections" /></label>
+            <label>Simple model calls <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_model_calls" /></label>
+            <label>Complex model calls <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_model_calls" /></label>
+            <label>Simple tool calls <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_tool_calls" /></label>
+            <label>Complex tool calls <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_tool_calls" /></label>
+            <label>Simple state transitions <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_state_transitions" /></label>
+            <label>Complex state transitions <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_state_transitions" /></label>
+            <label>Maximum parallel tool calls <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_parallel_tool_calls" /></label>
+            <label>Consecutive tool failures <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_consecutive_tool_failures" /></label>
+            <label>Same failed fingerprint limit <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_same_failed_fingerprint" /></label>
+            <label>Route corrections <input class="settings-control" type="number" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_route_corrections" /></label>
+            <label>Validation corrections <input class="settings-control" type="number" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_validation_corrections" /></label>
+            <label>Model attempts <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.model_max_attempts" /></label>
+            <label>Provider attempts <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_max_attempts" /></label>
+            <label>Retry backoff base seconds <input class="settings-control" type="number" min="0" step="0.05" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_base_seconds" /></label>
+            <label>Retry backoff max seconds <input class="settings-control" type="number" min="0" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_max_seconds" /></label>
+            <label>Provider request seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_request_seconds" /></label>
+          </div>
+          <div class="settings-actions">
+            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save agent runtime settings' }}</button>
+          </div>
+        </section>
+      </section>
+    }
+
     <footer class="settings-page__status" role="status" aria-live="polite">{{ visibleStatusText }}</footer>
+    @if (runtimeSettingsError) {
+      <p class="settings-inline-status settings-inline-status--error" role="alert">{{ runtimeSettingsError }}</p>
+    }
+    @if (runtimeRestartRequired) {
+      <p class="settings-inline-status" role="status" aria-live="polite">Runtime settings saved. Restart AEGIS to apply the changes to active services.</p>
+    }
+    </main>
   </div>
 
   @if (isSignupModalOpen && selectedProviderAccountSetup; as setup) {

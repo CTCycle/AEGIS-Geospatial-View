@@ -3,7 +3,7 @@ from __future__ import annotations
 from alembic import context
 from sqlalchemy.engine import Connection
 
-from server.configurations import get_server_settings
+from server.configurations import build_database_settings, ensure_environment_loaded
 from server.repositories.database.engine import build_engine
 from server.repositories.schemas import Base
 
@@ -38,8 +38,8 @@ def _include_object(
 
 ###############################################################################
 def run_migrations_offline() -> None:
-    settings = get_server_settings()
-    engine = build_engine(settings.database)
+    ensure_environment_loaded()
+    engine = build_engine(build_database_settings())
     try:
         context.configure(
             url=str(engine.url),
@@ -62,8 +62,8 @@ def run_migrations_online() -> None:
         _run_migrations(connection)
         return
 
-    settings = get_server_settings()
-    connectable = build_engine(settings.database)
+    ensure_environment_loaded()
+    connectable = build_engine(build_database_settings())
     try:
         with connectable.connect() as connection:
             _run_migrations(connection)

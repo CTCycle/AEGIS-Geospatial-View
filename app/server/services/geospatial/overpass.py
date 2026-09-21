@@ -13,7 +13,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from server.configurations import get_server_settings
+from server.configurations.settings import JsonOverpassSettings, OverpassSettings
 from server.services.geospatial.providers.base import (
     ProviderError,
     ProviderInvalidQueryError,
@@ -114,6 +114,7 @@ class OverpassService:
     def __init__(
         self,
         *,
+        settings: OverpassSettings | None = None,
         base_url: str | None = None,
         user_agent: str | None = None,
         timeout_s: float | None = None,
@@ -122,27 +123,31 @@ class OverpassService:
         default_radius_m: float | None = None,
         default_limit: int | None = None,
     ) -> None:
-        settings = get_server_settings().overpass
-        self.base_url = base_url or settings.base_url
-        self.user_agent = user_agent or settings.user_agent
-        self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
+        configured = settings or OverpassSettings(
+            **JsonOverpassSettings().model_dump()
+        )
+        self.base_url = base_url or configured.base_url
+        self.user_agent = user_agent or configured.user_agent
+        self.timeout_s = timeout_s if timeout_s is not None else configured.timeout
         self.cache_ttl_s = max(
-            cache_ttl_s if cache_ttl_s is not None else settings.cache_ttl_s, 30.0
+            cache_ttl_s if cache_ttl_s is not None else configured.cache_ttl_s,
+            30.0,
         )
         self.min_call_interval_s = max(
             min_call_interval_s
             if min_call_interval_s is not None
-            else settings.min_call_interval_s,
+            else configured.min_call_interval_s,
             0.05,
         )
         self.default_radius_m = max(
             default_radius_m
             if default_radius_m is not None
-            else settings.default_radius_m,
+            else configured.default_radius_m,
             100.0,
         )
         self.default_limit = max(
-            1, default_limit if default_limit is not None else settings.default_limit
+            1,
+            default_limit if default_limit is not None else configured.default_limit,
         )
         self._lock = threading.Lock()
         self._cache: dict[str, tuple[float, dict[str, Any]]] = {}

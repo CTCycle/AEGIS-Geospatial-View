@@ -95,7 +95,9 @@ def build_chat_runtime(
     )
     settings_service.structured_probe_service = structured_probe_service
     model_library_service.set_structured_probe_service(structured_probe_service)
-    location_resolver = LocationResolver()
+    location_resolver = LocationResolver(
+        nominatim_service=geospatial_runtime.nominatim_service
+    )
     policy_engine = PolicyEngine(
         location_resolver=location_resolver,
         capability_registry=capability_registry,

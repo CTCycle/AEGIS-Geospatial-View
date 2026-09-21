@@ -996,6 +996,146 @@ export interface ModelSettingsUpdateRequest {
   credentials: Record<string, { api_key?: string }>;
 }
 
+export interface RuntimeNominatimSettings {
+  base_url: string;
+  user_agent: string;
+  timeout: number;
+}
+
+export interface RuntimeGeospatialSettings {
+  min_timeline_year: number;
+  max_lat: number;
+  min_lat: number;
+  max_lon: number;
+  min_lon: number;
+  max_mercator_extent: number;
+}
+
+export interface RuntimeMapSettings {
+  default_size_m: number;
+  render_delay_s: number;
+  tiles: string;
+}
+
+export interface RuntimeJobsSettings {
+  polling_interval: number;
+}
+
+export interface RuntimeChatSettings {
+  max_history_messages: number;
+  application_timezone: string;
+}
+
+export interface RuntimeOpenMeteoSettings {
+  weather_base_url: string;
+  air_quality_base_url: string;
+  user_agent: string;
+  timeout: number;
+  cache_ttl_s: number;
+  min_call_interval_s: number;
+}
+
+export interface RuntimeOverpassSettings {
+  base_url: string;
+  user_agent: string;
+  timeout: number;
+  cache_ttl_s: number;
+  min_call_interval_s: number;
+  default_radius_m: number;
+  default_limit: number;
+}
+
+export interface RuntimeRainViewerSettings {
+  metadata_url: string;
+  user_agent: string;
+  timeout: number;
+  cache_ttl_s: number;
+  min_call_interval_s: number;
+  tile_color_scheme: number;
+  tile_smooth: number;
+  tile_snow: number;
+}
+
+export interface RuntimeGibsSettings {
+  user_agent: string;
+  timeout: number;
+  capabilities_ttl_s: number;
+  max_cache_entries: number;
+  bbox_precision: number;
+  wms_base_endpoints: Record<string, string>;
+  retry_backoff_s: number;
+  min_visual_radius_m: number;
+  image_width: number;
+  image_height: number;
+  default_layer: string;
+  capabilities_endpoints: Record<string, string>;
+  ows_namespaces: Record<string, string>;
+  layer_sync_user_agent: string;
+  layer_sync_timeout: number;
+}
+
+export interface RuntimeAgentExecutionSettings {
+  initial_run_seconds: number;
+  simple_seconds: number;
+  complex_seconds: number;
+  context_assembly_seconds: number;
+  native_model_call_seconds: number;
+  tool_execution_seconds: number;
+  tool_absolute_seconds: number;
+  map_assembly_seconds: number;
+  persistence_seconds: number;
+  render_ack_seconds: number;
+  max_tool_result_chars: number;
+  max_iterations: number;
+  max_render_attempts: number;
+  max_no_progress_corrections: number;
+  simple_max_model_calls: number;
+  complex_max_model_calls: number;
+  simple_max_tool_calls: number;
+  complex_max_tool_calls: number;
+  simple_max_state_transitions: number;
+  complex_max_state_transitions: number;
+  max_parallel_tool_calls: number;
+  max_consecutive_tool_failures: number;
+  max_same_failed_fingerprint: number;
+  max_route_corrections: number;
+  max_validation_corrections: number;
+  model_max_attempts: number;
+  provider_max_attempts: number;
+  retry_backoff_base_seconds: number;
+  retry_backoff_max_seconds: number;
+  provider_request_seconds: number;
+}
+
+export interface RuntimeSettingsResponse {
+  schema_version: number;
+  nominatim: RuntimeNominatimSettings;
+  geospatial: RuntimeGeospatialSettings;
+  map: RuntimeMapSettings;
+  jobs: RuntimeJobsSettings;
+  chat: RuntimeChatSettings;
+  openmeteo: RuntimeOpenMeteoSettings;
+  overpass: RuntimeOverpassSettings;
+  rainviewer: RuntimeRainViewerSettings;
+  gibs: RuntimeGibsSettings;
+  agent_execution: RuntimeAgentExecutionSettings;
+  restart_required: boolean;
+  message: string | null;
+}
+
+export interface RuntimeSettingsUpdateRequest {
+  nominatim?: Partial<RuntimeNominatimSettings>;
+  geospatial?: Partial<RuntimeGeospatialSettings>;
+  map?: Partial<RuntimeMapSettings>;
+  jobs?: Partial<RuntimeJobsSettings>;
+  chat?: Partial<RuntimeChatSettings>;
+  openmeteo?: Partial<RuntimeOpenMeteoSettings>;
+  overpass?: Partial<RuntimeOverpassSettings>;
+  rainviewer?: Partial<RuntimeRainViewerSettings>;
+  gibs?: Partial<RuntimeGibsSettings>;
+  agent_execution?: Partial<RuntimeAgentExecutionSettings>;
+}
+
 export interface OllamaHealthResponse {
   ok: boolean | null;
   detail: string | null;

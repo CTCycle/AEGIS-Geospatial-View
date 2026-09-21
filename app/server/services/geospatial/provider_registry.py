@@ -117,6 +117,7 @@ class ProviderRegistry:
         providers: list[GeospatialProvider] | None = None,
         execution_policy: ProviderExecutionPolicy | None = None,
         credential_resolver: GeospatialCredentialResolver | None = None,
+        provider_factories: dict[str, ProviderFactory] | None = None,
     ) -> None:
         loader = manifest_loader or GeospatialManifestLoader()
         self.catalog_snapshot = (
@@ -125,6 +126,7 @@ class ProviderRegistry:
         )
         self.execution_policy = execution_policy or ProviderExecutionPolicy()
         self.credential_resolver = credential_resolver or GeospatialCredentialResolver()
+        self.provider_factories = provider_factories or PROVIDER_FACTORIES
         self._providers: dict[str, GeospatialProvider] = {}
         self._failures: dict[str, int] = {}
         self._circuit_opened_at: dict[str, float] = {}
@@ -429,7 +431,7 @@ class ProviderRegistry:
     def _provider_for_manifest(
         self, provider_id: str, manifest: dict[str, Any]
     ) -> GeospatialProvider:
-        factory = PROVIDER_FACTORIES.get(provider_id)
+        factory = self.provider_factories.get(provider_id)
         if factory is not None:
             credential = self.credential_resolver.resolve(provider_id, mark_used=True)
             return factory(credential)

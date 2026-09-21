@@ -44,24 +44,146 @@ import {
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
+  RuntimeSettingsResponse,
+  RuntimeSettingsUpdateRequest,
   StructuredProbeResponse,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
 
-export type SettingsTab = 'models' | 'model-providers' | 'geospatial-access';
+export type SettingsSectionId =
+  | 'models'
+  | 'model-providers'
+  | 'geospatial-access'
+  | 'application'
+  | 'map-search'
+  | 'data-sources'
+  | 'agent-runtime';
 
-export const SETTINGS_TABS: readonly { id: SettingsTab; label: string }[] = [
+export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; label: string }[] = [
   { id: 'models', label: 'Models' },
   { id: 'model-providers', label: 'Model Providers' },
   { id: 'geospatial-access', label: 'Geospatial Access' },
+  { id: 'application', label: 'Application' },
+  { id: 'map-search', label: 'Map & Search' },
+  { id: 'data-sources', label: 'Data Sources' },
+  { id: 'agent-runtime', label: 'Agent Runtime' },
 ];
 
-const normalizeSettingsTab = (value: string | null | undefined): SettingsTab => (
-  SETTINGS_TABS.some((tab) => tab.id === value)
-    ? value as SettingsTab
+const normalizeSettingsSection = (value: string | null | undefined): SettingsSectionId => (
+  SETTINGS_SECTIONS.some((section) => section.id === value)
+    ? value as SettingsSectionId
     : 'models'
 );
+
+const createDefaultRuntimeSettings = (): RuntimeSettingsResponse => ({
+  schema_version: 1,
+  nominatim: {
+    base_url: 'https://nominatim.openstreetmap.org/search',
+    user_agent: 'AEGIS-Geographics/1.0 (contact: support@aegis-geographics.local)',
+    timeout: 10,
+  },
+  geospatial: {
+    min_timeline_year: 1900,
+    max_lat: 90,
+    min_lat: -90,
+    max_lon: 180,
+    min_lon: -180,
+    max_mercator_extent: 20037508.3427892,
+  },
+  map: { default_size_m: 500, render_delay_s: 1, tiles: 'OpenStreetMap' },
+  jobs: { polling_interval: 1 },
+  chat: { max_history_messages: 12, application_timezone: 'UTC' },
+  openmeteo: {
+    weather_base_url: 'https://api.open-meteo.com/v1/forecast',
+    air_quality_base_url: 'https://air-quality-api.open-meteo.com/v1/air-quality',
+    user_agent: 'AEGIS-OpenMeteo/1.0',
+    timeout: 15,
+    cache_ttl_s: 600,
+    min_call_interval_s: 0.15,
+  },
+  overpass: {
+    base_url: 'https://overpass-api.de/api/interpreter',
+    user_agent: 'AEGIS-Overpass/1.0',
+    timeout: 20,
+    cache_ttl_s: 600,
+    min_call_interval_s: 0.2,
+    default_radius_m: 2500,
+    default_limit: 30,
+  },
+  rainviewer: {
+    metadata_url: 'https://api.rainviewer.com/public/weather-maps.json',
+    user_agent: 'AEGIS-RainViewer/1.0',
+    timeout: 15,
+    cache_ttl_s: 300,
+    min_call_interval_s: 0.2,
+    tile_color_scheme: 2,
+    tile_smooth: 1,
+    tile_snow: 1,
+  },
+  gibs: {
+    user_agent: 'AEGIS-GIBS/1.0',
+    timeout: 20,
+    capabilities_ttl_s: 21600,
+    max_cache_entries: 24,
+    bbox_precision: 6,
+    wms_base_endpoints: {
+      'EPSG:3857': 'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi',
+      'EPSG:4326': 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi',
+    },
+    retry_backoff_s: 2,
+    min_visual_radius_m: 20000,
+    image_width: 1024,
+    image_height: 1024,
+    default_layer: 'VIIRS_SNPP_CorrectedReflectance_TrueColor',
+    capabilities_endpoints: {
+      'EPSG:4326': 'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/1.0.0/WMTSCapabilities.xml',
+      'EPSG:3857': 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml',
+      'EPSG:3413': 'https://gibs.earthdata.nasa.gov/wmts/epsg3413/best/1.0.0/WMTSCapabilities.xml',
+      'EPSG:3031': 'https://gibs.earthdata.nasa.gov/wmts/epsg3031/best/1.0.0/WMTSCapabilities.xml',
+    },
+    ows_namespaces: { ows: 'http://www.opengis.net/ows/1.1' },
+    layer_sync_user_agent: 'AEGIS-GIBS-LayerSync/1.0',
+    layer_sync_timeout: 30,
+  },
+  agent_execution: {
+    initial_run_seconds: 90,
+    simple_seconds: 150,
+    complex_seconds: 300,
+    context_assembly_seconds: 5,
+    native_model_call_seconds: 60,
+    tool_execution_seconds: 45,
+    tool_absolute_seconds: 90,
+    map_assembly_seconds: 20,
+    persistence_seconds: 5,
+    render_ack_seconds: 90,
+    max_tool_result_chars: 4096,
+    max_iterations: 12,
+    max_render_attempts: 3,
+    max_no_progress_corrections: 2,
+    simple_max_model_calls: 4,
+    complex_max_model_calls: 10,
+    simple_max_tool_calls: 6,
+    complex_max_tool_calls: 20,
+    simple_max_state_transitions: 32,
+    complex_max_state_transitions: 64,
+    max_parallel_tool_calls: 8,
+    max_consecutive_tool_failures: 3,
+    max_same_failed_fingerprint: 2,
+    max_route_corrections: 1,
+    max_validation_corrections: 2,
+    model_max_attempts: 2,
+    provider_max_attempts: 2,
+    retry_backoff_base_seconds: 0.25,
+    retry_backoff_max_seconds: 2,
+    provider_request_seconds: 10,
+  },
+  restart_required: false,
+  message: null,
+});
+
+const cloneRuntimeSettings = (settings: RuntimeSettingsResponse): RuntimeSettingsResponse =>
+  JSON.parse(JSON.stringify(settings)) as RuntimeSettingsResponse;
 
 interface GeoProviderAccess {
   id: string;
@@ -92,7 +214,7 @@ interface GeoProviderAccess {
 export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('modelGridScroll', { static: false }) modelGridRef?: ElementRef<HTMLDivElement>;
 
-  readonly settingsTabs = SETTINGS_TABS;
+  readonly settingsSections = SETTINGS_SECTIONS;
   readonly cloudProviders: readonly {
     id: CloudCredentialProvider;
     name: string;
@@ -106,7 +228,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     { id: 'opencode', name: 'OpenCode Zen', purpose: 'Discover and run OpenCode Zen OpenAI-compatible models.', placeholder: 'OpenCode API key', hint: 'OpenCode Zen model availability comes from its live account catalog.' },
     { id: 'opencode-go', name: 'OpenCode Go', purpose: 'Discover and run OpenCode Go OpenAI-compatible models.', placeholder: 'OpenCode API key', hint: 'DeepSeek V4.1 Flash is identified as deepseek-v4.1-flash when published by the live catalog.' },
   ];
-  activeTab: SettingsTab = 'models';
+  activeSection: SettingsSectionId = 'models';
   readonly state: PersistedSettingsPageState;
   settings: ModelSettingsResponse = {
     active_provider_mode: 'cloud',
@@ -162,6 +284,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   };
   isTestingStructuredProbe = false;
 
+  runtimeSettings: RuntimeSettingsResponse = createDefaultRuntimeSettings();
+  runtimeSettingsDraft: RuntimeSettingsResponse = cloneRuntimeSettings(this.runtimeSettings);
+  runtimeSettingsError = '';
+  isLoadingRuntimeSettings = false;
+  isSavingRuntimeSettings = false;
+  runtimeRestartRequired = false;
+
   providerFilter: ModelProviderFilter = 'all';
   private isDestroyed = false;
   private routerEventsSubscription?: Subscription;
@@ -178,7 +307,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.state = this.appStateStore.getSettingsPage();
     const query = new URLSearchParams(window.location.search);
     this.searchText = query.get('q') ?? this.state.searchText;
-    this.activeTab = normalizeSettingsTab(query.get('tab'));
+    this.activeSection = normalizeSettingsSection(query.get('tab'));
   }
 
   ngOnInit(): void {
@@ -191,6 +320,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     // load completes, so the public URL contract is stable on first paint.
     this.syncQueryState();
     void this.loadData();
+    void this.loadRuntimeSettings();
     void this.loadProviderAccountSetups();
     this.syncState();
   }
@@ -379,20 +509,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.dynamicProviderStatus?.message || `Could not load ${this.dynamicProviderLabel} models right now.`;
   }
 
-  isActiveTab(tab: SettingsTab): boolean {
-    return this.activeTab === tab;
+  isActiveSection(section: SettingsSectionId): boolean {
+    return this.activeSection === section;
   }
 
-  setSettingsTab(tab: string, focus = false): void {
-    const nextTab = normalizeSettingsTab(tab);
-    this.activeTab = nextTab;
-    if (focus && typeof window !== 'undefined') {
-      window.setTimeout(() => {
-        document.getElementById(`settings-tab-${nextTab}`)?.focus();
-      });
-    }
-    // Settings is the only component that owns this tab contract. Keep tab
-    // changes on the router so each selection is a browser-history entry.
+  setSettingsSection(section: string): void {
+    const nextSection = normalizeSettingsSection(section);
+    this.activeSection = nextSection;
     if (typeof window === 'undefined') {
       return;
     }
@@ -400,33 +523,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.searchText.trim()) {
       params.set('q', this.searchText.trim());
     }
-    if (nextTab !== 'models') {
-      params.set('tab', nextTab);
+    if (nextSection !== 'models') {
+      params.set('tab', nextSection);
     }
     const query = params.toString();
     void this.router.navigateByUrl(query ? `/settings?${query}` : '/settings');
-  }
-
-  onSettingsTabKeydown(event: KeyboardEvent, tab: SettingsTab): void {
-    const tabIndex = this.settingsTabs.findIndex((item) => item.id === tab);
-    if (tabIndex < 0) {
-      return;
-    }
-    let nextIndex: number | null = null;
-    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-      nextIndex = (tabIndex + 1) % this.settingsTabs.length;
-    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-      nextIndex = (tabIndex - 1 + this.settingsTabs.length) % this.settingsTabs.length;
-    } else if (event.key === 'Home') {
-      nextIndex = 0;
-    } else if (event.key === 'End') {
-      nextIndex = this.settingsTabs.length - 1;
-    }
-    if (nextIndex === null) {
-      return;
-    }
-    event.preventDefault();
-    this.setSettingsTab(this.settingsTabs[nextIndex].id, true);
   }
 
   setSearchText(value: string): void {
@@ -967,6 +1068,77 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  private async loadRuntimeSettings(): Promise<void> {
+    this.isLoadingRuntimeSettings = true;
+    this.runtimeSettingsError = '';
+    try {
+      const loaded = await this.apiClient.fetchRuntimeSettings();
+      if (this.isDestroyed) {
+        return;
+      }
+      this.runtimeSettings = loaded;
+      this.runtimeSettingsDraft = cloneRuntimeSettings(loaded);
+      this.runtimeRestartRequired = loaded.restart_required;
+    } catch (error: unknown) {
+      if (this.isDestroyed) {
+        return;
+      }
+      this.runtimeSettingsError = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not load runtime settings right now.',
+      );
+    } finally {
+      if (this.isDestroyed) {
+        return;
+      }
+      this.isLoadingRuntimeSettings = false;
+      this.changeDetectorRef.detectChanges();
+    }
+  }
+
+  async saveRuntimeSettings(): Promise<void> {
+    if (this.isSavingRuntimeSettings || this.isLoadingRuntimeSettings) {
+      return;
+    }
+    this.isSavingRuntimeSettings = true;
+    this.runtimeSettingsError = '';
+    try {
+      const saved = await this.apiClient.updateRuntimeSettings(this.runtimeSettingsPatch());
+      if (this.isDestroyed) {
+        return;
+      }
+      this.runtimeSettings = saved;
+      this.runtimeSettingsDraft = cloneRuntimeSettings(saved);
+      this.runtimeRestartRequired = saved.restart_required;
+      this.statusText = saved.message ?? 'Runtime settings saved.';
+    } catch (error: unknown) {
+      if (this.isDestroyed) {
+        return;
+      }
+      this.runtimeSettingsError = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not save runtime settings.',
+      );
+      this.statusText = this.runtimeSettingsError;
+    } finally {
+      if (this.isDestroyed) {
+        return;
+      }
+      this.isSavingRuntimeSettings = false;
+      this.changeDetectorRef.detectChanges();
+    }
+  }
+
+  private runtimeSettingsPatch(): RuntimeSettingsUpdateRequest {
+    const {
+      schema_version: _schemaVersion,
+      restart_required: _restartRequired,
+      message: _message,
+      ...blocks
+    } = this.runtimeSettingsDraft;
+    return blocks;
+  }
+
   private async ensureProviderModelsLoaded(
     provider: ModelProviderFilter,
     forceRefresh = false,
@@ -1083,8 +1255,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     } else {
       params.delete('q');
     }
-    if (this.activeTab !== 'models') {
-      params.set('tab', this.activeTab);
+    if (this.activeSection !== 'models') {
+      params.set('tab', this.activeSection);
     } else {
       params.delete('tab');
     }
@@ -1105,7 +1277,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const queryStart = url.indexOf('?');
     const query = queryStart >= 0 ? url.slice(queryStart + 1) : '';
     const params = new URLSearchParams(query);
-    this.activeTab = normalizeSettingsTab(params.get('tab'));
+    this.activeSection = normalizeSettingsSection(params.get('tab'));
     this.searchText = params.get('q') ?? '';
     this.syncState();
   }

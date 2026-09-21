@@ -15,7 +15,6 @@ DATABASE_FILENAME = "database.db"
 CLIENT_DIST_PATH = APP_DIR / "client" / "dist" / "browser"
 CLIENT_ASSETS_PATH = CLIENT_DIST_PATH / "assets"
 CLIENT_INDEX_FILE_PATH = CLIENT_DIST_PATH / "index.html"
-CONFIGURATIONS_FILE = SETTING_PATH / "configurations.json"
 
 ###############################################################################
 def resolve_runtime_data_root() -> Path:

@@ -15,6 +15,7 @@ import {
   API_OLLAMA_HEALTH_PATH,
   API_OLLAMA_PULL_PATH,
   API_OLLAMA_REFRESH_PATH,
+  API_RUNTIME_SETTINGS_PATH,
 } from './constants';
 import {
   parseCatalogResponse,
@@ -29,6 +30,7 @@ import {
   parseGeospatialProviderAccountSetups,
   parseModelLibraryResponse,
   parseModelSettingsResponse,
+  parseRuntimeSettingsResponse,
   parseOllamaHealthResponse,
   parseOllamaRefreshResponse,
   parseStructuredProbeResponse,
@@ -50,6 +52,8 @@ import {
   ModelLibraryResponse,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
+  RuntimeSettingsResponse,
+  RuntimeSettingsUpdateRequest,
   StructuredProbeResponse,
   RunTraceResponse,
   AgentRunSnapshot,
@@ -291,6 +295,25 @@ export const updateChatSettings = async (payload: ModelSettingsUpdateRequest): P
     body: JSON.stringify(payload),
   });
   return parseModelSettingsResponse(data);
+};
+
+export const fetchRuntimeSettings = async (): Promise<RuntimeSettingsResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_RUNTIME_SETTINGS_PATH}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  return parseRuntimeSettingsResponse(data);
+};
+
+export const updateRuntimeSettings = async (
+  payload: RuntimeSettingsUpdateRequest,
+): Promise<RuntimeSettingsResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_RUNTIME_SETTINGS_PATH}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return parseRuntimeSettingsResponse(data);
 };
 
 export const refreshOllamaModels = async (): Promise<GenericObjectResponse> => {

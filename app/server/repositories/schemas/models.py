@@ -273,6 +273,20 @@ class ConversationRecord(Base):
     )
 
 ###############################################################################
+class ApplicationRuntimeSettingsRecord(Base):
+    __tablename__ = "application_runtime_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+###############################################################################
 class AgentEvidenceRecord(Base):
     """Compressed, conversation-scoped payload owned by the evidence store."""
 

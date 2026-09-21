@@ -4,7 +4,6 @@ from server.configurations.environment import (
     ensure_environment_loaded,
     reset_environment_bootstrap_for_tests,
 )
-from server.configurations.management import ConfigurationManager
 from server.configurations.settings import (
     AppSettings,
     DatabaseSettings,
@@ -16,14 +15,8 @@ from server.configurations.settings import (
     ServerSettings,
     build_database_settings,
 )
-from server.configurations.startup import (
-    get_configuration_manager,
-    get_server_settings,
-    reload_settings_for_tests,
-)
 
 __all__ = [
-    "ConfigurationManager",
     "AppSettings",
     "DatabaseSettings",
     "NominatimSettings",
@@ -35,7 +28,4 @@ __all__ = [
     "build_database_settings",
     "ensure_environment_loaded",
     "reset_environment_bootstrap_for_tests",
-    "get_configuration_manager",
-    "get_server_settings",
-    "reload_settings_for_tests",
 ]

@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-09-15
+Last updated: 2026-09-21
 
 ## Environment file
 
@@ -34,15 +34,27 @@ The SQLite database path is always derived as:
 initialization action wait for the adjacent SQLite migration lock. It does not
 change SQL transaction timeouts or database durability settings.
 
-## Structured configuration
+## Runtime configuration
 
-`settings/configurations.json` supplies JSON blocks for Nominatim, geospatial
+`settings/.env` is limited to bootstrap and deployment values: data-root and
+database-lock settings, service hosts and ports, reload behavior, and other
+process-level switches. It is not the source of application-editable runtime
+blocks.
+
+Application runtime settings are validated typed blocks stored in the SQLite
+`application_runtime_settings` row and exposed through
+`GET/PATCH /api/settings/runtime`. The blocks cover Nominatim, geospatial
 bounds, map defaults, job polling, chat defaults, Open-Meteo, Overpass,
-RainViewer, and NASA GIBS request tuning. It intentionally contains no
-database block. Database location and migration-lock settings come from the
-environment only.
+RainViewer, NASA GIBS request tuning, and the native agent execution policy.
+Partial updates merge one or more blocks and commit atomically. Responses never
+contain credentials or secret values and identify when a restart is required.
 
-The `agent_execution` JSON block owns the complete native-agent deadline
+Older installations with `settings/configurations.json` are migrated once at
+startup: the legacy file is validated, the SQLite row is committed, and only
+then is the file retired. Invalid legacy data fails visibly and remains in
+place for correction; SQLite is not silently replaced with defaults.
+
+The `agent_execution` runtime block owns the complete native-agent deadline
 policy. Its defaults are 90 seconds for the initial run, 150 seconds for
 simple runs, and 300 seconds for the complex hard ceiling; stage defaults are
 5 seconds for context assembly, 60 seconds per native model decision, 45

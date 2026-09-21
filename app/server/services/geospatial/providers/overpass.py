@@ -4,6 +4,7 @@ from server.common.typing import is_json_array, json_array, json_object
 
 from typing import Any
 
+from server.configurations.settings import OverpassSettings
 from server.services.geospatial.normalizers import (
     NormalizationError,
     normalize_poi_feature,
@@ -42,8 +43,13 @@ class OverpassProvider(GeospatialProvider):
     provider_id = "overpass"
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, service: OverpassService | None = None) -> None:
-        self.service = service or OverpassService()
+    def __init__(
+        self,
+        *,
+        service: OverpassService | None = None,
+        settings: OverpassSettings | None = None,
+    ) -> None:
+        self.service = service or OverpassService(settings=settings)
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:

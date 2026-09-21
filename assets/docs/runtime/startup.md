@@ -47,6 +47,11 @@ error and are never silently stamped or replaced. SQLite creates a temporary
 backup while a migration or first-start seed is in progress and restores it if
 that operation fails.
 
+During seeding, an older `settings/configurations.json` is imported into the
+typed `application_runtime_settings` row. The source is retired only after the
+SQLite transaction commits; invalid legacy settings stop startup and leave the
+source available for correction.
+
 Launch option 1 stops listeners on the configured backend/UI ports, starts the
 backend, waits for `/api/health`, starts the frontend preview, waits for the UI
 port, and only then opens the browser. It launches the venv Python directly

@@ -4,6 +4,7 @@ from server.common.typing import is_json_array, is_json_object, json_object
 
 from urllib.parse import urlencode
 
+from server.configurations.settings import JsonNominatimSettings, NominatimSettings
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
@@ -26,11 +27,17 @@ class NominatimProvider(GeospatialProvider):
     def __init__(
         self,
         *,
+        settings: NominatimSettings | None = None,
         fetcher: JsonFetcher | None = None,
         cache: GeospatialCache | None = None,
     ) -> None:
         self.fetcher = fetcher or fetch_json_url
         self.cache = cache or GeospatialCache()
+        configured = settings or NominatimSettings(
+            **JsonNominatimSettings().model_dump()
+        )
+        self.base_url = configured.base_url
+        self.user_agent = configured.user_agent
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
@@ -54,7 +61,7 @@ class NominatimProvider(GeospatialProvider):
             payload = await call_json_fetcher(
                 self.fetcher,
                 url,
-                {"User-Agent": "AEGIS-Geospatial-View/1.0"},
+                {"User-Agent": self.user_agent},
             )
             normalized = self._normalize(payload, query=query)
             self.cache.set(
@@ -98,7 +105,7 @@ class NominatimProvider(GeospatialProvider):
             "limit": "5",
             "addressdetails": "1",
         }
-        return f"https://nominatim.openstreetmap.org/search?{urlencode(params)}"
+        return f"{self.base_url}?{urlencode(params)}"
 
     # -------------------------------------------------------------------------
     def _normalize(self, payload: object, *, query: str) -> dict[str, object]:
