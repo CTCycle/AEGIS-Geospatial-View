@@ -58,7 +58,7 @@ $DotEnvExamplePath = Join-Path $SettingsDir '.env.example'
 $LogsDir = Join-Path $AppDir 'resources\logs'
 $TestScript = Join-Path $AppDir 'tests\run_tests.bat'
 $InitializeDatabaseScript = Join-Path $AppDir 'scripts\initialize_database.py'
-$PythonVersion = '3.14.2'
+$PythonVersion = '3.14.7'
 $PythonArchiveName = "python-$PythonVersion-embed-amd64.zip"
 $PythonArchiveUri = "https://www.python.org/ftp/python/$PythonVersion/$PythonArchiveName"
 $UvAmd64Uri = 'https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip'
@@ -138,6 +138,23 @@ function Get-PythonRuntimeVersion {
     & $PythonExecutable -c 'import platform; print(platform.python_version())'
     if ($LASTEXITCODE -ne 0) {
         throw "Unable to execute Python at $PythonExecutable."
+    }
+}
+
+function Test-PythonRuntimeVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$PythonExecutable
+    )
+    if (-not (Test-Path -LiteralPath $PythonExecutable)) {
+        return $false
+    }
+    try {
+        return (Get-PythonRuntimeVersion -PythonExecutable $PythonExecutable).Trim() -eq $PythonVersion
+    }
+    catch {
+        return $false
     }
 }
 
@@ -358,8 +375,21 @@ function Ensure-PortableRuntimes {
     New-Item -ItemType Directory -Path $RuntimesDir, $PythonDir, $UvDir -Force | Out-Null
 
     Write-Status STEP 'Setting up Python (embeddable) locally'
-    if (-not (Test-Path -LiteralPath $PythonExe)) {
-        Write-Status INFO "Downloading $PythonArchiveUri"
+    $pythonExists = Test-Path -LiteralPath $PythonExe
+    $pythonNeedsUpdate = $false
+    $currentPythonVersion = $null
+    if ($pythonExists) {
+        try {
+            $currentPythonVersion = (Get-PythonRuntimeVersion -PythonExecutable $PythonExe).Trim()
+            $pythonNeedsUpdate = $currentPythonVersion -ne $PythonVersion
+        }
+        catch {
+            $pythonNeedsUpdate = $true
+        }
+    }
+    if (-not $pythonExists -or $pythonNeedsUpdate) {
+        $pythonAction = if ($pythonExists) { "Updating portable Python from $currentPythonVersion to $PythonVersion" } else { "Downloading portable Python $PythonVersion" }
+        Write-Status INFO "$pythonAction from $PythonArchiveUri"
         Invoke-DownloadAndExtract -Uri $PythonArchiveUri -ArchivePath (Join-Path $PythonDir $PythonArchiveName) -DestinationPath $PythonDir
     }
     Enable-EmbeddedPythonSitePackages -Path $PythonPth
@@ -385,6 +415,24 @@ function Ensure-PortableRuntimes {
     Write-Status OK ($uvVersion -join ' ')
 
     Ensure-NodeRuntime
+}
+
+function Ensure-VirtualEnvironment {
+    $venvPython = Join-Path $VenvDir 'Scripts\python.exe'
+    if (Test-PythonRuntimeVersion -PythonExecutable $venvPython) {
+        return
+    }
+
+    $currentVenvVersion = $null
+    if (Test-Path -LiteralPath $venvPython) {
+        try { $currentVenvVersion = (Get-PythonRuntimeVersion -PythonExecutable $venvPython).Trim() } catch { }
+    }
+    $versionDescription = if ($currentVenvVersion) { "from $currentVenvVersion to $PythonVersion" } else { "for Python $PythonVersion" }
+    Write-Status INFO "Recreating backend virtual environment $versionDescription"
+    & $UvExe venv --python $PythonExe --clear --prompt aegis $VenvDir
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to recreate the backend virtual environment at $VenvDir. Stop running application processes and retry."
+    }
 }
 
 function Build-Frontend {
@@ -413,6 +461,7 @@ function Sync-Dependencies {
     )
 
     Write-Status STEP 'Installing Python dependencies with uv'
+    Ensure-VirtualEnvironment
     $uvArguments = @('sync', '--python', $PythonExe, '--no-install-project')
     if ($InstallationType -eq 'Development') {
         $uvArguments += '--all-extras'
@@ -483,8 +532,8 @@ function Test-DependenciesReady {
         return $false
     }
 
-    & $PythonExe --version *> $null
-    if ($LASTEXITCODE -ne 0) { return $false }
+    if (-not (Test-PythonRuntimeVersion -PythonExecutable $PythonExe) -or
+        -not (Test-PythonRuntimeVersion -PythonExecutable $venvPython)) { return $false }
     & $UvExe --version *> $null
     if ($LASTEXITCODE -ne 0) { return $false }
     & $NodeExe --version *> $null

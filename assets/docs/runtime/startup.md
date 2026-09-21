@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-09-18
+Last updated: 2026-09-21
 
 ## Local Development Via Launcher
 
@@ -17,10 +17,10 @@ For a non-interactive clean-cache step in setup scripts, use:
 That action strictly clears and recreates `runtimes/cache` and fails if a
 canonical cache item is locked or inaccessible.
 
-The interactive launcher installs or updates portable Python, uv, and Node.js
-runtimes; synchronizes backend and frontend dependencies; optionally builds the
-frontend; runs tests; removes logs; clears caches; and starts backend and
-frontend services. If `settings/.env` is missing, the launcher reads
+The interactive launcher installs or updates portable Python 3.14.7, uv, and
+Node.js runtimes; synchronizes backend and frontend dependencies; optionally
+builds the frontend; runs tests; removes logs; clears caches; and starts
+backend and frontend services. If `settings/.env` is missing, the launcher reads
 `settings/.env.example` for its first-run process settings and the application
 creates the local file without overwriting an existing file.
 
