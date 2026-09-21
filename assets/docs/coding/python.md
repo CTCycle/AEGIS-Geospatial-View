@@ -1,9 +1,10 @@
 # Python
 
-Last updated: 2026-08-02
+Last updated: 2026-09-21
 
 ## Baseline
 
+- Supported local and CI runtime patch: `3.14.7`
 - Target version: `>=3.14`
 - Use the existing repository virtual environment, preferring `app/server/.venv` and then `runtimes/.venv`
 - Keep dependency state aligned with `app/server/pyproject.toml` and `app/server/uv.lock`
