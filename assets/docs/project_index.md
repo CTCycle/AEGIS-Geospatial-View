@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-09-20
+Last updated: 2026-09-21
 
 ## Purpose
 
@@ -124,6 +124,11 @@ conversation-scoped `agent_evidence` store rather than model messages.
 
 #### Validation Ledger
 
+- [`validation/strategy.md`](validation/strategy.md)
+  Durable digest of the ordered Tier 0–5 campaign, status semantics, evidence
+  contract, browser boundary, and comprehensive-pass rule.
+- [`validation/tier1_application_foundations.md`](validation/tier1_application_foundations.md)
+  Tier 1 application-foundations checklist and current hand-off boundary.
 - [validation/gate_status.md](validation/gate_status.md)
   Canonical PASS/PARTIAL/FAIL/BLOCKED/UNRUN ledger for native-loop,
   presentation, browser-fault, provider, and hosted-CI gates. It is the
