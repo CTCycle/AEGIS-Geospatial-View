@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-22 (T0-02 current migration/schema passed; hosted verification remains separate)
+Last updated: 2026-09-22 (Tier 0 complete on the current develop validation boundary; hosted verification remains separate)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -16,12 +16,12 @@ documentation reconciliation.
 ## Comprehensive validation campaign
 
 The long-term Tier 0–5 campaign is defined in the
-[validation strategy](strategy.md). The [T0-01 static-quality baseline](../../QA/t0-01-static-quality-20260922/report.md)
-is scoped to exact `loop-dev` HEAD `5bb8d416da80e33a7e85b02538f605ee22aee0a5`;
-that commit is an ancestor of current `develop` HEAD
-`664f1beb69f17063f5f9e1deb0f38cdc4a5596c3`. The current `T0-02` result is
-recorded in the [current migration/schema report](../../QA/t0-02-current-migration-20260922/report.md)
-at that exact `develop` head. The
+[validation strategy](strategy.md). The dated ancestor reports remain
+historical evidence. The current Tier 0 reconciliation was run on `develop`
+from starting SHA `7e8b10d58aebf21f194a74bcc2307f9d8e08f15c` with isolated
+data/cache roots; the complete package is the
+[current Tier 0 report](../../QA/tier0-validation-develop-20260922/final/report.md).
+The
 [Tier 1 application-foundations baseline](../../QA/tier1-application-foundations-20260921/report.md)
 remains recorded at exact `loop-dev` commit `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`.
 This campaign ledger is orthogonal to the native-agent rows below: a native
@@ -29,7 +29,7 @@ gate can pass while its broader application-foundation slice remains partial.
 
 | Tier | Focus | Slice count | Campaign status | Evidence / hand-off |
 | --- | --- | ---: | --- | --- |
-| Tier 0 | Environment, schema, current-HEAD reconciliation | 5 | `PARTIAL` | `T0-01` and [T0-02 current migration/schema](../../QA/t0-02-current-migration-20260922/report.md) are `PASS`; `T0-03` through `T0-05` remain `UNRUN`. |
+| Tier 0 | Environment, schema, current-HEAD reconciliation | 5 | `PASS` | [Current Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md): `T0-01` through `T0-05` are `PASS` on the same source boundary. |
 | Tier 1 | Application foundations | 12 | `PARTIAL` | [Tier 1 ledger](../../QA/tier1-application-foundations-20260921/ledger.md); 6 `PASS`, 6 `PARTIAL`. |
 | Tier 2 | Core agent workflows | 7 | `UNRUN` | Preserve exact-location and no-fallback boundaries. |
 | Tier 3 | Rendering and geospatial feature families | 18 | `UNRUN` | Require browser-authoritative source/layer/render-ack evidence. |
@@ -37,14 +37,28 @@ gate can pass while its broader application-foundation slice remains partial.
 | Tier 4B | Model-provider parity | 5 | `UNRUN` | Never substitute provider or model. |
 | Tier 5 | Recovery, races, difficult boundaries, hosted CI | 13 | `UNRUN` | Open only after lower-tier contracts are classified. |
 
-Campaign-slice status is 8 `PASS`, 6 `PARTIAL`, and 54 `UNRUN` of 68 slices.
+Campaign-slice status is 11 `PASS`, 6 `PARTIAL`, and 51 `UNRUN` of 68 slices.
 Tier 1 remains at 6 `PASS` and 6 `PARTIAL`; the next actionable campaign
-slice is `T0-03`.
+slice is the first incomplete Tier 1 row.
 
 Tier 1 is not promoted to complete: the remaining boundaries are listed in
 the dated report and must stay visible to future agents.
 
 ## Current ledger
+
+### Current Tier 0 slice ledger
+
+| Slice | Scope | Status | Verification date | Tested source boundary | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| `T0-01` | Static quality | `PASS` | 2026-09-22 | `develop` starting `7e8b10d5` plus validation working tree | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) |
+| `T0-02` | Current SQLite migration/schema | `PASS` | 2026-09-22 | `develop` starting `7e8b10d5` plus validation working tree | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) |
+| `T0-03` | Legacy Settings migration | `PASS` | 2026-09-22 | `develop` starting `7e8b10d5` plus validation working tree | [T0-03 report](../../QA/tier0-validation-develop-20260922/T0-03/report.md) |
+| `T0-04` | Windows startup | `PASS` | 2026-09-22 | `develop` starting `7e8b10d5` plus validation working tree | [T0-04 report](../../QA/tier0-validation-develop-20260922/T0-04/report.md) |
+| `T0-05` | API composition and contract | `PASS` | 2026-09-22 | `develop` starting `7e8b10d5` plus validation working tree | [T0-05 report](../../QA/tier0-validation-develop-20260922/T0-05/report.md) |
+
+Tier 0 is `PASS`. The overall campaign remains `PARTIAL` because six Tier 1
+slices and the downstream live/browser/provider/hosted-CI boundaries remain
+partial or unrun.
 
 | Gate ID / name | Subsystem | Lane / environment | Status | Verification date | Tested commit | Evidence link | Next action / boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -61,17 +75,17 @@ the dated report and must stay visible to future agents.
 | LIVE-DIARY-20260919 — representative geospatial browser diary | Browser / realtime / MapLibre | Local services 4512/7059, exact `opencode-go / deepseek-v4.1-flash`, real chat workflow | PARTIAL | 2026-09-19 | `77bf7e9` + working tree | [validation diary](../../QA/aegis-geospatial-e2e-validation-20260919/report.md) | Rome-to-Florence recovery is browser-verified after the surgical loop fix; coordinate reverse geocoding, landmark/catalog coverage, provider availability, and the complete scenario matrix remain open. |
 | LIVE-HYD-20260920 — hazard and hydrology rerun | Browser / realtime / MapLibre | Local services 4512/7059, exact `opencode-go / deepseek-v4.1-flash`, live public providers | PARTIAL | 2026-09-20 | `84c210f6` | [hazard/hydrology rerun](../../QA/aegis-hazard-hydrology-e2e-20260920/report.md) | FEMA raster retrieval is corrected but live MapLibre source loading still fails; GEO-HYD-05 and GEO-HYD-06 remain BLOCKED, and the current Zurich guardrail rerun is inconclusive. Keep the complete matrix PARTIAL. |
 | LIVE-API — orchestration and ambiguity smoke | API orchestration | Exact provider lane, isolated runtime | PARTIAL | 2026-09-17 | `558f1966` | [api-live-final.log](../../QA/native-agent-loop-evaluation-20260917-final/api-live-final.log) | Investigate the typed 409 while `/api/chat/turn` is still running; keep the Ollama-unavailable 502 as a separate non-fallback boundary. |
-| SYNC-CHAT-TURN — terminal hydration response | Backend API | Exact provider lane, isolated runtime | PARTIAL | 2026-09-17 | `558f1966` | [api-live-final.log](../../QA/native-agent-loop-evaluation-20260917-final/api-live-final.log) | Make the synchronous endpoint boundary explicit or await completion before returning; current 409 is not a generic catalog error. |
+| SYNC-CHAT-TURN — terminal hydration response | Backend API | Isolated API composition contract; live provider lane remains separate | PARTIAL | 2026-09-22 | `7e8b10d5 + WT` | [T0-05 report](../../QA/tier0-validation-develop-20260922/T0-05/report.md) | Current contract proves terminal 200, accepted 202, and genuine-conflict 409. Retain PARTIAL until the live-provider timing boundary is rerun. |
 | BACKEND-UNIT — full unit suite | Backend | `app/server/.venv`, isolated basetemp | PASS | 2026-09-17 | `558f1966` | [backend-unit-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/backend-unit-final-commit.log) | Retain the 832-test result and rerun when backend sources change. |
 | NATIVE-FOCUSED — remediation regression suite | Backend / agent loop | `app/server/.venv`, isolated basetemp | PASS | 2026-09-17 | `558f1966` | [focused-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/focused-final-commit.log) | Retain the focused boundary for every future route, render, state, or finalization change. |
-| RUFF — Python lint | Python quality | Repository-wide `uv run` gate with project configuration | PASS | 2026-09-22 | `5bb8d416 + T0-01 WT` | [T0-01 static-quality report](../../QA/t0-01-static-quality-20260922/report.md) | Ruff passes; keep protected-cache warnings separate from the lint result. |
-| PYRIGHT-STRICT — repository strict typing | Static typing | `app/server/pyproject.toml` strict run | PASS | 2026-09-22 | `5bb8d416 + T0-01 WT` | [T0-01 static-quality report](../../QA/t0-01-static-quality-20260922/report.md) | Full repository run reports 0 errors, 0 warnings, and 0 informations; rerun after typing or project-configuration changes. |
-| FRONTEND-BUILD — production bundle | Angular client | Local `npm ci` plus `npm run build` | PASS | 2026-09-22 | `5bb8d416 + T0-01 WT` | [T0-01 static-quality report](../../QA/t0-01-static-quality-20260922/report.md) | Keep generated `dist` output out of source control. |
-| FRONTEND-KARMA — client regression suite | Angular client | ChromeHeadlessNoGpu | PASS | 2026-09-17 | `558f1966` | [frontend-karma-558f-final.log](../../QA/native-agent-loop-evaluation-20260917-final/frontend-karma-558f-final.log) | 233/233 pass; add browser-timing coverage before retrying supersession remediation. |
-| MIGRATION — isolated upgrade/head/check | Persistence schema | Isolated SQLite under dated QA data | PASS | 2026-09-17 | `558f1966` | [migration-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/migration-final-commit.log) | Historical proof is scoped to head `202609170001`; use the current-head [T0-02 report](../../QA/t0-02-current-migration-20260922/report.md) for current schema status. |
+| RUFF — Python lint | Python quality | Repository-wide project-configured gate | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | Ruff passes; keep protected-cache warnings separate from the lint result. |
+| PYRIGHT-STRICT — repository strict typing | Static typing | `app/server/pyproject.toml` strict run | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | Full repository run reports 0 errors, 0 warnings, and 0 informations; rerun after typing or project-configuration changes. |
+| FRONTEND-BUILD — production bundle | Angular client | Local `npm run build` | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | Keep generated `dist` output out of source control. |
+| FRONTEND-KARMA — client regression suite | Angular client | ChromeHeadlessNoGpu | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | 248/248 pass; add browser-timing coverage before retrying supersession remediation. |
+| MIGRATION — isolated upgrade/head/check | Persistence schema | Isolated SQLite under dated QA data | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | Fresh upgrade, `alembic check`, `current --check-heads`, and 25 migration/persistence tests pass at `202609210001`. |
 | MATRIX-22 — complete required scenario matrix | Coverage | Exact live provider plus controlled browser | PARTIAL | 2026-09-17 | `bf5a7cfa` | [final-report.md](../../QA/native-agent-loop-evaluation-20260917-final/final-report.md) | Complete the explicit PARTIAL and UNRUN rows, including a separate mismatched-ack case, before any overall PASS claim. |
 | HOSTED-CI — exact tested head | Hosted CI | GitHub Actions push workflows on `develop` | UNRUN | 2026-09-18 | `a33642a` | [push boundary record](../../QA/native-agent-loop-evaluation-20260918/push-status.md) | The current head is being pushed under explicit user authorization; inspect the resulting exact-head workflow run before changing this gate to PASS or FAIL. |
-| PROCESS-CLEANUP — task-owned services and browser | Test harness | Local host, ports 4512/7059/9876 | PASS | 2026-09-17 | `bf5a7cfa` | [process-cleanup-final.md](../../QA/native-agent-loop-evaluation-20260917-final/process-cleanup-final.md) | Final harness services and browser tab stopped; ports verified free; unrelated services and caches preserved. |
+| PROCESS-CLEANUP — task-owned services and browser | Test harness | Local host, ports 4512/7059/9876 | PASS | 2026-09-22 | `7e8b10d5 + WT` | [T0-04 report](../../QA/tier0-validation-develop-20260922/T0-04/report.md) | Final harness services stopped; ports verified free; unrelated processes survived readiness-failure cleanup. |
 
 ## 2026-09-19 live browser diary
 

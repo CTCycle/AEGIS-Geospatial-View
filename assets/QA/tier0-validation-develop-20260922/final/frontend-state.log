@@ -1,0 +1,128 @@
+
+> aegis-client@1.0.0 test:frontend-state
+> node --test scripts/frontend-state.test.cjs
+
+TAP version 13
+# Subtest: same inputs and untouched output are current
+ok 1 - same inputs and untouched output are current
+  ---
+  duration_ms: 40.2268
+  type: 'test'
+  ...
+# Subtest: missing dist output is missing
+ok 2 - missing dist output is missing
+  ---
+  duration_ms: 32.7813
+  type: 'test'
+  ...
+# Subtest: missing build marker is missing
+ok 3 - missing build marker is missing
+  ---
+  duration_ms: 20.6169
+  type: 'test'
+  ...
+# Subtest: change to src/app.ts makes the build stale
+ok 4 - change to src/app.ts makes the build stale
+  ---
+  duration_ms: 37.2102
+  type: 'test'
+  ...
+# Subtest: change to public/logo.txt makes the build stale
+ok 5 - change to public/logo.txt makes the build stale
+  ---
+  duration_ms: 36.9352
+  type: 'test'
+  ...
+# Subtest: change to angular.json makes the build stale
+ok 6 - change to angular.json makes the build stale
+  ---
+  duration_ms: 36.1543
+  type: 'test'
+  ...
+# Subtest: change to package.json makes the build stale
+ok 7 - change to package.json makes the build stale
+  ---
+  duration_ms: 36.3716
+  type: 'test'
+  ...
+# Subtest: change to package-lock.json makes the build stale
+ok 8 - change to package-lock.json makes the build stale
+  ---
+  duration_ms: 36.7614
+  type: 'test'
+  ...
+# Subtest: change to tsconfig.json makes the build stale
+ok 9 - change to tsconfig.json makes the build stale
+  ---
+  duration_ms: 37.0688
+  type: 'test'
+  ...
+# Subtest: change to tsconfig.app.json makes the build stale
+ok 10 - change to tsconfig.app.json makes the build stale
+  ---
+  duration_ms: 36.7292
+  type: 'test'
+  ...
+# Subtest: change to .nvmrc makes the build stale
+ok 11 - change to .nvmrc makes the build stale
+  ---
+  duration_ms: 36.1342
+  type: 'test'
+  ...
+# Subtest: Node runtime version mismatch makes the build stale
+ok 12 - Node runtime version mismatch makes the build stale
+  ---
+  duration_ms: 32.5629
+  type: 'test'
+  ...
+# Subtest: modified generated output makes the build stale
+ok 13 - modified generated output makes the build stale
+  ---
+  duration_ms: 36.6086
+  type: 'test'
+  ...
+# Subtest: corrupt build marker is stale
+ok 14 - corrupt build marker is stale
+  ---
+  duration_ms: 32.1094
+  type: 'test'
+  ...
+# Subtest: test-only source changes do not invalidate a production build
+ok 15 - test-only source changes do not invalidate a production build
+  ---
+  duration_ms: 37.4258
+  type: 'test'
+  ...
+# Subtest: proxy, Karma, and test tsconfig changes do not invalidate a production build
+ok 16 - proxy, Karma, and test tsconfig changes do not invalidate a production build
+  ---
+  duration_ms: 38.5093
+  type: 'test'
+  ...
+# Subtest: failed or incomplete build cannot retain a current marker
+ok 17 - failed or incomplete build cannot retain a current marker
+  ---
+  duration_ms: 33.2574
+  type: 'test'
+  ...
+# Subtest: dependency state is current after recording and ignores script-only changes
+ok 18 - dependency state is current after recording and ignores script-only changes
+  ---
+  duration_ms: 28.2743
+  type: 'test'
+  ...
+# Subtest: dependency fields, lock state, and Node version invalidate the install marker
+ok 19 - dependency fields, lock state, and Node version invalidate the install marker
+  ---
+  duration_ms: 29.4326
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 748.9155

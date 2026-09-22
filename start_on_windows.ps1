@@ -722,6 +722,21 @@ function Confirm-PortConflictTermination {
     param([Parameter(Mandatory)][object[]]$Conflicts)
 
     Write-PortConflicts -Conflicts $Conflicts
+    $unresolvedOwners = @(
+        $Conflicts | Where-Object {
+            [string]::IsNullOrWhiteSpace([string]$_.ProcessName) -or
+                $_.ProcessName -eq 'unavailable' -or
+                $null -eq $_.StartTimeUtcTicks
+        }
+    )
+    if ($unresolvedOwners.Count -gt 0) {
+        $details = @(
+            $unresolvedOwners | ForEach-Object {
+                "PID $($_.ProcessId) ($($_.ProcessName)), port(s) $(@($_.Ports) -join ', ')"
+            }
+        ) -join '; '
+        throw "Unable to resolve the identity of configured port owner(s); no existing process was terminated: $details."
+    }
     if (-not $script:LauncherInteractive) {
         $details = @(
             $Conflicts | ForEach-Object {
