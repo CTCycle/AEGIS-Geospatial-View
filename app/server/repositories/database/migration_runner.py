@@ -36,12 +36,20 @@ class MigrationResult:
     migrations_applied: bool
 
 ###############################################################################
+@dataclass(frozen=True)
+class _DatabaseState:
+    current_revisions: tuple[str, ...]
+    head_revisions: tuple[str, ...]
+    fresh_database: bool
+
+###############################################################################
 def synchronize_database(
     database: SQLiteRepository,
     *,
     on_ready: Callable[[], None] | None = None,
+    on_ready_required: Callable[[], bool] | None = None,
 ) -> MigrationResult:
-    """Synchronize SQLite and run the optional callback under the file lock."""
+    """Synchronize SQLite and run required callbacks under the file lock."""
 
     database_path = Path(database.db_path)
     original_exists = database_path.exists()
@@ -50,10 +58,23 @@ def synchronize_database(
 
     try:
         with lock.acquire(timeout=timeout_seconds):
-            backup_path = _create_sqlite_backup(database, database_path)
+            state = _inspect_database_state(database.engine)
+            migration_required = state.current_revisions != state.head_revisions
+            callback_required = on_ready is not None and (
+                state.fresh_database
+                or migration_required
+                or on_ready_required is None
+                or on_ready_required()
+            )
+            backup_path = (
+                _create_sqlite_backup(database, database_path)
+                if not state.fresh_database
+                and (migration_required or callback_required)
+                else None
+            )
             try:
-                result = _synchronize_locked(database.engine)
-                if on_ready is not None:
+                result = _synchronize_locked(database.engine, state)
+                if callback_required and on_ready is not None:
                     on_ready()
                 if backup_path is not None:
                     backup_path.unlink(missing_ok=True)
@@ -64,12 +85,13 @@ def synchronize_database(
                 )
                 return result
             except BaseException:
-                _restore_sqlite_backup(
-                    database,
-                    database_path,
-                    backup_path,
-                    original_exists=original_exists,
-                )
+                if backup_path is not None or not original_exists:
+                    _restore_sqlite_backup(
+                        database,
+                        database_path,
+                        backup_path,
+                        original_exists=original_exists,
+                    )
                 raise
     except Timeout as exc:
         raise DatabaseMigrationError(
@@ -78,7 +100,7 @@ def synchronize_database(
         ) from exc
 
 ###############################################################################
-def _synchronize_locked(engine: Engine) -> MigrationResult:
+def _inspect_database_state(engine: Engine) -> _DatabaseState:
     with engine.connect() as connection:
         config = _alembic_config()
         script = ScriptDirectory.from_config(config)
@@ -108,14 +130,28 @@ def _synchronize_locked(engine: Engine) -> MigrationResult:
                 "then run AEGIS again."
             )
 
-        if current != heads:
-            logger.info("Applying pending SQLite migrations to head %s.", heads[0])
+        return _DatabaseState(
+            current_revisions=current,
+            head_revisions=heads,
+            fresh_database=fresh_database,
+        )
+
+###############################################################################
+def _synchronize_locked(engine: Engine, state: _DatabaseState) -> MigrationResult:
+    config = _alembic_config()
+    current = state.current_revisions
+    heads = state.head_revisions
+
+    if current != heads:
+        logger.info("Applying pending SQLite migrations to head %s.", heads[0])
+        with engine.connect() as connection:
             _run_alembic_command(
                 config,
                 connection,
                 lambda cfg: command.upgrade(cfg, "head"),
             )
 
+    with engine.connect() as connection:
         final = _current_revisions(connection)
         if set(final) != set(heads):
             raise DatabaseMigrationError(
@@ -127,7 +163,7 @@ def _synchronize_locked(engine: Engine) -> MigrationResult:
             current_revisions=current,
             head_revisions=heads,
             final_revisions=final,
-            fresh_database=fresh_database,
+            fresh_database=state.fresh_database,
             migrations_applied=current != final,
         )
 

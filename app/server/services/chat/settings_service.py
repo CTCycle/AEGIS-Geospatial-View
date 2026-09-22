@@ -7,6 +7,7 @@ from server.common.typing import is_json_object, json_array
 from server.contracts.chat import (
     ModelProviderMode,
     ModelSettingsResponse,
+    ModelSettingsSnapshot,
     ModelSettingsUpdateRequest,
     SelectedModelContextResponse,
 )
@@ -57,47 +58,12 @@ class ChatSettingsService:
 
     # -------------------------------------------------------------------------
     def get_settings(self) -> ModelSettingsResponse:
-        record = self.settings_repo.get_required()
-        if record.active_provider_mode not in {"local", "cloud"}:
-            raise ChatSettingsValidationError(
-                "Stored model settings contain an invalid provider mode."
-            )
-        stored_provider = record.agent_model_provider
-        stored_model = record.agent_model_name
-        if bool(stored_provider) != bool(stored_model):
-            raise ChatSettingsValidationError(
-                "Stored model settings contain an incomplete agent assignment."
-            )
-        if stored_provider and stored_model:
-            try:
-                require_canonical_provider(stored_provider)
-            except ValueError as exc:
-                raise ChatSettingsValidationError(str(exc)) from exc
-        active_provider_mode: ModelProviderMode = cast(
-            ModelProviderMode, record.active_provider_mode
-        )
-        active_credentials = self.credentials_repo.list_active()
-        credential_presence: dict[str, dict[str, bool]] = {}
-        credential_health: dict[str, dict[str, str]] = {}
-        for item in active_credentials:
-            self._require_canonical_credential_provider(item.provider)
-            if item.label != "api_key":
-                raise ChatSettingsValidationError(
-                    f"Stored credentials for '{item.provider}' use unsupported label '{item.label}'."
-                )
-            provider_bucket = credential_presence.setdefault(item.provider, {})
-            provider_bucket[item.label] = True
-            health_bucket = credential_health.setdefault(item.provider, {})
-            try:
-                self.crypto_service.decrypt(item.encrypted_value)
-            except ValueError:
-                health_bucket[item.label] = "unreadable"
-            else:
-                health_bucket[item.label] = (
-                    "healthy"
-                    if item.provider in {"openai", "google", *DYNAMIC_CLOUD_PROVIDERS}
-                    else "stored"
-                )
+        (
+            record,
+            active_provider_mode,
+            credential_presence,
+            credential_health,
+        ) = self._load_validated_persisted_settings(require_decryptable=False)
         profile = None
         if record.agent_model_provider and record.agent_model_name:
             try:
@@ -145,6 +111,73 @@ class ChatSettingsService:
             credentials=credential_presence,
             credential_health=credential_health,
             selected_model_context=selected_model_context,
+        )
+
+    # -------------------------------------------------------------------------
+    def validate_persisted_settings(self) -> None:
+        """Validate local persisted settings without resolving provider metadata."""
+
+        self._load_validated_persisted_settings(require_decryptable=True)
+
+    # -------------------------------------------------------------------------
+    def _load_validated_persisted_settings(
+        self, *, require_decryptable: bool
+    ) -> tuple[
+        ModelSettingsSnapshot,
+        ModelProviderMode,
+        dict[str, dict[str, bool]],
+        dict[str, dict[str, str]],
+    ]:
+        record = self.settings_repo.get_required()
+        if record.active_provider_mode not in {"local", "cloud"}:
+            raise ChatSettingsValidationError(
+                "Stored model settings contain an invalid provider mode."
+            )
+        stored_provider = record.agent_model_provider
+        stored_model = record.agent_model_name
+        if bool(stored_provider) != bool(stored_model):
+            raise ChatSettingsValidationError(
+                "Stored model settings contain an incomplete agent assignment."
+            )
+        if stored_provider and stored_model:
+            try:
+                require_canonical_provider(stored_provider)
+            except ValueError as exc:
+                raise ChatSettingsValidationError(str(exc)) from exc
+        active_provider_mode: ModelProviderMode = cast(
+            ModelProviderMode, record.active_provider_mode
+        )
+        active_credentials = self.credentials_repo.list_active()
+        credential_presence: dict[str, dict[str, bool]] = {}
+        credential_health: dict[str, dict[str, str]] = {}
+        for item in active_credentials:
+            self._require_canonical_credential_provider(item.provider)
+            if item.label != "api_key":
+                raise ChatSettingsValidationError(
+                    f"Stored credentials for '{item.provider}' use unsupported label '{item.label}'."
+                )
+            provider_bucket = credential_presence.setdefault(item.provider, {})
+            provider_bucket[item.label] = True
+            health_bucket = credential_health.setdefault(item.provider, {})
+            try:
+                self.crypto_service.decrypt(item.encrypted_value)
+            except ValueError as exc:
+                if require_decryptable:
+                    raise ChatSettingsValidationError(
+                        f"Stored credentials for '{item.provider}' cannot be decrypted."
+                    ) from exc
+                health_bucket[item.label] = "unreadable"
+            else:
+                health_bucket[item.label] = (
+                    "healthy"
+                    if item.provider in {"openai", "google", *DYNAMIC_CLOUD_PROVIDERS}
+                    else "stored"
+                )
+        return (
+            record,
+            active_provider_mode,
+            credential_presence,
+            credential_health,
         )
 
     # -------------------------------------------------------------------------

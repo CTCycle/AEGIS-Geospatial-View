@@ -53,6 +53,7 @@ $CacheDirectories = @(
     $TestRuntimeCacheDir
 )
 $VenvDir = Join-Path $ServerDir '.venv'
+$FrontendStateScript = Join-Path $ClientDir 'scripts\frontend-state.cjs'
 $DotEnvPath = Join-Path $SettingsDir '.env'
 $DotEnvExamplePath = Join-Path $SettingsDir '.env.example'
 $LogsDir = Join-Path $AppDir 'resources\logs'
@@ -163,6 +164,7 @@ function Wait-HttpHealth {
     param(
         [Parameter(Mandatory)]
         [string]$Uri,
+        [System.Diagnostics.Process]$Process,
         [ValidateRange(1, 600)]
         [int]$TimeoutSeconds = 60,
         [ValidateRange(1, 60)]
@@ -173,6 +175,12 @@ function Wait-HttpHealth {
     $progressId = Start-LauncherProgress -Activity $activity -Status "Waiting up to $TimeoutSeconds seconds"
     try {
         do {
+            if ($null -ne $Process) {
+                $Process.Refresh()
+                if ($Process.HasExited) {
+                    throw "Service process $($Process.Id) exited with code $($Process.ExitCode) before becoming healthy at $Uri."
+                }
+            }
             $elapsed = [int](([DateTime]::UtcNow - $deadline.AddSeconds(-$TimeoutSeconds)).TotalSeconds)
             Update-LauncherProgress -Id $progressId -Activity $activity -Status "Waiting for healthy response; ${elapsed}s elapsed"
             try {
@@ -269,7 +277,12 @@ function Invoke-TrackedLauncherAction {
         Write-Status SUCCESS "$Name completed"
     }
     catch {
-        Write-Status FATAL "$Name failed: $($_.Exception.Message)"
+        if ($_.Exception -is [System.OperationCanceledException]) {
+            Write-Status INFO "$Name cancelled: $($_.Exception.Message)"
+        }
+        else {
+            Write-Status FATAL "$Name failed: $($_.Exception.Message)"
+        }
         throw
     }
     finally {
@@ -478,6 +491,7 @@ function Sync-Dependencies {
     }
 
     Write-Status STEP 'Installing frontend dependencies'
+    Invoke-FrontendStateCommand -Command 'invalidate-dependencies'
     Push-Location $ClientDir
     try {
         if (Test-Path -LiteralPath (Join-Path $ClientDir 'package-lock.json')) {
@@ -489,6 +503,7 @@ function Sync-Dependencies {
         if ($LASTEXITCODE -ne 0) {
             throw "npm dependency installation failed with exit code $LASTEXITCODE."
         }
+        Invoke-FrontendStateCommand -Command 'record-dependencies'
     }
     finally {
         Pop-Location
@@ -510,35 +525,84 @@ function Invoke-RebuildFrontend {
     Write-Status SUCCESS 'Frontend rebuilt successfully.'
 }
 
-function Test-DependenciesReady {
+function Invoke-FrontendStateCommand {
+    param(
+        [Parameter(Mandatory)][string]$Command,
+        [switch]$ExpectState
+    )
+    if (-not (Test-Path -LiteralPath $NodeExe) -or
+        -not (Test-Path -LiteralPath $FrontendStateScript)) {
+        throw 'Node.js or the frontend state evaluator is missing.'
+    }
+    $output = @(& $NodeExe $FrontendStateScript $Command 2>&1)
+    $exitCode = $LASTEXITCODE
+    if (-not $ExpectState) {
+        if ($exitCode -ne 0) {
+            throw "Frontend state command '$Command' failed with exit code ${exitCode}: $($output -join [Environment]::NewLine)"
+        }
+        return
+    }
+    $status = if ($output.Count -gt 0) { [string]$output[-1] } else { '' }
+    $status = $status.Trim()
+    $expectedExitCode = switch ($status) {
+        'Current' { 0 }
+        'Missing' { 2 }
+        'Stale' { 3 }
+        default { -1 }
+    }
+    if ($expectedExitCode -lt 0 -or $exitCode -ne $expectedExitCode) {
+        throw "Frontend state evaluator '$Command' failed with exit code ${exitCode}: $($output -join [Environment]::NewLine)"
+    }
+    return $status
+}
+
+function Get-FrontendDependencyState {
+    return Invoke-FrontendStateCommand -Command 'dependency-state' -ExpectState
+}
+
+function Get-FrontendBuildState {
+    return Invoke-FrontendStateCommand -Command 'build-state' -ExpectState
+}
+
+function Ensure-FrontendBuildCurrent {
+    $state = Get-FrontendBuildState
+    switch ($state) {
+        'Current' {
+            Write-Status OK 'Frontend production build is current; skipped rebuild.'
+        }
+        { $_ -in @('Missing', 'Stale') } {
+            Write-Status STEP "Frontend production build is $($state.ToLowerInvariant()); rebuilding."
+            Build-Frontend
+        }
+        default { throw "Unsupported frontend build state '$state'." }
+    }
+}
+
+function Test-LaunchDependenciesReady {
     $frontendPackage = Join-Path $ClientDir 'package.json'
     $frontendLock = Join-Path $ClientDir 'package-lock.json'
     $frontendModules = Join-Path $ClientDir 'node_modules'
     $frontendInstallState = Join-Path $frontendModules '.package-lock.json'
+    $frontendDependencyMarker = Join-Path $frontendModules '.aegis-dependency-state.json'
     $frontendRunner = Join-Path $frontendModules '@angular/cli/bin/ng.js'
     $backendEntrypoint = Join-Path $ServerDir 'app.py'
     $venvPython = Join-Path $VenvDir 'Scripts\python.exe'
 
-    if (-not (Test-Path -LiteralPath $PythonExe) -or
-        -not (Test-Path -LiteralPath $UvExe) -or
-        -not (Test-Path -LiteralPath $NodeExe) -or
+    if (-not (Test-Path -LiteralPath $NodeExe) -or
         -not (Test-Path -LiteralPath $NpmCmd) -or
         -not (Test-Path -LiteralPath $venvPython) -or
         -not (Test-Path -LiteralPath $backendEntrypoint) -or
         -not (Test-Path -LiteralPath $frontendPackage) -or
         -not (Test-Path -LiteralPath $frontendLock) -or
         -not (Test-Path -LiteralPath $frontendInstallState) -or
+        -not (Test-Path -LiteralPath $frontendDependencyMarker) -or
         -not (Test-Path -LiteralPath $frontendRunner)) {
         return $false
     }
 
-    if (-not (Test-PythonRuntimeVersion -PythonExecutable $PythonExe) -or
-        -not (Test-PythonRuntimeVersion -PythonExecutable $venvPython)) { return $false }
-    & $UvExe --version *> $null
-    if ($LASTEXITCODE -ne 0) { return $false }
-    & $NodeExe --version *> $null
-    if ($LASTEXITCODE -ne 0) { return $false }
-    & $venvPython -c 'import alembic, fastapi, filelock, uvicorn' *> $null
+    if ((Get-FrontendDependencyState) -ne 'Current') { return $false }
+    $pythonCheck = "import sys; import alembic, fastapi, filelock, uvicorn; assert tuple(sys.version_info[:3]) == ($($PythonVersion.Replace('.', ', ')))"
+    & $venvPython -c $pythonCheck *> $null
     if ($LASTEXITCODE -ne 0) { return $false }
 
     return $true
@@ -572,6 +636,217 @@ function Stop-PortListeners {
     }
 }
 
+function Get-ConfiguredApplicationPorts {
+    $configuredPorts = [ordered]@{}
+    foreach ($name in @('FASTAPI_PORT', 'UI_PORT')) {
+        $rawValue = [Environment]::GetEnvironmentVariable($name, 'Process')
+        $port = 0
+        if (-not [int]::TryParse($rawValue, [ref]$port) -or $port -lt 1 -or $port -gt 65535) {
+            throw "$name must be a TCP port from 1 through 65535; received '$rawValue'."
+        }
+        $configuredPorts[$name] = $port
+    }
+    if ($configuredPorts.FASTAPI_PORT -eq $configuredPorts.UI_PORT) {
+        throw "FASTAPI_PORT and UI_PORT must differ; both are configured as $($configuredPorts.FASTAPI_PORT)."
+    }
+    return [int[]]@($configuredPorts.FASTAPI_PORT, $configuredPorts.UI_PORT)
+}
+
+function Get-PortConflicts {
+    param([Parameter(Mandatory)][int[]]$Ports)
+
+    $byProcessId = [Collections.Generic.Dictionary[int, object]]::new()
+    foreach ($port in @($Ports | Sort-Object -Unique)) {
+        foreach ($processId in @(Get-PortListenerPids -Port $port)) {
+            if ($byProcessId.ContainsKey($processId)) {
+                $entry = $byProcessId[$processId]
+                if (-not $entry.Ports.Contains($port)) { [void]$entry.Ports.Add($port) }
+                continue
+            }
+            $processName = 'unavailable'
+            $startTimeUtcTicks = $null
+            try {
+                $process = Get-Process -Id $processId -ErrorAction Stop
+                $processName = $process.ProcessName
+                try { $startTimeUtcTicks = $process.StartTime.ToUniversalTime().Ticks } catch { }
+            }
+            catch { }
+            $occupiedPorts = [Collections.Generic.List[int]]::new()
+            [void]$occupiedPorts.Add($port)
+            $byProcessId[$processId] = [pscustomobject]@{
+                ProcessId = [int]$processId
+                ProcessName = $processName
+                StartTimeUtcTicks = $startTimeUtcTicks
+                Ports = $occupiedPorts
+            }
+        }
+    }
+    return @(
+        $byProcessId.Values |
+            Sort-Object ProcessId |
+            ForEach-Object {
+                [pscustomobject]@{
+                    ProcessId = $_.ProcessId
+                    ProcessName = $_.ProcessName
+                    StartTimeUtcTicks = $_.StartTimeUtcTicks
+                    Ports = @($_.Ports | Sort-Object -Unique)
+                }
+            }
+    )
+}
+
+function Get-PortConflictSignature {
+    param([object[]]$Conflicts)
+
+    return (@(
+        $Conflicts |
+            Sort-Object ProcessId |
+            ForEach-Object {
+                $ports = @($_.Ports | Sort-Object -Unique) -join ','
+                "$($_.ProcessId)|$($_.ProcessName)|$($_.StartTimeUtcTicks)|$ports"
+            }
+    ) -join ';')
+}
+
+function Write-PortConflicts {
+    param([Parameter(Mandatory)][object[]]$Conflicts)
+
+    Write-Status WARN 'The configured AEGIS ports are already occupied:'
+    foreach ($conflict in $Conflicts) {
+        $ports = @($conflict.Ports | Sort-Object -Unique) -join ', '
+        Write-Host "  PID $($conflict.ProcessId) ($($conflict.ProcessName)) — port(s) $ports"
+    }
+}
+
+function Confirm-PortConflictTermination {
+    param([Parameter(Mandatory)][object[]]$Conflicts)
+
+    Write-PortConflicts -Conflicts $Conflicts
+    if (-not $script:LauncherInteractive) {
+        $details = @(
+            $Conflicts | ForEach-Object {
+                "PID $($_.ProcessId) ($($_.ProcessName)), port(s) $(@($_.Ports) -join ', ')"
+            }
+        ) -join '; '
+        throw "Launch is non-interactive and a configured port is occupied; no existing process was terminated: $details."
+    }
+    $answer = (Read-Host '  Terminate these process trees and continue? [y/N]').Trim()
+    return $answer.ToLowerInvariant() -in @('y', 'yes')
+}
+
+function Resolve-LaunchPortConflicts {
+    param([Parameter(Mandatory)][int[]]$Ports)
+
+    $conflicts = @(Get-PortConflicts -Ports $Ports)
+    while ($conflicts.Count -gt 0) {
+        if (-not (Confirm-PortConflictTermination -Conflicts $conflicts)) {
+            throw [System.OperationCanceledException]::new(
+                'Launch cancelled. No existing processes were terminated.'
+            )
+        }
+
+        $currentConflicts = @(Get-PortConflicts -Ports $Ports)
+        if ((Get-PortConflictSignature $currentConflicts) -ne (Get-PortConflictSignature $conflicts)) {
+            $conflicts = $currentConflicts
+            continue
+        }
+        if ($currentConflicts.Count -eq 0) { return }
+
+        $authorizedByPid = @{}
+        foreach ($conflict in $currentConflicts) {
+            $authorizedByPid[[int]$conflict.ProcessId] = $conflict
+        }
+        $terminated = [Collections.Generic.HashSet[int]]::new()
+        $taskkillFailures = [Collections.Generic.List[string]]::new()
+        $ownershipChanged = $false
+        foreach ($conflict in $currentConflicts) {
+            $processId = [int]$conflict.ProcessId
+            if (-not $terminated.Add($processId)) { continue }
+
+            $latestForPid = @(
+                Get-PortConflicts -Ports $Ports |
+                    Where-Object { $_.ProcessId -eq $processId }
+            ) | Select-Object -First 1
+            if ($null -eq $latestForPid) { continue }
+            if ((Get-PortConflictSignature @($latestForPid)) -ne
+                (Get-PortConflictSignature @($authorizedByPid[$processId]))) {
+                $ownershipChanged = $true
+                break
+            }
+
+            Write-Status INFO "Terminating confirmed PID $processId on port(s) $(@($conflict.Ports) -join ', ')."
+            $nativeOutput = @(& taskkill.exe /PID $processId /T /F 2>&1)
+            $nativeExitCode = $LASTEXITCODE
+            if ($nativeExitCode -ne 0) {
+                [void]$taskkillFailures.Add("PID ${processId}: exit code ${nativeExitCode}; $($nativeOutput -join ' ')")
+            }
+        }
+        if ($ownershipChanged) {
+            $conflicts = @(Get-PortConflicts -Ports $Ports)
+            continue
+        }
+
+        $deadline = [DateTime]::UtcNow.AddSeconds(20)
+        $remaining = @(Get-PortConflicts -Ports $Ports)
+        while ($remaining.Count -gt 0 -and [DateTime]::UtcNow -lt $deadline) {
+            Start-Sleep -Seconds 1
+            $remaining = @(Get-PortConflicts -Ports $Ports)
+        }
+        if ($remaining.Count -gt 0) {
+            $newOwners = @(
+                $remaining | Where-Object {
+                    $ownerId = [int]$_.ProcessId
+                    -not $authorizedByPid.ContainsKey($ownerId) -or
+                        (Get-PortConflictSignature @($_)) -ne
+                        (Get-PortConflictSignature @($authorizedByPid[$ownerId]))
+                }
+            )
+            if ($newOwners.Count -gt 0) {
+                if ($taskkillFailures.Count -gt 0) {
+                    Write-Status WARN ('A termination command failed before ownership changed: ' + ($taskkillFailures -join '; '))
+                }
+                $conflicts = $remaining
+                continue
+            }
+            $identity = @(
+                $remaining | ForEach-Object {
+                    "PID $($_.ProcessId) ($($_.ProcessName)), port(s) $(@($_.Ports) -join ', ')"
+                }
+            ) -join '; '
+            $failureText = if ($taskkillFailures.Count -gt 0) {
+                ' Termination errors: ' + ($taskkillFailures -join '; ')
+            } else { '' }
+            throw "Configured ports remain occupied after 20 seconds: $identity.$failureText"
+        }
+        if ($taskkillFailures.Count -gt 0) {
+            Write-Status WARN ('A termination command failed, but the configured ports are now free: ' + ($taskkillFailures -join '; '))
+        }
+        return
+    }
+}
+
+function Stop-StartedProcessTree {
+    param([System.Diagnostics.Process[]]$Processes)
+
+    foreach ($process in $Processes) {
+        if ($null -eq $process) { continue }
+        try {
+            $process.Refresh()
+            if ($process.HasExited) { continue }
+            $output = @(& taskkill.exe /PID $process.Id /T /F 2>&1)
+            if ($LASTEXITCODE -ne 0) {
+                $process.Refresh()
+                if (-not $process.HasExited) {
+                    Write-Status WARN "Could not stop launch-owned process tree $($process.Id): $($output -join ' ')"
+                }
+            }
+        }
+        catch {
+            Write-Status WARN "Could not inspect or stop launch-owned process $($process.Id): $($_.Exception.Message)"
+        }
+    }
+}
+
 function Get-BrowserHost {
     param([Parameter(Mandatory)][string]$HostName)
     if ($HostName -in @('0.0.0.0', '::')) {
@@ -583,14 +858,18 @@ function Get-BrowserHost {
 function Invoke-LaunchApplication {
     Import-EnvironmentFile
     Set-LauncherEnvironment
-    if (-not (Test-DependenciesReady)) {
-        Write-Status STEP 'Required application environments are missing or unusable; installing dependencies and rebuilding the frontend.'
+    $applicationPorts = Get-ConfiguredApplicationPorts
+    Resolve-LaunchPortConflicts -Ports $applicationPorts
+
+    if (-not (Test-LaunchDependenciesReady)) {
+        Write-Status STEP 'Required application environments or frontend dependencies are missing or stale; installing dependencies.'
         Ensure-PortableRuntimes
-        Sync-Dependencies -BuildFrontend $true -InstallationType 'Standard'
+        Sync-Dependencies -BuildFrontend $false -InstallationType 'Standard'
     }
     else {
-        Write-Status OK 'Application environments are ready; skipped dependency installation.'
+        Write-Status OK 'Application environments and frontend dependencies are ready; skipped dependency installation.'
     }
+    Ensure-FrontendBuildCurrent
 
     $fastApiPort = [int]$env:FASTAPI_PORT
     $uiPort = [int]$env:UI_PORT
@@ -599,8 +878,7 @@ function Invoke-LaunchApplication {
     $backendHealthUri = "http://${browserBackendHost}:$fastApiPort/api/health"
     $uiUri = "http://${browserUiHost}:$uiPort"
 
-    Stop-PortListeners -Port $fastApiPort
-    Stop-PortListeners -Port $uiPort
+    Resolve-LaunchPortConflicts -Ports $applicationPorts
 
     $venvPython = Join-Path $VenvDir 'Scripts\python.exe'
     if (-not (Test-Path -LiteralPath $venvPython)) {
@@ -610,35 +888,40 @@ function Invoke-LaunchApplication {
     $backendModule = 'server.app:app'
     $backendWorkingDirectory = $AppDir
     $env:PYTHONPATH = $AppDir
-    & $venvPython -c "import importlib; module = importlib.import_module('server.app'); assert getattr(module, 'app', None) is not None" 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        throw "The backend entrypoint server.app:app could not be imported from $AppDir or does not expose an ASGI app."
-    }
 
     $backendArguments = @('-m', 'uvicorn', $backendModule, '--host', $env:FASTAPI_HOST, '--port', "$fastApiPort", '--log-level', 'info', '--ws-max-size', '65536', '--ws-ping-interval', '15', '--ws-ping-timeout', '10')
     if ($env:RELOAD -ieq 'true') {
         $backendArguments += '--reload'
     }
 
-    Write-Status RUN "Launching backend ($backendModule)"
     $backendProcess = $null
-    if ($env:BACKEND_LOGS_VISIBLE -ieq 'true') {
-        $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -WindowStyle Normal -PassThru
-    }
-    else {
-        $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -WindowStyle Hidden -PassThru
-    }
+    $frontendProcess = $null
+    try {
+        Write-Status RUN "Launching backend ($backendModule)"
+        if ($env:BACKEND_LOGS_VISIBLE -ieq 'true') {
+            $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -WindowStyle Normal -PassThru
+        }
+        else {
+            $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -WindowStyle Hidden -PassThru
+        }
 
-    Write-Status WAIT "Waiting for backend readiness at $backendHealthUri"
-    if (-not (Wait-HttpHealth -Uri $backendHealthUri -TimeoutSeconds 60 -IntervalSeconds 1)) {
-        throw "Backend did not become ready within 60 seconds at $backendHealthUri."
-    }
-    Write-Status OK 'Backend health check passed.'
+        Write-Status RUN 'Launching frontend preview'
+        $frontendProcess = Start-Process -FilePath $NpmCmd -ArgumentList @('run', 'preview', '--', '--host', $env:UI_HOST, '--port', "$uiPort") -WorkingDirectory $ClientDir -WindowStyle Hidden -PassThru
 
-    Write-Status RUN 'Launching frontend preview'
-    $frontendProcess = Start-Process -FilePath $NpmCmd -ArgumentList @('run', 'preview', '--', '--host', $env:UI_HOST, '--port', "$uiPort") -WorkingDirectory $ClientDir -WindowStyle Hidden -PassThru
-    if (-not (Wait-HttpHealth -Uri $uiUri -TimeoutSeconds 60 -IntervalSeconds 1)) {
-        throw "Frontend preview did not become ready within 60 seconds at $uiUri."
+        Write-Status WAIT "Waiting for backend readiness at $backendHealthUri"
+        if (-not (Wait-HttpHealth -Uri $backendHealthUri -Process $backendProcess -TimeoutSeconds 60 -IntervalSeconds 1)) {
+            throw "Backend did not become ready within 60 seconds at $backendHealthUri."
+        }
+        Write-Status OK 'Backend health check passed.'
+
+        Write-Status WAIT "Waiting for frontend readiness at $uiUri"
+        if (-not (Wait-HttpHealth -Uri $uiUri -Process $frontendProcess -TimeoutSeconds 60 -IntervalSeconds 1)) {
+            throw "Frontend preview did not become ready within 60 seconds at $uiUri."
+        }
+    }
+    catch {
+        Stop-StartedProcessTree -Processes @($frontendProcess, $backendProcess)
+        throw
     }
 
     try {
@@ -1245,6 +1528,9 @@ if ($Action -eq 'Launch') {
         exit 0
     }
     catch {
+        if ($_.Exception -is [System.OperationCanceledException]) {
+            exit 0
+        }
         Write-Status FATAL $_.Exception.Message
         exit 1
     }
@@ -1300,6 +1586,9 @@ while ($true) {
         }
     }
     catch {
+        if ($_.Exception -is [System.OperationCanceledException]) {
+            continue
+        }
         Write-Status FATAL $_.Exception.Message
         if ([Console]::IsInputRedirected) {
             exit 1

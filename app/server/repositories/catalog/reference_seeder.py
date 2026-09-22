@@ -30,6 +30,16 @@ class ReferenceCatalogSeeder:
         self.database = database
 
     # -------------------------------------------------------------------------
+    def needs_seed(self) -> bool:
+        required_tables = (
+            ReferenceCountryRecord,
+            ReferenceGeospatialLayerRecord,
+            ReferenceGibsTileMatrixSetRecord,
+            ReferenceGibsLayerDefaultRecord,
+        )
+        return any(self.database.count_records(model) == 0 for model in required_tables)
+
+    # -------------------------------------------------------------------------
     def seed_if_needed(self, catalog: ReferenceCatalog) -> ReferenceSeedResult:
         return ReferenceSeedResult(
             countries_seeded=self._seed_countries_if_empty(catalog),

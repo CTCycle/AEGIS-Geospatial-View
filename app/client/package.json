@@ -3,10 +3,14 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
+    "prebuild": "node scripts/frontend-state.cjs invalidate-build",
     "start": "ng serve --proxy-config proxy.conf.cjs",
     "build": "ng build",
+    "postbuild": "node scripts/frontend-state.cjs record-build",
+    "postinstall": "node scripts/frontend-state.cjs record-dependencies",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "test:frontend-state": "node --test scripts/frontend-state.test.cjs",
     "test:e2e:geospatial": "ng test --watch=false --browsers=ChromeHeadlessNoGpu --include src/app/e2e/geospatial-browser-smoke.spec.ts",
     "preview": "ng serve --proxy-config proxy.conf.cjs"
   },
