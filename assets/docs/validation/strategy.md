@@ -1,6 +1,6 @@
 # Comprehensive validation strategy
 
-Last updated: 2026-09-21
+Last updated: 2026-09-22
 
 This document is the durable digest of the `loop-dev` comprehensive validation
 roadmap. It defines the campaign order, evidence boundary, status vocabulary,
@@ -116,9 +116,13 @@ explicitly reclassified.
 
 ## Current campaign pointer
 
-The first opened campaign is the Tier 1 application-foundations baseline at
-`loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`. Its machine-readable
+The first opened campaign slice is the T0-01 static-quality baseline at exact
+`loop-dev` HEAD `5bb8d416da80e33a7e85b02538f605ee22aee0a5`. Its detailed
+evidence is in
+[`../../QA/t0-01-static-quality-20260922/report.md`](../../QA/t0-01-static-quality-20260922/report.md).
+The Tier 1 application-foundations baseline remains recorded at
+`loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The current result is `PARTIAL`; this is intentional until the six partial
-rows in that package are completed or explicitly reclassified.
+The current campaign result remains `PARTIAL`; this is intentional while
+`T0-02` through `T0-05` and the six partial Tier 1 rows remain open.

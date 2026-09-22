@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-21 (Tier 1 application-foundations baseline added; hosted verification remains separate)
+Last updated: 2026-09-22 (T0-01 static-quality baseline added; hosted verification remains separate)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -16,15 +16,17 @@ documentation reconciliation.
 ## Comprehensive validation campaign
 
 The long-term Tier 0–5 campaign is defined in the
-[validation strategy](strategy.md). Its first opened package is the
+[validation strategy](strategy.md). The first opened Tier 0 package is the
+[T0-01 static-quality baseline](../../QA/t0-01-static-quality-20260922/report.md)
+at exact `loop-dev` HEAD `5bb8d416da80e33a7e85b02538f605ee22aee0a5`; the
 [Tier 1 application-foundations baseline](../../QA/tier1-application-foundations-20260921/report.md)
-at exact `loop-dev` commit `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`.
+remains recorded at exact `loop-dev` commit `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`.
 This campaign ledger is orthogonal to the native-agent rows below: a native
 gate can pass while its broader application-foundation slice remains partial.
 
 | Tier | Focus | Slice count | Campaign status | Evidence / hand-off |
 | --- | --- | ---: | --- | --- |
-| Tier 0 | Environment, schema, current-HEAD reconciliation | 5 | `UNRUN` | Open `T0-01` through `T0-05` in [strategy](strategy.md). |
+| Tier 0 | Environment, schema, current-HEAD reconciliation | 5 | `PARTIAL` | [T0-01 static-quality report](../../QA/t0-01-static-quality-20260922/report.md) passed; `T0-02` through `T0-05` remain `UNRUN`. |
 | Tier 1 | Application foundations | 12 | `PARTIAL` | [Tier 1 ledger](../../QA/tier1-application-foundations-20260921/ledger.md); 6 `PASS`, 6 `PARTIAL`. |
 | Tier 2 | Core agent workflows | 7 | `UNRUN` | Preserve exact-location and no-fallback boundaries. |
 | Tier 3 | Rendering and geospatial feature families | 18 | `UNRUN` | Require browser-authoritative source/layer/render-ack evidence. |
@@ -55,9 +57,9 @@ the dated report and must stay visible to future agents.
 | SYNC-CHAT-TURN — terminal hydration response | Backend API | Exact provider lane, isolated runtime | PARTIAL | 2026-09-17 | `558f1966` | [api-live-final.log](../../QA/native-agent-loop-evaluation-20260917-final/api-live-final.log) | Make the synchronous endpoint boundary explicit or await completion before returning; current 409 is not a generic catalog error. |
 | BACKEND-UNIT — full unit suite | Backend | `app/server/.venv`, isolated basetemp | PASS | 2026-09-17 | `558f1966` | [backend-unit-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/backend-unit-final-commit.log) | Retain the 832-test result and rerun when backend sources change. |
 | NATIVE-FOCUSED — remediation regression suite | Backend / agent loop | `app/server/.venv`, isolated basetemp | PASS | 2026-09-17 | `558f1966` | [focused-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/focused-final-commit.log) | Retain the focused boundary for every future route, render, state, or finalization change. |
-| RUFF — Python lint | Python quality | Local no-cache run | PASS | 2026-09-17 | `558f1966` | [ruff-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/ruff-final-commit.log) | Keep protected-cache warnings separate from lint outcome. |
-| PYRIGHT-STRICT — repository strict typing | Static typing | `app/server/pyproject.toml` strict run | FAIL | 2026-09-17 | `558f1966` | [pyright-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/pyright-final-commit.log) | Resolve the remaining 46 repository diagnostics and rerun. The repaired map descriptor diagnostics are no longer present. |
-| FRONTEND-BUILD — production bundle | Angular client | Local `npm run build` | PASS | 2026-09-17 | `558f1966` | [frontend-build-558f-final.log](../../QA/native-agent-loop-evaluation-20260917-final/frontend-build-558f-final.log) | Keep generated `dist` output out of source control. |
+| RUFF — Python lint | Python quality | Repository-wide `uv run` gate with project configuration | PASS | 2026-09-22 | `5bb8d416 + T0-01 WT` | [T0-01 static-quality report](../../QA/t0-01-static-quality-20260922/report.md) | Ruff passes; keep protected-cache warnings separate from the lint result. |
+| PYRIGHT-STRICT — repository strict typing | Static typing | `app/server/pyproject.toml` strict run | PASS | 2026-09-22 | `5bb8d416 + T0-01 WT` | [T0-01 static-quality report](../../QA/t0-01-static-quality-20260922/report.md) | Full repository run reports 0 errors, 0 warnings, and 0 informations; rerun after typing or project-configuration changes. |
+| FRONTEND-BUILD — production bundle | Angular client | Local `npm ci` plus `npm run build` | PASS | 2026-09-22 | `5bb8d416 + T0-01 WT` | [T0-01 static-quality report](../../QA/t0-01-static-quality-20260922/report.md) | Keep generated `dist` output out of source control. |
 | FRONTEND-KARMA — client regression suite | Angular client | ChromeHeadlessNoGpu | PASS | 2026-09-17 | `558f1966` | [frontend-karma-558f-final.log](../../QA/native-agent-loop-evaluation-20260917-final/frontend-karma-558f-final.log) | 233/233 pass; add browser-timing coverage before retrying supersession remediation. |
 | MIGRATION — isolated upgrade/head/check | Persistence schema | Isolated SQLite under dated QA data | PASS | 2026-09-17 | `558f1966` | [migration-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/migration-final-commit.log) | Keep migration head `202609170001` and rerun only against isolated data. |
 | MATRIX-22 — complete required scenario matrix | Coverage | Exact live provider plus controlled browser | PARTIAL | 2026-09-17 | `bf5a7cfa` | [final-report.md](../../QA/native-agent-loop-evaluation-20260917-final/final-report.md) | Complete the explicit PARTIAL and UNRUN rows, including a separate mismatched-ack case, before any overall PASS claim. |
