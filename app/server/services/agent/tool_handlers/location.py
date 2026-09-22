@@ -108,33 +108,34 @@ class LocationToolHandler:
         if coordinates is None and text_coordinate_match is not None:
             coordinates = _parse_coordinate_pair_from_text(state.user_message)
             coordinate_source = "text"
-        if coordinates is None and (
-            _COORDINATE_PAIR_RE.fullmatch(query) is not None
-            or text_coordinate_match is not None
-        ):
-            invalid_coordinate_text = (
-                query
-                if _COORDINATE_PAIR_RE.fullmatch(query) is not None
-                else text_coordinate_match.group(0).strip().rstrip(".,;")
-            )
-            return _failure(
-                code="invalid_coordinates",
-                message=(
-                    f'"{invalid_coordinate_text}" is outside coordinate bounds. '
-                    "Latitude must be between -90 and 90, and longitude "
-                    "must be between -180 and 180. Provide a valid pair "
-                    "or a place name."
-                ),
-                recovery="request_user_input",
-                semantic_outcome="failed",
-                data={
-                    "resolution_status": "invalid_coordinates",
-                    "query": invalid_coordinate_text,
-                    "latitude_bounds": [-90, 90],
-                    "longitude_bounds": [-180, 180],
-                },
-                started=started,
-            )
+        query_coordinate_match = _COORDINATE_PAIR_RE.fullmatch(query)
+        if coordinates is None:
+            invalid_coordinate_text: str | None = None
+            if query_coordinate_match is not None:
+                invalid_coordinate_text = query
+            elif text_coordinate_match is not None:
+                invalid_coordinate_text = (
+                    text_coordinate_match.group(0).strip().rstrip(".,;")
+                )
+            if invalid_coordinate_text is not None:
+                return _failure(
+                    code="invalid_coordinates",
+                    message=(
+                        f'"{invalid_coordinate_text}" is outside coordinate bounds. '
+                        "Latitude must be between -90 and 90, and longitude "
+                        "must be between -180 and 180. Provide a valid pair "
+                        "or a place name."
+                    ),
+                    recovery="request_user_input",
+                    semantic_outcome="failed",
+                    data={
+                        "resolution_status": "invalid_coordinates",
+                        "query": invalid_coordinate_text,
+                        "latitude_bounds": [-90, 90],
+                        "longitude_bounds": [-180, 180],
+                    },
+                    started=started,
+                )
         if coordinates is not None:
             latitude, longitude = coordinates
             signal = LocationSignal(

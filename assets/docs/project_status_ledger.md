@@ -3,16 +3,15 @@
 Last updated: 2026-09-22
 
 This is the canonical high-level catalog of the current operational state of
-AEGIS Geospatial View. The repository snapshot used for this update is
-`loop-dev` after the requested pre-work checkpoint `8ed88699`; the documentation
-change itself follows that checkpoint. Detailed reports explain how a status
-was established, while this ledger records the current conclusion.
+AEGIS Geospatial View. The repository snapshot used for this update is `loop-dev`
+at HEAD `5bb8d416da80e33a7e85b02538f605ee22aee0a5`; the T0-01 remediation and
+this documentation change are in the working tree. Detailed reports explain
+how a status was established, while this ledger records the current conclusion.
 
 **Current project posture: `PARTIAL`.** The native runtime and core browser
 interaction paths have meaningful local and manual proof. The complete live
 geospatial matrix, several public-provider routes, live raster rendering,
-strict repository typing, hosted CI, and some optional integrations remain
-incomplete or unvalidated.
+hosted CI, and some optional integrations remain incomplete or unvalidated.
 
 ## Purpose and document roles
 
@@ -125,8 +124,8 @@ These distinctions prevent code existence from being mistaken for proof.
 | `ui.chat-map-workspace` | `VALIDATED` | Startup-to-chat flow, clarification, map controls, transcript hygiene, recovery, and repeated core location use. | Core browser report recorded 38 passes and 2 attention cases with no core blocker. | Brief hydration blank state and `Mostrami Milano` language-aware disambiguation remain attention items. | — | 2026-09-19 | E2E | [frontend architecture](architecture/frontend_architecture.md), [core report](../QA/core-behavior-e2e-20260919/final-report.md) | Re-run the core browser smoke after user-visible UI, realtime, or map changes. |
 | `ui.settings-provider-access` | `PARTIAL` | Settings sections for model selection, model-provider credentials, local runtime, geospatial access, and persisted application runtime configuration. | SQLite migration/API coverage, 177 targeted geospatial/chat regression tests, Angular production build, 30 focused Settings Karma tests, and the Tier 1 browser baseline pass the seven-section, masked-state, safe fixture save/clear, runtime save/restart, and desktop model-card checks. | Controlled unreadable-credential/API-failure states and a stale E2E `role=tab` assertion remain. | — | 2026-09-21 | integration | [frontend architecture](architecture/frontend_architecture.md), [access overview](geospatial/providers/access_overview.md), [user settings](user/settings_and_access.md), [runtime validation](../QA/settings-runtime-validation-20260921.md), [Tier 1 report](../QA/tier1-application-foundations-20260921/report.md) | Align the Settings E2E locator, then exercise controlled credential failure states. |
 | `validation.application-foundations-tier1` | `PARTIAL` | Tier 1 route, state, conversation, realtime, run, API, jobs, Settings, credential, model, and context foundations. | Exact current-HEAD baseline records 6 PASS and 6 PARTIAL slices; 105 targeted backend tests, 248 Angular tests, and rendered desktop-width browser evidence are preserved in the dated QA package. | T1-02 headless MapLibre canvas boundary; T1-03 hydration coverage; T1-06 live HTTP timing; T1-07 mounted jobs/shutdown; T1-09 test-contract drift; T1-10 credential failure fixtures. | — | 2026-09-21 | integration/E2E | [validation strategy](validation/strategy.md), [Tier 1 checklist](validation/tier1_application_foundations.md), [Tier 1 ledger](../QA/tier1-application-foundations-20260921/ledger.md) | Continue at the first incomplete Tier 1 row; do not open downstream campaign claims as complete. |
-| `quality.pyright-strict` | `BROKEN` | Strict repository-wide Python typing gate. | Detailed gate ledger records 46 remaining repository diagnostics; targeted changed-module typing had passed separately. | `ISSUE-004`: repository strict gate is not green. | — | 2026-09-17 | integration | [testing and quality](coding/testing_and_quality.md), [gate ledger](validation/gate_status.md) | Resolve the remaining diagnostics and rerun the full strict project configuration. |
-| `quality.ruff-and-frontend-regressions` | `VALIDATED` | Ruff on changed Python files, Angular production build, and recorded frontend regression suites. | Recent reports record Ruff success; the core report records a successful production build; the gate ledger records 233/233 Karma tests. | The frontend build was not repeated for backend-only changes in the latest focused run. | — | 2026-09-20 | integration | [testing and quality](coding/testing_and_quality.md), [gate ledger](validation/gate_status.md), [focused report](../QA/aegis-geospatial-e2e-validation-20260920/report.md) | Re-run the relevant frontend build/tests when frontend or shared contract files change. |
+| `quality.pyright-strict` | `VALIDATED` | Strict repository-wide Python typing gate. | The exact-head T0-01 run reports 0 errors, 0 warnings, and 0 informations under `app/server/pyproject.toml`; the invalid-coordinate regression file passes 9 tests. | — | — | 2026-09-22 | integration | [testing and quality](coding/testing_and_quality.md), [T0-01 static-quality report](../QA/t0-01-static-quality-20260922/report.md), [gate ledger](validation/gate_status.md) | Rerun the full strict project configuration after typing or project-configuration changes. |
+| `quality.ruff-and-frontend-regressions` | `VALIDATED` | Repository-wide Ruff, Angular production build, and frontend state regression helper. | The exact-head T0-01 run passes Ruff, 19 frontend-state tests, and the Angular production build; the gate ledger retains the separate 233/233 Karma result. | Karma was not rerun as part of the static-quality slice. | — | 2026-09-22 | integration | [testing and quality](coding/testing_and_quality.md), [T0-01 static-quality report](../QA/t0-01-static-quality-20260922/report.md), [gate ledger](validation/gate_status.md) | Rerun the relevant frontend suite when frontend or shared contract files change. |
 | `testing.complete-live-matrix` | `PARTIAL` | Complete live provider, browser, raster, composition, and coverage scenario matrix. | 2026-09-20 focused matrix remains `PARTIAL`; successful vector subsets do not cover all required rows. | Explicit gaps remain for raster loading, routing, provider availability, coverage reruns, and other catalog families. | External providers and configured sources vary by environment. | 2026-09-20 | E2E | [gate ledger](validation/gate_status.md), [focused report](../QA/aegis-geospatial-e2e-validation-20260920/report.md), [hazard rerun](../QA/aegis-hazard-hydrology-e2e-20260920/report.md) | Execute the missing rows and retain the exact provider/model, browser, source/layer, and acknowledgement evidence. |
 | `ci.hosted-exact-head` | `UNVALIDATED` | Hosted CI result for the exact current branch head. | The detailed gate ledger records the hosted-CI gate as unrun; no current exact-head result is claimed here. | No hosted PASS or FAIL is inferred from local tests. | — | — | None | [gate ledger](validation/gate_status.md), [testing and quality](coding/testing_and_quality.md) | Inspect the workflow result for the exact pushed head before changing this status. |
 | `deployment.cross-platform` | `NOT_IMPLEMENTED` | First-class Docker deployment, Linux/macOS launcher, and standalone production distribution artifact. | Runtime modes explicitly list these capabilities as not implemented. | This is a product-scope boundary, not a failed local Windows workflow. | — | — | None | [runtime modes](runtime/modes.md), [deployment](runtime/deployment.md) | Implement only if cross-platform or standalone deployment becomes an approved scope. |
@@ -201,25 +200,6 @@ status; an `UNVALIDATED` component is not automatically an issue, and a
 - **Related documentation:** [backend API](architecture/backend_api.md),
   [gate ledger](validation/gate_status.md).
 
-### ISSUE-004 — Repository-wide strict Pyright gate remains failing
-
-- **Affected component:** `quality.pyright-strict`.
-- **Severity:** `MEDIUM`.
-- **Description and impact:** The strict project run still reports 46
-  repository diagnostics. Targeted typing for changed modules passed, but the
-  repository-level quality gate cannot be marked green.
-- **Evidence:** The `PYRIGHT-STRICT` row in the
-  [validation gate ledger](validation/gate_status.md).
-- **Suspected cause:** Pre-existing provider Optional-access, maintenance,
-  transport, and AgentLoop complexity diagnostics are recorded; do not assume
-  that list is exhaustive until the next run.
-- **Blocker:** None.
-- **Remediation status:** Open.
-- **Required revalidation:** Run the full strict configuration, not only
-  changed-module or targeted diagnostics.
-- **Related documentation:** [testing and quality](coding/testing_and_quality.md),
-  [native harness](geospatial/native_harness_bootstrap.md).
-
 ### ISSUE-005 — Controlled supersession acknowledgement ordering still fails
 
 - **Affected component:** `agent.map-render-ack-recovery`.
@@ -275,6 +255,7 @@ regression is observed.
 | `HIST-004` `maps.committed-state-narration` | Completion narration could trust a model claim instead of the committed visible overlay set. | FEMA/USGS removal retest reported the actual committed overlay state, not an unverified FEMA claim. | Finalization, map-state, or assistant narration changes. |
 | `HIST-005` `providers.fema.arcgis-endpoint` | FEMA descriptor retrieval used an obsolete or unusable endpoint. | Current ArcGIS export descriptor retrieval now succeeds; browser source loading remains active `ISSUE-002`. | FEMA adapter, raster descriptor, or MapLibre source changes. |
 | `HIST-006` `agent.data-bearing-map-policy` | Data-bearing map routes could be rejected by the map-only policy boundary. | WorldCover and Overpass route/policy fixes passed focused regression coverage and reached their correct provider/render boundaries. | Capability domains, policy, or route compilation changes. |
+| `HIST-007` `quality.pyright-strict` | The repository strict gate reported 46 diagnostics and `PYRIGHT-STRICT` was `FAIL`. | T0-01 explicitly narrowed the invalid-coordinate branch, the full `app/server/pyproject.toml` run reports 0 errors, and the related regression file passes 9 tests. See the [T0-01 static-quality report](../QA/t0-01-static-quality-20260922/report.md). | Python typing, project configuration, or source changes. |
 
 ## Validation debt
 
