@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from fastapi import FastAPI
@@ -13,6 +14,9 @@ from server.contracts.chat import (
     ChatTurnResponse,
     StructuredProbeResponse,
 )
+from server.contracts.runs import AgentRunCreateResult, AgentRunSnapshot, AgentRunState
+from server.services.agent_runs.exceptions import RunConflictError
+from server.services.agent_runs.lifecycle import RunLifecycleService
 
 ###############################################################################
 def _app() -> FastAPI:
@@ -122,6 +126,132 @@ def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     assert response.status_code == 404
     assert response.json()["detail"] == "Conversation not found."
     assert orchestrator_called is False
+
+###############################################################################
+class _ChatTurnLifecycleStub(RunLifecycleService):
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        *,
+        response: ChatTurnResponse | None,
+        result: AgentRunCreateResult,
+        snapshot: AgentRunSnapshot | None = None,
+        conflict: RunConflictError | None = None,
+    ) -> None:
+        self._response = response
+        self._result = result
+        self._snapshot = snapshot
+        self._conflict = conflict
+        self.run_repository = SimpleNamespace(
+            get_run=lambda _run_id: self._snapshot
+        )
+
+    # -------------------------------------------------------------------------
+    async def run_turn(self, *args, **kwargs):  # noqa: ANN002, ANN003
+        if self._conflict is not None:
+            raise self._conflict
+        return self._response, self._result, True
+
+
+def _chat_turn_runtime() -> SimpleNamespace:
+    return SimpleNamespace(
+        conversation_repository=SimpleNamespace(
+            get_conversation=lambda _conversation_id: object()
+        )
+    )
+
+
+def _chat_turn_result(state: AgentRunState) -> AgentRunCreateResult:
+    return AgentRunCreateResult(
+        conversation_id="conv-1",
+        run_id="run-1",
+        run_version=2,
+        state=state,
+    )
+
+
+def _accepted_snapshot() -> AgentRunSnapshot:
+    return AgentRunSnapshot(
+        conversation_id="conv-1",
+        run_id="run-1",
+        original_request="Show Rome",
+        aggregated_request="Show Rome",
+        active_run_version=2,
+        state=AgentRunState.PENDING,
+        created_at=datetime.now(timezone.utc),
+        presentation_status="pending",
+    )
+
+
+def _terminal_response() -> ChatTurnResponse:
+    return ChatTurnResponse(
+        request_id="request-1",
+        conversation_id="conv-1",
+        assistant_message="Evidence is ready.",
+        operation=ChatOperationResult(
+            kind="direct_answer",
+            status="success",
+            message="Evidence is ready.",
+        ),
+    )
+
+
+def _post_with_lifecycle(lifecycle: _ChatTurnLifecycleStub):
+    application = _app()
+    application.state.run_lifecycle_service = lifecycle
+    application.dependency_overrides[get_chat_runtime] = _chat_turn_runtime
+    return TestClient(application).post(
+        f"/api/chat{CHAT_TURN_ROUTE}",
+        json={"message": "Show Rome", "conversation_id": "conv-1"},
+    )
+
+
+def test_chat_turn_returns_terminal_200_response() -> None:
+    response = _post_with_lifecycle(
+        _ChatTurnLifecycleStub(
+            response=_terminal_response(),
+            result=_chat_turn_result(AgentRunState.COMPLETED),
+        )
+    )
+
+    assert response.status_code == 200
+    assert response.json()["assistant_message"] == "Evidence is ready."
+
+
+def test_chat_turn_returns_accepted_202_snapshot_contract() -> None:
+    response = _post_with_lifecycle(
+        _ChatTurnLifecycleStub(
+            response=None,
+            result=_chat_turn_result(AgentRunState.PENDING),
+            snapshot=_accepted_snapshot(),
+        )
+    )
+
+    assert response.status_code == 202
+    assert response.json() == {
+        "conversation_id": "conv-1",
+        "run_id": "run-1",
+        "run_version": 2,
+        "state": "pending",
+        "presentation_status": "pending",
+        "status_url": "/api/conversations/conv-1/runs/run-1",
+        "realtime_url": "/api/conversations/conv-1/realtime",
+        "terminal": False,
+    }
+
+
+def test_chat_turn_returns_409_only_for_real_run_conflict() -> None:
+    response = _post_with_lifecycle(
+        _ChatTurnLifecycleStub(
+            response=None,
+            result=_chat_turn_result(AgentRunState.PENDING),
+            conflict=RunConflictError("An active run already exists."),
+        )
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "An active run already exists."
 
 ###############################################################################
 def test_structured_probe_routes_return_latest_and_run_results() -> None:

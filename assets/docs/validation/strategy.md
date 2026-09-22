@@ -64,7 +64,7 @@ trusting downstream feature evidence.
 
 | Campaign tier | Slice IDs | Focus | Current hand-off |
 | --- | --- | --- | --- |
-| Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | `T0-01` and [T0-02](../../QA/t0-02-current-migration-20260922/report.md) pass; `T0-03` is next, while `T0-04` and `T0-05` remain unrun. |
+| Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | [Current Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md) records `T0-01` through `T0-05` as `PASS` on the same `develop` source boundary. |
 | Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 application-foundations checklist](tier1_application_foundations.md) and [2026-09-21 evidence](../../QA/tier1-application-foundations-20260921/report.md). |
 | Tier 2 | `T2-01`–`T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | Open only after foundations are classified; preserve exact geography and no-fallback rules. |
 | Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
@@ -125,6 +125,24 @@ The Tier 1 application-foundations baseline remains recorded at
 `loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The current campaign result remains `PARTIAL`: 8 slices are `PASS`, 6 are
-`PARTIAL`, and 54 are `UNRUN`. `T0-03` through `T0-05` and the six partial Tier
-1 rows remain open.
+The current campaign result remains `PARTIAL`: 11 slices are `PASS`, 6 are
+`PARTIAL`, and 51 are `UNRUN`. Tier 0 is complete; the six partial Tier 1
+rows and downstream live/browser/provider/hosted-CI boundaries remain open.
+
+## Current Tier 0 execution record
+
+The 2026-09-22 campaign continued on `develop` from starting SHA
+`7e8b10d58aebf21f194a74bcc2307f9d8e08f15c`. All application data and pytest
+state used isolated paths below `runtimes/cache/test-runtime` and
+`runtimes/cache/pytest*`; the user's normal runtime database was not used by
+the final validation and was verified restored to the documented provider
+lane. The detailed reports are:
+
+- [T0-03 legacy Settings migration](../../QA/tier0-validation-develop-20260922/T0-03/report.md)
+- [T0-04 Windows startup](../../QA/tier0-validation-develop-20260922/T0-04/report.md)
+- [T0-05 API composition](../../QA/tier0-validation-develop-20260922/T0-05/report.md)
+- [final exact-head regression and reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md)
+
+The exact execution order was `T0-03 -> T0-04 -> T0-05 -> final T0-01/T0-02
+regression sweep -> ledger reconciliation`. Local PASS does not promote the
+hosted-CI, live-provider, complete browser matrix, or Tier 1 partial rows.

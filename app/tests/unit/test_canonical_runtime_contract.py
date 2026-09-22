@@ -43,6 +43,7 @@ def test_launcher_uses_confirmed_port_guard_and_process_aware_startup() -> None:
         return launcher[start:] if end < 0 else launcher[start:end]
 
     launch = function_body("Invoke-LaunchApplication")
+    confirmation = function_body("Confirm-PortConflictTermination")
     conflicts = function_body("Resolve-LaunchPortConflicts")
     grouped_conflicts = function_body("Get-PortConflicts")
     health_wait = function_body("Wait-HttpHealth")
@@ -50,6 +51,10 @@ def test_launcher_uses_confirmed_port_guard_and_process_aware_startup() -> None:
     assert "Stop-PortListeners" not in launch
     assert "taskkill.exe" not in launch
     assert launch.count("Resolve-LaunchPortConflicts") == 2
+    assert "StartTimeUtcTicks" in confirmation
+    assert "'unavailable'" in confirmation
+    assert "no existing process was terminated" in confirmation
+    assert confirmation.index("$unresolvedOwners") < confirmation.index("Read-Host")
     assert "Confirm-PortConflictTermination" in conflicts
     assert "HashSet[int]" in conflicts
     assert "Dictionary[int, object]" in grouped_conflicts

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -36,6 +37,11 @@ def test_runtime_settings_api_returns_typed_blocks_and_restart_metadata(tmp_path
     assert payload["agent_execution"]["max_iterations"] == 12
     assert payload["restart_required"] is False
     assert "credentials" not in payload
+    serialized = json.dumps(payload).casefold()
+    assert not any(
+        secret_field in serialized
+        for secret_field in ("api_key", "password", "secret", "token")
+    )
     assert repository.get_required().chat.max_history_messages == 12
 
 
@@ -63,4 +69,16 @@ def test_runtime_settings_api_rejects_unknown_nested_fields(tmp_path: Path) -> N
 
     assert response.status_code == 400
     assert "Unsupported runtime settings in map" in response.json()["detail"]
+    assert repository.get_required().map.tiles == "OpenStreetMap"
+
+
+def test_runtime_settings_api_rejects_unknown_blocks(tmp_path: Path) -> None:
+    client, repository = _client(tmp_path)
+
+    response = client.patch(
+        "/api/settings/runtime",
+        json={"unsupported": {"enabled": True}},
+    )
+
+    assert response.status_code == 422
     assert repository.get_required().map.tiles == "OpenStreetMap"

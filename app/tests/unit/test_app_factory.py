@@ -55,6 +55,10 @@ class _LifecycleStub:
     async def shutdown(self) -> None:
         self.call_order.append("run_lifecycle.shutdown")
 
+
+async def _record_async(call_order: list[str], label: str) -> None:
+    call_order.append(label)
+
 ###############################################################################
 def _response_schema_ref(schema: dict, path: str, method: str, status_code: str) -> str:
     response = schema["paths"][path][method]["responses"][status_code]
@@ -81,6 +85,66 @@ def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
     assert f"{FASTAPI_API_PREFIX}/settings/runtime" in route_paths
     assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}" in route_paths
     assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}/cancel" in route_paths
+
+###############################################################################
+def test_create_app_uses_only_canonical_router_composition(monkeypatch) -> None:
+    monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
+
+    created = app_module.create_app()
+    route_paths = {route.path for route in created.routes}
+
+    assert f"{FASTAPI_API_PREFIX}/health" in route_paths
+    assert f"{FASTAPI_API_PREFIX}/chat/turn" in route_paths
+    assert f"{FASTAPI_API_PREFIX}/conversations" in route_paths
+    assert (
+        f"{FASTAPI_API_PREFIX}/conversations/{{conversation_id}}/realtime"
+        in route_paths
+    )
+    assert f"{FASTAPI_API_PREFIX}/realtime/metrics" in route_paths
+    assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}" in route_paths
+    assert f"{FASTAPI_API_PREFIX}/geospatial/capabilities" in route_paths
+    assert f"{FASTAPI_API_PREFIX}/settings/runtime" in route_paths
+
+    shadow_prefixes = ("/api/maps", "/api/preview", "/api/legacy", "/api/shadow")
+    assert not any(
+        path == prefix or path.startswith(f"{prefix}/")
+        for path in route_paths
+        for prefix in shadow_prefixes
+    )
+
+    response = TestClient(created).get("/", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "/docs"
+
+###############################################################################
+def test_create_app_mounts_client_root_assets_and_spa_fallback(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    client_dist = tmp_path / "dist"
+    client_assets = client_dist / "assets"
+    client_assets.mkdir(parents=True)
+    index_file = client_dist / "index.html"
+    index_file.write_text("<html>client</html>", encoding="utf-8")
+    asset_file = client_assets / "main.js"
+    asset_file.write_text("console.log('client');", encoding="utf-8")
+
+    monkeypatch.setattr(app_module, "_client_build_available", lambda: True)
+    monkeypatch.setattr(app_module, "CLIENT_DIST_PATH", client_dist)
+    monkeypatch.setattr(app_module, "CLIENT_ASSETS_PATH", client_assets)
+    monkeypatch.setattr(app_module, "CLIENT_INDEX_FILE_PATH", index_file)
+
+    with TestClient(app_module.create_app()) as client:
+        root = client.get("/")
+        asset = client.get("/assets/main.js")
+        fallback = client.get("/map/rome")
+
+    assert root.status_code == 200
+    assert root.text == "<html>client</html>"
+    assert asset.status_code == 200
+    assert "console.log" in asset.text
+    assert fallback.status_code == 200
+    assert fallback.text == "<html>client</html>"
 
 ###############################################################################
 def test_openapi_declares_stable_response_models(monkeypatch) -> None:
@@ -138,6 +202,14 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         start=lambda: call_order.append("job_service.start"),
         stop=lambda: call_order.append("job_service.stop"),
     )
+    database = SimpleNamespace(
+        engine=SimpleNamespace(
+            dispose=lambda: call_order.append("sqlite.dispose"),
+        )
+    )
+    realtime_connections = SimpleNamespace(
+        close_all=lambda: _record_async(call_order, "realtime.close_all"),
+    )
 
     monkeypatch.setattr(app_module, "ensure_environment_loaded", lambda: None)
     monkeypatch.setattr(app_module, "build_database_settings", lambda: object())
@@ -151,7 +223,7 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         ),
     )
     monkeypatch.setattr(app_module, "RuntimeSettingsService", lambda repository: object())
-    monkeypatch.setattr(app_module, "SQLiteRepository", lambda settings: object())
+    monkeypatch.setattr(app_module, "SQLiteRepository", lambda settings: database)
     monkeypatch.setattr(
         app_module,
         "initialize_database",
@@ -181,6 +253,14 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         app_module, "AgentSteeringRepository", lambda database: object()
+    )
+    monkeypatch.setattr(
+        app_module, "RunLifecycleService", lambda **kwargs: _LifecycleStub(call_order)
+    )
+    monkeypatch.setattr(
+        app_module,
+        "RealtimeConnectionRegistry",
+        lambda: realtime_connections,
     )
     monkeypatch.setattr(
         app_module, "BackgroundJobService", lambda **kwargs: job_service
@@ -213,7 +293,10 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         "job_service.start",
         "settings_service.validate_persisted_settings",
         "run_startup_validations",
+        "realtime.close_all",
         "job_service.stop",
+        "run_lifecycle.shutdown",
+        "sqlite.dispose",
     ]
 
 ###############################################################################

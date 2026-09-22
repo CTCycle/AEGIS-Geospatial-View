@@ -1,0 +1,23 @@
+
+> aegis-client@1.0.0 prebuild
+> node scripts/frontend-state.cjs invalidate-build
+
+
+> aegis-client@1.0.0 build
+> ng build
+
+> Building...
+√ Building...
+Initial chunk files | Names         | Raw size | Estimated transfer size
+main-DELD4XNR.js    | main          |  1.55 MB |               353.37 kB
+styles-NFZPBYYM.css | styles        | 68.72 kB |                 8.48 kB
+
+                    | Initial total |  1.62 MB |               361.85 kB
+
+Application bundle generation complete. [6.896 seconds] - 2026-09-22T18:04:47.531Z
+
+Output location: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\client\dist
+
+
+> aegis-client@1.0.0 postbuild
+> node scripts/frontend-state.cjs record-build
