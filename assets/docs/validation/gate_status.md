@@ -50,11 +50,11 @@ the dated report and must stay visible to future agents.
 
 | Slice | Scope | Status | Verification date | Tested source boundary | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| `T0-01` | Static quality | `PASS` | 2026-09-22 | `develop` starting `7e8b10d5` plus validation working tree | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) |
-| `T0-02` | Current SQLite migration/schema | `PASS` | 2026-09-22 | `develop` starting `7e8b10d5` plus validation working tree | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) |
-| `T0-03` | Legacy Settings migration | `PASS` | 2026-09-22 | `develop` starting `7e8b10d5` plus validation working tree | [T0-03 report](../../QA/tier0-validation-develop-20260922/T0-03/report.md) |
-| `T0-04` | Windows startup | `PASS` | 2026-09-22 | `develop` starting `7e8b10d5` plus validation working tree | [T0-04 report](../../QA/tier0-validation-develop-20260922/T0-04/report.md) |
-| `T0-05` | API composition and contract | `PASS` | 2026-09-22 | `develop` starting `7e8b10d5` plus validation working tree | [T0-05 report](../../QA/tier0-validation-develop-20260922/T0-05/report.md) |
+| `T0-01` | Static quality | `PASS` | 2026-09-22 | `develop@afa608c8d5c53a34d0ce8da36e5fe5f47f689145` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) |
+| `T0-02` | Current SQLite migration/schema | `PASS` | 2026-09-22 | `develop@afa608c8d5c53a34d0ce8da36e5fe5f47f689145` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) |
+| `T0-03` | Legacy Settings migration | `PASS` | 2026-09-22 | `develop@afa608c8d5c53a34d0ce8da36e5fe5f47f689145` | [T0-03 report](../../QA/tier0-validation-develop-20260922/T0-03/report.md) |
+| `T0-04` | Windows startup | `PASS` | 2026-09-22 | `develop@afa608c8d5c53a34d0ce8da36e5fe5f47f689145` | [T0-04 report](../../QA/tier0-validation-develop-20260922/T0-04/report.md) |
+| `T0-05` | API composition and contract | `PASS` | 2026-09-22 | `develop@afa608c8d5c53a34d0ce8da36e5fe5f47f689145` | [T0-05 report](../../QA/tier0-validation-develop-20260922/T0-05/report.md) |
 
 Tier 0 is `PASS`. The overall campaign remains `PARTIAL` because six Tier 1
 slices and the downstream live/browser/provider/hosted-CI boundaries remain

@@ -136,7 +136,8 @@ The 2026-09-22 campaign continued on `develop` from starting SHA
 state used isolated paths below `runtimes/cache/test-runtime` and
 `runtimes/cache/pytest*`; the user's normal runtime database was not used by
 the final validation and was verified restored to the documented provider
-lane. The detailed reports are:
+lane. The validated source was committed and pushed as
+`afa608c8d5c53a34d0ce8da36e5fe5f47f689145`. The detailed reports are:
 
 - [T0-03 legacy Settings migration](../../QA/tier0-validation-develop-20260922/T0-03/report.md)
 - [T0-04 Windows startup](../../QA/tier0-validation-develop-20260922/T0-04/report.md)

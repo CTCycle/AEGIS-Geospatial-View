@@ -6,6 +6,7 @@ Status: `PASS`
 
 - Branch: `develop`
 - Starting HEAD: `7e8b10d58aebf21f194a74bcc2307f9d8e08f15c`
+- Validated source commit: `afa608c8d5c53a34d0ce8da36e5fe5f47f689145`
 - Validation source: working tree based on that exact HEAD.
 - Python: `app/server/.venv/Scripts/python.exe` (Python 3.14)
 - Isolated data: `runtimes/cache/test-runtime/tier0-validation-develop-20260922/T0-05/data`
