@@ -1,0 +1,58 @@
+{
+  "slice_id": "T1-02",
+  "status": "PASS",
+  "verification_date": "2026-09-22",
+  "source_boundary": {
+    "branch": "develop",
+    "base_commit": "8375fe071823e7f844f6bb125d86d6ebf36b3110",
+    "working_tree": "uncommitted source changes; see source-sha256.txt"
+  },
+  "environment": {
+    "os": "Windows",
+    "frontend": "Angular development server at 127.0.0.1:4512",
+    "backend": "standard test runner at 127.0.0.1:7059",
+    "isolated_data_dir": "runtimes/cache/test-runtime/t1-02-browser-20260922",
+    "browser": "system Chrome channel, headed Playwright; ChromeHeadlessNoGpu for Karma"
+  },
+  "checks": [
+    {
+      "name": "focused Angular Karma suite",
+      "status": "PASS",
+      "passed": 90,
+      "failed": 0,
+      "scope": [
+        "app-state schema and storage",
+        "TTL and corrupted-state recovery",
+        "map overlay restoration",
+        "geospatial page synchronization"
+      ]
+    },
+    {
+      "name": "chat-state persistence browser suite",
+      "status": "PASS",
+      "passed": 8,
+      "failed": 0,
+      "target": "app/tests/e2e/test_chat_state_persistence.py",
+      "browser": "system Chrome channel, headed",
+      "coverage": [
+        "same-tab chat and map state reload",
+        "session storage isolation between tabs",
+        "route back and forward restoration",
+        "unknown route fallback",
+        "missing conversation snapshot recovery",
+        "corrupted and expired state recovery",
+        "stale overlay ID recovery"
+      ]
+    }
+  ],
+  "artifacts": {
+    "report": "report.md",
+    "source_sha256": "source-sha256.txt",
+    "screenshot": "screenshots/__test_refresh_same_tab_restores_chat_and_map_state[chromium]/t1-02-restored-map-state.png"
+  },
+  "limitations": [
+    "Transparent map tile fixtures validate restored controls, not live provider pixels or map-render acknowledgement.",
+    "This PASS applies to the recorded uncommitted working tree, not to the base commit alone."
+  ],
+  "next_action": "Continue with T1-03 conversation lifecycle and history."
+}

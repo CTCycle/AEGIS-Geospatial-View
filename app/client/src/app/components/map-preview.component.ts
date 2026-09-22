@@ -288,7 +288,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.observeHostSize();
     if (!this.mapSession && this.payload) {
       this.syncSessionFromPayload();
-      this.rebuildOverlayStateFromSession();
+      this.rebuildOverlayStateFromSession(true);
       // The session-derived loading state changes during view initialization;
       // publish it before MapLibre starts its external render lifecycle.
       this.changeDetector.detectChanges();
@@ -301,13 +301,21 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (this.destroyed) {
       return;
     }
-    const sessionChanged = Boolean(changes['payload'] || changes['renderIdentity']);
+    const payloadChanged = Boolean(changes['payload']);
+    const sessionChanged = Boolean(payloadChanged || changes['renderIdentity']);
     const overlayStateChanged = Boolean(changes['initialOverlayVisibility'] || changes['initialOverlayOpacity']);
     if (sessionChanged || overlayStateChanged) {
-      if (sessionChanged) {
+      const hadMapSession = Boolean(this.mapSession);
+      if (payloadChanged) {
         this.syncSessionFromPayload();
       }
-      this.rebuildOverlayStateFromSession(!sessionChanged);
+      const previousSession = (changes['payload']?.previousValue as SearchResponsePayload | undefined)?.map_session;
+      const currentSession = this.payload?.map_session;
+      const sameSessionRevision = Boolean(previousSession && currentSession
+        && previousSession.session_id === currentSession.session_id
+        && previousSession.overlay_collection?.revision === currentSession.overlay_collection?.revision);
+      const restoringInitialSession = payloadChanged && !hadMapSession && Boolean(this.mapSession);
+      this.rebuildOverlayStateFromSession(!payloadChanged || restoringInitialSession || sameSessionRevision);
       if (sessionChanged) {
         this.recreateMapIfPossible();
       }
@@ -482,11 +490,16 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     const nextOpacity: Record<string, number> = {};
     overlays.forEach((overlay) => {
       const fallback = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
-      nextOpacity[overlay.id] = this.overlayOpacity[overlay.id] ?? this.initialOverlayOpacity[overlay.id] ?? fallback;
+      const initialOpacity = this.initialOverlayOpacity[overlay.id];
+      nextOpacity[overlay.id] = preferInitialState && typeof initialOpacity === 'number'
+        ? initialOpacity
+        : this.overlayOpacity[overlay.id] ?? initialOpacity ?? fallback;
     });
     this.overlayOpacity = recordNumberEqual(this.overlayOpacity, nextOpacity) ? this.overlayOpacity : nextOpacity;
 
-    this.emitOverlayState();
+    if (this.mapSession) {
+      this.emitOverlayState();
+    }
   }
 
   private emitOverlayState(): void {

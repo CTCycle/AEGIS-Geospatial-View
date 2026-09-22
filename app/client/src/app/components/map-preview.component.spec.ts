@@ -114,6 +114,32 @@ describe('components/map-preview.component', () => {
     component = fixture.componentInstance;
   });
 
+  it('does not emit an empty overlay state before a map session exists', () => {
+    const emitted: Array<{ overlayVisibility: Record<string, boolean>; overlayOpacity: Record<string, number> }> = [];
+    component.overlayStateChange.subscribe((value) => emitted.push(value));
+    fixture.componentRef.setInput('initialOverlayVisibility', { weather: false });
+    fixture.componentRef.setInput('initialOverlayOpacity', { weather: 0.33 });
+
+    fixture.detectChanges();
+
+    expect(emitted).toEqual([]);
+  });
+
+  it('restores persisted overlay state in the view-init payload fallback', () => {
+    component.initialOverlayVisibility = { weather: false };
+    component.initialOverlayOpacity = { weather: 0.33 };
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'fixture', visible: true, default_opacity: 0.65 }],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(component.overlayVisibility['weather']).toBeFalse();
+    expect(component.overlayOpacity['weather']).toBe(0.33);
+  });
+
   it('uses the backend basemap descriptor when rendering the base map', () => {
     component.payload = { map_session: makeMapSession() as never };
     fixture.detectChanges();
@@ -342,24 +368,40 @@ describe('components/map-preview.component', () => {
     expect(component.restoreNotice).toContain('could not be restored');
   });
 
-  it('keeps backend visibility authoritative over a stale local preference', () => {
-    component.initialOverlayVisibility = { weather: true };
-    component.payload = {
+  it('preserves restored overlay preferences for same-session payload echoes and applies new-session visibility', () => {
+    fixture.componentRef.setInput('initialOverlayVisibility', { weather: false });
+    fixture.componentRef.setInput('initialOverlayOpacity', { weather: 0.12 });
+    fixture.componentRef.setInput('payload', {
       map_session: makeMapSession({
-        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true }],
+        session_id: 'map-1',
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }],
       }) as never,
-    };
+    });
     fixture.detectChanges();
-    expect(component.overlayVisibility['weather']).toBeTrue();
+    expect(component.overlayVisibility['weather']).toBeFalse();
+    expect(component.overlayOpacity['weather']).toBe(0.12);
 
     fixture.componentRef.setInput('payload', {
       map_session: makeMapSession({
-        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: false }],
+        session_id: 'map-1',
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }],
       }) as never,
     });
     fixture.detectChanges();
 
     expect(component.overlayVisibility['weather']).toBeFalse();
+    expect(component.overlayOpacity['weather']).toBe(0.12);
+
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({
+        session_id: 'map-2',
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }],
+      }) as never,
+    });
+    fixture.detectChanges();
+
+    expect(component.overlayVisibility['weather']).toBeTrue();
+    expect(component.overlayOpacity['weather']).toBe(0.12);
   });
 
   it('keeps a local visibility toggle when the parent echoes map state', () => {

@@ -1063,6 +1063,47 @@ describe('pages/geospatial-page.component', () => {
     expect(store.updateChatPage).toHaveBeenCalled();
   });
 
+  it('keeps saved overlay preferences when the restored map session is replayed', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const session = {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      overlay_collection: {
+        collection_id: 'active-map',
+        revision: 1,
+        instances: [{
+          instance_id: 'weather',
+          capability_id: 'weather',
+          label: 'Weather',
+          provider: 'fixture',
+          overlay_type: 'tile',
+          rendering_mode: 'xyz',
+          scope_key: 'global',
+          scope: {},
+          visible: true,
+          opacity: 0.65,
+          render_variant: {},
+          descriptor: { id: 'weather', type: 'tile' },
+          inspections: [],
+        }],
+      },
+    } as MapSession;
+    component.mapSession = session;
+    component.mapState = {
+      overlayVisibility: { weather: false },
+      overlayOpacity: { weather: 0.34 },
+    };
+
+    component['handleMapSession'](session);
+
+    expect(component.mapState.overlayVisibility['weather']).toBeFalse();
+    expect(component.mapState.overlayOpacity['weather']).toBe(0.34);
+  });
+
   it('handles zoom commands locally without chat API request', async () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();

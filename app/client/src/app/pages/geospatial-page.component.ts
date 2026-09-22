@@ -1846,11 +1846,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         basemap: { ...preferredBasemap },
       }
       : mapSession;
+    const preserveOverlayPreferences = this.mapSession?.session_id === effectiveMapSession.session_id;
     if (!this.pendingMapSession && this.mapSession && this.mapSession.session_id !== mapSession.session_id) {
       this.committedMapSession = this.mapSession;
     }
     this.pendingMapSession = effectiveMapSession;
-    this.synchronizeOverlayState(effectiveMapSession);
+    this.synchronizeOverlayState(effectiveMapSession, preserveOverlayPreferences);
     this.payload = {
       map_session: effectiveMapSession,
       compliance_warnings: effectiveMapSession.compliance_warnings,
@@ -1919,7 +1920,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.messages = [...this.messages, { role: 'assistant', content }];
   }
 
-  private synchronizeOverlayState(session: MapSession): void {
+  private synchronizeOverlayState(session: MapSession, preservePreferences = false): void {
     const overlays = mapSessionOverlayEntries(session);
     const ids = new Set(overlays.map((overlay) => overlay.id));
     const visibility = Object.fromEntries(
@@ -1929,11 +1930,15 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       Object.entries(this.mapState.overlayOpacity).filter(([id]) => ids.has(id)),
     );
     overlays.forEach((overlay) => {
-      if (typeof overlay.visible === 'boolean') {
-        visibility[overlay.id] = overlay.visible;
+      if (!preservePreferences || typeof visibility[overlay.id] !== 'boolean') {
+        if (typeof overlay.visible === 'boolean') {
+          visibility[overlay.id] = overlay.visible;
+        }
       }
-      if (typeof overlay.default_opacity === 'number') {
-        opacity[overlay.id] = overlay.default_opacity;
+      if (!preservePreferences || typeof opacity[overlay.id] !== 'number') {
+        if (typeof overlay.default_opacity === 'number') {
+          opacity[overlay.id] = overlay.default_opacity;
+        }
       }
     });
     this.mapState = { overlayVisibility: visibility, overlayOpacity: opacity };
