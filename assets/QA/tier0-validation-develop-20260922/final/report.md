@@ -29,7 +29,7 @@ Date: 2026-09-22
 | T0-02 Alembic upgrade/check/current-heads | PASS — `202609210001 (head)` |
 | T0-02 migration/persistence regression | PASS — 25 tests |
 | T0-03 legacy Settings/runtime regression | PASS — 44 tests |
-| T0-04 startup/backend/helper/harness regression | PASS — 36 backend tests, 19 helper tests, harness PASS |
+| T0-04 startup/backend/helper/harness regression | PASS — 38 backend tests, 19 helper tests, harness PASS |
 | T0-05 API/composition/OpenAPI regression | PASS — 44 tests |
 | Process cleanup | PASS — ports 7059, 4512, and 9876 free |
 

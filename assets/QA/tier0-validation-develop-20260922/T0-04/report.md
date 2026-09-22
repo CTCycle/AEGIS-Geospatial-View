@@ -33,7 +33,7 @@ from that report:
 Current results:
 
 ```text
-backend-focused final slice: 36 passed, 2 warnings, 3.03 seconds
+backend-focused final slice: 38 passed, 2 warnings, 3.58 seconds
 frontend-state helper:       19 passed, 0 failed
 launcher safety harness:     PASS
 ```
