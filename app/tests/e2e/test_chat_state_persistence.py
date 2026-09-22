@@ -4,9 +4,11 @@ import base64
 import json
 import re
 import time
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
-from playwright.sync_api import Page, Route, expect
+from playwright.sync_api import BrowserContext, Page, Route, expect
 
 from tests.e2e.helpers.chat_stub_payloads import (
     conversation_snapshot_payload,
@@ -85,11 +87,16 @@ def _stub_settings_api(
 def _seed_persisted_state(page: Page, state: dict[str, Any]) -> None:
     payload_literal = json.dumps(state)
     storage_key_literal = json.dumps(STORAGE_KEY)
+    seed_marker_literal = json.dumps(f"{STORAGE_KEY}:test-seeded")
     page.add_init_script(
         f"""
         (() => {{
-          const payload = {payload_literal};
-          window.sessionStorage.setItem({storage_key_literal}, JSON.stringify(payload));
+          const seedMarker = {seed_marker_literal};
+          if (window.sessionStorage.getItem(seedMarker) !== "1") {{
+            const payload = {payload_literal};
+            window.sessionStorage.setItem({storage_key_literal}, JSON.stringify(payload));
+            window.sessionStorage.setItem(seedMarker, "1");
+          }}
         }})();
         """
     )
@@ -123,7 +130,7 @@ def _base_state(saved_at: int | None = None) -> dict[str, Any]:
 
 ###############################################################################
 def test_refresh_same_tab_restores_chat_and_map_state(
-    page: Page, base_url: str
+    page: Page, base_url: str, save_snapshot: Callable[[Page, str], Path]
 ) -> None:
     _stub_settings_api(page)
     _seed_persisted_state(page, _base_state())
@@ -131,6 +138,66 @@ def test_refresh_same_tab_restores_chat_and_map_state(
     expect(page.get_by_label("Chat message")).to_have_value("draft should persist")
     expect(page.get_by_text("show map at 41.9028, 12.4964")).to_be_visible()
     expect(page.locator(".maplibregl-canvas")).to_be_visible()
+
+    page.get_by_role("button", name="Expand", exact=True).click()
+    layer_visibility = page.get_by_label("Show OpenAQ Air Quality layer", exact=True)
+    layer_opacity = page.get_by_label("Opacity for OpenAQ Air Quality", exact=True)
+    expect(layer_visibility).to_be_checked()
+    expect(layer_opacity).to_have_value("33")
+
+    page.get_by_label("Chat message").fill("draft changed before reload")
+    layer_opacity.press("ArrowRight")
+    layer_visibility.uncheck()
+    expect(layer_opacity).to_have_value("34")
+    persisted_state = page.evaluate(
+        "storageKey => JSON.parse(window.sessionStorage.getItem(storageKey) || '{}')",
+        STORAGE_KEY,
+    )
+    assert persisted_state["chatPage"]["mapState"] == {
+        "overlayVisibility": {"openaq_air_quality": False},
+        "overlayOpacity": {"openaq_air_quality": 0.34},
+    }
+
+    page.reload()
+
+    expect(page.get_by_label("Chat message")).to_have_value("draft changed before reload")
+    expect(page.get_by_text("show map at 41.9028, 12.4964")).to_be_visible()
+    restored_state = page.evaluate(
+        "storageKey => JSON.parse(window.sessionStorage.getItem(storageKey) || '{}')",
+        STORAGE_KEY,
+    )
+    assert restored_state["chatPage"]["mapState"] == {
+        "overlayVisibility": {"openaq_air_quality": False},
+        "overlayOpacity": {"openaq_air_quality": 0.34},
+    }
+    expect(page.locator(".maplibregl-canvas")).to_be_visible()
+    page.get_by_role("button", name="Expand", exact=True).click()
+    expect(page.get_by_label("Show OpenAQ Air Quality layer", exact=True)).not_to_be_checked()
+    expect(page.get_by_label("Opacity for OpenAQ Air Quality", exact=True)).to_have_value("34")
+    save_snapshot(page, "t1-02-restored-map-state")
+
+###############################################################################
+def test_session_storage_is_isolated_between_tabs(
+    context: BrowserContext, base_url: str
+) -> None:
+    first_tab = context.new_page()
+    second_tab = context.new_page()
+    _stub_settings_api(first_tab)
+    _stub_settings_api(second_tab)
+
+    first_tab.goto(base_url)
+    second_tab.goto(base_url)
+    first_tab.get_by_label("Chat message").fill("draft in first tab")
+    second_tab.get_by_label("Chat message").fill("draft in second tab")
+
+    expect(first_tab.get_by_label("Chat message")).to_have_value("draft in first tab")
+    expect(second_tab.get_by_label("Chat message")).to_have_value("draft in second tab")
+
+    first_tab.reload()
+    second_tab.reload()
+
+    expect(first_tab.get_by_label("Chat message")).to_have_value("draft in first tab")
+    expect(second_tab.get_by_label("Chat message")).to_have_value("draft in second tab")
 
 ###############################################################################
 def test_back_forward_between_routes_restores_both_states(

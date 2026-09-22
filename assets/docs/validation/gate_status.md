@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-22 (Tier 0 complete on the current develop validation boundary; hosted verification remains separate)
+Last updated: 2026-09-22 (Tier 0 complete; T1-02 browser continuation passed; hosted verification remains separate)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -23,26 +23,31 @@ data/cache roots; the complete package is the
 [current Tier 0 report](../../QA/tier0-validation-develop-20260922/final/report.md).
 The
 [Tier 1 application-foundations baseline](../../QA/tier1-application-foundations-20260921/report.md)
-remains recorded at exact `loop-dev` commit `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`.
+remains historical evidence at exact `loop-dev` commit
+`c615c5799e1d5fb01e0af0eccaab5c6490d554c0`. The latest focused continuation is
+the [T1-02 report](../../QA/tier1-validation-develop-20260922/T1-02/report.md)
+on the `develop` working tree based at `8375fe071823e7f844f6bb125d86d6ebf36b3110`.
 This campaign ledger is orthogonal to the native-agent rows below: a native
 gate can pass while its broader application-foundation slice remains partial.
 
 | Tier | Focus | Slice count | Campaign status | Evidence / hand-off |
 | --- | --- | ---: | --- | --- |
 | Tier 0 | Environment, schema, current-HEAD reconciliation | 5 | `PASS` | [Current Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md): `T0-01` through `T0-05` are `PASS` on the same source boundary. |
-| Tier 1 | Application foundations | 12 | `PARTIAL` | [Tier 1 ledger](../../QA/tier1-application-foundations-20260921/ledger.md); 6 `PASS`, 6 `PARTIAL`. |
+| Tier 1 | Application foundations | 12 | `PARTIAL` | [Tier 1 checklist](tier1_application_foundations.md) and [T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md); 7 `PASS`, 5 `PARTIAL`. The 2026-09-21 [baseline ledger](../../QA/tier1-application-foundations-20260921/ledger.md) remains historical. |
 | Tier 2 | Core agent workflows | 7 | `UNRUN` | Preserve exact-location and no-fallback boundaries. |
 | Tier 3 | Rendering and geospatial feature families | 18 | `UNRUN` | Require browser-authoritative source/layer/render-ack evidence. |
 | Tier 4A | Ingestion, local sources, optional integrations | 8 | `UNRUN` | Use isolated data and approved credentials/snapshots. |
 | Tier 4B | Model-provider parity | 5 | `UNRUN` | Never substitute provider or model. |
 | Tier 5 | Recovery, races, difficult boundaries, hosted CI | 13 | `UNRUN` | Open only after lower-tier contracts are classified. |
 
-Campaign-slice status is 11 `PASS`, 6 `PARTIAL`, and 51 `UNRUN` of 68 slices.
-Tier 1 remains at 6 `PASS` and 6 `PARTIAL`; the next actionable campaign
-slice is the first incomplete Tier 1 row.
+Campaign-slice status is 12 `PASS`, 5 `PARTIAL`, and 51 `UNRUN` of 68 slices.
+These are the latest per-slice classifications across their linked source
+boundaries, not a common-commit campaign result. Tier 1 remains `PARTIAL`; the
+next actionable campaign slice is `T1-03`.
 
-Tier 1 is not promoted to complete: the remaining boundaries are listed in
-the dated report and must stay visible to future agents.
+Tier 1 is not promoted to complete: `T1-03`, `T1-06`, `T1-07`, `T1-09`, and
+`T1-10` remain partial. Keep their gaps visible in the
+[Tier 1 checklist](tier1_application_foundations.md) and its linked reports.
 
 ## Current ledger
 
@@ -56,9 +61,15 @@ the dated report and must stay visible to future agents.
 | `T0-04` | Windows startup | `PASS` | 2026-09-22 | `develop@afa608c8d5c53a34d0ce8da36e5fe5f47f689145` | [T0-04 report](../../QA/tier0-validation-develop-20260922/T0-04/report.md) |
 | `T0-05` | API composition and contract | `PASS` | 2026-09-22 | `develop@afa608c8d5c53a34d0ce8da36e5fe5f47f689145` | [T0-05 report](../../QA/tier0-validation-develop-20260922/T0-05/report.md) |
 
-Tier 0 is `PASS`. The overall campaign remains `PARTIAL` because six Tier 1
+Tier 0 is `PASS`. The overall campaign remains `PARTIAL` because five Tier 1
 slices and the downstream live/browser/provider/hosted-CI boundaries remain
 partial or unrun.
+
+### Current Tier 1 continuation ledger
+
+| Slice | Scope | Status | Verification date | Tested source boundary | Evidence | Next action |
+| --- | --- | --- | --- | --- | --- | --- |
+| `T1-02` | Frontend tab-local state | `PASS` | 2026-09-22 | `develop@8375fe071823e7f844f6bb125d86d6ebf36b3110` plus the uncommitted source changes fingerprinted in the report | [T1-02 report](../../QA/tier1-validation-develop-20260922/T1-02/report.md), [slice manifest](../../QA/tier1-validation-develop-20260922/T1-02/slice.json), [restored map controls screenshot](<../../QA/tier1-validation-develop-20260922/T1-02/screenshots/__test_refresh_same_tab_restores_chat_and_map_state[chromium]/t1-02-restored-map-state.png>) | Continue at `T1-03` conversation lifecycle and history. |
 
 | Gate ID / name | Subsystem | Lane / environment | Status | Verification date | Tested commit | Evidence link | Next action / boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- |

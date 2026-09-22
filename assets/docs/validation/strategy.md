@@ -65,7 +65,7 @@ trusting downstream feature evidence.
 | Campaign tier | Slice IDs | Focus | Current hand-off |
 | --- | --- | --- | --- |
 | Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | [Current Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md) records `T0-01` through `T0-05` as `PASS` on the same `develop` source boundary. |
-| Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 application-foundations checklist](tier1_application_foundations.md) and [2026-09-21 evidence](../../QA/tier1-application-foundations-20260921/report.md). |
+| Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 checklist](tier1_application_foundations.md), [2026-09-21 baseline](../../QA/tier1-application-foundations-20260921/report.md), and [2026-09-22 T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md). |
 | Tier 2 | `T2-01`–`T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | Open only after foundations are classified; preserve exact geography and no-fallback rules. |
 | Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
 | Tier 4A | `T4-01`–`T4-08` | CSV/GeoJSON ingestion, optional heavy formats, mobility data, local/configured sources, cameras, credentialed providers, and catalog-only descriptors. | Run only with isolated data and approved credentials/snapshots. |
@@ -125,9 +125,15 @@ The Tier 1 application-foundations baseline remains recorded at
 `loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The current campaign result remains `PARTIAL`: 11 slices are `PASS`, 6 are
-`PARTIAL`, and 51 are `UNRUN`. Tier 0 is complete; the six partial Tier 1
-rows and downstream live/browser/provider/hosted-CI boundaries remain open.
+The latest per-slice roll-up remains `PARTIAL`: 12 slices are `PASS`, 5 are
+`PARTIAL`, and 51 are `UNRUN`. These counts combine the cited dated evidence
+boundaries; they do not certify one common commit. Tier 0 is complete. The
+2026-09-22 continuation
+records `T1-02` as `PASS` on the `develop` working tree based at
+`8375fe071823e7f844f6bb125d86d6ebf36b3110`; its source changes remain
+uncommitted and are fingerprinted in the [T1-02 report](../../QA/tier1-validation-develop-20260922/T1-02/report.md).
+The five partial Tier 1 slices and downstream live/browser/provider/hosted-CI
+boundaries remain open. Continue at `T1-03`.
 
 ## Current Tier 0 execution record
 
