@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-22 (T0-01 static-quality baseline added; hosted verification remains separate)
+Last updated: 2026-09-22 (T0-02 current migration/schema passed; hosted verification remains separate)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -16,9 +16,12 @@ documentation reconciliation.
 ## Comprehensive validation campaign
 
 The long-term Tier 0–5 campaign is defined in the
-[validation strategy](strategy.md). The first opened Tier 0 package is the
-[T0-01 static-quality baseline](../../QA/t0-01-static-quality-20260922/report.md)
-at exact `loop-dev` HEAD `5bb8d416da80e33a7e85b02538f605ee22aee0a5`; the
+[validation strategy](strategy.md). The [T0-01 static-quality baseline](../../QA/t0-01-static-quality-20260922/report.md)
+is scoped to exact `loop-dev` HEAD `5bb8d416da80e33a7e85b02538f605ee22aee0a5`;
+that commit is an ancestor of current `develop` HEAD
+`664f1beb69f17063f5f9e1deb0f38cdc4a5596c3`. The current `T0-02` result is
+recorded in the [current migration/schema report](../../QA/t0-02-current-migration-20260922/report.md)
+at that exact `develop` head. The
 [Tier 1 application-foundations baseline](../../QA/tier1-application-foundations-20260921/report.md)
 remains recorded at exact `loop-dev` commit `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`.
 This campaign ledger is orthogonal to the native-agent rows below: a native
@@ -26,13 +29,17 @@ gate can pass while its broader application-foundation slice remains partial.
 
 | Tier | Focus | Slice count | Campaign status | Evidence / hand-off |
 | --- | --- | ---: | --- | --- |
-| Tier 0 | Environment, schema, current-HEAD reconciliation | 5 | `PARTIAL` | [T0-01 static-quality report](../../QA/t0-01-static-quality-20260922/report.md) passed; `T0-02` through `T0-05` remain `UNRUN`. |
+| Tier 0 | Environment, schema, current-HEAD reconciliation | 5 | `PARTIAL` | `T0-01` and [T0-02 current migration/schema](../../QA/t0-02-current-migration-20260922/report.md) are `PASS`; `T0-03` through `T0-05` remain `UNRUN`. |
 | Tier 1 | Application foundations | 12 | `PARTIAL` | [Tier 1 ledger](../../QA/tier1-application-foundations-20260921/ledger.md); 6 `PASS`, 6 `PARTIAL`. |
 | Tier 2 | Core agent workflows | 7 | `UNRUN` | Preserve exact-location and no-fallback boundaries. |
 | Tier 3 | Rendering and geospatial feature families | 18 | `UNRUN` | Require browser-authoritative source/layer/render-ack evidence. |
 | Tier 4A | Ingestion, local sources, optional integrations | 8 | `UNRUN` | Use isolated data and approved credentials/snapshots. |
 | Tier 4B | Model-provider parity | 5 | `UNRUN` | Never substitute provider or model. |
 | Tier 5 | Recovery, races, difficult boundaries, hosted CI | 13 | `UNRUN` | Open only after lower-tier contracts are classified. |
+
+Campaign-slice status is 8 `PASS`, 6 `PARTIAL`, and 54 `UNRUN` of 68 slices.
+Tier 1 remains at 6 `PASS` and 6 `PARTIAL`; the next actionable campaign
+slice is `T0-03`.
 
 Tier 1 is not promoted to complete: the remaining boundaries are listed in
 the dated report and must stay visible to future agents.
@@ -61,7 +68,7 @@ the dated report and must stay visible to future agents.
 | PYRIGHT-STRICT — repository strict typing | Static typing | `app/server/pyproject.toml` strict run | PASS | 2026-09-22 | `5bb8d416 + T0-01 WT` | [T0-01 static-quality report](../../QA/t0-01-static-quality-20260922/report.md) | Full repository run reports 0 errors, 0 warnings, and 0 informations; rerun after typing or project-configuration changes. |
 | FRONTEND-BUILD — production bundle | Angular client | Local `npm ci` plus `npm run build` | PASS | 2026-09-22 | `5bb8d416 + T0-01 WT` | [T0-01 static-quality report](../../QA/t0-01-static-quality-20260922/report.md) | Keep generated `dist` output out of source control. |
 | FRONTEND-KARMA — client regression suite | Angular client | ChromeHeadlessNoGpu | PASS | 2026-09-17 | `558f1966` | [frontend-karma-558f-final.log](../../QA/native-agent-loop-evaluation-20260917-final/frontend-karma-558f-final.log) | 233/233 pass; add browser-timing coverage before retrying supersession remediation. |
-| MIGRATION — isolated upgrade/head/check | Persistence schema | Isolated SQLite under dated QA data | PASS | 2026-09-17 | `558f1966` | [migration-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/migration-final-commit.log) | Keep migration head `202609170001` and rerun only against isolated data. |
+| MIGRATION — isolated upgrade/head/check | Persistence schema | Isolated SQLite under dated QA data | PASS | 2026-09-17 | `558f1966` | [migration-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/migration-final-commit.log) | Historical proof is scoped to head `202609170001`; use the current-head [T0-02 report](../../QA/t0-02-current-migration-20260922/report.md) for current schema status. |
 | MATRIX-22 — complete required scenario matrix | Coverage | Exact live provider plus controlled browser | PARTIAL | 2026-09-17 | `bf5a7cfa` | [final-report.md](../../QA/native-agent-loop-evaluation-20260917-final/final-report.md) | Complete the explicit PARTIAL and UNRUN rows, including a separate mismatched-ack case, before any overall PASS claim. |
 | HOSTED-CI — exact tested head | Hosted CI | GitHub Actions push workflows on `develop` | UNRUN | 2026-09-18 | `a33642a` | [push boundary record](../../QA/native-agent-loop-evaluation-20260918/push-status.md) | The current head is being pushed under explicit user authorization; inspect the resulting exact-head workflow run before changing this gate to PASS or FAIL. |
 | PROCESS-CLEANUP — task-owned services and browser | Test harness | Local host, ports 4512/7059/9876 | PASS | 2026-09-17 | `bf5a7cfa` | [process-cleanup-final.md](../../QA/native-agent-loop-evaluation-20260917-final/process-cleanup-final.md) | Final harness services and browser tab stopped; ports verified free; unrelated services and caches preserved. |
