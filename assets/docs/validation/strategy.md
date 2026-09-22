@@ -2,9 +2,10 @@
 
 Last updated: 2026-09-22
 
-This document is the durable digest of the `loop-dev` comprehensive validation
-roadmap. It defines the campaign order, evidence boundary, status vocabulary,
-and hand-off points that future validation agents should use. The dated
+This document is the durable digest of the AEGIS comprehensive validation
+roadmap, first established on `loop-dev` and continued on `develop`. It defines
+the campaign order, evidence boundary, status vocabulary, and hand-off points
+that future validation agents should use. The dated
 scenario results live under [`../../QA/`](../../QA/); this document does not
 replace those reports.
 
@@ -63,7 +64,7 @@ trusting downstream feature evidence.
 
 | Campaign tier | Slice IDs | Focus | Current hand-off |
 | --- | --- | --- | --- |
-| Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | Reconcile current-HEAD environment and schema truth before broad functional claims. |
+| Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | `T0-01` and [T0-02](../../QA/t0-02-current-migration-20260922/report.md) pass; `T0-03` is next, while `T0-04` and `T0-05` remain unrun. |
 | Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 application-foundations checklist](tier1_application_foundations.md) and [2026-09-21 evidence](../../QA/tier1-application-foundations-20260921/report.md). |
 | Tier 2 | `T2-01`–`T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | Open only after foundations are classified; preserve exact geography and no-fallback rules. |
 | Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
@@ -124,5 +125,6 @@ The Tier 1 application-foundations baseline remains recorded at
 `loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The current campaign result remains `PARTIAL`; this is intentional while
-`T0-02` through `T0-05` and the six partial Tier 1 rows remain open.
+The current campaign result remains `PARTIAL`: 8 slices are `PASS`, 6 are
+`PARTIAL`, and 54 are `UNRUN`. `T0-03` through `T0-05` and the six partial Tier
+1 rows remain open.
