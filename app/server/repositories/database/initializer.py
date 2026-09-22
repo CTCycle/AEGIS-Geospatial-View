@@ -4,7 +4,11 @@ from collections.abc import Callable
 from pathlib import Path
 
 from server.common.logger import logger
-from server.repositories.credential_material import seed_credential_encryption_material
+from server.repositories.catalog.reference_seeder import ReferenceCatalogSeeder
+from server.repositories.credential_material import (
+    CredentialEncryptionMaterialRepository,
+    seed_credential_encryption_material,
+)
 from server.repositories.database.migration_runner import (
     MigrationResult,
     synchronize_database,
@@ -12,6 +16,17 @@ from server.repositories.database.migration_runner import (
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.runtime_settings import RuntimeSettingsRepository
+from server.repositories.schemas.models import ApplicationRuntimeSettingsRecord
+
+
+###############################################################################
+def required_seed_data_missing(database: SQLiteRepository) -> bool:
+    return (
+        CredentialEncryptionMaterialRepository(database).get_active_material() is None
+        or not ModelSettingsRepository(database).has_required()
+        or database.count_records(ApplicationRuntimeSettingsRecord) == 0
+        or ReferenceCatalogSeeder(database).needs_seed()
+    )
 
 ###############################################################################
 def initialize_database(
@@ -29,7 +44,11 @@ def initialize_database(
         if on_ready is not None:
             on_ready()
 
-    result = synchronize_database(database, on_ready=seed_required_data)
+    result = synchronize_database(
+        database,
+        on_ready=seed_required_data,
+        on_ready_required=lambda: required_seed_data_missing(database),
+    )
     logger.info(
         "SQLite database is ready: fresh=%s, migrations_applied=%s",
         result.fresh_database,

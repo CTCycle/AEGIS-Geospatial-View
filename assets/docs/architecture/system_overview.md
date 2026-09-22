@@ -1,6 +1,6 @@
 # System Overview
 
-Last updated: 2026-08-20
+Last updated: 2026-09-22
 
 ## Scope
 
@@ -52,13 +52,13 @@ database-backed credential resolver.
 
 `app_lifespan` composes the server runtime and:
 
-- loads settings
-- ensures relational schema
-- seeds auto-generated credential encryption key material
-- seeds reference catalog data
+- synchronizes the relational schema and seeds required local data
+- loads typed application runtime settings
+- builds one shared geospatial runtime, including its validated catalog snapshot
 - composes search and chat runtimes
-- seeds chat settings through the settings service
-- runs startup validation
+- validates persisted model settings, canonical provider and credential fields,
+  and credential decryptability without requesting live model metadata
+- runs capability validation against the shared geospatial catalog snapshot
 
 The composition root also wires the durable conversation/run lifecycle, steering,
 event replay, and the in-process background-job worker. A runtime dependency is

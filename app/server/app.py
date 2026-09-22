@@ -50,7 +50,6 @@ from server.services.jobs import BackgroundJobService
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
-from server.repositories.credentials import CredentialRepository
 from server.services.catalog.startup import seed_reference_catalog
 from server.services.startup_validation import run_startup_validations
 from server.services.settings.runtime_settings import RuntimeSettingsService
@@ -204,8 +203,8 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
 
     try:
         job_service.start()
-        chat_runtime.settings_service.get_settings()
-        run_startup_validations(CredentialRepository(database))
+        chat_runtime.settings_service.validate_persisted_settings()
+        run_startup_validations(geospatial_runtime.catalog_snapshot)
         resume_active_runs = getattr(run_lifecycle_service, "resume_active_runs", None)
         if callable(resume_active_runs):
             resume_active_runs()

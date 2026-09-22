@@ -168,6 +168,21 @@ class NoLiveCatalogModelLibraryService(FakeModelLibraryService):
         raise AssertionError("reading settings must not query a live model catalog")
 
 ###############################################################################
+class NoSelectedModelResolution:
+
+    # -------------------------------------------------------------------------
+    def resolve_selected(self, *_args: object, **_kwargs: object) -> None:
+        raise AssertionError("startup validation must not resolve model metadata")
+
+###############################################################################
+class UnreadableCredentialCrypto:
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def decrypt(_value: str) -> str:
+        raise ValueError("Credential cannot be decrypted with current key.")
+
+###############################################################################
 def build_service(
     *,
     settings_repo: FakeSettingsRepository | None = None,
@@ -273,6 +288,36 @@ def test_get_settings_uses_canonical_static_context_without_live_catalog() -> No
         "context_profile_source": "openai_model_catalog",
         "context_metadata_authority": "configured",
     }
+
+###############################################################################
+def test_validate_persisted_settings_avoids_provider_and_model_lookups() -> None:
+    service = build_service(
+        settings_repo=FakeSettingsRepository(
+            FakeSettingsRecord(
+                agent_model_provider="deepseek",
+                agent_model_name="deepseek-chat",
+            )
+        ),
+        credentials_repo=FakeCredentialsRepository(
+            [FakeCredentialRecord("openai", "api_key", "encrypted")]
+        ),
+        model_library_service=NoLiveCatalogModelLibraryService(),
+    )
+    service.context_profile_resolver = NoSelectedModelResolution()  # type: ignore[assignment]
+
+    service.validate_persisted_settings()
+
+###############################################################################
+def test_validate_persisted_settings_rejects_unreadable_credentials() -> None:
+    service = build_service(
+        credentials_repo=FakeCredentialsRepository(
+            [FakeCredentialRecord("openai", "api_key", "unreadable")]
+        )
+    )
+
+    service.crypto_service = UnreadableCredentialCrypto()  # type: ignore[assignment]
+    with pytest.raises(ChatSettingsValidationError, match="cannot be decrypted"):
+        service.validate_persisted_settings()
 
 ###############################################################################
 def test_updating_only_credentials_is_allowed_before_first_agent_selection() -> None:

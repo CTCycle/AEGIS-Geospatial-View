@@ -3,14 +3,11 @@ from __future__ import annotations
 from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
-from server.services.geospatial.manifest_loader import GeospatialManifestLoader
-from server.repositories.credentials import CredentialRepository
 
 ###############################################################################
-def run_startup_validations(credentials_repo: CredentialRepository) -> None:
-    loader = GeospatialManifestLoader()
-    catalog_snapshot = GeospatialManifestSnapshot.from_payload(loader.load_all())
-
+def run_startup_validations(
+    catalog_snapshot: GeospatialManifestSnapshot,
+) -> None:
     missing_execution_contracts: list[str] = []
     invalid_agent_domains: list[str] = []
     runtime_profiles = {

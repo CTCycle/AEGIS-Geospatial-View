@@ -10,7 +10,7 @@ from filelock import Timeout
 from sqlalchemy import inspect
 
 from server.configurations import DatabaseSettings
-from server.repositories.catalog.reference_seeder import ReferenceCatalogSeeder
+from server.repositories.database import migration_runner
 from server.repositories.database.initializer import initialize_database
 from server.repositories.database.migration_runner import (
     ALEMBIC_CONFIG_PATH,
@@ -23,7 +23,9 @@ from server.repositories.schemas import (
     ReferenceCountryRecord,
 )
 from server.repositories.schemas.models import ConversationRecord
-from server.services.catalog.loader import load_reference_catalog
+from server.repositories.model_settings import ModelSettingsRepository
+from server.repositories.schemas.models import ModelProviderSettingsRecord
+from server.services.catalog.startup import seed_reference_catalog
 
 ###############################################################################
 def _settings(database_path: Path, *, timeout: int = 60) -> DatabaseSettings:
@@ -36,9 +38,7 @@ def _settings(database_path: Path, *, timeout: int = 60) -> DatabaseSettings:
 def _initialize(repository: SQLiteRepository):
     return initialize_database(
         repository,
-        on_ready=lambda: ReferenceCatalogSeeder(repository).seed_if_needed(
-            load_reference_catalog()
-        ),
+        on_ready=lambda: seed_reference_catalog(repository),
     )
 
 ###############################################################################
@@ -64,7 +64,9 @@ def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> No
     assert repository.count_records(ReferenceCountryRecord) > 0
 
 ###############################################################################
-def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
+def test_existing_sqlite_database_is_idempotent(
+    monkeypatch, tmp_path: Path
+) -> None:
     database_path = tmp_path / "database.db"
     repository = SQLiteRepository(_settings(database_path))
     _initialize(repository)
@@ -74,6 +76,11 @@ def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
     )
     repository.engine.dispose()
 
+    monkeypatch.setattr(
+        migration_runner,
+        "_create_sqlite_backup",
+        lambda *_args: pytest.fail("idempotent startup must not create a backup"),
+    )
     second_repository = SQLiteRepository(_settings(database_path))
     result = _initialize(second_repository)
 
@@ -82,6 +89,38 @@ def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
         second_repository.count_records(CredentialEncryptionMaterial),
         second_repository.count_records(ReferenceCountryRecord),
     ) == first_counts
+
+###############################################################################
+def test_at_head_missing_required_seed_creates_backup_before_reseeding(
+    monkeypatch, tmp_path: Path
+) -> None:
+    database_path = tmp_path / "database.db"
+    settings = _settings(database_path)
+    repository = SQLiteRepository(settings)
+    _initialize(repository)
+    with repository.engine.begin() as connection:
+        connection.exec_driver_sql("DELETE FROM model_provider_settings")
+    repository.engine.dispose()
+
+    original_backup = migration_runner._create_sqlite_backup
+    backups: list[Path | None] = []
+
+    def track_backup(database: SQLiteRepository, path: Path) -> Path | None:
+        assert not ModelSettingsRepository(database).has_required()
+        backup = original_backup(database, path)
+        backups.append(backup)
+        return backup
+
+    monkeypatch.setattr(migration_runner, "_create_sqlite_backup", track_backup)
+    repaired = SQLiteRepository(settings)
+
+    result = _initialize(repaired)
+
+    assert result.migrations_applied is False
+    assert len(backups) == 1
+    assert backups[0] is not None
+    assert ModelSettingsRepository(repaired).has_required()
+    assert repaired.count_records(ModelProviderSettingsRecord) == 1
 
 ###############################################################################
 def test_native_state_migration_preserves_legacy_context_and_settings(
@@ -134,7 +173,7 @@ def test_native_state_migration_preserves_legacy_context_and_settings(
     result = _initialize(migrated)
 
     assert result.current_revisions == ("202609090002",)
-    assert result.final_revisions == ("202609170001",)
+    assert result.final_revisions == ("202609210001",)
     with migrated.engine.connect() as connection:
         columns = {
             item["name"]
@@ -222,10 +261,12 @@ def test_seeding_failure_restores_existing_sqlite_database(
     settings = _settings(database_path)
     repository = SQLiteRepository(settings)
     _initialize(repository)
+    with repository.engine.begin() as connection:
+        connection.exec_driver_sql("DELETE FROM model_provider_settings")
     repository.engine.dispose()
 
     monkeypatch.setattr(
-        "server.repositories.database.initializer.seed_credential_encryption_material",
+        "server.repositories.model_settings.ModelSettingsRepository.seed_required",
         lambda _database: (_ for _ in ()).throw(RuntimeError("seed failure")),
     )
     with pytest.raises(RuntimeError, match="seed failure"):
@@ -234,6 +275,7 @@ def test_seeding_failure_restores_existing_sqlite_database(
     verification_repository = SQLiteRepository(settings)
     assert verification_repository.count_records(CredentialEncryptionMaterial) == 1
     assert verification_repository.count_records(ReferenceCountryRecord) > 0
+    assert not ModelSettingsRepository(verification_repository).has_required()
 
 ###############################################################################
 def test_corrupt_sqlite_file_is_not_replaced(tmp_path: Path) -> None:

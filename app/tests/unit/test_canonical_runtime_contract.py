@@ -32,6 +32,62 @@ def test_launcher_has_one_canonical_backend_entrypoint() -> None:
 
 
 ###############################################################################
+def test_launcher_uses_confirmed_port_guard_and_process_aware_startup() -> None:
+    launcher = (REPOSITORY_ROOT / "start_on_windows.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    def function_body(name: str) -> str:
+        start = launcher.index(f"function {name}")
+        end = launcher.find("\nfunction ", start + 1)
+        return launcher[start:] if end < 0 else launcher[start:end]
+
+    launch = function_body("Invoke-LaunchApplication")
+    conflicts = function_body("Resolve-LaunchPortConflicts")
+    grouped_conflicts = function_body("Get-PortConflicts")
+    health_wait = function_body("Wait-HttpHealth")
+
+    assert "Stop-PortListeners" not in launch
+    assert "taskkill.exe" not in launch
+    assert launch.count("Resolve-LaunchPortConflicts") == 2
+    assert "Confirm-PortConflictTermination" in conflicts
+    assert "HashSet[int]" in conflicts
+    assert "Dictionary[int, object]" in grouped_conflicts
+    assert "ContainsKey($processId)" in grouped_conflicts
+    assert "importlib.import_module('server.app')" not in launch
+    assert "[System.Diagnostics.Process]$Process" in health_wait
+    assert "HasExited" in health_wait
+
+
+###############################################################################
+def test_launcher_separates_dependency_sync_from_build_state() -> None:
+    launcher = (REPOSITORY_ROOT / "start_on_windows.ps1").read_text(
+        encoding="utf-8"
+    )
+    package_json = json.loads(
+        (APP_ROOT / "client" / "package.json").read_text(encoding="utf-8")
+    )
+
+    def function_body(name: str) -> str:
+        start = launcher.index(f"function {name}")
+        end = launcher.find("\nfunction ", start + 1)
+        return launcher[start:] if end < 0 else launcher[start:end]
+
+    launch = function_body("Invoke-LaunchApplication")
+    install = function_body("Invoke-InstallOrUpdate")
+    rebuild = function_body("Invoke-RebuildFrontend")
+
+    assert "Sync-Dependencies -BuildFrontend $false" in launch
+    assert "Ensure-FrontendBuildCurrent" in launch
+    assert "-BuildFrontend $true" in install
+    assert "Build-Frontend" in rebuild
+    assert "ALWAYS_REBUILD" not in launcher
+    assert "prebuild" in package_json["scripts"]
+    assert "postbuild" in package_json["scripts"]
+    assert "test:frontend-state" in package_json["scripts"]
+
+
+###############################################################################
 def test_old_import_root_is_rejected_when_only_app_is_on_pythonpath() -> None:
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(APP_ROOT)

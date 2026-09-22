@@ -21,6 +21,14 @@ class ModelSettingsRepository:
         self._session_factory = database.session
 
     # -------------------------------------------------------------------------
+    def has_required(self) -> bool:
+        with self._session_factory() as session:
+            statement = select(ModelProviderSettingsRecord).order_by(
+                ModelProviderSettingsRecord.id.asc()
+            )
+            return session.execute(statement).scalars().first() is not None
+
+    # -------------------------------------------------------------------------
     def get_required(self) -> ModelSettingsSnapshot:
         with self._session_factory() as session:
             statement = select(ModelProviderSettingsRecord).order_by(

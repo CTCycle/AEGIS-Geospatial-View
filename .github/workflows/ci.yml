@@ -127,6 +127,10 @@ jobs:
         working-directory: app/client
         run: npm ci --no-audit --no-fund
 
+      - name: Frontend state tests
+        working-directory: app/client
+        run: npm run test:frontend-state
+
       - name: Frontend build
         working-directory: app/client
         run: npm run build

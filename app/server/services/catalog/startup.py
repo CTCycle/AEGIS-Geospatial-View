@@ -7,4 +7,6 @@ from server.services.catalog.loader import load_reference_catalog
 ###############################################################################
 def seed_reference_catalog(database: SQLiteRepository) -> None:
     """Load static catalog files and seed their relational reference tables."""
-    ReferenceCatalogSeeder(database).seed_if_needed(load_reference_catalog())
+    seeder = ReferenceCatalogSeeder(database)
+    if seeder.needs_seed():
+        seeder.seed_if_needed(load_reference_catalog())

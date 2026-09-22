@@ -27,7 +27,9 @@ def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
         conversation_repository=object(),
         history_service=object(),
         settings_service=SimpleNamespace(
-            get_settings=lambda: call_order.append("settings_service.get_settings")
+            validate_persisted_settings=lambda: call_order.append(
+                "settings_service.validate_persisted_settings"
+            )
         ),
         maintenance_service=SimpleNamespace(),
     )
@@ -39,6 +41,7 @@ def _build_geospatial_runtime() -> SimpleNamespace:
         capability_registry=object(),
         provider_registry=object(),
         credential_resolver=object(),
+        catalog_snapshot=object(),
     )
 
 ###############################################################################
@@ -179,7 +182,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     monkeypatch.setattr(
         app_module, "AgentSteeringRepository", lambda database: object()
     )
-    monkeypatch.setattr(app_module, "CredentialRepository", lambda database: object())
     monkeypatch.setattr(
         app_module, "BackgroundJobService", lambda **kwargs: job_service
     )
@@ -189,7 +191,11 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     monkeypatch.setattr(
         app_module,
         "run_startup_validations",
-        lambda credentials_repo: call_order.append("run_startup_validations"),
+        lambda snapshot: (
+            call_order.append("run_startup_validations")
+            if snapshot is geospatial_runtime.catalog_snapshot
+            else (_ for _ in ()).throw(AssertionError("startup snapshot was not shared"))
+        ),
     )
     monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
 
@@ -205,7 +211,7 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         "build_geospatial_runtime",
         "build_chat_runtime",
         "job_service.start",
-        "settings_service.get_settings",
+        "settings_service.validate_persisted_settings",
         "run_startup_validations",
         "job_service.stop",
     ]
@@ -256,7 +262,6 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
     monkeypatch.setattr(
         app_module, "AgentSteeringRepository", lambda database: object()
     )
-    monkeypatch.setattr(app_module, "CredentialRepository", lambda database: object())
     monkeypatch.setattr(app_module, "RunLifecycleService", lambda **kwargs: lifecycle)
     monkeypatch.setattr(
         app_module, "BackgroundJobService", lambda **kwargs: job_service
@@ -267,7 +272,7 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
     monkeypatch.setattr(
         app_module,
         "run_startup_validations",
-        lambda credentials_repo: (_ for _ in ()).throw(RuntimeError("startup failure")),
+        lambda snapshot: (_ for _ in ()).throw(RuntimeError("startup failure")),
     )
     monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
 
@@ -277,7 +282,7 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
 
     assert call_order == [
         "job_service.start",
-        "settings_service.get_settings",
+        "settings_service.validate_persisted_settings",
         "job_service.stop",
         "run_lifecycle.shutdown",
     ]
