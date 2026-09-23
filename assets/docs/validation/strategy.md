@@ -1,6 +1,6 @@
 # Comprehensive validation strategy
 
-Last updated: 2026-09-22
+Last updated: 2026-09-23
 
 This document is the durable digest of the AEGIS comprehensive validation
 roadmap, first established on `loop-dev` and continued on `develop`. It defines
@@ -125,21 +125,20 @@ The Tier 1 application-foundations baseline remains recorded at
 `loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The latest per-slice roll-up remains `PARTIAL`: 14 slices are `PASS`, 3 are
+The latest per-slice roll-up is `PARTIAL`: 16 slices are `PASS`, 1 is
 `PARTIAL`, and 51 are `UNRUN`. These counts combine the cited dated evidence
-boundaries; they do not certify one common commit. Tier 0 is complete. The
-2026-09-22 continuation
-records `T1-02` as `PASS` on the `develop` working tree based at
-`8375fe071823e7f844f6bb125d86d6ebf36b3110`; its source changes were
-fingerprinted in the [T1-02 report](../../QA/tier1-validation-develop-20260922/T1-02/report.md)
-and later committed at `35d04f8399d0166d1a134ad9f45931bc15efda91`. Preserve
-that historical test boundary. The 2026-09-23 [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md)
-passes conversation search, paging, hydration, isolation, stale-ID recovery,
-and a focused transcript-spacing repair. The [T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md)
-passes the exact-lane HTTP response matrix and corrected backend CI test
-selection, and the exact pushed implementation head passed hosted CI. Tier 1 is
-`PARTIAL` at 9 `PASS` and 3 `PARTIAL`; broader browser/provider coverage
-remains open. Continue at `T1-07`.
+boundaries; they do not certify one common commit. Tier 0 is complete. Preserve
+the historical source boundaries in the [T1-02](../../QA/tier1-validation-develop-20260922/T1-02/report.md),
+[T1-03](../../QA/tier1-validation-develop-20260923/T1-03/report.md),
+[T1-06](../../QA/tier1-validation-develop-20260923/T1-06/report.md), and
+[T1-07](../../QA/tier1-validation-develop-20260923/T1-07/report.md) reports.
+The 2026-09-23 [T1-09 continuation](../../QA/tier1-validation-develop-20260923/T1-09/report.md)
+passes Settings URL authority, all seven rendered sections, invalid-tab
+fallback, draft retention, controlled save, and return/reopen. Its exact pushed
+implementation commit `c090abd1ca9d6d78e82e798da9167b9d19b3fc23` passed all
+four jobs in [hosted CI run 35873578752](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35873578752).
+Tier 1 is `PARTIAL` at 11 `PASS` and 1 `PARTIAL`; continue with `T1-10`
+credential failure fixtures. Broader browser/provider coverage remains open.
 
 ## Current Tier 0 execution record
 
