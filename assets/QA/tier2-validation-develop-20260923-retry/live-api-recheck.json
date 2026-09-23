@@ -1,0 +1,16 @@
+{
+  "conversation_id": "conv_53e21b3a29434aba8056668ca5af4013",
+  "first_http_status": 200,
+  "second_http_status": 409,
+  "second_detail": "Conversation already has an active run.",
+  "persisted_run_ids": [
+    "run_4aad3e84e4aa44eea221b82fbdf2b689"
+  ],
+  "persisted_run_states": [
+    "completed"
+  ],
+  "persisted_runs_for_conversation": 1,
+  "database_integrity_check": "ok",
+  "first_response_terminal": true,
+  "expected_conflict_observed": true
+}
