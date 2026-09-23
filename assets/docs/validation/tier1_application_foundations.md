@@ -100,7 +100,9 @@ Credentialed provider connectivity was not tested and remains a separate gate.
 
 ## Next actionable slice
 
-Continue with `T2-01`, the first core agent workflow slice. Preserve exact
-location and no-fallback evidence boundaries. Tier 1 is 12/12 `PASS`; the full
-campaign remains `PARTIAL` with 51 slices `UNRUN` and separate live/provider
-gates still open.
+Continue with `T2-01` and `T2-02`, the first core agent workflow slices. Their
+2026-09-23 live attempt is `BLOCKED` because the official launcher did not
+reach backend health; see the [current Tier 2 report](../../QA/tier2-validation-develop-20260923/report.md).
+Preserve exact-location and no-fallback evidence boundaries. Tier 1 is 12/12
+`PASS`; the full campaign remains `PARTIAL` with 2 slices `BLOCKED`, 49
+`UNRUN`, and separate live/provider gates still open.
