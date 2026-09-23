@@ -1,6 +1,6 @@
 # Tier 1 application foundations
 
-Last updated: 2026-09-22
+Last updated: 2026-09-23
 
 Tier 1 is the application-foundation gate. It must establish that the shell,
 state, persistence, realtime lifecycle, Settings, model selection, and context
@@ -37,10 +37,18 @@ That historical result was `loop-dev` at
 The 2026-09-22 continuation records `T1-02` as `PASS` on the `develop`
 working tree based at `8375fe071823e7f844f6bb125d86d6ebf36b3110`. Focused
 Angular state/map tests passed 90/90, and the headed Chrome chat-state browser
-file passed 8/8. See the [T1-02 report](../../QA/tier1-validation-develop-20260922/T1-02/report.md)
-and [slice manifest](../../QA/tier1-validation-develop-20260922/T1-02/slice.json).
-Tier 1 remains `PARTIAL`, now at 7 `PASS` and 5 `PARTIAL` slices across the
-cited source boundaries; this roll-up is not a same-commit campaign result.
+file passed 8/8. Its five source hashes remain the tested boundary in the
+[T1-02 report](../../QA/tier1-validation-develop-20260922/T1-02/report.md)
+and [slice manifest](../../QA/tier1-validation-develop-20260922/T1-02/slice.json);
+those changes were subsequently committed at `35d04f8399d0166d1a134ad9f45931bc15efda91`.
+
+The 2026-09-23 [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md)
+passes focused conversation API/repository tests (9/9), the geospatial-page
+Karma suite (47/47), and in-app Browser evidence for search, two-page history,
+distinct conversation hydration, isolation, and stale-ID recovery. A focused
+transcript top-spacing issue found during visual validation was repaired and
+rechecked. Tier 1 remains `PARTIAL` at 8 `PASS` and 4 `PARTIAL` slices across
+the cited source boundaries; this roll-up is not a same-commit campaign result.
 
 The 2026-09-21 headless run's missing `.maplibregl-canvas` remains historical
 evidence; the current headed Chrome run verified the T1-02 reload and visible
@@ -52,7 +60,7 @@ accessible contract before claiming automated `T1-09` completion.
 
 ## Next actionable slice
 
-Continue with `T1-03` conversation lifecycle and history: create/list/search/
-select/hydrate, pagination, unknown IDs, and cross-conversation isolation.
-Keep the exact tested source boundary and isolated runtime paths in its QA
-report.
+Continue with `T1-06` synchronous `/api/chat/turn` behavior: the terminal
+`200`, accepted `202`, genuine-conflict `409`, missing `404`, and unusable-
+provider `503` boundaries, including the exact live response matrix. Keep the
+tested source boundary and isolated runtime paths in its QA report.

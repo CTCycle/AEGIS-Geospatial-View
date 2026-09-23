@@ -1,0 +1,80 @@
+{
+  "slice_id": "T1-03",
+  "status": "PASS",
+  "verification_date": "2026-09-23",
+  "source_boundary": {
+    "branch": "develop",
+    "base_commit": "35d04f8399d0166d1a134ad9f45931bc15efda91",
+    "working_tree": "single focused transcript CSS spacing fix; see source-sha256.txt"
+  },
+  "environment": {
+    "os": "Windows",
+    "launcher": "start_on_windows.ps1 -Action Launch",
+    "frontend": "Angular development server at 127.0.0.1:4512",
+    "backend": "127.0.0.1:7059",
+    "isolated_data_dir": "runtimes/cache/test-runtime/t1-03-20260923",
+    "browser": "Codex in-app Browser"
+  },
+  "checks": [
+    {
+      "name": "conversation API and history repository suites",
+      "status": "PASS",
+      "passed": 9,
+      "failed": 0,
+      "warnings": 2
+    },
+    {
+      "name": "geospatial page Karma suite",
+      "status": "PASS",
+      "passed": 47,
+      "failed": 0
+    },
+    {
+      "name": "browser history search and pagination",
+      "status": "PASS",
+      "first_page_count": 30,
+      "total_unique_rows": 32,
+      "duplicate_rows": 0
+    },
+    {
+      "name": "browser selection, hydration, and conversation isolation",
+      "status": "PASS",
+      "conversations": [30, 31],
+      "cross_conversation_markers": 0
+    },
+    {
+      "name": "stale conversation recovery",
+      "status": "PASS",
+      "snapshot_status": 404,
+      "workspace_after_selection": "empty; prior conversation markers absent"
+    },
+    {
+      "name": "hydrated transcript control spacing",
+      "status": "PASS",
+      "repair": "chat-transcript top padding 0.85rem to 3.25rem",
+      "visual_recheck": "in-app Browser screenshot"
+    },
+    {
+      "name": "task-owned process and cache cleanup",
+      "status": "PASS",
+      "ports_free": [4512, 7059],
+      "isolated_data_and_pytest_cache": "removed"
+    }
+  ],
+  "artifacts": {
+    "report": "report.md",
+    "browser_evidence": "browser-evidence.md",
+    "seed_manifest": "seed.json",
+    "source_sha256": "source-sha256.txt",
+    "backend_tests": "backend-tests.log",
+    "frontend_tests": "frontend-tests.log",
+    "process_cleanup": "process-cleanup.log"
+  },
+  "limitations": [
+    "Provider/model execution was not exercised.",
+    "No live map-render or provider claim is made.",
+    "Hosted CI is recorded separately for the exact pushed head.",
+    "In-app Browser screenshots were visually inspected inline but could not be exported to a workspace file."
+  ],
+  "next_action": "Continue with T1-06."
+}

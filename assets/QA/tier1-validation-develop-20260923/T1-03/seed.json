@@ -1,0 +1,167 @@
+{
+  "database_path": "runtimes/cache/test-runtime/t1-03-20260923/database.db",
+  "count": 32,
+  "conversations": [
+    {
+      "conversation_id": "conv_b937c3f4f0cc4986b83de2c967588b7e",
+      "title": "T1-03 Conversation 01",
+      "marker": "01"
+    },
+    {
+      "conversation_id": "conv_a5d6faf5f9d54529b1b2bd3a7b447600",
+      "title": "T1-03 Conversation 02",
+      "marker": "02"
+    },
+    {
+      "conversation_id": "conv_f1fc285e53314be286aba51df8ca0a99",
+      "title": "T1-03 Conversation 03",
+      "marker": "03"
+    },
+    {
+      "conversation_id": "conv_ea3e191aecd24fe3a8503e5440138524",
+      "title": "T1-03 Conversation 04",
+      "marker": "04"
+    },
+    {
+      "conversation_id": "conv_e1051e9335bf4d1ea3ea563c0aeee136",
+      "title": "T1-03 Conversation 05",
+      "marker": "05"
+    },
+    {
+      "conversation_id": "conv_5b95880e07b644a596b2df83d70bf383",
+      "title": "T1-03 Conversation 06",
+      "marker": "06"
+    },
+    {
+      "conversation_id": "conv_ecad94be4fe443f29fe67dad5ce8bf96",
+      "title": "T1-03 Conversation 07",
+      "marker": "07"
+    },
+    {
+      "conversation_id": "conv_a72f39bfd8254ac9a2d3091ddb38f97f",
+      "title": "T1-03 Conversation 08",
+      "marker": "08"
+    },
+    {
+      "conversation_id": "conv_d47276a163544b84aa40971f0192db2a",
+      "title": "T1-03 Conversation 09",
+      "marker": "09"
+    },
+    {
+      "conversation_id": "conv_581e9becd1464072afd0ab0ce5f6c957",
+      "title": "T1-03 Conversation 10",
+      "marker": "10"
+    },
+    {
+      "conversation_id": "conv_1b89c7fd96004f8ebfa5aeb044324a98",
+      "title": "T1-03 Conversation 11",
+      "marker": "11"
+    },
+    {
+      "conversation_id": "conv_3608d5c0912b4b13bb7f5a55efa55dac",
+      "title": "T1-03 Conversation 12",
+      "marker": "12"
+    },
+    {
+      "conversation_id": "conv_cd5cd2556c824103b8a3fd7e5cd87f12",
+      "title": "T1-03 Conversation 13",
+      "marker": "13"
+    },
+    {
+      "conversation_id": "conv_a039661f86094a60859e7ac86ec63b22",
+      "title": "T1-03 Conversation 14",
+      "marker": "14"
+    },
+    {
+      "conversation_id": "conv_fb321853b0954e5dab58cb831bceeae5",
+      "title": "T1-03 Conversation 15",
+      "marker": "15"
+    },
+    {
+      "conversation_id": "conv_c2411b674ca44e48944bc05330f8aca3",
+      "title": "T1-03 Conversation 16",
+      "marker": "16"
+    },
+    {
+      "conversation_id": "conv_5c334cb7f7d8495cb9de119a077dab38",
+      "title": "T1-03 Conversation 17",
+      "marker": "17"
+    },
+    {
+      "conversation_id": "conv_1bad4759b4c54acba4ba3aaf71572bee",
+      "title": "T1-03 Conversation 18",
+      "marker": "18"
+    },
+    {
+      "conversation_id": "conv_da72e6a2bc134d19bd551f12e1db883e",
+      "title": "T1-03 Conversation 19",
+      "marker": "19"
+    },
+    {
+      "conversation_id": "conv_0c7088d87f884016a733c703a259cf5c",
+      "title": "T1-03 Conversation 20",
+      "marker": "20"
+    },
+    {
+      "conversation_id": "conv_82dcd337cc754fb78c3f16ad58af1b1e",
+      "title": "T1-03 Conversation 21",
+      "marker": "21"
+    },
+    {
+      "conversation_id": "conv_19f78451e9674d9a8b1b9b30c85c2709",
+      "title": "T1-03 Conversation 22",
+      "marker": "22"
+    },
+    {
+      "conversation_id": "conv_887de5ececcb42119387e6b1b75a3720",
+      "title": "T1-03 Conversation 23",
+      "marker": "23"
+    },
+    {
+      "conversation_id": "conv_f3883d306917435ca6cf0ee4070f1d4f",
+      "title": "T1-03 Conversation 24",
+      "marker": "24"
+    },
+    {
+      "conversation_id": "conv_ddd12d873bc64531ba029f3756513f43",
+      "title": "T1-03 Conversation 25",
+      "marker": "25"
+    },
+    {
+      "conversation_id": "conv_a2ea7154ed234da5a164143f8e922ef5",
+      "title": "T1-03 Conversation 26",
+      "marker": "26"
+    },
+    {
+      "conversation_id": "conv_dd02ae990eac4274a3b58ee31cf04612",
+      "title": "T1-03 Conversation 27",
+      "marker": "27"
+    },
+    {
+      "conversation_id": "conv_7529957df7884ebaad0356f8752c5c3e",
+      "title": "T1-03 Conversation 28",
+      "marker": "28"
+    },
+    {
+      "conversation_id": "conv_92c8ca3dd57d4dbf88448510bc8a1435",
+      "title": "T1-03 Conversation 29",
+      "marker": "29"
+    },
+    {
+      "conversation_id": "conv_e5bc64daad5649ac8cd1d31111625b89",
+      "title": "T1-03 Conversation 30",
+      "marker": "30"
+    },
+    {
+      "conversation_id": "conv_f2c29e037bf64344bae5480b12320336",
+      "title": "T1-03 Conversation 31",
+      "marker": "31"
+    },
+    {
+      "conversation_id": "conv_aafd0374dfa74f63bf0333d7873f8b78",
+      "title": "T1-03 Stale row",
+      "marker": "stale",
+      "delete_after_list": true
+    }
+  ]
+}
