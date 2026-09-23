@@ -519,6 +519,38 @@ async def test_verified_render_emits_tools_disabled_finalization_trace() -> None
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_verified_render_suppresses_raw_dsml_finalization_content() -> None:
+    protocol_content = (
+        '<｜｜DSML｜｜ calls> <｜｜DSML｜｜ invoke '
+        'name="apply_map_plan">fit_location="florence, italy"'
+    )
+    provider = FakeProvider([LLMResult(content=protocol_content)])
+    events = []
+
+    async def trace(event) -> None:  # noqa: ANN001
+        events.append(event)
+
+    answer = await _loop(provider)._finalize_verified_render(  # pyright: ignore[reportPrivateUsage]
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            trace_callback=trace,
+        ),
+        provider,
+        [],
+    )
+
+    assert answer == "The map is ready and the rendering was verified."
+    assert "DSML" not in answer
+    completed = [event for event in events if event.kind == "finalization_completed"]
+    assert len(completed) == 1
+    assert completed[0].payload["outcome"] == "protocol_text_suppressed"
+
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_verified_map_state_finalization_uses_committed_overlays() -> None:
     provider = FakeProvider(
         [LLMResult(content="The FEMA flood zones were retained successfully.")]

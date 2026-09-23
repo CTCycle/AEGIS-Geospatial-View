@@ -51,6 +51,8 @@ _LOCATION_MAP_DATA_TERMS = frozenset(
         "amenities",
         "cafe",
         "cafes",
+        "clinic",
+        "clinics",
         "hospital",
         "hospitals",
         "museum",
@@ -67,12 +69,33 @@ _LOCATION_MAP_DATA_TERMS = frozenset(
         "castles",
         "palace",
         "palaces",
+        "pharmacy",
+        "pharmacies",
         "attraction",
         "attractions",
         "station",
         "stations",
         "data",
         "points",
+    }
+)
+_PLACE_SEARCH_DATA_TERMS = frozenset(
+    {
+        "amenity",
+        "amenities",
+        "cafe",
+        "cafes",
+        "clinic",
+        "clinics",
+        "hospital",
+        "hospitals",
+        "museum",
+        "museums",
+        "pharmacy",
+        "pharmacies",
+        "poi",
+        "station",
+        "stations",
     }
 )
 
@@ -126,7 +149,9 @@ class CapabilityRouter:
         proposed, semantic_reason = _normalize_route_semantics(proposed)
         if semantic_reason is not None:
             reasons.append(semantic_reason)
-        proposed, map_data_reason = _normalize_data_bearing_map_route(proposed)
+        proposed, map_data_reason = _normalize_data_bearing_map_route(
+            proposed, user_message=user_message
+        )
         if map_data_reason is not None:
             reasons.append(map_data_reason)
         proposed, temporal_reason = _normalize_recent_scope(proposed)
@@ -567,14 +592,54 @@ def _normalize_route_semantics(
 ###############################################################################
 def _normalize_data_bearing_map_route(
     route: CapabilityRoute,
+    *,
+    user_message: str = "",
 ) -> tuple[CapabilityRoute, str | None]:
-    """Keep layer-add requests on the data-plus-map execution route."""
+    """Keep data-bearing map requests on a route eligible for data tools."""
 
     operation = str(route.operation or "").strip().casefold()
+    if route.task_mode != "execute" or route.presentation not in {"map", "both"}:
+        return route, None
+
+    if route.primary_domain is CapabilityDomain.PLACE_SEARCH:
+        message_terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
+        query_terms = {
+            term
+            for query in route.capability_queries
+            for term in re.findall(r"[a-z0-9]+", query.casefold())
+        }
+        data_query = bool(
+            message_terms.intersection(_PLACE_SEARCH_DATA_TERMS)
+            or query_terms.intersection(_PLACE_SEARCH_DATA_TERMS)
+            or any(
+                query.strip().casefold()
+                in {"overpass_poi_amenities", "points of interest"}
+                for query in route.capability_queries
+            )
+        )
+        if data_query:
+            secondary_domains = [
+                CapabilityDomain.MAP_RENDERING,
+                CapabilityDomain.DATA_RETRIEVAL,
+                *(
+                    domain
+                    for domain in route.secondary_domains
+                    if domain
+                    not in {
+                        CapabilityDomain.MAP_RENDERING,
+                        CapabilityDomain.DATA_RETRIEVAL,
+                    }
+                ),
+            ]
+            return (
+                route.model_copy(
+                    update={"secondary_domains": secondary_domains[:3]}
+                ),
+                "data_bearing_place_search_route_normalized",
+            )
+
     if (
-        route.task_mode != "execute"
-        or route.presentation not in {"map", "both"}
-        or route.primary_domain
+        route.primary_domain
         not in {CapabilityDomain.MAP_STATE, CapabilityDomain.MAP_RENDERING}
         or operation != "add_layer"
         or not (route.capability_queries or route.explicit_capability_ids)

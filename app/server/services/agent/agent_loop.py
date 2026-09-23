@@ -670,6 +670,17 @@ class AgentLoop:
         return LoopDecision.FAIL
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _sanitize_finalization_candidate(content: str | None) -> tuple[str, bool]:
+        """Suppress raw DSML protocol text returned as ordinary content."""
+
+        candidate = (content or "").strip()
+        folded = candidate.casefold()
+        if "<｜｜dsml｜｜" in folded or "<|dsml|>" in folded:
+            return "", True
+        return candidate, False
+
+    # -------------------------------------------------------------------------
     async def _finalize_iteration_exhaustion(
         self,
         request: AgentLoopRequest,
@@ -708,8 +719,16 @@ class AgentLoop:
                 # finalization result; the deterministic explanation remains
                 # the safe terminal response.
                 if not result.tool_calls:
-                    candidate = (result.content or "").strip()
-                    outcome = "text" if candidate else "empty"
+                    candidate, protocol_text_suppressed = (
+                        self._sanitize_finalization_candidate(result.content)
+                    )
+                    outcome = (
+                        "protocol_text_suppressed"
+                        if protocol_text_suppressed
+                        else "text"
+                        if candidate
+                        else "empty"
+                    )
                 else:
                     outcome = "tool_calls_suppressed"
             except (AgentRunControlSignal, asyncio.CancelledError):
@@ -800,8 +819,16 @@ class AgentLoop:
             try:
                 result = await self._model_step(request, provider, messages, [])
                 if not result.tool_calls:
-                    candidate = (result.content or "").strip()
-                    outcome = "text" if candidate else "empty"
+                    candidate, protocol_text_suppressed = (
+                        self._sanitize_finalization_candidate(result.content)
+                    )
+                    outcome = (
+                        "protocol_text_suppressed"
+                        if protocol_text_suppressed
+                        else "text"
+                        if candidate
+                        else "empty"
+                    )
                 else:
                     outcome = "tool_calls_suppressed"
             except (AgentRunControlSignal, asyncio.CancelledError):
@@ -906,8 +933,16 @@ class AgentLoop:
             try:
                 result = await self._model_step(request, provider, messages, [])
                 if not result.tool_calls:
-                    candidate = (result.content or "").strip()
-                    outcome = "text" if candidate else "empty"
+                    candidate, protocol_text_suppressed = (
+                        self._sanitize_finalization_candidate(result.content)
+                    )
+                    outcome = (
+                        "protocol_text_suppressed"
+                        if protocol_text_suppressed
+                        else "text"
+                        if candidate
+                        else "empty"
+                    )
                 else:
                     outcome = "tool_calls_suppressed"
             except (AgentRunControlSignal, asyncio.CancelledError):
