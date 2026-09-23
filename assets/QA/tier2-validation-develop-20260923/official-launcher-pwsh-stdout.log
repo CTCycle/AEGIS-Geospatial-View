@@ -1,0 +1,33 @@
+[RUN] Starting Launch application
+[OK] Application environments and frontend dependencies are ready; skipped dependency installation.
+[STEP] Frontend production build is missing; rebuilding.
+[STEP] Building frontend
+
+> aegis-client@1.0.0 prebuild
+> node scripts/frontend-state.cjs invalidate-build
+
+
+> aegis-client@1.0.0 build
+> ng build
+
+> Building...
+√ Building...
+Initial chunk files | Names         | Raw size | Estimated transfer size
+main-5N4WIECL.js    | main          |  1.55 MB |               353.66 kB
+styles-NFZPBYYM.css | styles        | 68.72 kB |                 8.48 kB
+
+                    | Initial total |  1.62 MB |               362.14 kB
+
+Application bundle generation complete. [19.208 seconds] - 2026-09-23T17:54:13.638Z
+
+Output location: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\client\dist
+
+
+> aegis-client@1.0.0 postbuild
+> node scripts/frontend-state.cjs record-build
+
+[RUN] Launching backend (server.app:app)
+[RUN] Launching frontend preview
+[WAIT] Waiting for backend readiness at http://127.0.0.1:7059/api/health
+[FATAL] Launch application failed: Backend did not become ready within 60 seconds at http://127.0.0.1:7059/api/health.
+[FATAL] Backend did not become ready within 60 seconds at http://127.0.0.1:7059/api/health.

@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-23 (T1-10 and exact pushed-head hosted CI passed)
+Last updated: 2026-09-23 (T2-01/T2-02 attempted on current head; live browser blocked)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -40,16 +40,17 @@ gate can pass while its broader application-foundation slice remains partial.
 | --- | --- | ---: | --- | --- |
 | Tier 0 | Environment, schema, current-HEAD reconciliation | 5 | `PASS` | [Current Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md): `T0-01` through `T0-05` are `PASS` on the same source boundary. |
 | Tier 1 | Application foundations | 12 | `PASS` | [Tier 1 checklist](tier1_application_foundations.md), [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [T1-09 continuation](../../QA/tier1-validation-develop-20260923/T1-09/report.md), [T1-07 continuation](../../QA/tier1-validation-develop-20260923/T1-07/report.md), [T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), and [T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md); 12 `PASS`. The 2026-09-21 [baseline ledger](../../QA/tier1-application-foundations-20260921/ledger.md) remains historical. |
-| Tier 2 | Core agent workflows | 7 | `UNRUN` | Preserve exact-location and no-fallback boundaries. |
+| Tier 2 | Core agent workflows | 7 | `PARTIAL` | [Current T2 attempt](../../QA/tier2-validation-develop-20260923/report.md): `T2-01` and `T2-02` are `BLOCKED` before the live browser workflow; `T2-03`–`T2-07` remain `UNRUN`. |
 | Tier 3 | Rendering and geospatial feature families | 18 | `UNRUN` | Require browser-authoritative source/layer/render-ack evidence. |
 | Tier 4A | Ingestion, local sources, optional integrations | 8 | `UNRUN` | Use isolated data and approved credentials/snapshots. |
 | Tier 4B | Model-provider parity | 5 | `UNRUN` | Never substitute provider or model. |
 | Tier 5 | Recovery, races, difficult boundaries, hosted CI | 13 | `UNRUN` | Open only after lower-tier contracts are classified. |
 
-Campaign-slice status is 17 `PASS`, 0 `PARTIAL`, and 51 `UNRUN` of 68 slices.
-These are the latest per-slice classifications across their linked source
-boundaries, not a common-commit campaign result. Tier 1 is `PASS`; the next
-actionable campaign slice is `T2-01`.
+Campaign-slice status is 17 `PASS`, 0 `PARTIAL`, 2 `BLOCKED`, and 49 `UNRUN`
+of 68 slices. These are the latest per-slice classifications across their
+linked source boundaries, not a common-commit campaign result. Tier 1 is
+`PASS`; retry `T2-01` and `T2-02` after the official launcher reaches backend
+health, then continue with the separate `T2-03` landmark/POI scope.
 Hosted CI is a separate exact-head gate. The earlier push run for
 `fccafa1f48be71a8f68116b83783b29369e9e419` failed because its backend test
 command referenced a missing path. The corrected implementation commit
@@ -76,6 +77,8 @@ The local T1-10 credential slice passed on
 `develop@8e32f82e3f094e5fb17c3978fad69b9f80b7af0b`; its exact pushed-head CI
 passed all four jobs. Tier 1 is complete at 12 `PASS`; continue with `T2-01`
 while preserving the downstream `PARTIAL`, `BLOCKED`, and `UNRUN` gates below.
+The 2026-09-23 current-head Tier 2 attempt is recorded separately below and in
+the [T2 validation report](../../QA/tier2-validation-develop-20260923/report.md).
 
 ## Current ledger
 
@@ -89,9 +92,11 @@ while preserving the downstream `PARTIAL`, `BLOCKED`, and `UNRUN` gates below.
 | `T0-04` | Windows startup | `PASS` | 2026-09-22 | `develop@afa608c8d5c53a34d0ce8da36e5fe5f47f689145` | [T0-04 report](../../QA/tier0-validation-develop-20260922/T0-04/report.md) |
 | `T0-05` | API composition and contract | `PASS` | 2026-09-22 | `develop@afa608c8d5c53a34d0ce8da36e5fe5f47f689145` | [T0-05 report](../../QA/tier0-validation-develop-20260922/T0-05/report.md) |
 
-Tier 0 and Tier 1 are `PASS`. The overall campaign remains `PARTIAL` because
-Tier 2–5 are `UNRUN` and the downstream live/browser/provider boundaries remain
-partial or blocked. Hosted CI passed for the exact T1-10 implementation head.
+Tier 0 and Tier 1 are `PASS`. The overall campaign remains `PARTIAL`: Tier 2
+contains two `BLOCKED` slices and five `UNRUN` slices, Tier 3–5 remain
+`UNRUN`, and the downstream live/browser/provider boundaries remain partial or
+blocked. Hosted CI passed for the exact T1-10 implementation head; validation
+on the new report commit is tracked separately.
 
 ### Current Tier 1 continuation ledger
 
@@ -104,10 +109,28 @@ partial or blocked. Hosted CI passed for the exact T1-10 implementation head.
 | `T1-09` | Settings navigation and drafts | `PASS` | 2026-09-23 | `develop@c090abd1ca9d6d78e82e798da9167b9d19b3fc23`; source fingerprints are recorded in the report | [T1-09 report](../../QA/tier1-validation-develop-20260923/T1-09/report.md), [slice manifest](../../QA/tier1-validation-develop-20260923/T1-09/slice.json), [source fingerprints](../../QA/tier1-validation-develop-20260923/T1-09/source-sha256.txt), [hosted-CI record](../../QA/tier1-validation-develop-20260923/T1-09/hosted-ci.md) | `T1-10` is now passed; the current campaign hand-off is `T2-01`. |
 | `T1-10` | Credential lifecycle | `PASS` | 2026-09-23 | `develop@8e32f82e3f094e5fb17c3978fad69b9f80b7af0b`; source fingerprints are recorded in the report | [T1-10 report](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [slice manifest](../../QA/tier1-validation-develop-20260923/T1-10/slice.json), [hosted-CI record](../../QA/tier1-validation-develop-20260923/T1-10/hosted-ci.md) | `T2-01` is the next campaign slice; the targeted model-selection regression does not expand the T1-11 boundary. |
 
+### Current Tier 2 slice ledger
+
+The attempt below used current application sources at
+`develop@155e1e22ce34a4b2698f474afa60b57f61b56916`. The official launcher
+built the frontend but timed out waiting for backend health; the in-app browser
+could not connect. Focused unit tests do not substitute for live map and
+acknowledgement evidence.
+
+| Slice | Scope | Status | Verification date | Tested source boundary | Evidence | Next action |
+| --- | --- | --- | --- | --- | --- | --- |
+| `T2-01` | Plain and ambiguous locations; Springfield clarification; invalid-coordinate retention; Italian-context Milan request | `BLOCKED` | 2026-09-23 | `develop@155e1e22ce34a4b2698f474afa60b57f61b56916` | [T2 report](../../QA/tier2-validation-develop-20260923/report.md), [browser evidence](../../QA/tier2-validation-develop-20260923/browser-evidence.md); historical [core browser report](../../QA/core-behavior-e2e-20260919/final-report.md) | Retry after official launcher backend health is restored; require visible map, attribution, and matching render acknowledgement. Keep `Mostrami Milano` disambiguation visible as an attention item. |
+| `T2-02` | Hydrated Rome to ambiguous Florence, then explicit Florence, Tuscany, Italy replacement | `BLOCKED` | 2026-09-23 | `develop@155e1e22ce34a4b2698f474afa60b57f61b56916` | [T2 report](../../QA/tier2-validation-develop-20260923/report.md), [browser evidence](../../QA/tier2-validation-develop-20260923/browser-evidence.md); historical [2026-09-19 diary](../../QA/aegis-geospatial-e2e-validation-20260919/report.md) | Retry after official launcher backend health is restored; confirm Rome remains during clarification and Florence renders with matching acknowledgement. |
+| `T2-03` | Landmark and point-of-interest routing | `UNRUN` | — | — | [ISSUE-001](../project_status_ledger.md#issue-001-landmark-and-nearby-poi-routing-can-use-the-wrong-geography) | Keep separate: validate capability selection, bounded POI execution, exact geography, and rendered-layer proof. |
+| `T2-04` | Capability discovery | `UNRUN` | — | — | [Validation strategy](strategy.md) | Validate only after current location slices have browser-authoritative evidence. |
+| `T2-05` | Direct tools | `UNRUN` | — | — | [Validation strategy](strategy.md) | Validate tool routing, result semantics, and any requested rendered map. |
+| `T2-06` | Conversation history | `UNRUN` | — | — | [Validation strategy](strategy.md) | Validate hydrated state and replay behavior with visible browser evidence. |
+| `T2-07` | Evidence inspection | `UNRUN` | — | — | [Validation strategy](strategy.md) | Validate evidence provenance and matching render acknowledgement. |
+
 | Gate ID / name | Subsystem | Lane / environment | Status | Verification date | Tested commit | Evidence link | Next action / boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | ROUTE-UNIT — semantic catalog and alias contracts | Routing / catalog | Local focused native pytest | PASS | 2026-09-17 | `558f1966` | [focused-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/focused-final-commit.log) | Preserve semantic subject matching, required aliases, generic-infrastructure clarification, and source-availability gates. |
-| ROUTE-LIVE — exact-lane route matrix | Routing / catalog | Chrome UI, exact `opencode-go / deepseek-v4.1-flash` | PARTIAL | 2026-09-17 | `558f1966` | [manual-live-observations.md](../../QA/native-agent-loop-evaluation-20260917-final/manual-live-observations.md) | Repair and rerun Acropolis landmark-only semantics, imagery extent matching, weather execution budget, USGS/land-cover aliases, and generic infrastructure clarification. |
+| ROUTE-LIVE — exact-lane route matrix | Routing / catalog | Chrome UI, exact `opencode-go / deepseek-v4.1-flash` | PARTIAL | 2026-09-23 | `develop@155e1e22ce34a4b2698f474afa60b57f61b56916` | [current T2 report](../../QA/tier2-validation-develop-20260923/report.md), [browser evidence](../../QA/tier2-validation-develop-20260923/browser-evidence.md), [historical route observations](../../QA/native-agent-loop-evaluation-20260917-final/manual-live-observations.md) | Current core location rerun is blocked before the browser workflow. Retry it when the launcher is healthy; also repair and rerun Acropolis landmark-only semantics, imagery extent matching, weather execution budget, USGS/land-cover aliases, generic-infrastructure clarification, and Milan contextual disambiguation. |
 | STATE-V2 — ConversationState and clarification projection | Agent state | Local focused native pytest plus isolated API checks | PASS | 2026-09-17 | `558f1966` | [focused-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/focused-final-commit.log) | Keep schema version 2 and `pending_clarification` as the sole durable/public contract; accept `unresolved_questions` only as migration input. |
 | PRESENTATION-TERMINAL — terminal run finalization | Run persistence | Local backend unit/native tests | PASS | 2026-09-17 | `558f1966` | [backend-unit-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/backend-unit-final-commit.log) | Preserve atomic closure for failed, cancelled, superseded, and timed-out runs with no pending presentation row. |
 | FINALIZATION-OBS — sanitized tools-disabled traces | Trace observability | Local focused native pytest | PASS | 2026-09-17 | `558f1966` | [focused-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/focused-final-commit.log) | Keep reason, model call index, `tools_exposed=0`, and `tool_choice=none`; never persist private reasoning, credentials, or raw provider payloads. |
@@ -116,20 +139,20 @@ partial or blocked. Hosted CI passed for the exact T1-10 implementation head.
 | CONTROLLED-FAULT — recovery and acknowledgement matrix | Browser / MapLibre | Local controlled fixture; six fault cases pass, supersession case fails | PARTIAL | 2026-09-17 | `bf5a7cfa` | [controlled-browser-bf5-warm-final.log](../../QA/native-agent-loop-evaluation-20260917-final/controlled-browser-bf5-warm-final.log) and [superseded report](../../QA/native-agent-loop-evaluation-20260917-final/controlled-browser-bf5-warm-final/reports/controlled-map-superseded.json) | Fix the late superseded rejection ordering, then rerun the entire controlled module. |
 | PROVIDER-READY — exact configured lane readiness | Provider | `opencode-go / deepseek-v4.1-flash`, `openai-chat-completions` | PASS | 2026-09-17 | `558f1966` | [final structured probe](../../QA/native-agent-loop-evaluation-20260917-final/live-browser-558f-final/http/CHAT-LIVE-01/provider-structured-probe.json) | Preserve this exact lane; no fallback is permitted. |
 | LIVE-BROWSER-SMOKE — realtime UI smoke | Browser / realtime | Local services 4512/7059, exact provider lane, isolated runtime data | PASS | 2026-09-17 | `558f1966` | [live-browser-558f-final.log](../../QA/native-agent-loop-evaluation-20260917-final/live-browser-558f-final.log) | Four tests passed: three exact-lane UI flows plus one intentional degraded-path stub; do not promote this subset to complete 22-scenario proof. |
-| LIVE-DIARY-20260919 — representative geospatial browser diary | Browser / realtime / MapLibre | Local services 4512/7059, exact `opencode-go / deepseek-v4.1-flash`, real chat workflow | PARTIAL | 2026-09-19 | `77bf7e9` + working tree | [validation diary](../../QA/aegis-geospatial-e2e-validation-20260919/report.md) | Rome-to-Florence recovery is browser-verified after the surgical loop fix; coordinate reverse geocoding, landmark/catalog coverage, provider availability, and the complete scenario matrix remain open. |
+| LIVE-DIARY-20260919 — representative geospatial browser diary | Browser / realtime / MapLibre | Local services 4512/7059, exact `opencode-go / deepseek-v4.1-flash`, real chat workflow | PARTIAL | 2026-09-23 | `develop@155e1e22ce34a4b2698f474afa60b57f61b56916` | [current T2 report](../../QA/tier2-validation-develop-20260923/report.md), [current browser evidence](../../QA/tier2-validation-develop-20260923/browser-evidence.md), [historical validation diary](../../QA/aegis-geospatial-e2e-validation-20260919/report.md) | Current-head Rome-to-Florence and plain-location reruns are blocked before the browser workflow; historical Florence evidence remains scoped to its old boundary. Retry after launcher readiness, then cover coordinate reverse geocoding, landmark/catalog coverage, provider availability, and the complete scenario matrix. |
 | LIVE-HYD-20260920 — hazard and hydrology rerun | Browser / realtime / MapLibre | Local services 4512/7059, exact `opencode-go / deepseek-v4.1-flash`, live public providers | PARTIAL | 2026-09-20 | `84c210f6` | [hazard/hydrology rerun](../../QA/aegis-hazard-hydrology-e2e-20260920/report.md) | FEMA raster retrieval is corrected but live MapLibre source loading still fails; GEO-HYD-05 and GEO-HYD-06 remain BLOCKED, and the current Zurich guardrail rerun is inconclusive. Keep the complete matrix PARTIAL. |
-| LIVE-API — orchestration and ambiguity smoke | API orchestration | Exact provider lane, isolated runtime | PARTIAL | 2026-09-17 | `558f1966` | [api-live-final.log](../../QA/native-agent-loop-evaluation-20260917-final/api-live-final.log) | Investigate the typed 409 while `/api/chat/turn` is still running; keep the Ollama-unavailable 502 as a separate non-fallback boundary. |
+| LIVE-API — orchestration and ambiguity smoke | API orchestration | Exact provider lane, isolated runtime | PARTIAL | 2026-09-23 | `develop@155e1e22ce34a4b2698f474afa60b57f61b56916` | [current T2/API report](../../QA/tier2-validation-develop-20260923/report.md), [T1-06 historical live matrix](../../QA/tier1-validation-develop-20260923/T1-06/live-http-matrix.json), [historical API log](../../QA/native-agent-loop-evaluation-20260917-final/api-live-final.log) | The current-head live recheck was blocked because the official launcher did not expose a healthy API. T1-06 previously passed the genuine active-run `409`; recheck it live at the current head. Keep the Ollama-unavailable `502` as a separate non-fallback boundary. |
 | SYNC-CHAT-TURN — terminal hydration response | Backend API | Exact `opencode-go / deepseek-v4.1-flash` lane, isolated runtime, and focused API/OpenAPI pytest | PASS | 2026-09-23 | `develop@af663adaa5e14be3fcd7312e4bd230cca11f1b40` | [T1-06 report](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [live HTTP matrix](../../QA/tier1-validation-develop-20260923/T1-06/live-http-matrix.json) | Preserve terminal hydration, genuine-conflict, accepted-run details, preflight, and safe provider-error behavior. |
 | BACKEND-UNIT — full unit suite | Backend | Standard Windows test runner, isolated basetemp | PASS | 2026-09-23 | `develop@3fd0c820c2d4de0fb06120b6feac80b199d57f26` | [T1-07 report](../../QA/tier1-validation-develop-20260923/T1-07/report.md), [full unit log](../../QA/tier1-validation-develop-20260923/T1-07/backend-unit.log) | 918 tests pass, including app-lifespan cleanup and all job lifecycle/API tests. |
 | NATIVE-FOCUSED — remediation regression suite | Backend / agent loop | `app/server/.venv`, isolated basetemp | PASS | 2026-09-17 | `558f1966` | [focused-final-commit.log](../../QA/native-agent-loop-evaluation-20260917-final/focused-final-commit.log) | Retain the focused boundary for every future route, render, state, or finalization change. |
 | RUFF — Python lint | Python quality | Repository-wide project-configured gate | PASS | 2026-09-23 | `develop@3fd0c820c2d4de0fb06120b6feac80b199d57f26` | [T1-07 report](../../QA/tier1-validation-develop-20260923/T1-07/report.md), [Ruff log](../../QA/tier1-validation-develop-20260923/T1-07/ruff.log) | All checks pass; three protected-cache access warnings remain separate from the lint result. |
 | PYRIGHT-STRICT — repository strict typing | Static typing | `app/server/pyproject.toml` strict run | PASS | 2026-09-23 | `develop@3fd0c820c2d4de0fb06120b6feac80b199d57f26` | [T1-07 report](../../QA/tier1-validation-develop-20260923/T1-07/report.md), [Pyright log](../../QA/tier1-validation-develop-20260923/T1-07/pyright.log) | Full repository run reports 0 errors, 0 warnings, and 0 informations. |
-| FRONTEND-BUILD — production bundle | Angular client | Local `npm run build` | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | Keep generated `dist` output out of source control. |
+| FRONTEND-BUILD — production bundle | Angular client | Local `npm run build` via official launcher | PASS | 2026-09-23 | `develop@155e1e22ce34a4b2698f474afa60b57f61b56916` | [T2 validation report](../../QA/tier2-validation-develop-20260923/report.md) | The production bundle completed; backend readiness still blocked live browser validation. Keep generated `dist` output out of source control. |
 | FRONTEND-KARMA — client regression suite | Angular client | ChromeHeadlessNoGpu | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | 248/248 pass; add browser-timing coverage before retrying supersession remediation. |
 | MIGRATION — isolated upgrade/head/check | Persistence schema | Isolated SQLite under dated QA data | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | Fresh upgrade, `alembic check`, `current --check-heads`, and 25 migration/persistence tests pass at `202609210001`. |
 | MATRIX-22 — complete required scenario matrix | Coverage | Exact live provider plus controlled browser | PARTIAL | 2026-09-17 | `bf5a7cfa` | [final-report.md](../../QA/native-agent-loop-evaluation-20260917-final/final-report.md) | Complete the explicit PARTIAL and UNRUN rows, including a separate mismatched-ack case, before any overall PASS claim. |
 | HOSTED-CI — exact tested head | Hosted CI | GitHub Actions push workflow on `develop` | PASS | 2026-09-23 | `3fd0c820c2d4de0fb06120b6feac80b199d57f26` | [exact-head GitHub Actions run 35861096479](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35861096479), [T1-07 hosted-CI record](../../QA/tier1-validation-develop-20260923/T1-07/hosted-ci.md) | All four jobs passed on the pushed T1-07 implementation commit; rerun after workflow or application changes. |
-| PROCESS-CLEANUP — task-owned services and browser | Test harness | Local host, ports 4512/7059/9876 | PASS | 2026-09-22 | `7e8b10d5 + WT` | [T0-04 report](../../QA/tier0-validation-develop-20260922/T0-04/report.md) | Final harness services stopped; ports verified free; unrelated processes survived readiness-failure cleanup. |
+| PROCESS-CLEANUP — task-owned services and browser | Test harness | Local host, ports 4512/7059/9876 | PASS | 2026-09-23 | `develop@155e1e22ce34a4b2698f474afa60b57f61b56916` | [T2 validation report](../../QA/tier2-validation-develop-20260923/report.md) | Official-launcher children were cleaned up after readiness timeout; ports verified free and `.env` restored byte-for-byte. |
 
 ## 2026-09-19 live browser diary
 
