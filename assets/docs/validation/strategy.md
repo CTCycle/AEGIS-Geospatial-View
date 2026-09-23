@@ -65,7 +65,7 @@ trusting downstream feature evidence.
 | Campaign tier | Slice IDs | Focus | Current hand-off |
 | --- | --- | --- | --- |
 | Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | [Current Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md) records `T0-01` through `T0-05` as `PASS` on the same `develop` source boundary. |
-| Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 checklist](tier1_application_foundations.md), [2026-09-23 T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), [2026-09-22 T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md), and [2026-09-21 baseline](../../QA/tier1-application-foundations-20260921/report.md). T1-07 is next. |
+| Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 checklist](tier1_application_foundations.md), [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [2026-09-23 T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), [2026-09-22 T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md), and [2026-09-21 baseline](../../QA/tier1-application-foundations-20260921/report.md). Tier 1 is 12/12 `PASS`; `T2-01` is next. |
 | Tier 2 | `T2-01`–`T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | Open only after foundations are classified; preserve exact geography and no-fallback rules. |
 | Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
 | Tier 4A | `T4-01`–`T4-08` | CSV/GeoJSON ingestion, optional heavy formats, mobility data, local/configured sources, cameras, credentialed providers, and catalog-only descriptors. | Run only with isolated data and approved credentials/snapshots. |
@@ -137,8 +137,15 @@ passes Settings URL authority, all seven rendered sections, invalid-tab
 fallback, draft retention, controlled save, and return/reopen. Its exact pushed
 implementation commit `c090abd1ca9d6d78e82e798da9167b9d19b3fc23` passed all
 four jobs in [hosted CI run 35873578752](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35873578752).
-Tier 1 is `PARTIAL` at 11 `PASS` and 1 `PARTIAL`; continue with `T1-10`
-credential failure fixtures. Broader browser/provider coverage remains open.
+The 2026-09-23 [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md)
+passes credential repository/crypto/settings tests (38/38), focused Settings
+Angular tests (33/33), and the controlled credential/model-selection browser
+regressions (5/5). It also fixes the model-selection success footer refresh and
+checks that selected-model response metadata matches the selected model. Tier 1
+is now `PASS` at 12/12; the campaign is `PARTIAL` at 17 `PASS`, 0 `PARTIAL`,
+and 51 `UNRUN`. The exact pushed implementation head passed all four jobs in
+[hosted CI run 35891289442](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35891289442).
+Continue with `T2-01`; broader browser/provider coverage remains open.
 
 ## Current Tier 0 execution record
 

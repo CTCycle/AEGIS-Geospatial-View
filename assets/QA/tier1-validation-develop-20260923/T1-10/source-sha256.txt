@@ -1,0 +1,8 @@
+0c00cd458a700c6ca85a91632ee8aff824ce6087a8740367d7da57fda2bb11fc  app/client/src/app/pages/settings-page.component.ts
+b54f2a95b9cb1320105420de1e4abb4bbd9b81bfc475d5711dc38ef32d860188  app/client/src/app/pages/settings-page.component.html
+c8f4a3945cb8fc21d05a4cc6ef30ce53029f6cd293600864193199eec28a4483  app/client/src/app/core/credential-settings.service.ts
+accee1cc1d9b1bab136812f23c975fc07e26fc582658fba54b5bc64d77de8c29  app/client/src/app/components/settings-api-key-field.component.ts
+6c8134a74e8b35adc6eb36394b32ec3a76edd77c4caa03adda2b8cf865557da2  app/client/src/app/components/settings-api-key-field.component.html
+c66d77b1dc8162287196e447ea1e8a159502f7a7af128d1ffbe5a0469d599b98  app/client/src/app/core/api-parsers.ts
+b75d84aae94a5eb810a0ece2a33d997d440d588f67a276dc20cb1353a3074508  app/server/services/chat/settings_service.py
+97e7274ba0c171d6da92c2ebd86350704799daa900d3b78919d8ea9b44eee81e  app/tests/e2e/test_settings_regressions.py
