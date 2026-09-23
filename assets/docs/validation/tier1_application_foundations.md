@@ -72,14 +72,24 @@ is implementation commit `3fd0c820c2d4de0fb06120b6feac80b199d57f26`.
 The 2026-09-21 headless run's missing `.maplibregl-canvas` remains historical
 evidence; the current headed Chrome run verified the T1-02 reload and visible
 map-control boundary. Its transparent tile fixture does not verify live
-provider pixels or `map.render_ack`. The other retained browser failure,
-`TestChatFlow.test_settings_page_opens_from_toolbar`, expects `role=tab` while
-the current Settings sidebar exposes section buttons. Align that test with the
-accessible contract before claiming automated `T1-09` completion.
+provider pixels or `map.render_ack`. The stale toolbar `role=tab` locator was
+aligned with the Settings button contract in T1-09 and its focused browser
+regression now passes.
+
+The 2026-09-23 [T1-09 continuation](../../QA/tier1-validation-develop-20260923/T1-09/report.md)
+passes the seven-section URL and rendered-panel flow, invalid-tab fallback,
+Back/Forward restoration, draft retention, controlled save, and return/reopen
+value check. The focused Settings component suite passed 31/31, the targeted
+browser regressions passed 2/2, the toolbar regression passed 1/1, and the
+Angular production build and exact-head hosted CI passed. Its tested source
+boundary is implementation commit
+`c090abd1ca9d6d78e82e798da9167b9d19b3fc23`. Tier 1 is now `PARTIAL` at
+11 `PASS` / 1 `PARTIAL`; the campaign is 16 `PASS` / 1 `PARTIAL` / 51
+`UNRUN`.
 
 ## Next actionable slice
 
-Continue with `T1-09` Settings navigation and drafts: URL-authoritative
-sections, invalid-tab fallback, dirty drafts, save, and return. `T1-10`
-credential failure fixtures remain the other Tier 1 partial slice. Keep their
-tested source boundaries and controlled credentials in the QA reports.
+Continue with `T1-10` credential failure fixtures: masked state, safe
+save/clear, blank-draft safety, invalid input, undecryptable state, and API
+failure. Keep its controlled credential fixtures and source boundary in the QA
+report. T1-09 passed on the exact pushed implementation commit above.

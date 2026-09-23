@@ -1,0 +1,4 @@
+07c8c928a3b3177b167eaac20243489f872bed32088bba88e86acdcdeaed76ce  app/client/src/app/pages/settings-page.component.ts
+e204b037f0aa1fda423d57051230968edd0487cb7477ac6899e56bd23ed29b5d  app/client/src/app/pages/settings-page.component.spec.ts
+66881657624a62aebf1b25f1575ad004c3e426426dce0d86b22e89608ce06d7f  app/tests/e2e/test_app_flow.py
+7c7084b3450677c33b8a43835c75d5d56d7c31cafe43a49dfb54ad875b49392c  app/tests/e2e/test_settings_regressions.py
