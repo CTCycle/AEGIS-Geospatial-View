@@ -30,6 +30,7 @@ from server.domain.jobs import (
     JobCancelResponse,
 )
 from server.services.chat.streaming import ChatStreamingService
+from server.services.llm.errors import safe_failure_detail
 
 LOGGER = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class BackgroundJobService:
     def stop(self) -> None:
         self._stop.set()
         if self._thread is not None:
-            self._thread.join(timeout=2)
+            self._thread.join()
 
     # -------------------------------------------------------------------------
     def create_chat_job(self, payload: ChatTurnRequest) -> BackgroundJobCreateResponse:
@@ -216,7 +217,12 @@ class BackgroundJobService:
             if self._is_cancel_requested(job.job_id):
                 self._cancel_running_job(job.job_id)
                 return
-            self._record_stream_event(job.job_id, event.event, dict(event.data or {}))
+            event_data = dict(event.data or {})
+            if event.event == "error":
+                self._fail_job(job.job_id, self._safe_stream_failure(event_data))
+                return
+            if event.event != "final":
+                self._record_stream_event(job.job_id, event.event, event_data)
             if event.event == "status":
                 self._heartbeat(job.job_id, 5, "Agent received request")
             elif event.event == "stage":
@@ -259,6 +265,23 @@ class BackgroundJobService:
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _safe_stream_failure(event_data: dict[str, Any]) -> dict[str, Any]:
+        message = event_data.get("message")
+        error = RuntimeError(message if isinstance(message, str) else "")
+        error_json: dict[str, Any] = {
+            "message": safe_failure_detail(error, "Background chat job failed.")
+        }
+        status_code = event_data.get("status")
+        if (
+            isinstance(status_code, int)
+            and not isinstance(status_code, bool)
+            and 100 <= status_code <= 599
+        ):
+            error_json["status"] = status_code
+        return error_json
+
+    # -------------------------------------------------------------------------
     def _heartbeat(
         self, job_id: str, progress_percent: int, status_message: str
     ) -> None:
@@ -283,17 +306,20 @@ class BackgroundJobService:
         self, job_id: str, event_name: str, payload_json: dict[str, Any]
     ) -> None:
         mapped_name = {
+            "context_usage": "status",
+            "stage": "status",
             "tool_call_started": "tool_call",
             "tool_call_completed": "tool_result",
             "tool_started": "tool_call",
             "tool_completed": "tool_result",
-            "final": "completed",
             "map_session_created": "map_session",
         }.get(event_name, event_name)
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
                 return
+            if mapped_name == "status" and event_name not in {"status"}:
+                payload_json = {"source_event": event_name, **payload_json}
             self._append_event_locked(job, mapped_name, payload_json)
 
     # -------------------------------------------------------------------------

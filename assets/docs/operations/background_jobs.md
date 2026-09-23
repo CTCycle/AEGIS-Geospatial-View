@@ -1,6 +1,6 @@
 # Background Jobs
 
-Last updated: 2026-08-02
+Last updated: 2026-09-23
 
 ## Scope
 
@@ -46,6 +46,8 @@ Important fields include:
 
 - One worker thread claims queued jobs and dispatches by `job_type`.
 - Chat jobs stream lifecycle events from the orchestrator into a shared event model.
+- `stage` and `context_usage` stream events are represented as `status` job events with their original event name in `source_event`.
+- Provider stream errors become sanitized `failed` terminal events; the final response is included once in the `completed` terminal event.
 - Chat job requests require a `conversation_id`; the worker never creates or infers one.
 - Missing-job failures are translated into HTTP 404 by the API layer.
 
@@ -56,8 +58,14 @@ Important fields include:
 - Running handlers check cancellation between major execution phases.
 - There is no force-kill mechanism for active work.
 - Jobs are process-local and memory-backed.
-- The worker is started and stopped by the FastAPI lifespan. Shutdown is
-  cooperative; active lifecycle tasks are awaited before the application exits.
+- The worker is started and stopped by the FastAPI lifespan. Shutdown stops
+  new job claims and waits for the active handler to reach its cooperative
+  completion or cancellation boundary. The wait has no fixed timeout; a
+  provider call that does not return can therefore delay shutdown.
+- FastAPI waits for the worker on a helper thread so the application event loop
+  remains available while shutdown is in progress.
+- Job records are not persisted. After a process restart, status, events, and
+  cancellation requests for an old job ID return HTTP 404.
 
 ## Configuration
 
