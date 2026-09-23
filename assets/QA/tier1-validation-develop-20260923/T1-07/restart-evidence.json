@@ -1,0 +1,20 @@
+{
+  "verification_date": "2026-09-23",
+  "runtime_data_dir": "runtimes/cache/test-runtime/t1-07-live-20260923",
+  "health": "ok",
+  "selected_lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "credential_health": "healthy"
+  },
+  "old_job_id": "job_99a0bd30deb047b2",
+  "status_route_http": 404,
+  "events_route_http": 404,
+  "cancel_route_http": 404,
+  "source_boundary": "develop@3fd0c820c2d4de0fb06120b6feac80b199d57f26 (the live validation source files match source-sha256.txt)",
+  "cleanup": {
+    "task_owned_process_tree_exited": true,
+    "backend_http_reachable_after_cleanup": false,
+    "frontend_http_reachable_after_cleanup": false
+  }
+}

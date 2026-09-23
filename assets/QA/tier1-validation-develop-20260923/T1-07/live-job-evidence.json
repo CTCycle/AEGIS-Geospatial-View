@@ -1,0 +1,53 @@
+{
+  "verification_date": "2026-09-23",
+  "source_boundary": "develop@3fd0c820c2d4de0fb06120b6feac80b199d57f26 (the live validation source files match source-sha256.txt)",
+  "runtime_data_dir": "runtimes/cache/test-runtime/t1-07-live-20260923",
+  "endpoint": "http://127.0.0.1:7059",
+  "selected_lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "credential_health": "healthy"
+  },
+  "fallback_used": false,
+  "request_id": "t1-07-live-20260923-01",
+  "conversation_id": "conv_48748225ef214818845aff5e566afd0f",
+  "job_id": "job_99a0bd30deb047b2",
+  "status": "succeeded",
+  "progress_percent": 100,
+  "assistant_message": "4",
+  "operation_status": "success",
+  "event_sequences": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "event_types": [
+    "queued",
+    "started",
+    "status",
+    "status",
+    "status",
+    "status",
+    "status",
+    "status",
+    "status",
+    "status",
+    "status",
+    "status",
+    "status",
+    "status",
+    "completed"
+  ]
+}
