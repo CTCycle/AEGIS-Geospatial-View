@@ -37,4 +37,4 @@ The transcript began too close to the panel top while its controls were absolute
 
 ## Gate roll-up and hand-off
 
-T1-03 is `PASS`. Tier 1 is `PARTIAL` at 8 `PASS` / 4 `PARTIAL`; the 68-slice campaign is `PARTIAL` at 13 `PASS` / 4 `PARTIAL` / 51 `UNRUN`. Hosted CI remains a separate exact-pushed-head gate and is not inferred from these local results. The next actionable slice is `T1-06`.
+T1-03 is `PASS` on its local test and browser evidence. Tier 1 is `PARTIAL` at 8 `PASS` / 4 `PARTIAL`; the 68-slice campaign is `PARTIAL` at 13 `PASS` / 4 `PARTIAL` / 51 `UNRUN`. The exact pushed-head hosted-CI run is a separate `FAIL`: the backend unit job stopped before collecting tests because its command references missing path `app/tests/unit/services/search`. The other three jobs passed. See [`hosted-ci.md`](hosted-ci.md); do not fold this workflow failure into the T1-03 local result. The next actionable slice is `T1-06`.

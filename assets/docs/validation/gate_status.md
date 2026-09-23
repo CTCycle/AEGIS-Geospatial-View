@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-23 (T1-03 passed; hosted verification remains separate)
+Last updated: 2026-09-23 (T1-03 passed locally; exact-head hosted CI failed separately)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -50,6 +50,11 @@ Campaign-slice status is 13 `PASS`, 4 `PARTIAL`, and 51 `UNRUN` of 68 slices.
 These are the latest per-slice classifications across their linked source
 boundaries, not a common-commit campaign result. Tier 1 remains `PARTIAL`; the
 next actionable campaign slice is `T1-06`.
+Hosted CI is a separate exact-head gate. The push run for
+`fccafa1f48be71a8f68116b83783b29369e9e419` failed because the backend test
+command references a missing test path; see the
+[hosted-CI record](../../QA/tier1-validation-develop-20260923/T1-03/hosted-ci.md).
+This does not change the local T1-03 classification or the 68-slice counts.
 
 Tier 1 is not promoted to complete: `T1-06`, `T1-07`, `T1-09`, and `T1-10`
 remain partial. Keep their gaps visible in the
@@ -102,7 +107,7 @@ partial or unrun.
 | FRONTEND-KARMA — client regression suite | Angular client | ChromeHeadlessNoGpu | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | 248/248 pass; add browser-timing coverage before retrying supersession remediation. |
 | MIGRATION — isolated upgrade/head/check | Persistence schema | Isolated SQLite under dated QA data | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | Fresh upgrade, `alembic check`, `current --check-heads`, and 25 migration/persistence tests pass at `202609210001`. |
 | MATRIX-22 — complete required scenario matrix | Coverage | Exact live provider plus controlled browser | PARTIAL | 2026-09-17 | `bf5a7cfa` | [final-report.md](../../QA/native-agent-loop-evaluation-20260917-final/final-report.md) | Complete the explicit PARTIAL and UNRUN rows, including a separate mismatched-ack case, before any overall PASS claim. |
-| HOSTED-CI — exact tested head | Hosted CI | GitHub Actions push workflows on `develop` | UNRUN | 2026-09-18 | `a33642a` | [push boundary record](../../QA/native-agent-loop-evaluation-20260918/push-status.md) | The current head is being pushed under explicit user authorization; inspect the resulting exact-head workflow run before changing this gate to PASS or FAIL. |
+| HOSTED-CI — exact tested head | Hosted CI | GitHub Actions push workflow on `develop` | FAIL | 2026-09-23 | `fccafa1f48be71a8f68116b83783b29369e9e419` | [exact-head GitHub Actions run](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35834459171), [failure record](../../QA/tier1-validation-develop-20260923/T1-03/hosted-ci.md) | Fix the missing configured test path and rerun hosted CI on the exact pushed head; the T1-03 local PASS is separate. |
 | PROCESS-CLEANUP — task-owned services and browser | Test harness | Local host, ports 4512/7059/9876 | PASS | 2026-09-22 | `7e8b10d5 + WT` | [T0-04 report](../../QA/tier0-validation-develop-20260922/T0-04/report.md) | Final harness services stopped; ports verified free; unrelated processes survived readiness-failure cleanup. |
 
 ## 2026-09-19 live browser diary

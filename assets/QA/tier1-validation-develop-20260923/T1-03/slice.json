@@ -7,6 +7,15 @@
     "base_commit": "35d04f8399d0166d1a134ad9f45931bc15efda91",
     "working_tree": "single focused transcript CSS spacing fix; see source-sha256.txt"
   },
+  "hosted_ci": {
+    "status": "FAIL",
+    "head_commit": "fccafa1f48be71a8f68116b83783b29369e9e419",
+    "workflow": "CI",
+    "run_id": 35834459171,
+    "run_url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35834459171",
+    "failed_job": "backend-unit-tests",
+    "failure": "The configured pytest command references missing path app/tests/unit/services/search and collected no tests."
+  },
   "environment": {
     "os": "Windows",
     "launcher": "start_on_windows.ps1 -Action Launch",
@@ -68,12 +77,13 @@
     "source_sha256": "source-sha256.txt",
     "backend_tests": "backend-tests.log",
     "frontend_tests": "frontend-tests.log",
-    "process_cleanup": "process-cleanup.log"
+    "process_cleanup": "process-cleanup.log",
+    "hosted_ci": "hosted-ci.md"
   },
   "limitations": [
     "Provider/model execution was not exercised.",
     "No live map-render or provider claim is made.",
-    "Hosted CI is recorded separately for the exact pushed head.",
+    "Hosted CI is a separate failed gate for the exact pushed code and evidence commit; see hosted-ci.md.",
     "In-app Browser screenshots were visually inspected inline but could not be exported to a workspace file."
   ],
   "next_action": "Continue with T1-06."
