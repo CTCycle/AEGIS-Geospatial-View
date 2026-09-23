@@ -55,9 +55,19 @@ passes the exact-lane live `/api/chat/turn` matrix (`200`, `202`, genuine
 `409`, preflight `404`, and safe `503`), 14 focused API/OpenAPI tests, the
 corrected 397-test backend CI selection, and exact-head hosted CI. Its live
 terminal case exposed and fixed completed-event hydration of run-only and
-omitted nullable fields. Tier 1 is now `PARTIAL` at 9 `PASS` / 3 `PARTIAL`;
-the campaign is 14 `PASS` / 3
-`PARTIAL` / 51 `UNRUN`. These results retain their dated source boundaries.
+omitted nullable fields. At the T1-06 source boundary, Tier 1 was `PARTIAL` at
+9 `PASS` / 3 `PARTIAL`; the campaign then recorded 14 `PASS` / 3 `PARTIAL` /
+51 `UNRUN`. These results retain their dated source boundaries.
+
+The 2026-09-23 [T1-07 continuation](../../QA/tier1-validation-develop-20260923/T1-07/report.md)
+passes the mounted job API and worker lifecycle cases (11/11 focused tests),
+the full backend unit suite (918/918), and one successful live background job
+on the exact `opencode-go / deepseek-v4.1-flash` lane. Cooperative shutdown
+waited for active work to finish; after an official-launcher restart against
+the same isolated runtime, the former job returned `404` for status, events,
+and cancellation. Tier 1 is now `PARTIAL` at 10 `PASS` / 2 `PARTIAL`; the
+campaign is 15 `PASS` / 2 `PARTIAL` / 51 `UNRUN`. The tested source boundary
+is implementation commit `3fd0c820c2d4de0fb06120b6feac80b199d57f26`.
 
 The 2026-09-21 headless run's missing `.maplibregl-canvas` remains historical
 evidence; the current headed Chrome run verified the T1-02 reload and visible
@@ -69,6 +79,7 @@ accessible contract before claiming automated `T1-09` completion.
 
 ## Next actionable slice
 
-Continue with `T1-07` background chat jobs: queue/progress/completion/cancel,
-unknown-job behavior, shutdown, and restart-persistence boundaries. Keep the
-tested source boundary and isolated runtime paths in its QA report.
+Continue with `T1-09` Settings navigation and drafts: URL-authoritative
+sections, invalid-tab fallback, dirty drafts, save, and return. `T1-10`
+credential failure fixtures remain the other Tier 1 partial slice. Keep their
+tested source boundaries and controlled credentials in the QA reports.
