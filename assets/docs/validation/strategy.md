@@ -143,9 +143,10 @@ Angular tests (33/33), and the controlled credential/model-selection browser
 regressions (5/5). It also fixes the model-selection success footer refresh and
 checks that selected-model response metadata matches the selected model. Tier 1
 is now `PASS` at 12/12; the campaign is `PARTIAL` at 18 `PASS`, 2 `PARTIAL`,
-0 `BLOCKED`, and 48 `UNRUN`. The latest exact pushed implementation head passed all
-four jobs in
-[hosted CI run 35891289442](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35891289442).
+0 `BLOCKED`, and 48 `UNRUN`. The T1-10 implementation head passed all four
+jobs in [hosted CI run 35891289442](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35891289442).
+The current T2 source-and-evidence head `3734df22a09eb83c279ac28467654c4cfa29bab6`
+also passed all four jobs in [hosted CI run 35915263134](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35915263134).
 The current T2 retry records POI routing and the live API conflict check as
 passing; Milan candidate quality, ambiguous Florence confirmation, and broader
 browser/provider coverage remain open.
