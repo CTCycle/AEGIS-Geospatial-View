@@ -87,9 +87,20 @@ boundary is implementation commit
 11 `PASS` / 1 `PARTIAL`; the campaign is 16 `PASS` / 1 `PARTIAL` / 51
 `UNRUN`.
 
+The 2026-09-23 [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md)
+passes 38 focused backend credential/settings tests, 33 Settings Angular tests,
+and five controlled browser regressions. The tests cover model and geospatial
+credential masking, safe save/clear, blank and invalid drafts, unreadable
+credentials, and failed updates. The model-card regression checks both PATCH
+responses and confirms the final visible selected state. A missing success-path
+change-detection call was fixed. T1-10 is `PASS` on
+`develop@8e32f82e3f094e5fb17c3978fad69b9f80b7af0b`; Tier 1 is now 12/12
+`PASS`, and the campaign is 17 `PASS` / 0 `PARTIAL` / 51 `UNRUN`.
+Credentialed provider connectivity was not tested and remains a separate gate.
+
 ## Next actionable slice
 
-Continue with `T1-10` credential failure fixtures: masked state, safe
-save/clear, blank-draft safety, invalid input, undecryptable state, and API
-failure. Keep its controlled credential fixtures and source boundary in the QA
-report. T1-09 passed on the exact pushed implementation commit above.
+Continue with `T2-01`, the first core agent workflow slice. Preserve exact
+location and no-fallback evidence boundaries. Tier 1 is 12/12 `PASS`; the full
+campaign remains `PARTIAL` with 51 slices `UNRUN` and separate live/provider
+gates still open.

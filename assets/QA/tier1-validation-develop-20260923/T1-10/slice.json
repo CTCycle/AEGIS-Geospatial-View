@@ -1,0 +1,64 @@
+{
+  "slice_id": "T1-10",
+  "name": "Credential lifecycle",
+  "status": "PASS",
+  "verified_at": "2026-09-23",
+  "branch": "develop",
+  "implementation_commit": "8e32f82e3f094e5fb17c3978fad69b9f80b7af0b",
+  "baseline_commit": "7e93d2080668043b6a021de723c8b6e7717fa6f0",
+  "source_fingerprints": "source-sha256.txt",
+  "report": "report.md",
+  "evidence": {
+    "backend_credential_settings_tests": {
+      "status": "PASS",
+      "passed": 38,
+      "deselected": 880,
+      "warnings": 2,
+      "test_runner": "app/tests/run_tests.bat"
+    },
+    "settings_angular_tests": {
+      "status": "PASS",
+      "passed": 33,
+      "test_runner": "npm run test"
+    },
+    "controlled_settings_browser": {
+      "status": "PASS",
+      "passed": 5,
+      "deselected": 7,
+      "browser": "Chrome 154",
+      "viewport": "1366x768",
+      "screenshots": [
+        "screenshots/models-selected-model.png",
+        "screenshots/model-provider-update-failure.png",
+        "screenshots/model-provider-credential-saved.png",
+        "screenshots/model-provider-credential-cleared.png",
+        "screenshots/geospatial-credential-saved.png",
+        "screenshots/geospatial-credential-cleared.png",
+        "screenshots/geospatial-credential-update-failure.png"
+      ]
+    },
+    "ruff": "PASS",
+    "git_diff_check": "PASS",
+    "hosted_ci": {
+      "status": "PASS",
+      "run_id": "35891289442",
+      "head_sha": "8e32f82e3f094e5fb17c3978fad69b9f80b7af0b",
+      "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35891289442"
+    }
+  },
+  "next_action": "T2-01",
+  "unaffected_open_gates": [
+    "ROUTE-LIVE",
+    "CONTROLLED-FAULT",
+    "LIVE-DIARY-20260919",
+    "LIVE-HYD-20260920",
+    "LIVE-API",
+    "MATRIX-22",
+    "GEO-HYD-05",
+    "GEO-HYD-06",
+    "maps.fema-coverage-guardrail",
+    "model.provider-parity.openai-ollama",
+    "providers.credentialed-and-local-source-access",
+    "geospatial.dataset-ingestion"
+  ]
+}
