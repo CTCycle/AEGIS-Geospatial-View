@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -211,7 +212,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         yield
     finally:
         await realtime_connections.close_all()
-        job_service.stop()
+        await asyncio.to_thread(job_service.stop)
         await run_lifecycle_service.shutdown()
         _dispose_sqlite_engine(database)
 

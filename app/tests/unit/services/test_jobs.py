@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import time
+from threading import Event, Thread
+from collections.abc import AsyncIterator
 
 from server.common.constants import (
     JOB_STATUS_CANCELLED,
@@ -88,6 +91,41 @@ class _UnexpectedFailureStub:
             "api-key=sk-test https://provider.invalid/v1 C:\\private\\settings.env"
         )
         yield  # pragma: no cover
+
+###############################################################################
+class _BlockingChatStreamingStub:
+
+    def __init__(self) -> None:
+        self.started = Event()
+        self.release = Event()
+
+    # -------------------------------------------------------------------------
+    async def stream_turn(
+        self, payload: ChatTurnRequest
+    ) -> AsyncIterator[ChatStreamEvent]:
+        self.started.set()
+        yield ChatStreamEvent(event="status", data={"request_id": payload.request_id})
+        await asyncio.to_thread(self.release.wait)
+        yield ChatStreamEvent(
+            event="final",
+            data={
+                "request_id": payload.request_id,
+                "conversation_id": payload.conversation_id,
+                "assistant_message": "done",
+                "operation": {
+                    "kind": "direct_answer",
+                    "status": "success",
+                    "message": "done",
+                },
+                "map_session": None,
+                "tool_payload": None,
+                "memory_snapshot": {},
+                "context_revision": 1,
+                "presentation_status": "not_requested",
+                "tool_results": [],
+                "context_usage": None,
+            },
+        )
 
 ###############################################################################
 def _build_service() -> BackgroundJobService:
@@ -195,3 +233,37 @@ def test_worker_sanitizes_unexpected_exception_details() -> None:
     assert status is not None
     assert status.status == JOB_STATUS_FAILED
     assert status.error_json == {"message": "Unexpected job failure"}
+
+###############################################################################
+def test_stop_waits_for_active_job_and_joins_worker() -> None:
+    streaming_stub = _BlockingChatStreamingStub()
+    service = BackgroundJobService(
+        chat_streaming_service=streaming_stub,
+        polling_interval=1.0,
+    )
+    service.start()
+    created = service.create_chat_job(
+        ChatTurnRequest(
+            conversation_id="test-conversation",
+            message="hello",
+            request_id="req-shutdown",
+        )
+    )
+    stop_returned = Event()
+    stopper = Thread(target=lambda: (service.stop(), stop_returned.set()))
+
+    try:
+        assert streaming_stub.started.wait(timeout=2)
+        stopper.start()
+        assert not stop_returned.wait(timeout=2.2)
+    finally:
+        streaming_stub.release.set()
+        if stopper.ident is not None:
+            stopper.join(timeout=3)
+
+    assert not stopper.is_alive()
+    assert stop_returned.is_set()
+    worker = service._thread
+    assert worker is not None and not worker.is_alive()
+    status = service.get_job(created.job_id)
+    assert status is not None and status.status == JOB_STATUS_SUCCEEDED
