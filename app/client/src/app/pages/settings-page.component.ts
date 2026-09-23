@@ -584,6 +584,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.structuredProbe = this.unverifiedProbe(updated);
       this.statusText = `Selected ${model.name} as agent model`;
       this.syncState();
+      this.changeDetectorRef.detectChanges();
     } catch (error: unknown) {
       if (this.isDestroyed) {
         return;
