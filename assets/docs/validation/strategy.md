@@ -137,8 +137,9 @@ that historical test boundary. The 2026-09-23 [T1-03 continuation](../../QA/tier
 passes conversation search, paging, hydration, isolation, stale-ID recovery,
 and a focused transcript-spacing repair. The [T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md)
 passes the exact-lane HTTP response matrix and corrected backend CI test
-selection. Tier 1 is `PARTIAL` at 9 `PASS` and 3 `PARTIAL`; downstream
-browser/provider/hosted-CI boundaries remain open. Continue at `T1-07`.
+selection, and the exact pushed implementation head passed hosted CI. Tier 1 is
+`PARTIAL` at 9 `PASS` and 3 `PARTIAL`; broader browser/provider coverage
+remains open. Continue at `T1-07`.
 
 ## Current Tier 0 execution record
 

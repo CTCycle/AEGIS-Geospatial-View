@@ -13,6 +13,7 @@ contract and OpenAPI schema are unchanged.
 ## Source and environment boundary
 
 - Branch: `develop`; starting commit: `4b5a6284379fd6f7fdcb2e523b2bde78e0387d87`.
+- Implementation commit: `af663adaa5e14be3fcd7312e4bd230cca11f1b40`, pushed to `origin/develop` and passed exact-head hosted CI.
 - Source changes tested: `.github/workflows/ci.yml`,
   `app/server/services/agent_runs/lifecycle.py`, and
   `app/tests/unit/api/test_chat_contracts.py`. Hashes are in
@@ -66,7 +67,8 @@ separate focused API test now covers the safe unusable-provider `503` boundary.
 | Pyright strict project | `PASS` | 0 errors, 0 warnings, 0 informations. |
 | Python source compilation | `PASS` | 410 backend and test source files compiled. |
 | Alembic | `PASS` | Isolated `upgrade head`, `check` reported no new operations, and `current --check-heads` reported `202609210001 (head)`. |
-| Shared OpenAPI | `PASS` | Regenerated and `git diff --exit-code -- app/shared/openapi.json` remained clean. |
+| Shared OpenAPI | `PASS` | Regenerated and `git diff --exit-code -- app/shared/openapi.json` remained clean locally and in hosted CI. |
+| Hosted CI exact implementation head | `PASS` | Run 35845587545 on `af663adaa5e14be3fcd7312e4bd230cca11f1b40`; all four jobs passed. See [`hosted-ci.md`](hosted-ci.md). |
 
 Full command output is retained in the adjacent `*-tests.log`, `ruff.log`,
 `pyright.log`, `compile.log`, `alembic-check.log`, and OpenAPI logs.
@@ -76,6 +78,6 @@ Full command output is retained in the adjacent `*-tests.log`, `ruff.log`,
 T1-06 is `PASS`. Tier 1 is now `PARTIAL` at 9 `PASS` / 3 `PARTIAL`; the full
 68-slice campaign is `PARTIAL` at 14 `PASS` / 3 `PARTIAL` / 51 `UNRUN`.
 `ISSUE-003` is closed because the exact live response boundary passed. Continue
-with `T1-07` background chat jobs. Hosted CI remains a separate exact-pushed-
-commit gate; its result is recorded in [`hosted-ci.md`](hosted-ci.md) after
-the workflow completes.
+with `T1-07` background chat jobs. The separate hosted-CI gate also passed on
+the exact pushed implementation commit; its job-level result is recorded in
+[`hosted-ci.md`](hosted-ci.md).
