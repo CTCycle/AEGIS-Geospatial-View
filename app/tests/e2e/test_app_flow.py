@@ -2,9 +2,24 @@
 E2E tests for AEGIS chat-first UI flow.
 """
 
+import json
 import re
+from typing import Any
 
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page, Route, expect
+from server.configurations.settings import AppSettings
+from tests.e2e.helpers.chat_stub_payloads import (
+    model_catalog_payload,
+    selected_agent_settings_payload,
+)
+
+
+def _fulfill_json(route: Route, payload: dict[str, Any]) -> None:
+    route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(payload),
+    )
 
 ###############################################################################
 class TestAppShell:
@@ -34,6 +49,30 @@ class TestChatFlow:
 
     # -------------------------------------------------------------------------
     def test_settings_page_opens_from_toolbar(self, page: Page, base_url: str):
+        settings_payload = selected_agent_settings_payload()
+        runtime_settings = {
+            "schema_version": 1,
+            **AppSettings.model_construct().runtime_payload(),
+            "restart_required": False,
+            "message": None,
+        }
+        page.route(
+            re.compile(r".*/api/chat/settings(?:\?.*)?$"),
+            lambda route: _fulfill_json(route, settings_payload),
+        )
+        page.route(
+            re.compile(r".*/api/chat/models(?:\?.*)?$"),
+            lambda route: _fulfill_json(route, model_catalog_payload()),
+        )
+        page.route(
+            re.compile(r".*/api/settings/runtime(?:\?.*)?$"),
+            lambda route: _fulfill_json(route, runtime_settings),
+        )
+        page.route(
+            re.compile(r".*/api/geospatial/providers/account-setup(?:\?.*)?$"),
+            lambda route: _fulfill_json(route, {"providers": []}),
+        )
+
         page.goto(base_url)
         page.get_by_role("link", name="Settings", exact=True).click()
         expect(page).to_have_url(f"{base_url.rstrip('/')}/settings")
@@ -42,10 +81,10 @@ class TestChatFlow:
         )
         expect(page.get_by_placeholder("Search models")).to_be_visible()
         expect(page.get_by_role("button", name="All")).to_be_visible()
-        expect(page.get_by_role("tab", name="Models", exact=True)).to_be_visible()
-        expect(page.get_by_role("tab", name="Model Providers", exact=True)).to_be_visible()
-        expect(page.get_by_role("tab", name="Geospatial Access", exact=True)).to_be_visible()
-        page.get_by_role("tab", name="Model Providers", exact=True).click()
+        expect(page.get_by_role("button", name="Models", exact=True)).to_be_visible()
+        expect(page.get_by_role("button", name="Model Providers", exact=True)).to_be_visible()
+        expect(page.get_by_role("button", name="Geospatial Access", exact=True)).to_be_visible()
+        page.get_by_role("button", name="Model Providers", exact=True).click()
         expect(page.get_by_role("heading", name="Ollama", exact=True)).to_be_visible()
 
     # -------------------------------------------------------------------------

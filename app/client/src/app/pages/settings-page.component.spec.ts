@@ -751,6 +751,25 @@ describe('pages/settings-page.component', () => {
     expect(navigateSpy).toHaveBeenCalledWith('/settings?tab=agent-runtime');
   });
 
+  it('restores the active Settings section when browser history changes the URL', async () => {
+    window.history.replaceState({}, '', '/settings?tab=agent-runtime');
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.activeSection).toBe('agent-runtime');
+
+    window.history.pushState({}, '', '/settings?tab=data-sources');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.activeSection).toBe('data-sources');
+    const activeButton = fixture.nativeElement.querySelector(
+      '.settings-sidebar__item[aria-current="page"]',
+    ) as HTMLButtonElement | null;
+    expect(activeButton?.textContent?.trim()).toBe('Data Sources');
+    window.history.replaceState({}, '', '/');
+  });
+
   it('renders manifest-driven geospatial access providers in the shared Settings page', async () => {
     fetchGeospatialProviderAccountSetupsMock.and.resolveTo({
       providers: [{

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from playwright.sync_api import Page, Route, expect
+from server.configurations.settings import AppSettings
 
 from tests.e2e.helpers.chat_stub_payloads import (
     chat_completion_map_payload,
@@ -219,11 +220,11 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
 ) -> None:
     _setup_stub_harness(page)
 
-    for width, height, expected_columns in ((1366, 768, 2), (1024, 700, 1)):
+    for width, height, expected_columns in ((1366, 768, 1), (1024, 700, 1)):
         page.set_viewport_size({"width": width, "height": height})
         page.goto(f"{base_url.rstrip('/')}/settings?tab=model-providers")
 
-        provider_grid = page.locator(".settings-provider-grid")
+        provider_grid = page.locator(".settings-provider-list")
         expect(provider_grid).to_be_visible(timeout=15000)
         expect(provider_grid.locator(".settings-provider-card").first).to_be_visible(
             timeout=15000
@@ -232,7 +233,7 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
         layout_metrics = page.evaluate(
             """
             () => {
-              const grid = document.querySelector('.settings-provider-grid');
+              const grid = document.querySelector('.settings-provider-list');
               const gridRect = grid?.getBoundingClientRect();
               const rect = (element) => {
                 const value = element.getBoundingClientRect();
@@ -242,7 +243,7 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
                 bodyOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
                 columnCount: grid ? getComputedStyle(grid).gridTemplateColumns.trim().split(/\\s+/).length : 0,
                 gridRect: gridRect ? rect(grid) : null,
-                cards: [...document.querySelectorAll('.settings-provider-grid .settings-provider-card')].map((card) => ({
+                cards: [...document.querySelectorAll('.settings-provider-list .settings-provider-card')].map((card) => ({
                   card: rect(card),
                   input: card.querySelector('input') ? rect(card.querySelector('input')) : null,
                   actions: card.querySelector('.settings-actions') ? rect(card.querySelector('.settings-actions')) : null,
@@ -270,7 +271,7 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
             full_page=True,
         )
 
-        page.get_by_role("tab", name="Geospatial Access").click()
+        page.get_by_role("button", name="Geospatial Access").click()
         geospatial_card = page.locator(".settings-provider-list .settings-provider-card").first
         expect(geospatial_card).to_be_visible(timeout=15000)
         page.get_by_role("button", name="Get API key").click()
@@ -482,6 +483,132 @@ def test_settings_query_params_do_not_leak_back_to_chat(
     query = page.evaluate("() => window.location.search")
     assert path == "/"
     assert query == ""
+
+###############################################################################
+def test_settings_sections_preserve_drafts_save_and_return(
+    page: Page, base_url: str
+) -> None:
+    _setup_stub_harness(page)
+    page.set_viewport_size({"width": 1366, "height": 768})
+
+    runtime_settings = {
+        "schema_version": 1,
+        **AppSettings.model_construct().runtime_payload(),
+        "restart_required": False,
+        "message": None,
+    }
+    captured_runtime_patches: list[dict[str, Any]] = []
+
+    def handle_runtime_settings(route: Route) -> None:
+        method = route.request.method.upper()
+        if method == "GET":
+            _json_ok(route, runtime_settings)
+            return
+        if method == "PATCH":
+            patch = _request_json(route)
+            captured_runtime_patches.append(patch)
+            for block_name, block_patch in patch.items():
+                if isinstance(block_patch, dict):
+                    runtime_settings[block_name].update(block_patch)
+            runtime_settings["restart_required"] = bool(patch)
+            runtime_settings["message"] = (
+                "Settings saved. Restart AEGIS to apply runtime changes."
+                if patch
+                else None
+            )
+            _json_ok(route, runtime_settings)
+            return
+        route.fulfill(
+            status=405,
+            content_type="application/json",
+            body=json.dumps({"detail": "Method not allowed"}),
+        )
+
+    page.route(re.compile(r".*/settings/runtime(?:\?.*)?$"), handle_runtime_settings)
+    page.goto(f"{base_url.rstrip('/')}/settings?tab=not-a-section")
+
+    expect(page).to_have_url(f"{base_url.rstrip('/')}/settings")
+    expect(page.get_by_role("button", name="Models", exact=True)).to_have_attribute(
+        "aria-current", "page"
+    )
+
+    page.goto(f"{base_url.rstrip('/')}/settings?tab=map-search")
+    expect(page.get_by_role("heading", name="Map & Search", exact=True)).to_be_visible(
+        timeout=15000
+    )
+
+    sections = (
+        ("Models", "/settings", None),
+        ("Model Providers", "/settings?tab=model-providers", "Model providers"),
+        (
+            "Geospatial Access",
+            "/settings?tab=geospatial-access",
+            "Optional provider credentials",
+        ),
+        ("Application", "/settings?tab=application", "Application"),
+        ("Map & Search", "/settings?tab=map-search", "Map & Search"),
+        ("Data Sources", "/settings?tab=data-sources", "Data Sources"),
+        ("Agent Runtime", "/settings?tab=agent-runtime", "Agent Runtime"),
+    )
+    t1_09_qa_dir = (
+        Path(__file__).resolve().parents[3]
+        / "assets"
+        / "QA"
+        / "tier1-validation-develop-20260923"
+        / "T1-09"
+    )
+    screenshot_dir = t1_09_qa_dir / "screenshots"
+    screenshot_dir.mkdir(parents=True, exist_ok=True)
+
+    for label, expected_url, heading in sections:
+        page.get_by_role("button", name=label, exact=True).click()
+        expect(page).to_have_url(f"{base_url.rstrip('/')}{expected_url}")
+        if heading is None:
+            expect(page.get_by_placeholder("Search models")).to_be_visible()
+        else:
+            expect(page.get_by_role("heading", name=heading, exact=True)).to_be_visible(
+                timeout=15000
+            )
+        slug = label.lower().replace(" & ", "-").replace(" ", "-")
+        page.screenshot(
+            path=str(screenshot_dir / f"section-{slug}.png"), full_page=True
+        )
+
+    page.go_back()
+    expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?tab=data-sources")
+    expect(page.get_by_role("heading", name="Data Sources", exact=True)).to_be_visible()
+    page.go_forward()
+    expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?tab=agent-runtime")
+    expect(page.get_by_role("heading", name="Agent Runtime", exact=True)).to_be_visible()
+
+    page.get_by_role("button", name="Application", exact=True).click()
+    history_limit = page.get_by_label("Maximum history messages")
+    history_limit.fill("23")
+    page.get_by_role("button", name="Data Sources", exact=True).click()
+    page.get_by_role("button", name="Application", exact=True).click()
+    history_limit = page.get_by_label("Maximum history messages")
+    expect(history_limit).to_have_value("23")
+    page.screenshot(
+        path=str(screenshot_dir / "application-draft-retained.png"), full_page=True
+    )
+
+    with page.expect_response(
+        lambda response: response.request.method == "PATCH"
+        and response.url.endswith("/settings/runtime")
+    ) as patch_response:
+        page.get_by_role("button", name="Save application settings").click()
+    assert patch_response.value.ok, patch_response.value.status
+    assert captured_runtime_patches[-1]["chat"]["max_history_messages"] == 23
+
+    page.get_by_role("link", name="Search", exact=True).click()
+    expect(page.get_by_label("Chat message")).to_be_visible(timeout=15000)
+    page.get_by_role("link", name="Settings", exact=True).click()
+    page.get_by_role("button", name="Application", exact=True).click()
+    history_limit = page.get_by_label("Maximum history messages")
+    expect(history_limit).to_have_value("23")
+    page.screenshot(
+        path=str(screenshot_dir / "application-saved-after-return.png"), full_page=True
+    )
 
 ###############################################################################
 def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(
