@@ -64,4 +64,4 @@ The seven removed task-generated IDs were:
 
 ## Hosted CI
 
-Hosted CI for the pushed source-and-evidence head is recorded in the current validation gate ledger after the exact-head workflow completes.
+The pushed source-and-evidence head `develop@3734df22a09eb83c279ac28467654c4cfa29bab6` passed all four jobs in [GitHub Actions run 35915263134](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35915263134): capability contracts, persistence conformance, frontend build/unit/browser smoke, and backend static/unit/OpenAPI.

@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-23 (current-head T2 retry: T2-01/02 PARTIAL, T2-03 PASS; LIVE-API recheck PASS)
+Last updated: 2026-09-23 (T2-01/02 PARTIAL, T2-03 and LIVE-API PASS; exact-head CI run 35915263134 passed)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -98,8 +98,9 @@ T2-04 through T2-07 as `UNRUN`; see the
 Tier 0 and Tier 1 are `PASS`. The overall campaign remains `PARTIAL`: Tier 2
 contains two `PARTIAL`, one `PASS`, and four `UNRUN` slices, Tier 3–5 remain
 `UNRUN`, and downstream live/browser/provider boundaries remain partial or
-blocked. The current T2 retry and source changes are pushed and recorded below;
-hosted CI is tracked against the exact pushed validation head.
+blocked. The current T2 retry and source changes are pushed and recorded below.
+The exact source-and-evidence head passed all four hosted-CI jobs in run
+35915263134.
 
 ### Current Tier 1 continuation ledger
 
@@ -154,7 +155,7 @@ remains historical evidence in the original report.
 | FRONTEND-KARMA — client regression suite | Angular client | ChromeHeadlessNoGpu | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | 248/248 pass; add browser-timing coverage before retrying supersession remediation. |
 | MIGRATION — isolated upgrade/head/check | Persistence schema | Isolated SQLite under dated QA data | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | Fresh upgrade, `alembic check`, `current --check-heads`, and 25 migration/persistence tests pass at `202609210001`. |
 | MATRIX-22 — complete required scenario matrix | Coverage | Exact live provider plus controlled browser | PARTIAL | 2026-09-23 | `develop@f6e78852b21e1c4abdcdded95148cf86ee9c3371` | [T2 retry report](../../QA/tier2-validation-develop-20260923-retry/report.md), [original matrix report](../../QA/native-agent-loop-evaluation-20260917-final/final-report.md) | T2-01/02/03 and the live API conflict row now have current evidence; complete all remaining PARTIAL/UNRUN rows, including a separate mismatched-ack case, before an overall PASS claim. |
-| HOSTED-CI — exact tested head | Hosted CI | GitHub Actions push workflow on `develop` | PASS | 2026-09-23 | `develop@53260863c2f0fa9b1ffc5b64e9edc687236eb91d` | [exact-head GitHub Actions run 35901790479](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35901790479), [T2 validation report](../../QA/tier2-validation-develop-20260923/report.md) | All four jobs passed on the pushed validation commit; current live-browser slices remain `BLOCKED` as reported.
+| HOSTED-CI — exact tested head | Hosted CI | GitHub Actions push workflow on `develop` | PASS | 2026-09-23 | `develop@3734df22a09eb83c279ac28467654c4cfa29bab6` | [exact-head GitHub Actions run 35915263134](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35915263134), [T2 retry report](../../QA/tier2-validation-develop-20260923-retry/report.md) | All four jobs passed: contracts, persistence, frontend build/unit/browser smoke, and backend static/unit/OpenAPI. Remaining T2 limitations are recorded separately.
 | PROCESS-CLEANUP — task-owned services and browser | Test harness | Local host, ports 4512/7059/9876 | PASS | 2026-09-23 | `develop@f6e78852b21e1c4abdcdded95148cf86ee9c3371` | [T2 retry report](../../QA/tier2-validation-develop-20260923-retry/report.md), [isolated launcher log](../../QA/tier2-validation-develop-20260923-retry/official-launcher-route-fix.log) | Exact launcher-owned backend/frontend processes were stopped; ports were free and `.env` was restored byte-for-byte. |
 
 ## 2026-09-19 live browser diary
