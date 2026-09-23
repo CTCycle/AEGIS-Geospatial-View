@@ -1,0 +1,9 @@
+T1-06 official-launcher process cleanup (2026-09-23)
+
+- Backend PID 10676: verified command was the workspace app-server venv running uvicorn on 127.0.0.1:7059; terminated its task-owned tree.
+- Frontend PID 36840: verified command was the workspace Angular CLI serving 127.0.0.1:4512; terminated its task-owned tree.
+- Verified task-owned PIDs 10676, 37500, 36840, and 25896 were absent after cleanup.
+- Verified no listeners remained on ports 7059 or 4512.
+- Removed only the task-created `t1-06-live-20260923`, `t1-06-unit-20260923`, and `t1-06-alembic-check-20260923` runtime directories and the two T1-06 pytest basetemp directories below `runtimes/cache`.
+- `settings/.env` SHA-256 after the launcher run: `95d56835badd0dd60aeda6662d382bafb0f76d3a75da4d09b95f0165d98606fc`; the file was restored byte-for-byte after the temporary isolated-launch override.
+- Read-only source-runtime check found zero synthetic T1-06 conversation and run rows.

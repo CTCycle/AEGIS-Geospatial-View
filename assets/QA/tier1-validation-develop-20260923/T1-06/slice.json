@@ -1,0 +1,74 @@
+{
+  "slice_id": "T1-06",
+  "status": "PASS",
+  "verification_date": "2026-09-23",
+  "source_boundary": {
+    "branch": "develop",
+    "base_commit": "4b5a6284379fd6f7fdcb2e523b2bde78e0387d87",
+    "tested_files": "See source-sha256.txt; implementation commit is recorded after push."
+  },
+  "live_provider_lane": {
+    "mode": "cloud",
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "fallback_used": false,
+    "runtime_isolated": true
+  },
+  "live_http_matrix": {
+    "terminal_200": "PASS",
+    "accepted_202": "PASS",
+    "genuine_active_run_409": "PASS",
+    "missing_conversation_404": "PASS",
+    "unusable_provider_503": "PASS",
+    "evidence": "live-http-matrix.json"
+  },
+  "checks": [
+    {
+      "name": "focused chat-contract and OpenAPI tests",
+      "status": "PASS",
+      "passed": 14,
+      "warnings": 2
+    },
+    {
+      "name": "corrected backend CI pytest selection",
+      "status": "PASS",
+      "passed": 397,
+      "warnings": 2
+    },
+    {
+      "name": "Ruff",
+      "status": "PASS",
+      "detail": "All checks passed; three protected-path access warnings were emitted on Windows."
+    },
+    {
+      "name": "strict Pyright",
+      "status": "PASS",
+      "errors": 0,
+      "warnings": 0,
+      "informations": 0
+    },
+    {
+      "name": "Python source compilation",
+      "status": "PASS",
+      "compiled_files": 410
+    },
+    {
+      "name": "isolated Alembic migration metadata",
+      "status": "PASS",
+      "head": "202609210001",
+      "new_operations": 0
+    },
+    {
+      "name": "shared OpenAPI generation and diff",
+      "status": "PASS",
+      "tracked_diff": false
+    }
+  ],
+  "hosted_ci": {
+    "status": "PENDING",
+    "workflow": "CI",
+    "target": "Exact implementation commit after push; see hosted-ci.md."
+  },
+  "closed_issue": "ISSUE-003",
+  "next_action": "Continue with T1-07."
+}

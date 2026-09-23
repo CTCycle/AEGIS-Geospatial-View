@@ -1,0 +1,18 @@
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] Running upgrade  -> 202608200001, Create the initial SQLite schema.
+[INFO] Running upgrade 202608200001 -> 202608310001, Remove derived model capability metadata from persisted settings.
+[INFO] Running upgrade 202608310001 -> 202609050001, Persist the prepared map presentation and browser acknowledgment state.
+[INFO] Running upgrade 202609050001 -> 202609050002, Persist the client timezone captured for an agent run.
+[INFO] Running upgrade 202609050002 -> 202609090001, Persist bounded native-agent evidence for a conversation lifetime.
+[INFO] Running upgrade 202609090001 -> 202609090002
+[INFO] Running upgrade 202609090002 -> 202609140001, Add the canonical durable native conversation state.
+[INFO] Running upgrade 202609140001 -> 202609150001, Make native conversation state the only durable conversation snapshot.
+[INFO] Running upgrade 202609150001 -> 202609170001, Migrate legacy unresolved questions to scoped native clarification state.
+[INFO] Running upgrade 202609170001 -> 202609210001, Add the canonical SQLite-backed application runtime settings row.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+No new upgrade operations detected.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+202609210001 (head)

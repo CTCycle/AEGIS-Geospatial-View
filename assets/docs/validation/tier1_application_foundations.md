@@ -50,6 +50,14 @@ transcript top-spacing issue found during visual validation was repaired and
 rechecked. Tier 1 remains `PARTIAL` at 8 `PASS` and 4 `PARTIAL` slices across
 the cited source boundaries; this roll-up is not a same-commit campaign result.
 
+The 2026-09-23 [T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md)
+passes the exact-lane live `/api/chat/turn` matrix (`200`, `202`, genuine
+`409`, preflight `404`, and safe `503`), 14 focused API/OpenAPI tests, and the
+corrected 397-test backend CI selection. Its live terminal case exposed and
+fixed completed-event hydration of run-only and omitted nullable fields. Tier 1
+is now `PARTIAL` at 9 `PASS` / 3 `PARTIAL`; the campaign is 14 `PASS` / 3
+`PARTIAL` / 51 `UNRUN`. These results retain their dated source boundaries.
+
 The 2026-09-21 headless run's missing `.maplibregl-canvas` remains historical
 evidence; the current headed Chrome run verified the T1-02 reload and visible
 map-control boundary. Its transparent tile fixture does not verify live
@@ -60,7 +68,6 @@ accessible contract before claiming automated `T1-09` completion.
 
 ## Next actionable slice
 
-Continue with `T1-06` synchronous `/api/chat/turn` behavior: the terminal
-`200`, accepted `202`, genuine-conflict `409`, missing `404`, and unusable-
-provider `503` boundaries, including the exact live response matrix. Keep the
+Continue with `T1-07` background chat jobs: queue/progress/completion/cancel,
+unknown-job behavior, shutdown, and restart-persistence boundaries. Keep the
 tested source boundary and isolated runtime paths in its QA report.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+from server.common.typing import is_json_object
 from server.contracts.runs import (
     AgentRunCancelResponse,
     AgentRunCreateRequest,
@@ -191,7 +192,10 @@ class RunLifecycleService:
             if "assistant_message" not in payload and "content" in payload:
                 payload["assistant_message"] = payload.get("content")
             payload.pop("content", None)
-            payload.pop("content", None)
+            payload.pop("state", None)
+            context_usage = payload.get("context_usage")
+            if is_json_object(context_usage):
+                context_usage.setdefault("usage_percent", None)
             try:
                 return ChatTurnResponse.model_validate(payload)
             except (TypeError, ValueError):

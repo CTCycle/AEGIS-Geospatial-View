@@ -1,0 +1,89 @@
+{
+  "slice_id": "T1-06",
+  "verification_date": "2026-09-23",
+  "status": "PASS",
+  "provider_lane": {
+    "mode": "cloud",
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "fallback_used": false
+  },
+  "environment": {
+    "launcher": "start_on_windows.ps1 -Action Launch",
+    "api": "http://127.0.0.1:7059",
+    "client": "http://127.0.0.1:4512",
+    "runtime_data": "runtimes/cache/test-runtime/t1-06-live-20260923",
+    "synthetic_rows_in_normal_runtime": 0
+  },
+  "cases": [
+    {
+      "name": "terminal",
+      "http_status": 200,
+      "request_id": "t1-06-live-200-20260923",
+      "conversation_id": "conv_5cdb84ff39a141cdab1bf0fa0d3b6017",
+      "run_id": "run_2c7fb7901e6b4f92ad5415b7f9ba77b3",
+      "run_state": "completed",
+      "checks": [
+        "assistant response contained T1-06 terminal-check marker",
+        "response context identified opencode-go / deepseek-v4.1-flash"
+      ]
+    },
+    {
+      "name": "accepted",
+      "http_status": 202,
+      "request_id": "t1-06-live-202-20260923",
+      "conversation_id": "conv_d1522558c5c34dc2aaaf02b28e12ed9f",
+      "run_id": "run_6a7fb5bd48324adeaa379559b7e30bc4",
+      "run_state": "awaiting_render",
+      "presentation_status": "pending",
+      "status_url": "/api/conversations/conv_d1522558c5c34dc2aaaf02b28e12ed9f/runs/run_6a7fb5bd48324adeaa379559b7e30bc4",
+      "realtime_url": "/api/conversations/conv_d1522558c5c34dc2aaaf02b28e12ed9f/realtime",
+      "terminal": false,
+      "setup": "Created through AgentRunRepository then transitioned through prepare_render; the HTTP request did not execute the provider."
+    },
+    {
+      "name": "genuine_active_run_conflict",
+      "http_status": 409,
+      "first_request_id": "t1-06-live-conflict-first-20260923",
+      "second_request_id": "t1-06-live-conflict-second-20260923",
+      "conversation_id": "conv_0695cc0d131c4698b2eea991890f49f2",
+      "first_run_id": "run_96504a6d24164014801cc51b9c25d1c1",
+      "second_run_persisted": false,
+      "first_run_state_afterward": "completed",
+      "response_detail": "Conversation already has an active run.",
+      "concurrent_request_spacing_ms": 250
+    },
+    {
+      "name": "missing_conversation_preflight",
+      "http_status": 404,
+      "request_id": "t1-06-live-404-20260923",
+      "conversation_id": "conv_t106_missing_20260923",
+      "response_detail": "Conversation not found.",
+      "conversation_exists": false,
+      "run_count": 0
+    },
+    {
+      "name": "unusable_provider",
+      "http_status": 503,
+      "request_id": "t1-06-live-503-20260923",
+      "conversation_id": "conv_d7361bfe6e3e47ea875805999dfff841",
+      "run_id": "run_873fffdda6f4483d8aaa520eabc8bac6",
+      "run_state": "failed",
+      "response_keys": ["detail"],
+      "response_detail": "The configured agent provider is not ready. Open Settings and configure its credential.",
+      "isolated_credential_temporarily_inactive": true,
+      "isolated_credential_restored_active": true,
+      "provider_model_selection_restored": true,
+      "credential_material_recorded": false
+    }
+  ],
+  "additional_fixture_iteration": {
+    "http_status": 200,
+    "request_id": "t1-06-live-202-20260923",
+    "conversation_id": "conv_9f8742ee2840470e9c151201d05180b5",
+    "run_id": "run_f4614cadfc3e4dbab1c42abc4efceb15",
+    "run_state": "completed",
+    "note": "A RUNNING fixture was claimed by the worker and completed; a durable AWAITING_RENDER fixture was used for the final 202 case."
+  },
+  "redaction": "Contains only synthetic request/conversation/run identifiers and safe response detail; no credential or raw provider payload is included."
+}
