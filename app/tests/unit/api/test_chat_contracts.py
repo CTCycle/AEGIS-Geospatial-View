@@ -10,6 +10,7 @@ from server.api.chat import get_chat_runtime, router
 from server.common.paths import CHAT_STRUCTURED_PROBE_ROUTE, CHAT_TURN_ROUTE
 from server.contracts.chat import (
     ChatOperationResult,
+    ContextUsageResponse,
     ChatTurnRequest,
     ChatTurnResponse,
     StructuredProbeResponse,
@@ -219,6 +220,51 @@ def test_chat_turn_returns_terminal_200_response() -> None:
     assert response.json()["assistant_message"] == "Evidence is ready."
 
 
+def test_chat_turn_hydrates_completed_event_as_terminal_200() -> None:
+    terminal = _terminal_response().model_copy(
+        update={
+            "context_usage": ContextUsageResponse(
+                estimated_input_tokens=12,
+                usage_percent=None,
+                provider="opencode-go",
+                model="deepseek-v4.1-flash",
+            )
+        }
+    )
+    event_payload = terminal.model_dump(mode="json", exclude_none=True)
+    event_payload["content"] = terminal.assistant_message
+    event_payload["state"] = AgentRunState.COMPLETED.value
+
+    ###############################################################################
+    class _PersistedTerminalLifecycleStub(_ChatTurnLifecycleStub):
+
+        # -------------------------------------------------------------------------
+        async def run_turn(self, *args, **kwargs):  # noqa: ANN002, ANN003
+            response = self.read_completed_response("conv-1", "run-1")
+            return response, self._result, True
+
+    lifecycle = _PersistedTerminalLifecycleStub(
+        response=None,
+        result=_chat_turn_result(AgentRunState.COMPLETED),
+        snapshot=_accepted_snapshot().model_copy(
+            update={"state": AgentRunState.COMPLETED}
+        ),
+    )
+    lifecycle.event_publisher = SimpleNamespace(
+        replay=lambda _run_id: [
+            SimpleNamespace(
+                type=SimpleNamespace(value="completed"),
+                payload=event_payload,
+            )
+        ]
+    )
+
+    response = _post_with_lifecycle(lifecycle)
+
+    assert response.status_code == 200
+    assert response.json()["assistant_message"] == "Evidence is ready."
+
+
 def test_chat_turn_returns_accepted_202_snapshot_contract() -> None:
     response = _post_with_lifecycle(
         _ChatTurnLifecycleStub(
@@ -252,6 +298,25 @@ def test_chat_turn_returns_409_only_for_real_run_conflict() -> None:
 
     assert response.status_code == 409
     assert response.json()["detail"] == "An active run already exists."
+
+
+def test_chat_turn_returns_503_for_unusable_provider() -> None:
+    snapshot = _accepted_snapshot().model_copy(
+        update={
+            "state": AgentRunState.FAILED,
+            "error_message": "The selected provider is unavailable.",
+        }
+    )
+    response = _post_with_lifecycle(
+        _ChatTurnLifecycleStub(
+            response=None,
+            result=_chat_turn_result(AgentRunState.FAILED),
+            snapshot=snapshot,
+        )
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "The selected provider is unavailable."
 
 ###############################################################################
 def test_structured_probe_routes_return_latest_and_run_results() -> None:
