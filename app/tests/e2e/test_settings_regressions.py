@@ -23,6 +23,13 @@ PNG_1X1_TRANSPARENT = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 SETTINGS_UI_QA_DIR = Path(__file__).resolve().parents[3] / "assets" / "QA" / "settings-ui"
+T1_10_SETTINGS_QA_DIR = (
+    Path(__file__).resolve().parents[3]
+    / "assets"
+    / "QA"
+    / "tier1-validation-develop-20260923"
+    / "T1-10"
+)
 
 ###############################################################################
 def settings_provider_account_setup_payload() -> dict[str, Any]:
@@ -102,6 +109,8 @@ def _setup_stub_harness(
     models_payload: dict[str, Any] | None = None,
     turn_payload_factory: Callable[[str], dict[str, Any]] | None = None,
     patch_payloads: list[dict[str, Any]] | None = None,
+    settings_responses: list[dict[str, Any]] | None = None,
+    settings_patch_failure: bool = False,
 ) -> list[dict[str, Any]]:
     page.add_init_script(
         """
@@ -115,6 +124,7 @@ def _setup_stub_harness(
     active_settings = dict(settings_payload or selected_agent_settings_payload())
     active_models = models_payload or model_catalog_payload()
     captured_patch_payloads = patch_payloads if patch_payloads is not None else []
+    captured_settings_responses = settings_responses if settings_responses is not None else []
 
     def handle_settings(route: Route) -> None:
         method = route.request.method.upper()
@@ -125,7 +135,54 @@ def _setup_stub_harness(
             payload = _request_json(route)
             if payload:
                 captured_patch_payloads.append(payload)
-            active_settings.update(payload)
+            if settings_patch_failure:
+                route.fulfill(
+                    status=503,
+                    content_type="application/json",
+                    body=json.dumps({"detail": "Synthetic credential update failure."}),
+                )
+                return
+            active_settings.update(
+                {key: value for key, value in payload.items() if key != "credentials"}
+            )
+            if "credentials" in payload:
+                saved_credentials = dict(active_settings.get("credentials", {}))
+                saved_health = dict(active_settings.get("credential_health", {}))
+                for provider, provider_updates in payload["credentials"].items():
+                    provider_credentials = dict(saved_credentials.get(provider, {}))
+                    provider_health = dict(saved_health.get(provider, {}))
+                    for label, value in provider_updates.items():
+                        if value:
+                            provider_credentials[label] = True
+                            provider_health[label] = (
+                                "healthy"
+                                if provider
+                                in {"openai", "google", "deepseek", "opencode", "opencode-go"}
+                                else "stored"
+                            )
+                        else:
+                            provider_credentials.pop(label, None)
+                            provider_health.pop(label, None)
+                    if provider_credentials:
+                        saved_credentials[provider] = provider_credentials
+                    else:
+                        saved_credentials.pop(provider, None)
+                    if provider_health:
+                        saved_health[provider] = provider_health
+                    else:
+                        saved_health.pop(provider, None)
+                active_settings["credentials"] = saved_credentials
+                active_settings["credential_health"] = saved_health
+            if "agent_model_provider" in payload or "agent_model_name" in payload:
+                active_settings["selected_model_context"] = {
+                    "provider": active_settings["agent_model_provider"],
+                    "model": active_settings["agent_model_name"],
+                    "context_window_tokens": None,
+                    "maximum_output_tokens": None,
+                    "context_profile_source": "unknown",
+                    "context_metadata_authority": "unknown",
+                }
+            captured_settings_responses.append(dict(active_settings))
             _json_ok(route, active_settings)
             return
         route.fulfill(
@@ -318,9 +375,13 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
 ###############################################################################
 def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) -> None:
     patch_payloads: list[dict[str, Any]] = []
+    settings_responses: list[dict[str, Any]] = []
     expected_initial = selected_agent_settings_payload()
     _setup_stub_harness(
-        page, settings_payload=expected_initial, patch_payloads=patch_payloads
+        page,
+        settings_payload=expected_initial,
+        patch_payloads=patch_payloads,
+        settings_responses=settings_responses,
     )
     page.set_viewport_size({"width": 1366, "height": 768})
 
@@ -336,14 +397,34 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
         "button", name="Select as agent model: gpt-5-mini"
     )
     selection_button.focus()
-    page.keyboard.press("Enter")
+    def settings_patch(response: Any) -> bool:
+        return (
+            response.request.method == "PATCH"
+            and response.url.endswith("/api/chat/settings")
+        )
+
+    with page.expect_response(settings_patch) as first_selection_response:
+        page.keyboard.press("Enter")
+    first_response = first_selection_response.value.json()
+    assert first_response["agent_model_name"] == "gpt-5-mini"
+    assert first_response["selected_model_context"]["model"] == "gpt-5-mini"
 
     selected_button = model_card.get_by_role(
         "button", name="Selected agent model: gpt-5-mini"
     )
     expect(selected_button).to_have_attribute("aria-pressed", "true")
+    expect(page.locator(".settings-page__status")).to_have_text(
+        "Selected gpt-5-mini as agent model"
+    )
     selected_button.focus()
-    page.keyboard.press("Space")
+    with page.expect_response(settings_patch) as second_selection_response:
+        page.keyboard.press("Space")
+    second_response = second_selection_response.value.json()
+    assert second_response["agent_model_name"] == "gpt-5-mini"
+    assert second_response["selected_model_context"]["model"] == "gpt-5-mini"
+    expect(page.locator(".settings-page__status")).to_have_text(
+        "Selected gpt-5-mini as agent model"
+    )
     summary = page.get_by_role("complementary", name="Selected agent model")
     expect(summary.get_by_role("heading", name="gpt-5-mini")).to_be_visible()
     probe_button = page.get_by_role("button", name="Test selected model")
@@ -372,12 +453,11 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
     assert selected_panel_metrics["probe"] is not None
     assert selected_panel_metrics["probe"]["bottom"] <= selected_panel_metrics["column"]["bottom"] + 1, selected_panel_metrics
     assert selected_panel_metrics["summaryScrollHeight"] >= selected_panel_metrics["summaryClientHeight"]
-    SETTINGS_UI_QA_DIR.mkdir(parents=True, exist_ok=True)
+    T1_10_SETTINGS_QA_DIR.joinpath("screenshots").mkdir(parents=True, exist_ok=True)
     page.screenshot(
-        path=str(SETTINGS_UI_QA_DIR / "models-selected-model.png"),
+        path=str(T1_10_SETTINGS_QA_DIR / "screenshots" / "models-selected-model.png"),
         full_page=True,
     )
-
     assert patch_payloads, "Expected PATCH /api/chat/settings payload to be captured."
     payload = patch_payloads[-1]
     if "agent_model_provider" not in payload:
@@ -398,6 +478,254 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
     assert payload["active_provider_mode"] == "cloud"
     assert "credential_health" not in payload
     assert all("api_key" not in values for values in payload["credentials"].values())
+    assert settings_responses, "Expected a Settings response after selecting the model."
+    for response in settings_responses:
+        assert response["agent_model_provider"] == "openai"
+        assert response["agent_model_name"] == "gpt-5-mini"
+        assert response["selected_model_context"]["model"] == "gpt-5-mini"
+
+
+###############################################################################
+def test_model_provider_unreadable_key_and_failed_updates_are_safe(
+    page: Page, base_url: str
+) -> None:
+    settings_payload = selected_agent_settings_payload()
+    settings_payload["credentials"] = {"openai": {"api_key": True}}
+    settings_payload["credential_health"] = {"openai": {"api_key": "unreadable"}}
+    patch_payloads: list[dict[str, Any]] = []
+    _setup_stub_harness(
+        page,
+        settings_payload=settings_payload,
+        patch_payloads=patch_payloads,
+        settings_patch_failure=True,
+    )
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{base_url.rstrip('/')}/settings")
+    page.get_by_role("button", name="Model Providers").click()
+
+    card = page.locator(".settings-provider-card").filter(
+        has=page.get_by_role("heading", name="OpenAI", exact=True)
+    )
+    key_input = card.get_by_label("OpenAI API key")
+    expect(key_input).to_be_visible()
+    expect(key_input).to_have_attribute("type", "password")
+    expect(key_input).to_have_value("")
+    expect(card.get_by_text("Saved key cannot be read")).to_be_visible()
+    expect(
+        card.get_by_text("Saved key cannot be decrypted. Re-enter the key.")
+    ).to_be_visible()
+
+    card.get_by_role("button", name="Save key").click()
+    expect(
+        page.get_by_text("Enter a OpenAI API key before saving.", exact=True)
+    ).to_be_visible()
+    key_input.fill("not-a-valid-key")
+    card.get_by_role("button", name="Save key").click()
+    expect(
+        card.get_by_text(
+            'OpenAI key must start with "sk-" and include a valid key body.',
+            exact=True,
+        )
+    ).to_be_visible()
+    assert patch_payloads == []
+
+    card.get_by_role("button", name="Clear saved key").click()
+    expect(page.get_by_text("Synthetic credential update failure.", exact=True)).to_be_visible()
+    expect(page.get_by_text("OpenAI key cleared.", exact=True)).to_have_count(0)
+    expect(card.get_by_text("Saved key cannot be read")).to_be_visible()
+    assert len(patch_payloads) == 1
+
+    fixture_key = "sk-fixturekey12345"
+    key_input.fill(fixture_key)
+    card.get_by_role("button", name="Save key").click()
+    expect(page.get_by_text("Synthetic credential update failure.", exact=True)).to_be_visible()
+    expect(
+        page.get_by_text(
+            "OpenAI key saved. Provider access has not been validated.", exact=True
+        )
+    ).to_have_count(0)
+    expect(key_input).to_have_value(fixture_key)
+    expect(key_input).to_have_attribute("type", "password")
+    expect(page.locator("body")).not_to_contain_text(fixture_key)
+    expect(card.get_by_text("Saved key cannot be read")).to_be_visible()
+    assert len(patch_payloads) == 2
+
+    screenshots = T1_10_SETTINGS_QA_DIR / "screenshots"
+    screenshots.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=str(screenshots / "model-provider-update-failure.png"), full_page=True)
+
+
+###############################################################################
+def test_model_provider_credential_safe_save_clear_and_reload(
+    page: Page, base_url: str
+) -> None:
+    settings_payload = selected_agent_settings_payload()
+    settings_payload["credentials"] = {}
+    settings_payload["credential_health"] = {}
+    patch_payloads: list[dict[str, Any]] = []
+    _setup_stub_harness(
+        page, settings_payload=settings_payload, patch_payloads=patch_payloads
+    )
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{base_url.rstrip('/')}/settings")
+    page.get_by_role("button", name="Model Providers").click()
+
+    card = page.locator(".settings-provider-card").filter(
+        has=page.get_by_role("heading", name="OpenAI", exact=True)
+    )
+    key_input = card.get_by_label("OpenAI API key")
+    clear_button = card.get_by_role("button", name="Clear saved key")
+    expect(key_input).to_have_attribute("type", "password")
+    expect(key_input).to_have_value("")
+    expect(clear_button).to_be_disabled()
+
+    fixture_key = "sk-fixturekey12345"
+    key_input.fill(fixture_key)
+    card.get_by_role("button", name="Save key").click()
+    expect(
+        page.get_by_text(
+            "OpenAI key saved. Provider access has not been validated.", exact=True
+        )
+    ).to_be_visible()
+    expect(key_input).to_have_value("")
+    expect(card.get_by_text("Saved key is readable.", exact=True)).to_be_visible()
+    expect(clear_button).to_be_enabled()
+    expect(page.locator("body")).not_to_contain_text(fixture_key)
+    assert len(patch_payloads) == 1
+
+    screenshots = T1_10_SETTINGS_QA_DIR / "screenshots"
+    screenshots.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=str(screenshots / "model-provider-credential-saved.png"), full_page=True)
+
+    clear_button.click()
+    expect(page.get_by_text("OpenAI key cleared.", exact=True)).to_be_visible()
+    expect(key_input).to_have_value("")
+    expect(card.get_by_text("Saved key is readable.", exact=True)).to_have_count(0)
+    expect(clear_button).to_be_disabled()
+    assert len(patch_payloads) == 2
+
+    page.reload()
+    page.get_by_role("button", name="Model Providers").click()
+    expect(key_input).to_have_value("")
+    expect(clear_button).to_be_disabled()
+    expect(page.locator("body")).not_to_contain_text(fixture_key)
+    page.screenshot(path=str(screenshots / "model-provider-credential-cleared.png"), full_page=True)
+
+
+###############################################################################
+def test_geospatial_credential_safe_save_clear_and_reload(page: Page, base_url: str) -> None:
+    patch_payloads: list[dict[str, Any]] = []
+    _setup_stub_harness(page, patch_payloads=patch_payloads)
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{base_url.rstrip('/')}/settings")
+    page.get_by_role("button", name="Geospatial Access").click()
+
+    card = page.locator(".settings-provider-card").filter(
+        has=page.get_by_role("heading", name="TomTom", exact=True)
+    )
+    key_input = card.get_by_label("TomTom API key")
+    expect(card.get_by_text("Not configured")).to_be_visible()
+    expect(key_input).to_have_attribute("type", "password")
+    expect(key_input).to_have_value("")
+
+    card.get_by_role("button", name="Save key").click()
+    expect(
+        page.get_by_text(
+            "Enter a TomTom API key before saving, or clear the saved key.", exact=True
+        )
+    ).to_be_visible()
+    assert patch_payloads == []
+
+    fixture_key = "synthetic-tomtom-fixture"
+    key_input.fill(fixture_key)
+    card.get_by_role("button", name="Save key").click()
+    expect(
+        page.get_by_text(
+            "TomTom key saved. Provider access has not been validated.", exact=True
+        )
+    ).to_be_visible()
+    expect(key_input).to_have_value("")
+    expect(card.get_by_text("Saved key is readable (not validated)")).to_be_visible()
+    expect(page.locator("body")).not_to_contain_text(fixture_key)
+    assert len(patch_payloads) == 1
+
+    screenshots = T1_10_SETTINGS_QA_DIR / "screenshots"
+    screenshots.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=str(screenshots / "geospatial-credential-saved.png"), full_page=True)
+
+    card.get_by_role("button", name="Save key").click()
+    expect(
+        page.get_by_text(
+            "Enter a TomTom API key before saving, or clear the saved key.", exact=True
+        )
+    ).to_be_visible()
+    assert len(patch_payloads) == 1
+
+    card.get_by_role("button", name="Clear saved key").click()
+    expect(
+        page.get_by_text(
+            "TomTom key cleared. Optional capabilities are disabled.", exact=True
+        )
+    ).to_be_visible()
+    expect(card.get_by_text("Not configured")).to_be_visible()
+    assert len(patch_payloads) == 2
+
+    page.reload()
+    expect(card.get_by_text("Not configured")).to_be_visible()
+    page.screenshot(path=str(screenshots / "geospatial-credential-cleared.png"), full_page=True)
+
+
+###############################################################################
+def test_geospatial_credential_failed_updates_preserve_saved_state(
+    page: Page, base_url: str
+) -> None:
+    settings_payload = selected_agent_settings_payload()
+    settings_payload["credentials"] = {"tomtom": {"api_key": True}}
+    settings_payload["credential_health"] = {"tomtom": {"api_key": "stored"}}
+    patch_payloads: list[dict[str, Any]] = []
+    _setup_stub_harness(
+        page,
+        settings_payload=settings_payload,
+        patch_payloads=patch_payloads,
+        settings_patch_failure=True,
+    )
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{base_url.rstrip('/')}/settings")
+    page.get_by_role("button", name="Geospatial Access").click()
+
+    card = page.locator(".settings-provider-card").filter(
+        has=page.get_by_role("heading", name="TomTom", exact=True)
+    )
+    key_input = card.get_by_label("TomTom API key")
+    expect(card.get_by_text("Saved key is readable (not validated)")).to_be_visible()
+
+    fixture_key = "synthetic-tomtom-replacement"
+    key_input.fill(fixture_key)
+    card.get_by_role("button", name="Save key").click()
+    expect(page.get_by_text("Synthetic credential update failure.", exact=True)).to_be_visible()
+    expect(
+        page.get_by_text(
+            "TomTom key saved. Provider access has not been validated.", exact=True
+        )
+    ).to_have_count(0)
+    expect(key_input).to_have_value(fixture_key)
+    expect(key_input).to_have_attribute("type", "password")
+    expect(page.locator("body")).not_to_contain_text(fixture_key)
+    expect(card.get_by_text("Saved key is readable (not validated)")).to_be_visible()
+
+    card.get_by_role("button", name="Clear saved key").click()
+    expect(page.get_by_text("Synthetic credential update failure.", exact=True)).to_be_visible()
+    expect(
+        page.get_by_text(
+            "TomTom key cleared. Optional capabilities are disabled.", exact=True
+        )
+    ).to_have_count(0)
+    expect(card.get_by_text("Saved key is readable (not validated)")).to_be_visible()
+    assert len(patch_payloads) == 2
+
+    screenshots = T1_10_SETTINGS_QA_DIR / "screenshots"
+    screenshots.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=str(screenshots / "geospatial-credential-update-failure.png"), full_page=True)
 
 ###############################################################################
 def test_capabilities_tables_do_not_clip_desktop_columns(
