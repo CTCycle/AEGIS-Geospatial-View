@@ -1,0 +1,275 @@
+
+============================================================
+ Standard Test Runner
+============================================================
+[INFO] Project root: G:\Projects\Repositories\Active projects\AEGIS Geospatial View
+[INFO] Backend URL : http://127.0.0.1:7059
+[INFO] Frontend URL: http://127.0.0.1:4512
+[INFO] Target      : app\tests\e2e\test_settings_regressions.py
+
+[INFO] Starting backend server...
+[INFO] Starting frontend preview server...
+
+> aegis-client@1.0.0 preview
+> ng serve --proxy-config proxy.conf.cjs --host 127.0.0.1 --port 4512
+
+ERRORE: il reindirizzamento dell'input non è supportato.
+
+Chiudere immediatamente il processo.
+The "@angular-devkit/build-angular:dev-server" builder is deprecated as part of Angular's Webpack support deprecation. Use "@angular/build:dev-server" instead. For more information, see https://angular.dev/tools/cli/build-system-migration.
+> Building...
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite migration check: current=202609210001, head=202609210001
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite synchronization complete: path=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\t1-09-regressions-20260923\database.db, revisions=202609210001
+[INFO] SQLite database is ready: fresh=False, migrations_applied=False
+ERRORE: il reindirizzamento dell'input non è supportato.
+
+Chiudere immediatamente il processo.
+ERRORE: il reindirizzamento dell'input non è supportato.
+
+Chiudere immediatamente il processo.
+√ Building...
+Initial chunk files | Names         |  Raw size
+main.js             | main          | 898.65 kB |
+styles.css          | styles        |  71.84 kB |
+
+                    | Initial total | 970.49 kB
+
+Application bundle generation complete. [5.346 seconds] - 2026-09-23T13:32:44.594Z
+
+Watch mode enabled. Watching for file changes...
+NOTE: Raw file sizes do not reflect development server per-request transformations.
+  ➜  Local:   http://127.0.0.1:4512/
+ERRORE: il reindirizzamento dell'input non è supportato.
+
+Chiudere immediatamente il processo.
+[STEP] Running Python tests...
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\server\.venv\Scripts\python.exe
+cachedir: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\pytest
+rootdir: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\server
+configfile: pyproject.toml
+plugins: anyio-4.14.2, asyncio-1.4.0, base-url-2.1.0, playwright-0.8.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 8 items
+
+app\server::test_settings_layout_has_no_overlap_at_minimum_desktop_width[chromium] PASSED [ 12%]
+app\server::test_settings_provider_surfaces_and_setup_modal_are_responsive[chromium] PASSED [ 25%]
+app\server::test_model_card_selects_the_single_agent_model[chromium] FAILED [ 37%]
+app\server::test_capabilities_tables_do_not_clip_desktop_columns[chromium] PASSED [ 50%]
+app\server::test_chat_composer_does_not_cover_latest_assistant_message[chromium] PASSED [ 62%]
+app\server::test_settings_query_params_do_not_leak_back_to_chat[chromium] PASSED [ 75%]
+app\server::test_settings_sections_preserve_drafts_save_and_return[chromium] FAILED [ 87%]
+app\server::test_coordinate_lookup_and_place_search_follow_distinct_ui_paths[chromium] PASSED [100%]
+
+================================== FAILURES ===================================
+__________ test_model_card_selects_the_single_agent_model[chromium] ___________
+app\tests\e2e\test_settings_regressions.py:344: in test_model_card_selects_the_single_agent_model
+    expect(selected_button).to_have_attribute("aria-pressed", "true")
+E   AssertionError: Locator expected to have attribute 'true'
+E   Actual value: None
+E   Error: element(s) not found
+E   Call log:
+E     - Expect "to_have_attribute" with timeout 5000ms
+E     - waiting for locator("article.model-card").filter(has=get_by_role("heading", name="gpt-5-mini")).first.get_by_role("button", name="Selected agent model: gpt-5-mini")
+E
+E   Aria snapshot:
+E   - banner "Primary navigation":
+E     - link "AEGIS workspace":
+E       - /url: /
+E       - text: AEGIS
+E     - navigation "Application sections":
+E       - link "Search":
+E         - /url: /
+E       - link "Geodata":
+E         - /url: /geodata
+E       - link "Settings":
+E         - /url: /settings
+E   - main:
+E     - navigation "Settings sections":
+E       - button "Models"
+E       - button "Model Providers"
+E       - button "Geospatial Access"
+E       - button "Application"
+E       - button "Map & Search"
+E       - button "Data Sources"
+E       - button "Agent Runtime"
+E     - main:
+E       - region "Model catalog controls":
+E         - group "Model provider filter":
+E           - button "All" [pressed]
+E           - button "Ollama"
+E           - button "OpenAI"
+E           - button "Google"
+E           - button "DeepSeek"
+E           - button "OpenCode Zen"
+E           - button "OpenCode Go"
+E         - button "Refresh from Ollama API"
+E         - searchbox "Search models"
+E       - paragraph: ollama � installed
+E       - article:
+E         - 'button "Select as agent model: llama3.2"':
+E           - heading "llama3.2" [level=3]
+E           - paragraph: Optimized for llama.
+E           - text: "Tool support: not verified Context: provider limit not reported Select as agent model"
+E       - paragraph: OpenAI
+E       - article:
+E         - 'button "Select as agent model: gpt-5-mini"':
+E           - heading "gpt-5-mini" [level=3]
+E           - paragraph: Low-latency OpenAI cloud model.
+E           - text: "Tools Structured output Tool support: detected Context: provider limit not reported Select as agent model"
+E       - article:
+E         - 'button "Selected agent model: gpt-4.1-mini" [pressed]':
+E           - heading "gpt-4.1-mini" [level=3]
+E           - paragraph: General purpose OpenAI cloud model.
+E           - text: "Tool support: not verified Context: provider limit not reported Selected agent model"
+E       - paragraph: Google
+E       - article:
+E         - 'button "Select as agent model: gemini-2.5-flash"':
+E           - heading "gemini-2.5-flash" [level=3]
+E           - paragraph: Fast Google cloud model.
+E           - text: "Tool support: not verified Context: provider limit not reported Select as agent model"
+E       - complementary "Selected agent model":
+E         - region "Selected agent model":
+E           - paragraph: Selected agent model
+E           - heading "gpt-4.1-mini" [level=2]
+E           - text: openai � cloud
+E           - term: Installed locally
+E           - definition: "No"
+E           - term: Tool calling
+E           - definition: Unknown
+E           - term: Structured output
+E           - definition: Unknown
+E           - term: Vision
+E           - definition: "No"
+E           - term: Embeddings
+E           - definition: "No"
+E           - term: Tool support source
+E           - definition: fixture
+E           - term: Capabilities
+E           - definition: chat
+E           - paragraph: This model is used for native routing, orchestration, tool calls, and final responses.
+E         - region "Native route and tool verification":
+E           - paragraph: Native route and tools
+E           - strong: Not verified
+E           - paragraph: This model has not been verified against the native route/tool contract.
+E           - button "Test selected model"
+E       - status: "Invalid model settings API response: selected_model_context.model must match agent_model_name"
+______ test_settings_sections_preserve_drafts_save_and_return[chromium] _______
+app\tests\e2e\test_settings_regressions.py:579: in test_settings_sections_preserve_drafts_save_and_return
+    expect(page.get_by_role("heading", name="Data Sources", exact=True)).to_be_visible()
+E   AssertionError: Locator expected to be visible
+E   Actual value: None
+E   Error: element(s) not found
+E   Call log:
+E     - Expect "to_be_visible" with timeout 5000ms
+E     - waiting for get_by_role("heading", name="Data Sources", exact=True)
+E
+E   Aria snapshot:
+E   - banner "Primary navigation":
+E     - link "AEGIS workspace":
+E       - /url: /
+E       - text: AEGIS
+E     - navigation "Application sections":
+E       - link "Search":
+E         - /url: /
+E       - link "Geodata":
+E         - /url: /geodata
+E       - link "Settings":
+E         - /url: /settings
+E   - main:
+E     - navigation "Settings sections":
+E       - button "Models"
+E       - button "Model Providers"
+E       - button "Geospatial Access"
+E       - button "Application"
+E       - button "Map & Search"
+E       - button "Data Sources"
+E       - button "Agent Runtime"
+E     - main:
+E       - region "Agent Runtime":
+E         - paragraph: Runtime settings
+E         - heading "Agent Runtime" [level=2]
+E         - paragraph: Adjust execution budgets, correction limits, and retry behavior used by the native agent loop.
+E         - text: Initial run seconds
+E         - spinbutton "Initial run seconds": "90"
+E         - text: Simple run seconds
+E         - spinbutton "Simple run seconds": "150"
+E         - text: Complex run seconds
+E         - spinbutton "Complex run seconds": "300"
+E         - text: Context assembly seconds
+E         - spinbutton "Context assembly seconds": "5"
+E         - text: Native model call seconds
+E         - spinbutton "Native model call seconds": "60"
+E         - text: Tool execution seconds
+E         - spinbutton "Tool execution seconds": "45"
+E         - text: Tool absolute seconds
+E         - spinbutton "Tool absolute seconds": "90"
+E         - text: Map assembly seconds
+E         - spinbutton "Map assembly seconds": "20"
+E         - text: Persistence seconds
+E         - spinbutton "Persistence seconds": "5"
+E         - text: Render acknowledgement seconds
+E         - spinbutton "Render acknowledgement seconds": "90"
+E         - text: Maximum tool result characters
+E         - spinbutton "Maximum tool result characters": "4096"
+E         - text: Maximum iterations
+E         - spinbutton "Maximum iterations": "12"
+E         - text: Maximum render attempts
+E         - spinbutton "Maximum render attempts": "3"
+E         - text: No-progress corrections
+E         - spinbutton "No-progress corrections": "2"
+E         - text: Simple model calls
+E         - spinbutton "Simple model calls": "4"
+E         - text: Complex model calls
+E         - spinbutton "Complex model calls": "10"
+E         - text: Simple tool calls
+E         - spinbutton "Simple tool calls": "6"
+E         - text: Complex tool calls
+E         - spinbutton "Complex tool calls": "20"
+E         - text: Simple state transitions
+E         - spinbutton "Simple state transitions": "32"
+E         - text: Complex state transitions
+E         - spinbutton "Complex state transitions": "64"
+E         - text: Maximum parallel tool calls
+E         - spinbutton "Maximum parallel tool calls": "8"
+E         - text: Consecutive tool failures
+E         - spinbutton "Consecutive tool failures": "3"
+E         - text: Same failed fingerprint limit
+E         - spinbutton "Same failed fingerprint limit": "2"
+E         - text: Route corrections
+E         - spinbutton "Route corrections": "1"
+E         - text: Validation corrections
+E         - spinbutton "Validation corrections": "2"
+E         - text: Model attempts
+E         - spinbutton "Model attempts": "2"
+E         - text: Provider attempts
+E         - spinbutton "Provider attempts": "2"
+E         - text: Retry backoff base seconds
+E         - spinbutton "Retry backoff base seconds": "0.25"
+E         - text: Retry backoff max seconds
+E         - spinbutton "Retry backoff max seconds": "2"
+E         - text: Provider request seconds
+E         - spinbutton "Provider request seconds": "10"
+E         - button "Save agent runtime settings"
+E       - status: Model settings loaded
+=========================== short test summary info ===========================
+FAILED app\server::test_model_card_selects_the_single_agent_model[chromium]
+FAILED app\server::test_settings_sections_preserve_drafts_save_and_return[chromium]
+======================== 2 failed, 6 passed in 19.90s =========================
+
+============================================================
+ Test Summary
+============================================================
+ Live server phase   : PASS
+ Python tests        : FAIL
+ Frontend bootstrap  : SKIPPED
+ Frontend unit tests : SKIPPED
+ Frontend E2E tests  : SKIPPED
+============================================================
+
+
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\client>

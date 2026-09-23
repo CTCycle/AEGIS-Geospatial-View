@@ -294,6 +294,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   providerFilter: ModelProviderFilter = 'all';
   private isDestroyed = false;
   private routerEventsSubscription?: Subscription;
+  private readonly onWindowPopState = (): void => {
+    if (typeof window !== 'undefined' && window.location.pathname === '/settings') {
+      this.applyUrlState(`${window.location.pathname}${window.location.search}`);
+      this.changeDetectorRef.detectChanges();
+    }
+  };
 
   constructor(
     private readonly apiClient: ApiClientService,
@@ -311,6 +317,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('popstate', this.onWindowPopState);
+    }
     this.routerEventsSubscription = this.router.events.subscribe((event) => {
       if (event instanceof NavigationEnd && event.urlAfterRedirects.startsWith('/settings')) {
         this.applyUrlState(event.urlAfterRedirects);
@@ -336,6 +345,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.isDestroyed = true;
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('popstate', this.onWindowPopState);
+    }
     this.routerEventsSubscription?.unsubscribe();
     this.syncState();
   }

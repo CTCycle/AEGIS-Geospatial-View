@@ -1,0 +1,75 @@
+
+============================================================
+ Standard Test Runner
+============================================================
+[INFO] Project root: G:\Projects\Repositories\Active projects\AEGIS Geospatial View
+[INFO] Backend URL : http://127.0.0.1:7059
+[INFO] Frontend URL: http://127.0.0.1:4512
+[INFO] Target      : app\tests\e2e\test_settings_regressions.py
+
+[INFO] Starting backend server...
+[INFO] Starting frontend preview server...
+
+> aegis-client@1.0.0 preview
+> ng serve --proxy-config proxy.conf.cjs --host 127.0.0.1 --port 4512
+
+ERRORE: il reindirizzamento dell'input non è supportato.
+
+Chiudere immediatamente il processo.
+The "@angular-devkit/build-angular:dev-server" builder is deprecated as part of Angular's Webpack support deprecation. Use "@angular/build:dev-server" instead. For more information, see https://angular.dev/tools/cli/build-system-migration.
+> Building...
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite migration check: current=202609210001, head=202609210001
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite synchronization complete: path=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\t1-09-focused-20260923\database.db, revisions=202609210001
+[INFO] SQLite database is ready: fresh=False, migrations_applied=False
+ERRORE: il reindirizzamento dell'input non è supportato.
+
+Chiudere immediatamente il processo.
+ERRORE: il reindirizzamento dell'input non è supportato.
+
+Chiudere immediatamente il processo.
+√ Building...
+Initial chunk files | Names         |  Raw size
+main.js             | main          | 898.70 kB |
+styles.css          | styles        |  71.84 kB |
+
+                    | Initial total | 970.54 kB
+
+Application bundle generation complete. [5.521 seconds] - 2026-09-23T13:36:24.320Z
+
+Watch mode enabled. Watching for file changes...
+NOTE: Raw file sizes do not reflect development server per-request transformations.
+ERRORE: il reindirizzamento dell'input non è supportato.
+
+Chiudere immediatamente il processo.
+  ➜  Local:   http://127.0.0.1:4512/
+[STEP] Running Python tests...
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\server\.venv\Scripts\python.exe
+cachedir: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\pytest
+rootdir: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\server
+configfile: pyproject.toml
+plugins: anyio-4.14.2, asyncio-1.4.0, base-url-2.1.0, playwright-0.8.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 8 items / 6 deselected / 2 selected
+
+app\server::test_settings_provider_surfaces_and_setup_modal_are_responsive[chromium] PASSED [ 50%]
+app\server::test_settings_sections_preserve_drafts_save_and_return[chromium] PASSED [100%]
+
+======================= 2 passed, 6 deselected in 5.12s =======================
+
+============================================================
+ Test Summary
+============================================================
+ Live server phase   : PASS
+ Python tests        : PASS
+ Frontend bootstrap  : SKIPPED
+ Frontend unit tests : SKIPPED
+ Frontend E2E tests  : SKIPPED
+============================================================
+
+
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\client>
