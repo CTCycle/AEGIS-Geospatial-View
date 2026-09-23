@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-23 (T2-01/T2-02 attempted on current head; live browser blocked)
+Last updated: 2026-09-23 (T2-01/T2-02 live attempt blocked; pushed validation commit CI passed)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -151,7 +151,7 @@ acknowledgement evidence.
 | FRONTEND-KARMA — client regression suite | Angular client | ChromeHeadlessNoGpu | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | 248/248 pass; add browser-timing coverage before retrying supersession remediation. |
 | MIGRATION — isolated upgrade/head/check | Persistence schema | Isolated SQLite under dated QA data | PASS | 2026-09-22 | `7e8b10d5 + WT` | [Tier 0 final report](../../QA/tier0-validation-develop-20260922/final/report.md) | Fresh upgrade, `alembic check`, `current --check-heads`, and 25 migration/persistence tests pass at `202609210001`. |
 | MATRIX-22 — complete required scenario matrix | Coverage | Exact live provider plus controlled browser | PARTIAL | 2026-09-17 | `bf5a7cfa` | [final-report.md](../../QA/native-agent-loop-evaluation-20260917-final/final-report.md) | Complete the explicit PARTIAL and UNRUN rows, including a separate mismatched-ack case, before any overall PASS claim. |
-| HOSTED-CI — exact tested head | Hosted CI | GitHub Actions push workflow on `develop` | PASS | 2026-09-23 | `3fd0c820c2d4de0fb06120b6feac80b199d57f26` | [exact-head GitHub Actions run 35861096479](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35861096479), [T1-07 hosted-CI record](../../QA/tier1-validation-develop-20260923/T1-07/hosted-ci.md) | All four jobs passed on the pushed T1-07 implementation commit; rerun after workflow or application changes. |
+| HOSTED-CI — exact tested head | Hosted CI | GitHub Actions push workflow on `develop` | PASS | 2026-09-23 | `develop@53260863c2f0fa9b1ffc5b64e9edc687236eb91d` | [exact-head GitHub Actions run 35901790479](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35901790479), [T2 validation report](../../QA/tier2-validation-develop-20260923/report.md) | All four jobs passed on the pushed validation commit; current live-browser slices remain `BLOCKED` as reported.
 | PROCESS-CLEANUP — task-owned services and browser | Test harness | Local host, ports 4512/7059/9876 | PASS | 2026-09-23 | `develop@155e1e22ce34a4b2698f474afa60b57f61b56916` | [T2 validation report](../../QA/tier2-validation-develop-20260923/report.md) | Official-launcher children were cleaned up after readiness timeout; ports verified free and `.env` restored byte-for-byte. |
 
 ## 2026-09-19 live browser diary
