@@ -52,10 +52,11 @@ the cited source boundaries; this roll-up is not a same-commit campaign result.
 
 The 2026-09-23 [T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md)
 passes the exact-lane live `/api/chat/turn` matrix (`200`, `202`, genuine
-`409`, preflight `404`, and safe `503`), 14 focused API/OpenAPI tests, and the
-corrected 397-test backend CI selection. Its live terminal case exposed and
-fixed completed-event hydration of run-only and omitted nullable fields. Tier 1
-is now `PARTIAL` at 9 `PASS` / 3 `PARTIAL`; the campaign is 14 `PASS` / 3
+`409`, preflight `404`, and safe `503`), 14 focused API/OpenAPI tests, the
+corrected 397-test backend CI selection, and exact-head hosted CI. Its live
+terminal case exposed and fixed completed-event hydration of run-only and
+omitted nullable fields. Tier 1 is now `PARTIAL` at 9 `PASS` / 3 `PARTIAL`;
+the campaign is 14 `PASS` / 3
 `PARTIAL` / 51 `UNRUN`. These results retain their dated source boundaries.
 
 The 2026-09-21 headless run's missing `.maplibregl-canvas` remains historical

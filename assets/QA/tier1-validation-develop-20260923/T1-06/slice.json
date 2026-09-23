@@ -5,7 +5,8 @@
   "source_boundary": {
     "branch": "develop",
     "base_commit": "4b5a6284379fd6f7fdcb2e523b2bde78e0387d87",
-    "tested_files": "See source-sha256.txt; implementation commit is recorded after push."
+    "implementation_commit": "af663adaa5e14be3fcd7312e4bd230cca11f1b40",
+    "tested_files": "See source-sha256.txt."
   },
   "live_provider_lane": {
     "mode": "cloud",
@@ -65,9 +66,19 @@
     }
   ],
   "hosted_ci": {
-    "status": "PENDING",
+    "status": "PASS",
     "workflow": "CI",
-    "target": "Exact implementation commit after push; see hosted-ci.md."
+    "event": "push",
+    "head_commit": "af663adaa5e14be3fcd7312e4bd230cca11f1b40",
+    "run_id": 35845587545,
+    "run_url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35845587545",
+    "jobs": {
+      "backend-unit-tests": "PASS",
+      "frontend-build-and-tests": "PASS",
+      "capability-contract-validation": "PASS",
+      "persistence-conformance": "PASS"
+    },
+    "evidence": "hosted-ci.md"
   },
   "closed_issue": "ISSUE-003",
   "next_action": "Continue with T1-07."
