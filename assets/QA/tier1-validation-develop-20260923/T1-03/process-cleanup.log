@@ -1,0 +1,4 @@
+Frontend process tree: stopped task-owned launcher preview root PID 20944 (npm preview on 127.0.0.1:4512) and descendants.
+Backend process tree: stopped task-owned Uvicorn PID 21692 on 127.0.0.1:7059 and descendants.
+Final listener query: ports 4512 and 7059 free.
+Removed only task-owned isolated data and pytest cache directories below runtimes/cache after verifying their resolved paths stayed inside the corresponding cache roots.
