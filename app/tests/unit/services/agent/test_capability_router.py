@@ -392,6 +392,25 @@ def test_router_normalizes_new_data_bearing_map_routes() -> None:
     assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
     assert "data_bearing_map_route_normalized" in decision.reason_codes
 
+
+###############################################################################
+def test_router_keeps_data_retrieval_on_poi_map_search_route() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.PLACE_SEARCH,
+            operation="search_places",
+            capability_queries=["place search", "overpass_poi_amenities"],
+        ),
+        user_message="Show pharmacies in Rome, Italy.",
+        active_state=_state(),
+    )
+
+    assert decision.route.primary_domain is CapabilityDomain.PLACE_SEARCH
+    assert CapabilityDomain.MAP_RENDERING in decision.route.secondary_domains
+    assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
+    assert "data_bearing_place_search_route_normalized" in decision.reason_codes
+    assert "location_map_route_normalized" not in decision.reason_codes
+
 ###############################################################################
 def test_router_normalizes_geocoding_route_for_location_only_map() -> None:
     decision = _router().validate_route(

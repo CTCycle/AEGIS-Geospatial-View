@@ -739,6 +739,10 @@ class LocationResolver:
             signal.signal_type,
             target_components=target_components,
             candidate_parent_values=candidate_parent_values,
+            candidate_country=str(
+                address.get("country") or address.get("country_name") or ""
+            ),
+            candidate_country_code=str(address.get("country_code") or ""),
             allow_related_type=allow_related_type,
         ):
             return False
@@ -966,6 +970,8 @@ class LocationResolver:
         *,
         target_components: Sequence[str] = (),
         candidate_parent_values: Sequence[str] = (),
+        candidate_country: str = "",
+        candidate_country_code: str = "",
         allow_related_type: bool = False,
     ) -> bool:
         """Match names while allowing a generic role word around the name.
@@ -976,6 +982,17 @@ class LocationResolver:
         reduced form is only allowed for specific named targets and never for
         a country, administrative parent, or acronym-only child feature.
         """
+
+        if len(target_components) > 1:
+            explicit_country = self._known_country_aliases(target_components[-1])
+            if explicit_country:
+                actual_country = self._known_country_aliases(candidate_country)
+                expected_codes = self._country_codes(target_components[-1])
+                actual_code = self._normalize_text(candidate_country_code)
+                country_matches = bool(explicit_country.intersection(actual_country))
+                code_matches = bool(expected_codes and actual_code in expected_codes)
+                if not country_matches and not code_matches:
+                    return False
 
         if signal_type == "country" and any(
             self._contains_location_text(candidate_text, alias)
@@ -1204,6 +1221,18 @@ class LocationResolver:
             if normalized in normalized_aliases:
                 return normalized_aliases
         return {normalized} if normalized else set()
+
+    # -------------------------------------------------------------------------
+    def _known_country_aliases(self, value: str) -> set[str]:
+        normalized = self._normalize_text(value)
+        for canonical, aliases in self.COUNTRY_ALIASES.items():
+            normalized_aliases = {
+                self._normalize_text(canonical),
+                *(self._normalize_text(alias) for alias in aliases),
+            }
+            if normalized in normalized_aliases:
+                return normalized_aliases
+        return set()
 
     # -------------------------------------------------------------------------
     def _country_codes(self, value: str) -> set[str]:

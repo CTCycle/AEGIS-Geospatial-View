@@ -5,7 +5,7 @@ import unicodedata
 
 from tests.conftest import run_async_in_thread
 
-from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.decision import ClarificationRequest, ResolvedLocation
 from server.services.agent.location_resolver import LocationResolver
 from server.contracts.location import LocationSignal
 
@@ -56,6 +56,69 @@ def test_hierarchical_normalized_location_does_not_duplicate_parent_query() -> N
     )
     assert result.longitude == -95.5555
     assert calls == ["Paris, Texas, USA"]
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("display_name", "address", "expected_longitude"),
+    [
+        (
+            "Embassy of Italy, Rome Alley, Central Tehran, Tehran Province, Iran",
+            {
+                "city": "Tehran",
+                "state": "Tehran Province",
+                "country": "Iran",
+                "country_code": "ir",
+            },
+            None,
+        ),
+        (
+            "Central Rome, Rome, Roma Capitale, Lazio, Italy",
+            {
+                "city": "Rome",
+                "state": "Lazio",
+                "country": "Italy",
+                "country_code": "it",
+            },
+            12.4829,
+        ),
+    ],
+)
+def test_explicit_country_qualifier_rejects_unrelated_geocoder_candidate(
+    display_name: str,
+    address: dict[str, str],
+    expected_longitude: float | None,
+) -> None:
+    class Geocoder:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            return {
+                "display_name": display_name,
+                "lat": 41.8933 if expected_longitude is not None else 35.6892,
+                "lon": expected_longitude or 51.3890,
+                "selected_result_type": "city",
+                "selected_address_type": "city",
+                "address": address,
+            }
+
+    result = run_async_in_thread(
+        LocationResolver(nominatim_service=Geocoder()).resolve_location_signals(
+            [
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="central Rome, Italy",
+                    normalized_value="central Rome, Italy",
+                    confidence=0.9,
+                )
+            ],
+            {},
+        )
+    )
+
+    if expected_longitude is None:
+        assert isinstance(result, ClarificationRequest)
+    else:
+        assert isinstance(result, ResolvedLocation)
+        assert result.longitude == expected_longitude
 
 ###############################################################################
 def test_location_resolver_uses_coordinates_without_geocoder() -> None:
