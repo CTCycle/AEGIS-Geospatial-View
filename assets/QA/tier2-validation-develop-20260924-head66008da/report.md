@@ -81,6 +81,18 @@ removed after validation. The task-created browser tab was closed and the
 three task-owned ports were confirmed free. Existing protected QA cache paths
 were not touched.
 
+### Hosted CI for the validation commit
+
+After the evidence and ledger update was committed and pushed as
+`0113812c7e4e1945c9a2846bec1942c6889a7264`, GitHub Actions run
+[36003422893](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36003422893)
+completed successfully. All four jobs passed: `backend-unit-tests`,
+`persistence-conformance`, `capability-contract-validation`, and
+`frontend-build-and-tests` (including frontend build, unit tests, and
+geospatial browser smoke). GitHub emitted Node.js 20 deprecation and upcoming
+`ubuntu-latest` image migration notices; these were warnings and did not fail
+the run.
+
 ## Final status and remaining work
 
 No product source or test code changed. `ROUTE-UNIT`, `CONTROLLED-HAPPY`, and
