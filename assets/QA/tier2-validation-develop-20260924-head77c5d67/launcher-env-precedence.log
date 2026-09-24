@@ -1,0 +1,30 @@
+
+  ---------------------------------------------------------
+  AEGIS  /  GEOSPATIAL VIEW
+  Local application control center
+  ---------------------------------------------------------
+
+  APPLICATION
+   1. Launch application             Start local services
+
+  SETUP & VALIDATION
+   2. Install / update dependencies  Sync and build
+   3. Rebuild frontend               Run frontend production build
+   4. Initialize database            Create, upgrade, and seed SQLite schema
+   5. Run test suite                 Validate installation
+
+  SOURCE CONTROL
+   6. Check for updates              Report main branch status only
+   7. Update application             Pull the latest main branch
+
+  DATA & MAINTENANCE
+   8. Remove logs                    Clear application logs
+   9. Clear cache                    Remove runtime and test caches
+  10. Remove all data                Delete user-generated data
+  11. Uninstall application          Remove local dependencies
+
+  EXIT
+  12. Exit                           Close launcher
+  ---------------------------------------------------------
+
+PASS: explicit AEGIS_DATA_DIR process override survives Import-EnvironmentFile.

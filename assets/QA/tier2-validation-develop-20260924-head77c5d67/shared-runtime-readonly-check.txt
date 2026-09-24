@@ -1,0 +1,5 @@
+database=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\resources\runtime\database.db
+connection=read-only
+journal_mode=wal
+quick_check=[('ok',)]
+alembic_versions=[('202609210001',)]

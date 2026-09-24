@@ -90,6 +90,7 @@ class LocationToolHandler:
                 recovery="request_user_input",
                 started=started,
             )
+        query = _retain_user_stated_location_components(query, state.user_message)
 
         expected_type = str(request.expected_location_type or "city").casefold()
         if expected_type not in _LOCATION_TYPES:
@@ -181,6 +182,29 @@ class LocationToolHandler:
 def _target_key(request: ResolveLocationInput) -> str:
     value = request.target_id or request.candidate_id or request.query or "location"
     return " ".join(value.casefold().split())
+
+###############################################################################
+def _retain_user_stated_location_components(query: str, user_message: str) -> str:
+    """Drop model-added parent qualifiers that could conceal place ambiguity."""
+
+    components = [part.strip() for part in query.split(",") if part.strip()]
+    if len(components) < 2:
+        return query
+
+    def normalized_phrase(value: str) -> str:
+        return " ".join(re.findall(r"[^\W_]+", value.casefold(), flags=re.UNICODE))
+
+    message = f" {normalized_phrase(user_message)} "
+    target = normalized_phrase(components[0])
+    if not target or f" {target} " not in message:
+        return query
+
+    retained = [components[0]]
+    for component in components[1:]:
+        qualifier = normalized_phrase(component)
+        if qualifier and f" {qualifier} " in message:
+            retained.append(component)
+    return ", ".join(retained)
 
 ###############################################################################
 def _parse_coordinate_pair(query: str) -> tuple[float, float] | None:

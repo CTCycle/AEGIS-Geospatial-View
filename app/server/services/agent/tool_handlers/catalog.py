@@ -43,9 +43,13 @@ class CatalogToolHandler:
     ) -> ToolResult:
         started = time.perf_counter()
         route_domains = {CapabilityDomain.MIXED}
-        if state.route is not None:
-            route_domains = {state.route.primary_domain, *state.route.secondary_domains}
         route = state.route
+        catalog_discovery = (
+            route is not None
+            and route.operation == "discover_available_map_data"
+        )
+        if route is not None and not catalog_discovery:
+            route_domains = {route.primary_domain, *route.secondary_domains}
         location = (
             next(iter(state.location_refs.values()))
             if len(state.location_refs) == 1
@@ -53,10 +57,16 @@ class CatalogToolHandler:
             if state.active_map_session is not None
             else None
         )
-        query_values = [request.query] if request.query else (
+        query_values = (
+            list(route.capability_queries)
+            if catalog_discovery and route is not None
+            else [request.query]
+            if request.query
+            else (
             list(route.capability_queries)
             if route is not None
             else []
+            )
         )
         candidates = self.capability_registry.shortlist(
             domains=route_domains,
@@ -66,8 +76,16 @@ class CatalogToolHandler:
             # Pagination is applied after deterministic ranking so a cursor
             # always addresses the same catalog snapshot.
             limit=50,
-            operation=route.operation if route is not None else None,
-            scope_kind=_resolved_scope_kind(route, location),
+            operation=(
+                None
+                if catalog_discovery
+                else route.operation if route is not None else None
+            ),
+            scope_kind=(
+                None
+                if catalog_discovery
+                else _resolved_scope_kind(route, location)
+            ),
             temporal_mode=(
                 route.temporal_scope.mode
                 if route is not None and route.temporal_scope.mode != "none"
@@ -115,7 +133,12 @@ class CatalogToolHandler:
                 recovery="correct_arguments",
                 started=started,
             )
-        page = candidates[offset : offset + request.limit]
+        # Keep catalog pages within the model observation projection, which
+        # retains at most twelve capability records and their continuation
+        # cursor. Returning a larger page here would hide the remaining items
+        # while reporting that pagination had finished.
+        page_limit = min(request.limit, 12) if catalog_discovery else request.limit
+        page = candidates[offset : offset + page_limit]
         descriptors = [
             _descriptor(self.capability_registry, self.runtime_registry, item)
             for item in page

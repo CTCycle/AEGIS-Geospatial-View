@@ -426,6 +426,28 @@ class AgentLoop:
             )
         self._transition(state, AgentPhase.MODEL_STEP, request.budget)
         result = await self._model_step(request, provider, messages, tools)
+        if not result.tool_calls:
+            cursor = self._pending_catalog_discovery_cursor(state)
+            if (
+                cursor is not None
+                and "discover_geospatial_capabilities" in exposed_tool_names
+            ):
+                # Inventory pagination is deterministic once the catalog has
+                # returned a continuation cursor. Do not rely on the model to
+                # notice the cursor before it attempts a final response.
+                result = LLMResult(
+                    content="",
+                    raw=result.raw,
+                    tool_calls=[
+                        LLMToolCall(
+                            id=f"catalog-page-{state.current_iteration}-{cursor}",
+                            name="discover_geospatial_capabilities",
+                            arguments={"cursor": cursor, "limit": 12},
+                        )
+                    ],
+                    finish_reason="tool_calls",
+                    context_usage=result.context_usage,
+                )
         if result.tool_calls:
             messages.extend(self._assistant_and_tool_messages(result))
             tool_results = await self._execute_calls(
@@ -1164,6 +1186,35 @@ class AgentLoop:
             )
             for result in state.tool_results
         )
+        discovery_results = [
+            result
+            for result in state.tool_results
+            if result.tool_name == "discover_geospatial_capabilities"
+        ]
+        catalog_discovery_only = (
+            state.goal is not None
+            and state.goal.operation == "discover_available_map_data"
+        )
+        if catalog_discovery_only:
+            latest_discovery = discovery_results[-1] if discovery_results else None
+            latest_data = (
+                latest_discovery.data
+                if latest_discovery is not None
+                and isinstance(latest_discovery.data, dict)
+                else None
+            )
+            capabilities_discovered = bool(
+                latest_discovery is not None
+                and latest_discovery.status in {"success", "valid_empty"}
+                and latest_data is not None
+                and "next_cursor" in latest_data
+                and latest_data.get("next_cursor") is None
+            )
+        else:
+            capabilities_discovered = any(
+                result.status in {"success", "valid_empty"}
+                for result in discovery_results
+            )
         geocode_location_resolved = (
             state.route is not None
             and state.route.task_mode == "execute"
@@ -1182,6 +1233,7 @@ class AgentLoop:
             "location_resolved": bool(state.location_refs)
             or state.active_map_session is not None,
             "required_data_retrieved": data_completed,
+            "capabilities_discovered": capabilities_discovered,
             "temporal_scope_applied": completed_data,
             # A successful map-plan observation is the server-owned proof
             # that the requested spatial scope was applied.  Location-only
@@ -1195,6 +1247,29 @@ class AgentLoop:
             or (state.active_map_session is not None and state.render_verified),
             "render_verified": bool(state.render_verified),
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _pending_catalog_discovery_cursor(state: AgentRunState) -> str | None:
+        """Return the next catalog page cursor for a discovery-only route."""
+
+        if (
+            state.goal is None
+            or state.goal.operation != "discover_available_map_data"
+        ):
+            return None
+        latest = next(
+            (
+                result
+                for result in reversed(state.tool_results)
+                if result.tool_name == "discover_geospatial_capabilities"
+            ),
+            None,
+        )
+        if latest is None or latest.status != "success" or not isinstance(latest.data, dict):
+            return None
+        cursor = latest.data.get("next_cursor")
+        return str(cursor).strip() if cursor is not None and str(cursor).strip() else None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1213,6 +1288,7 @@ class AgentLoop:
         requirements: list[CompletionRequirement] = []
         requirement_kinds: dict[str, CompletionRequirementKind] = {
             "location_resolved": "location",
+            "capabilities_discovered": "capability_discovery",
             "required_data_retrieved": "provider_data",
             "temporal_scope_applied": "temporal_scope",
             "spatial_scope_applied": "spatial_scope",
@@ -2218,6 +2294,10 @@ class AgentLoop:
                 all(result.status == "valid_empty" for result in results)
                 and not state.capability_ids
                 and state.discovery_attempts >= max_discovery_attempts
+                and not (
+                    state.goal is not None
+                    and state.goal.operation == "discover_available_map_data"
+                )
             ):
                 return (
                     "insufficient_evidence",
@@ -2507,13 +2587,17 @@ class AgentLoop:
             or route.primary_domain
             not in {CapabilityDomain.MAP_RENDERING, CapabilityDomain.MAP_STATE}
         )
+        capability_discovery_only = operation == "discover_available_map_data"
         requires_provider_data = (
             route.task_mode == "execute"
             and data_route
+            and not capability_discovery_only
             and not _is_location_only_map_request(state.user_message, route)
         )
         if requires_provider_data:
             requirements.append("required_data_retrieved")
+        elif route.task_mode == "execute" and capability_discovery_only:
+            requirements.append("capabilities_discovered")
         if route.task_mode == "execute" and route_has_temporal_scope and temporal_scope and (
             temporal_scope.get("mode") != "none"
             or temporal_scope.get("start_time_iso") is not None
@@ -2521,7 +2605,11 @@ class AgentLoop:
             or temporal_scope.get("reference_time_iso") is not None
         ):
             requirements.append("temporal_scope_applied")
-        if route.task_mode == "execute" and route.spatial_scope is not None:
+        if (
+            route.task_mode == "execute"
+            and route.spatial_scope is not None
+            and not capability_discovery_only
+        ):
             requirements.append("spatial_scope_applied")
         if route.presentation in {"map", "both"}:
             requirements.append("map_candidate_prepared")
@@ -2554,7 +2642,7 @@ class AgentLoop:
                     or temporal_scope.get("reference_time_iso") is not None
                 )
             ),
-            spatial_scope_required=bool(spatial_scope),
+            spatial_scope_required=bool(spatial_scope) and not capability_discovery_only,
             render_verification_required=route.presentation in {"map", "both"},
             render_verified=state.render_verified,
         )

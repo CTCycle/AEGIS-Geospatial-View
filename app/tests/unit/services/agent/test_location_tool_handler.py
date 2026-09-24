@@ -115,6 +115,48 @@ async def test_unresolved_target_id_is_resolved_as_initial_location_query() -> N
 
 ###############################################################################
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("query", "user_message", "expected"),
+    [
+        ("Florence, Tuscany, Italy", "Show me Florence.", "Florence"),
+        ("Florence, Italy", "Show Florence, Italy.", "Florence, Italy"),
+    ],
+)
+async def test_location_resolution_uses_only_user_stated_parent_qualifiers(
+    query: str,
+    user_message: str,
+    expected: str,
+) -> None:
+    captured: list[str] = []
+
+    ###############################################################################
+    class CapturingResolver:
+
+        # -------------------------------------------------------------------------
+        async def resolve_location_signals(self, signals, _memory):  # noqa: ANN001
+            captured.append(signals[0].raw_value)
+            return ResolvedLocation(
+                label="Florence, Tuscany, Italy",
+                latitude=43.7698,
+                longitude=11.2556,
+                source="geocoder",
+            )
+
+    result = await LocationToolHandler(resolver=CapturingResolver()).resolve(
+        ResolveLocationInput(query=query, expected_location_type="city"),
+        AgentRunState(
+            request_id="request-1",
+            conversation_id="conversation-1",
+            phase=AgentPhase.BUILD_TOOL_CONTEXT,
+            user_message=user_message,
+        ),
+    )
+
+    assert result.status == "success"
+    assert captured == [expected]
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_ambiguous_location_is_a_typed_semantic_outcome() -> None:
 
     ###############################################################################

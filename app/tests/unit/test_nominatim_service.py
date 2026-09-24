@@ -210,6 +210,55 @@ def test_nominatim_surfaces_unqualified_same_level_city_ambiguity() -> None:
     run_async_in_thread(_run())
 
 ###############################################################################
+def test_nominatim_uses_structured_city_context_for_ambiguity_labels() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    ranked = [
+        {
+            "display_name": "Milano, Milam County, Texas, 76556, United States",
+            "lat": 30.7,
+            "lon": -96.5,
+            "confidence": 0.78,
+            "geocoder_importance": 0.55,
+            "selected_result_type": "city",
+            "selected_result_class": "place",
+            "address": {
+                "city": "Milano",
+                "county": "Milam County",
+                "state": "Texas",
+                "country": "United States",
+            },
+        },
+        {
+            "display_name": "Milan, Rodano, Milan, Lombardy, Italy",
+            "lat": 45.46,
+            "lon": 9.19,
+            "confidence": 0.77,
+            "geocoder_importance": 0.54,
+            "selected_result_type": "city",
+            "selected_result_class": "place",
+            "address": {
+                "city": "Milan",
+                "suburb": "Rodano",
+                "state": "Lombardy",
+                "country": "Italy",
+            },
+            "namedetails": {"name:it": "Milano"},
+        },
+    ]
+
+    candidates = service._find_ambiguous_candidates(
+        ranked,
+        expected_location_type="city",
+        query="Milano",
+        has_parent_context=False,
+    )
+
+    assert [item["display_name"] for item in candidates] == [
+        "Milano, Texas, United States",
+        "Milan, Lombardy, Italy",
+    ]
+
+###############################################################################
 def test_nominatim_accepts_a_dominant_unqualified_city_candidate() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
     ranked = [

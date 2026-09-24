@@ -1,0 +1,135 @@
+{
+  "date": "2026-09-24",
+  "branch": "develop",
+  "starting_head": "77c5d67afe1121801f3a86cc5953d3e0dcea667e",
+  "validation_boundary": "Scoped source and test changes based on starting commit, committed with this evidence",
+  "provider_lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "readiness": "Verified; native tool probe passed after launcher restart",
+    "fallback_used": false
+  },
+  "campaign_status": {
+    "PASS": 19,
+    "PARTIAL": 2,
+    "BLOCKED": 0,
+    "UNRUN": 47
+  },
+  "items": [
+    {
+      "id": "ROUTE-UNIT",
+      "status": "PASS",
+      "tests_passed": 155,
+      "warnings": 1,
+      "evidence": "focused-backend-final.log"
+    },
+    {
+      "id": "RUFF",
+      "status": "PASS",
+      "evidence": "ruff-final.log"
+    },
+    {
+      "id": "T2-01",
+      "status": "PASS",
+      "runs": [
+        "run_261892b0c24b4fc799cb075670cdb8da",
+        "run_9a8243e859714449a55c4c89245269a6"
+      ],
+      "prior_evidence": "../../tier2-validation-develop-20260923-retry/browser-evidence.md",
+      "result": "Milan clarification labels were normalized to locality/region/country; explicit Italy resolved and map render was acknowledged."
+    },
+    {
+      "id": "T2-02",
+      "status": "PASS",
+      "runs": [
+        "run_9191dbe1eee445068801fb8011832c7e",
+        "run_23f46a8c161a41ed97cdab8aa83a4982",
+        "run_9cb946f38ad24391bf82e6c7253fd4b6"
+      ],
+      "result": "Rome remained displayed until Florence was clarified; Florence, Tuscany then rendered and was acknowledged."
+    },
+    {
+      "id": "T2-03",
+      "status": "PASS",
+      "evidence": "../../tier2-validation-develop-20260923-retry/browser-evidence.md",
+      "remaining": "Overpass partial reliability and approximately 2.5 km extent."
+    },
+    {
+      "id": "T2-04",
+      "status": "PARTIAL",
+      "run": "run_e736054311d241b8b53b1b73205e2de1",
+      "successful_pages": 3,
+      "items_discovered": 36,
+      "page_size": 12,
+      "max_model_calls": 4,
+      "inventory_bound": 50,
+      "map_render_requested": false,
+      "remaining": "Execution guard stopped pagination before inventory exhaustion; requires an approved budget change or guard-respecting continuation policy."
+    },
+    {
+      "id": "T2-05-T2-07",
+      "status": "UNRUN"
+    },
+    {
+      "id": "FEMA-COVERAGE-GUARDRAIL",
+      "status": "PASS",
+      "run": "run_08ff9bd080d04de588a443ab5eb7115c",
+      "location_resolution": "success",
+      "capability_description": "rejected outside declared geographic coverage",
+      "provider_retrieval_called": false,
+      "map_render_called": false
+    },
+    {
+      "id": "T0-04",
+      "status": "PARTIAL",
+      "fresh_start_healthy": true,
+      "warm_start_healthy": true,
+      "isolated_database_quick_check": "ok",
+      "remaining": "Paired timing, provider outage, changed-owner race, and injected service-failure cleanup cases remain unverified."
+    },
+    {
+      "id": "LIVE-DIARY-20260919",
+      "status": "PARTIAL",
+      "remaining": "This continuation closes the Florence clarification scenario; the wider diary retains coordinate reverse-geocoding, route-family, and provider-coverage gaps."
+    },
+    {
+      "id": "LIVE-HYD-20260920",
+      "status": "PARTIAL",
+      "coverage_guardrail": "PASS",
+      "remaining": "Public raster load and dependent composition limitations remain; GEO-HYD-05 and GEO-HYD-06 remain BLOCKED."
+    },
+    {
+      "id": "MATRIX-22",
+      "status": "PARTIAL",
+      "remaining": "Broad route, coverage, multilingual, composition, provider-parity, and Tier 2-5 scenarios remain."
+    },
+    {
+      "id": "PROCESS-CLEANUP",
+      "status": "PASS",
+      "task_owned_services_stopped": true,
+      "configured_isolated_runtime_retained": true,
+      "ports_free": [
+        4512,
+        7059,
+        9876
+      ]
+    }
+  ],
+  "unrelated_open_boundaries": [
+    {
+      "id": "model.provider-parity.openai-ollama",
+      "status": "BLOCKED",
+      "reason": "Required independent provider service/credential boundary is not configured for this lane."
+    },
+    {
+      "id": "geospatial.dataset-ingestion",
+      "status": "UNVALIDATED"
+    },
+    {
+      "id": "TIER3-TIER5",
+      "status": "UNRUN"
+    }
+  ],
+  "screenshot_exported": false,
+  "secret_material_recorded": false
+}

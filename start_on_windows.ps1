@@ -6,6 +6,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+$script:ProcessAegisDataDirOverride = [Environment]::GetEnvironmentVariable('AEGIS_DATA_DIR', 'Process')
 
 $RootDir = $PSScriptRoot
 $AppDir = Join-Path $RootDir 'app'
@@ -331,6 +332,10 @@ function Import-EnvironmentFile {
             $value = $value.Substring(1, $value.Length - 2)
         }
         [Environment]::SetEnvironmentVariable($key, $value, 'Process')
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($script:ProcessAegisDataDirOverride)) {
+        [Environment]::SetEnvironmentVariable('AEGIS_DATA_DIR', $script:ProcessAegisDataDirOverride, 'Process')
     }
 }
 

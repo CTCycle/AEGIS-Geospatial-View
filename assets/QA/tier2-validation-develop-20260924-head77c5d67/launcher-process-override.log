@@ -1,0 +1,14 @@
+[RUN] Starting Launch application
+[OK] Application environments and frontend dependencies are ready; skipped dependency installation.
+[OK] Frontend production build is current; skipped rebuild.
+[RUN] Launching backend (server.app:app)
+[RUN] Launching frontend preview
+[WAIT] Waiting for backend readiness at http://127.0.0.1:7059/api/health
+[OK] Backend health check passed.
+[WAIT] Waiting for frontend readiness at http://127.0.0.1:4512
+
+[SUCCESS] AEGIS started successfully.
+  Backend: http://127.0.0.1:7059/api/health (PID 28284)
+  Frontend: http://127.0.0.1:4512 (PID 29372)
+[SUCCESS] Launch application completed
+launcher_elapsed_ms=12250

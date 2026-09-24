@@ -188,7 +188,9 @@ def register_agent_tools(
             description=(
                 "Discover eligible geospatial capabilities from the validated "
                 "route and catalog. Use describe_geospatial_capability for the "
-                "full execution contract."
+                "full execution contract. For an inventory request, follow "
+                "each next_cursor until it is null before presenting the list "
+                "as complete."
             ),
             input_model=CapabilityDiscoveryInput,
             handler=catalog.discover,

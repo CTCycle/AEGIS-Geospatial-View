@@ -125,7 +125,11 @@ class ToolRegistry:
                 return False
             if prerequisite == "capability_shortlist" and not state.capability_ids:
                 return False
-            if prerequisite == "capability_shortlist_missing" and state.capability_ids:
+            if (
+                prerequisite == "capability_shortlist_missing"
+                and state.capability_ids
+                and not _catalog_discovery_can_continue(state)
+            ):
                 return False
             if prerequisite == "location" and not has_location:
                 return False
@@ -163,6 +167,8 @@ class ToolRegistry:
             if prerequisite == "data_route":
                 if state.route is None:
                     return False
+                if state.route.operation == "discover_available_map_data":
+                    return False
                 route_domains = {
                     state.route.primary_domain,
                     *state.route.secondary_domains,
@@ -176,6 +182,29 @@ class ToolRegistry:
                 if state.route is None or state.route.presentation not in {"map", "both"}:
                     return False
         return True
+
+
+###############################################################################
+def _catalog_discovery_can_continue(state: "AgentRunState") -> bool:
+    """Expose discovery again only while a catalog page remains or a retry is needed."""
+
+    route = state.route
+    if route is None or route.operation != "discover_available_map_data":
+        return False
+    discovery_results = [
+        result
+        for result in state.tool_results
+        if result.tool_name == "discover_geospatial_capabilities"
+    ]
+    if not discovery_results:
+        return True
+    latest = discovery_results[-1]
+    if latest.status not in {"success", "valid_empty"}:
+        return True
+    return bool(
+        isinstance(latest.data, dict)
+        and latest.data.get("next_cursor") not in {None, ""}
+    )
 
 _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
     {

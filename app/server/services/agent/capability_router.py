@@ -149,6 +149,11 @@ class CapabilityRouter:
         proposed, semantic_reason = _normalize_route_semantics(proposed)
         if semantic_reason is not None:
             reasons.append(semantic_reason)
+        proposed, discovery_reason = _normalize_capability_inventory_route(
+            proposed, user_message=user_message
+        )
+        if discovery_reason is not None:
+            reasons.append(discovery_reason)
         proposed, map_data_reason = _normalize_data_bearing_map_route(
             proposed, user_message=user_message
         )
@@ -261,9 +266,11 @@ class CapabilityRouter:
         if proposed.clarification_question is not None:
             reasons.append("clarification_question_not_allowed")
 
+        catalog_discovery = proposed.operation == "discover_available_map_data"
         candidates = (
             []
-            if proposed.explicit_capability_ids and not valid_explicit_ids
+            if catalog_discovery
+            or (proposed.explicit_capability_ids and not valid_explicit_ids)
             else self.capability_registry.shortlist(
                 domains=route_domains,
                 queries=proposed.capability_queries,
@@ -586,6 +593,116 @@ def _normalize_route_semantics(
             }
         ),
         "route_semantics_normalized",
+    )
+
+
+###############################################################################
+def _normalize_capability_inventory_route(
+    route: CapabilityRoute,
+    *,
+    user_message: str,
+) -> tuple[CapabilityRoute, str | None]:
+    """Turn broad catalog questions into discovery-only routes."""
+
+    if (
+        route.primary_domain is not CapabilityDomain.PROVIDER_DISCOVERY
+        or route.task_mode != "execute"
+        or route.presentation != "text"
+    ):
+        return route, None
+
+    message_terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
+    asks_inventory = bool(
+        message_terms.intersection({"what", "which", "list", "available"})
+        and message_terms.intersection(
+            {
+                "data",
+                "dataset",
+                "datasets",
+                "layer",
+                "layers",
+                "capability",
+                "capabilities",
+                "basemap",
+                "basemaps",
+            }
+        )
+    ) or (
+        "show" in message_terms
+        and message_terms.intersection(
+            {
+                "data",
+                "dataset",
+                "datasets",
+                "layer",
+                "layers",
+                "capability",
+                "capabilities",
+                "basemap",
+                "basemaps",
+            }
+        )
+    )
+    if not asks_inventory:
+        return route, None
+
+    generic_terms = {
+        "a",
+        "an",
+        "and",
+        "available",
+        "basemap",
+        "basemaps",
+        "can",
+        "capabilities",
+        "capability",
+        "data",
+        "dataset",
+        "datasets",
+        "do",
+        "display",
+        "for",
+        "geospatial",
+        "in",
+        "layer",
+        "layers",
+        "list",
+        "map",
+        "maps",
+        "me",
+        "load",
+        "not",
+        "of",
+        "on",
+        "or",
+        "show",
+        "supported",
+        "the",
+        "to",
+        "what",
+        "which",
+        "you",
+    }
+    target_terms = {
+        term
+        for target in [
+            *route.target_refs,
+            *(
+                route.spatial_scope.target_refs
+                if route.spatial_scope is not None
+                else []
+            ),
+        ]
+        for term in re.findall(r"[a-z0-9]+", target.casefold())
+    }
+    has_specific_subject = bool(message_terms - generic_terms - target_terms)
+    operation = "discover_available_map_data"
+    query_update = {} if has_specific_subject else {"capability_queries": []}
+    if route.operation == operation and not query_update:
+        return route, None
+    return (
+        route.model_copy(update={"operation": operation, **query_update}),
+        "capability_inventory_route_normalized",
     )
 
 

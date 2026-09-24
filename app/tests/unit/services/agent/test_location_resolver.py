@@ -228,6 +228,8 @@ def test_location_resolver_accepts_localized_hierarchical_city_boundary_target()
     )
 
     assert isinstance(result, ResolvedLocation)
+    assert result.label == "Milan, Lombardy, Italy"
+    assert result.hierarchy.target.canonical_label == result.label
     assert result.latitude == 45.4641943
     assert result.longitude == 9.1896346
     assert result.country == "Italy"

@@ -130,6 +130,7 @@ class CompletionContract(BaseModel):
 CompletionStatus = Literal["pending", "satisfied", "failed", "not_applicable"]
 CompletionRequirementKind = Literal[
     "location",
+    "capability_discovery",
     "provider_data",
     "temporal_scope",
     "spatial_scope",
