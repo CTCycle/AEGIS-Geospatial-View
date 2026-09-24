@@ -2,6 +2,19 @@
   "date": "2026-09-24",
   "branch": "develop",
   "source_sha_at_start": "a53040ae137d3e5c7c4cd1ddf8a09274e56aeb1d",
+  "tested_commit": "a1b4e43ff20ab8683f34c04e9ff78e59dc01f74f",
+  "pushed_to": "origin/develop",
+  "hosted_ci": {
+    "run_id": 35970154295,
+    "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35970154295",
+    "conclusion": "success",
+    "jobs_passed": [
+      "frontend-build-and-tests",
+      "persistence-conformance",
+      "backend-unit-tests",
+      "capability-contract-validation"
+    ]
+  },
   "scope": [
     "T2-01",
     "T2-02",

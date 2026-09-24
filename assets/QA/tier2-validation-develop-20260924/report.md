@@ -66,6 +66,15 @@ FEMA or ESA raster loading, last-known-good retention with those public
 overlays, or the complete provider/browser matrix. Those remain `PARTIAL` or
 `BLOCKED` under `ISSUE-002`, `LIVE-HYD-20260920`, and `MATRIX-22`.
 
+## Commit and hosted CI
+
+The tested validation source/test commit is
+[`a1b4e43ff20ab8683f34c04e9ff78e59dc01f74f`](https://github.com/CTCycle/AEGIS-Geospatial-View/commit/a1b4e43ff20ab8683f34c04e9ff78e59dc01f74f),
+pushed to `origin/develop`. Its exact-head [GitHub Actions run
+35970154295](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35970154295)
+passed all four jobs: frontend build/tests, persistence conformance, backend
+unit tests, and capability contract validation.
+
 ## Remaining validation boundaries
 
 - `ROUTE-LIVE`, `LIVE-DIARY-20260919`, and `MATRIX-22` remain `PARTIAL`. The
