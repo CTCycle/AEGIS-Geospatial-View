@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+import pytest
+
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
     AgentPhase,
@@ -222,6 +224,38 @@ def test_router_opens_discovery_when_semantic_shortlist_is_empty() -> None:
 
     assert decision.status == "discovery_required"
     assert "discovery_required" in decision.reason_codes
+
+
+###############################################################################
+def test_broad_catalog_question_routes_to_unfiltered_capability_discovery() -> None:
+    router = _router()
+    router.capability_registry.shortlist = lambda **_kwargs: pytest.fail(  # type: ignore[method-assign]
+        "catalog inventory must defer filtering until discovery"
+    )
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
+        secondary_domains=[CapabilityDomain.PLACE_SEARCH, CapabilityDomain.MAP_RENDERING],
+        task_mode="execute",
+        presentation="text",
+        requires_location=True,
+        capability_queries=["map data", "basemaps", "geospatial layers"],
+        target_refs=["Florence, Italy"],
+        spatial_scope={"kind": "point", "target_refs": ["Florence, Italy"]},
+    )
+
+    decision = router.validate_route(
+        route,
+        user_message=(
+            "What map data can you show for Florence, Italy? "
+            "Do not display a map or load a layer."
+        ),
+        active_state=_state(),
+    )
+
+    assert decision.status == "discovery_required"
+    assert decision.route.operation == "discover_available_map_data"
+    assert decision.route.capability_queries == []
+    assert decision.capability_ids == []
 
 
 ###############################################################################

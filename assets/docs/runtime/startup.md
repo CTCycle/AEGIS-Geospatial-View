@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-09-22
+Last updated: 2026-09-24
 
 ## Local Development Via Launcher
 
@@ -23,6 +23,11 @@ builds the frontend; runs tests; removes logs; clears caches; and starts
 backend and frontend services. If `settings/.env` is missing, the launcher reads
 `settings/.env.example` for its first-run process settings and the application
 creates the local file without overwriting an existing file.
+
+An explicit non-empty `AEGIS_DATA_DIR` inherited from the parent process takes
+precedence over the value in `settings/.env` for the launched backend. When no
+process override is supplied, the launcher uses the environment-file value; a
+blank value keeps the default `app/resources/runtime` root.
 
 The menu is grouped into clear sections. Application options launch the
 application, install or update dependencies, rebuild the frontend independently,

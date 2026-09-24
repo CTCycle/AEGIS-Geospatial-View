@@ -669,6 +669,102 @@ def test_map_add_route_requires_provider_data_when_data_retrieval_is_secondary()
 
 
 ###############################################################################
+def test_capability_discovery_route_completes_on_catalog_result() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
+        secondary_domains=[
+            CapabilityDomain.PLACE_SEARCH,
+            CapabilityDomain.MAP_RENDERING,
+        ],
+        task_mode="execute",
+        presentation="text",
+        requires_location=True,
+        capability_queries=["geospatial data layers", "points of interest"],
+        operation="discover_available_map_data",
+        target_refs=["Florence, Italy"],
+        spatial_scope={
+            "kind": "administrative_geometry",
+            "relationship": "in",
+            "target_refs": ["Florence, Italy"],
+        },
+    )
+
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+
+    assert state.completion_contract is not None
+    assert state.completion_contract.data_requirement == "none"
+    assert state.completion_contract.requirements == [
+        "location_resolved",
+        "capabilities_discovered",
+    ]
+    assert state.completion_contract.spatial_scope_required is False
+
+    state.context_hydrated = True
+    state.location_refs["florence, italy"] = ResolvedLocation(
+        label="Florence, Tuscany, Italy", latitude=43.7696, longitude=11.2558
+    )
+    state.tool_results.append(
+        ToolResult(
+            call_id="discover-1",
+            tool_name="discover_geospatial_capabilities",
+            status="success",
+            summary="Found 8 eligible capabilities.",
+            data={"capabilities": [], "next_cursor": None, "total": 8},
+            metadata=ToolExecutionMetadata(duration_ms=1),
+        )
+    )
+
+    assert AgentLoop._completion_checks(state)["capabilities_discovered"] is True  # pyright: ignore[reportPrivateUsage]
+    assert AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
+        state
+    ) == []
+
+    state.tool_results[-1] = state.tool_results[-1].model_copy(
+        update={"data": {"capabilities": [], "next_cursor": "12", "total": 20}}
+    )
+    assert AgentLoop._completion_checks(state)["capabilities_discovered"] is False  # pyright: ignore[reportPrivateUsage]
+    continuation = AgentLoop._pending_catalog_discovery_cursor(state)  # pyright: ignore[reportPrivateUsage]
+    assert continuation == "12"
+
+    state.tool_results[-1] = state.tool_results[-1].model_copy(
+        update={"data": {"capabilities": [], "next_cursor": None, "total": 20}}
+    )
+    assert AgentLoop._pending_catalog_discovery_cursor(state) is None  # pyright: ignore[reportPrivateUsage]
+
+
+###############################################################################
+def test_empty_catalog_discovery_can_complete_as_a_reportable_result() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
+        task_mode="execute",
+        presentation="text",
+        requires_location=True,
+        operation="discover_available_map_data",
+    )
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+    state.discovery_attempts = 2
+    empty_result = ToolResult(
+        call_id="discover-empty",
+        tool_name="discover_geospatial_capabilities",
+        status="valid_empty",
+        summary="No eligible capabilities matched the request.",
+        data={"capabilities": [], "next_cursor": None, "total": 0},
+        metadata=ToolExecutionMetadata(duration_ms=1),
+    )
+
+    assert AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
+        state,
+        route,
+        [empty_result],
+        max_consecutive_tool_failures=3,
+        max_validation_corrections=3,
+        max_discovery_attempts=2,
+    ) is None
+
+
+###############################################################################
 def test_text_geocode_resolution_satisfies_data_and_spatial_completion() -> None:
     state = _state()
     route = CapabilityRoute(

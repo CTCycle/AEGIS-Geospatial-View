@@ -666,14 +666,45 @@ class LocationResolver:
             # object. Preserve the requested country granularity only when the
             # candidate carries matching country name and ISO evidence.
             resolved_type = "country"
+        label = str(geocoded.get("display_name") or signal.raw_value).strip()
+        if signal.signal_type in {"city", "municipality"} and resolved_type == signal.signal_type:
+            locality = self._address_component(
+                geocoded, "city", "town", "village", "municipality"
+            )
+            if locality:
+                locality_key = self._normalize_text(locality)
+                duplicate_locality = sum(
+                    self._normalize_text(part) == locality_key
+                    for part in label.split(",")
+                ) > 1
+                if duplicate_locality:
+                    components = (
+                        locality,
+                        self._address_component(
+                            geocoded, "state", "region", "province"
+                        ),
+                        self._address_component(geocoded, "country"),
+                    )
+                    canonical_parts: list[str] = []
+                    seen_parts: set[str] = set()
+                    for component in components:
+                        value = str(component or "").strip()
+                        key = self._normalize_text(value)
+                        if value and key not in seen_parts:
+                            canonical_parts.append(value)
+                            seen_parts.add(key)
+                    if len(canonical_parts) > 1:
+                        label = ", ".join(canonical_parts)
+
         hierarchy = self._build_hierarchy(
             signal=signal,
             context_signals=context_signals,
             geocoded=geocoded,
+            canonical_label=label,
         )
         try:
             return ResolvedLocation(
-                label=str(geocoded.get("display_name") or signal.raw_value),
+                label=label,
                 latitude=latitude,
                 longitude=longitude,
                 source="geocoder",
@@ -1294,6 +1325,7 @@ class LocationResolver:
         signal: LocationSignal,
         context_signals: Sequence[LocationSignal],
         geocoded: dict[str, Any],
+        canonical_label: str,
     ) -> LocationHierarchy:
         hierarchy_signal_type = signal.signal_type
         geocoder_type = self._normalize_text(
@@ -1309,7 +1341,7 @@ class LocationResolver:
             hierarchy_signal_type = "district"
         target = self._hierarchy_entry(
             signal,
-            canonical_label=str(geocoded.get("display_name") or "").strip() or None,
+            canonical_label=canonical_label or None,
             # Keep the user's semantic granularity in the hierarchy even
             # when the provider uses a related result type such as ``suburb``
             # for a district/neighborhood.

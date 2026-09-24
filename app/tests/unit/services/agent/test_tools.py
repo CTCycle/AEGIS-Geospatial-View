@@ -251,6 +251,66 @@ def test_active_map_layer_lifecycle_exposes_only_map_plan_for_mutation() -> None
     assert "inspect_evidence" not in exposed
     assert "discover_geospatial_capabilities" not in exposed
 
+
+###############################################################################
+def test_capability_discovery_route_does_not_expose_data_execution() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
+        secondary_domains=[
+            CapabilityDomain.PLACE_SEARCH,
+            CapabilityDomain.MAP_RENDERING,
+        ],
+        task_mode="execute",
+        presentation="text",
+        requires_location=True,
+        capability_queries=["geospatial data layers"],
+        operation="discover_available_map_data",
+        target_refs=["Florence, Italy"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.location_refs["florence, italy"] = ResolvedLocation(
+        label="Florence, Tuscany, Italy", latitude=43.7696, longitude=11.2558
+    )
+    state.capability_ids = ["places:hospitals"]
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    assert "describe_geospatial_capability" in exposed
+    assert "execute_geospatial_capability" not in exposed
+
+
+###############################################################################
+def test_catalog_discovery_remains_exposed_while_a_page_cursor_is_pending() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
+        task_mode="execute",
+        presentation="text",
+        requires_location=False,
+        operation="discover_available_map_data",
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["places:hospitals"]
+    state.tool_results.append(
+        ToolResult(
+            call_id="discover-page-1",
+            tool_name="discover_geospatial_capabilities",
+            status="success",
+            summary="Found 12 eligible capabilities.",
+            data={"capabilities": [], "next_cursor": "12", "total": 20},
+            metadata=ToolExecutionMetadata(duration_ms=1),
+        )
+    )
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    assert "discover_geospatial_capabilities" in exposed
+    assert "execute_geospatial_capability" not in exposed
+
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_capability_handler_uses_persisted_run_id_not_request_id() -> None:

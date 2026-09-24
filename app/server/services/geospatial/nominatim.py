@@ -430,14 +430,52 @@ class NominatimService:
             confidence_gap = 0.0
         if has_parent_context and confidence_gap >= 0.08:
             return []
-        first_label = str(first.get("display_name") or "").strip()
-        second_label = str(second.get("display_name") or "").strip()
+        first_label = self._ambiguity_candidate_label(first, expected)
+        second_label = self._ambiguity_candidate_label(second, expected)
         if not first_label or not second_label or first_label == second_label:
             return []
         return [
             {"display_name": first_label, "lat": first.get("lat"), "lon": first.get("lon")},
             {"display_name": second_label, "lat": second.get("lat"), "lon": second.get("lon")},
         ]
+
+    # -------------------------------------------------------------------------
+    def _ambiguity_candidate_label(
+        self, candidate: dict[str, Any], expected_location_type: str
+    ) -> str:
+        display_name = str(candidate.get("display_name") or "").strip()
+        if expected_location_type not in {"city", "municipality"}:
+            return display_name
+
+        address = json_object(candidate.get("address"))
+        locality = next(
+            (
+                str(address.get(key) or "").strip()
+                for key in ("city", "town", "village", "municipality")
+                if address.get(key)
+            ),
+            "",
+        )
+        country = str(address.get("country") or "").strip()
+        if not locality or not country:
+            return display_name
+
+        region = next(
+            (
+                str(address.get(key) or "").strip()
+                for key in ("state", "region", "province", "county")
+                if address.get(key)
+            ),
+            "",
+        )
+        components: list[str] = []
+        seen: set[str] = set()
+        for component in (locality, region, country):
+            key = self.normalize_component(component)
+            if component and key not in seen:
+                components.append(component)
+                seen.add(key)
+        return ", ".join(components) if len(components) > 1 else display_name
 
     # -------------------------------------------------------------------------
     @staticmethod
