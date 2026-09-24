@@ -3,7 +3,7 @@
 - Date: 2026-09-24
 - Branch: `develop`
 - Starting commit: `77c5d67afe1121801f3a86cc5953d3e0dcea667e`
-Validation source: scoped implementation and test changes based on the starting commit, committed with this evidence.
+Validation source: scoped implementation and test changes based on the starting commit; follow-up fixes and the generated shared OpenAPI schema are in the pushed commit chain.
 
 Validation used the official Windows launcher and isolated runtime at `runtimes/cache/test-runtime/validation-20260924-exact-lane`. After the launcher restart, Settings showed the exact `opencode-go / deepseek-v4.1-flash` model selected; `Test selected model` returned `Verified` and `Native tool probe passed`. No alternate provider or model was used. The user-configured provider data remains in the isolated runtime and is not included in source control or evidence.
 
@@ -12,6 +12,8 @@ Validation used the official Windows launcher and isolated runtime at `runtimes/
 | Gate or slice | Final status | Current evidence and remaining boundary |
 | --- | --- | --- |
 | `ROUTE-UNIT` | `PASS` | 155 focused routing, catalog, location, tool, agent-loop, and Nominatim tests pass. One existing pytest warning reports unknown `cache_dir`. See [`focused-backend-final.log`](focused-backend-final.log). |
+| `BACKEND-UNIT` | `PASS` | The complete `app/tests/unit` suite passes: 932 passed, 3 warnings. See [`post-cache-cleanup-full-unit.log`](post-cache-cleanup-full-unit.log). |
+| `OPENAPI-SCHEMA` | `PASS` | Regenerated `app/shared/openapi.json` using the repository generator; the runtime-equality test passes. See [`openapi-snapshot-pytest.log`](openapi-snapshot-pytest.log). |
 | `RUFF` | `PASS` | Ruff passed for all modified agent, geospatial-service, and focused-test files. See [`ruff-final.log`](ruff-final.log). |
 | `T2-01` | `PASS` | The initial live check exposed a verbose Milan candidate label; the resolver now uses structured locality/region/country fields. On the retest, `Mostrami Milano.` asked the user to choose between the clear options `Milano, Texas, United States` and `Milan, Lombardy, Italy`; explicit `Milano, Italia` then rendered and was acknowledged at Milan, Lombardy, Italy with OpenStreetMap attribution. Earlier Springfield clarification and invalid-coordinate retention evidence remains linked from the prior browser record. |
 | `T2-02` | `PASS` | Rome rendered first; `Show me Florence.` then asked which Florence while Rome remained displayed; choosing Florence, Tuscany, Italy rendered and was acknowledged. Both maps showed OpenStreetMap attribution. |
@@ -51,7 +53,7 @@ The live run is `run_e736054311d241b8b53b1b73205e2de1`. The model-call guard sto
 
 ## Hosted CI follow-up
 
-The first pushed implementation commit, `29115ee0c62af70a7e3e40c9bdbaaacc11f8ccaa`, triggered [GitHub Actions run 36050255036](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36050255036). The backend job stopped at strict Pyright because the route normalizer inferred a partially unknown type for an empty/update dictionary. The route update now uses explicit branches. After the repair, repository Pyright reports 0 errors, 0 warnings, and 0 informations; the focused capability-router suite passes 23 tests, and Ruff passes. See the `hosted-static-fix-pyright.log`, `hosted-static-fix-pytest.log`, and `hosted-static-fix-ruff.log` artifacts. A follow-up push will provide the final hosted result.
+The first pushed implementation commit, `29115ee0c62af70a7e3e40c9bdbaaacc11f8ccaa`, triggered [GitHub Actions run 36050255036](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36050255036). The backend job stopped at strict Pyright because the route normalizer inferred a partially unknown type for an empty/update dictionary. The route update now uses explicit branches. After the repair, repository Pyright reports 0 errors, 0 warnings, and 0 informations; the focused capability-router suite passes 23 tests, and repository Ruff passes. Those checks are in the `hosted-static-fix-pyright.log`, `hosted-static-fix-pytest.log`, and `hosted-static-fix-ruff.log` artifacts. The second push at `255d1277aa312b1d253b6d992b518c896911edf7` passed static analysis, compilation, migrations, persistence conformance, capability contracts, and all frontend jobs, but its backend suite found that the shared OpenAPI snapshot lacked the new `capability_discovery` enum value (409 passed, 1 failed). The snapshot was regenerated with the documented generator, and the exact OpenAPI equality test now passes in [`openapi-snapshot-pytest.log`](openapi-snapshot-pytest.log). The complete local `app/tests/unit` rerun passes 932 tests with three existing configuration/dependency warnings. The first local attempt had also exposed a root Ruff cache outside the canonical cache location; that task-created cache was removed before the successful rerun. A third push with the generated shared schema will provide the final hosted result.
 
 ## Evidence and cleanup
 

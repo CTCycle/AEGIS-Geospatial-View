@@ -3457,6 +3457,7 @@
                 "type": "string",
                 "enum": [
                   "location",
+                  "capability_discovery",
                   "provider_data",
                   "temporal_scope",
                   "spatial_scope",
