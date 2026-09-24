@@ -47,6 +47,22 @@
     "ports_free_after_cleanup": [4512, 7059, 9876],
     "settings_env_sha256_before_after": "95D56835BADD0DD60AEDA6662D382BAFB0F76D3A75DA4D09B95F0165D98606FC"
   },
+  "hosted_ci": {
+    "status": "PASS",
+    "tested_commit": "0113812c7e4e1945c9a2846bec1942c6889a7264",
+    "run_id": 36003422893,
+    "run_url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36003422893",
+    "jobs": [
+      "backend-unit-tests",
+      "persistence-conformance",
+      "capability-contract-validation",
+      "frontend-build-and-tests"
+    ],
+    "warnings": [
+      "GitHub Actions Node.js 20 deprecation notices",
+      "Upcoming ubuntu-latest image migration notice"
+    ]
+  },
   "limitations": [
     "Milan candidate selection and Rodano label remain unresolved pending exact-lane browser recheck",
     "Ambiguous Florence previously replaced Rome without clarification; exact-lane transition remains unresolved",
