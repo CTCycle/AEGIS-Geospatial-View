@@ -113,6 +113,19 @@
         7059,
         9876
       ]
+    },
+    {
+      "id": "BACKEND-UNIT",
+      "status": "PASS",
+      "tests_passed": 932,
+      "warnings": 3,
+      "evidence": "post-cache-cleanup-full-unit.log"
+    },
+    {
+      "id": "OPENAPI-SCHEMA",
+      "status": "PASS",
+      "tests_passed": 1,
+      "evidence": "openapi-snapshot-pytest.log"
     }
   ],
   "unrelated_open_boundaries": [
