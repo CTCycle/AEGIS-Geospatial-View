@@ -1,0 +1,68 @@
+{
+  "date": "2026-09-24",
+  "branch": "develop",
+  "source_sha_at_start": "a53040ae137d3e5c7c4cd1ddf8a09274e56aeb1d",
+  "scope": [
+    "T2-01",
+    "T2-02",
+    "CONTROLLED-FAULT"
+  ],
+  "related_gates": [
+    "ROUTE-LIVE",
+    "LIVE-DIARY-20260919",
+    "MATRIX-22",
+    "LIVE-HYD-20260920 Zurich coverage guardrail",
+    "agent.map-render-ack-recovery"
+  ],
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "runtime_data_dir": "runtimes/cache/test-runtime/tier2-validation-develop-20260924",
+  "browser": "Codex in-app Browser",
+  "t2_scenarios": [
+    {
+      "id": "Zurich plain location and invalid coordinate retention",
+      "status": "BLOCKED",
+      "reason": "No selected agent model or OpenCode Go API key in the isolated runtime; no provider request was sent."
+    },
+    {
+      "id": "Springfield disambiguation and selected-location map render",
+      "status": "BLOCKED",
+      "reason": "No selected agent model or OpenCode Go API key in the isolated runtime; no provider request was sent."
+    },
+    {
+      "id": "Mostrami Milano disambiguation and candidate label quality",
+      "status": "BLOCKED",
+      "reason": "No selected agent model or OpenCode Go API key in the isolated runtime; no provider request was sent."
+    },
+    {
+      "id": "Rome map render and hydration after reload",
+      "status": "BLOCKED",
+      "reason": "No selected agent model or OpenCode Go API key in the isolated runtime; no provider request was sent."
+    },
+    {
+      "id": "Ambiguous Florence follow-up preserves Rome and asks for confirmation",
+      "status": "BLOCKED",
+      "reason": "No selected agent model or OpenCode Go API key in the isolated runtime; no provider request was sent."
+    },
+    {
+      "id": "Explicit Florence, Tuscany, Italy replacement and render acknowledgement",
+      "status": "BLOCKED",
+      "reason": "No selected agent model or OpenCode Go API key in the isolated runtime; no provider request was sent."
+    },
+    {
+      "id": "Zurich FEMA coverage guardrail",
+      "status": "NOT RUN",
+      "reason": "The exact-lane readiness blocker prevented starting the live diary; the guardrail was not exercised."
+    }
+  ],
+  "source_change_before_live_recheck": false,
+  "live_recheck_status": "BLOCKED before request execution",
+  "no_fallback_used": true,
+  "controlled_fault": {
+    "status": "PASS",
+    "result": "10 passed",
+    "test_file": "app/tests/e2e/test_agentic_map_completion.py",
+    "test_file_sha256": "4DE5D6857B6796D807355E19CEDC56C086F97C0DEC7CDF86B4E34C10DF6982F2",
+    "log": "controlled-fault/full-module.log"
+  }
+}
