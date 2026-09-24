@@ -2,7 +2,7 @@
   "date": "2026-09-24",
   "branch": "develop",
   "starting_head": "77c5d67afe1121801f3a86cc5953d3e0dcea667e",
-  "validation_boundary": "Scoped source and test changes based on starting commit, committed with this evidence",
+  "validation_boundary": "Implementation and generated shared OpenAPI schema tested at develop@7685cce7e23c5d4cb9edd603a8b49d3ef5aaa8d9; ledger reconciliation records hosted run 36051868085.",
   "provider_lane": {
     "provider": "opencode-go",
     "model": "deepseek-v4.1-flash",
@@ -126,6 +126,19 @@
       "status": "PASS",
       "tests_passed": 1,
       "evidence": "openapi-snapshot-pytest.log"
+    },
+    {
+      "id": "HOSTED-CI",
+      "status": "PASS",
+      "tested_commit": "7685cce7e23c5d4cb9edd603a8b49d3ef5aaa8d9",
+      "run_id": 36051868085,
+      "jobs": {
+        "backend-unit-tests": "PASS",
+        "persistence-conformance": "PASS",
+        "capability-contract-validation": "PASS",
+        "frontend-build-and-tests": "PASS"
+      },
+      "warnings": "GitHub runner Node.js and Ubuntu migration notices; informational only."
     }
   ],
   "unrelated_open_boundaries": [
