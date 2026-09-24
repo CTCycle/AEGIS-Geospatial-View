@@ -1,0 +1,57 @@
+{
+  "campaign": "tier2-validation-develop-20260924-head66008da",
+  "date": "2026-09-24",
+  "branch": "develop",
+  "tested_commit": "66008da15ea4ea23a5b1e99090441438bb163fba",
+  "initial_tree": "clean; matched origin/develop",
+  "results": {
+    "ROUTE-UNIT": "PASS",
+    "CONTROLLED-HAPPY": "PASS",
+    "CONTROLLED-FAULT": "PASS",
+    "T2-01": "PARTIAL",
+    "T2-02": "PARTIAL",
+    "ROUTE-LIVE": "PARTIAL",
+    "runtime.startup.windows-local": "PARTIAL",
+    "PROCESS-CLEANUP": "PASS"
+  },
+  "focused_backend": {
+    "modules": [
+      "app/tests/unit/services/agent/test_agent_loop_v2.py",
+      "app/tests/unit/services/agent/test_capability_router.py",
+      "app/tests/unit/services/agent/test_location_resolver.py",
+      "app/tests/unit/services/agent/test_location_resolver_country_contract.py",
+      "app/tests/unit/services/agent/test_location_tool_handler.py"
+    ],
+    "passed": 103,
+    "warnings": ["PytestConfigWarning: Unknown config option: cache_dir"]
+  },
+  "controlled_browser": {
+    "module": "app/tests/e2e/test_agentic_map_completion.py",
+    "passed": 10,
+    "warnings": ["PytestConfigWarning: Unknown config option: cache_dir"],
+    "scenario_reports": 9,
+    "screenshots": 9,
+    "fault_injection": "WebSocket fixture only; browser MapLibre acknowledgements observed"
+  },
+  "exact_lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "status": "BLOCKED before request execution",
+    "reason": "Rendered isolated Settings screen had no selected agent model and OpenCode Go API key was not configured",
+    "fallback_used": false
+  },
+  "launcher_smoke": {
+    "status": "PASS",
+    "isolated_runtime": "runtimes/cache/test-runtime/tier2-validation-develop-20260924-head66008da",
+    "healthy_ports": [7059, 4512],
+    "ports_free_after_cleanup": [4512, 7059, 9876],
+    "settings_env_sha256_before_after": "95D56835BADD0DD60AEDA6662D382BAFB0F76D3A75DA4D09B95F0165D98606FC"
+  },
+  "limitations": [
+    "Milan candidate selection and Rodano label remain unresolved pending exact-lane browser recheck",
+    "Ambiguous Florence previously replaced Rome without clarification; exact-lane transition remains unresolved",
+    "Zurich FEMA guardrail not run because exact lane was unavailable",
+    "Controlled local results do not establish public raster loading or broad live provider/browser coverage",
+    "Windows startup timing, provider-outage, ownership-race, and injected-failure-cleanup checks remain incomplete"
+  ]
+}

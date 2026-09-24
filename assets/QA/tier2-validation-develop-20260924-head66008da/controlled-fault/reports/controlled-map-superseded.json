@@ -1,0 +1,174 @@
+{
+  "scenario": "superseded",
+  "run_id": "controlled-map-run-1",
+  "run_version": 1,
+  "final_run_version": 1,
+  "map_session_id": "rome-earthquake-session",
+  "candidate_map_sessions": [
+    {
+      "map_session_id": "rome-earthquake-session-attempt-2",
+      "collection_revision": 9,
+      "run_version": 1,
+      "status": "ready"
+    },
+    {
+      "map_session_id": "rome-earthquake-session",
+      "collection_revision": 7,
+      "run_version": 1,
+      "status": null
+    }
+  ],
+  "tested_commit": "66008da15ea4ea23a5b1e99090441438bb163fba",
+  "acknowledgment_count": 1,
+  "acknowledgments": [
+    {
+      "run_id": "controlled-map-run-2",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session-attempt-2",
+      "collection_revision": 9,
+      "status": "ready",
+      "viewport_bounds": [
+        12.276163154800713,
+        41.78872434628582,
+        12.72383684520139,
+        42.01123841234292
+      ],
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlay_results": [
+        {
+          "overlay_id": "earthquake-rome-1",
+          "capability_id": "usgs_earthquakes",
+          "source_present": true,
+          "layer_present": true,
+          "loaded": true,
+          "metadata_only": false,
+          "visibility_matches": true,
+          "style_valid": true,
+          "zoom_range_valid": true,
+          "rendered_feature_count": 1,
+          "failure_code": null
+        }
+      ],
+      "failure_code": null,
+      "failure_stage": null,
+      "failure_summary": null
+    }
+  ],
+  "ack_payloads": [
+    {
+      "run_id": "controlled-map-run-2",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session-attempt-2",
+      "collection_revision": 9,
+      "status": "ready",
+      "viewport_bounds": [
+        12.276163154800713,
+        41.78872434628582,
+        12.72383684520139,
+        42.01123841234292
+      ],
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlay_results": [
+        {
+          "overlay_id": "earthquake-rome-1",
+          "capability_id": "usgs_earthquakes",
+          "source_present": true,
+          "layer_present": true,
+          "loaded": true,
+          "metadata_only": false,
+          "visibility_matches": true,
+          "style_valid": true,
+          "zoom_range_valid": true,
+          "rendered_feature_count": 1,
+          "failure_code": null
+        }
+      ],
+      "failure_code": null,
+      "failure_stage": null,
+      "failure_summary": null
+    }
+  ],
+  "synthetic_event_sequence": [
+    {
+      "sequence": 1,
+      "type": "progress",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1
+    },
+    {
+      "sequence": 2,
+      "type": "assistant_text_completed",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1
+    },
+    {
+      "sequence": 3,
+      "type": "map_prepared",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session",
+      "collection_revision": 7
+    },
+    {
+      "sequence": 4,
+      "type": "progress",
+      "run_id": "controlled-map-run-2",
+      "run_version": 1
+    },
+    {
+      "sequence": 5,
+      "type": "assistant_text_completed",
+      "run_id": "controlled-map-run-2",
+      "run_version": 1
+    },
+    {
+      "sequence": 6,
+      "type": "map_prepared",
+      "run_id": "controlled-map-run-2",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session-attempt-2",
+      "collection_revision": 9
+    },
+    {
+      "sequence": 7,
+      "type": "progress",
+      "run_id": "controlled-map-run-2",
+      "run_version": 1
+    },
+    {
+      "sequence": 8,
+      "type": "assistant_text_completed",
+      "run_id": "controlled-map-run-2",
+      "run_version": 1
+    },
+    {
+      "sequence": 9,
+      "type": "completed",
+      "run_id": "controlled-map-run-2",
+      "run_version": 1
+    }
+  ],
+  "final_ui_state_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Show recent earthquakes around Rome Data prepared; the map is loading. Focus on Milan instead Map ready. Send message Context Unavailable Rome, Italy Hide chat Alerts OpenStreetMap contributors | MapLibre Basemap OpenStreetMap Esri World Imagery + \u2212 LAYERS 1 of 1 visible Expand Recent earthquake Opacity for Recent earthquake: 100 percent Recent earthquake geojson Demo alert summary for documented session. usgs Agent model Verified Satellite Available Optional Keys Optional Tool activity Complete",
+  "console_output": [],
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier2-validation-develop-20260924-head66008da\\controlled-fault\\screenshots\\__test_controlled_render_fault_scenarios[chromium-superseded]\\controlled-map-superseded.png",
+  "screenshot_path": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier2-validation-develop-20260924-head66008da\\controlled-fault\\screenshots\\__test_controlled_render_fault_scenarios[chromium-superseded]\\controlled-map-superseded.png",
+  "final_presentation_status": "ready",
+  "rejected_acknowledgments": [
+    {
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session",
+      "collection_revision": 7,
+      "rejection_reason": "superseded"
+    }
+  ],
+  "fault_injection": "WebSocket fixture only"
+}
