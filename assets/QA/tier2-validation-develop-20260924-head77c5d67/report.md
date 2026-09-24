@@ -49,6 +49,10 @@ Ruff passed on all modified Python implementation and focused-test files. `git d
 
 The live run is `run_e736054311d241b8b53b1b73205e2de1`. The model-call guard stopped continuation after three successful pages and four model calls total. The code path that silently advances inventory beyond the configured model-call guard was not used. Full inventory validation still needs an explicitly approved runtime budget adjustment or a bounded continuation policy that respects that guard. Once authorized, continue from the remaining catalog cursor and verify the UI completion state without requesting a map.
 
+## Hosted CI follow-up
+
+The first pushed implementation commit, `29115ee0c62af70a7e3e40c9bdbaaacc11f8ccaa`, triggered [GitHub Actions run 36050255036](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36050255036). The backend job stopped at strict Pyright because the route normalizer inferred a partially unknown type for an empty/update dictionary. The route update now uses explicit branches. After the repair, repository Pyright reports 0 errors, 0 warnings, and 0 informations; the focused capability-router suite passes 23 tests, and Ruff passes. See the `hosted-static-fix-pyright.log`, `hosted-static-fix-pytest.log`, and `hosted-static-fix-ruff.log` artifacts. A follow-up push will provide the final hosted result.
+
 ## Evidence and cleanup
 
 Rendered browser observations and run IDs are in [`browser-evidence.md`](browser-evidence.md). The in-app Browser did not export a local screenshot, so no screenshot artifact is claimed. The Settings key value, raw provider payloads, and secrets are absent from committed files. The configured isolated runtime database was retained; only task-owned service processes were stopped. The shared runtime database was opened read-only for an integrity check, and its pre/post file metadata snapshots match ([before](canonical-db-metadata-before.txt), [after](canonical-db-metadata-after.txt), [read-only integrity check](shared-runtime-readonly-check.txt)).

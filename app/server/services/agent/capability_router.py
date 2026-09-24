@@ -697,13 +697,15 @@ def _normalize_capability_inventory_route(
     }
     has_specific_subject = bool(message_terms - generic_terms - target_terms)
     operation = "discover_available_map_data"
-    query_update = {} if has_specific_subject else {"capability_queries": []}
-    if route.operation == operation and not query_update:
+    if route.operation == operation and has_specific_subject:
         return route, None
-    return (
-        route.model_copy(update={"operation": operation, **query_update}),
-        "capability_inventory_route_normalized",
-    )
+    if has_specific_subject:
+        normalized = route.model_copy(update={"operation": operation})
+    else:
+        normalized = route.model_copy(
+            update={"operation": operation, "capability_queries": []}
+        )
+    return normalized, "capability_inventory_route_normalized"
 
 
 ###############################################################################
