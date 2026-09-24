@@ -1,0 +1,34 @@
+{
+  "checked_at": "2026-09-24",
+  "branch": "develop",
+  "current_head_at_start": "a53040ae137d3e5c7c4cd1ddf8a09274e56aeb1d",
+  "exact_provider": "opencode-go / deepseek-v4.1-flash",
+  "browser": "Codex in-app Browser",
+  "isolated_runtime_data_dir": "runtimes/cache/test-runtime/tier2-validation-develop-20260924",
+  "isolated_settings_observed": {
+    "selected_agent_model": null,
+    "opencode_go_api_key": "Not configured"
+  },
+  "no_fallback_used": true,
+  "canonical_runtime_used": false,
+  "provider_requests_sent": 0,
+  "live_recheck": "BLOCKED before request execution",
+  "scenario_status": "See slice.json; T2-01 and T2-02 live cases were blocked before execution; Zurich guardrail was not run.",
+  "focused_tests": {
+    "command_scope": [
+      "app/tests/unit/services/agent/test_capability_router.py",
+      "app/tests/unit/services/agent/test_location_resolver.py",
+      "app/tests/unit/services/agent/test_agent_loop_v2.py"
+    ],
+    "result": "86 passed",
+    "log": "focused-backend.log"
+  },
+  "settings_env_restored_sha256": "95D56835BADD0DD60AEDA6662D382BAFB0F76D3A75DA4D09B95F0165D98606FC",
+  "source_code_matches_prior_live_boundary": true,
+  "notes": [
+    "The official Windows launcher started the application against the isolated data directory.",
+    "The in-app Settings screen showed no agent model selected and no OpenCode Go API key configured.",
+    "No exact-lane query was submitted and no provider/model fallback was used.",
+    "The 2026-09-23 browser evidence remains the latest execution evidence for T2-01 and T2-02."
+  ]
+}

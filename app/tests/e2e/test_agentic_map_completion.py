@@ -885,6 +885,27 @@ def _setup_controlled_routes(
         re.compile(r".*/api/conversations/[^/]+$"),
         lambda route: fulfill(route, conversation_snapshot_payload(map_session=None)),
     )
+    def fulfill_empty_run_trace(route: Route) -> None:
+        match = re.search(
+            r"/api/conversations/([^/]+)/runs/([^/?]+)/trace(?:\?.*)?$",
+            route.request.url,
+        )
+        if match is None:
+            route.continue_()
+            return
+        fulfill(
+            route,
+            {
+                "conversation_id": match.group(1),
+                "run_id": match.group(2),
+                "entries": [],
+            },
+        )
+
+    page.route(
+        re.compile(r".*/api/conversations/[^/]+/runs/[^/]+/trace(?:\?.*)?$"),
+        fulfill_empty_run_trace,
+    )
     page.route(
         re.compile(r".*/api/conversations$"),
         lambda route: fulfill(
@@ -983,7 +1004,7 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
 
 ###############################################################################
 @pytest.mark.parametrize("scenario", FAULT_SCENARIOS)
-def test_controlled_render_fault_scenarios_are_observable_and_bounded(
+def test_controlled_render_fault_scenarios(
     page: Page,
     base_url: str,
     artifact_root: Path,
@@ -1057,21 +1078,37 @@ def test_controlled_render_fault_scenarios_are_observable_and_bounded(
         )
         assert len(acknowledgments) >= (2 if scenario != "duplicate_ack" else 1)
     elif scenario == "retry_exhausted":
-        expect(page.locator(".chat-message--assistant").last).to_contain_text(
-            "The map renderer did not produce a verified result.", timeout=15000
-        )
+        for _ in range(150):
+            if fixture_state.get("final_presentation_status") == "render_timeout":
+                break
+            page.wait_for_timeout(100)
+        assert fixture_state.get("final_presentation_status") == "render_timeout"
         assert len(acknowledgments) == 3
-        assert "Map ready." not in page.locator(".chat-message--assistant").all_inner_texts()[-1]
+        assistant_messages = page.locator(".chat-message--assistant").all_inner_texts()
+        assert assistant_messages and "Map ready." not in assistant_messages[-1]
         assert "Map data ready; rendering" not in _bounded_text(page.locator("body").inner_text())
         assert page.get_by_role("button", name="Stop generating").count() == 0
+        execution_status = page.locator("app-execution-status")
+        execution_status.locator("button").click()
+        expect(execution_status.locator(".execution-status__run-error")).to_contain_text(
+            "The map update could not be completed", timeout=15000
+        )
     elif scenario == "stale_ack":
-        expect(page.locator(".chat-message--assistant").last).to_contain_text(
+        for _ in range(150):
+            if fixture_state.get("final_presentation_status") == "failed":
+                break
+            page.wait_for_timeout(100)
+        assert fixture_state.get("final_presentation_status") == "failed"
+        assert len(acknowledgments) == 1
+        assistant_messages = page.locator(".chat-message--assistant").all_inner_texts()
+        assert assistant_messages and "Map ready." not in assistant_messages[-1]
+        assert "Map data ready; rendering" not in _bounded_text(page.locator("body").inner_text())
+        assert page.get_by_role("button", name="Stop generating").count() == 0
+        execution_status = page.locator("app-execution-status")
+        execution_status.locator("button").click()
+        expect(execution_status.locator(".execution-status__run-error")).to_contain_text(
             "real-time connection", timeout=15000
         )
-        assert len(acknowledgments) == 1
-        assert "Map ready." not in page.locator(".chat-message--assistant").all_inner_texts()[-1]
-        assert "Map data ready; rendering" not in _bounded_text(page.locator("body").inner_text())
-        assert page.get_by_role("button", name="Stop generating").count() == 0
     elif scenario == "mismatched_ack":
         expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
         expect(page.locator(".chat-message--assistant").last).to_contain_text(
