@@ -1,6 +1,6 @@
 # Comprehensive validation strategy
 
-Last updated: 2026-09-23
+Last updated: 2026-09-24
 
 This document is the durable digest of the AEGIS comprehensive validation
 roadmap, first established on `loop-dev` and continued on `develop`. It defines
@@ -66,7 +66,7 @@ trusting downstream feature evidence.
 | --- | --- | --- | --- |
 | Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | [Current Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md) records `T0-01` through `T0-05` as `PASS` on the same `develop` source boundary. |
 | Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 checklist](tier1_application_foundations.md), [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [2026-09-23 T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), [2026-09-22 T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md), and [2026-09-21 baseline](../../QA/tier1-application-foundations-20260921/report.md). Tier 1 remains 12/12 `PASS`. |
-| Tier 2 | `T2-01`–`T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | [Current T2 retry](../../QA/tier2-validation-develop-20260923-retry/report.md): `T2-01`/`T2-02` are `PARTIAL`, `T2-03` is `PASS`, and `T2-04`–`T2-07` remain `UNRUN`. Fix the remaining Milan/Florence confirmation limits, then continue the unrun slices. `ISSUE-001` is resolved. |
+| Tier 2 | `T2-01`–`T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | [Current exact-head T2 recheck](../../QA/tier2-validation-develop-20260924-head66008da/report.md): `T2-01`/`T2-02` remain `PARTIAL` after local regression revalidation and a blocked exact-lane browser attempt; `T2-03` remains `PASS`, and `T2-04`–`T2-07` remain `UNRUN`. Resolve the Milan/Florence confirmation limits when the exact lane is configured, then continue the unrun slices. `ISSUE-001` is resolved. |
 | Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
 | Tier 4A | `T4-01`–`T4-08` | CSV/GeoJSON ingestion, optional heavy formats, mobility data, local/configured sources, cameras, credentialed providers, and catalog-only descriptors. | Run only with isolated data and approved credentials/snapshots. |
 | Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
