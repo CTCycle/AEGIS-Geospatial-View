@@ -31,16 +31,18 @@ Settings verified the selected provider/model lane as `opencode-go` / `deepseek-
 ## Automated checks
 
 - Focused pytest: **115 passed** across `test_agent_loop_v2.py`, `test_capability_execution.py`, `test_capability_router.py`, `test_direct_service_provenance.py`, and `test_geospatial_provider_adapters_core.py`.
+- Full backend CI-equivalent unit selection: **420 passed**, with two dependency deprecation warnings.
 - Ruff: **All checks passed** for the 13 changed Python source and test files.
 - Strict Pyright: **0 errors, 0 warnings, 0 informations** across `app/server` after fixing the CI-discovered type errors.
 - `git diff --check`: passed.
 
-The report records the implementation boundary based on `a712301` plus these scoped changes. The first push's exact-head workflow (`36114905386`) passed capability contracts, persistence conformance, and frontend build/tests, but backend static analysis found three strict typing errors in the new GeoJSON coordinate and route-domain list paths. The code was corrected; strict Pyright and the focused 115-test suite pass locally on the correction. Exact-head CI for the follow-up commit remains pending and is not claimed here.
+The report records the implementation boundary based on `a712301` plus these scoped changes. The first exact-head workflow (`36114905386`) passed capability contracts, persistence conformance, and frontend build/tests, but backend static analysis found three strict typing errors in the new GeoJSON coordinate and route-domain list paths. Those types were corrected. The second workflow (`36115432750`) then passed static analysis, compilation, migration metadata, capability contracts, persistence, and frontend checks; its backend suite had 419 passes and one failure because the shared OpenAPI snapshot lacked the new `evidence_inspection` enum value. The snapshot was regenerated with the repository script. Strict Pyright and the full 420-test backend selection pass locally on the resulting tree. Exact-head CI for the regenerated snapshot is pending publication and is not claimed here.
 
 ## Scoped implementation changes
 
 - Preserve bounded, allowlisted preview rows from feature results in model-visible tool observations so direct text answers can use retrieved records without exposing provider payloads wholesale.
 - Keep GeoJSON coordinate-array narrowing and route-domain accumulation fully typed under strict Pyright.
+- Regenerate the shared OpenAPI contract for the `evidence_inspection` completion requirement.
 - Keep weather and air-quality hourly windows bounded to 24 local hours and expose allowlisted measurements.
 - Normalize direct coordinate and saved-evidence inspection routes so they do not inherit unrelated provider-data requirements; require successful evidence inspection for that task.
 - Forward nested category filters through the Overpass adapter and retain hourly forecasts in the Open-Meteo path.
