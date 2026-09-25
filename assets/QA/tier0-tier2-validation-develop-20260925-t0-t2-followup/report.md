@@ -3,6 +3,7 @@
 - Date: 2026-09-25
 - Branch: `develop`
 - Tested source: `develop@800e0568f6b83254b60c4efe25e014e3fefdf81c`
+- Evidence commit: `db5b9485e80073f87dd4a8b964e484ba42384fcb`
 - Scope: `T0-04` Windows startup and `T2-04` capability inventory
 - Final campaign roll-up: **23 PASS / 1 PARTIAL / 0 BLOCKED / 44 UNRUN**
 
@@ -31,6 +32,12 @@
   empty map boundary, and final native model probe: see
   [`browser-evidence.md`](browser-evidence.md) and
   [`inventory-run-trace.json`](inventory-run-trace.json).
+- Exact pushed-head GitHub Actions run
+  [36152093449](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36152093449)
+  passed all four jobs. The pushed evidence commit contains documentation and
+  QA artifacts only; the implementation source tested above remains
+  `800e0568f6b83254b60c4efe25e014e3fefdf81c`. See
+  [`hosted-ci-followup.md`](hosted-ci-followup.md).
 
 ## Remaining boundaries
 

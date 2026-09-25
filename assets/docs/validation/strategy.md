@@ -153,6 +153,12 @@ follow-up now passes the bounded 50-candidate inventory after a temporary isolat
 budget increase, with the original runtime setting restored; broader route, raster,
 provider, and browser coverage remain open.
 
+The follow-up evidence head `db5b9485e80073f87dd4a8b964e484ba42384fcb` passed
+all four jobs in [exact-head hosted CI run
+36152093449](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36152093449).
+That pushed head contains documentation and QA evidence only; the tested
+implementation source remains `800e0568f6b83254b60c4efe25e014e3fefdf81c`.
+
 The 2026-09-22 campaign continued on `develop` from starting SHA
 `7e8b10d58aebf21f194a74bcc2307f9d8e08f15c`. All application data and pytest
 state used isolated paths below `runtimes/cache/test-runtime` and
