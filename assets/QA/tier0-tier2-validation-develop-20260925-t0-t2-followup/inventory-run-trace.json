@@ -1,0 +1,119 @@
+{
+  "run_id": "run_24af742659ad4c32863c2c38b5f6abd2",
+  "request": "List the available map data capabilities. Do not display a map or load a layer.",
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "route": "discover_available_map_data",
+  "iterations": 5,
+  "model_calls": 6,
+  "max_model_calls": 6,
+  "tool_calls": 5,
+  "pages": [
+    {
+      "iteration": 1,
+      "call_id": "call_00_enshlr49ng6dlwqqotywcqb4",
+      "offset": 0,
+      "count": 12,
+      "next_cursor": "12",
+      "status": "success",
+      "ids": [
+        "IMERG_Precipitation_Rate",
+        "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+        "MODIS_Combined_Thermal_Anomalies_Fire",
+        "MODIS_Terra_Aerosol",
+        "MODIS_Terra_L3_Land_Water_Mask",
+        "MODIS_Terra_Land_Surface_Temp_Day",
+        "MODIS_Terra_Land_Surface_Temp_Night",
+        "MODIS_Terra_NDVI_8Day",
+        "OMPS_Ozone_Total_Column",
+        "SRTM_Color_Index",
+        "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+        "VIIRS_SNPP_DayNightBand_ENCC"
+      ]
+    },
+    {
+      "iteration": 2,
+      "call_id": "call_00_s1tmks0t0kqd1r7hecbslc5u",
+      "offset": 12,
+      "count": 12,
+      "next_cursor": "24",
+      "status": "success",
+      "ids": [
+        "census_acs_demographic_joins",
+        "census_cartographic_boundaries",
+        "census_tigerweb_demographics",
+        "census_tigerweb_hydrography",
+        "eea_noise_2019",
+        "esa_worldcover",
+        "esri_world_imagery",
+        "eurostat_housing_market",
+        "eurostat_nuts_regions",
+        "eurostat_regional_demographics",
+        "fema_nfhl_flood_zones",
+        "gbif_species_occurrences"
+      ]
+    },
+    {
+      "iteration": 3,
+      "call_id": "catalog-page-3-24",
+      "offset": 24,
+      "count": 12,
+      "next_cursor": "36",
+      "status": "success",
+      "ids": [
+        "get_air_quality_forecast",
+        "get_nearby_poi",
+        "get_weather_forecast",
+        "local_parcel_template",
+        "location_to_coordinates",
+        "mobility_database_feeds",
+        "natural_earth_admin_boundaries",
+        "noaa_coops_water_levels",
+        "noaa_radar",
+        "noaa_weather_alerts",
+        "openaddresses_points",
+        "openfreemap_liberty"
+      ]
+    },
+    {
+      "iteration": 4,
+      "call_id": "catalog-page-4-36",
+      "offset": 36,
+      "count": 12,
+      "next_cursor": "48",
+      "status": "success",
+      "ids": [
+        "openfreemap_positron",
+        "openmeteo_air_quality_forecast",
+        "openmeteo_pressure_humidity_wind",
+        "openmeteo_weather_forecast",
+        "osm_dark",
+        "osm_default",
+        "osm_terrain",
+        "ourairports_airports",
+        "overpass_poi_amenities",
+        "overpass_residential_buildings",
+        "pvgis_solar",
+        "rainviewer_precipitation_radar"
+      ]
+    },
+    {
+      "iteration": 5,
+      "call_id": "catalog-page-5-48",
+      "offset": 48,
+      "count": 2,
+      "next_cursor": null,
+      "status": "success",
+      "ids": ["soilgrids_soil_properties", "usgs_earthquakes"]
+    }
+  ],
+  "reconciliation": {
+    "candidate_count": 50,
+    "unique_ids": 50,
+    "final_next_cursor": null,
+    "all_tool_results_success": true,
+    "map_session": null,
+    "model_budget_exhausted": false,
+    "termination_reason": null
+  }
+}

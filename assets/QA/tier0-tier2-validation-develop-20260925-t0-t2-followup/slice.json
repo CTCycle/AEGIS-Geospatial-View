@@ -1,0 +1,52 @@
+{
+  "date": "2026-09-25",
+  "branch": "develop",
+  "starting_head": "800e0568f6b83254b60c4efe25e014e3fefdf81c",
+  "tested_source_head": "800e0568f6b83254b60c4efe25e014e3fefdf81c",
+  "scope": ["T0-04", "T2-04"],
+  "provider_lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "selection": "Settings visibly selected the exact cloud lane; final native tool probe passed",
+    "fallback_used": false
+  },
+  "isolation": {
+    "data_dir": "runtimes/cache/test-runtime/validation-20260925-t0-t2-followup",
+    "source_runtime": "runtimes/cache/test-runtime/validation-20260924-exact-lane",
+    "canonical_runtime_used": false
+  },
+  "results": {
+    "T0-04": {
+      "status": "PARTIAL",
+      "fresh_and_warm_launcher_readiness": "PASS",
+      "provider_outage_startup_test": "PASS",
+      "owner_pid_reuse_and_readiness_cleanup": "PASS",
+      "canonical_state_unchanged": "PASS",
+      "remaining": "No safe same-machine historical before/after timing comparator was available; current timing samples are recorded separately."
+    },
+    "T2-04": {
+      "status": "PASS",
+      "prompt": "List the available map data capabilities. Do not display a map or load a layer.",
+      "temporary_simple_max_model_calls": 6,
+      "successful_pages": 5,
+      "page_counts": [12, 12, 12, 12, 2],
+      "candidate_count": 50,
+      "unique_candidate_ids": 50,
+      "final_next_cursor": null,
+      "model_calls": 6,
+      "tool_calls": 5,
+      "map_session": null,
+      "model_budget_exhausted": false,
+      "settings_restored_after_restart": true
+    }
+  },
+  "campaign_status": {
+    "PASS": 23,
+    "PARTIAL": 1,
+    "BLOCKED": 0,
+    "UNRUN": 44
+  },
+  "secret_material_recorded": false,
+  "raw_provider_payloads_recorded": false,
+  "screenshot_exported": false
+}

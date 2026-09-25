@@ -1,6 +1,6 @@
 # Comprehensive validation strategy
 
-Last updated: 2026-09-24
+Last updated: 2026-09-25
 
 This document is the durable digest of the AEGIS comprehensive validation
 roadmap, first established on `loop-dev` and continued on `develop`. It defines
@@ -64,15 +64,15 @@ trusting downstream feature evidence.
 
 | Campaign tier | Slice IDs | Focus | Current hand-off |
 | --- | --- | --- | --- |
-| Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | The [2026-09-22 Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md) passed all five on its tested boundary. The [2026-09-24 current-head recheck](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md) validated the launcher data-root override subset but found inherited `AEGIS_DATA_DIR` was overwritten; the fix passed fresh and warm starts, while the broader `T0-04` slice remains `PARTIAL`. |
+| Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | The [2026-09-22 Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md) passed all five on its tested boundary. The [2026-09-25 T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) revalidated the exact-head Windows launcher boundary: fresh/warm readiness, outage startup, ownership/PID-reuse safety, injected cleanup, canonical-state protection, and final port cleanup pass. `T0-04` remains `PARTIAL` only because a safe historical timing comparator is unavailable. |
 | Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 checklist](tier1_application_foundations.md), [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [2026-09-23 T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), [2026-09-22 T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md), and [2026-09-21 baseline](../../QA/tier1-application-foundations-20260921/report.md). Tier 1 remains 12/12 `PASS`. |
-| Tier 2 | `T2-01` through `T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | The [2026-09-24 continuation](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md) passes `T2-01`/`T2-02` on the exact OpenCode Go lane; `T2-03` remains `PASS`. The [2026-09-25 continuation](../../QA/tier2-validation-develop-20260925-next-slices/report.md) passes the tested `T2-05`/`T2-06`/`T2-07` scenarios on that exact lane. `T2-04` remains `PARTIAL` after 36 candidates across three pages hit `max_model_calls=4`; full enumeration requires an approved budget change or a guard-respecting continuation policy. `ISSUE-001` is resolved. |
+| Tier 2 | `T2-01` through `T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | The [2026-09-24 continuation](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md) passes `T2-01`/`T2-02` on the exact OpenCode Go lane; `T2-03` remains `PASS`. The [2026-09-25 continuation](../../QA/tier2-validation-develop-20260925-next-slices/report.md) passes the tested `T2-05`/`T2-06`/`T2-07` scenarios, and the [T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) passes `T2-04` with five pages, 50 unique candidates, and `next_cursor=null` under an approved isolated six-call budget restored to four afterward. `ISSUE-001` is resolved. |
 | Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
 | Tier 4A | `T4-01`–`T4-08` | CSV/GeoJSON ingestion, optional heavy formats, mobility data, local/configured sources, cameras, credentialed providers, and catalog-only descriptors. | Run only with isolated data and approved credentials/snapshots. |
 | Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
 | Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Requires the lower-tier contracts and exact-head evidence to be stable. |
 
-The current roll-up is 22 `PASS`, 2 `PARTIAL`, 0 `BLOCKED`, and 44 `UNRUN`.
+The current roll-up is 23 `PASS`, 1 `PARTIAL`, 0 `BLOCKED`, and 44 `UNRUN`.
 
 The recommended execution order is numeric order within each tier. A blocked
 credential or optional dataset slice may be deferred without stopping unrelated
@@ -127,7 +127,7 @@ The Tier 1 application-foundations baseline remains recorded at
 `loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The latest per-slice roll-up is `PARTIAL`: 22 slices are `PASS`, 2 are
+The latest per-slice roll-up is `PARTIAL`: 23 slices are `PASS`, 1 is
 `PARTIAL`, and 44 are `UNRUN`. These counts combine the cited dated
 evidence boundaries; they do not certify one common commit. Tier 0 is
 `PARTIAL` for the broader Windows startup scope; Tier 1 remains 12/12
@@ -148,9 +148,10 @@ The previous T2 source-and-evidence head `3734df22a09eb83c279ac28467654c4cfa29ba
 passed four jobs in [hosted CI run
 35915263134](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35915263134).
 The current continuation passes the Milan clarification/render and Rome-to-Florence
-clarification/render scenarios plus the Zurich coverage guardrail. Inventory discovery
-remains partial at the configured model-call limit; broader route, raster, provider,
-and browser coverage also remain open.
+clarification/render scenarios plus the Zurich coverage guardrail. The T0/T2
+follow-up now passes the bounded 50-candidate inventory after a temporary isolated
+budget increase, with the original runtime setting restored; broader route, raster,
+provider, and browser coverage remain open.
 
 The 2026-09-22 campaign continued on `develop` from starting SHA
 `7e8b10d58aebf21f194a74bcc2307f9d8e08f15c`. All application data and pytest
