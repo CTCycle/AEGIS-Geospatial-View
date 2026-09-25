@@ -112,6 +112,30 @@ def test_openmeteo_direct_service_distinguishes_valid_empty_response() -> None:
     assert result["partial"] is False
 
 ###############################################################################
+def test_openmeteo_air_quality_service_retains_hourly_forecast_window() -> None:
+    service = OpenMeteoService(air_quality_base_url="https://air.example/forecast")
+    timeline = [f"2026-09-01T{hour:02d}:00" for hour in range(24)]
+    service._get_json = lambda **kwargs: {  # type: ignore[method-assign]
+        "timezone": "Europe/Rome",
+        "hourly": {
+            "time": timeline,
+            **{
+                name: [float(index) for index in range(24)]
+                for name in OpenMeteoService.AIR_QUALITY_VARIABLES
+            },
+        },
+    }
+
+    result = run_async_in_thread(
+        service.get_air_quality_forecast(latitude=41.9, longitude=12.5)
+    )
+
+    assert len(result["hourly_preview"]) == 6
+    assert len(result["hourly_forecast"]) == 24
+    assert result["hourly_forecast"][0]["time"] == timeline[0]
+    assert result["hourly_forecast"][-1]["time"] == timeline[-1]
+
+
 def test_overpass_direct_service_marks_limited_results_as_partial() -> None:
     service = OverpassService(
         base_url="https://overpass.example/api/interpreter",

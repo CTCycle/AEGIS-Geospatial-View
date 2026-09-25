@@ -97,8 +97,13 @@ class OverpassProvider(GeospatialProvider):
             else None
         )
         if amenity_tags is None:
-            category = str(request.params.get("category") or "").strip().lower()
+            filters = json_object(request.params.get("filters"))
+            category = str(
+                request.params.get("category") or filters.get("category") or ""
+            ).strip().lower()
             amenity_tags = AMENITY_GROUPS.get(category)
+            if category and amenity_tags is None and categories is None:
+                categories = [category]
         try:
             payload = await self.service.get_nearby_poi(
                 latitude=latitude,

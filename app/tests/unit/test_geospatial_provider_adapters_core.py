@@ -277,6 +277,37 @@ def test_openmeteo_provider_preserves_zero_measurements() -> None:
     assert response.result_status == "partial"
 
 ###############################################################################
+def test_openmeteo_provider_preserves_hourly_forecast_alongside_map_feature() -> None:
+    forecast = [
+        {"time": f"2026-05-11T{hour:02d}:00", "temperature_2m": 18 + hour}
+        for hour in range(24)
+    ]
+
+    class _HourlyWeatherService(_OpenMeteoService):
+        async def get_weather_forecast(self, *, latitude: float, longitude: float):
+            return {
+                "kind": "weather_forecast",
+                "latitude": latitude,
+                "longitude": longitude,
+                "hourly_preview": forecast[:6],
+                "hourly_forecast": forecast,
+                "result_status": "ok",
+                "partial": False,
+            }
+
+    response = run_async_in_thread(
+        OpenMeteoProvider(service=_HourlyWeatherService()).fetch(  # type: ignore[arg-type]
+            ProviderRequest(
+                capability_id="get_weather_forecast",
+                params={"latitude": 41.9, "longitude": 12.5},
+            )
+        )
+    )
+
+    assert response.payload["hourlyForecast"] == forecast
+    assert len(response.payload["features"]) == 1
+
+
 def test_overpass_provider_normalizes_poi_features_from_bbox() -> None:
     service = _OverpassService()
     provider = OverpassProvider(service=service)  # type: ignore[arg-type]
@@ -315,6 +346,24 @@ def test_overpass_provider_maps_supported_amenity_groups() -> None:
         "pharmacy",
         "doctors",
     ]
+
+###############################################################################
+def test_overpass_provider_maps_nested_specific_category_to_service_filter() -> None:
+    service = _OverpassService()
+    provider = OverpassProvider(service=service)  # type: ignore[arg-type]
+
+    run_async_in_thread(
+        provider.fetch(
+            ProviderRequest(
+                capability_id="overpass_poi_amenities",
+                bbox=(12.0, 41.0, 13.0, 42.0),
+                params={"filters": {"category": "pharmacy"}},
+            )
+        )
+    )
+
+    assert service.calls[0]["amenity_tags"] is None
+    assert service.calls[0]["categories"] == ["pharmacy"]
 
 ###############################################################################
 def test_overpass_provider_propagates_rate_limits_and_timeouts() -> None:

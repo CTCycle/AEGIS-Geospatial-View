@@ -154,6 +154,16 @@ class CapabilityRouter:
         )
         if discovery_reason is not None:
             reasons.append(discovery_reason)
+        proposed, evidence_reason = _normalize_text_evidence_inspection_route(
+            proposed, user_message=user_message, active_state=active_state
+        )
+        if evidence_reason is not None:
+            reasons.append(evidence_reason)
+        proposed, coordinate_reason = _normalize_text_only_coordinate_route(
+            proposed, user_message=user_message
+        )
+        if coordinate_reason is not None:
+            reasons.append(coordinate_reason)
         proposed, map_data_reason = _normalize_data_bearing_map_route(
             proposed, user_message=user_message
         )
@@ -267,9 +277,14 @@ class CapabilityRouter:
             reasons.append("clarification_question_not_allowed")
 
         catalog_discovery = proposed.operation == "discover_available_map_data"
+        evidence_inspection_only = (
+            proposed.operation == "inspect_evidence"
+            and "text_evidence_inspection_route_normalized" in reasons
+        )
         candidates = (
             []
             if catalog_discovery
+            or evidence_inspection_only
             or (proposed.explicit_capability_ids and not valid_explicit_ids)
             else self.capability_registry.shortlist(
                 domains=route_domains,
@@ -330,6 +345,20 @@ class CapabilityRouter:
             )
 
         if proposed.task_mode == "execute" and not capability_ids:
+            if any(
+                reason
+                in {
+                    "text_only_coordinate_lookup_route_normalized",
+                    "text_evidence_inspection_route_normalized",
+                }
+                for reason in reasons
+            ):
+                return CapabilityRouteDecision(
+                    status="accepted",
+                    route=proposed,
+                    rejected_capability_ids=rejected,
+                    reason_codes=list(dict.fromkeys(reasons)),
+                )
             status = (
                 "discovery_required"
                 if not proposed.explicit_capability_ids
@@ -709,15 +738,121 @@ def _normalize_capability_inventory_route(
 
 
 ###############################################################################
+def _normalize_text_only_coordinate_route(
+    route: CapabilityRoute,
+    *,
+    user_message: str,
+) -> tuple[CapabilityRoute, str | None]:
+    """Keep a plain coordinate lookup from inheriting a provider-data obligation."""
+
+    if route.task_mode != "execute" or route.presentation != "text":
+        return route, None
+
+    message_terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
+    query_terms = {
+        term
+        for query in route.capability_queries
+        for term in re.findall(r"[a-z0-9]+", query.casefold())
+    }
+    if not message_terms.intersection(
+        {"coordinate", "coordinates", "latitude", "longitude"}
+    ):
+        return route, None
+
+    data_terms = _PLACE_SEARCH_DATA_TERMS | {
+        "air",
+        "data",
+        "dataset",
+        "elevation",
+        "forecast",
+        "imagery",
+        "layer",
+        "layers",
+        "precipitation",
+        "raster",
+        "temperature",
+        "vector",
+        "weather",
+        "wind",
+    }
+    if message_terms.intersection(data_terms) or query_terms.intersection(data_terms):
+        return route, None
+
+    return (
+        route.model_copy(
+            update={
+                "primary_domain": CapabilityDomain.PLACE_SEARCH,
+                "secondary_domains": [],
+                "presentation": "text",
+                "operation": "resolve_location",
+                "capability_queries": [],
+                "explicit_capability_ids": [],
+                "requires_location": True,
+                "spatial_scope": None,
+                "filters": {},
+            }
+        ),
+        "text_only_coordinate_lookup_route_normalized",
+    )
+
+
+###############################################################################
+def _normalize_text_evidence_inspection_route(
+    route: CapabilityRoute,
+    *,
+    user_message: str,
+    active_state: AgentRunState,
+) -> tuple[CapabilityRoute, str | None]:
+    """Keep saved-evidence inspection from inheriting a provider-fetch obligation."""
+
+    if route.task_mode != "execute" or route.presentation != "text":
+        return route, None
+    if not active_state.evidence_refs:
+        return route, None
+
+    message_terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
+    if not {"inspect", "evidence"}.issubset(message_terms):
+        return route, None
+
+    return (
+        route.model_copy(
+            update={
+                "primary_domain": CapabilityDomain.DATA_RETRIEVAL,
+                "secondary_domains": [],
+                "presentation": "text",
+                "operation": "inspect_evidence",
+                "capability_queries": [],
+                "explicit_capability_ids": [],
+                "requires_location": False,
+                "spatial_scope": None,
+                "temporal_scope": route.temporal_scope.model_copy(
+                    update={
+                        "mode": "none",
+                        "reference_time_iso": None,
+                        "start_time_iso": None,
+                        "end_time_iso": None,
+                        "granularity": "none",
+                        "aggregation": "none",
+                    }
+                ),
+                "target_refs": [],
+                "filters": {},
+            }
+        ),
+        "text_evidence_inspection_route_normalized",
+    )
+
+
+###############################################################################
 def _normalize_data_bearing_map_route(
     route: CapabilityRoute,
     *,
     user_message: str = "",
 ) -> tuple[CapabilityRoute, str | None]:
-    """Keep data-bearing map requests on a route eligible for data tools."""
+    """Keep data-bearing requests on a route eligible for data tools."""
 
     operation = str(route.operation or "").strip().casefold()
-    if route.task_mode != "execute" or route.presentation not in {"map", "both"}:
+    if route.task_mode != "execute":
         return route, None
 
     if route.primary_domain is CapabilityDomain.PLACE_SEARCH:
@@ -737,25 +872,32 @@ def _normalize_data_bearing_map_route(
             )
         )
         if data_query:
-            secondary_domains = [
-                CapabilityDomain.MAP_RENDERING,
-                CapabilityDomain.DATA_RETRIEVAL,
-                *(
-                    domain
-                    for domain in route.secondary_domains
-                    if domain
-                    not in {
-                        CapabilityDomain.MAP_RENDERING,
-                        CapabilityDomain.DATA_RETRIEVAL,
-                    }
-                ),
-            ]
+            secondary_domains = []
+            if route.presentation in {"map", "both"}:
+                secondary_domains.append(CapabilityDomain.MAP_RENDERING)
+            secondary_domains.extend(
+                [
+                    CapabilityDomain.DATA_RETRIEVAL,
+                    *(
+                        domain
+                        for domain in route.secondary_domains
+                        if domain
+                        not in {
+                            CapabilityDomain.MAP_RENDERING,
+                            CapabilityDomain.DATA_RETRIEVAL,
+                        }
+                    ),
+                ]
+            )
             return (
                 route.model_copy(
                     update={"secondary_domains": secondary_domains[:3]}
                 ),
                 "data_bearing_place_search_route_normalized",
             )
+
+    if route.presentation not in {"map", "both"}:
+        return route, None
 
     if (
         route.primary_domain

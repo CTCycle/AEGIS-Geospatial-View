@@ -446,6 +446,108 @@ def test_router_keeps_data_retrieval_on_poi_map_search_route() -> None:
     assert "location_map_route_normalized" not in decision.reason_codes
 
 ###############################################################################
+def test_router_adds_data_retrieval_to_text_only_poi_search_route() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.PLACE_SEARCH,
+            presentation="text",
+            operation="search_places",
+            capability_queries=["pharmacy"],
+        ),
+        user_message=(
+            "Find nearby pharmacies within about 2 km of the Colosseum in Rome. "
+            "Return names and distances as text."
+        ),
+        active_state=_state(),
+    )
+
+    assert decision.status in {"accepted", "discovery_required"}
+    assert decision.route.primary_domain is CapabilityDomain.PLACE_SEARCH
+    assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
+    assert CapabilityDomain.MAP_RENDERING not in decision.route.secondary_domains
+    assert "data_bearing_place_search_route_normalized" in decision.reason_codes
+
+
+###############################################################################
+def test_router_keeps_text_only_coordinate_lookup_free_of_provider_data() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+            secondary_domains=[CapabilityDomain.MAP_RENDERING],
+            presentation="text",
+            operation="retrieve",
+            capability_queries=["coordinates"],
+        ),
+        user_message=(
+            "What are the coordinates of the Colosseum in Rome? Give latitude "
+            "and longitude as text only; don't load a map."
+        ),
+        active_state=_state(),
+    )
+
+    assert decision.status == "accepted"
+    assert decision.route.primary_domain is CapabilityDomain.PLACE_SEARCH
+    assert decision.route.secondary_domains == []
+    assert decision.route.operation == "resolve_location"
+    assert decision.route.capability_queries == []
+    assert decision.route.requires_location is True
+    assert decision.capability_ids == []
+    assert "text_only_coordinate_lookup_route_normalized" in decision.reason_codes
+
+
+###############################################################################
+def test_router_normalizes_saved_evidence_inspection_without_provider_lookup() -> None:
+    state = _state()
+    state.evidence_refs = ["evidence-previous"]
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+            secondary_domains=[CapabilityDomain.MAP_RENDERING],
+            presentation="text",
+            operation="retrieve",
+            requires_location=True,
+            capability_queries=["pharmacy near the Colosseum"],
+            target_refs=["Colosseum", "pharmacies"],
+            filters={"category": "pharmacy"},
+        ),
+        user_message=(
+            "Inspect the evidence from the immediately preceding pharmacy lookup. "
+            "Use saved results only and do not fetch again or render a map."
+        ),
+        active_state=state,
+    )
+
+    assert decision.status == "accepted"
+    assert decision.route.primary_domain is CapabilityDomain.DATA_RETRIEVAL
+    assert decision.route.secondary_domains == []
+    assert decision.route.operation == "inspect_evidence"
+    assert decision.route.capability_queries == []
+    assert decision.route.explicit_capability_ids == []
+    assert decision.route.requires_location is False
+    assert decision.route.spatial_scope is None
+    assert decision.route.target_refs == []
+    assert decision.route.filters == {}
+    assert decision.capability_ids == []
+    assert "text_evidence_inspection_route_normalized" in decision.reason_codes
+
+
+###############################################################################
+def test_router_does_not_assume_evidence_exists_in_a_new_conversation() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+            presentation="text",
+            operation="retrieve",
+            capability_queries=["evidence from the previous pharmacy lookup"],
+        ),
+        user_message="Inspect evidence from the previous pharmacy lookup.",
+        active_state=_state(),
+    )
+
+    assert decision.route.operation == "retrieve"
+    assert "text_evidence_inspection_route_normalized" not in decision.reason_codes
+
+
 def test_router_normalizes_geocoding_route_for_location_only_map() -> None:
     decision = _router().validate_route(
         _route(

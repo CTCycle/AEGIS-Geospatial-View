@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import uuid4
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.evidence import EvidenceKind, EvidenceStatus
@@ -521,6 +522,12 @@ def _response_summary(
     feature_bbox = _feature_bbox(features)
     if feature_bbox is not None:
         summary["bbox"] = feature_bbox
+    if response.result_type == "features" and is_json_array(features):
+        feature_preview = _feature_preview(features)
+        if feature_preview:
+            summary["feature_preview"] = feature_preview
+            summary["feature_preview_limit"] = 10
+            summary["feature_preview_truncated"] = len(features) > len(feature_preview)
     if response.attribution:
         summary["attribution"] = [str(item)[:200] for item in response.attribution[:8]]
     if response.warnings:
@@ -558,6 +565,76 @@ def _response_summary(
                 # Keep current weather values available for bounded answer
                 # synthesis without exposing the complete provider payload.
                 summary["observations"] = observations
+    if payload.get("kind") in {"weather_forecast", "air_quality_forecast"}:
+        kind = str(payload.get("kind"))
+        summary["kind"] = kind
+        hourly = payload.get("hourlyForecast")
+        if is_json_array(hourly):
+            fields = (
+                (
+                    "time",
+                    "temperature_2m",
+                    "relative_humidity_2m",
+                    "precipitation",
+                    "weather_code",
+                    "surface_pressure",
+                    "wind_speed_10m",
+                    "wind_direction_10m",
+                    "wind_gusts_10m",
+                )
+                if payload.get("kind") == "weather_forecast"
+                else (
+                    "time",
+                    "pm10",
+                    "pm2_5",
+                    "carbon_monoxide",
+                    "nitrogen_dioxide",
+                    "ozone",
+                    "sulphur_dioxide",
+                )
+            )
+            timezone = payload.get("timezone")
+            try:
+                timezone_info = (
+                    ZoneInfo(timezone) if isinstance(timezone, str) else UTC
+                )
+            except (ZoneInfoNotFoundError, ValueError):
+                timezone_info = None
+            selected_rows: list[dict[str, Any]] = []
+            if timezone_info is not None:
+                window_start = response.fetched_at.astimezone(timezone_info)
+                window_end = window_start + timedelta(hours=24)
+                for raw_row in hourly:
+                    if not is_json_object(raw_row) or not raw_row.get("time"):
+                        continue
+                    try:
+                        row_time = datetime.fromisoformat(
+                            str(raw_row["time"]).replace("Z", "+00:00")
+                        )
+                    except ValueError:
+                        continue
+                    if row_time.tzinfo is None:
+                        row_time = row_time.replace(tzinfo=timezone_info)
+                    else:
+                        row_time = row_time.astimezone(timezone_info)
+                    if window_start <= row_time < window_end:
+                        selected_rows.append(raw_row)
+                    if len(selected_rows) == 24:
+                        break
+            rows = [
+                {key: row[key] for key in fields if key in row}
+                for row in selected_rows
+            ]
+            summary["forecast_hours_requested"] = 24
+            summary["forecast_hours"] = len(rows)
+            summary["forecast_truncated"] = len(rows) < 24
+            summary["forecast_window_status"] = (
+                "ok" if len(rows) == 24 else "partial"
+            )
+            if rows:
+                summary["hourly_forecast"] = rows
+                summary["forecast_window_start"] = rows[0].get("time")
+                summary["forecast_window_end"] = rows[-1].get("time")
         timezone = payload.get("timezone")
         if isinstance(timezone, str) and timezone:
             summary["timezone"] = timezone[:80]
@@ -575,6 +652,42 @@ def _response_summary(
             "filter_keys": sorted(str(key) for key in request.filters)[:32],
         }
     return summary
+
+
+def _feature_preview(features: list[Any]) -> list[dict[str, Any]]:
+    """Expose a small, allowlisted feature sample for bounded answer synthesis."""
+
+    preview: list[dict[str, Any]] = []
+    for feature in features[:10]:
+        if not is_json_object(feature):
+            continue
+        properties = feature.get("properties")
+        values = properties if is_json_object(properties) else feature
+        item: dict[str, Any] = {}
+        for key in ("id", "name", "category", "latitude", "longitude", "address"):
+            value = values.get(key, feature.get(key))
+            if isinstance(value, (str, int, float)):
+                item[key] = value[:160] if isinstance(value, str) else value
+        metadata = values.get("metadata")
+        distance = values.get("distance_m")
+        if distance is None and is_json_object(metadata):
+            distance = metadata.get("distance_m")
+        if isinstance(distance, (int, float)):
+            item["distance_m"] = distance
+        geometry = feature.get("geometry")
+        coordinates = geometry.get("coordinates") if is_json_object(geometry) else None
+        if (
+            "latitude" not in item
+            and "longitude" not in item
+            and isinstance(coordinates, list)
+            and len(coordinates) >= 2
+            and isinstance(coordinates[0], (int, float))
+            and isinstance(coordinates[1], (int, float))
+        ):
+            item["longitude"], item["latitude"] = coordinates[:2]
+        if item:
+            preview.append(item)
+    return preview
 
 ###############################################################################
 def _map_eligibility(response: ProviderResponse) -> str:
