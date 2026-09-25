@@ -872,7 +872,7 @@ def _normalize_data_bearing_map_route(
             )
         )
         if data_query:
-            secondary_domains = []
+            secondary_domains: list[CapabilityDomain] = []
             if route.presentation in {"map", "both"}:
                 secondary_domains.append(CapabilityDomain.MAP_RENDERING)
             secondary_domains.extend(
