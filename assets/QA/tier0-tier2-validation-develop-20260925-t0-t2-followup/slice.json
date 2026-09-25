@@ -3,6 +3,18 @@
   "branch": "develop",
   "starting_head": "800e0568f6b83254b60c4efe25e014e3fefdf81c",
   "tested_source_head": "800e0568f6b83254b60c4efe25e014e3fefdf81c",
+  "evidence_commit": "db5b9485e80073f87dd4a8b964e484ba42384fcb",
+  "hosted_ci": {
+    "run_id": 36152093449,
+    "head": "db5b9485e80073f87dd4a8b964e484ba42384fcb",
+    "status": "success",
+    "jobs": [
+      "persistence-conformance",
+      "frontend-build-and-tests",
+      "capability-contract-validation",
+      "backend-unit-tests"
+    ]
+  },
   "scope": ["T0-04", "T2-04"],
   "provider_lane": {
     "provider": "opencode-go",
