@@ -1220,7 +1220,7 @@ class AgentLoop:
             and state.route.task_mode == "execute"
             and state.route.primary_domain is CapabilityDomain.PLACE_SEARCH
             and state.route.presentation == "text"
-            and state.route.operation == "geocode"
+            and state.route.operation in {"geocode", "resolve_location"}
             and bool(state.location_refs)
             and any(
                 result.tool_name == "resolve_geospatial_location"
@@ -1228,11 +1228,17 @@ class AgentLoop:
                 for result in state.tool_results
             )
         )
+        evidence_inspected = any(
+            result.tool_name == "inspect_evidence"
+            and result.status in {"success", "valid_empty"}
+            for result in state.tool_results
+        )
         data_completed = completed_data or geocode_location_resolved
         return {
             "location_resolved": bool(state.location_refs)
             or state.active_map_session is not None,
             "required_data_retrieved": data_completed,
+            "evidence_inspected": evidence_inspected,
             "capabilities_discovered": capabilities_discovered,
             "temporal_scope_applied": completed_data,
             # A successful map-plan observation is the server-owned proof
@@ -1290,6 +1296,7 @@ class AgentLoop:
             "location_resolved": "location",
             "capabilities_discovered": "capability_discovery",
             "required_data_retrieved": "provider_data",
+            "evidence_inspected": "evidence_inspection",
             "temporal_scope_applied": "temporal_scope",
             "spatial_scope_applied": "spatial_scope",
             "map_candidate_prepared": "map_candidate",
@@ -2582,6 +2589,16 @@ class AgentLoop:
         if route.requires_location:
             requirements.append("location_resolved")
         route_domains = {route.primary_domain, *route.secondary_domains}
+        text_location_resolution_only = (
+            route.primary_domain is CapabilityDomain.PLACE_SEARCH
+            and route.presentation == "text"
+            and route.operation in {"geocode", "resolve_location"}
+        )
+        text_evidence_inspection_only = (
+            route.task_mode == "execute"
+            and route.presentation == "text"
+            and operation == "inspect_evidence"
+        )
         data_route = (
             CapabilityDomain.DATA_RETRIEVAL in route_domains
             or route.primary_domain
@@ -2591,6 +2608,8 @@ class AgentLoop:
         requires_provider_data = (
             route.task_mode == "execute"
             and data_route
+            and not text_location_resolution_only
+            and not text_evidence_inspection_only
             and not capability_discovery_only
             and not _is_location_only_map_request(state.user_message, route)
         )
@@ -2598,6 +2617,8 @@ class AgentLoop:
             requirements.append("required_data_retrieved")
         elif route.task_mode == "execute" and capability_discovery_only:
             requirements.append("capabilities_discovered")
+        elif text_evidence_inspection_only:
+            requirements.append("evidence_inspected")
         if route.task_mode == "execute" and route_has_temporal_scope and temporal_scope and (
             temporal_scope.get("mode") != "none"
             or temporal_scope.get("start_time_iso") is not None

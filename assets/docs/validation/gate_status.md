@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-24 (`T2-01`/`T2-02` PASS; `T2-04` PARTIAL at the configured model-call guard; `T0-04` PARTIAL; exact implementation commit `7685cce7` passed all four hosted CI jobs in run 36051868085)
+Last updated: 2026-09-25 (`T2-05`/`T2-06`/`T2-07` PASS on selected exact-lane scenarios; `T2-04` and `T0-04` remain PARTIAL; the new implementation changes have focused tests and browser evidence but no hosted-CI result yet)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -40,28 +40,31 @@ gate can pass while its broader application-foundation slice remains partial.
 | --- | --- | ---: | --- | --- |
 | Tier 0 | Environment, schema, current-HEAD reconciliation | 5 | `PARTIAL` | The [2026-09-22 Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md) passed all five on its tested boundary. The [current-head recheck](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md) found and fixed the launcher's inherited `AEGIS_DATA_DIR` precedence; the fresh/warm data-root subset passes, while the broader `T0-04` startup slice remains `PARTIAL`. |
 | Tier 1 | Application foundations | 12 | `PASS` | [Tier 1 checklist](tier1_application_foundations.md), [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [T1-09 continuation](../../QA/tier1-validation-develop-20260923/T1-09/report.md), [T1-07 continuation](../../QA/tier1-validation-develop-20260923/T1-07/report.md), [T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), and [T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md); 12 `PASS`. The 2026-09-21 [baseline ledger](../../QA/tier1-application-foundations-20260921/ledger.md) remains historical. |
-| Tier 2 | Core agent workflows | 7 | `PARTIAL` | The 2026-09-24 continuation passes `T2-01`/`T2-02`, retains `T2-03` as `PASS`, and classifies `T2-04` as `PARTIAL` after 36 inventory candidates across three pages hit the configured four-model-call limit. `T2-05` through `T2-07` remain `UNRUN`; see the [continuation report](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md). |
+| Tier 2 | Core agent workflows | 7 | `PARTIAL` | `T2-01`/`T2-02`/`T2-03` and the 2026-09-25 `T2-05`/`T2-06`/`T2-07` scenarios are `PASS`; `T2-04` remains `PARTIAL` after 36 inventory candidates across three pages hit `max_model_calls=4`. See the [2026-09-25 continuation](../../QA/tier2-validation-develop-20260925-next-slices/report.md) and [browser evidence](../../QA/tier2-validation-develop-20260925-next-slices/browser-evidence.md). |
 | Tier 3 | Rendering and geospatial feature families | 18 | `UNRUN` | Require browser-authoritative source/layer/render-ack evidence. |
 | Tier 4A | Ingestion, local sources, optional integrations | 8 | `UNRUN` | Use isolated data and approved credentials/snapshots. |
 | Tier 4B | Model-provider parity | 5 | `UNRUN` | Never substitute provider or model. |
 | Tier 5 | Recovery, races, difficult boundaries, hosted CI | 13 | `UNRUN` | Open only after lower-tier contracts are classified. |
 
-Campaign-slice status is 19 `PASS`, 2 `PARTIAL`, 0 `BLOCKED`, and 47 `UNRUN`
+Campaign-slice status is 22 `PASS`, 2 `PARTIAL`, 0 `BLOCKED`, and 44 `UNRUN`
 of 68 slices. These are the latest per-slice classifications across their
 linked source boundaries, not a common-commit campaign result. Tier 0 is
 `PARTIAL` for its broader Windows startup slice; Tier 1 is `PASS`; Tier 2
-has three `PASS`, one `PARTIAL`, and three `UNRUN` slices. `T2-04` remains
-partial at the configured model-call limit. The current exact-lane
+has six `PASS` and one `PARTIAL` slice. `T2-04` remains partial at the
+configured model-call limit. The current exact-lane
 [continuation report](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md)
 and [browser evidence](../../QA/tier2-validation-develop-20260924-head77c5d67/browser-evidence.md)
-record the location flows, inventory boundary, and Zurich coverage guardrail.
+record the location flows, inventory boundary, and Zurich coverage guardrail;
+the [2026-09-25 continuation](../../QA/tier2-validation-develop-20260925-next-slices/report.md)
+records direct tools, saved history, and evidence inspection.
 
 The local T1-10 credential slice passed on
 `develop@8e32f82e3f094e5fb17c3978fad69b9f80b7af0b`; its exact pushed-head CI
 passed all four jobs. Tier 1 remains complete at 12 `PASS`. The current
-Tier 2 continuation passes `T2-01` and `T2-02`, retains `T2-03` as `PASS`,
-and records `T2-04` as `PARTIAL`; `T2-05` through `T2-07` remain `UNRUN`.
-See the [2026-09-24 continuation report](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md).
+Tier 2 passes `T2-01`/`T2-02`/`T2-03` and `T2-05`/`T2-06`/`T2-07`;
+`T2-04` remains `PARTIAL` at the configured model-call guard. See the
+[2026-09-24 continuation](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md)
+and [2026-09-25 continuation](../../QA/tier2-validation-develop-20260925-next-slices/report.md).
 
 ## Current ledger
 
@@ -77,8 +80,8 @@ See the [2026-09-24 continuation report](../../QA/tier2-validation-develop-20260
 
 Tier 1 is `PASS`; Tier 0 is `PARTIAL` because Windows startup outage, race,
 and injected-failure cleanup cases remain unverified. The overall campaign
-is `PARTIAL`: Tier 2 currently has three `PASS`, one `PARTIAL`, and three
-`UNRUN` slices; Tier 3–5 remain `UNRUN`, and broader live/browser/provider
+is `PARTIAL`: Tier 2 currently has six `PASS` and one `PARTIAL` slice;
+Tier 3–5 remain `UNRUN`, and broader live/browser/provider
 boundaries remain partial or blocked. Historical source and controlled
 matrix boundaries are retained below. The prior exact validation
 source/test commit `a1b4e43ff20ab8683f34c04e9ff78e59dc01f74f` passed all four
@@ -108,9 +111,9 @@ limits are in the [continuation evidence](../../QA/tier2-validation-develop-2026
 | `T2-02` | Hydrated Rome to ambiguous Florence, then explicit Florence, Tuscany, Italy replacement | `PASS` | 2026-09-24 (exact-lane browser; 155 local regressions pass) | `develop@77c5d67` plus scoped changes | [continuation report](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md), [browser evidence](../../QA/tier2-validation-develop-20260924-head77c5d67/browser-evidence.md), [focused backend log](../../QA/tier2-validation-develop-20260924-head77c5d67/focused-backend-final.log) | Ambiguous Florence was clarified while Rome remained displayed; selecting Tuscany rendered the correct location and received visible acknowledgement. |
 | `T2-03` | Landmark and point-of-interest routing | `PASS` | 2026-09-23 | `develop@f6e78852b21e1c4abdcdded95148cf86ee9c3371` | [T2 retry report](../../QA/tier2-validation-develop-20260923-retry/report.md), [browser evidence](../../QA/tier2-validation-develop-20260923-retry/browser-evidence.md) | Colosseum and clarified central-Rome POI flows resolved, retrieved, rendered, and acknowledged; preserve the partial-reliability and roughly 2.5 km Overpass coverage note. |
 | `T2-04` | Capability discovery | `PARTIAL` | 2026-09-24 | `develop@77c5d67` plus scoped changes | [continuation report](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md), [browser evidence](../../QA/tier2-validation-develop-20260924-head77c5d67/browser-evidence.md), [slice manifest](../../QA/tier2-validation-develop-20260924-head77c5d67/slice.json), [focused backend log](../../QA/tier2-validation-develop-20260924-head77c5d67/focused-backend-final.log) | Three 12-item pages (36/50) completed without requesting a map; continuation stopped at `max_model_calls=4`. Finish only with an approved budget adjustment or a continuation policy that honors the configured guard. |
-| `T2-05` | Direct tools | `UNRUN` | — | — | [Validation strategy](strategy.md) | Validate tool routing, result semantics, and any requested rendered map. |
-| `T2-06` | Conversation history | `UNRUN` | — | — | [Validation strategy](strategy.md) | Validate hydrated state and replay behavior with visible browser evidence. |
-| `T2-07` | Evidence inspection | `UNRUN` | — | — | [Validation strategy](strategy.md) | Validate evidence provenance and matching render acknowledgement. |
+| `T2-05` | Direct tools: coordinates, weather, air quality, and filtered POI text results | `PASS` | 2026-09-25 | `develop@a712301` plus scoped working-tree changes | [2026-09-25 report](../../QA/tier2-validation-develop-20260925-next-slices/report.md), [browser evidence](../../QA/tier2-validation-develop-20260925-next-slices/browser-evidence.md), [focused tests](../../QA/tier2-validation-develop-20260925-next-slices/report.md) | Tested exact-lane requests returned coordinates, 24 local hourly weather and AQ rows, and ten pharmacy-only Overpass rows without rendering a map. One AQ tool-argument rejection recovered on retry; Overpass’s general reliability remains partial and the response limit is ten. |
+| `T2-06` | Conversation history hydration and saved map replay | `PASS` | 2026-09-25 | `develop@a712301` plus scoped working-tree changes | [2026-09-25 report](../../QA/tier2-validation-develop-20260925-next-slices/report.md), [browser evidence](../../QA/tier2-validation-develop-20260925-next-slices/browser-evidence.md) | New browser tab after backend restart hydrated saved history and restored the transcript and Colosseum map. Crash recovery and all tab races were not tested. |
+| `T2-07` | Saved evidence inspection | `PASS` | 2026-09-25 | `develop@a712301` plus scoped working-tree changes | [2026-09-25 report](../../QA/tier2-validation-develop-20260925-next-slices/report.md), [browser evidence](../../QA/tier2-validation-develop-20260925-next-slices/browser-evidence.md) | Same-conversation inspector returned provenance and all ten categories with one call and no provider fetch or map plan. Saved-evidence map replay is recorded separately under `T2-06`; fresh chats without saved evidence do not receive the inspection-only route. |
 
 | Gate ID / name | Subsystem | Lane / environment | Status | Verification date | Tested commit | Evidence link | Next action / boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- |

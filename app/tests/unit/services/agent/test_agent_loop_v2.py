@@ -643,6 +643,92 @@ def test_native_goal_compiles_deterministic_completion_contract() -> None:
 
 
 ###############################################################################
+def test_text_coordinate_resolution_does_not_require_provider_evidence() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.PLACE_SEARCH,
+        task_mode="execute",
+        presentation="text",
+        requires_location=True,
+        operation="resolve_location",
+        target_refs=["Colosseum, Rome"],
+    )
+
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+
+    assert state.completion_contract is not None
+    assert state.completion_contract.data_requirement == "none"
+    assert state.completion_contract.requirements == ["location_resolved"]
+    assert state.completion_contract.evidence_required is False
+
+    state.route = route
+    state.context_hydrated = True
+    state.location_refs["colosseum, rome"] = ResolvedLocation(
+        label="Colosseum, Rome",
+        latitude=41.8909421,
+        longitude=12.491903,
+        confidence=0.87,
+        location_type="monument",
+    )
+    state.tool_results.append(
+        ToolResult(
+            call_id="resolve-colosseum",
+            tool_name="resolve_geospatial_location",
+            status="success",
+            summary="Resolved Colosseum, Rome.",
+            data={"target_id": "colosseum, rome"},
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    )
+
+    checks = AgentLoop._completion_checks(state)  # pyright: ignore[reportPrivateUsage]
+
+    assert checks["location_resolved"] is True
+    assert checks["required_data_retrieved"] is True
+    assert AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
+        state
+    ) == []
+
+
+###############################################################################
+def test_text_evidence_inspection_requires_only_a_saved_inspection_result() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        requires_location=False,
+        operation="inspect_evidence",
+    )
+
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+
+    assert state.completion_contract is not None
+    assert state.completion_contract.data_requirement == "none"
+    assert state.completion_contract.requirements == ["evidence_inspected"]
+    assert state.completion_contract.evidence_required is False
+
+    state.context_hydrated = True
+    state.tool_results.append(
+        ToolResult(
+            call_id="inspect-evidence",
+            tool_name="inspect_evidence",
+            status="success",
+            summary="Inspected evidence using the sample view.",
+            data={"evidence_id": "evidence-1", "records": []},
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    )
+
+    checks = AgentLoop._completion_checks(state)  # pyright: ignore[reportPrivateUsage]
+
+    assert checks["evidence_inspected"] is True
+    assert AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
+        state
+    ) == []
+
+
+###############################################################################
 def test_map_add_route_requires_provider_data_when_data_retrieval_is_secondary() -> None:
     state = _state()
     route = CapabilityRoute(

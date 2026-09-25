@@ -338,6 +338,63 @@ def _project_result_data(
         }
         return _fit_projection(projected, max_chars=max_chars, preserve_keys=("result",))
 
+    if (
+        tool_name == "execute_geospatial_capability"
+        and is_json_object(data)
+        and data.get("kind") in {"weather_forecast", "air_quality_forecast"}
+        and is_json_array(data.get("hourly_forecast"))
+    ):
+        is_weather = data.get("kind") == "weather_forecast"
+        fields = (
+            ["time", "temperature_2m", "precipitation", "wind_speed_10m"]
+            if is_weather
+            else ["time", "pm10", "pm2_5", "nitrogen_dioxide", "ozone"]
+        )
+        rows = [
+            [row.get(key) for key in fields]
+            for row in data["hourly_forecast"][:24]
+            if is_json_object(row)
+        ]
+        projected = {
+            key: data[key]
+            for key in (
+                "capability_id",
+                "provider_id",
+                "result_status",
+                "feature_count",
+                "stale",
+                "fetched_at",
+                "timezone",
+                "units",
+                "forecast_hours_requested",
+                "forecast_hours",
+                "forecast_truncated",
+                "forecast_window_status",
+                "forecast_window_start",
+                "forecast_window_end",
+                "observations",
+            )
+            if key in data
+        }
+        projected["kind"] = data["kind"]
+        projected["hourly_forecast"] = {"fields": fields, "rows": rows}
+        return _fit_projection(
+            projected,
+            max_chars=max_chars,
+            preserve_keys=("hourly_forecast",),
+        )
+
+    if (
+        tool_name == "execute_geospatial_capability"
+        and is_json_object(data)
+        and is_json_array(data.get("feature_preview"))
+    ):
+        bounded = _bounded_json_value(data, depth=0, max_depth=4, list_limit=10)
+        if is_json_object(bounded):
+            return _fit_projection(
+                bounded, max_chars=max_chars, preserve_keys=("feature_preview",)
+            )
+
     bounded = _bounded_json_value(data, depth=0, max_depth=4, list_limit=24)
     if not (is_json_object(bounded) or is_json_array(bounded)):
         return None, False

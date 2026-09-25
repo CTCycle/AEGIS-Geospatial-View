@@ -109,6 +109,7 @@ class OpenMeteoProvider(GeospatialProvider):
             "timezone": payload.get("timezone"),
             "current": json_object(payload.get("current")),
             "hourlyPreview": json_array(payload.get("hourly_preview")),
+            "hourlyForecast": json_array(payload.get("hourly_forecast")),
             "features": self._features(payload, rendering_mode=rendering_mode),
             "resolvedAt": payload.get("resolved_at"),
             "observation_time": payload.get("observation_time"),

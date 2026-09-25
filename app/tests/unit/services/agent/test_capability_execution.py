@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
 
+from server.domain.agent.tool_result import (
+    ModelObservation,
+    ToolExecutionMetadata,
+    ToolResult,
+)
 from server.domain.geospatial.providers import ProviderResponse
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.capability_execution import (
@@ -156,6 +163,58 @@ async def test_execute_capability_persists_full_payload_and_returns_bounded_summ
     request = provider.requests[0][1]
     assert request.params["filters"] == {"category": "hospital"}  # type: ignore[attr-defined]
     assert request.params["radius_m"] == 5000  # type: ignore[attr-defined]
+
+
+###############################################################################
+def test_feature_summary_exposes_bounded_preview_to_model() -> None:
+    features = [
+        {
+            "id": f"overpass:{index}",
+            "name": f"Pharmacy {index}",
+            "category": "pharmacy",
+            "source": "overpass",
+            "latitude": 41.89 + index / 10000,
+            "longitude": 12.49,
+            "metadata": {"distance_m": index * 100.0, "raw_tags": "omit"},
+        }
+        for index in range(12)
+    ]
+    summary = _response_summary(
+        ProviderResponse(
+            capability_id="overpass_poi_amenities",
+            provider_id="overpass",
+            payload={"features": features},
+            result_type="features",
+        )
+    )
+
+    observation = ModelObservation.from_tool_result(
+        ToolResult(
+            call_id="pois-1",
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="12 pharmacy features returned.",
+            data=summary,
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    )
+
+    assert summary["feature_count"] == 12
+    assert summary["feature_preview_truncated"] is True
+    assert isinstance(observation.result, dict)
+    preview = observation.result["feature_preview"]
+    assert isinstance(preview, list)
+    assert len(preview) == 10
+    assert preview[0] == {
+        "id": "overpass:0",
+        "name": "Pharmacy 0",
+        "category": "pharmacy",
+        "latitude": 41.89,
+        "longitude": 12.49,
+        "distance_m": 0.0,
+    }
+    assert preview[-1]["name"] == "Pharmacy 9"
+    assert all("raw_tags" not in item for item in preview)
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -339,6 +398,91 @@ def test_weather_summary_exposes_bounded_current_observations() -> None:
         "wind_speed_10m": 9.5,
     }
     assert summary["timezone"] == "Europe/Rome"
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("kind", "rows", "expected_fields"),
+    [
+        (
+            "weather_forecast",
+            [
+                {
+                    "time": (datetime(2026, 5, 11) + timedelta(hours=hour)).strftime(
+                        "%Y-%m-%dT%H:%M"
+                    ),
+                    "temperature_2m": hour,
+                    "precipitation": 0.0,
+                    "wind_speed_10m": 2.0,
+                    "secret": "omit",
+                }
+                for hour in range(48)
+            ],
+            {"time", "temperature_2m", "precipitation", "wind_speed_10m"},
+        ),
+        (
+            "air_quality_forecast",
+            [
+                {
+                    "time": (datetime(2026, 5, 11) + timedelta(hours=hour)).strftime(
+                        "%Y-%m-%dT%H:%M"
+                    ),
+                    "pm2_5": hour,
+                    "secret": "omit",
+                }
+                for hour in range(48)
+            ],
+            {"time", "pm2_5"},
+        ),
+    ],
+)
+def test_forecast_summary_exposes_at_most_24_allowlisted_hourly_rows(
+    kind: str,
+    rows: list[dict[str, object]],
+    expected_fields: set[str],
+) -> None:
+    summary = _response_summary(
+        ProviderResponse(
+            capability_id="get_weather_forecast",
+            provider_id="openmeteo",
+            payload={
+                "kind": kind,
+                "hourlyForecast": rows,
+                "timezone": "Europe/Rome",
+            },
+            fetched_at=datetime(2026, 5, 11, 8, 30, tzinfo=UTC),
+        )
+    )
+
+    assert summary["forecast_hours"] == 24
+    assert summary["forecast_hours_requested"] == 24
+    assert summary["forecast_truncated"] is False
+    assert summary["forecast_window_status"] == "ok"
+    assert len(summary["hourly_forecast"]) == 24
+    assert set(summary["hourly_forecast"][0]) == expected_fields
+    assert "secret" not in summary["hourly_forecast"][0]
+    assert summary["forecast_window_start"] == "2026-05-11T11:00"
+    assert summary["forecast_window_end"] == "2026-05-12T10:00"
+    assert summary["timezone"] == "Europe/Rome"
+
+    observation = ModelObservation.from_tool_result(
+        ToolResult(
+            call_id="forecast-1",
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="Hourly forecast returned.",
+            data=summary,
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        ),
+        max_chars=2048,
+    )
+    projected = observation.result
+    assert isinstance(projected, dict)
+    series = projected["hourly_forecast"]
+    assert isinstance(series, dict)
+    assert len(series["rows"]) == 24
+    assert series["fields"][0] == "time"
+    assert len(json.dumps(projected, separators=(",", ":"))) <= 2048
 
 
 ###############################################################################

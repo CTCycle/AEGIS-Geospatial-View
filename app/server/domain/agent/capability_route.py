@@ -132,6 +132,7 @@ CompletionRequirementKind = Literal[
     "location",
     "capability_discovery",
     "provider_data",
+    "evidence_inspection",
     "temporal_scope",
     "spatial_scope",
     "map_candidate",

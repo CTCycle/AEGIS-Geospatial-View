@@ -197,11 +197,14 @@ class OpenMeteoService:
             name: self._series(hourly.get(name)) for name in self.AIR_QUALITY_VARIABLES
         }
         preview: list[dict[str, Any]] = []
-        for index in range(min(6, len(timeline))):
+        hourly_forecast: list[dict[str, Any]] = []
+        for index in range(min(72, len(timeline))):
             row: dict[str, Any] = {"time": timeline[index]}
             for key, values in pollutants.items():
                 row[key] = values[index] if index < len(values) else None
-            preview.append(row)
+            hourly_forecast.append(row)
+            if len(preview) < 6:
+                preview.append(row)
         partial = any(len(values) < len(timeline) for values in pollutants.values())
         result_status = "ok" if timeline else "valid_empty"
         if partial and timeline:
@@ -218,6 +221,7 @@ class OpenMeteoService:
             "longitude": longitude,
             "timezone": payload.get("timezone"),
             "hourly_preview": preview,
+            "hourly_forecast": hourly_forecast,
             "resolved_at": fetched_at,
             "observation_time": preview[0].get("time") if preview else None,
             "units": self._units(payload),
