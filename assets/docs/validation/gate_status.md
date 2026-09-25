@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-25 (`T2-05`/`T2-06`/`T2-07` PASS on selected exact-lane scenarios; `T2-04` and `T0-04` remain PARTIAL; the new implementation changes have focused tests and browser evidence but no hosted-CI result yet)
+Last updated: 2026-09-25 (`T2-05`/`T2-06`/`T2-07` PASS on selected exact-lane scenarios; `T2-04` and `T0-04` remain PARTIAL; first exact-head CI run 36114905386 exposed strict typing errors now fixed locally; follow-up CI is pending publication)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,

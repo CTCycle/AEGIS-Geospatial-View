@@ -679,7 +679,7 @@ def _feature_preview(features: list[Any]) -> list[dict[str, Any]]:
         if (
             "latitude" not in item
             and "longitude" not in item
-            and isinstance(coordinates, list)
+            and is_json_array(coordinates)
             and len(coordinates) >= 2
             and isinstance(coordinates[0], (int, float))
             and isinstance(coordinates[1], (int, float))
