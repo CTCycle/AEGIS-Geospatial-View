@@ -1,6 +1,6 @@
 # Comprehensive validation strategy
 
-Last updated: 2026-09-25
+Last updated: 2026-09-26
 
 This document is the durable digest of the AEGIS comprehensive validation
 roadmap, first established on `loop-dev` and continued on `develop`. It defines
@@ -67,12 +67,12 @@ trusting downstream feature evidence.
 | Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | The [2026-09-22 Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md) passed all five on its tested boundary. The [2026-09-25 T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) revalidated the exact-head Windows launcher boundary: fresh/warm readiness, outage startup, ownership/PID-reuse safety, injected cleanup, canonical-state protection, and final port cleanup pass. `T0-04` remains `PARTIAL` only because a safe historical timing comparator is unavailable. |
 | Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 checklist](tier1_application_foundations.md), [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [2026-09-23 T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), [2026-09-22 T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md), and [2026-09-21 baseline](../../QA/tier1-application-foundations-20260921/report.md). Tier 1 remains 12/12 `PASS`. |
 | Tier 2 | `T2-01` through `T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | The [2026-09-24 continuation](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md) passes `T2-01`/`T2-02` on the exact OpenCode Go lane; `T2-03` remains `PASS`. The [2026-09-25 continuation](../../QA/tier2-validation-develop-20260925-next-slices/report.md) passes the tested `T2-05`/`T2-06`/`T2-07` scenarios, and the [T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) passes `T2-04` with five pages, 50 unique candidates, and `next_cursor=null` under an approved isolated six-call budget restored to four afterward. `ISSUE-001` is resolved. |
-| Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
+| Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | `T3-01`/`T3-02`/`T3-03` now pass current location-only, USGS vector, visibility-mutation, and basemap checks; `T3-04` is blocked by the exact-lane NOAA non-renderable/tool-validation boundary. `T3-05`–`T3-18` remain unrun. See the [2026-09-26 Tier 3 report](../../QA/tier3-validation-develop-20260926-map-rendering/report.md). Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
 | Tier 4A | `T4-01`–`T4-08` | CSV/GeoJSON ingestion, optional heavy formats, mobility data, local/configured sources, cameras, credentialed providers, and catalog-only descriptors. | Run only with isolated data and approved credentials/snapshots. |
 | Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
 | Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Requires the lower-tier contracts and exact-head evidence to be stable. |
 
-The current roll-up is 23 `PASS`, 1 `PARTIAL`, 0 `BLOCKED`, and 44 `UNRUN`.
+The current roll-up is 26 `PASS`, 1 `PARTIAL`, 1 `BLOCKED`, and 40 `UNRUN`.
 
 The recommended execution order is numeric order within each tier. A blocked
 credential or optional dataset slice may be deferred without stopping unrelated
@@ -153,11 +153,9 @@ follow-up now passes the bounded 50-candidate inventory after a temporary isolat
 budget increase, with the original runtime setting restored; broader route, raster,
 provider, and browser coverage remain open.
 
-The follow-up evidence head `db5b9485e80073f87dd4a8b964e484ba42384fcb` passed
-all four jobs in [exact-head hosted CI run
-36152093449](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36152093449).
-That pushed head contains documentation and QA evidence only; the tested
-implementation source remains `800e0568f6b83254b60c4efe25e014e3fefdf81c`.
+The pushed head `9b34c5aa52dd6c26c9c451d0d3384fa660e5893d` passed all four jobs
+in [exact-head hosted CI run
+36241506428](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36241506428).
 
 The 2026-09-22 campaign continued on `develop` from starting SHA
 `7e8b10d58aebf21f194a74bcc2307f9d8e08f15c`. All application data and pytest
