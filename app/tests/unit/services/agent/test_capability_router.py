@@ -564,6 +564,7 @@ def test_router_normalizes_geocoding_route_for_location_only_map() -> None:
     )
 
     assert decision.route.primary_domain is CapabilityDomain.MAP_RENDERING
+    assert decision.route.secondary_domains == []
     assert decision.route.operation == "show_location_on_map"
     assert decision.route.capability_queries == ["place search", "map viewport"]
     assert "location_map_route_normalized" in decision.reason_codes

@@ -2042,6 +2042,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     if (change.state === 'ready') {
       this.commitMapSession(this.pendingMapSession);
+      this.runFailureSummary = '';
+      this.status = 'Agent ready';
+      this.progressLabel = undefined;
       this.syncState();
       this.changeDetectorRef.detectChanges();
       return;

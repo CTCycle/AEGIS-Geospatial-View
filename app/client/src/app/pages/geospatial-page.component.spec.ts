@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import { MapRenderStateChange } from '../components/map-preview.component';
 import { AgentReadinessService } from '../core/agent-readiness.service';
 import { ApiClientService } from '../core/api-client.service';
 import { defaultAppState } from '../core/app-state';
@@ -1649,6 +1650,72 @@ describe('pages/geospatial-page.component', () => {
     expect(component.payload?.map_session?.basemap_id).toBe('osm_dark');
     expect(component.payload?.map_session?.basemap?.label).toBe('Dark Basemap');
     expect(component.payload?.map_session?.resolved_location.label).toBe('Zurich');
+  });
+
+  it('clears a previous basemap render warning after a manual recovery renders', async () => {
+    apiClient.fetchCatalog.and.resolveTo({
+      capabilities: [],
+      basemaps: [
+        {
+          id: 'osm_default',
+          name: 'OpenStreetMap',
+          provider: 'openstreetmap',
+          kind: 'basemap',
+          type: 'tile',
+          description: 'Public street map',
+          requires_credentials: false,
+          is_available: true,
+          supports_map: true,
+          supports_direct_text: false,
+          coverage: 'global',
+          render: { status: 'available', tile_url: '/tiles/osm/{z}/{x}/{y}.png', attribution: 'OSM' },
+          action_tags: [],
+          task_tags: [],
+          metadata: {},
+        },
+        {
+          id: 'osm_dark',
+          name: 'Dark Basemap',
+          provider: 'openstreetmap',
+          kind: 'basemap',
+          type: 'tile',
+          description: 'Dark street map',
+          requires_credentials: false,
+          is_available: true,
+          supports_map: true,
+          supports_direct_text: false,
+          coverage: 'global',
+          render: { status: 'available', tile_url: '/tiles/osm/{z}/{x}/{y}.png', attribution: 'OSM' },
+          action_tags: [],
+          task_tags: [],
+          metadata: {},
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    component.mapSession = {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      basemap: { id: 'osm_default', label: 'OpenStreetMap', render_status: 'available' },
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
+    } as MapSession;
+    component.onBasemapChange('osm_dark');
+    component.runFailureSummary = 'The map update could not be rendered. The previous map remains available.';
+
+    const readyChange: MapRenderStateChange = {
+      sessionId: 'map-1',
+      state: 'ready',
+      collectionRevision: 0,
+    };
+    component.onMapRenderStateChange(readyChange);
+
+    expect(component.runFailureSummary).toBe('');
+    expect(component.status).toBe('Agent ready');
   });
 
 });

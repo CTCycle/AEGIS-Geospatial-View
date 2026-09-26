@@ -1,0 +1,48 @@
+{
+  "run_date": "2026-09-26",
+  "source_boundary": "develop@5947bdd plus the scoped working-tree changes recorded in the report",
+  "branch": "develop",
+  "provider_lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "fallback_used": false
+  },
+  "runtime": {
+    "backend": "http://127.0.0.1:7059",
+    "frontend": "http://127.0.0.1:4512",
+    "data_root": "runtimes/cache/test-runtime/validation-20260924-exact-lane"
+  },
+  "slices": [
+    {
+      "id": "T3-01",
+      "scope": "Named-landmark location-only map recovery and basemap render",
+      "status": "PASS",
+      "run_id": "run_ccece153b1f243349cbc340378bbfc6a",
+      "map_session_id": "candidate-14ac5521f755485f9978e4262960ed89",
+      "evidence": "Colosseum, Rome resolved at 41.89094 N, 12.49190 E; OpenStreetMap tiles, attribution, MapLibre, and the location viewport were visible in Chrome; render observation status was ready with required sources, layers, and viewport checks true."
+    },
+    {
+      "id": "T3-02",
+      "scope": "Live USGS clustered point overlay and visibility mutation",
+      "status": "PASS",
+      "run_id": "run_1e8d9e3cf1a442d9b4d057dbf9abb24a",
+      "evidence_id": "evidence_1f2d5805a6b042a1ab6b6125bab2a457",
+      "evidence": "USGS returned 48 current water-gauge features with map_eligibility=renderable; Chrome visibly showed clustered points, the USGS layer control, legend, and attribution. The layer control changed from 1/1 visible to 0/1 and back to 1/1."
+    },
+    {
+      "id": "T3-03",
+      "scope": "Manual basemap switching and successful recovery status",
+      "status": "PASS",
+      "evidence": "The live USGS map visibly rendered Dark Basemap and OpenTopoMap Terrain with their expected selector values and attribution. The focused frontend regression confirms a subsequent ready manual render clears a prior render warning and returns the status to Agent ready."
+    },
+    {
+      "id": "T3-04",
+      "scope": "NOAA alert non-renderable and valid-empty boundary",
+      "status": "BLOCKED",
+      "run_id": "run_f37c2e4ef9914c63847d22365e575147",
+      "evidence_id": "evidence_6049bdd608fa4823b33b0b087557552b",
+      "evidence": "NOAA returned one Air Quality Alert with map_eligibility=not_renderable. The exact lane then failed closed after repeated apply_map_plan semantic/tool-exposure failures, so no map render acknowledgement or valid-empty outcome was obtained."
+    }
+  ],
+  "remaining": "T3-05 through T3-18 remain UNRUN. Public FEMA/ESA raster loading, composition and retention, broader provider families, and credentialed/local sources remain outside this slice."
+}
