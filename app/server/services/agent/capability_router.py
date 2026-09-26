@@ -1032,6 +1032,7 @@ def _normalize_location_map_route(
         route.model_copy(
             update={
                 "primary_domain": CapabilityDomain.MAP_RENDERING,
+                "secondary_domains": [],
                 "capability_queries": ["place search", "map viewport"],
                 "operation": "show_location_on_map",
             }
