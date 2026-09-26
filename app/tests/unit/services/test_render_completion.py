@@ -286,6 +286,36 @@ def test_explicit_scope_and_time_require_descriptor_evidence() -> None:
     assert next(item for item in requirements if item.name == "temporal_scope_applied").status == "satisfied"
 
 ###############################################################################
+def test_temporal_scope_ignores_static_overlay_retained_during_current_update() -> None:
+    goal = _goal(temporal_scope={"mode": "current"})
+    static_overlay = OverlayInstance(
+        instance_id="hydrography-seattle",
+        capability_id="census_tigerweb_hydrography",
+        label="Hydrography",
+        provider="census",
+        overlay_type="geojson",
+        rendering_mode="geojson",
+        descriptor={"result_type": "features"},
+    )
+    current_overlay = OverlayInstance(
+        instance_id="gauges-seattle",
+        capability_id="usgs_water_gauges",
+        label="Water gauges",
+        provider="usgs",
+        overlay_type="geojson",
+        rendering_mode="clustered-points",
+        descriptor={"result_type": "features", "temporal_mode": "current"},
+    )
+
+    requirements = CompletionEvaluator.native_candidate_requirements(
+        completion_contract=_contract("required_data_retrieved", "temporal_scope_applied"),
+        goal=goal,
+        map_session=_session(static_overlay, current_overlay),
+    )
+
+    assert next(item for item in requirements if item.name == "temporal_scope_applied").status == "satisfied"
+
+###############################################################################
 def test_acknowledgment_payload_is_bounded_and_requires_valid_viewport() -> None:
     payload = RealtimeRenderAckPayload(
         run_id="run-1",
