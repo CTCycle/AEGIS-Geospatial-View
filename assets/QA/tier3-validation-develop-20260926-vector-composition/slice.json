@@ -1,0 +1,41 @@
+{
+  "run_date": "2026-09-26",
+  "source_boundary": "develop@d3f719465a7c185cd7b5035b965083b1c602b369",
+  "branch": "develop",
+  "provider_lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "fallback_used": false
+  },
+  "runtime": {
+    "backend": "http://127.0.0.1:7059",
+    "frontend": "http://127.0.0.1:4512",
+    "data_root": "runtimes/cache/test-runtime/validation-20260924-exact-lane"
+  },
+  "selection_reason": "T3-05 and T3-06 form one manageable public-vector scope: prove a second live vector family, compose it with a retained rendered overlay, and verify selective removal without weakening render acknowledgement.",
+  "slices": [
+    {
+      "id": "T3-05",
+      "scope": "Live Census TIGERweb hydrography overlay and standalone rendered-vector verification",
+      "status": "PASS",
+      "evidence": "Seattle hydrography returned 13 features; the browser visibly rendered the Census TIGERweb layer with 15 features in view, 1/1 visible, OpenStreetMap and MapLibre attribution, and a passed render check."
+    },
+    {
+      "id": "T3-06",
+      "scope": "Renderable vector composition and selective removal of retained overlays",
+      "status": "PASS",
+      "evidence": "USGS returned 2 active Seattle gauges. The browser visibly rendered Census hydrography and USGS clustered points together with 2/2 visible, 13 + 2 rendered features, combined-extent fitting, both attributions, and a passed render check; removing USGS left Census rendered at 1/1 visible with its attribution."
+    }
+  ],
+  "defect_fixed": {
+    "component": "app/server/services/agent/completion.py",
+    "summary": "Current temporal-scope completion now checks only overlay instances that explicitly carry temporal metadata, so a retained static overlay cannot invalidate a valid current update.",
+    "regression_test": "app/tests/unit/services/test_render_completion.py::test_temporal_scope_ignores_static_overlay_retained_during_current_update"
+  },
+  "checks": [
+    "34 focused tests passed across test_render_completion.py and test_map_plan_service.py",
+    "Ruff passed for both changed Python files",
+    "Settings native tool probe returned Verified / Native tool probe passed before browser validation"
+  ],
+  "remaining": "T3-04 remains BLOCKED for the exact-lane NOAA non-renderable/tool-validation boundary. The FEMA/ESA public raster source-loading limitation remains PARTIAL/BLOCKED and was not promoted by the vector pass. T3-07 through T3-18, Tier 4A, Tier 4B, and Tier 5 remain UNRUN; T0-04 remains PARTIAL for the safe historical startup timing comparator."
+}
