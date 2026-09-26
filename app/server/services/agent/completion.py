@@ -194,14 +194,23 @@ def _native_temporal_scope_applied(
             ).casefold()
             == "valid_empty"
         )
-    return all(
+    temporal_instances = [
+        instance
+        for instance in instances
+        if str(
+            instance.descriptor.get("temporal_mode")
+            or instance.descriptor.get("time_mode")
+            or ""
+        ).strip()
+    ]
+    return bool(temporal_instances) and all(
         str(
             instance.descriptor.get("temporal_mode")
             or instance.descriptor.get("time_mode")
             or ""
-        )
+        ).strip()
         == expected_mode
-        for instance in instances
+        for instance in temporal_instances
     )
 
 
