@@ -2,8 +2,10 @@
 runtimes/**
 !runtimes/cache/
 !runtimes/cache/.gitkeep
-app/resources/logs/**
-app/resources/vectors/**
+resources/logs/**
+!resources/logs/.gitkeep
+resources/vectors/**
+!resources/vectors/.gitkeep
 app/client/node_modules/
 app/client/dist/
 app/client/dist-ssr/

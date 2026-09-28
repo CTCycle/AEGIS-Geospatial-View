@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-09-21
+Last updated: 2026-09-28
 
 ## Purpose
 
@@ -21,8 +21,6 @@ AEGIS Geospatial View/
       proxy.conf.cjs
     shared/
       openapi.json
-    resources/
-      catalog/
     scripts/
       generate_openapi.py
       initialize_database.py
@@ -45,6 +43,8 @@ AEGIS Geospatial View/
   settings/
     .env
     .env.example
+  resources/
+    catalog/
   runtimes/
     cache/
   start_on_windows.ps1
@@ -141,7 +141,7 @@ Key frontend directories under `app/client/src/app`:
 
 ## Catalog Areas
 
-`app/resources/catalog` contains manifest-backed geospatial configuration:
+`resources/catalog` contains manifest-backed geospatial configuration:
 
 - `index.json`
 - `runtime_profiles.json`

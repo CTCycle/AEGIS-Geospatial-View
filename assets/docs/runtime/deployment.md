@@ -1,11 +1,11 @@
 # Deployment
 
-Last updated: 2026-08-20
+Last updated: 2026-09-28
 
 ## Backend persistence
 
 AEGIS is a local SQLite application. The database file defaults to
-`<repo>/app/resources/runtime/database.db` and can be moved by setting
+`<repo>/resources/runtime/database.db` and can be moved by setting
 `AEGIS_DATA_DIR` to a directory that the application can read and write.
 
 An empty database file is created, migrated to the Alembic head, and seeded on

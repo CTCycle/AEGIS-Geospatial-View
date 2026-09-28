@@ -1,13 +1,13 @@
 # Persistence
 
-Last updated: 2026-09-21
+Last updated: 2026-09-28
 
 ## SQLite-only relational storage
 
 AEGIS uses one local SQLite database. The application resolves the database
 file through `server.common.paths.resolve_database_file_path()`:
 
-- default: `<repo>/app/resources/runtime/database.db`
+- default: `<repo>/resources/runtime/database.db`
 - optional data-root override: `AEGIS_DATA_DIR`
 
 `app/server/app.py` and `app/scripts/initialize_database.py` construct one
@@ -115,7 +115,7 @@ so replay retains the causal terminal state.
 Startup orchestration belongs under `app/server/services/catalog/startup.py`.
 It invokes the repository seeder after migrations complete.
 
-- static reference data belongs under `app/resources/catalog/reference`;
+- static reference data belongs under `resources/catalog/reference`;
 - loading and parsing belongs under `app/server/services/catalog/loader.py`;
 - relational writes belong under `app/server/repositories/catalog/`.
 
