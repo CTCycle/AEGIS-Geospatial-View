@@ -45,6 +45,8 @@ No provider, model, or fallback lane was substituted.
   and provider execution completed. The provider returned an attributed,
   renderable raster descriptor, but MapLibre failed to load the public source;
   no raster pixels or accepted render acknowledgement were obtained.
+- Hosted CI run [36480878494](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36480878494)
+  passed all four jobs for the pushed documentation/source revision.
 
 See [slice manifest](slice.json), [browser evidence](browser-evidence.md),
 [live evidence](live-evidence.json), [focused suite](focused-suite.log), and
