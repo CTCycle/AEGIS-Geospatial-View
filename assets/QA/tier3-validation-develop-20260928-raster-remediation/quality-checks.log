@@ -1,0 +1,12 @@
+Source under test: develop@be61298ddf4ae1c0b6900810b046c10d97e4993a
+Provider/model: opencode-go / deepseek-v4.1-flash
+Launcher evidence: startup.log (isolated database migration/head and readiness).
+Focused pytest command: app/server/.venv/Scripts/python.exe -m pytest -c app/server/pyproject.toml -o cache_dir=runtimes/cache/pytest --basetemp=runtimes/cache/pytest-tmp/tier3-raster-remediation-20260928 -q [12 targeted modules].
+Test modules: app/tests/unit/services/geospatial/test_render_descriptors.py; app/tests/unit/services/geospatial/test_agentic_manifest_contract.py; app/tests/unit/services/geospatial/test_manifest_metadata_contract.py; app/tests/unit/services/agent/test_map_plan_service.py; app/tests/unit/services/agent/test_capability_execution.py; app/tests/unit/services/geospatial/test_map_inspection.py; app/tests/unit/test_geospatial_layer_auditor.py; app/tests/unit/test_geospatial_raster_and_secret_providers.py; app/tests/unit/test_geospatial_provider_adapters_core.py; app/tests/unit/services/test_render_completion.py; app/tests/unit/services/agent/test_overlay_collection.py; app/tests/unit/test_geospatial_provider_contracts.py.
+Pytest result: 150 passed in 2.86s.
+Strict command: python -m server.services.geospatial.layer_auditor --strict --production (cwd app; app/server/.venv).
+Manifest audit: 86 manifests, 0 errors, 0 warnings; exit 0.
+Ruff command: ruff check . ../tests (cwd app/server; isolated RUFF_CACHE_DIR).
+Ruff result: All checks passed; three access-denied cache traversal warnings, no source diagnostics; exit 0.
+Frontend specs/build: not rerun because no frontend renderer code changed; browser scenarios exercised current source.
+Cleanup: task-owned PIDs stopped; ports 4512, 7059, and 9876 free; cloned SQLite quick_check=ok.
