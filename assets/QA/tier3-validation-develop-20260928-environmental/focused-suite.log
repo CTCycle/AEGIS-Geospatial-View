@@ -1,0 +1,3 @@
+Command: app/server/.venv/Scripts/python.exe -m pytest app/tests/unit/services/agent/test_capability_router.py app/tests/unit/services/geospatial/test_agentic_manifest_contract.py app/tests/unit/test_geospatial_provider_adapters_core.py app/tests/unit/services/agent/test_capability_execution.py -q
+Environment: isolated basetemp under runtimes/cache/pytest-tmp and cache under runtimes/cache/pytest
+Result: 85 passed in 0.94s
