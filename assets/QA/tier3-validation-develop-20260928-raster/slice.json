@@ -9,7 +9,7 @@
     "backend": "127.0.0.1:7059",
     "frontend": "127.0.0.1:4512",
     "data_root": "runtimes/cache/test-runtime/validation-20260924-exact-lane",
-    "provider_lane": "opencode-go / deepseek-v4.1-flash attempted for live browser recheck"
+    "provider_lane": "opencode-go / deepseek-v4.1-flash; final catalog/native-probe readiness is recorded separately"
   },
   "evidence": {
     "layer_auditor": "86 manifests; 0 errors; 0 warnings; FEMA, ESA, raster-tile, and WMTS coverage present",
@@ -19,7 +19,7 @@
   },
   "limits": [
     "This slice validates descriptor construction and the controlled client renderer contract; it is not a live public MapLibre source-load or map.render_ack PASS.",
-    "The exact OpenCode Go native probe failed for the selected opencode-go / deepseek-v4.1-flash lane. The supplied credential refresh was rejected by the provider catalog with HTTP 401; no provider or model fallback was used.",
-    "The in-app browser could inspect the saved FEMA failure boundary, but could not execute a new exact-lane raster chat after the provider blocker."
+    "The initial OpenCode Go native probe failed because the isolated runtime held a different credential; final catalog/native-probe readiness passed after the credential-path correction. No provider or model fallback was used.",
+    "The in-app browser could inspect the saved FEMA failure boundary, but this descriptor slice did not execute a new exact-lane raster chat; live raster rendering remains a separate browser-authoritative gate."
   ]
 }

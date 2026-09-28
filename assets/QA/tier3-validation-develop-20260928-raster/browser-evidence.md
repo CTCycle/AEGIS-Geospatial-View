@@ -8,7 +8,8 @@ module. The visible saved FEMA New Orleans conversation showed:
 - Failure: `render_failed` at MapLibre, with overlay source absent and layer
   not present.
 - Map canvas remained at the empty prompt state.
-- Agent model state: `Not verified` after the current exact-lane probe failure.
+- Agent model state: `Not verified` in the saved historical conversation; this
+  is not evidence of the final provider readiness result.
 
 The saved conversation is not a fresh live-provider run and is therefore not
 promoted to a current raster render result. The controlled Angular geospatial
@@ -17,5 +18,6 @@ descriptor rendering. That validates the client contract only; it does not
 replace live source/layer presence, visible pixels, attribution, and
 `map.render_ack` evidence.
 
-No binary screenshot is claimed because the in-app browser did not export a
-local image in this run.
+The final provider/catalog/native-probe recheck passed separately after the
+credential-path correction. No fresh live raster chat or binary screenshot is
+claimed because the in-app browser did not export a local image in this run.
