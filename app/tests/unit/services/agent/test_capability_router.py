@@ -17,6 +17,7 @@ from server.services.agent.capability_router import (
     build_location_map_fallback_route,
 )
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
 class _Runtime:
@@ -137,6 +138,51 @@ def test_router_normalizes_radius_scope_to_provider_bbox_after_location_resoluti
 
     assert decision.status == "accepted"
     assert decision.capability_ids == ["traffic"]
+
+
+def test_router_keeps_solar_estimate_on_metadata_only_text_route() -> None:
+    state = _state()
+    state.user_message = "Estimate PVGIS solar potential near Rome, Italy."
+    state.location_refs["rome"] = ResolvedLocation(
+        label="Rome, Italy",
+        latitude=41.9028,
+        longitude=12.4964,
+        bbox=[12.35, 41.75, 12.65, 42.05],
+        country="Italy",
+    )
+    router = CapabilityRouter(
+        capability_registry=CapabilityRegistry(),
+        runtime_registry=RuntimeRegistry(),
+    )
+
+    decision = router.validate_route(
+        _route(
+            secondary_domains=[
+                CapabilityDomain.PLACE_SEARCH,
+                CapabilityDomain.MAP_RENDERING,
+            ],
+            presentation="both",
+            operation="estimate_solar_potential",
+            capability_queries=[
+                "pvgis solar potential",
+                "solar irradiance estimate",
+                "photovoltaic potential",
+            ],
+            spatial_scope={
+                "kind": "radius",
+                "relationship": "near",
+                "target_refs": ["Rome"],
+                "distance_m": 25000,
+            },
+        ),
+        user_message=state.user_message,
+        active_state=state,
+    )
+
+    assert decision.status == "accepted"
+    assert decision.capability_ids == ["pvgis_solar"]
+    assert decision.route.presentation == "text"
+    assert "metadata_only_analysis_route_normalized" in decision.reason_codes
 
 
 ###############################################################################

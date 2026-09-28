@@ -566,6 +566,8 @@ def test_pvgis_provider_returns_metadata_only_analysis() -> None:
 
     assert response.payload["renderingMode"] == "metadata-only"
     assert response.payload["yearlyKwhPerKwpEstimate"] == 1234.5
+    assert response.result_type == "metadata"
+    assert response.result_status == "ok"
 
 ###############################################################################
 def test_tomtom_requires_keys_before_emitting_urls() -> None:

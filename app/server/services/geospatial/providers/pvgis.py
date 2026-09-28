@@ -25,7 +25,8 @@ class PVGISProvider(GeospatialProvider):
         except (PVGISError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
         warnings: list[str] = []
-        if payload.get("error"):
+        has_error = bool(payload.get("error"))
+        if has_error:
             warnings.append(str(payload["error"]))
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -42,4 +43,7 @@ class PVGISProvider(GeospatialProvider):
                 str(payload.get("attribution") or "PVGIS (European Commission JRC)")
             ],
             warnings=warnings,
+            result_status="partial" if has_error else "ok",
+            result_type="metadata",
+            partial=has_error,
         )
