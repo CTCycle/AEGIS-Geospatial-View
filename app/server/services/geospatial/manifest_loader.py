@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from server.common.paths import PROJECT_DIR, ROOT_DIR
+from server.common.paths import RESOURCES_PATH, ROOT_DIR
 from server.contracts.geospatial import CapabilityManifestV2
 
 type JsonDict = dict[str, Any]
@@ -99,7 +99,7 @@ class GeospatialManifestLoader:
     # -------------------------------------------------------------------------
     def __init__(self, root_path: str | Path | None = None) -> None:
         if root_path is None:
-            base_path = PROJECT_DIR / "resources" / "catalog"
+            base_path = RESOURCES_PATH / "catalog"
         else:
             candidate = Path(root_path)
             base_path = candidate if candidate.is_absolute() else ROOT_DIR / candidate

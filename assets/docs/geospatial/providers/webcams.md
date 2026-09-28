@@ -1,6 +1,6 @@
 # Webcams
 
-Last updated: 2026-08-02
+Last updated: 2026-09-28
 
 ## Scope
 
@@ -8,7 +8,7 @@ Webcams and public cameras are `camera-network` capabilities. They are used when
 
 ## Windy Webcams
 
-- Manifest: `app/resources/catalog/cameras/windy_webcams.json`
+- Manifest: `resources/catalog/cameras/windy_webcams.json`
 - Provider key: `WINDY_WEBCAMS_API_KEY`
 - Official docs: `https://api.windy.com/webcams/docs`
 

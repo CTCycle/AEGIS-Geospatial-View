@@ -1,6 +1,6 @@
 # Testing And Quality
 
-Last updated: 2026-09-18
+Last updated: 2026-09-28
 
 ## Python Quality Gates
 
@@ -54,7 +54,7 @@ validation notes remain under `assets/QA` and are not removed by cache cleanup.
 
 When `AEGIS_DATA_DIR` is not explicitly supplied, the pytest configuration
 assigns a session-scoped temporary runtime directory. Application-startup unit
-tests therefore never open or mutate `app/resources/runtime/database.db`.
+tests therefore never open or mutate `resources/runtime/database.db`.
 Source-architecture scans exclude `.venv` and `__pycache__` trees so protected
 dependency files cannot turn a test run into an ACL failure.
 

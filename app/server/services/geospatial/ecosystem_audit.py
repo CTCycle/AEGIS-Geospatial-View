@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from server.common.paths import PROJECT_DIR
+from server.common.paths import PROJECT_DIR, RESOURCES_PATH
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.provider_registry import PROVIDER_FACTORIES
 from server.services.geospatial.endpoint_validation import EndpointValidationService
@@ -24,7 +24,7 @@ RENDERER_SOURCE = (
     PROJECT_DIR / "client" / "src" / "app" / "components" / "map-preview-rendering.ts"
 )
 PROVIDER_SOURCE_DIR = PROJECT_DIR / "server" / "services" / "geospatial" / "providers"
-CATALOG_SOURCE = PROJECT_DIR / "resources" / "catalog"
+CATALOG_SOURCE = RESOURCES_PATH / "catalog"
 
 DIRECT_TOOL_PROVIDERS = {
     "location_to_coordinates": "nominatim",

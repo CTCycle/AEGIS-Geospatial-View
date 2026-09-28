@@ -1,10 +1,10 @@
 # Reference Catalog
 
-Last updated: 2026-08-02
+Last updated: 2026-09-28
 
 ## Purpose
 
-`app/resources/catalog/reference` stores seedable static reference data that should not live in Python constants.
+`resources/catalog/reference` stores seedable static reference data that should not live in Python constants.
 
 ## Current Files
 

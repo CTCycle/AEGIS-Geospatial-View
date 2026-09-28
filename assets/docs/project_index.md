@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-09-21
+Last updated: 2026-09-28
 
 ## Purpose
 
@@ -27,7 +27,7 @@ conversation-scoped `agent_evidence` store rather than model messages.
 2. Choose one topic branch.
 3. Open the narrowest leaf file under that branch.
 4. Open sibling files only when the task clearly crosses boundaries.
-5. Treat `app/resources/catalog` as the runtime source of truth for geospatial capabilities.
+5. Treat `resources/catalog` as the runtime source of truth for geospatial capabilities.
 
 ## Ontology
 

@@ -1,10 +1,10 @@
 # Schema V2
 
-Last updated: 2026-08-02
+Last updated: 2026-09-28
 
 ## Required Fields
 
-Every manifest under `app/resources/catalog` must define:
+Every manifest under `resources/catalog` must define:
 
 - `capabilityKind`
 - `renderingMode`

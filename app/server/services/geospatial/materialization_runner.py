@@ -55,7 +55,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--manifest-root",
-        default="app/resources/catalog",
+        default="resources/catalog",
         help="Root directory containing capability manifests.",
     )
     parser.add_argument(

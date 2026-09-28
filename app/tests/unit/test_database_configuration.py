@@ -14,6 +14,9 @@ def test_database_settings_use_default_sqlite_path(monkeypatch) -> None:
 
     settings = build_database_settings()
 
+    assert settings.database_path == str(
+        ROOT_DIR / "resources" / "runtime" / "database.db"
+    )
     assert settings.database_path == str(resolve_database_file_path())
     assert settings.sqlite_lock_timeout_seconds == 60
 
@@ -32,11 +35,11 @@ def test_database_settings_use_short_data_directory_override(
 def test_database_settings_resolve_relative_data_directory_from_repository_root(
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv("AEGIS_DATA_DIR", "app/resources")
+    monkeypatch.setenv("AEGIS_DATA_DIR", "alternate-data")
 
     settings = build_database_settings()
 
-    assert settings.database_path == str(ROOT_DIR / "app" / "resources" / "database.db")
+    assert settings.database_path == str(ROOT_DIR / "alternate-data" / "database.db")
 
 ###############################################################################
 def test_database_settings_read_sqlite_lock_timeout(monkeypatch) -> None:

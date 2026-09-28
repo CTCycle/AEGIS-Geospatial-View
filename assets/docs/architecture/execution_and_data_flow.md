@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-09-17
+Last updated: 2026-09-28
 
 ## Layering
 
@@ -156,7 +156,7 @@ only execution boundary; it validates input, applies policy, counts attempts,
 records timeout/trace metadata, invokes the handler, and normalizes one
 `ToolResult`.
 
-`manifest_loader.py` reads schema-v2 entries from `app/resources/catalog`.
+`manifest_loader.py` reads schema-v2 entries from `resources/catalog`.
 Agent-facing entries must declare `agenticUse.domains` and an explicit
 `executionContract`. `CapabilityRegistry` applies runtime availability,
 coverage, temporal, scope, operation, render, and relevance filters without

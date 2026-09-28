@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-09-21
+Last updated: 2026-09-28
 
 ## Environment file
 
@@ -10,7 +10,7 @@ overwritten. The generated file remains local.
 
 Common keys include:
 
-- `AEGIS_DATA_DIR` (optional; defaults to `app/resources/runtime`; relative
+- `AEGIS_DATA_DIR` (optional; defaults to `resources/runtime`; relative
   values are resolved from the repository root)
 - `SQLITE_LOCK_TIMEOUT` (positive seconds; defaults to `60`)
 - `FASTAPI_HOST`
@@ -28,7 +28,7 @@ Common keys include:
 The SQLite database path is always derived as:
 
 ```text
-<AEGIS_DATA_DIR or app/resources/runtime>/database.db
+<AEGIS_DATA_DIR or resources/runtime>/database.db
 ```
 
 `SQLITE_LOCK_TIMEOUT` controls how long startup and the explicit launcher
