@@ -10,7 +10,8 @@ overwritten. The generated file remains local.
 
 Common keys include:
 
-- `AEGIS_DATA_DIR` (optional; defaults to `app/resources/runtime`)
+- `AEGIS_DATA_DIR` (optional; defaults to `app/resources/runtime`; relative
+  values are resolved from the repository root)
 - `SQLITE_LOCK_TIMEOUT` (positive seconds; defaults to `60`)
 - `FASTAPI_HOST`
 - `FASTAPI_PORT`
