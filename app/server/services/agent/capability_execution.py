@@ -717,9 +717,9 @@ def _map_eligibility(response: ProviderResponse) -> str:
 ###############################################################################
 def _feature_has_geometry(value: object) -> bool:
     feature = value if is_json_object(value) else {}
-    if feature.get("type") == "Feature":
-        geometry = feature.get("geometry")
-        return is_json_object(geometry) and bool(geometry.get("type")) and (
+    geometry = feature.get("geometry")
+    if is_json_object(geometry):
+        return bool(geometry.get("type")) and (
             geometry.get("coordinates") is not None
             or geometry.get("geometries") is not None
         )
@@ -775,24 +775,48 @@ def _feature_bbox(value: object) -> list[float] | None:
             coordinates.append((float(longitude), float(latitude)))
             continue
         geometry = feature.get("geometry")
-        if not is_json_object(geometry) or geometry.get("type") != "Point":
-            continue
-        position = geometry.get("coordinates")
-        if not is_json_array(position) or len(position) < 2:
-            continue
-        longitude, latitude = position[0], position[1]
-        if (
-            isinstance(latitude, (int, float))
-            and not isinstance(latitude, bool)
-            and isinstance(longitude, (int, float))
-            and not isinstance(longitude, bool)
-        ):
-            coordinates.append((float(longitude), float(latitude)))
+        if is_json_object(geometry):
+            for longitude, latitude in _geometry_positions(geometry):
+                coordinates.append((longitude, latitude))
     if not coordinates:
         return None
     longitudes = [item[0] for item in coordinates]
     latitudes = [item[1] for item in coordinates]
     return [min(longitudes), min(latitudes), max(longitudes), max(latitudes)]
+
+
+###############################################################################
+def _geometry_positions(value: object) -> list[tuple[float, float]]:
+    """Extract coordinate pairs from any bounded GeoJSON geometry."""
+
+    geometry = value if is_json_object(value) else {}
+    if geometry.get("type") == "GeometryCollection":
+        geometries = geometry.get("geometries")
+        if not is_json_array(geometries):
+            return []
+        positions: list[tuple[float, float]] = []
+        for item in geometries:
+            positions.extend(_geometry_positions(item))
+        return positions
+    coordinates = geometry.get("coordinates")
+    positions: list[tuple[float, float]] = []
+
+    def visit(value: object) -> None:
+        if is_json_array(value):
+            if (
+                len(value) >= 2
+                and isinstance(value[0], (int, float))
+                and not isinstance(value[0], bool)
+                and isinstance(value[1], (int, float))
+                and not isinstance(value[1], bool)
+            ):
+                positions.append((float(value[0]), float(value[1])))
+                return
+            for item in value:
+                visit(item)
+
+    visit(coordinates)
+    return positions
 
 ###############################################################################
 def _summary_text(response: ProviderResponse, summary: dict[str, Any]) -> str:

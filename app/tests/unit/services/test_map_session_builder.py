@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from server.domain.agent.decision import ResolvedLocation
-from server.services.geospatial.map_session_builder import _viewport_for_location
+from server.services.geospatial.map_session_builder import (
+    _geojson_render_data,
+    _viewport_for_location,
+)
 
 
 ###############################################################################
@@ -36,3 +39,52 @@ def test_point_like_feature_bbox_keeps_a_usable_context_viewport() -> None:
     assert viewport.center_latitude == location.latitude
     assert viewport.center_longitude == location.longitude
     assert viewport.bbox is None
+
+
+###############################################################################
+def test_normalized_polygon_feature_is_converted_to_renderable_geojson() -> None:
+    data = _geojson_render_data(
+        {
+            "features": [
+                {
+                    "id": "alert-1",
+                    "name": "Air Quality Alert",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [
+                                [-95.6, 29.5],
+                                [-95.3, 29.5],
+                                [-95.3, 29.9],
+                                [-95.6, 29.9],
+                                [-95.6, 29.5],
+                            ]
+                        ],
+                    },
+                }
+            ]
+        }
+    )
+
+    assert data == {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "id": "alert-1",
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [-95.6, 29.5],
+                            [-95.3, 29.5],
+                            [-95.3, 29.9],
+                            [-95.6, 29.9],
+                            [-95.6, 29.5],
+                        ]
+                    ],
+                },
+                "properties": {"name": "Air Quality Alert"},
+            }
+        ],
+    }

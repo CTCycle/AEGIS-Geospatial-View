@@ -4,7 +4,11 @@ from tests.conftest import run_async_in_thread
 
 import pytest
 
-from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest
+from server.services.geospatial.providers.base import (
+    ProviderAuthError,
+    ProviderRequest,
+    ProviderUnavailableError,
+)
 from server.services.geospatial.providers.fema import (
     FEMA_NFHL_EXPORT_URL,
     FEMAProvider,
@@ -203,6 +207,109 @@ def test_noaa_provider_normalizes_live_alert_geojson() -> None:
     assert response.payload["totalResults"] == 1
     assert response.payload["features"][0]["category"] == "weather_alert"
     assert response.payload["features"][0]["severity"] == "Severe"
+
+###############################################################################
+def test_noaa_provider_resolves_missing_alert_geometry_from_affected_zones() -> None:
+    calls: list[str] = []
+    zone_urls = [
+        "https://api.weather.gov/zones/forecast/TXZ213",
+        "https://api.weather.gov/zones/forecast/TXZ237",
+    ]
+
+    async def fetcher(url: str, headers=None):  # noqa: ANN001
+        calls.append(url)
+        assert headers and "User-Agent" in headers
+        if "api.weather.gov/alerts/active" in url:
+            return {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "id": "alert-air-quality",
+                        "properties": {
+                            "event": "Air Quality Alert",
+                            "areaDesc": "Houston area",
+                            "affectedZones": [
+                                *zone_urls,
+                                "https://attacker.example/zones/forecast/NOPE",
+                            ],
+                            "geocode": {"UGC": ["TXZ213", "TXZ237", "BAD"]},
+                        },
+                        "geometry": None,
+                    }
+                ],
+            }
+        assert url in zone_urls
+        return {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [-95.6, 29.5],
+                        [-95.3, 29.5],
+                        [-95.3, 29.9],
+                        [-95.6, 29.9],
+                        [-95.6, 29.5],
+                    ]
+                ],
+            },
+        }
+
+    response = run_async_in_thread(
+        NOAAProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="noaa_weather_alerts",
+                bbox=(-96.0, 29.0, -95.0, 30.0),
+                params={"live": True},
+            )
+        )
+    )
+
+    assert calls[0].startswith("https://api.weather.gov/alerts/active")
+    assert sorted(calls[1:]) == zone_urls
+    feature = response.payload["features"][0]
+    assert feature["geometry"]["type"] == "GeometryCollection"
+    assert len(feature["geometry"]["geometries"]) == 2
+    assert feature["metadata"]["geometrySource"] == "affected_zones"
+    assert response.result_status == "ok"
+    assert response.partial is False
+    assert response.warnings == []
+
+
+###############################################################################
+def test_noaa_provider_keeps_alert_data_when_zone_geometry_is_temporarily_unavailable() -> None:
+    async def fetcher(url: str, headers=None):  # noqa: ANN001
+        if "api.weather.gov/alerts/active" in url:
+            return {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "id": "alert-zone-failure",
+                        "properties": {
+                            "event": "Air Quality Alert",
+                            "affectedZones": [
+                                "https://api.weather.gov/zones/forecast/TXZ213"
+                            ],
+                        },
+                        "geometry": None,
+                    }
+                ],
+            }
+        raise ProviderUnavailableError("zone service unavailable")
+
+    response = run_async_in_thread(
+        NOAAProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="noaa_weather_alerts",
+                params={"live": True},
+            )
+        )
+    )
+
+    assert response.result_status == "partial"
+    assert response.partial is True
+    assert response.payload["features"][0]["geometry"] is None
+    assert any("zone" in warning.casefold() for warning in response.warnings)
 
 ###############################################################################
 def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
