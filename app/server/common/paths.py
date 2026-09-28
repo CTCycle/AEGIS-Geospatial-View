@@ -20,7 +20,15 @@ CLIENT_INDEX_FILE_PATH = CLIENT_DIST_PATH / "index.html"
 def resolve_runtime_data_root() -> Path:
     override = os.getenv("AEGIS_DATA_DIR", "").strip()
     if override:
-        return Path(override).expanduser()
+        override_path = Path(override).expanduser()
+        # The Windows launcher resolves relative data roots from the
+        # repository root before starting the backend. Keep direct backend
+        # launches on the same path semantics.
+        return (
+            override_path
+            if override_path.is_absolute()
+            else ROOT_DIR / override_path
+        )
 
     return RESOURCES_PATH / "runtime"
 

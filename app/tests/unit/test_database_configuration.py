@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from server.common.paths import resolve_database_file_path
+from server.common.paths import ROOT_DIR, resolve_database_file_path
 from server.configurations import build_database_settings
 
 ###############################################################################
@@ -27,6 +27,16 @@ def test_database_settings_use_short_data_directory_override(
     settings = build_database_settings()
 
     assert settings.database_path == str(tmp_path / "database.db")
+
+
+def test_database_settings_resolve_relative_data_directory_from_repository_root(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AEGIS_DATA_DIR", "app/resources")
+
+    settings = build_database_settings()
+
+    assert settings.database_path == str(ROOT_DIR / "app" / "resources" / "database.db")
 
 ###############################################################################
 def test_database_settings_read_sqlite_lock_timeout(monkeypatch) -> None:
