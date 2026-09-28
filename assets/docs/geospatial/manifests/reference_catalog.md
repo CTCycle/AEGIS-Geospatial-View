@@ -4,7 +4,7 @@ Last updated: 2026-09-28
 
 ## Purpose
 
-`resources/catalog/reference` stores seedable static reference data that should not live in Python constants.
+`data/catalog/reference` stores seedable static reference data that should not live in Python constants.
 
 ## Current Files
 

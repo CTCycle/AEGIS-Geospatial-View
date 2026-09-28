@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from server.common.paths import RESOURCES_PATH
+from server.common.paths import DATA_PATH
 from server.domain.catalog import (
     CountryAliasReferenceEntry,
     CountryReferenceEntry,
@@ -24,7 +24,7 @@ GIBS_LAYER_DEFAULTS_REFERENCE_FILE_NAME = "gibs_layer_defaults.json"
 
 ###############################################################################
 def get_catalog_root() -> Path:
-    return RESOURCES_PATH / "catalog"
+    return DATA_PATH / "catalog"
 
 ###############################################################################
 def load_reference_catalog(catalog_root: Path | None = None) -> ReferenceCatalog:

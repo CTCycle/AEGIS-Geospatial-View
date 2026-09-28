@@ -4,7 +4,7 @@ Last updated: 2026-09-28
 
 ## Purpose
 
-This file is the reviewable inventory of geospatial capabilities implemented by AEGIS. The runtime source of truth remains `resources/catalog`; avoid maintaining a second authoritative capability count in documentation because the manifest inventory evolves independently.
+This file is the reviewable inventory of geospatial capabilities implemented by AEGIS. The runtime source of truth remains `data/catalog`; avoid maintaining a second authoritative capability count in documentation because the manifest inventory evolves independently.
 
 ## Providers
 

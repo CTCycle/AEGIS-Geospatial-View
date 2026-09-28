@@ -7,8 +7,8 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 APP_DIR = ROOT_DIR / "app"
 PROJECT_DIR = APP_DIR
 SETTING_PATH = ROOT_DIR / "settings"
-RESOURCES_PATH = ROOT_DIR / "resources"
-LOGS_PATH = RESOURCES_PATH / "logs"
+DATA_PATH = ROOT_DIR / "data"
+LOGS_PATH = DATA_PATH / "logs"
 ENV_FILE_PATH = SETTING_PATH / ".env"
 ENV_EXAMPLE_FILE_PATH = SETTING_PATH / ".env.example"
 DATABASE_FILENAME = "database.db"
@@ -30,7 +30,7 @@ def resolve_runtime_data_root() -> Path:
             else ROOT_DIR / override_path
         )
 
-    return RESOURCES_PATH / "runtime"
+    return DATA_PATH / "runtime"
 
 ###############################################################################
 def resolve_database_file_path() -> Path:

@@ -15,7 +15,7 @@ def test_database_settings_use_default_sqlite_path(monkeypatch) -> None:
     settings = build_database_settings()
 
     assert settings.database_path == str(
-        ROOT_DIR / "resources" / "runtime" / "database.db"
+        ROOT_DIR / "data" / "runtime" / "database.db"
     )
     assert settings.database_path == str(resolve_database_file_path())
     assert settings.sqlite_lock_timeout_seconds == 60

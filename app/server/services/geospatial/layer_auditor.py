@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from server.common.paths import PROJECT_DIR, RESOURCES_PATH
+from server.common.paths import DATA_PATH, PROJECT_DIR
 from server.contracts.geospatial import (
     CapabilityImplementationStatus,
     CapabilityKind,
@@ -437,7 +437,7 @@ def audit_all_manifests(
     root = (
         Path(root_path)
         if root_path is not None
-        else RESOURCES_PATH / "catalog"
+        else DATA_PATH / "catalog"
     )
     report = LayerAuditReport()
     _validate_index(root, report)

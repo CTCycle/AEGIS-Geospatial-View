@@ -27,7 +27,7 @@ creates the local file without overwriting an existing file.
 An explicit non-empty `AEGIS_DATA_DIR` inherited from the parent process takes
 precedence over the value in `settings/.env` for the launched backend. When no
 process override is supplied, the launcher uses the environment-file value; a
-blank value keeps the default `resources/runtime` root.
+blank value keeps the default `data/runtime` root.
 
 The menu is grouped into clear sections. Application options launch the
 application, install or update dependencies, rebuild the frontend independently,
@@ -100,8 +100,8 @@ The launcher stores every disposable runtime and test cache under
 pytest, Angular, coverage, and test-runtime databases. Launching preserves the
 cache contents. Use menu option 2 to install or update dependencies and prune
 uv, or menu option 9 to clear the complete canonical cache tree without
-reinstalling. Persistent application data under `resources/runtime`,
-`data`, and `resources/vectors` is outside this cleanup boundary.
+reinstalling. Persistent application data under `data/runtime`, `data/geospatial`,
+`data/vectors`, and `data/logs` is outside this cleanup boundary.
 
 ## Local Development Manual
 
