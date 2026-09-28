@@ -3,6 +3,7 @@
 - Date: 2026-09-28
 - Branch: `develop`
 - Tested source: `develop@be61298ddf4ae1c0b6900810b046c10d97e4993a`
+- Evidence commit: `develop@51f94d2bc82e8510df1b70730b3b722ca272b64e`
 - Provider/model: `opencode-go / deepseek-v4.1-flash`
 - Runtime: isolated `runtimes/cache/test-runtime/tier3-raster-remediation-20260928`
 
@@ -38,7 +39,7 @@ The source-load evidence does not conclusively distinguish a bad constructed ras
 | `agent.map-render-ack-recovery` | `PARTIAL` | Failure is withheld correctly; no raster acknowledgement is falsely accepted. |
 | `MATRIX-22` | `PARTIAL` | Raster dependent rows and broad route/provider/recovery coverage remain open. |
 | `PROCESS-CLEANUP` | `PASS` | Exact owned processes stopped; required ports are free. |
-| `HOSTED-CI` | `UNRUN` pending push | Must be checked against the evidence commit pushed to `origin/develop`; final ledger will record its exact SHA/result. |
+| `HOSTED-CI` | `PASS` | [Run 36447036544](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36447036544) completed successfully with all four jobs green for exact evidence commit `51f94d2bc82e8510df1b70730b3b722ca272b64e`; see [hosted-ci.json](hosted-ci.json). The final ledger reconciliation follows as a docs-only commit. |
 
 The campaign remains **30 PASS, 1 PARTIAL, 0 BLOCKED, 37 UNRUN** at the 68-slice tier roll-up. Scenario-level FEMA dependencies are blocked without changing the slice count. Other open items remain visible: route coverage, the representative diary, OpenAI/Ollama parity, credentialed/local providers, dataset ingestion, and T3-08 through T5.
 
