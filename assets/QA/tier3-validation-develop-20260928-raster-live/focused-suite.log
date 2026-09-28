@@ -1,0 +1,4 @@
+Source: develop@14e94e09134b00c511138cf1cfe7567bd571d878
+Command: pytest focused raster, descriptor, map-plan, capability, inspection, and auditor tests
+Result: 96 passed, 2 warnings in 17.22s
+Warnings: existing Starlette/httpx and google-genai deprecation warnings

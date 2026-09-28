@@ -1,0 +1,11 @@
+{
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "protocol": "openai-chat-completions",
+  "status": "passed",
+  "parse_status": "complete",
+  "duration_ms": 2517,
+  "message": "Native tool probe passed.",
+  "checked_at": "2026-09-28T12:24:13.159229Z",
+  "fallback_used": false
+}
