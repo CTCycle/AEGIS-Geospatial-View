@@ -1,0 +1,14 @@
+{
+  "request": {
+    "capability_id": "noaa_weather_alerts",
+    "bbox": [-96.1, 29.4, -95.0, 30.3],
+    "live": true
+  },
+  "result_status": "ok",
+  "partial": false,
+  "feature_count": 1,
+  "geometry_types": ["GeometryCollection"],
+  "geometry_sources": ["affected_zones"],
+  "warnings": [],
+  "attribution": ["NOAA National Weather Service"]
+}

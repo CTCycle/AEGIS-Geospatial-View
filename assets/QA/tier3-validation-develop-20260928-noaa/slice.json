@@ -1,0 +1,38 @@
+{
+  "slice_id": "T3-04",
+  "status": "PASS",
+  "verified_at": "2026-09-28",
+  "tested_commit": "acf01a580166fc685eb5bde52f4e4cca2482d4a3",
+  "lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "fallback_used": false,
+    "runtime_data_root": "app/resources",
+    "backend_port": 7059,
+    "frontend_port": 4512
+  },
+  "request": "Show me current NOAA weather alerts around Houston, Texas.",
+  "provider_observation": {
+    "result_status": "ok",
+    "partial": false,
+    "feature_count": 1,
+    "geometry_type": "GeometryCollection",
+    "geometry_source": "affected_zones",
+    "warnings": [],
+    "attribution": ["NOAA National Weather Service"]
+  },
+  "browser_observation": {
+    "model_status": "Verified",
+    "layer": "NOAA Weather Alerts",
+    "format": "geojson",
+    "visible_layers": "1 of 1",
+    "rendered_polygon_count": 22,
+    "maplibre_attribution_visible": true,
+    "tool_calls": 4,
+    "render_acknowledged": true
+  },
+  "limitations": [
+    "The Codex in-app Browser screenshot was captured inline but could not be exported as a local binary artifact in this run.",
+    "The live count is a time-specific NOAA active-alert snapshot and is not a historical baseline comparison."
+  ]
+}

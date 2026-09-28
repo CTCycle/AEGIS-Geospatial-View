@@ -1,0 +1,8 @@
+Focused NOAA/render validation
+Source: acf01a580166fc685eb5bde52f4e4cca2482d4a3
+
+Command:
+app/server/.venv/Scripts/python.exe -m pytest app/tests/unit/test_hazard_provider_adapters.py app/tests/unit/services/agent/test_capability_execution.py app/tests/unit/services/test_map_session_builder.py --basetemp=runtimes/cache/pytest-tmp/noaa-t304-focused-final --override-ini cache_dir=runtimes/cache/pytest -q
+
+Result:
+29 passed in 0.84s

@@ -1,0 +1,8 @@
+Agent/map-plan regression validation
+Source: acf01a580166fc685eb5bde52f4e4cca2482d4a3
+
+Command:
+app/server/.venv/Scripts/python.exe -m pytest app/tests/unit/services/agent/test_map_plan_service.py app/tests/unit/services/agent/test_tools.py app/tests/unit/services/agent/test_native_harness_trajectories.py app/tests/unit/services/agent/test_agent_loop_v2.py --basetemp=runtimes/cache/pytest-tmp/noaa-t304-regression-final --override-ini cache_dir=runtimes/cache/pytest -q
+
+Result:
+96 passed in 1.92s
