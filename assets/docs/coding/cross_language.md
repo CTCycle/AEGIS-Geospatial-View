@@ -9,7 +9,7 @@ Last updated: 2026-09-28
 - Remove dead code and obsolete artifacts when identified.
 - Avoid duplicated logic across layers when a shared contract can serve both.
 - Keep `assets/docs` updated whenever behavior or conventions change.
-- Add new static catalog/reference data under `resources/catalog/reference`, not Python constants.
+- Add new static catalog/reference data under `data/catalog/reference`, not Python constants.
 - Keep JSON-shaped contracts object-safe at the Python/TypeScript boundary;
   validate unknown API payloads before rendering or persisting them.
 - Treat provider and visualization warnings as first-class response data. Do

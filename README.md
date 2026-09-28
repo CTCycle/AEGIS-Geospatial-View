@@ -206,7 +206,7 @@ The repository is split into a few broad areas:
 
 - `app/server` for the backend
 - `app/client` for the frontend webapp
-- `resources` for local data and supporting files
+- `data` for local data and supporting files
 - `app/tests` for automated checks
 - `settings` for environment-specific configuration
 

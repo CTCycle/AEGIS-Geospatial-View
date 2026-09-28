@@ -4,7 +4,7 @@ Last updated: 2026-09-28
 
 ## Required Fields
 
-Every manifest under `resources/catalog` must define:
+Every manifest under `data/catalog` must define:
 
 - `capabilityKind`
 - `renderingMode`

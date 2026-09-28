@@ -43,7 +43,7 @@ AEGIS Geospatial View/
   settings/
     .env
     .env.example
-  resources/
+  data/
     catalog/
   runtimes/
     cache/
@@ -141,7 +141,7 @@ Key frontend directories under `app/client/src/app`:
 
 ## Catalog Areas
 
-`resources/catalog` contains manifest-backed geospatial configuration:
+`data/catalog` contains manifest-backed geospatial configuration:
 
 - `index.json`
 - `runtime_profiles.json`

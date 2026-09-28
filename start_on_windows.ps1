@@ -15,10 +15,10 @@ $ClientDir = Join-Path $AppDir 'client'
 $TestsDir = Join-Path $AppDir 'tests'
 $SettingsDir = Join-Path $RootDir 'settings'
 $RuntimesDir = Join-Path $RootDir 'runtimes'
-$ResourcesDir = Join-Path $RootDir 'resources'
-$DefaultRuntimeDataDir = Join-Path $ResourcesDir 'runtime'
-$IngestionDataDir = Join-Path $RootDir 'data'
-$VectorsDir = Join-Path $ResourcesDir 'vectors'
+$DataDir = Join-Path $RootDir 'data'
+$DefaultRuntimeDataDir = Join-Path $DataDir 'runtime'
+$IngestionDataDir = Join-Path $DataDir 'geospatial'
+$VectorsDir = Join-Path $DataDir 'vectors'
 $RuntimeCacheDir = Join-Path $RuntimesDir 'cache'
 $PythonDir = Join-Path $RuntimesDir 'python'
 $PythonExe = Join-Path $PythonDir 'python.exe'
@@ -57,7 +57,7 @@ $VenvDir = Join-Path $ServerDir '.venv'
 $FrontendStateScript = Join-Path $ClientDir 'scripts\frontend-state.cjs'
 $DotEnvPath = Join-Path $SettingsDir '.env'
 $DotEnvExamplePath = Join-Path $SettingsDir '.env.example'
-$LogsDir = Join-Path $ResourcesDir 'logs'
+$LogsDir = Join-Path $DataDir 'logs'
 $TestScript = Join-Path $AppDir 'tests\run_tests.bat'
 $InitializeDatabaseScript = Join-Path $AppDir 'scripts\initialize_database.py'
 $PythonVersion = '3.14.7'
@@ -1134,7 +1134,7 @@ function Test-SafeDataDirectory {
     $protectedPaths = @(
         $root,
         (Get-NormalizedPath -Path $AppDir),
-        (Get-NormalizedPath -Path $ResourcesDir),
+        (Get-NormalizedPath -Path $DataDir),
         (Get-NormalizedPath -Path $ServerDir),
         (Get-NormalizedPath -Path $ClientDir),
         (Get-NormalizedPath -Path $SettingsDir),
