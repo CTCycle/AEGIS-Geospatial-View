@@ -1,0 +1,54 @@
+{
+  "source_commit": "be61298ddf4ae1c0b6900810b046c10d97e4993a",
+  "browser": "Codex in-app Browser",
+  "application_tab": "http://127.0.0.1:4512/",
+  "console": {
+    "captured_entries": 3,
+    "entries": [
+      {
+        "level": "debug",
+        "message": "[vite] connecting..."
+      },
+      {
+        "level": "debug",
+        "message": "[vite] connected."
+      },
+      {
+        "level": "log",
+        "message": "Angular is running in development mode."
+      }
+    ],
+    "console_errors": 0,
+    "console_warnings": 0,
+    "maplibre_failure_surface": "The application run record and UI displayed render_failed at maplibre with a generic data-source load message; no additional MapLibre console error was captured."
+  },
+  "network": {
+    "request_events_available": false,
+    "http_status_available": false,
+    "available_tab_capabilities": [
+      "pageAssets",
+      "webmcp"
+    ],
+    "esa_capabilities_navigation": {
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetCapabilities",
+      "result": "Browser network interstitial: services.terrascope.be could not be loaded.",
+      "error_code": "ERR_HTTP2_PROTOCOL_ERROR",
+      "http_status": null,
+      "response_body": null
+    },
+    "fema_tile_endpoint": {
+      "host": "hazards.fema.gov",
+      "path": "/arcgis/rest/services/public/NFHL/MapServer/export",
+      "request_status": null
+    },
+    "esa_wmts_endpoint": {
+      "host": "services.terrascope.be",
+      "path": "/wmts/v2",
+      "layer": "WORLDCOVER_2021_MAP",
+      "tile_matrix_set": "EPSG:3857",
+      "request_status": null
+    },
+    "diagnostic_limit": "The browser interface does not expose request-level network data. The direct ESA capabilities navigation failed at the browser transport layer; it does not distinguish invalid URL construction from upstream/service/network failure."
+  },
+  "sanitization": "No credentials, authorization headers, raw request bodies, or private provider payloads included."
+}

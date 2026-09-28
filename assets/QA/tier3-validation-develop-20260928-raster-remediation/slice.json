@@ -1,0 +1,70 @@
+{
+  "campaign": "AEGIS Tier 3 validation follow-up",
+  "slice_id": "T3-07",
+  "scope": "Live FEMA and ESA public raster source/layer loading; FEMA-dependent USGS composition and retention; reconciliation of map raster, preservation, acknowledgement recovery, LIVE-HYD, MATRIX-22, hosted CI, and process cleanup gates.",
+  "status": "PARTIAL",
+  "verification_date": "2026-09-28",
+  "tested_source": "develop@be61298ddf4ae1c0b6900810b046c10d97e4993a",
+  "environment": {
+    "launcher": "start_on_windows.ps1 -Action Launch",
+    "backend": "127.0.0.1:7059",
+    "frontend": "127.0.0.1:4512",
+    "browser": "Codex in-app Browser",
+    "data_root": "runtimes/cache/test-runtime/tier3-raster-remediation-20260928",
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "fallback_used": null
+  },
+  "provider_probe": {
+    "status": "passed",
+    "parse_status": "complete",
+    "protocol": "openai-chat-completions",
+    "duration_ms": 3121,
+    "checked_at": "2026-09-28T14:52:31.576093Z"
+  },
+  "gate_status": {
+    "T3-07": "PARTIAL",
+    "RASTER-LIVE": "PARTIAL",
+    "GEO-HYD-05 FEMA plus USGS composition": "BLOCKED",
+    "GEO-HYD-06 remove USGS and retain FEMA": "BLOCKED",
+    "LIVE-HYD-20260920": "PARTIAL",
+    "maps.raster-overlays": "PARTIAL",
+    "maps.state-preservation": "PARTIAL",
+    "agent.map-render-ack-recovery": "PARTIAL",
+    "MATRIX-22": "PARTIAL",
+    "HOSTED-CI": "UNRUN pending exact pushed evidence commit",
+    "PROCESS-CLEANUP": "PASS"
+  },
+  "scenario_status": {
+    "fema_new_orleans": "PARTIAL",
+    "esa_worldcover_rome": "PARTIAL",
+    "geo_hyd_05_fema_usgs_composition": "BLOCKED",
+    "geo_hyd_06_remove_usgs_keep_fema": "BLOCKED"
+  },
+  "quality_results": {
+    "focused_backend_regressions": "150 passed",
+    "strict_production_manifest_audit": "86 manifests, 0 errors, 0 warnings",
+    "ruff": "passed with three protected-cache access warnings and no code diagnostics"
+  },
+  "limits": [
+    "FEMA and ESA provider retrievals returned attributed renderable descriptors, but MapLibre source/layer checks failed and no live raster pixels or accepted map.render_ack were obtained.",
+    "USGS rendered and acknowledged alone; removal then left no overlays. The dependent FEMA composition and retention requirements were not met because FEMA never rendered.",
+    "The browser exposed no request-level network events or HTTP status. The official ESA GetCapabilities navigation ended in ERR_HTTP2_PROTOCOL_ERROR, which does not establish whether the raster URL construction or the remote endpoint caused the source failure.",
+    "The in-app Browser displayed screenshots but exposed no local screenshot file path; no screenshot binary is claimed in this package.",
+    "T3-08 through T3-18, route coverage, the representative diary, provider parity, credentialed/local sources, dataset ingestion, and remaining Tier 4/Tier 5 gates remain open or unrun as recorded in the ledgers."
+  ],
+  "evidence": [
+    "startup.log",
+    "report.md",
+    "browser-evidence.md",
+    "console-network-summary.json",
+    "provider-probe.json",
+    "run-summary.json",
+    "database-observation.txt",
+    "focused-suite.log",
+    "manifest-audit.log",
+    "ruff.log",
+    "quality-checks.log",
+    "cleanup-checks.md"
+  ]
+}
