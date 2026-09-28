@@ -1,0 +1,682 @@
+{
+  "test_id": "RASTER-LIVE-DIAGNOSTICS",
+  "provider_probe": {
+    "http_status": 200,
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "protocol": "openai-chat-completions",
+    "status": "passed",
+    "parse_status": "complete",
+    "duration_ms": 3616
+  },
+  "scenarios": [
+    {
+      "scenario_id": "fema_new_orleans",
+      "prompt": "Show standalone FEMA NFHL flood zones for New Orleans, Louisiana.",
+      "assistant_response_visible": true,
+      "maplibre_map_count": 0,
+      "maplibre_canvas_count": 0,
+      "ui_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Show standalone FEMA NFHL flood zones for New Orleans, Louisiana. The map candidate for the FEMA NFHL flood zones failed browser rendering, and the system has blocked repeating the same plan. What happened: Location resolved: New Orleans, Orleans Parish, Louisiana, United States. FEMA NFHL flood zone data was retrieved successfully (raster, renderable, evidence available). A map candidate was prepared with the flood-zone overlay on the default basemap. Render verification failed: the FEMA NFHL data source could not be loaded in the browser (source not present, layer not rendered, viewport invalid). The failure is at the MapLibre data-source load stage. A revised attempt was rejected as a repeated failed render, so no further retry is permitted. Outcome: I cannot deliver a verified standalone FEMA NFHL flood zone map for New Orleans right now. The provider data was retrieved, but the flood-zone raster source is not loading in the renderer, and the recovery path is exhausted for this plan. What this means: The flood-zone context is available as retrieved data, but it is not currently renderable as a standalone map layer. This is a provider/renderer availability issue, not a location or data-retrieval problem. If you'd like, I can try a different presentation (for example, a location-only view of New Orleans without the flood-zone overlay), but a verified standalone NFHL flood-zone map is not achievable at this time. Previous map render failed (render_failed) during maplibre: A map data source could not be loaded. Check provider availability and try again. The last-known-good map was left unchanged. Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Needs attention Satellite Available Optional Keys Optional Tool activity Needs attention",
+      "raster_events": [
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3502650.384139918%2C-9999186.292153617%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3483082.504898913%2C-9999186.292153617%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3502650.384139918%2C-9979618.41291261%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3483082.504898913%2C-9979618.41291261%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3502650.384139918%2C-10018754.171394622%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3522218.2633809224%2C-9999186.292153617%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3483082.504898913%2C-10018754.171394622%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3522218.2633809224%2C-9979618.41291261%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3522218.2633809224%2C-10018754.171394622%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3502650.384139918%2C-9960050.533671606%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3483082.504898913%2C-9960050.533671606%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3502650.384139918%2C-10038322.050635627%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3522218.2633809224%2C-9960050.533671606%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3483082.504898913%2C-10038322.050635627%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3522218.2633809224%2C-10038322.050635627%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_CONNECTION_RESET",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3502650.384139918%2C-9999186.292153617%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3483082.504898913%2C-9999186.292153617%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3502650.384139918%2C-9979618.41291261%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3483082.504898913%2C-9979618.41291261%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3502650.384139918%2C-10018754.171394622%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3522218.2633809224%2C-9999186.292153617%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3483082.504898913%2C-10018754.171394622%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3522218.2633809224%2C-9979618.41291261%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3522218.2633809224%2C-10018754.171394622%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3502650.384139918%2C-9960050.533671606%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3483082.504898913%2C-9960050.533671606%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3502650.384139918%2C-10038322.050635627%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3522218.2633809224%2C-9960050.533671606%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3483082.504898913%2C-10038322.050635627%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_ABORTED",
+          "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3522218.2633809224%2C-10038322.050635627%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=548&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=548&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=548&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=548&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=548&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=548&format=image%2Fpng"
+        }
+      ],
+      "console": [
+        {
+          "type": "warning",
+          "text": "[.WebGL-0x35c001c0400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+        },
+        {
+          "type": "warning",
+          "text": "[.WebGL-0x35c001c0400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+        },
+        {
+          "type": "warning",
+          "text": "[.WebGL-0x35c001c0400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+        },
+        {
+          "type": "warning",
+          "text": "[.WebGL-0x35c001c0400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_RESET"
+        },
+        {
+          "type": "debug",
+          "text": "[vite] connecting..."
+        },
+        {
+          "type": "debug",
+          "text": "[vite] connected."
+        },
+        {
+          "type": "log",
+          "text": "Angular is running in development mode."
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        }
+      ],
+      "page_errors": [],
+      "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20260928-raster-diagnostics\\screenshots\\RASTER-LIVE-DIAGNOSTICS\\fema_new_orleans.png"
+    },
+    {
+      "scenario_id": "esa_worldcover_rome",
+      "prompt": "Show standalone ESA WorldCover for Rome, Italy.",
+      "assistant_response_visible": true,
+      "maplibre_map_count": 0,
+      "maplibre_canvas_count": 0,
+      "ui_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Show standalone ESA WorldCover for Rome, Italy. I've hit a wall with the ESA WorldCover layer. Let me summarize the situation honestly. Outcome: the map could not be rendered. What succeeded: Location resolved: Rome, Roma Capitale, Lazio, Italy (bbox 12.2344–12.8558 E, 41.6556–42.1410 N). Data retrieved: ESA WorldCover returned a valid, renderable raster result (attribution: © ESA WorldCover / Terrascope), with a valid evidence reference. What failed: A map candidate was prepared (OSM default basemap + the ESA WorldCover overlay), but browser render verification failed: the ESA WorldCover raster source could not be loaded (source_present: false, layer not rendered). The recovery guidance was to revise the map. My revision attempts did not produce a verified render: A basemap-swap + viewport plan was rejected as semantically invalid (a data-bearing plan must include the evidence layer). A rebuilt plan (Esri World Imagery basemap + the ESA WorldCover evidence layer + fit-to-evidence viewport) was rejected with viewport_bounds_unavailable — the viewport could not be derived from validated state. Bottom line: The ESA WorldCover data itself is valid and available, but the standalone layer repeatedly fails to load in the browser renderer, and I could not construct a map plan that both includes the evidence layer and yields a derivable viewport. I have no supported recovery left within this turn, so I'm stopping rather than repeating the same failing action. If you'd like, I can retry with a different basemap or a location-only map (no overlay) to confirm the basemap renders — but I can't currently guarantee the ESA WorldCover overlay will display. Previous map render failed (render_failed) during maplibre: A map data source could not be loaded. Check provider availability and try again. The last-known-good map was left unchanged. Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Needs attention Satellite Available Optional Keys Optional Tool activity Needs attention",
+      "raster_events": [
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=548&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=548&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=548&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "resource_type": "fetch",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=548&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=548&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=547&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=546&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=549&format=image%2Fpng"
+        },
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "resource_type": "fetch",
+          "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+          "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=548&format=image%2Fpng"
+        }
+      ],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+        }
+      ],
+      "page_errors": [],
+      "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20260928-raster-diagnostics\\screenshots\\RASTER-LIVE-DIAGNOSTICS\\esa_worldcover_rome.png"
+    }
+  ],
+  "artifacts": {
+    "screenshots": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20260928-raster-diagnostics\\screenshots\\RASTER-LIVE-DIAGNOSTICS",
+    "network": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20260928-raster-diagnostics\\http\\RASTER-LIVE-DIAGNOSTICS"
+  },
+  "tested_commit": "047673c6712512c93cc828895536727255fe2cca"
+}

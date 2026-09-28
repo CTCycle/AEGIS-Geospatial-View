@@ -1,0 +1,229 @@
+{
+  "scenario_id": "fema_new_orleans",
+  "prompt": "Show standalone FEMA NFHL flood zones for New Orleans, Louisiana.",
+  "assistant_response_visible": true,
+  "maplibre_map_count": 0,
+  "maplibre_canvas_count": 0,
+  "ui_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Show standalone FEMA NFHL flood zones for New Orleans, Louisiana. The map candidate for the FEMA NFHL flood zones failed browser rendering, and the system has blocked repeating the same plan. What happened: Location resolved: New Orleans, Orleans Parish, Louisiana, United States. FEMA NFHL flood zone data was retrieved successfully (raster, renderable, evidence available). A map candidate was prepared with the flood-zone overlay on the default basemap. Render verification failed: the FEMA NFHL data source could not be loaded in the browser (source not present, layer not rendered, viewport invalid). The failure is at the MapLibre data-source load stage. A revised attempt was rejected as a repeated failed render, so no further retry is permitted. Outcome: I cannot deliver a verified standalone FEMA NFHL flood zone map for New Orleans right now. The provider data was retrieved, but the flood-zone raster source is not loading in the renderer, and the recovery path is exhausted for this plan. What this means: The flood-zone context is available as retrieved data, but it is not currently renderable as a standalone map layer. This is a provider/renderer availability issue, not a location or data-retrieval problem. If you'd like, I can try a different presentation (for example, a location-only view of New Orleans without the flood-zone overlay), but a verified standalone NFHL flood-zone map is not achievable at this time. Previous map render failed (render_failed) during maplibre: A map data source could not be loaded. Check provider availability and try again. The last-known-good map was left unchanged. Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Needs attention Satellite Available Optional Keys Optional Tool activity Needs attention",
+  "raster_events": [
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3502650.384139918%2C-9999186.292153617%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3483082.504898913%2C-9999186.292153617%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3502650.384139918%2C-9979618.41291261%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3483082.504898913%2C-9979618.41291261%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3502650.384139918%2C-10018754.171394622%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3522218.2633809224%2C-9999186.292153617%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3483082.504898913%2C-10018754.171394622%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3522218.2633809224%2C-9979618.41291261%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3522218.2633809224%2C-10018754.171394622%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3502650.384139918%2C-9960050.533671606%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3483082.504898913%2C-9960050.533671606%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3502650.384139918%2C-10038322.050635627%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3522218.2633809224%2C-9960050.533671606%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3483082.504898913%2C-10038322.050635627%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3522218.2633809224%2C-10038322.050635627%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_CONNECTION_RESET",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3502650.384139918%2C-9999186.292153617%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3483082.504898913%2C-9999186.292153617%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3502650.384139918%2C-9979618.41291261%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3483082.504898913%2C-9979618.41291261%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3502650.384139918%2C-10018754.171394622%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10018754.171394622%2C3522218.2633809224%2C-9999186.292153617%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3483082.504898913%2C-10018754.171394622%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9999186.292153617%2C3522218.2633809224%2C-9979618.41291261%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10038322.050635627%2C3522218.2633809224%2C-10018754.171394622%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3502650.384139918%2C-9960050.533671606%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3483082.504898913%2C-9960050.533671606%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3502650.384139918%2C-10038322.050635627%2C3522218.2633809224&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-9979618.41291261%2C3522218.2633809224%2C-9960050.533671606%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3483082.504898913%2C-10038322.050635627%2C3502650.384139918&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_ABORTED",
+      "url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox=-10057889.929876633%2C3522218.2633809224%2C-10038322.050635627%2C3541786.142621927&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image"
+    }
+  ],
+  "console": [
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x35c001c0400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x35c001c0400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x35c001c0400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x35c001c0400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_RESET"
+    }
+  ],
+  "page_errors": [],
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20260928-raster-diagnostics\\screenshots\\RASTER-LIVE-DIAGNOSTICS\\fema_new_orleans.png"
+}
