@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-28 (`T3-07` remains PARTIAL on `develop@be61298`; GEO-FOCUS-16 follow-up tested on `develop@87ca6942`; PVGIS now passes exact-lane routing, metadata normalization, numeric result narration, and direct-text completion; EEA retrieval is PASS but public raster source loading remains PARTIAL; `GEO-HYD-05`/`GEO-HYD-06` remain BLOCKED; 85 focused regressions, the strict 86-manifest audit, Ruff, and process cleanup pass)
+Last updated: 2026-09-28 (`T3-07` remains PARTIAL on `develop@be61298`; GEO-FOCUS-16 follow-up tested on `develop@87ca6942`; PVGIS now passes exact-lane routing, metadata normalization, numeric result narration, and direct-text completion; EEA retrieval is PASS but public raster source loading remains PARTIAL; `GEO-HYD-05`/`GEO-HYD-06` remain BLOCKED; 85 focused regressions, the strict 86-manifest audit, Ruff, process cleanup, and hosted CI run `36480878494` pass)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
