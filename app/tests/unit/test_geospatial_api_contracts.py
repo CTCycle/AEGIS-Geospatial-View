@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from server.api import geospatial
 from server.api.geospatial import raise_service_http_error
 from server.app import create_app
+from server.domain.geospatial.providers import ProviderResponse
 from server.services.geospatial.api_service import (
     GeospatialApiService,
     GeospatialApiServiceError,
@@ -362,6 +363,51 @@ def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] in {"missing-credential", "ok", "unavailable"}
+
+###############################################################################
+def test_geospatial_raster_features_forward_manifest_metadata_to_provider() -> None:
+    captured: dict[str, object] = {}
+
+    class MetadataRegistry:
+
+        # -------------------------------------------------------------------------
+        def build_from_manifests(self) -> None:
+            return None
+
+        # -------------------------------------------------------------------------
+        async def fetch(self, provider_id, request):
+            captured["provider_id"] = provider_id
+            captured["request"] = request
+            return ProviderResponse(
+                capability_id=request.capability_id,
+                provider_id=provider_id,
+                payload={
+                    "renderingMode": "wmts",
+                    "serviceUrl": request.params["metadata"]["url"],
+                    "layerId": request.params["metadata"]["layer_id"],
+                },
+                result_type="raster",
+            )
+
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        _build_api_service(MetadataRegistry())
+    )
+
+    response = client.get("/api/geospatial/layers/esa_worldcover/features")
+
+    assert response.status_code == 200
+    assert response.json()["payload"]["serviceUrl"] == (
+        "https://services.terrascope.be/wmts/v2"
+    )
+    assert response.json()["payload"]["layerId"] == "WORLDCOVER_2021_MAP"
+    request = captured["request"]
+    assert request.params["metadata"]["url"] == (  # type: ignore[attr-defined]
+        "https://services.terrascope.be/wmts/v2"
+    )
+    assert request.params["metadata"]["layer_id"] == (  # type: ignore[attr-defined]
+        "WORLDCOVER_2021_MAP"
+    )
 
 ###############################################################################
 @pytest.mark.parametrize(

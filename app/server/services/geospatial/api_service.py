@@ -338,6 +338,9 @@ class GeospatialApiService:
         manifest = self._manifest_by_id(layer_id)
         provider_id = str(manifest.get("provider") or "")
         params: dict[str, Any] = {}
+        metadata = json_object(manifest.get("metadata"))
+        if metadata:
+            params["metadata"] = metadata
         if live:
             params["live"] = True
         if incidents:
