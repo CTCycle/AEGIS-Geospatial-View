@@ -1,0 +1,30 @@
+{
+  "tested_at": "2026-09-28",
+  "endpoint_contract": "/api/geospatial/layers/{id}/features",
+  "esa_worldcover": {
+    "status": "ok",
+    "provider": "esa",
+    "result_status": "ok",
+    "result_type": "raster",
+    "payload": {
+      "renderingMode": "wmts",
+      "serviceUrl": "https://services.terrascope.be/wmts/v2",
+      "layerId": "WORLDCOVER_2021_MAP",
+      "tileMatrixSet": "EPSG:3857"
+    }
+  },
+  "fema_nfhl_flood_zones": {
+    "status": "ok",
+    "provider": "fema",
+    "result_status": "ok",
+    "result_type": "raster",
+    "payload": {
+      "renderingMode": "raster-tile",
+      "tileUrl": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256%2C256&format=png32&transparent=true&f=image",
+      "layer": "NFHL"
+    },
+    "attribution": [
+      "Federal Emergency Management Agency"
+    ]
+  }
+}
