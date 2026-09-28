@@ -1,0 +1,59 @@
+{
+  "slice_id": "GEO-FOCUS-16-follow-up",
+  "status": "PARTIAL",
+  "verified_at": "2026-09-28",
+  "tested_commit": "87ca6942",
+  "lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "fallback_used": false,
+    "browser": "Codex in-app Chrome",
+    "runtime_data_root": "runtimes/cache/aegis-route-validation-20260928-01",
+    "backend_port": 7059,
+    "frontend_port": 4512
+  },
+  "scenarios": [
+    {
+      "id": "PVGIS-ROME-20260928",
+      "request": "Estimate PVGIS solar potential near Rome, Italy.",
+      "status": "PASS",
+      "run_id": "run_7731b7c73cca4b9fbf5fac1f7fdaf0dd",
+      "evidence_id": "evidence_620f318fa52a4c31ab82cacc79ef181d",
+      "result_type": "metadata",
+      "result_status": "ok",
+      "solar_potential": {
+        "yearly_kwh_per_kwp": 1267.38,
+        "unit": "kWh/kWp/year"
+      },
+      "map_prepared": false
+    },
+    {
+      "id": "EEA-NOISE-MILAN-20260928",
+      "request": "Show environmental noise exposure around Milan, Italy.",
+      "status": "PARTIAL",
+      "run_id": "run_99df20c2e9ef42898d08dbab4b319aba",
+      "evidence_id": "evidence_b7598a66953d46429524a408fb393b12",
+      "result_type": "raster",
+      "result_status": "ok",
+      "map_eligibility": "renderable",
+      "provider_attribution": "© European Environment Agency (CC BY 4.0 where applicable)",
+      "maplibre_render": "failed_source_load"
+    }
+  ],
+  "automated_checks": {
+    "focused_pytest": "85 passed",
+    "ruff": "passed",
+    "strict_manifest_audit": {
+      "manifest_count": 86,
+      "error_count": 0,
+      "warning_count": 0
+    },
+    "git_diff_check": "passed"
+  },
+  "limitations": [
+    "The EEA provider returned an attributed renderable descriptor, but MapLibre did not load the public raster source and no render acknowledgement was accepted.",
+    "The EEA run ended after repeated invalid recovery tool calls; the public raster source boundary and map-recovery behavior remain PARTIAL.",
+    "The Codex in-app Browser screenshot was captured inline but could not be exported as a local binary artifact in this run.",
+    "This follow-up does not close T3-07 or the broader T3-08–T3-18 matrix."
+  ]
+}
