@@ -1,0 +1,48 @@
+{
+  "campaign": "AEGIS Tier 3 follow-up",
+  "slice_id": "T3-07",
+  "scope": "Live FEMA and ESA public raster source/layer loading, with dependent FEMA plus USGS composition and selective-removal boundaries",
+  "status": "PARTIAL",
+  "verification_date": "2026-09-28",
+  "tested_source": "develop@14e94e09134b00c511138cf1cfe7567bd571d878",
+  "environment": {
+    "launcher": "start_on_windows.ps1 -Action Launch",
+    "backend": "127.0.0.1:7059",
+    "frontend": "127.0.0.1:4512",
+    "browser": "Codex in-app Browser",
+    "data_root": "runtimes/cache/test-runtime/tier3-raster-live-20260928",
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "fallback_used": false
+  },
+  "provider_probe": {
+    "status": "passed",
+    "parse_status": "complete",
+    "protocol": "openai-chat-completions",
+    "duration_ms": 2517
+  },
+  "scenario_status": {
+    "fema_new_orleans": "PARTIAL",
+    "esa_worldcover_rome": "PARTIAL",
+    "geo_hyd_05_fema_usgs_composition": "BLOCKED",
+    "geo_hyd_06_remove_usgs_keep_fema": "BLOCKED"
+  },
+  "evidence": {
+    "fema_evidence_id": "evidence_33d49fac491144cf83bf54a77f225d31",
+    "fema_run_id": "run_ac2d464afe2d4e46a7abd0b896ad62a6",
+    "esa_evidence_id": "evidence_c1737e02dce6462ebb220ea95440dc08",
+    "esa_run_id": "run_82f6eb89429f47228d4f56522a63a7fb",
+    "composition_run_id": "run_6b575e031941484eacc64521c46d174c",
+    "removal_run_id": "run_7580850fe5ce4bc4b433a83fb71c1d11",
+    "focused_tests": "96 passed, 2 pre-existing deprecation warnings",
+    "strict_manifest_audit": "86 manifests, 0 errors, 0 warnings",
+    "ruff": "passed",
+    "cleanup": "ports 4512, 7059, and 9876 free after task-owned services stopped"
+  },
+  "limits": [
+    "Both providers returned renderable raster evidence and attribution, but the live MapLibre source did not load; no raster pixels or map.render_ack were obtained.",
+    "USGS rendered alone after the FEMA failure. The dependent FEMA plus USGS composition and FEMA retention scenarios therefore remain blocked.",
+    "The in-app browser displayed the validation screenshots inline but did not expose a local binary screenshot path.",
+    "T3-08 through T3-18, Tier 4A, Tier 4B, and Tier 5 remain unrun."
+  ]
+}
