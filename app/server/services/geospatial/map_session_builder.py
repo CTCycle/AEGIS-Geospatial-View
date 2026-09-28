@@ -682,6 +682,24 @@ def _geojson_render_data(value: object) -> dict[str, Any] | None:
     for item in normalized_features:
         if not item:
             continue
+        raw_geometry = item.get("geometry")
+        geometry = cast(dict[str, Any], raw_geometry)
+        if isinstance(raw_geometry, dict) and geometry.get("type"):
+            properties = dict(item)
+            properties.pop("latitude", None)
+            properties.pop("longitude", None)
+            properties.pop("geometry", None)
+            properties.pop("type", None)
+            properties.pop("id", None)
+            feature: dict[str, Any] = {
+                "type": "Feature",
+                "geometry": geometry,
+                "properties": properties,
+            }
+            if item.get("id") is not None:
+                feature["id"] = item["id"]
+            features.append(feature)
+            continue
         latitude = item.get("latitude")
         longitude = item.get("longitude")
         if not isinstance(latitude, (int, float)) or isinstance(latitude, bool):

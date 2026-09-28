@@ -506,3 +506,38 @@ def test_raster_summary_is_renderable_only_with_a_source() -> None:
 
     assert renderable["map_eligibility"] == "renderable"
     assert unavailable["map_eligibility"] == "unknown"
+
+
+###############################################################################
+def test_normalized_polygon_feature_is_renderable_and_has_bounds() -> None:
+    summary = _response_summary(
+        ProviderResponse(
+            capability_id="noaa_weather_alerts",
+            provider_id="noaa",
+            payload={
+                "renderingMode": "geojson",
+                "features": [
+                    {
+                        "id": "alert-1",
+                        "category": "weather_alert",
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [
+                                [
+                                    [-95.6, 29.5],
+                                    [-95.3, 29.5],
+                                    [-95.3, 29.9],
+                                    [-95.6, 29.9],
+                                    [-95.6, 29.5],
+                                ]
+                            ],
+                        },
+                    }
+                ],
+            },
+            result_type="features",
+        )
+    )
+
+    assert summary["map_eligibility"] == "renderable"
+    assert summary["bbox"] == [-95.6, 29.5, -95.3, 29.9]
