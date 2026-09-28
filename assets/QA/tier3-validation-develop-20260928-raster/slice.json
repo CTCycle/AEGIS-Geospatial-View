@@ -4,7 +4,7 @@
   "scope": "Public raster descriptor propagation and WMTS/raster renderer contract",
   "status": "PASS",
   "verification_date": "2026-09-28",
-  "tested_source_base": "develop@4225cd6e710dfd50b98955f81896afaa215a7326 plus scoped working-tree changes",
+  "tested_source_base": "develop@9170f813",
   "environment": {
     "backend": "127.0.0.1:7059",
     "frontend": "127.0.0.1:4512",

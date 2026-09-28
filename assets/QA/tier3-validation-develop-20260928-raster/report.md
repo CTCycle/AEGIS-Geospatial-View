@@ -2,7 +2,7 @@
 
 Date: 2026-09-28
 Branch: `develop`
-Starting source: `4225cd6e710dfd50b98955f81896afaa215a7326`
+Tested source: `develop@9170f813`
 Runtime: isolated `runtimes/cache/test-runtime/validation-20260924-exact-lane`
 Services: backend `127.0.0.1:7059`, frontend `127.0.0.1:4512`
 
