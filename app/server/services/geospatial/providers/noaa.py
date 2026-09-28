@@ -482,8 +482,8 @@ def _normalize_noaa_alerts(
         if not is_json_object(item):
             continue
         properties = json_object(item.get("properties"))
-        geometry_source = "alert"
         geometry = _normalize_noaa_geometry(item.get("geometry"))
+        geometry_source = "alert" if geometry is not None else "unresolved"
         zone_urls = _noaa_alert_zone_urls(properties)
         if geometry is None and zone_geometries:
             geometry = _combine_noaa_geometries(
