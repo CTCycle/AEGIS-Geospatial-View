@@ -32,7 +32,7 @@
     "maps.state-preservation": "PARTIAL",
     "agent.map-render-ack-recovery": "PARTIAL",
     "MATRIX-22": "PARTIAL",
-    "HOSTED-CI": "UNRUN pending exact pushed evidence commit",
+    "HOSTED-CI": "PASS: run 36447036544 succeeded on exact evidence commit 51f94d2bc82e8510df1b70730b3b722ca272b64e",
     "PROCESS-CLEANUP": "PASS"
   },
   "scenario_status": {
@@ -65,6 +65,8 @@
     "manifest-audit.log",
     "ruff.log",
     "quality-checks.log",
-    "cleanup-checks.md"
-  ]
+    "cleanup-checks.md",
+    "hosted-ci.json"
+  ],
+  "evidence_commit": "51f94d2bc82e8510df1b70730b3b722ca272b64e"
 }

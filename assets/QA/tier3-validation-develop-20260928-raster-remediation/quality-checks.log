@@ -10,3 +10,4 @@ Ruff command: ruff check . ../tests (cwd app/server; isolated RUFF_CACHE_DIR).
 Ruff result: All checks passed; three access-denied cache traversal warnings, no source diagnostics; exit 0.
 Frontend specs/build: not rerun because no frontend renderer code changed; browser scenarios exercised current source.
 Cleanup: task-owned PIDs stopped; ports 4512, 7059, and 9876 free; cloned SQLite quick_check=ok.
+Hosted CI: run 36447036544 passed 4/4 jobs for evidence commit 51f94d2bc82e8510df1b70730b3b722ca272b64e; https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36447036544
