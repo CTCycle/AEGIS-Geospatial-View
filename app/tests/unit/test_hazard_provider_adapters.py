@@ -309,6 +309,7 @@ def test_noaa_provider_keeps_alert_data_when_zone_geometry_is_temporarily_unavai
     assert response.result_status == "partial"
     assert response.partial is True
     assert response.payload["features"][0]["geometry"] is None
+    assert response.payload["features"][0]["metadata"]["geometrySource"] == "unresolved"
     assert any("zone" in warning.casefold() for warning in response.warnings)
 
 ###############################################################################
