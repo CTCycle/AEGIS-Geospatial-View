@@ -169,6 +169,11 @@ class CapabilityRouter:
         )
         if map_data_reason is not None:
             reasons.append(map_data_reason)
+        proposed, analysis_reason = _normalize_metadata_only_analysis_route(
+            proposed
+        )
+        if analysis_reason is not None:
+            reasons.append(analysis_reason)
         proposed, temporal_reason = _normalize_recent_scope(proposed)
         if temporal_reason is not None:
             reasons.append(temporal_reason)
@@ -949,6 +954,35 @@ def _normalize_recent_scope(
             "recent_scope_normalized_to_current",
         )
     return route, None
+
+
+###############################################################################
+def _normalize_metadata_only_analysis_route(
+    route: CapabilityRoute,
+) -> tuple[CapabilityRoute, str | None]:
+    """Keep metadata-only analytical operations on a text-capable route."""
+
+    if (
+        route.task_mode != "execute"
+        or route.operation != "estimate_solar_potential"
+        or route.presentation not in {"map", "both"}
+    ):
+        return route, None
+
+    secondary_domains = [
+        domain
+        for domain in route.secondary_domains
+        if domain is not CapabilityDomain.MAP_RENDERING
+    ]
+    return (
+        route.model_copy(
+            update={
+                "presentation": "text",
+                "secondary_domains": secondary_domains,
+            }
+        ),
+        "metadata_only_analysis_route_normalized",
+    )
 
 ###############################################################################
 def _normalize_location_map_route(

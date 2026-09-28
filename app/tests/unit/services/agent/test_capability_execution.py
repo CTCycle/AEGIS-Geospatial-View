@@ -401,6 +401,26 @@ def test_weather_summary_exposes_bounded_current_observations() -> None:
 
 
 ###############################################################################
+def test_solar_summary_exposes_bounded_pvgis_estimate() -> None:
+    summary = _response_summary(
+        ProviderResponse(
+            capability_id="pvgis_solar",
+            provider_id="pvgis",
+            payload={
+                "renderingMode": "metadata-only",
+                "yearlyKwhPerKwpEstimate": 1267.38,
+            },
+            result_type="metadata",
+        )
+    )
+
+    assert summary["solar_potential"] == {
+        "yearly_kwh_per_kwp": 1267.38,
+        "unit": "kWh/kWp/year",
+    }
+
+
+###############################################################################
 @pytest.mark.parametrize(
     ("kind", "rows", "expected_fields"),
     [

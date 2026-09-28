@@ -122,6 +122,42 @@ def test_basemap_switch_operations_include_the_manifest_render_primitive() -> No
 
 
 ###############################################################################
+def test_metadata_only_solar_estimate_is_direct_text_and_operation_compatible() -> None:
+    registry = CapabilityRegistry()
+    runtime = RuntimeRegistry()
+    rome = ResolvedLocation(
+        label="Rome",
+        latitude=41.9028,
+        longitude=12.4964,
+        country="Italy",
+    )
+
+    candidates = registry.shortlist(
+        domains={
+            CapabilityDomain.DATA_RETRIEVAL,
+            CapabilityDomain.PLACE_SEARCH,
+            CapabilityDomain.MAP_RENDERING,
+        },
+        queries=[
+            "pvgis solar potential",
+            "solar irradiance estimate",
+            "photovoltaic potential",
+        ],
+        explicit_ids=[],
+        runtime_registry=runtime,
+        operation="estimate_solar_potential",
+        scope_kind="bbox",
+        temporal_mode=None,
+        requires_render=False,
+        location=rome,
+    )
+
+    assert [candidate["id"] for candidate in candidates] == ["pvgis_solar"]
+    assert runtime.supports_mode("pvgis_solar", "map") is False
+    assert runtime.supports_mode("pvgis_solar", "text") is True
+
+
+###############################################################################
 def test_add_layer_operations_include_the_manifest_render_primitives() -> None:
     assert {"show", "overlay"}.issubset(_operation_candidates("add_layer"))
 

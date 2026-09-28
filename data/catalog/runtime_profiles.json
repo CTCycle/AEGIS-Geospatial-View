@@ -1199,7 +1199,7 @@
       "capability_id": "pvgis_solar",
       "enabled_by_default": true,
       "credential_provider": null,
-      "supports_map": true,
+      "supports_map": false,
       "supports_direct_text": true,
       "coverage_policy": "global-except-poles",
       "health_policy": "best_effort",

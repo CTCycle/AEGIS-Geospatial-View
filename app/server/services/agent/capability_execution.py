@@ -544,6 +544,14 @@ def _response_summary(
         summary["source_url"] = response.source_url[:500]
     if response.partial:
         summary["partial"] = True
+    yearly_kwh_per_kwp = payload.get("yearlyKwhPerKwpEstimate")
+    if isinstance(yearly_kwh_per_kwp, (int, float)) and not isinstance(
+        yearly_kwh_per_kwp, bool
+    ):
+        summary["solar_potential"] = {
+            "yearly_kwh_per_kwp": float(yearly_kwh_per_kwp),
+            "unit": "kWh/kWp/year",
+        }
     if payload.get("kind") == "weather_forecast":
         current = payload.get("current")
         if is_json_object(current):
