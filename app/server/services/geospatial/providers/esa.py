@@ -45,37 +45,42 @@ class ESAProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     def _descriptor_payload(
-        self, request: ProviderRequest, metadata: dict[str, object]
-    ) -> dict[str, object]:
-        layer_id = str(
+        self, request: ProviderRequest, metadata: dict[str, Any]
+    ) -> dict[str, Any]:
+        layer_id = (
             metadata.get("layer_id")
             or metadata.get("layers")
             or request.capability_id
         )
-        source_protocol = str(metadata.get("source_protocol") or "WMTS").strip().lower()
-        if source_protocol == "wms":
-            return {
-                "renderingMode": "wms",
-                "serviceUrl": metadata.get("url"),
-                "layerId": layer_id,
-                "crs": str(metadata.get("crs") or "EPSG:3857"),
-                "format": str(
-                    metadata.get("wms_format")
-                    or metadata.get("format")
-                    or "image/png"
-                ),
-                "style": str(metadata.get("style") or ""),
-                "version": str(metadata.get("wms_version") or "1.3.0"),
-                "attribution": metadata.get("attribution") or "ESA / Terrascope",
-            }
-        return {
-            "renderingMode": "wmts",
+        base_payload: dict[str, Any] = {
             "serviceUrl": metadata.get("url"),
             "layerId": layer_id,
-            "tileMatrixSet": str(metadata.get("tile_matrix_set") or "EPSG:3857"),
-            "format": str(metadata.get("wmts_format") or "image/png"),
-            "style": str(metadata.get("wmts_style") or ""),
-            "attribution": metadata.get("attribution") or "ESA / Terrascope",
+            "legend": {
+                "title": metadata.get("label") or "ESA WorldCover",
+                "source": "ESA WorldCover / Terrascope",
+            },
+            "freshnessLabel": "WorldCover 2021 static source layer",
+        }
+        source_protocol = str(
+            metadata.get("source_protocol") or "WMTS"
+        ).strip().lower()
+        if source_protocol == "wms":
+            return {
+                **base_payload,
+                "renderingMode": "wms",
+                "crs": metadata.get("crs") or "EPSG:3857",
+                "format": metadata.get("wms_format")
+                or metadata.get("format")
+                or "image/png",
+                "style": metadata.get("style") or "",
+                "version": metadata.get("wms_version") or "1.3.0",
+            }
+        return {
+            **base_payload,
+            "renderingMode": "wmts",
+            "tileMatrixSet": metadata.get("tile_matrix_set") or "EPSG:3857",
+            "format": metadata.get("wmts_format") or "image/png",
+            "style": metadata.get("wmts_style") or "",
         }
 
     # -------------------------------------------------------------------------
