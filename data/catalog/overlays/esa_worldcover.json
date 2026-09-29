@@ -15,6 +15,11 @@
     "requires_key": false,
     "url": "https://titiler.terrascope.be/wms",
     "layer_id": "esa-worldcover-map-10m-2021-v2_map",
+    "layers": "esa-worldcover-map-10m-2021-v2_map",
+    "crs": "EPSG:3857",
+    "wms_format": "image/png",
+    "wms_version": "1.3.0",
+    "wms_exceptions": "application/vnd.ogc.se_inimage",
     "attribution": "© ESA WorldCover / Terrascope",
     "keywords": [
       "wms",
@@ -64,12 +69,7 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "last_validated": "2026-09-29",
-    "layers": "esa-worldcover-map-10m-2021-v2_map",
-    "crs": "EPSG:3857",
-    "wms_format": "image/png",
-    "wms_version": "1.3.0",
-    "wms_exceptions": "application/vnd.ogc.se_inimage"
+    "last_validated": "2026-09-29"
   },
   "version": 1,
   "last_modified": "2026-09-29T16:13:00+00:00",
@@ -95,10 +95,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "domains": [
-      "data_retrieval",
-      "map_rendering"
-    ],
+    "domains": ["data_retrieval", "map_rendering"],
     "plannerHints": [
       "wms",
       "land-cover",
