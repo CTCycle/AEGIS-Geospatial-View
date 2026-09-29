@@ -1,0 +1,55 @@
+{
+  "browser_direct_provider_requests": {
+    "FEMA": 0,
+    "ESA": 0,
+    "GIBS_all_12": 0
+  },
+  "T3-07": [
+    {
+      "scenario": "FEMA NFHL / New Orleans",
+      "capability_id": "fema_nfhl_flood_zones",
+      "target_proxy_requests": 30,
+      "aegis_statuses": [502],
+      "aegis_content_types": ["application/json"],
+      "target_image_responses": 0,
+      "source_state": "unobserved",
+      "layer_state": "unobserved",
+      "visible_raster_pixels": "unobserved",
+      "attribution": false,
+      "render_ack": "not_accepted",
+      "upstream_category": "transport_error",
+      "upstream_status": null,
+      "upstream_content_type": null
+    },
+    {
+      "scenario": "ESA WorldCover / Rome",
+      "capability_id": "esa_worldcover",
+      "target_proxy_requests": 24,
+      "aegis_statuses": [502],
+      "aegis_content_types": ["application/json"],
+      "target_image_responses": 0,
+      "source_state": "unobserved",
+      "layer_state": "unobserved",
+      "visible_raster_pixels": "unobserved",
+      "attribution": false,
+      "render_ack": "not_accepted",
+      "upstream_category": "transport_error",
+      "upstream_status": null,
+      "upstream_content_type": null
+    }
+  ],
+  "T3-08": [
+    {"capability_id":"SRTM_Color_Index","classification":"raster_render_pass","target_proxy_requests":4,"target_image_responses":4,"statuses":[200],"content_type":"image/png","direct_provider_requests":0,"source":"target_overlay_status_loaded","layer":"visible_and_loaded","pixels":"canvas_present_target_loaded","attribution":"NASA GIBS","render_ack":"render_observed","effective_time":null},
+    {"capability_id":"MODIS_Terra_NDVI_8Day","classification":"raster_render_pass","target_proxy_requests":4,"target_image_responses":4,"statuses":[200],"content_type":"image/png","direct_provider_requests":0,"source":"target_overlay_status_loaded","layer":"visible_and_loaded","pixels":"canvas_present_target_loaded","attribution":"NASA GIBS","render_ack":"render_observed","effective_time":"2026-09-28"},
+    {"capability_id":"IMERG_Precipitation_Rate","classification":"raster_render_pass","target_proxy_requests":1,"target_image_responses":1,"statuses":[200],"content_type":"image/png","direct_provider_requests":0,"source":"target_overlay_status_loaded","layer":"visible_and_loaded","pixels":"canvas_present_target_loaded","attribution":"NASA GIBS","render_ack":"render_observed","effective_time":"2026-09-28"},
+    {"capability_id":"MODIS_Terra_Aerosol","classification":"raster_render_pass","target_proxy_requests":1,"target_image_responses":1,"statuses":[200],"content_type":"image/png","direct_provider_requests":0,"source":"target_overlay_status_loaded","layer":"visible_and_loaded","pixels":"canvas_present_target_loaded","attribution":"NASA GIBS","render_ack":"render_observed","effective_time":"2026-09-29"},
+    {"capability_id":"MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual","classification":"raster_render_pass","target_proxy_requests":4,"target_image_responses":4,"statuses":[200],"content_type":"image/png","direct_provider_requests":0,"source":"target_overlay_status_loaded","layer":"visible_and_loaded","pixels":"canvas_present_target_loaded","attribution":"NASA GIBS","render_ack":"render_observed","effective_time":"2024-01-01"},
+    {"capability_id":"MODIS_Combined_Thermal_Anomalies_Fire","classification":"proxy_route_failure","target_proxy_requests":0,"target_image_responses":0,"statuses":[],"content_type":null,"direct_provider_requests":0,"source":"unobserved","layer":"unobserved","pixels":"unobserved","attribution":null,"render_ack":"unobserved","effective_time":null},
+    {"capability_id":"MODIS_Terra_L3_Land_Water_Mask","classification":"raster_render_pass","target_proxy_requests":4,"target_image_responses":4,"statuses":[200],"content_type":"image/png","direct_provider_requests":0,"source":"target_overlay_status_loaded","layer":"visible_and_loaded","pixels":"canvas_present_target_loaded","attribution":"NASA GIBS","render_ack":"render_observed","effective_time":"2015-01-01"},
+    {"capability_id":"MODIS_Terra_Land_Surface_Temp_Day","classification":"raster_render_pass","target_proxy_requests":1,"target_image_responses":1,"statuses":[200],"content_type":"image/png","direct_provider_requests":0,"source":"target_overlay_status_loaded","layer":"visible_and_loaded","pixels":"canvas_present_target_loaded","attribution":"NASA GIBS","render_ack":"render_observed","effective_time":"2026-09-29"},
+    {"capability_id":"MODIS_Terra_Land_Surface_Temp_Night","classification":"raster_render_pass","target_proxy_requests":1,"target_image_responses":1,"statuses":[200],"content_type":"image/png","direct_provider_requests":0,"source":"target_overlay_status_loaded","layer":"visible_and_loaded","pixels":"canvas_present_target_loaded","attribution":"NASA GIBS","render_ack":"render_observed","effective_time":"2026-09-29"},
+    {"capability_id":"OMPS_Ozone_Total_Column","classification":"raster_render_pass","target_proxy_requests":1,"target_image_responses":1,"statuses":[200],"content_type":"image/png","direct_provider_requests":0,"source":"target_overlay_status_loaded","layer":"visible_and_loaded","pixels":"canvas_present_target_loaded","attribution":"NASA GIBS","render_ack":"render_observed","effective_time":"2026-09-29"},
+    {"capability_id":"VIIRS_SNPP_CorrectedReflectance_TrueColor","classification":"raster_render_pass","target_proxy_requests":4,"target_image_responses":4,"statuses":[200],"content_type":"image/png","direct_provider_requests":0,"source":"target_overlay_status_loaded","layer":"visible_and_loaded","pixels":"canvas_present_target_loaded","attribution":"NASA GIBS","render_ack":"render_observed","effective_time":"2026-09-29"},
+    {"capability_id":"VIIRS_SNPP_DayNightBand_ENCC","classification":"raster_render_pass","target_proxy_requests":4,"target_image_responses":4,"statuses":[200],"content_type":"image/png","direct_provider_requests":0,"source":"target_overlay_status_loaded","layer":"visible_and_loaded","pixels":"canvas_present_target_loaded","attribution":"NASA GIBS","render_ack":"render_observed","effective_time":"2023-07-07"}
+  ]
+}

@@ -38,7 +38,11 @@ from server.services.geospatial.providers.base import (
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
-from server.services.geospatial.providers.http import fetch_bytes_url
+from server.services.geospatial.providers.http import (
+    RasterHttpError,
+    fetch_raster_image_url,
+    raster_diagnostic_scope,
+)
 from server.services.geospatial.providers.tomtom import build_tomtom_tile_url
 from server.services.geospatial.raster_tiles import (
     RasterTileTemplateError,
@@ -417,6 +421,12 @@ class GeospatialApiService:
             raise GeospatialTileCredentialError(
                 "TomTom rejected the configured API key."
             ) from exc
+        except RasterHttpError as exc:
+            if exc.diagnostic.category == "authentication_rejected":
+                raise GeospatialTileCredentialError(
+                    "TomTom rejected the configured API key."
+                ) from exc
+            raise GeospatialTileRequestError("TomTom tile request failed.") from exc
         except (ProviderTimeoutError, ProviderUnavailableError) as exc:
             raise GeospatialTileRequestError("TomTom tile request failed.") from exc
 
@@ -460,10 +470,23 @@ class GeospatialApiService:
             self._sanitize_tile_url(upstream_url),
         )
         try:
-            return await self._fetch_binary_url(upstream_url)
+            with raster_diagnostic_scope(
+                provider_id=provider or "unknown",
+                capability_id=capability_id,
+            ):
+                return await self._fetch_binary_url(upstream_url)
         except ProviderAuthError as exc:
             raise GeospatialTileCredentialError(
                 f"{self._humanize_provider(provider)} rejected the configured credentials."
+            ) from exc
+        except RasterHttpError as exc:
+            self._log_raster_failure(exc)
+            if exc.diagnostic.category == "authentication_rejected":
+                raise GeospatialTileCredentialError(
+                    f"{self._humanize_provider(provider)} rejected the configured credentials."
+                ) from exc
+            raise GeospatialTileRequestError(
+                f"{self._humanize_provider(provider)} tile request failed."
             ) from exc
         except ProviderError as exc:
             raise GeospatialTileRequestError(
@@ -1261,15 +1284,29 @@ class GeospatialApiService:
 
     # -------------------------------------------------------------------------
     async def _fetch_binary_url(self, url: str) -> bytes:
-        body = await fetch_bytes_url(url, {"User-Agent": "AEGIS/1.0"})
+        body = await fetch_raster_image_url(url, {"User-Agent": "AEGIS/1.0"})
         if not body:
             raise ProviderUnavailableError("Provider returned an empty tile body.")
-        # Reject HTML/error payloads that upstreams occasionally return with HTTP 200.
-        signatures = (
-            b"\x89PNG\r\n\x1a\n",
-            b"\xff\xd8\xff",
-            b"RIFF",
-        )
-        if not any(body.startswith(signature) for signature in signatures):
+        # Keep the service boundary defensive for test doubles and future helpers.
+        if not body.startswith(
+            (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"RIFF")
+        ):
             raise ProviderUnavailableError("Provider returned a non-image tile body.")
         return body
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _log_raster_failure(error: RasterHttpError) -> None:
+        diagnostic = error.diagnostic
+        LOGGER.warning(
+            "geospatial_tile_proxy_failure category=%s provider=%s capability=%s "
+            "status=%s content_type=%s content_length=%s phase=%s upstream=%s",
+            diagnostic.category,
+            diagnostic.provider_id or "unknown",
+            diagnostic.capability_id or "unknown",
+            diagnostic.status_code,
+            diagnostic.content_type or "unknown",
+            diagnostic.content_length,
+            diagnostic.failure_phase,
+            diagnostic.upstream,
+        )

@@ -1,0 +1,8 @@
+Focused raster/agent regression selection: 251 passed, 2 dependency deprecation warnings.
+Broader backend unit suite: 994 passed, 1 failed, 2 warnings.
+Broader-suite failure: app/server/test_canonical_runtime_contract.py::test_all_tooling_resolves_disposable_state_under_canonical_cache_root; pre-existing protected .ruff_cache residue was present at the repository root. The residue was preserved and not deleted.
+Ruff modified-file check: passed (All checks passed!).
+Strict Pyright: passed (0 errors, 0 warnings, 0 informations).
+Provider/model structured probe: passed; HTTP 200; parse_status=complete.
+Execution budgets: unchanged from the recorded defaults; no retry or ceiling increase was introduced.
+Frontend production source: unchanged; frontend build/Karma were not rerun for this backend-only slice.

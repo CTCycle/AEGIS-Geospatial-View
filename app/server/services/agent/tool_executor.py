@@ -30,6 +30,15 @@ from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMToolCall
 from server.services.agent.tool_registry import ToolRegistry
 
+
+# Some model lanes emit the concise discovery name even though the native
+# registry intentionally exposes the descriptive canonical name. Normalize
+# only this observed alias at execution time; it is not added to exposure or
+# authorization policy.
+MODEL_TOOL_NAME_ALIASES: dict[str, str] = {
+    "discover_capabilities": "discover_geospatial_capabilities",
+}
+
 ###############################################################################
 class ToolExecutor:
 
@@ -72,8 +81,19 @@ class ToolExecutor:
             task_id=task_id,
             callback=trace_callback or self.trace_callback,
         )
+        canonical_name = MODEL_TOOL_NAME_ALIASES.get(tool_call.name)
+        execution_tool_call = (
+            LLMToolCall(
+                id=tool_call.id,
+                name=canonical_name,
+                arguments=tool_call.arguments,
+                parse_error=tool_call.parse_error,
+            )
+            if canonical_name is not None
+            else tool_call
+        )
         result = await self._execute_tool(
-            tool_call,
+            execution_tool_call,
             state,
             budget,
             call_id=call_id,

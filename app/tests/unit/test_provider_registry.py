@@ -32,6 +32,20 @@ class _Provider:
             payload={"ok": True},
         )
 
+
+class _LayerProvider:
+    provider_id = "gibs"
+
+    async def list_layers(
+        self,
+        *,
+        query: str | None = None,
+        limit: int = 100,
+        refresh: bool = False,
+    ) -> list[object]:
+        del query, limit, refresh
+        return []
+
 ###############################################################################
 class _TimeoutProvider:
     provider_id = "slow"
@@ -149,6 +163,16 @@ def test_provider_registry_errors_for_missing_provider() -> None:
         assert "missing" in str(exc)
     else:
         raise AssertionError("Missing provider unexpectedly resolved.")
+
+###############################################################################
+def test_provider_registry_accepts_nasa_gibs_discovery_alias() -> None:
+    registry = ProviderRegistry(providers=[_LayerProvider()])
+
+    layers = run_async_in_thread(
+        registry.list_layers("nasa_gibs", query="SRTM", limit=20, refresh=False)
+    )
+
+    assert layers == []
 
 ###############################################################################
 def test_provider_registry_builds_manifest_backed_providers() -> None:

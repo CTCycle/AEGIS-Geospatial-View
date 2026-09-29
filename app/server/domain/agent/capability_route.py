@@ -497,8 +497,8 @@ class AgentRunState(BaseModel):
     transition_trace: list[dict[str, str]] = Field(
         default_factory=lambda: list[dict[str, str]]()
     )
-    exposure_trace: list[dict[str, str]] = Field(
-        default_factory=lambda: list[dict[str, str]]()
+    exposure_trace: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
     )
     discovery_attempts: int = Field(default=0, ge=0)
     budget_snapshot: dict[str, object] = Field(

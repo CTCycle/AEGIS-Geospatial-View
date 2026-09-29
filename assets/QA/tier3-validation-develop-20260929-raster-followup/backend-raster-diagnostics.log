@@ -1,0 +1,6 @@
+2026-09-29 FEMA final standalone: geospatial_tile_proxy_failure category=transport_error provider=fema capability=fema_nfhl_flood_zones status=None content_type=unknown content_length=None phase=request upstream=https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export
+2026-09-29 FEMA final standalone: public AEGIS tile response remained normalized as HTTP 502 application/json; no upstream status or content type was available.
+2026-09-29 ESA target-boundary rerun: geospatial_tile_proxy_failure category=transport_error provider=esa capability=esa_worldcover status=None content_type=unknown content_length=None phase=request upstream=https://services.terrascope.be/wmts/v2
+2026-09-29 ESA target-boundary rerun: public AEGIS tile response remained normalized as HTTP 502 application/json; no upstream status or content type was available.
+2026-09-29 browser-final ESA attempt: model trajectory stopped before a target ESA proxy request; this is retained as a trajectory limitation, not as new provider evidence.
+No credentials, authorization headers, tokens, query secrets, response bodies, or provider error documents are retained here.

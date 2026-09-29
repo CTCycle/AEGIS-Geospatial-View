@@ -10,10 +10,17 @@ from typing import Any
 import pytest
 from playwright.sync_api import Page, expect
 
-from tests.e2e.helpers.artifacts import ensure_test_artifact_dirs, write_snapshot
+from tests.e2e.helpers.artifacts import (
+    ensure_test_artifact_dirs,
+    write_log_tail,
+    write_snapshot,
+)
 from tests.e2e.test_live_raster_diagnostics import (
     _RasterCapture,
+    _expand_overlay_controls,
     _provider_probe,
+    _read_conversation_id,
+    _read_latest_run_trace,
     _scenario_result,
 )
 
@@ -89,6 +96,7 @@ def test_live_gibs_raster_layer(
     base_url: str,
     api_base_url: str,
     artifact_root: Path,
+    read_backend_log_tail,
     capability_id: str,
     prompt: str,
     temporal: bool,
@@ -134,9 +142,41 @@ def test_live_gibs_raster_layer(
         expect(stop_button).not_to_be_visible(timeout=90_000)
     page.wait_for_timeout(5_000)
 
+    _expand_overlay_controls(page)
     screenshot = write_snapshot(page, dirs["screenshots"], capability_id)
+    conversation_id = _read_conversation_id(page)
+    run_trace = _read_latest_run_trace(page, api_base_url, conversation_id)
     result: dict[str, Any] = _scenario_result(
-        page, capture, capability_id, prompt, screenshot
+        page,
+        capture,
+        capability_id,
+        prompt,
+        screenshot,
+        expected_capability_id=capability_id,
+        run_trace=run_trace,
+    )
+    backend_tail = read_backend_log_tail(500)
+    raster_diagnostics = [
+        line
+        for line in backend_tail.splitlines()
+        if "geospatial_tile_proxy" in line
+    ][-64:]
+    result["backend_raster_diagnostics"] = raster_diagnostics
+    write_log_tail(
+        dirs["logs"],
+        f"{TEST_ID}-{capability_id}",
+        "\n".join(raster_diagnostics),
+    )
+    trace_temporal = {}
+    if isinstance(run_trace, dict):
+        candidate_temporal = run_trace.get("temporal_evidence")
+        if isinstance(candidate_temporal, dict):
+            trace_temporal = candidate_temporal
+    temporal_evidence = result.get("temporal_evidence")
+    proxy_temporal = (
+        temporal_evidence.get("proxy_time_parameters", [])
+        if isinstance(temporal_evidence, dict)
+        else []
     )
     result.update(
         {
@@ -144,8 +184,18 @@ def test_live_gibs_raster_layer(
             "capability_id": capability_id,
             "temporal": temporal,
             "requested_time": None,
-            "effective_time": "provider_default_or_unobserved",
-            "provider_descriptor": "unobserved_in_browser",
+            "effective_time": (
+                trace_temporal.get("effective_time")
+                or trace_temporal.get("observation_time")
+                or trace_temporal.get("provider_time")
+                or "unobserved"
+            ),
+            "provider_default_time": trace_temporal.get(
+                "provider_default_time"
+            )
+            or trace_temporal.get("default_time"),
+            "proxy_time_parameters": proxy_temporal,
+            "provider_descriptor_time": trace_temporal.get("layer_time"),
         }
     )
     (dirs["http"] / f"{capability_id}.json").write_text(

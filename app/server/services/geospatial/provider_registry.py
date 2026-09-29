@@ -62,6 +62,15 @@ from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvi
 ProviderFactory = Callable[[str | None], Any]
 
 
+# Provider source modules may use descriptive filenames, while manifests and
+# runtime providers use their canonical public IDs. Keep this compatibility
+# mapping narrow to the provider-discovery boundary rather than duplicating
+# provider registrations.
+PROVIDER_ID_ALIASES: dict[str, str] = {
+    "nasa_gibs": "gibs",
+}
+
+
 PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "arcgis": lambda _credential: ArcGISRestProvider(),
     "census": lambda _credential: CensusProvider(),
@@ -445,7 +454,7 @@ class ProviderRegistry:
         normalized = str(provider_id).strip().lower()
         if not normalized:
             raise ProviderNotRegisteredError("Provider id is required.")
-        return normalized
+        return PROVIDER_ID_ALIASES.get(normalized, normalized)
 
     # -------------------------------------------------------------------------
     def _ensure_circuit_closed(self, provider_id: str) -> None:

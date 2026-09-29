@@ -508,6 +508,11 @@ def _bounded_render_payload(value: Any) -> Any:
     """Keep only the normalized feature payload required by the map client."""
 
     payload = json_object(value)
+    render_payload = json_object(payload.get("render"))
+    if render_payload:
+        bounded_render = _bounded_render_payload(render_payload)
+        if bounded_render is not None:
+            return {"render": bounded_render}
     features = payload.get("features")
     if isinstance(features, list):
         features = cast(list[Any], features)
@@ -525,15 +530,24 @@ def _bounded_render_payload(value: Any) -> Any:
         "serviceUrl",
         "service_url",
         "source_url",
+        "source_protocol",
         "layers",
         "layerId",
         "layer_id",
         "source_layer",
         "tileMatrixSet",
         "tile_matrix_set",
+        "tile_size",
+        "min_zoom",
+        "max_zoom",
         "format",
         "version",
         "style",
+        "crs",
+        "time",
+        "default_time",
+        "attribution",
+        "attribution_url",
         "bounds",
         "legend",
     }

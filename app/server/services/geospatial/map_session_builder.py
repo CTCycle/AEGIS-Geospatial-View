@@ -396,13 +396,14 @@ class MapSessionBuilder:
             or descriptor.get("type")
             or ""
         )
+        provider = str(
+            render.get("provider")
+            or descriptor.get("provider")
+            or ""
+        )
         proxy_template = build_backend_raster_proxy_template(
             str(descriptor.get("capability_id") or descriptor.get("id") or ""),
-            provider=str(
-                render.get("provider")
-                or descriptor.get("provider")
-                or ""
-            ),
+            provider=provider,
             render={
                 "rendering_mode": rendering_mode,
                 "time": render.get("time") or descriptor.get("time"),
@@ -429,8 +430,35 @@ class MapSessionBuilder:
         descriptor["url"] = proxy_template
         descriptor["tile_url_template"] = proxy_template
         if render:
+            # The client only accepts a nested render descriptor when its
+            # identity fields are complete. Preserve the provider selected
+            # for the proxy route so temporal and zoom metadata are retained.
+            render.setdefault("provider", provider)
+            render.setdefault(
+                "layer_id",
+                descriptor.get("layer_id")
+                or descriptor.get("layerId")
+                or descriptor.get("capability_id"),
+            )
+            render.setdefault("rendering_mode", rendering_mode)
             render["tile_url_template"] = proxy_template
             descriptor["render"] = render
+            for key in (
+                "time",
+                "default_time",
+                "min_zoom",
+                "max_zoom",
+                "tile_size",
+                "crs",
+                "source_protocol",
+                "format",
+                "style",
+                "tile_matrix_set",
+                "attribution",
+                "attribution_url",
+            ):
+                if key not in descriptor and render.get(key) is not None:
+                    descriptor[key] = render[key]
 
     # -------------------------------------------------------------------------
     @staticmethod

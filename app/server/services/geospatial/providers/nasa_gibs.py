@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from typing import Literal
 from xml.etree import ElementTree
 
@@ -73,10 +74,34 @@ class NASAGIBSProvider(GeospatialProvider):
         limit: int = 100,
         refresh: bool = False,
     ) -> list[GeospatialProviderLayerDescriptor]:
-        wmts = self._parse_wmts_layers(
-            await self._load_wmts_capabilities(refresh=refresh)
-        )
-        wms = self._parse_wms_layers(await self._load_wms_capabilities(refresh=refresh))
+        wmts: dict[str, ParsedGIBSLayer] = {}
+        wms: dict[str, ParsedGIBSLayer] = {}
+        wmts_error: ProviderUnavailableError | None = None
+        wms_error: ProviderUnavailableError | None = None
+
+        # WMTS is preferred for browser tiles, but the public GIBS service can
+        # expose WMS while its WMTS capabilities endpoint is unavailable. A
+        # failure in one discovery protocol must not hide a valid descriptor
+        # from the other protocol.
+        try:
+            wmts = self._parse_wmts_layers(
+                await self._load_wmts_capabilities(refresh=refresh)
+            )
+        except ProviderUnavailableError as exc:
+            wmts_error = exc
+
+        try:
+            wms = self._parse_wms_layers(
+                await self._load_wms_capabilities(refresh=refresh)
+            )
+        except ProviderUnavailableError as exc:
+            wms_error = exc
+
+        if not wmts and not wms:
+            raise wmts_error or wms_error or ProviderUnavailableError(
+                "NASA GIBS capabilities could not be fetched."
+            )
+
         layers = self._merge_layer_descriptors(wmts, wms)
         query_text = str(query or "").strip().casefold()
         if query_text:
@@ -96,7 +121,14 @@ class NASAGIBSProvider(GeospatialProvider):
         refresh: bool = False,
     ) -> GeospatialProviderLayerDescriptor:
         normalized = str(layer_id).strip()
-        for layer in await self.list_layers(limit=250, refresh=refresh):
+        # Query the bounded provider catalog by the requested identifier so a
+        # valid layer beyond the first page remains discoverable. The public
+        # GIBS catalog is larger than the metadata page ceiling.
+        for layer in await self.list_layers(
+            query=normalized,
+            limit=250,
+            refresh=refresh,
+        ):
             if layer.layer_id == normalized:
                 return layer
         raise ProviderUnavailableError(f"NASA GIBS layer '{layer_id}' was not found.")
@@ -341,7 +373,7 @@ class NASAGIBSProvider(GeospatialProvider):
                 tile_matrix_set=matrix_set,
                 tile_size=256,
                 min_zoom=0,
-                max_zoom=9,
+                max_zoom=self._max_zoom_for_matrix_set(matrix_set),
                 attribution=[NASA_ATTRIBUTION],
             )
         if "wms" in layer.protocols:
@@ -416,3 +448,10 @@ class NASAGIBSProvider(GeospatialProvider):
             "image/jpeg": "jpg",
             "image/jpg": "jpg",
         }.get(image_format.lower(), "png")
+
+    @staticmethod
+    def _max_zoom_for_matrix_set(matrix_set: str) -> int:
+        match = re.search(r"(?:^|[_:])level(\d+)$", matrix_set, re.IGNORECASE)
+        if match is None:
+            return 9
+        return max(0, min(int(match.group(1)), 24))
