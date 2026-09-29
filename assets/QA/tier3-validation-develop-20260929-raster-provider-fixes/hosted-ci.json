@@ -1,11 +1,13 @@
 {
-  "status": "pending",
+  "status": "success",
   "branch": "develop",
-  "required_jobs": [
-    "capability-contract-validation",
-    "backend-unit-tests",
-    "frontend-build-and-tests",
-    "persistence-conformance"
-  ],
-  "note": "Updated after the final develop push and hosted-CI run."
+  "commit": "1c5b34fc00c1611bc681322d76275212836cae64",
+  "run_id": 36628941155,
+  "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36628941155",
+  "required_jobs": {
+    "capability-contract-validation": "success",
+    "backend-unit-tests": "success",
+    "frontend-build-and-tests": "success",
+    "persistence-conformance": "success"
+  }
 }
