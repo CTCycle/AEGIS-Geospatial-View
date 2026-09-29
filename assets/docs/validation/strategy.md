@@ -75,13 +75,14 @@ trusting downstream feature evidence.
 The current roll-up is 30 `PASS`, 1 `PARTIAL`, 0 `BLOCKED`, and 37 `UNRUN`.
 
 The 2026-09-29 T3-07/T3-08 implementation follow-up centralizes public
-raster browser transport at the manifest-backed AEGIS tile proxy. Local WMS,
-WMTS, XYZ, coordinate, binary-payload, descriptor, and generic MapLibre
-consumer contracts pass. The required exact `opencode-go /
-deepseek-v4.1-flash` browser lane was unavailable, so the FEMA/ESA scenarios
-and all 12 GIBS cases stopped at preflight; no provider response, source/layer
-state, pixels, screenshot, or `map.render_ack` was recorded. `T3-07` therefore
-remains `PARTIAL` and `T3-08` remains `UNRUN`.
+raster browser transport at the manifest-backed AEGIS tile proxy, including
+the native map-plan descriptor path. Local WMS, WMTS, XYZ, coordinate,
+binary-payload, descriptor, and generic MapLibre consumer contracts pass. The
+required exact `opencode-go / deepseek-v4.1-flash` browser lane passed: FEMA
+and ESA requests stayed on the AEGIS proxy, but provider tiles returned `502`
+before source/layer state or `map.render_ack`; all 12 GIBS prompts reached the
+assistant execution limit before raster routing. `T3-07` therefore remains
+`PARTIAL` and `T3-08` remains `UNRUN`.
 
 The recommended execution order is numeric order within each tier. A blocked
 credential or optional dataset slice may be deferred without stopping unrelated

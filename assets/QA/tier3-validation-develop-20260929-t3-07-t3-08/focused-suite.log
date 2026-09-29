@@ -3,6 +3,11 @@ result: PASS
 tests: 71 passed
 warnings: 2 dependency deprecation warnings
 
+post-proxy command: app\\server\\.venv\\Scripts\\python.exe -m pytest -c app/server/pyproject.toml app/tests/unit/services/agent/test_map_plan_service.py app/tests/unit/services/geospatial/test_render_descriptors.py app/tests/unit/test_geospatial_api_contracts.py app/tests/unit/test_app_factory.py -q
+post-proxy result: PASS
+post-proxy tests: 91 passed
+post-proxy warnings: 2 dependency deprecation warnings
+
 command: app\server\.venv\Scripts\python.exe -m pytest -c app/server/pyproject.toml app/tests/unit -q
 result: PASS
 tests: 971 passed

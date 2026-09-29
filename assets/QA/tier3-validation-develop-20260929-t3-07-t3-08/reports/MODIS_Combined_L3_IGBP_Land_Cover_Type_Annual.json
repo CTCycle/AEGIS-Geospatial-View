@@ -2,14 +2,20 @@
   "test_id": "GIBS-RASTER-MATRIX",
   "capability_id": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
   "temporal": true,
+  "tested_commit": "411adb4fc0c1-dirty",
   "provider_probe": {
     "http_status": 200,
-    "provider": "",
-    "model": "",
-    "protocol": "unknown",
-    "status": "failed",
-    "parse_status": "failed",
-    "duration_ms": 0
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "protocol": "openai-chat-completions",
+    "status": "passed",
+    "parse_status": "complete"
   },
-  "classification": "provider_lane_unavailable"
+  "classification": "proxy_route_failure",
+  "execution_boundary": "agent_execution_limit_before_raster_route",
+  "assistant_response_visible": true,
+  "proxy_request_count": 0,
+  "direct_upstream_request_count": 0,
+  "maplibre_map_count": 0,
+  "maplibre_canvas_count": 0
 }

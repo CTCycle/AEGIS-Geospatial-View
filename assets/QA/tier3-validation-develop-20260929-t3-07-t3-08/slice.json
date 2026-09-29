@@ -1,41 +1,46 @@
 {
   "date": "2026-09-29",
   "branch": "develop",
-  "tested_commit": "b0be47ccdf40a5288d205607e45e5d9aaa079d5a-dirty",
+  "tested_commit": "411adb4fc0c1-dirty",
   "required_lane": {
     "provider": "opencode-go",
     "model": "deepseek-v4.1-flash"
   },
   "observed_lane_probe": {
     "http_status": 200,
-    "provider": "",
-    "model": "",
-    "protocol": "unknown",
-    "status": "failed",
-    "parse_status": "failed",
-    "duration_ms": 0
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "protocol": "openai-chat-completions",
+    "status": "passed",
+    "parse_status": "complete",
+    "duration_ms": 3168
   },
   "gates": {
     "T3-07": {
       "status": "PARTIAL",
-      "classification": "provider_lane_unavailable",
-      "reason": "FEMA and ESA browser scenarios skipped before provider discovery or raster transport because the required exact lane was unavailable."
+      "classification": "upstream_request_failure_after_proxy",
+      "reason": "FEMA and ESA browser requests used the AEGIS proxy with zero direct-upstream requests, but provider tile requests returned 502 responses before MapLibre source/layer acknowledgement."
     },
     "T3-08": {
       "status": "UNRUN",
-      "classification": "provider_lane_unavailable",
+      "classification": "agent_execution_limit_before_raster_route",
       "advertised_layer_count": 12,
-      "reason": "All parameterized GIBS cases skipped before layer discovery because the required exact lane was unavailable."
+      "reason": "All 12 GIBS browser cases ran with the exact lane but reached the assistant execution limit before layer selection produced a raster route; proxy and direct-upstream requests were both zero."
     }
   },
   "browser_evidence": {
-    "proxy_requests": 0,
-    "proxy_responses": 0,
+    "fema_esa_proxy_requests": 113,
+    "fema_esa_proxy_responses": 95,
+    "fema_esa_successful_provider_images": 0,
+    "fema_esa_provider_error_responses": 12,
+    "direct_upstream_requests": 0,
+    "gibs_matrix_proxy_requests": 0,
+    "gibs_matrix_direct_upstream_requests": 0,
     "source_state": "unobserved",
     "layer_state": "unobserved",
     "visible_raster_pixels": "unobserved",
     "render_ack": "unobserved",
-    "screenshots": 0
+    "screenshots": 2
   },
   "rollup": {
     "before": "30 PASS / 1 PARTIAL / 0 BLOCKED / 37 UNRUN",

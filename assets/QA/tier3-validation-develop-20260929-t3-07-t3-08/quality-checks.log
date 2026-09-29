@@ -6,5 +6,11 @@
 2026-09-29 | Angular production build | PASS
 2026-09-29 | frontend Karma | PASS | 254 SUCCESS
 2026-09-29 | geospatial browser smoke | PASS | 6 SUCCESS
-2026-09-29 | live FEMA/ESA diagnostic | SKIPPED | exact opencode-go/deepseek-v4.1-flash lane unavailable
-2026-09-29 | live NASA GIBS matrix | SKIPPED | 12 cases; exact opencode-go/deepseek-v4.1-flash lane unavailable
+2026-09-29 | live FEMA/ESA diagnostic | HISTORICAL | pre-key run skipped at unavailable exact-lane preflight; superseded by rerun below
+2026-09-29 | live NASA GIBS matrix | HISTORICAL | pre-key run skipped at unavailable exact-lane preflight; superseded by rerun below
+2026-09-29 | exact-lane provider probe rerun | PASS | opencode-go/deepseek-v4.1-flash; HTTP 200; complete parse
+2026-09-29 | live FEMA/ESA diagnostic rerun | PASS | 113 proxy requests; 0 direct-upstream requests; 12 provider 502 responses; no acknowledged provider raster
+2026-09-29 | live NASA GIBS matrix rerun | PASS | 12 browser cases executed; all reached the assistant execution limit before raster routing; T3-08 remains UNRUN
+2026-09-29 | scoped backend regression after proxy fix | PASS | 91 passed; 2 dependency deprecation warnings
+2026-09-29 | final Pyright after proxy fix | PASS | 0 errors, 0 warnings, 0 informations
+2026-09-29 | final Ruff after proxy fix | PASS | All changed Python checks passed with --no-cache

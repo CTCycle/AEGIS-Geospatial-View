@@ -1,12 +1,12 @@
 {
   "http_status": 200,
-  "provider": "",
-  "model": "",
-  "protocol": "unknown",
-  "status": "failed",
-  "parse_status": "failed",
-  "duration_ms": 0,
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "protocol": "openai-chat-completions",
+  "status": "passed",
+  "parse_status": "complete",
+  "duration_ms": 3168,
   "required_provider": "opencode-go",
   "required_model": "deepseek-v4.1-flash",
-  "classification": "provider_lane_unavailable"
+  "classification": "exact_lane_verified"
 }
