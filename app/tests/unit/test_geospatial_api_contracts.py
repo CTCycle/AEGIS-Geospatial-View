@@ -413,7 +413,7 @@ def test_geospatial_esa_tile_proxy_materializes_wms_getmap_request() -> None:
 
     async def fake_fetch_binary_url(url: str) -> bytes:
         captured["url"] = url
-        return b"\\x89PNG\\r\\n\\x1a\\npng-tile"
+        return b"\x89PNG\r\n\x1a\npng-tile"
 
     service = _build_api_service(ProviderRegistry())
     service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
@@ -502,7 +502,6 @@ def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time(
     )
 
 ###############################################################################
-###############################################################################
 def test_static_gibs_fire_capability_uses_current_provider_native_layer() -> None:
     captured: dict[str, str] = {}
 
@@ -531,7 +530,7 @@ def test_static_gibs_fire_capability_uses_current_provider_native_layer() -> Non
 
     async def fake_fetch_binary_url(url: str) -> bytes:
         captured["url"] = url
-        return b"\\x89PNG\\r\\n\\x1a\\npng-tile"
+        return b"\x89PNG\r\n\x1a\npng-tile"
 
     service = _build_api_service(GibsRegistry())
     service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
