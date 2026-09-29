@@ -408,7 +408,7 @@ def test_geospatial_fema_tile_proxy_materializes_bounded_export_request() -> Non
     assert query["f"] == ["image"]
 
 ###############################################################################
-def test_geospatial_esa_tile_proxy_materializes_wmts_row_column_and_matrix() -> None:
+def test_geospatial_esa_tile_proxy_materializes_bounded_wms_get_map_request() -> None:
     captured: dict[str, str] = {}
 
     async def fake_fetch_binary_url(url: str) -> bytes:
@@ -427,14 +427,22 @@ def test_geospatial_esa_tile_proxy_materializes_wmts_row_column_and_matrix() -> 
     assert response.status_code == 200
     parsed = urlsplit(captured["url"])
     query = parse_qs(parsed.query)
-    assert parsed.netloc == "services.terrascope.be"
-    assert query["service"] == ["WMTS"]
-    assert query["layer"] == ["WORLDCOVER_2021_MAP"]
-    assert query["tilematrixset"] == ["EPSG:3857"]
-    assert query["tilematrix"] == ["EPSG:3857:4"]
-    assert query["tilerow"] == ["6"]
-    assert query["tilecol"] == ["5"]
+    assert parsed.netloc == "titiler.terrascope.be"
+    assert query["service"] == ["WMS"]
+    assert query["request"] == ["GetMap"]
+    assert query["layers"] == ["esa-worldcover-map-10m-2021-v2_map"]
+    assert query["crs"] == ["EPSG:3857"]
+    assert query["version"] == ["1.3.0"]
     assert query["format"] == ["image/png"]
+    assert query["transparent"] == ["true"]
+    assert query["width"] == ["256"]
+    assert query["height"] == ["256"]
+    assert query["time"] == ["2021-01-01"]
+    assert query["bbox"] == [
+        ",".join(str(value) for value in web_mercator_tile_bbox(4, 5, 6))
+    ]
+    assert query["exceptions"] == ["application/vnd.ogc.se_inimage"]
+    assert "tilematrix" not in query
 
 ###############################################################################
 def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time() -> None:
@@ -494,6 +502,72 @@ def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time(
         "MODIS_Terra_NDVI_8Day/default/2026-06-20/"
         "GoogleMapsCompatible_Level9/2/3/1.png"
     )
+
+###############################################################################
+def test_geospatial_gibs_stable_capability_maps_to_provider_layer_and_time() -> None:
+    captured: dict[str, str] = {}
+
+    class GibsRegistry:
+
+        async def describe_layer(self, provider_id: str, layer_id: str):
+            assert provider_id == "gibs"
+            assert layer_id == "MODIS_Combined_Thermal_Anomalies_All"
+            return GeospatialProviderLayerDescriptor(
+                provider="gibs",
+                layer_id=layer_id,
+                title="MODIS Combined Thermal Anomalies",
+                rendering_mode="wms",
+                source_protocol="wms",
+                data_format="image/png",
+                geometry_type="raster-grid",
+                default_time="2026-09-27",
+                render=GeospatialLayerRenderDescriptor(
+                    provider="gibs",
+                    layer_id=layer_id,
+                    rendering_mode="wms",
+                    source_protocol="wms",
+                    url="https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+                    crs="EPSG:3857",
+                    format="image/png",
+                    default_time="2026-09-27",
+                    attribution=["© NASA GIBS"],
+                ),
+                attribution=["© NASA GIBS"],
+            )
+
+    async def fake_fetch_binary_url(url: str) -> bytes:
+        captured["url"] = url
+        return b"\x89PNG\r\n\x1a\npng-tile"
+
+    service = _build_api_service(GibsRegistry())
+    service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get(
+        "/api/geospatial/tiles/MODIS_Combined_Thermal_Anomalies_Fire/2/1/3.png"
+        "?time=2026-09-28"
+    )
+
+    assert response.status_code == 200
+    parsed = urlsplit(captured["url"])
+    query = parse_qs(parsed.query)
+    assert parsed.netloc == "gibs.earthdata.nasa.gov"
+    assert query["service"] == ["WMS"]
+    assert query["request"] == ["GetMap"]
+    assert query["layers"] == ["MODIS_Combined_Thermal_Anomalies_All"]
+    assert query["crs"] == ["EPSG:3857"]
+    assert query["version"] == ["1.3.0"]
+    assert query["format"] == ["image/png"]
+    assert query["transparent"] == ["true"]
+    assert query["width"] == ["256"]
+    assert query["height"] == ["256"]
+    assert query["time"] == ["2026-09-28"]
+    assert query["bbox"] == [
+        ",".join(str(value) for value in web_mercator_tile_bbox(2, 1, 3))
+    ]
 
 ###############################################################################
 def test_geospatial_tile_proxy_rejects_malformed_coordinates_before_network() -> None:
@@ -698,7 +772,7 @@ def test_geospatial_raster_features_forward_manifest_metadata_to_provider() -> N
                 capability_id=request.capability_id,
                 provider_id=provider_id,
                 payload={
-                    "renderingMode": "wmts",
+                    "renderingMode": "wms",
                     "serviceUrl": request.params["metadata"]["url"],
                     "layerId": request.params["metadata"]["layer_id"],
                 },
@@ -714,15 +788,17 @@ def test_geospatial_raster_features_forward_manifest_metadata_to_provider() -> N
 
     assert response.status_code == 200
     assert response.json()["payload"]["serviceUrl"] == (
-        "https://services.terrascope.be/wmts/v2"
+        "https://titiler.terrascope.be/wms"
     )
-    assert response.json()["payload"]["layerId"] == "WORLDCOVER_2021_MAP"
+    assert response.json()["payload"]["layerId"] == (
+        "esa-worldcover-map-10m-2021-v2_map"
+    )
     request = captured["request"]
     assert request.params["metadata"]["url"] == (  # type: ignore[attr-defined]
-        "https://services.terrascope.be/wmts/v2"
+        "https://titiler.terrascope.be/wms"
     )
     assert request.params["metadata"]["layer_id"] == (  # type: ignore[attr-defined]
-        "WORLDCOVER_2021_MAP"
+        "esa-worldcover-map-10m-2021-v2_map"
     )
 
 ###############################################################################

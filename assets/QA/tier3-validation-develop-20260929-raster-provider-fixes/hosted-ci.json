@@ -1,0 +1,11 @@
+{
+  "status": "pending",
+  "branch": "develop",
+  "required_jobs": [
+    "capability-contract-validation",
+    "backend-unit-tests",
+    "frontend-build-and-tests",
+    "persistence-conformance"
+  ],
+  "note": "Updated after the final develop push and hosted-CI run."
+}

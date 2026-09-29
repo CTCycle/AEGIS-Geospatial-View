@@ -69,7 +69,7 @@ PROVIDER_SMOKE_CHECKS = (
     LiveCheck(
         provider_id="esa",
         access_mode="configuration_dependent",
-        skip_message="ESA smoke validation requires a catalog-supplied WMTS URL.",
+        skip_message="ESA smoke validation requires a catalog-supplied WMS URL.",
     ),
     LiveCheck(
         provider_id="eurostat",

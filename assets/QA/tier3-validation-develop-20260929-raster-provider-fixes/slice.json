@@ -1,0 +1,33 @@
+{
+  "package": "tier3-validation-develop-20260929-raster-provider-fixes",
+  "date": "2026-09-29",
+  "branch": "develop",
+  "base_commit": "643ecf3fa018f2f86569b1dd87c1d83973b623e",
+  "tested_source_boundary": "develop working tree with the scoped raster-provider fixes",
+  "lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "protocol": "openai-chat-completions"
+  },
+  "services": {
+    "frontend": "http://127.0.0.1:4512",
+    "backend": "http://127.0.0.1:7059",
+    "browser": "Playwright Chromium 149.0.7827.55 (v1228)"
+  },
+  "scopes": [
+    "T3-07 ESA WorldCover and FEMA NFHL raster transport/render boundary",
+    "T3-08 complete 12-case NASA GIBS raster matrix"
+  ],
+  "classification": {
+    "ESA": "PASS",
+    "FEMA transport_render": "PARTIAL",
+    "FEMA composition_removal": "UNPROVEN",
+    "T3-07": "PARTIAL",
+    "T3-08": "PASS",
+    "GIBS_acceptance": "12/12"
+  },
+  "limitations": [
+    "FEMA remains an upstream transport failure; no speculative FEMA implementation change was made.",
+    "The first full matrix attempt had one transient exact-lane discovery-tool failure; that advertised case was rerun with the same provider/model and passed all browser criteria."
+  ]
+}

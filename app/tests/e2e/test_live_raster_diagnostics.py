@@ -29,6 +29,7 @@ MAX_TEXT = 8000
 RASTER_HOSTS = {
     "hazards.fema.gov",
     "services.terrascope.be",
+    "titiler.terrascope.be",
     "gibs.earthdata.nasa.gov",
 }
 SENSITIVE_QUERY_MARKERS = (
