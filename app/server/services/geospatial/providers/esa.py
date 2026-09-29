@@ -52,37 +52,35 @@ class ESAProvider(GeospatialProvider):
             or metadata.get("layers")
             or request.capability_id
         )
-        if protocol == "wms":
-            return {
-                "renderingMode": "wms",
-                "serviceUrl": metadata.get("url"),
-                "layerId": layer_id,
-                "layers": layer_id,
-                "crs": metadata.get("crs") or "EPSG:3857",
-                "format": metadata.get("format")
-                or metadata.get("wms_format")
-                or "image/png",
-                "version": metadata.get("wms_version") or "1.3.0",
-                "exceptions": metadata.get("wms_exceptions")
-                or "application/vnd.ogc.se_inimage",
-                "legend": {
-                    "title": metadata.get("label") or "ESA WorldCover",
-                    "source": "ESA WorldCover / Terrascope",
-                },
-                "freshnessLabel": "WorldCover 2021 static source layer",
-            }
-        return {
-            "renderingMode": "wmts",
+        base_payload: dict[str, Any] = {
             "serviceUrl": metadata.get("url"),
             "layerId": layer_id,
-            "tileMatrixSet": metadata.get("tile_matrix_set") or "EPSG:3857",
-            "format": metadata.get("wmts_format") or "image/png",
-            "style": metadata.get("wmts_style") or "",
             "legend": {
                 "title": metadata.get("label") or "ESA WorldCover",
                 "source": "ESA WorldCover / Terrascope",
             },
             "freshnessLabel": "WorldCover 2021 static source layer",
+        }
+        if protocol == "wms":
+            return {
+                **base_payload,
+                "renderingMode": "wms",
+                "layers": layer_id,
+                "crs": metadata.get("crs") or "EPSG:3857",
+                "format": metadata.get("wms_format")
+                or metadata.get("format")
+                or "image/png",
+                "style": metadata.get("style") or "",
+                "version": metadata.get("wms_version") or "1.3.0",
+                "exceptions": metadata.get("wms_exceptions")
+                or "application/vnd.ogc.se_inimage",
+            }
+        return {
+            **base_payload,
+            "renderingMode": "wmts",
+            "tileMatrixSet": metadata.get("tile_matrix_set") or "EPSG:3857",
+            "format": metadata.get("wmts_format") or "image/png",
+            "style": metadata.get("wmts_style") or "",
         }
 
     # -------------------------------------------------------------------------
