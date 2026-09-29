@@ -6,6 +6,7 @@ from typing import Any
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import CapabilityRoute
 from server.domain.agent.capability_route import AgentPhase, AgentRunState
+from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.tool_definitions import CapabilityDiscoveryInput
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
 
@@ -156,3 +157,40 @@ def test_catalog_inventory_page_matches_model_observation_limit() -> None:
     assert len(result.data["capabilities"]) == 12  # type: ignore[index]
     assert result.data["next_cursor"] == "12"  # type: ignore[index]
     assert result.data["total"] == 15  # type: ignore[index]
+
+
+###############################################################################
+def test_point_location_is_lowered_to_provider_bbox_for_execution_discovery() -> None:
+    registry = _CapabilityRegistry()
+    handler = CatalogToolHandler(
+        capability_registry=registry,  # type: ignore[arg-type]
+        runtime_registry=_RuntimeRegistry(),  # type: ignore[arg-type]
+    )
+    state = AgentRunState(
+        request_id="request-point-discovery",
+        conversation_id="conversation-point-discovery",
+        phase=AgentPhase.BUILD_TOOL_CONTEXT,
+        user_message="Show aerosol over Rome.",
+        route=CapabilityRoute(
+            primary_domain=CapabilityDomain.MAP_RENDERING,
+            secondary_domains=[CapabilityDomain.DATA_RETRIEVAL],
+            task_mode="execute",
+            presentation="map",
+            requires_location=True,
+            capability_queries=["aerosol"],
+            operation="render_layer",
+            target_refs=["Rome, Italy"],
+            spatial_scope={"kind": "point", "target_refs": ["Rome, Italy"]},
+        ),
+    )
+    state.location_refs["rome, italy"] = ResolvedLocation(
+        label="Rome, Italy",
+        latitude=41.89,
+        longitude=12.48,
+        bbox=[12.2, 41.6, 12.9, 42.2],
+        country="Italy",
+    )
+
+    asyncio.run(handler.discover(CapabilityDiscoveryInput(query="aerosol"), state))
+
+    assert registry.last_shortlist_kwargs["scope_kind"] == "bbox"

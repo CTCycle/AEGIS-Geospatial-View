@@ -937,6 +937,7 @@ def _identity_searchable_text(capability: dict[str, Any]) -> set[str]:
     values: list[object] = [
         capability.get("id"),
         capability.get("name"),
+        capability.get("description"),
         capability.get("capabilities"),
     ]
     return {
@@ -1010,6 +1011,7 @@ def _routing_searchable_text(
     values: list[object] = [
         capability.get("id"),
         capability.get("name"),
+        capability.get("description"),
         capability.get("capabilities"),
         agentic_use.get("intentTags"),
         metadata.get("semantic_aliases"),

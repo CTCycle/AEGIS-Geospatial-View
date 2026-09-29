@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -33,6 +34,10 @@ from server.services.geospatial.providers.base import (
     ProviderRateLimitError,
     ProviderTimeoutError,
     ProviderUnavailableError,
+)
+from server.services.geospatial.providers.http import (
+    RasterHttpDiagnostic,
+    RasterHttpError,
 )
 from server.services.geospatial.raster_tiles import web_mercator_tile_bbox
 
@@ -595,13 +600,13 @@ def test_geospatial_tile_proxy_normalizes_upstream_failures_without_details(
 
 ###############################################################################
 def test_geospatial_tile_proxy_rejects_non_image_http_200_body(monkeypatch) -> None:
-    async def fake_fetch_bytes_url(url: str, headers: dict[str, str]) -> bytes:
+    async def fake_fetch_raster_image_url(url: str, headers: dict[str, str]) -> bytes:
         del url, headers
         return b"<html>provider error</html>"
 
     monkeypatch.setattr(
-        "server.services.geospatial.api_service.fetch_bytes_url",
-        fake_fetch_bytes_url,
+        "server.services.geospatial.api_service.fetch_raster_image_url",
+        fake_fetch_raster_image_url,
     )
     client = create_started_client()
 
@@ -609,6 +614,49 @@ def test_geospatial_tile_proxy_rejects_non_image_http_200_body(monkeypatch) -> N
 
     assert response.status_code == 502
     assert "provider error" not in response.text
+
+
+def test_geospatial_tile_proxy_logs_safe_raster_diagnostic_and_normalizes_response(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    diagnostic = RasterHttpDiagnostic(
+        category="upstream_http_5xx",
+        failure_phase="response_headers",
+        upstream="https://fema.example/arcgis/tile",
+        status_code=503,
+        content_type="text/html",
+        content_length=42,
+        provider_id="fema",
+        capability_id="fema_nfhl_flood_zones",
+    )
+
+    async def failing_fetch_binary_url(url: str) -> bytes:
+        del url
+        raise RasterHttpError("secret provider response", diagnostic)
+
+    service = _build_api_service(ProviderRegistry())
+    service._fetch_binary_url = failing_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    with caplog.at_level(logging.WARNING, logger="server.services.geospatial.api_service"):
+        response = client.get(
+            "/api/geospatial/tiles/fema_nfhl_flood_zones/4/5/6.png"
+            "?api_key=secret-token"
+        )
+
+    assert response.status_code == 502
+    assert "secret" not in response.text.lower()
+    assert "secret" not in caplog.text.lower()
+    assert "category=upstream_http_5xx" in caplog.text
+    assert "provider=fema" in caplog.text
+    assert "capability=fema_nfhl_flood_zones" in caplog.text
+    assert "status=503" in caplog.text
+    assert "content_type=text/html" in caplog.text
+    assert "content_length=42" in caplog.text
+    assert "upstream=https://fema.example/arcgis/tile" in caplog.text
 
 ###############################################################################
 def test_geospatial_tile_proxy_sanitizes_sensitive_query_values_in_logs() -> None:

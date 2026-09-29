@@ -1,0 +1,35 @@
+{
+  "package": "tier3-validation-develop-20260929-raster-followup",
+  "date": "2026-09-29",
+  "branch": "develop",
+  "baseline_sha": "3ed9d99e032b6bb9eb5784c9fe47a24798dd58e0",
+  "tested_source": "baseline_sha_plus_working_tree_remediation",
+  "python": "app/server/.venv Python 3.14.7",
+  "node": "runtimes/node-v22.23.1 node / npm 10.9.8",
+  "data_root": "runtimes/cache/test-runtime/t3-baseline-aegis-20260929",
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "protocol": "openai-chat-completions",
+  "provider_probe": "passed; parse_status=complete; HTTP 200",
+  "execution_defaults_unchanged": {
+    "max_iterations": 12,
+    "complex_max_model_calls": 10,
+    "complex_max_tool_calls": 20,
+    "complex_max_state_transitions": 64,
+    "complex_run_ceiling_seconds": 300
+  },
+  "frontend_source_changed": false,
+  "gate_status": {
+    "T3-07": "PARTIAL",
+    "T3-08": "PARTIAL",
+    "T3-08_rendered_cases": 11,
+    "T3-08_advertised_cases": 12
+  },
+  "campaign_rollup": {
+    "PASS": 30,
+    "PARTIAL": 2,
+    "BLOCKED": 0,
+    "UNRUN": 36
+  },
+  "secret_handling": "Local ignored API_KEYS.md was not read, staged, copied, or pushed."
+}

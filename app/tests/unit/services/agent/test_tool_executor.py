@@ -140,6 +140,40 @@ def test_executor_validates_once_and_normalizes_success() -> None:
 
 
 ###############################################################################
+def test_tool_executor_normalizes_observed_discovery_alias() -> None:
+    calls: list[int] = []
+
+    async def handler(arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
+        calls.append(arguments.value)
+        return {"value": arguments.value}
+
+    registry = ToolRegistry(runtime_registry=cast(Any, None))
+    registry.register(
+        _tool(
+            handler,
+            name="discover_geospatial_capabilities",
+        )
+    )
+
+    result = asyncio.run(
+        ToolExecutor(tool_registry=registry).execute_tool(
+            LLMToolCall(
+                id="alias",
+                name="discover_capabilities",
+                arguments={"value": 7},
+            ),
+            _state(),
+            _budget(),
+            exposed_tool_names={"discover_geospatial_capabilities"},
+        )
+    )
+
+    assert result.status == "success"
+    assert result.tool_name == "discover_geospatial_capabilities"
+    assert calls == [7]
+
+
+###############################################################################
 def test_mixed_domain_tool_is_authorized_for_a_mixed_map_data_route() -> None:
     async def handler(arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
         return {"value": arguments.value}

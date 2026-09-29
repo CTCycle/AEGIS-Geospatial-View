@@ -212,7 +212,7 @@ def register_agent_tools(
             handler=provider_layers.discover,
             domains=frozenset({CapabilityDomain.PROVIDER_DISCOVERY}),
             phases=_MODEL_PHASE,
-            visibility="internal",
+            visibility="model",
             prerequisites=frozenset({"route", "provider_discovery_route"}),
             idempotent=True,
             semantic_validator=_provider_layer_semantic_validator,

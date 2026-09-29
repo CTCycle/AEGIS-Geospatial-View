@@ -417,6 +417,18 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
     )
     assert "MODIS_Terra_NDVI_8Day" in {item["id"] for item in modis}
 
+    named_gibs_layer = registry.shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        queries=["nasa gibs modis terra 8 day ndvi vegetation"],
+        explicit_ids=[],
+        runtime_registry=runtime,
+        operation="retrieve_and_render",
+        scope_kind="bbox",
+        requires_render=True,
+        location=location,
+    )
+    assert named_gibs_layer[0]["id"] == "MODIS_Terra_NDVI_8Day"
+
     worldcover = registry.shortlist(
         domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
         queries=["WorldCover"],

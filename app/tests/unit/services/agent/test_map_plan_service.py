@@ -69,6 +69,14 @@ class FakeCapabilityRegistry:
                 "renderingMode": "raster-tile",
                 "metadata": {"label": "FEMA Flood Zones"},
             },
+            "SRTM_Color_Index": {
+                "id": "SRTM_Color_Index",
+                "name": "NASA GIBS SRTM Color Index",
+                "provider": "gibs",
+                "capabilityKind": "raster-overlay",
+                "renderingMode": "raster-tile",
+                "metadata": {"label": "NASA GIBS SRTM Color Index"},
+            },
             "broken:vector-tile": {
                 "id": "broken:vector-tile",
                 "name": "Broken vector tile",
@@ -89,10 +97,14 @@ class FakeEvidenceRepository:
         *,
         conversation_id: str | None = None,
     ) -> AgentEvidenceSummary | None:
-        if evidence_id == "evidence:fema":
+        if evidence_id in {"evidence:fema", "evidence:gibs"}:
             return AgentEvidenceSummary(
                 evidence_id=evidence_id,
-                kind="raster_descriptor",
+                kind=(
+                    "raster_descriptor"
+                    if evidence_id == "evidence:fema"
+                    else "capability_result"
+                ),
                 media_type="application/json",
                 status="available",
                 summary={"result_status": "ok", "result_type": "raster"},
@@ -131,6 +143,28 @@ class FakeEvidenceRepository:
                 {
                     "renderingMode": "raster-tile",
                     "tileUrl": "https://hazards.fema.gov/export?bbox={bbox-epsg-3857}",
+                }
+            ).encode()
+        if evidence_id == "evidence:gibs":
+            summary = self.get_summary(evidence_id, conversation_id=conversation_id)
+            assert summary is not None
+            return summary, json.dumps(
+                {
+                    "layer": {"layer_id": "SRTM_Color_Index"},
+                    "render": {
+                        "rendering_mode": "wmts",
+                        "source_protocol": "wmts",
+                        "tile_url_template": (
+                            "https://gibs.example/wmts/SRTM_Color_Index/"
+                            "{time}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png"
+                        ),
+                        "layer_id": "SRTM_Color_Index",
+                        "format": "image/png",
+                        "tile_matrix_set": "GoogleMapsCompatible_Level9",
+                        "min_zoom": 0,
+                        "max_zoom": 9,
+                        "default_time": "2026-06-18",
+                    },
                 }
             ).encode()
         if evidence_id != "evidence:hospitals":
@@ -315,6 +349,39 @@ async def test_raster_tile_provider_url_is_normalized_for_candidate_rendering() 
     assert overlay.descriptor["source_url"] == (
         "https://hazards.fema.gov/export?bbox={bbox-epsg-3857}"
     )
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_nested_provider_raster_payload_is_admitted_for_map_plan() -> None:
+    state = _state(active_map_session=_active_session())
+    state.evidence_refs = ["evidence:gibs"]
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                AddEvidenceLayerAction(
+                    action="add_evidence_layer",
+                    evidence_ref="evidence:gibs",
+                    capability_id="SRTM_Color_Index",
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    overlay = state.prepared_map_session.overlay_collection.instances[-1]
+    assert overlay.capability_id == "SRTM_Color_Index"
+    assert overlay.descriptor["render"]["layer_id"] == "SRTM_Color_Index"
+    assert overlay.descriptor["render"]["provider"] == "gibs"
+    assert overlay.descriptor["tile_url_template"] == (
+        "/api/geospatial/tiles/SRTM_Color_Index/{z}/{x}/{y}.png?time={time}"
+    )
+    assert overlay.descriptor["render"]["max_zoom"] == 9
+    assert overlay.descriptor["render"]["default_time"] == "2026-06-18"
+    assert overlay.descriptor["default_time"] == "2026-06-18"
 
 ###############################################################################
 @pytest.mark.asyncio

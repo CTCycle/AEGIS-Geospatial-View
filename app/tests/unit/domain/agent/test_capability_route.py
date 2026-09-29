@@ -78,3 +78,23 @@ def test_agent_run_state_is_the_single_checkpointable_native_state() -> None:
     assert restored.run_version == 3
     assert restored.conversation_revision == 7
     assert restored.request_id == state.request_id
+
+###############################################################################
+def test_exposure_trace_iteration_is_checkpointable_after_render_resume() -> None:
+    state = AgentRunState(
+        request_id="req-render",
+        conversation_id="conversation-render",
+        phase=AgentPhase.AWAIT_RENDER,
+        user_message="Show a raster layer.",
+        exposure_trace=[
+            {
+                "iteration": 5,
+                "phase": "build_tool_context",
+                "tool": "apply_map_plan",
+            }
+        ],
+    )
+
+    restored = AgentRunState.from_checkpoint(state.checkpoint())
+
+    assert restored.exposure_trace[0]["iteration"] == 5

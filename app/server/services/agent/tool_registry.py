@@ -107,6 +107,7 @@ class ToolRegistry:
             if len(state.exposure_trace) < 64:
                 state.exposure_trace.append(
                     {
+                        "iteration": state.current_iteration,
                         "phase": state.phase.value,
                         "tool": definition.name,
                         "reason": "task_mode_domain_phase_and_prerequisites_satisfied",

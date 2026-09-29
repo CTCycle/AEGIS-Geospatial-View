@@ -924,7 +924,21 @@ def test_provider_layer_discovery_is_only_exposed_for_provider_route() -> None:
 
     assert {
         tool.name for tool in registry.expose(state)
-    } == {"discover_geospatial_capabilities"}
+    } == {
+        "discover_geospatial_capabilities",
+        "discover_geospatial_provider_layers",
+    }
+
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        requires_location=False,
+        capability_queries=["obscure layer"],
+    )
+    assert "discover_geospatial_provider_layers" not in {
+        tool.name for tool in registry.expose(state)
+    }
 
 
 ###############################################################################
