@@ -225,10 +225,17 @@ async def proxy_capability_tile(
     z: int,
     x: int,
     y: int,
+    request: Request,
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> Response:
     try:
-        body = await service.fetch_capability_tile(capability_id, z, x, y)
+        body = await service.fetch_capability_tile(
+            capability_id,
+            z,
+            x,
+            y,
+            time=request.query_params.get("time"),
+        )
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
     return Response(

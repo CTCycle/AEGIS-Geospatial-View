@@ -22,7 +22,11 @@ from tests.e2e.helpers.artifacts import ensure_test_artifact_dirs, write_snapsho
 TEST_ID = "RASTER-LIVE-DIAGNOSTICS"
 MAX_EVENTS = 512
 MAX_TEXT = 8000
-RASTER_HOSTS = {"hazards.fema.gov", "services.terrascope.be"}
+RASTER_HOSTS = {
+    "hazards.fema.gov",
+    "services.terrascope.be",
+    "gibs.earthdata.nasa.gov",
+}
 SENSITIVE_QUERY_MARKERS = (
     "api_key",
     "apikey",
@@ -60,8 +64,13 @@ def _sanitize_url(raw_url: str) -> str:
     )
 
 
-def _raster_url(url: str) -> bool:
-    return (urlsplit(url).hostname or "").casefold() in RASTER_HOSTS
+def _raster_transport(url: str) -> str | None:
+    parsed = urlsplit(url)
+    if parsed.path.startswith("/api/geospatial/tiles/"):
+        return "aegis_proxy"
+    if (parsed.hostname or "").casefold() in RASTER_HOSTS:
+        return "direct_upstream"
+    return None
 
 
 def _request_failure(request: Any) -> str | None:
@@ -87,10 +96,12 @@ class _RasterCapture:
 
     def attach(self, page: Page) -> None:
         def on_request(request: Any) -> None:
-            if _raster_url(request.url):
+            transport = _raster_transport(request.url)
+            if transport is not None:
                 self._append(
                     {
                         "kind": "request",
+                        "transport": transport,
                         "method": request.method,
                         "resource_type": request.resource_type,
                         "url": _sanitize_url(request.url),
@@ -98,10 +109,12 @@ class _RasterCapture:
                 )
 
         def on_response(response: Any) -> None:
-            if _raster_url(response.url):
+            transport = _raster_transport(response.url)
+            if transport is not None:
                 self._append(
                     {
                         "kind": "response",
+                        "transport": transport,
                         "resource_type": response.request.resource_type,
                         "status": response.status,
                         "content_type": response.headers.get("content-type"),
@@ -110,10 +123,12 @@ class _RasterCapture:
                 )
 
         def on_request_failed(request: Any) -> None:
-            if _raster_url(request.url):
+            transport = _raster_transport(request.url)
+            if transport is not None:
                 self._append(
                     {
                         "kind": "requestfailed",
+                        "transport": transport,
                         "method": request.method,
                         "resource_type": request.resource_type,
                         "failure": _request_failure(request),
@@ -167,6 +182,31 @@ def _scenario_result(
     screenshot: Path,
 ) -> dict[str, Any]:
     body_text = _bounded_text(page.locator("body").inner_text())
+    proxy_events = [
+        event for event in capture.events if event.get("transport") == "aegis_proxy"
+    ]
+    proxy_responses = [
+        event for event in proxy_events if event.get("kind") == "response"
+    ]
+    proxy_failures = [
+        event for event in proxy_events if event.get("kind") == "requestfailed"
+    ]
+    if not page.locator(".chat-message--assistant").count():
+        classification = "route_failure"
+    elif not proxy_events:
+        classification = "proxy_route_failure"
+    elif proxy_failures or not proxy_responses:
+        classification = "upstream_request_failure"
+    elif any(
+        not str(event.get("content_type") or "").lower().startswith("image/")
+        or int(event.get("status") or 0) >= 400
+        for event in proxy_responses
+    ):
+        classification = "invalid_image_payload"
+    elif "render_ack" in body_text.casefold() or "render failed" in body_text.casefold():
+        classification = "acknowledgement_or_maplibre_failure"
+    else:
+        classification = "maplibre_pixels_and_ack_unobserved"
     return {
         "scenario_id": scenario_id,
         "prompt": prompt,
@@ -178,6 +218,17 @@ def _scenario_result(
         "raster_events": capture.events,
         "console": capture.console,
         "page_errors": capture.page_errors,
+        "classification": classification,
+        "proxy_request_count": len(
+            [event for event in proxy_events if event.get("kind") == "request"]
+        ),
+        "proxy_response_statuses": [event.get("status") for event in proxy_responses],
+        "map_evidence": {
+            "source_state": "unobserved",
+            "layer_state": "unobserved",
+            "visible_raster_pixels": "unobserved",
+            "render_ack": "unobserved",
+        },
         "screenshot": str(screenshot),
     }
 

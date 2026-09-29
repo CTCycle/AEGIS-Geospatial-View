@@ -1,0 +1,15 @@
+{
+  "test_id": "GIBS-RASTER-MATRIX",
+  "capability_id": "MODIS_Combined_Thermal_Anomalies_Fire",
+  "temporal": true,
+  "provider_probe": {
+    "http_status": 200,
+    "provider": "",
+    "model": "",
+    "protocol": "unknown",
+    "status": "failed",
+    "parse_status": "failed",
+    "duration_ms": 0
+  },
+  "classification": "provider_lane_unavailable"
+}

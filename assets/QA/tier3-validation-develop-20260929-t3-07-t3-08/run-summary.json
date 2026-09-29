@@ -1,0 +1,52 @@
+{
+  "date": "2026-09-29",
+  "branch": "develop",
+  "tested_commit": "b0be47ccdf40a5288d205607e45e5d9aaa079d5a-dirty",
+  "commands": [
+    {
+      "name": "focused_backend",
+      "result": "passed",
+      "detail": "71 passed, 2 dependency deprecation warnings"
+    },
+    {
+      "name": "full_backend_unit",
+      "result": "passed",
+      "detail": "971 passed, 2 dependency deprecation warnings"
+    },
+    {
+      "name": "frontend_build",
+      "result": "passed"
+    },
+    {
+      "name": "frontend_karma",
+      "result": "passed",
+      "detail": "254 SUCCESS"
+    },
+    {
+      "name": "geospatial_browser_smoke",
+      "result": "passed",
+      "detail": "6 SUCCESS"
+    },
+    {
+      "name": "strict_manifest_audit",
+      "result": "passed",
+      "detail": "86 manifests; 0 errors; 0 warnings"
+    },
+    {
+      "name": "live_fema_esa_diagnostic",
+      "result": "skipped",
+      "detail": "1 skipped: exact provider/model lane unavailable"
+    },
+    {
+      "name": "live_gibs_matrix",
+      "result": "skipped",
+      "detail": "12 skipped: exact provider/model lane unavailable"
+    }
+  ],
+  "cleanup": {
+    "backend_port_7059_listening": false,
+    "frontend_port_4512_listening": false,
+    "isolated_database_integrity": "ok",
+    "isolated_runtime_removed_after_recording": true
+  }
+}

@@ -244,6 +244,37 @@ describe('map-preview-rendering', () => {
     expect((sources[0]['tiles'] as string[])[0]).toContain('request=GetMap');
   });
 
+  it('passes same-origin raster proxy templates unchanged to MapLibre', () => {
+    const sources: Array<Record<string, unknown>> = [];
+    const layers: Array<Record<string, unknown>> = [];
+    const proxyTemplate = '/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png';
+    const map = {
+      addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
+      addLayer: (layer: Record<string, unknown>) => layers.push(layer),
+    };
+
+    const result = addOverlayLayers(map as never, makeMapSession([{
+      id: 'esa-worldcover-proxy',
+      label: 'ESA WorldCover',
+      provider: 'esa',
+      type: 'raster-tile',
+      rendering_mode: 'raster-tile',
+      tile_url_template: proxyTemplate,
+      default_opacity: 0.42,
+    } as MapOverlayEntry]));
+
+    expect(result[0].status).toBe('loaded');
+    expect(sources[0]).toEqual(jasmine.objectContaining({
+      type: 'raster',
+      tiles: [proxyTemplate],
+    }));
+    expect(layers[0]).toEqual(jasmine.objectContaining({
+      type: 'raster',
+      paint: { 'raster-opacity': 0.42 },
+    }));
+    expect((sources[0].tiles as string[])[0]).not.toContain('terrascope');
+  });
+
   it('uses verified inline GeoJSON data without issuing a browser fetch', () => {
     const sources: Array<Record<string, unknown>> = [];
     const layers: Array<Record<string, unknown>> = [];

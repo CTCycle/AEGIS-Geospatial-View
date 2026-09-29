@@ -1,0 +1,11 @@
+{
+  "provider_probe": {
+    "http_status": 200,
+    "provider": "",
+    "model": "",
+    "protocol": "unknown",
+    "status": "failed",
+    "parse_status": "failed",
+    "duration_ms": 0
+  }
+}

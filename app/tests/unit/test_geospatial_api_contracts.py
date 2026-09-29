@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import parse_qs, urlsplit
+
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -7,7 +9,12 @@ from fastapi.testclient import TestClient
 from server.api import geospatial
 from server.api.geospatial import raise_service_http_error
 from server.app import create_app
+from server.contracts.geospatial import (
+    GeospatialLayerRenderDescriptor,
+    GeospatialProviderLayerDescriptor,
+)
 from server.domain.geospatial.providers import ProviderResponse
+from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.api_service import (
     GeospatialApiService,
     GeospatialApiServiceError,
@@ -25,7 +32,9 @@ from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.geospatial.providers.base import (
     ProviderRateLimitError,
     ProviderTimeoutError,
+    ProviderUnavailableError,
 )
+from server.services.geospatial.raster_tiles import web_mercator_tile_bbox
 
 ###############################################################################
 def create_started_client() -> TestClient:
@@ -321,7 +330,7 @@ def test_geospatial_tile_proxy_rejects_missing_credentials_without_leaking_secre
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
     client = create_started_client()
 
-    response = client.get("/api/geospatial/tiles/tomtom_traffic_flow/1/2/3.png")
+    response = client.get("/api/geospatial/tiles/tomtom_traffic_flow/1/0/0.png")
 
     assert response.status_code == 401
     assert "TOMTOM_API_KEY" not in response.text
@@ -351,6 +360,265 @@ def test_geospatial_tile_proxy_ignores_environment_credentials(
     assert response.status_code == 401
     assert captured == {}
     assert "tomtom-secret-forbidden" not in response.text
+
+###############################################################################
+def test_raster_tile_utility_returns_exact_web_mercator_bbox() -> None:
+    assert web_mercator_tile_bbox(1, 1, 1) == (
+        0.0,
+        -20037508.342789244,
+        20037508.342789244,
+        0.0,
+    )
+
+###############################################################################
+def test_geospatial_fema_tile_proxy_materializes_bounded_export_request() -> None:
+    captured: dict[str, str] = {}
+
+    async def fake_fetch_binary_url(url: str) -> bytes:
+        captured["url"] = url
+        return b"\x89PNG\r\n\x1a\npng-tile"
+
+    service = _build_api_service(ProviderRegistry())
+    service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get("/api/geospatial/tiles/fema_nfhl_flood_zones/1/1/1.png")
+
+    assert response.status_code == 200
+    assert response.content.startswith(b"\x89PNG")
+    parsed = urlsplit(captured["url"])
+    query = parse_qs(parsed.query)
+    assert parsed.netloc == "hazards.fema.gov"
+    assert query["bbox"] == [
+        ",".join(str(value) for value in web_mercator_tile_bbox(1, 1, 1))
+    ]
+    assert query["bboxSR"] == ["3857"]
+    assert query["imageSR"] == ["3857"]
+    assert query["size"] == ["256,256"]
+    assert query["format"] == ["png32"]
+    assert query["transparent"] == ["true"]
+    assert query["f"] == ["image"]
+
+###############################################################################
+def test_geospatial_esa_tile_proxy_materializes_wmts_row_column_and_matrix() -> None:
+    captured: dict[str, str] = {}
+
+    async def fake_fetch_binary_url(url: str) -> bytes:
+        captured["url"] = url
+        return b"\x89PNG\r\n\x1a\npng-tile"
+
+    service = _build_api_service(ProviderRegistry())
+    service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get("/api/geospatial/tiles/esa_worldcover/4/5/6.png")
+
+    assert response.status_code == 200
+    parsed = urlsplit(captured["url"])
+    query = parse_qs(parsed.query)
+    assert parsed.netloc == "services.terrascope.be"
+    assert query["service"] == ["WMTS"]
+    assert query["layer"] == ["WORLDCOVER_2021_MAP"]
+    assert query["tilematrixset"] == ["EPSG:3857"]
+    assert query["tilematrix"] == ["EPSG:3857:4"]
+    assert query["tilerow"] == ["6"]
+    assert query["tilecol"] == ["5"]
+    assert query["format"] == ["image/png"]
+
+###############################################################################
+def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time() -> None:
+    captured: dict[str, str] = {}
+
+    class GibsRegistry:
+
+        async def describe_layer(self, provider_id: str, layer_id: str):
+            assert provider_id == "gibs"
+            assert layer_id == "MODIS_Terra_NDVI_8Day"
+            return GeospatialProviderLayerDescriptor(
+                provider="gibs",
+                layer_id=layer_id,
+                title="MODIS Terra NDVI 8-Day",
+                rendering_mode="wmts",
+                source_protocol="wmts",
+                data_format="image/png",
+                geometry_type="raster-grid",
+                default_time="2026-06-18",
+                tile_matrix_sets=["GoogleMapsCompatible_Level9"],
+                render=GeospatialLayerRenderDescriptor(
+                    provider="gibs",
+                    layer_id=layer_id,
+                    rendering_mode="wmts",
+                    source_protocol="wmts",
+                    url="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best",
+                    tile_url_template=(
+                        "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/"
+                        "MODIS_Terra_NDVI_8Day/default/{time}/"
+                        "GoogleMapsCompatible_Level9/{z}/{y}/{x}.png"
+                    ),
+                    tile_matrix_set="GoogleMapsCompatible_Level9",
+                    format="image/png",
+                    default_time="2026-06-18",
+                ),
+            )
+
+    async def fake_fetch_binary_url(url: str) -> bytes:
+        captured["url"] = url
+        return b"\x89PNG\r\n\x1a\npng-tile"
+
+    service = _build_api_service(GibsRegistry())
+    service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get(
+        "/api/geospatial/tiles/gibs:MODIS_Terra_NDVI_8Day/2/1/3.png"
+        "?time=2026-06-20"
+    )
+
+    assert response.status_code == 200
+    assert captured["url"] == (
+        "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/"
+        "MODIS_Terra_NDVI_8Day/default/2026-06-20/"
+        "GoogleMapsCompatible_Level9/2/3/1.png"
+    )
+
+###############################################################################
+def test_geospatial_tile_proxy_rejects_malformed_coordinates_before_network() -> None:
+    captured: list[str] = []
+
+    async def fake_fetch_binary_url(url: str) -> bytes:
+        captured.append(url)
+        return b"\x89PNG\r\n\x1a\npng-tile"
+
+    service = _build_api_service(ProviderRegistry())
+    service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get("/api/geospatial/tiles/esa_worldcover/2/4/0.png")
+
+    assert response.status_code == 400
+    assert captured == []
+
+###############################################################################
+def test_geospatial_tile_proxy_rejects_unresolved_template_before_network() -> None:
+    captured: list[str] = []
+
+    async def fake_fetch_binary_url(url: str) -> bytes:
+        captured.append(url)
+        return b"\x89PNG\r\n\x1a\npng-tile"
+
+    service = _build_api_service(ProviderRegistry())
+    service.catalog_snapshot = GeospatialManifestSnapshot.from_payload(
+        {
+            "overlays": [
+                {
+                    "id": "fixture_raster",
+                    "provider": "fixture",
+                    "type": "raster-overlay",
+                    "renderingMode": "raster-tile",
+                    "metadata": {
+                        "url_template": "https://known.example/{z}/{unknown}/{y}.png"
+                    },
+                }
+            ]
+        }
+    )
+    service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get("/api/geospatial/tiles/fixture_raster/2/1/1.png")
+
+    assert response.status_code == 404
+    assert captured == []
+
+###############################################################################
+def test_geospatial_tile_proxy_rejects_unknown_capability_without_network() -> None:
+    captured: list[str] = []
+
+    async def fake_fetch_binary_url(url: str) -> bytes:
+        captured.append(url)
+        return b"\x89PNG\r\n\x1a\npng-tile"
+
+    service = _build_api_service(ProviderRegistry())
+    service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get("/api/geospatial/tiles/not-a-capability/1/0/0.png")
+
+    assert response.status_code == 404
+    assert captured == []
+    assert "evil.example" not in response.text
+
+###############################################################################
+@pytest.mark.parametrize(
+    "provider_error",
+    [
+        ProviderTimeoutError("sensitive-timeout-token"),
+        ProviderUnavailableError("sensitive-upstream-detail"),
+    ],
+)
+def test_geospatial_tile_proxy_normalizes_upstream_failures_without_details(
+    provider_error: Exception,
+) -> None:
+    async def failing_fetch_binary_url(url: str) -> bytes:
+        del url
+        raise provider_error
+
+    service = _build_api_service(ProviderRegistry())
+    service._fetch_binary_url = failing_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get("/api/geospatial/tiles/esa_worldcover/4/5/6.png")
+
+    assert response.status_code == 502
+    assert "sensitive" not in response.text
+
+###############################################################################
+def test_geospatial_tile_proxy_rejects_non_image_http_200_body(monkeypatch) -> None:
+    async def fake_fetch_bytes_url(url: str, headers: dict[str, str]) -> bytes:
+        del url, headers
+        return b"<html>provider error</html>"
+
+    monkeypatch.setattr(
+        "server.services.geospatial.api_service.fetch_bytes_url",
+        fake_fetch_bytes_url,
+    )
+    client = create_started_client()
+
+    response = client.get("/api/geospatial/tiles/esa_worldcover/4/5/6.png")
+
+    assert response.status_code == 502
+    assert "provider error" not in response.text
+
+###############################################################################
+def test_geospatial_tile_proxy_sanitizes_sensitive_query_values_in_logs() -> None:
+    sanitized = GeospatialApiService._sanitize_tile_url(
+        "https://known.example/tile.png?api_key=secret-value&format=image/png"
+    )
+
+    assert "secret-value" not in sanitized
+    assert "api_key=%5BREDACTED%5D" in sanitized
+    assert "format=image%2Fpng" in sanitized
 
 ###############################################################################
 def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
