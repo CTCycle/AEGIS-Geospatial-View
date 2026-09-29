@@ -1,15 +1,20 @@
 {
   "date": "2026-09-29",
   "branch": "develop",
-  "tested_commit": "b0be47ccdf40a5288d205607e45e5d9aaa079d5a-dirty",
+  "tested_commit": "411adb4fc0c1-dirty",
   "commands": [
     {
-      "name": "focused_backend",
+      "name": "scoped_backend_after_proxy_fix",
+      "result": "passed",
+      "detail": "91 passed, 2 dependency deprecation warnings"
+    },
+    {
+      "name": "focused_backend_before_proxy_fix",
       "result": "passed",
       "detail": "71 passed, 2 dependency deprecation warnings"
     },
     {
-      "name": "full_backend_unit",
+      "name": "full_backend_unit_before_proxy_fix",
       "result": "passed",
       "detail": "971 passed, 2 dependency deprecation warnings"
     },
@@ -34,13 +39,13 @@
     },
     {
       "name": "live_fema_esa_diagnostic",
-      "result": "skipped",
-      "detail": "1 skipped: exact provider/model lane unavailable"
+      "result": "passed",
+      "detail": "Exact lane verified; 113 proxy requests, 95 proxy responses, 0 direct-upstream requests, 12 provider 502 responses; no acknowledged provider raster."
     },
     {
       "name": "live_gibs_matrix",
-      "result": "skipped",
-      "detail": "12 skipped: exact provider/model lane unavailable"
+      "result": "passed",
+      "detail": "12 browser cases executed; all reached the assistant execution limit before a raster route, so T3-08 remains UNRUN."
     }
   ],
   "cleanup": {

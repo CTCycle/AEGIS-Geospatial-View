@@ -29,6 +29,9 @@ from server.domain.agent.map_plan import (
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.raster_tiles import (
+    build_backend_raster_proxy_template,
+)
 
 ###############################################################################
 MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
@@ -213,6 +216,10 @@ class MapSessionBuilder:
                 and isinstance(descriptor.get("serviceUrl"), str)
             ):
                 descriptor["url"] = descriptor["serviceUrl"]
+            render_payload = json_object(evidence_payload.get("render"))
+            if render_payload:
+                descriptor["render"] = render_payload
+            self._apply_backend_raster_proxy(descriptor)
             render_data = _geojson_render_data(evidence.payload)
             if render_data is not None:
                 descriptor["data"] = render_data
@@ -377,6 +384,56 @@ class MapSessionBuilder:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _apply_backend_raster_proxy(descriptor: dict[str, Any]) -> None:
+        """Keep public raster URLs server-side in the native map-plan path."""
+
+        render_value = descriptor.get("render")
+        render = json_object(render_value)
+        rendering_mode = str(
+            render.get("rendering_mode")
+            or descriptor.get("rendering_mode")
+            or descriptor.get("renderingMode")
+            or descriptor.get("type")
+            or ""
+        )
+        proxy_template = build_backend_raster_proxy_template(
+            str(descriptor.get("capability_id") or descriptor.get("id") or ""),
+            provider=str(
+                render.get("provider")
+                or descriptor.get("provider")
+                or ""
+            ),
+            render={
+                "rendering_mode": rendering_mode,
+                "time": render.get("time") or descriptor.get("time"),
+                "default_time": render.get("default_time")
+                or descriptor.get("default_time"),
+            },
+        )
+        if proxy_template is None:
+            return
+
+        source_url = _first_non_proxy_url(
+            descriptor.get("source_url"),
+            render.get("url"),
+            render.get("tile_url_template"),
+            descriptor.get("tileUrl"),
+            descriptor.get("serviceUrl"),
+            descriptor.get("service_url"),
+            descriptor.get("url_template"),
+            descriptor.get("url"),
+            descriptor.get("tile_url_template"),
+        )
+        if source_url is not None:
+            descriptor["source_url"] = source_url
+        descriptor["url"] = proxy_template
+        descriptor["tile_url_template"] = proxy_template
+        if render:
+            render["tile_url_template"] = proxy_template
+            descriptor["render"] = render
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _validate_render_descriptor(descriptor: dict[str, Any]) -> None:
         """Reject candidates the browser renderer cannot consume safely."""
 
@@ -461,6 +518,17 @@ def _usable_render_url(value: object) -> bool:
     if parsed.scheme in {"http", "https"}:
         return bool(parsed.netloc)
     return candidate.startswith("/")
+
+
+###############################################################################
+def _first_non_proxy_url(*values: object) -> str | None:
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        candidate = value.strip()
+        if candidate and not candidate.startswith("/api/geospatial/tiles/"):
+            return candidate
+    return None
 
 
 ###############################################################################

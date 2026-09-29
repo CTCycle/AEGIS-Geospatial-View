@@ -6,7 +6,7 @@ import math
 import os
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 
 from server.contracts.geospatial import LocationSearchRequest
 from server.services.geospatial.api_service import (
@@ -21,6 +21,7 @@ from server.services.geospatial.provider_registry import (
     ProviderRegistryError,
 )
 from server.services.geospatial.raster_tiles import (
+    build_backend_raster_proxy_template,
     build_wms_tile_template as build_wms_tile_template_url,
     build_wmts_tile_template as build_wmts_tile_template_url,
 )
@@ -530,22 +531,11 @@ class RenderDescriptorService:
         provider: str,
         render: dict[str, object] | None,
     ) -> str | None:
-        if provider not in {"fema", "esa", "gibs"} or render is None:
-            return None
-        rendering_mode = str(render.get("rendering_mode") or "").strip().lower()
-        if rendering_mode not in {"raster-tile", "xyz", "tile", "wms", "wmts"}:
-            return None
-        normalized_id = str(capability_id).strip()
-        if not normalized_id or any(char in normalized_id for char in "/?#{}"):
-            return None
-        template = (
-            f"/api/geospatial/tiles/{quote(normalized_id, safe=':')}/"
-            "{z}/{x}/{y}.png"
+        return build_backend_raster_proxy_template(
+            capability_id,
+            provider=provider,
+            render=render,
         )
-        time = render.get("time") or render.get("default_time")
-        if isinstance(time, str) and time.strip():
-            template += "?time={time}"
-        return template
 
     # -------------------------------------------------------------------------
     def metadata_only_descriptor(

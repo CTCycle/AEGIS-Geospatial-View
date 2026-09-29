@@ -9,6 +9,38 @@ from urllib.parse import quote, urlsplit, urlunsplit
 WEB_MERCATOR_HALF_WORLD = 20037508.342789244
 MAX_TILE_ZOOM = 30
 _UNRESOLVED_PLACEHOLDER = re.compile(r"\{[^{}]+\}")
+_BACKEND_RASTER_PROVIDERS = frozenset({"esa", "fema", "gibs"})
+_BACKEND_RASTER_RENDERING_MODES = frozenset(
+    {"raster-tile", "tile", "xyz", "wms", "wmts"}
+)
+
+###############################################################################
+def build_backend_raster_proxy_template(
+    capability_id: str,
+    *,
+    provider: str,
+    render: Mapping[str, Any] | None,
+) -> str | None:
+    """Build the same-origin tile route used for public raster providers."""
+
+    if render is None:
+        return None
+    if provider.strip().lower() not in _BACKEND_RASTER_PROVIDERS:
+        return None
+    rendering_mode = str(render.get("rendering_mode") or "").strip().lower()
+    if rendering_mode not in _BACKEND_RASTER_RENDERING_MODES:
+        return None
+    normalized_id = str(capability_id).strip()
+    if not normalized_id or any(char in normalized_id for char in "/?#{}"):
+        return None
+    template = (
+        f"/api/geospatial/tiles/{quote(normalized_id, safe=':')}/"
+        "{z}/{x}/{y}.png"
+    )
+    time = render.get("time") or render.get("default_time")
+    if isinstance(time, str) and time.strip():
+        template += "?time={time}"
+    return template
 
 ###############################################################################
 class RasterTileTemplateError(ValueError):

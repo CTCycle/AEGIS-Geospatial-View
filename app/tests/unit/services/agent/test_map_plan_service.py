@@ -309,7 +309,11 @@ async def test_raster_tile_provider_url_is_normalized_for_candidate_rendering() 
     assert overlay.capability_id == "fema_nfhl_flood_zones"
     assert (
         overlay.descriptor["tile_url_template"]
-        == "https://hazards.fema.gov/export?bbox={bbox-epsg-3857}"
+        == "/api/geospatial/tiles/fema_nfhl_flood_zones/{z}/{x}/{y}.png"
+    )
+    assert overlay.descriptor["url"] == overlay.descriptor["tile_url_template"]
+    assert overlay.descriptor["source_url"] == (
+        "https://hazards.fema.gov/export?bbox={bbox-epsg-3857}"
     )
 
 ###############################################################################

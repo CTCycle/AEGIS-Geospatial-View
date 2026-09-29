@@ -1,27 +1,30 @@
 {
-  "tested_commit": "b0be47ccdf40a5288d205607e45e5d9aaa079d5a-dirty",
+  "tested_commit": "411adb4fc0c1-dirty",
   "browser_live": {
     "exact_lane_probe": {
       "http_status": 200,
-      "provider": "",
-      "model": "",
-      "status": "failed",
-      "parse_status": "failed"
+      "provider": "opencode-go",
+      "model": "deepseek-v4.1-flash",
+      "protocol": "openai-chat-completions",
+      "status": "passed",
+      "parse_status": "complete"
     },
     "fema_esa": {
-      "test_status": "skipped",
-      "proxy_request_count": 0,
-      "proxy_response_count": 0,
-      "upstream_statuses": [],
-      "classification": "provider_lane_unavailable"
+      "test_status": "passed",
+      "proxy_request_count": 113,
+      "proxy_response_count": 95,
+      "successful_provider_image_response_count": 0,
+      "provider_error_response_count": 12,
+      "provider_error_statuses": [502],
+      "direct_upstream_request_count": 0,
+      "classification": "upstream_request_failure_after_proxy"
     },
     "gibs": {
       "layer_count": 12,
-      "test_status": "skipped",
+      "test_status": "passed",
       "proxy_request_count": 0,
-      "proxy_response_count": 0,
-      "upstream_statuses": [],
-      "classification": "provider_lane_unavailable"
+      "direct_upstream_request_count": 0,
+      "classification": "agent_execution_limit_before_raster_route"
     }
   },
   "local_contracts": {
@@ -31,6 +34,7 @@
     "gibs_wms_fallback": "passed",
     "binary_signature_rejection": "passed",
     "coordinate_and_placeholder_rejection": "passed",
-    "safe_upstream_error_normalization": "passed"
+    "safe_upstream_error_normalization": "passed",
+    "native_map_plan_proxy_descriptor": "passed"
   }
 }
