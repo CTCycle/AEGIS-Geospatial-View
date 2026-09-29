@@ -3,7 +3,8 @@
 ## Result
 
 This follow-up started from `develop` at
-`3ed9d99e032b6bb9eb5784c9fe47a24798dd58e0` and used the exact
+`3ed9d99e032b6bb9eb5784c9fe47a24798dd58e0` and the implementation was committed
+as `2c9112d0142f4425da418912d23c5a903606b4f8`. It used the exact
 `opencode-go / deepseek-v4.1-flash` lane. The structured provider probe passed
 with `parse_status=complete`. Execution defaults were unchanged.
 
@@ -109,6 +110,8 @@ source was unchanged.
 The ignored local `API_KEYS.md` file was not read, copied, staged, committed, or
 pushed. The user-owned `.gitignore` change remains unstaged.
 
-Hosted CI is recorded after the implementation commit is pushed; this report's
-`tested_source` field is deliberately a working-tree evidence marker until the
-exact implementation SHA is known.
+The exact implementation SHA passed hosted CI workflow `ci.yml` run
+[36594073100](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36594073100):
+`capability-contract-validation`, `backend-unit-tests`,
+`frontend-build-and-tests`, and `persistence-conformance` all concluded
+`success`. The machine-readable record is [hosted-ci.json](hosted-ci.json).
