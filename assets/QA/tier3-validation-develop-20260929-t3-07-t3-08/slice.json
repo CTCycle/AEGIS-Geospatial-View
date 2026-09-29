@@ -1,0 +1,44 @@
+{
+  "date": "2026-09-29",
+  "branch": "develop",
+  "tested_commit": "b0be47ccdf40a5288d205607e45e5d9aaa079d5a-dirty",
+  "required_lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash"
+  },
+  "observed_lane_probe": {
+    "http_status": 200,
+    "provider": "",
+    "model": "",
+    "protocol": "unknown",
+    "status": "failed",
+    "parse_status": "failed",
+    "duration_ms": 0
+  },
+  "gates": {
+    "T3-07": {
+      "status": "PARTIAL",
+      "classification": "provider_lane_unavailable",
+      "reason": "FEMA and ESA browser scenarios skipped before provider discovery or raster transport because the required exact lane was unavailable."
+    },
+    "T3-08": {
+      "status": "UNRUN",
+      "classification": "provider_lane_unavailable",
+      "advertised_layer_count": 12,
+      "reason": "All parameterized GIBS cases skipped before layer discovery because the required exact lane was unavailable."
+    }
+  },
+  "browser_evidence": {
+    "proxy_requests": 0,
+    "proxy_responses": 0,
+    "source_state": "unobserved",
+    "layer_state": "unobserved",
+    "visible_raster_pixels": "unobserved",
+    "render_ack": "unobserved",
+    "screenshots": 0
+  },
+  "rollup": {
+    "before": "30 PASS / 1 PARTIAL / 0 BLOCKED / 37 UNRUN",
+    "after": "30 PASS / 1 PARTIAL / 0 BLOCKED / 37 UNRUN"
+  }
+}

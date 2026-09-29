@@ -1,0 +1,10 @@
+2026-09-29 | focused geospatial backend suites | PASS | 71 passed, 2 dependency deprecation warnings
+2026-09-29 | full backend unit suite | PASS | 971 passed, 2 dependency deprecation warnings
+2026-09-29 | Ruff --no-cache changed/repository Python scope | PASS
+2026-09-29 | Pyright app/server/pyproject.toml | PASS | 0 errors, 0 warnings, 0 informations
+2026-09-29 | strict production manifest audit | PASS | 86 manifests, 0 errors, 0 warnings
+2026-09-29 | Angular production build | PASS
+2026-09-29 | frontend Karma | PASS | 254 SUCCESS
+2026-09-29 | geospatial browser smoke | PASS | 6 SUCCESS
+2026-09-29 | live FEMA/ESA diagnostic | SKIPPED | exact opencode-go/deepseek-v4.1-flash lane unavailable
+2026-09-29 | live NASA GIBS matrix | SKIPPED | 12 cases; exact opencode-go/deepseek-v4.1-flash lane unavailable

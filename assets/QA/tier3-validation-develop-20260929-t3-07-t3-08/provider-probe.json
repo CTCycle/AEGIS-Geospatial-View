@@ -1,0 +1,12 @@
+{
+  "http_status": 200,
+  "provider": "",
+  "model": "",
+  "protocol": "unknown",
+  "status": "failed",
+  "parse_status": "failed",
+  "duration_ms": 0,
+  "required_provider": "opencode-go",
+  "required_model": "deepseek-v4.1-flash",
+  "classification": "provider_lane_unavailable"
+}

@@ -1,0 +1,5 @@
+command: from app, server\.venv\Scripts\python.exe -m server.services.geospatial.layer_auditor --strict --production
+result: PASS
+manifest_count: 86
+error_count: 0
+warning_count: 0

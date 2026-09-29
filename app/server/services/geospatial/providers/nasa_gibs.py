@@ -313,9 +313,16 @@ class NASAGIBSProvider(GeospatialProvider):
         )
         matrix_sets = sorted(layer.tile_matrix_sets)
         matrix_set = next(
-            (item for item in matrix_sets if "GoogleMapsCompatible" in item), None
-        ) or next(iter(matrix_sets), None)
+            (
+                item
+                for item in matrix_sets
+                if "GOOGLEMAPSCOMPATIBLE" in item.upper()
+                or item.upper() in {"EPSG:3857", "EPSG:900913"}
+            ),
+            None,
+        )
         if preferred_mode == "wmts" and "wmts" in layer.protocols and matrix_set:
+            time_segment = "{time}" if layer.default_time else "default"
             return GeospatialLayerRenderDescriptor(
                 provider=self.provider_id,
                 layer_id=layer.layer_id,
@@ -324,7 +331,7 @@ class NASAGIBSProvider(GeospatialProvider):
                 url=GIBS_WMTS_REST_BASE_URL,
                 tile_url_template=(
                     f"{GIBS_WMTS_REST_BASE_URL}/{layer.layer_id}/{style}/"
-                    f"{layer.default_time or '{time}'}/{matrix_set}/{{z}}/{{y}}/{{x}}"
+                    f"{time_segment}/{matrix_set}/{{z}}/{{y}}/{{x}}"
                     f".{self._extension_for_format(image_format)}"
                 ),
                 crs="EPSG:3857",

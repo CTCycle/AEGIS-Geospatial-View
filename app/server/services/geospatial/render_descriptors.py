@@ -6,7 +6,7 @@ import math
 import os
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from server.contracts.geospatial import LocationSearchRequest
 from server.services.geospatial.api_service import (
@@ -19,6 +19,10 @@ from server.services.geospatial.credential_resolver import GeospatialCredentialR
 from server.services.geospatial.provider_registry import (
     ProviderRegistry,
     ProviderRegistryError,
+)
+from server.services.geospatial.raster_tiles import (
+    build_wms_tile_template as build_wms_tile_template_url,
+    build_wmts_tile_template as build_wmts_tile_template_url,
 )
 from server.services.geospatial.rainviewer import (
     RainViewerRequestError,
@@ -283,6 +287,15 @@ class RenderDescriptorService:
         if resolved_url is not None:
             descriptor["url"] = resolved_url
         if render is not None:
+            proxy_template = self._backend_raster_proxy_template(
+                overlay_id,
+                provider=str(capability.get("provider") or "").strip().lower(),
+                render=render,
+            )
+            if proxy_template is not None:
+                descriptor["source_url"] = resolved_url
+                descriptor["url"] = proxy_template
+                render["tile_url_template"] = proxy_template
             descriptor["render"] = render
             tile_url_template = render.get("tile_url_template")
             if tile_url_template is not None:
@@ -341,6 +354,14 @@ class RenderDescriptorService:
                 render_payload["tile_url_template"] = str(
                     render_payload["tile_url_template"]
                 ).replace("{time}", requested_time)
+        proxy_template = self._backend_raster_proxy_template(
+            f"{provider_id}:{layer.layer_id}",
+            provider=provider_id,
+            render=render_payload,
+        )
+        source_url = render.url if render else None
+        if proxy_template is not None and render_payload is not None:
+            render_payload["tile_url_template"] = proxy_template
         descriptor: dict[str, object] = {
             "id": f"{provider_id}:{layer.layer_id}",
             "label": layer.title,
@@ -348,7 +369,8 @@ class RenderDescriptorService:
             "type": "raster-overlay" if render else "metadata-only",
             "rendering_mode": render.rendering_mode if render else "metadata-only",
             "render": render_payload,
-            "url": render.url if render else None,
+            "url": proxy_template or source_url,
+            "source_url": source_url,
             "tile_url_template": render_payload.get("tile_url_template")
             if is_json_object(render_payload)
             else None,
@@ -469,24 +491,16 @@ class RenderDescriptorService:
         version: str,
         exceptions: str,
     ) -> str:
-        crs_key = "crs" if version.startswith("1.3") else "srs"
-        query = [
-            "service=WMS",
-            "request=GetMap",
-            f"layers={layer_id}",
-            f"styles={style}",
-            f"format={image_format}",
-            "transparent=true",
-            f"version={version}",
-            f"{crs_key}={crs}",
-            f"exceptions={exceptions}",
-            "bbox={bbox-epsg-3857}",
-            "width=256",
-            "height=256",
-        ]
-        if time:
-            query.append(f"time={time}")
-        return f"{url}{'&' if '?' in url else '?'}{'&'.join(query)}"
+        return build_wms_tile_template_url(
+            url=url,
+            layer_id=layer_id,
+            crs=crs,
+            image_format=image_format,
+            style=style,
+            time=time,
+            version=version,
+            exceptions=exceptions,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -499,21 +513,39 @@ class RenderDescriptorService:
         tile_matrix_set: str,
         time: str,
     ) -> str:
-        query = [
-            "service=WMTS",
-            "request=GetTile",
-            "version=1.0.0",
-            f"layer={layer_id}",
-            f"style={style}",
-            f"tilematrixset={tile_matrix_set}",
-            f"tilematrix={tile_matrix_set}:{{z}}",
-            "tilerow={y}",
-            "tilecol={x}",
-            f"format={image_format}",
-        ]
-        if time:
-            query.append(f"time={time}")
-        return f"{url}{'&' if '?' in url else '?'}{'&'.join(query)}"
+        return build_wmts_tile_template_url(
+            url=url,
+            layer_id=layer_id,
+            style=style,
+            image_format=image_format,
+            tile_matrix_set=tile_matrix_set,
+            time=time,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _backend_raster_proxy_template(
+        capability_id: str,
+        *,
+        provider: str,
+        render: dict[str, object] | None,
+    ) -> str | None:
+        if provider not in {"fema", "esa", "gibs"} or render is None:
+            return None
+        rendering_mode = str(render.get("rendering_mode") or "").strip().lower()
+        if rendering_mode not in {"raster-tile", "xyz", "tile", "wms", "wmts"}:
+            return None
+        normalized_id = str(capability_id).strip()
+        if not normalized_id or any(char in normalized_id for char in "/?#{}"):
+            return None
+        template = (
+            f"/api/geospatial/tiles/{quote(normalized_id, safe=':')}/"
+            "{z}/{x}/{y}.png"
+        )
+        time = render.get("time") or render.get("default_time")
+        if isinstance(time, str) and time.strip():
+            template += "?time={time}"
+        return template
 
     # -------------------------------------------------------------------------
     def metadata_only_descriptor(

@@ -1,0 +1,36 @@
+{
+  "tested_commit": "b0be47ccdf40a5288d205607e45e5d9aaa079d5a-dirty",
+  "browser_live": {
+    "exact_lane_probe": {
+      "http_status": 200,
+      "provider": "",
+      "model": "",
+      "status": "failed",
+      "parse_status": "failed"
+    },
+    "fema_esa": {
+      "test_status": "skipped",
+      "proxy_request_count": 0,
+      "proxy_response_count": 0,
+      "upstream_statuses": [],
+      "classification": "provider_lane_unavailable"
+    },
+    "gibs": {
+      "layer_count": 12,
+      "test_status": "skipped",
+      "proxy_request_count": 0,
+      "proxy_response_count": 0,
+      "upstream_statuses": [],
+      "classification": "provider_lane_unavailable"
+    }
+  },
+  "local_contracts": {
+    "fema_arcgis_export_materialization": "passed",
+    "esa_wmts_materialization": "passed",
+    "gibs_wmts_materialization": "passed",
+    "gibs_wms_fallback": "passed",
+    "binary_signature_rejection": "passed",
+    "coordinate_and_placeholder_rejection": "passed",
+    "safe_upstream_error_normalization": "passed"
+  }
+}

@@ -4,9 +4,10 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 
 from collections.abc import Iterator
 from datetime import datetime
+import logging
 import math
 from typing import Any, TypeGuard
-from urllib.parse import quote
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from server.contracts.geospatial import (
     GeospatialProviderLayerResponse,
@@ -23,6 +24,7 @@ from server.services.geospatial.layer_auditor import audit_all_manifests
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.provider_registry import (
     ProviderNotRegisteredError,
+    ProviderRegistryError,
     ProviderRegistry,
 )
 from server.services.geospatial.providers.base import (
@@ -38,7 +40,26 @@ from server.services.geospatial.providers.base import (
 )
 from server.services.geospatial.providers.http import fetch_bytes_url
 from server.services.geospatial.providers.tomtom import build_tomtom_tile_url
+from server.services.geospatial.raster_tiles import (
+    RasterTileTemplateError,
+    build_wms_get_map_url,
+    build_wmts_get_tile_url,
+    materialize_tile_template,
+    validate_tile_coordinates,
+)
 from server.services.geospatial.runtime_registry import RuntimeRegistry
+
+LOGGER = logging.getLogger(__name__)
+
+_SENSITIVE_TILE_QUERY_MARKERS = (
+    "api_key",
+    "apikey",
+    "authorization",
+    "credential",
+    "password",
+    "secret",
+    "token",
+)
 
 ###############################################################################
 class GeospatialApiServiceError(Exception):
@@ -406,28 +427,37 @@ class GeospatialApiService:
         z: int,
         x: int,
         y: int,
+        time: str | None = None,
     ) -> bytes:
-        manifest = self._manifest_by_id(capability_id)
+        try:
+            validate_tile_coordinates(z, x, y)
+        except RasterTileTemplateError as exc:
+            raise GeospatialInvalidRequestError(str(exc)) from exc
+
+        manifest = self._tile_manifest_by_id(capability_id)
         metadata = json_object(manifest.get("metadata"))
-        template = str(
-            metadata.get("tile_url_template")
-            or metadata.get("url_template")
-            or metadata.get("tile_url")
-            or metadata.get("url")
-            or ""
-        ).strip()
-        if not template:
-            raise GeospatialUnsupportedTileError(
-                "Tile URL is missing from provider metadata."
-            )
         provider = str(manifest.get("provider") or "").strip().lower()
-        upstream_url = self._resolve_credentialed_tile_template(
-            template=template,
-            provider=provider,
-            capability_id=capability_id,
-            z=z,
-            x=x,
-            y=y,
+        requested_time = self._normalize_tile_time(time)
+        try:
+            upstream_url = await self._resolve_capability_tile_url(
+                manifest=manifest,
+                metadata=metadata,
+                provider=provider,
+                capability_id=capability_id,
+                z=z,
+                x=x,
+                y=y,
+                requested_time=requested_time,
+            )
+        except RasterTileTemplateError as exc:
+            raise GeospatialUnsupportedTileError(
+                f"Capability '{capability_id}' does not expose a complete tile request."
+            ) from exc
+        LOGGER.info(
+            "geospatial_tile_proxy provider=%s capability=%s upstream=%s",
+            provider or "unknown",
+            capability_id,
+            self._sanitize_tile_url(upstream_url),
         )
         try:
             return await self._fetch_binary_url(upstream_url)
@@ -435,7 +465,7 @@ class GeospatialApiService:
             raise GeospatialTileCredentialError(
                 f"{self._humanize_provider(provider)} rejected the configured credentials."
             ) from exc
-        except (ProviderTimeoutError, ProviderUnavailableError) as exc:
+        except ProviderError as exc:
             raise GeospatialTileRequestError(
                 f"{self._humanize_provider(provider)} tile request failed."
             ) from exc
@@ -569,6 +599,244 @@ class GeospatialApiService:
                     return dict(item)
         raise GeospatialCapabilityNotFoundError(
             f"Geospatial capability '{capability_id}' was not found."
+        )
+
+    # -------------------------------------------------------------------------
+    def _tile_manifest_by_id(self, capability_id: str) -> dict[str, Any]:
+        try:
+            return self._manifest_by_id(capability_id)
+        except GeospatialCapabilityNotFoundError:
+            prefix = "gibs:"
+            layer_id = capability_id[len(prefix) :] if capability_id.startswith(prefix) else ""
+            if not layer_id or not all(
+                character.isalnum() or character in "_-." for character in layer_id
+            ):
+                raise
+            return {
+                "id": capability_id,
+                "provider": "gibs",
+                "type": "provider-layer",
+                "renderingMode": "provider",
+                "metadata": {"layer_id": layer_id},
+            }
+
+    # -------------------------------------------------------------------------
+    async def _resolve_capability_tile_url(
+        self,
+        *,
+        manifest: dict[str, Any],
+        metadata: dict[str, Any],
+        provider: str,
+        capability_id: str,
+        z: int,
+        x: int,
+        y: int,
+        requested_time: str | None,
+    ) -> str:
+        if provider == "gibs":
+            layer_id = str(
+                metadata.get("layer_id")
+                or metadata.get("layers")
+                or capability_id.removeprefix("gibs:")
+            ).strip()
+            return await self._resolve_gibs_tile_url(
+                layer_id=layer_id,
+                z=z,
+                x=x,
+                y=y,
+                requested_time=requested_time,
+            )
+
+        template = str(
+            metadata.get("tile_url_template")
+            or metadata.get("url_template")
+            or metadata.get("tile_url")
+            or metadata.get("url")
+            or ""
+        ).strip()
+        if not template:
+            raise GeospatialUnsupportedTileError(
+                "Tile URL is missing from provider metadata."
+            )
+
+        rendering_mode = str(
+            manifest.get("renderingMode") or manifest.get("type") or ""
+        ).strip().lower()
+        source_protocol = str(metadata.get("source_protocol") or "").strip().lower()
+        if rendering_mode in {"wmts"} or source_protocol == "wmts":
+            return build_wmts_get_tile_url(
+                url=template,
+                layer_id=str(
+                    metadata.get("layer_id") or metadata.get("layers") or capability_id
+                ),
+                style=str(metadata.get("style") or metadata.get("wmts_style") or "default"),
+                image_format=str(
+                    metadata.get("format")
+                    or metadata.get("wmts_format")
+                    or "image/png"
+                ),
+                tile_matrix_set=str(
+                    metadata.get("tile_matrix_set") or "EPSG:3857"
+                ),
+                z=z,
+                x=x,
+                y=y,
+                time=requested_time
+                or self._optional_tile_time(
+                    metadata.get("time") or metadata.get("default_time")
+                ),
+            )
+        if rendering_mode == "wms" or source_protocol == "wms":
+            return build_wms_get_map_url(
+                url=template,
+                layer_id=str(
+                    metadata.get("layer_id") or metadata.get("layers") or capability_id
+                ),
+                crs=str(metadata.get("crs") or "EPSG:3857"),
+                image_format=str(
+                    metadata.get("format") or metadata.get("wms_format") or "image/png"
+                ),
+                style=str(metadata.get("style") or ""),
+                version=str(metadata.get("wms_version") or "1.1.1"),
+                exceptions=str(
+                    metadata.get("wms_exceptions")
+                    or "application/vnd.ogc.se_inimage"
+                ),
+                z=z,
+                x=x,
+                y=y,
+                time=requested_time
+                or self._optional_tile_time(
+                    metadata.get("time") or metadata.get("default_time")
+                ),
+            )
+        return self._resolve_credentialed_tile_template(
+            template=template,
+            provider=provider,
+            capability_id=capability_id,
+            z=z,
+            x=x,
+            y=y,
+        )
+
+    # -------------------------------------------------------------------------
+    async def _resolve_gibs_tile_url(
+        self,
+        *,
+        layer_id: str,
+        z: int,
+        x: int,
+        y: int,
+        requested_time: str | None,
+    ) -> str:
+        if not layer_id or not all(
+            character.isalnum() or character in "_-." for character in layer_id
+        ):
+            raise GeospatialUnsupportedTileError("NASA GIBS layer id is invalid.")
+        try:
+            layer = await self.provider_registry.describe_layer("gibs", layer_id)
+        except (ProviderNotRegisteredError, ProviderRegistryError, ProviderError) as exc:
+            raise GeospatialTileRequestError(
+                "NASA GIBS layer description is unavailable."
+            ) from exc
+        render = layer.render
+        if render is None:
+            raise GeospatialUnsupportedTileError(
+                f"NASA GIBS layer '{layer_id}' is not renderable."
+            )
+
+        effective_time = requested_time or render.time or render.default_time
+        rendering_mode = str(render.rendering_mode).strip().lower()
+        if rendering_mode == "wmts" and self._is_web_mercator_render(render):
+            if render.tile_url_template:
+                replacements = {"time": effective_time} if effective_time else {}
+                return materialize_tile_template(
+                    render.tile_url_template,
+                    z,
+                    x,
+                    y,
+                    replacements=replacements,
+                )
+            if render.url:
+                return build_wmts_get_tile_url(
+                    url=render.url,
+                    layer_id=render.layer_id,
+                    style=render.style or "default",
+                    image_format=render.format or "image/png",
+                    tile_matrix_set=render.tile_matrix_set or "EPSG:3857",
+                    z=z,
+                    x=x,
+                    y=y,
+                    time=effective_time,
+                )
+        if rendering_mode == "wms" and render.url:
+            return build_wms_get_map_url(
+                url=render.url,
+                layer_id=render.layer_id,
+                crs=render.crs or "EPSG:3857",
+                image_format=render.format or "image/png",
+                style=render.style or "",
+                version="1.3.0",
+                exceptions="application/vnd.ogc.se_inimage",
+                z=z,
+                x=x,
+                y=y,
+                time=effective_time,
+            )
+        raise GeospatialUnsupportedTileError(
+            f"NASA GIBS layer '{layer_id}' has no compatible raster render descriptor."
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_web_mercator_render(render: Any) -> bool:
+        matrix_set = str(getattr(render, "tile_matrix_set", "") or "").upper()
+        crs = str(getattr(render, "crs", "") or "").upper()
+        return (
+            crs in {"EPSG:3857", "EPSG:900913"}
+            or matrix_set in {"EPSG:3857", "EPSG:900913"}
+            or "GOOGLEMAPSCOMPATIBLE" in matrix_set
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_tile_time(value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not normalized:
+            return None
+        if len(normalized) > 64 or not all(
+            character.isalnum() or character in "-:TZ+./_"
+            for character in normalized
+        ):
+            raise GeospatialInvalidRequestError("Raster time is invalid.")
+        return normalized
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _optional_tile_time(value: object) -> str | None:
+        return value.strip() if isinstance(value, str) and value.strip() else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _sanitize_tile_url(url: str) -> str:
+        parsed = urlsplit(url)
+        query: list[tuple[str, str]] = []
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True):
+            if any(
+                marker in key.casefold() for marker in _SENSITIVE_TILE_QUERY_MARKERS
+            ):
+                value = "[REDACTED]"
+            query.append((key, value))
+        return urlunsplit(
+            (
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                urlencode(query, doseq=True),
+                "",
+            )
         )
 
     # -------------------------------------------------------------------------
@@ -968,18 +1236,14 @@ class GeospatialApiService:
                     f"{self._humanize_provider(provider)} credentials are required."
                 )
             template = template.replace("{api_key}", quote(api_key, safe=""))
-        resolved = (
-            template.replace("{z}", str(z))
-            .replace("{x}", str(x))
-            .replace("{y}", str(y))
-        )
-        if resolved == template and all(
-            token not in template for token in ("{z}", "{x}", "{y}")
+        if not any(
+            token in template
+            for token in ("{z}", "{x}", "{y}", "{bbox-epsg-3857}")
         ):
             raise GeospatialUnsupportedTileError(
                 f"Capability '{capability_id}' does not expose a tile template."
             )
-        return resolved
+        return materialize_tile_template(template, z, x, y)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -989,6 +1253,9 @@ class GeospatialApiService:
             "google_maps": "Google Maps",
             "openaq": "OpenAQ",
             "arcgis": "ArcGIS",
+            "fema": "FEMA",
+            "esa": "ESA WorldCover",
+            "gibs": "NASA GIBS",
         }
         return lookup.get(provider, provider or "Provider")
 

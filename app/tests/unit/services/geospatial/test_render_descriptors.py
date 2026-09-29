@@ -6,7 +6,12 @@ from tests.conftest import run_async_in_thread
 
 import pytest
 
-from server.contracts.geospatial import LocationSearchRequest, ViewportPolicy
+from server.contracts.geospatial import (
+    GeospatialLayerRenderDescriptor,
+    GeospatialProviderLayerDescriptor,
+    LocationSearchRequest,
+    ViewportPolicy,
+)
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.geospatial.providers import ProviderResponse
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -254,11 +259,105 @@ def test_catalog_raster_overlays_expose_provider_tile_templates(
     assert warnings == []
     assert descriptor["rendering_mode"] == "raster-tile"
     tile_url_template = str(descriptor["tile_url_template"])
-    assert expected_host in tile_url_template
     if overlay_id == "fema_nfhl_flood_zones":
-        assert "/arcgis/rest/services/public/NFHL/MapServer/export" in tile_url_template
-    assert "{bbox-epsg-3857}" in tile_url_template
+        assert tile_url_template == (
+            "/api/geospatial/tiles/fema_nfhl_flood_zones/{z}/{x}/{y}.png"
+        )
+        assert expected_host in str(descriptor["source_url"])
+    else:
+        assert expected_host in tile_url_template
+        assert "{bbox-epsg-3857}" in tile_url_template
     assert descriptor["render"]["tile_url_template"] == tile_url_template
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("overlay_id", "expected_host", "expected_protocol"),
+    [
+        ("esa_worldcover", "services.terrascope.be", "wmts"),
+        ("IMERG_Precipitation_Rate", "gibs.earthdata.nasa.gov", "wms"),
+    ],
+)
+def test_catalog_public_raster_descriptors_use_backend_proxy(
+    overlay_id: str, expected_host: str, expected_protocol: str
+) -> None:
+    service = RenderDescriptorService(capability_registry=CapabilityRegistry())
+
+    result = run_async_in_thread(
+        service.build_overlay_descriptor(overlay_id, request=_request())
+    )
+
+    assert result is not None
+    descriptor, warnings = result
+    assert warnings == []
+    assert descriptor["tile_url_template"] == (
+        f"/api/geospatial/tiles/{overlay_id}/{{z}}/{{x}}/{{y}}.png"
+    )
+    assert expected_host in str(descriptor["source_url"])
+    assert descriptor["source_protocol"].lower() == expected_protocol
+    assert descriptor["attribution"]
+
+###############################################################################
+class _GibsProvider:
+    provider_id = "gibs"
+
+    async def describe_layer(self, layer_id: str, *, refresh: bool = False):
+        del refresh
+        assert layer_id == "MODIS_Terra_NDVI_8Day"
+        return GeospatialProviderLayerDescriptor(
+            provider="gibs",
+            layer_id=layer_id,
+            title="MODIS Terra NDVI 8-Day",
+            rendering_mode="wmts",
+            source_protocol="wmts",
+            data_format="image/png",
+            geometry_type="raster-grid",
+            default_time="2026-09-28",
+            tile_matrix_sets=["GoogleMapsCompatible_Level9"],
+            render=GeospatialLayerRenderDescriptor(
+                provider="gibs",
+                layer_id=layer_id,
+                rendering_mode="wmts",
+                source_protocol="wmts",
+                url="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best",
+                tile_url_template=(
+                    "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/"
+                    "MODIS_Terra_NDVI_8Day/default/{time}/"
+                    "GoogleMapsCompatible_Level9/{z}/{y}/{x}.png"
+                ),
+                tile_matrix_set="GoogleMapsCompatible_Level9",
+                format="image/png",
+                default_time="2026-09-28",
+                attribution=["© NASA GIBS"],
+            ),
+            attribution=["© NASA GIBS"],
+        )
+
+###############################################################################
+def test_provider_discovered_gibs_raster_descriptor_uses_proxy_and_keeps_time() -> None:
+    service = RenderDescriptorService(
+        provider_registry=ProviderRegistry(
+            providers=[_GibsProvider()]  # type: ignore[list-item]
+        )
+    )
+
+    descriptor, warnings = run_async_in_thread(
+        service.build_provider_layer_overlay(
+            provider_id="gibs",
+            layer_id="MODIS_Terra_NDVI_8Day",
+            request=_request(),
+        )
+    )
+
+    assert warnings == []
+    assert descriptor["url"] == (
+        "/api/geospatial/tiles/gibs:MODIS_Terra_NDVI_8Day/"
+        "{z}/{x}/{y}.png?time={time}"
+    )
+    assert descriptor["source_url"] == (
+        "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best"
+    )
+    assert descriptor["default_time"] == "2026-09-28"
+    assert descriptor["render"]["tile_url_template"] == descriptor["url"]
 
 ###############################################################################
 def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
