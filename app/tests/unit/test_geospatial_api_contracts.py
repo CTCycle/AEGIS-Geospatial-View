@@ -428,6 +428,7 @@ def test_geospatial_esa_tile_proxy_materializes_bounded_wms_get_map_request() ->
     parsed = urlsplit(captured["url"])
     query = parse_qs(parsed.query)
     assert parsed.netloc == "titiler.terrascope.be"
+    assert parsed.path == "/wms"
     assert query["service"] == ["WMS"]
     assert query["request"] == ["GetMap"]
     assert query["layers"] == ["esa-worldcover-map-10m-2021-v2_map"]
@@ -512,6 +513,8 @@ def test_geospatial_gibs_stable_capability_maps_to_provider_layer_and_time() -> 
         async def describe_layer(self, provider_id: str, layer_id: str):
             assert provider_id == "gibs"
             assert layer_id == "MODIS_Combined_Thermal_Anomalies_All"
+            captured["provider_id"] = provider_id
+            captured["layer_id"] = layer_id
             return GeospatialProviderLayerDescriptor(
                 provider="gibs",
                 layer_id=layer_id,
