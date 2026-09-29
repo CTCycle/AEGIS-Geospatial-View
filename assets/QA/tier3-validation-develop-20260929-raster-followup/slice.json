@@ -3,7 +3,7 @@
   "date": "2026-09-29",
   "branch": "develop",
   "baseline_sha": "3ed9d99e032b6bb9eb5784c9fe47a24798dd58e0",
-  "tested_source": "baseline_sha_plus_working_tree_remediation",
+  "tested_source": "2c9112d0142f4425da418912d23c5a903606b4f8",
   "python": "app/server/.venv Python 3.14.7",
   "node": "runtimes/node-v22.23.1 node / npm 10.9.8",
   "data_root": "runtimes/cache/test-runtime/t3-baseline-aegis-20260929",
@@ -11,6 +11,7 @@
   "model": "deepseek-v4.1-flash",
   "protocol": "openai-chat-completions",
   "provider_probe": "passed; parse_status=complete; HTTP 200",
+  "hosted_ci": "run 36594073100; success; all four jobs passed",
   "execution_defaults_unchanged": {
     "max_iterations": 12,
     "complex_max_model_calls": 10,
