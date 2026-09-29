@@ -93,10 +93,7 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "domains": [
-      "data_retrieval",
-      "map_rendering"
-    ],
+    "domains": ["data_retrieval", "map_rendering"],
     "plannerHints": [
       "imagery",
       "fires",
