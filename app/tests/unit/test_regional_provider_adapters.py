@@ -88,15 +88,20 @@ def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
         )
 
 ###############################################################################
-def test_esa_provider_returns_wmts_descriptor() -> None:
+def test_esa_provider_returns_wms_descriptor_with_metadata() -> None:
     response = run_async_in_thread(
         ESAProvider().fetch(
             ProviderRequest(
                 capability_id="esa_worldcover",
                 params={
                     "metadata": {
-                        "url": "https://example.test/wmts",
-                        "layer_id": "WORLDCOVER_2021_MAP",
+                        "url": "https://example.test/wms",
+                        "layer_id": "esa-worldcover-map-10m-2021-v2_map",
+                        "source_protocol": "WMS",
+                        "crs": "EPSG:3857",
+                        "format": "image/png",
+                        "wms_version": "1.3.0",
+                        "wms_exceptions": "application/vnd.ogc.se_inimage",
                         "attribution": "ESA",
                     }
                 },
@@ -104,11 +109,46 @@ def test_esa_provider_returns_wmts_descriptor() -> None:
         )
     )
 
-    assert response.payload["renderingMode"] == "wmts"
-    assert response.payload["layerId"] == "WORLDCOVER_2021_MAP"
-    assert response.payload["serviceUrl"] == "https://example.test/wmts"
+    assert response.payload["renderingMode"] == "wms"
+    assert response.payload["layerId"] == "esa-worldcover-map-10m-2021-v2_map"
+    assert response.payload["layers"] == "esa-worldcover-map-10m-2021-v2_map"
+    assert response.payload["serviceUrl"] == "https://example.test/wms"
+    assert response.payload["crs"] == "EPSG:3857"
+    assert response.payload["format"] == "image/png"
+    assert response.payload["version"] == "1.3.0"
+    assert response.payload["exceptions"] == "application/vnd.ogc.se_inimage"
+    assert response.payload["legend"]["source"] == "ESA WorldCover / Terrascope"
+    assert response.payload["freshnessLabel"] == "WorldCover 2021 static source layer"
     assert response.result_type == "raster"
     assert response.attribution == ["ESA"]
+
+###############################################################################
+def test_esa_provider_preserves_wmts_descriptor_compatibility() -> None:
+    response = run_async_in_thread(
+        ESAProvider().fetch(
+            ProviderRequest(
+                capability_id="esa_worldcover",
+                params={
+                    "metadata": {
+                        "url": "https://example.test/wmts",
+                        "source_protocol": "WMTS",
+                        "layer_id": "WORLDCOVER_2021_MAP",
+                        "tile_matrix_set": "EPSG:3857",
+                        "wmts_format": "image/png",
+                        "wmts_style": "default",
+                    }
+                },
+            )
+        )
+    )
+
+    assert response.payload["renderingMode"] == "wmts"
+    assert response.payload["serviceUrl"] == "https://example.test/wmts"
+    assert response.payload["layerId"] == "WORLDCOVER_2021_MAP"
+    assert response.payload["tileMatrixSet"] == "EPSG:3857"
+    assert response.payload["format"] == "image/png"
+    assert response.payload["style"] == "default"
+    assert response.payload["legend"]["source"] == "ESA WorldCover / Terrascope"
 
 ###############################################################################
 def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
@@ -118,7 +158,7 @@ def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
         return clock
 
     async def ok_fetcher(url: str, headers: dict[str, str] | None = None):
-        return {"service": "WMTS", "tileMatrixSets": ["EPSG3857"]}
+        return {"service": "WMS", "layers": ["esa-worldcover-map-10m-2021-v2_map"]}
 
     provider = ESAProvider(
         fetcher=ok_fetcher,
@@ -130,7 +170,11 @@ def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
         capability_id="esa_worldcover",
         params={
             "live_validate": True,
-            "metadata": {"url": "https://example.test/wmts"},
+            "metadata": {
+                "url": "https://example.test/wms",
+                "source_protocol": "WMS",
+                "layer_id": "esa-worldcover-map-10m-2021-v2_map",
+            },
         },
     )
     run_async_in_thread(provider.fetch(request))
@@ -143,7 +187,7 @@ def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
     stale = run_async_in_thread(provider.fetch(request))
 
     assert stale.stale is True
-    assert stale.payload["liveValidation"]["service"] == "WMTS"
+    assert stale.payload["liveValidation"]["service"] == "WMS"
 
 ###############################################################################
 def test_eurostat_provider_keeps_statistics_metadata_only_until_joined() -> None:

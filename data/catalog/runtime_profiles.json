@@ -738,13 +738,14 @@
       "health_policy": "best_effort",
       "handler_name": null,
       "capability_kind": "raster-overlay",
-      "rendering_mode": "wmts",
+      "rendering_mode": "wms",
       "health_status": "partial",
       "planner_hints": [
-        "wmts",
+        "wms",
         "land-cover",
         "esa",
-        "esa worldcover"
+        "esa worldcover",
+        "terrascope"
       ],
       "manual_toggle": true,
       "auth_required": false

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_object
-
 from typing import Any
 
+from server.common.typing import is_json_object
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
@@ -47,10 +46,35 @@ class ESAProvider(GeospatialProvider):
     def _descriptor_payload(
         self, request: ProviderRequest, metadata: dict[str, Any]
     ) -> dict[str, Any]:
+        protocol = _protocol(metadata)
+        layer_id = str(
+            metadata.get("layer_id")
+            or metadata.get("layers")
+            or request.capability_id
+        )
+        if protocol == "wms":
+            return {
+                "renderingMode": "wms",
+                "serviceUrl": metadata.get("url"),
+                "layerId": layer_id,
+                "layers": layer_id,
+                "crs": metadata.get("crs") or "EPSG:3857",
+                "format": metadata.get("format")
+                or metadata.get("wms_format")
+                or "image/png",
+                "version": metadata.get("wms_version") or "1.3.0",
+                "exceptions": metadata.get("wms_exceptions")
+                or "application/vnd.ogc.se_inimage",
+                "legend": {
+                    "title": metadata.get("label") or "ESA WorldCover",
+                    "source": "ESA WorldCover / Terrascope",
+                },
+                "freshnessLabel": "WorldCover 2021 static source layer",
+            }
         return {
             "renderingMode": "wmts",
             "serviceUrl": metadata.get("url"),
-            "layerId": metadata.get("layer_id") or request.capability_id,
+            "layerId": layer_id,
             "tileMatrixSet": metadata.get("tile_matrix_set") or "EPSG:3857",
             "format": metadata.get("wmts_format") or "image/png",
             "style": metadata.get("wmts_style") or "",
@@ -68,6 +92,7 @@ class ESAProvider(GeospatialProvider):
         metadata: dict[str, Any],
         payload: dict[str, Any],
     ) -> ProviderResponse:
+        protocol = _protocol(metadata).upper()
         service_url = str(payload.get("serviceUrl") or "").strip()
         cache_key = f"{self.provider_id}:{request.capability_id}:{service_url}"
         cached = self.cache.get(cache_key)
@@ -87,12 +112,12 @@ class ESAProvider(GeospatialProvider):
                     {**payload, "liveValidation": cached.value},
                     stale=True,
                     warnings=[
-                        "ESA WMTS validation failed; using stale validation metadata."
+                        f"ESA {protocol} validation failed; using stale validation metadata."
                     ],
                 )
             if isinstance(exc, ProviderUnavailableError):
                 raise
-            raise ProviderUnavailableError("ESA WMTS validation failed.") from exc
+            raise ProviderUnavailableError(f"ESA {protocol} validation failed.") from exc
         if not is_json_object(validation):
             if cached.status == CacheLookupStatus.STALE and is_json_object(
                 cached.value
@@ -103,11 +128,11 @@ class ESAProvider(GeospatialProvider):
                     {**payload, "liveValidation": cached.value},
                     stale=True,
                     warnings=[
-                        "ESA WMTS validation was malformed; using stale validation metadata."
+                        f"ESA {protocol} validation was malformed; using stale validation metadata."
                     ],
                 )
             raise ProviderUnavailableError(
-                "ESA WMTS validation returned malformed metadata."
+                f"ESA {protocol} validation returned malformed metadata."
             )
         self.cache.set(
             cache_key,
@@ -143,3 +168,14 @@ class ESAProvider(GeospatialProvider):
 def _metadata(request: ProviderRequest) -> dict[str, Any]:
     value = request.params.get("metadata")
     return dict(value) if is_json_object(value) else {}
+
+
+def _protocol(metadata: dict[str, Any]) -> str:
+    value = str(
+        metadata.get("source_protocol")
+        or metadata.get("renderingMode")
+        or metadata.get("rendering_mode")
+        or metadata.get("type")
+        or ""
+    ).strip().lower()
+    return "wms" if value == "wms" else "wmts"

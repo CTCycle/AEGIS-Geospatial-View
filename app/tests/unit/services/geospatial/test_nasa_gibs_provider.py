@@ -49,6 +49,10 @@ WMS_XML = """<?xml version="1.0"?>
 INCOMPATIBLE_WMTS_XML = WMTS_XML.replace(
     "GoogleMapsCompatible_Level9", "EPSG:4326"
 )
+VECTOR_ONLY_WMTS_XML = WMTS_XML.replace(
+    "<Format>image/png</Format>",
+    "<Format>application/vnd.mapbox-vector-tile</Format>",
+)
 
 
 def _large_wms_xml() -> str:
@@ -160,6 +164,39 @@ def test_nasa_gibs_provider_returns_renderable_raster_result() -> None:
     assert response.payload["render"] is not None
 
 ###############################################################################
+def test_nasa_gibs_provider_maps_stable_capability_to_manifest_layer() -> None:
+    native_wmts = VECTOR_ONLY_WMTS_XML.replace(
+        "MODIS_Terra_NDVI_8Day", "MODIS_Combined_Thermal_Anomalies_All"
+    )
+    native_wms = WMS_XML.replace(
+        "MODIS_Terra_NDVI_8Day", "MODIS_Combined_Thermal_Anomalies_All"
+    )
+
+    async def fetcher(url: str, headers: dict[str, str] | None) -> str:
+        del headers
+        return native_wmts if "wmts" in url else native_wms
+
+    response = run_async_in_thread(
+        NASAGIBSProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="MODIS_Combined_Thermal_Anomalies_Fire",
+                params={
+                    "metadata": {
+                        "layer_id": "MODIS_Combined_Thermal_Anomalies_All"
+                    }
+                },
+            )
+        )
+    )
+
+    assert response.capability_id == "MODIS_Combined_Thermal_Anomalies_Fire"
+    assert response.payload["layer"]["layer_id"] == (
+        "MODIS_Combined_Thermal_Anomalies_All"
+    )
+    assert response.payload["render"] is not None
+    assert response.payload["render"]["rendering_mode"] == "wms"
+
+###############################################################################
 def test_nasa_gibs_provider_falls_back_to_wms_without_web_mercator_wmts() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None) -> str:
         del headers
@@ -173,6 +210,26 @@ def test_nasa_gibs_provider_falls_back_to_wms_without_web_mercator_wmts() -> Non
     assert layer.render.rendering_mode == "wms"
     assert layer.render.source_protocol == "wms"
     assert layer.default_time == "2026-06-18"
+
+
+###############################################################################
+def test_nasa_gibs_provider_prefers_wms_when_wmts_is_vector_only() -> None:
+    async def fetcher(url: str, headers: dict[str, str] | None) -> str:
+        del headers
+        return VECTOR_ONLY_WMTS_XML if "wmts" in url else WMS_XML
+
+    layer = run_async_in_thread(
+        NASAGIBSProvider(fetcher=fetcher).describe_layer(
+            "MODIS_Terra_NDVI_8Day"
+        )
+    )
+
+    assert layer.render is not None
+    assert layer.render.rendering_mode == "wms"
+    assert layer.render.source_protocol == "wms"
+    assert layer.render.url == (
+        "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi"
+    )
 
 ###############################################################################
 def test_nasa_gibs_provider_falls_back_to_wms_when_wmts_discovery_is_unavailable() -> None:

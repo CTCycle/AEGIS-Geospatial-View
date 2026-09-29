@@ -6,6 +6,7 @@ from typing import Literal
 from xml.etree import ElementTree
 
 from server.common.constants import NASA_ATTRIBUTION
+from server.common.typing import is_json_object
 from server.contracts.geospatial import (
     GeospatialLayerRenderDescriptor,
     GeospatialProviderLayerDescriptor,
@@ -135,9 +136,16 @@ class NASAGIBSProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
+        metadata = request.params.get("metadata")
+        manifest_layer_id = ""
+        if is_json_object(metadata):
+            manifest_layer_id = str(
+                metadata.get("layer_id") or metadata.get("layers") or ""
+            ).strip()
         layer_id = str(
             request.params.get("layer_id")
             or request.params.get("layer")
+            or manifest_layer_id
             or request.capability_id
         )
         layer = await self.describe_layer(layer_id)
@@ -292,11 +300,19 @@ class NASAGIBSProvider(GeospatialProvider):
         descriptors: list[GeospatialProviderLayerDescriptor] = []
         for layer_id in sorted({*wmts_layers, *wms_layers}):
             parsed = wmts_layers.get(layer_id) or wms_layers[layer_id]
+            preferred_mode: Literal["wmts", "wms"] = "wmts"
             if layer_id in wmts_layers and layer_id in wms_layers:
+                preferred_mode = (
+                    "wmts"
+                    if self._wmts_supports_raster(wmts_layers[layer_id])
+                    else "wms"
+                )
                 parsed = self._merge_parsed_layers(
                     wmts_layers[layer_id], wms_layers[layer_id]
                 )
-            render = self._build_render_descriptor(parsed)
+            render = self._build_render_descriptor(
+                parsed, preferred_mode=preferred_mode
+            )
             descriptors.append(
                 GeospatialProviderLayerDescriptor(
                     provider=self.provider_id,
@@ -396,6 +412,14 @@ class NASAGIBSProvider(GeospatialProvider):
                 attribution=[NASA_ATTRIBUTION],
             )
         return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _wmts_supports_raster(layer: ParsedGIBSLayer) -> bool:
+        return any(
+            str(image_format).strip().lower().startswith("image/")
+            for image_format in layer.formats
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

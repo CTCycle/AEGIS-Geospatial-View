@@ -33,7 +33,7 @@
     ],
     "coverage_scope": "global",
     "temporal_behavior": "dynamic",
-    "constraints": "verify provider availability and attribution requirements",
+    "constraints": "AEGIS capability MODIS_Combined_Thermal_Anomalies_Fire maps to provider-native GIBS layer MODIS_Combined_Thermal_Anomalies_All; verify provider availability and attribution requirements.",
     "content_hash": "686f050f517c0c48beaa7dd99946d50abd56bd59662077fd14db85c371613398",
     "human_summary": "Hotspot layer for probable active fires and high-temperature anomalies.",
     "primary_use_cases": [
@@ -52,8 +52,9 @@
     "integration_requirements": [
       "No API key required"
     ],
-    "layer_id": "MODIS_Combined_Thermal_Anomalies_Fire",
-    "layers": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_id": "MODIS_Combined_Thermal_Anomalies_All",
+    "layers": "MODIS_Combined_Thermal_Anomalies_All",
+    "provider_native_layer_id": "MODIS_Combined_Thermal_Anomalies_All",
     "url": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
     "wms_version": "1.1.1",
     "wms_exceptions": "application/vnd.ogc.se_inimage",
