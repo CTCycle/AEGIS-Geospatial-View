@@ -408,12 +408,12 @@ def test_geospatial_fema_tile_proxy_materializes_bounded_export_request() -> Non
     assert query["f"] == ["image"]
 
 ###############################################################################
-def test_geospatial_esa_tile_proxy_materializes_wmts_row_column_and_matrix() -> None:
+def test_geospatial_esa_tile_proxy_materializes_wms_getmap_request() -> None:
     captured: dict[str, str] = {}
 
     async def fake_fetch_binary_url(url: str) -> bytes:
         captured["url"] = url
-        return b"\x89PNG\r\n\x1a\npng-tile"
+        return b"\\x89PNG\\r\\n\\x1a\\npng-tile"
 
     service = _build_api_service(ProviderRegistry())
     service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
@@ -427,14 +427,20 @@ def test_geospatial_esa_tile_proxy_materializes_wmts_row_column_and_matrix() -> 
     assert response.status_code == 200
     parsed = urlsplit(captured["url"])
     query = parse_qs(parsed.query)
-    assert parsed.netloc == "services.terrascope.be"
-    assert query["service"] == ["WMTS"]
-    assert query["layer"] == ["WORLDCOVER_2021_MAP"]
-    assert query["tilematrixset"] == ["EPSG:3857"]
-    assert query["tilematrix"] == ["EPSG:3857:4"]
-    assert query["tilerow"] == ["6"]
-    assert query["tilecol"] == ["5"]
+    assert parsed.netloc == "titiler.terrascope.be"
+    assert parsed.path == "/wms"
+    assert query["service"] == ["WMS"]
+    assert query["request"] == ["GetMap"]
+    assert query["layers"] == ["esa-worldcover-map-10m-2021-v2_map"]
+    assert query["crs"] == ["EPSG:3857"]
+    assert query["version"] == ["1.3.0"]
     assert query["format"] == ["image/png"]
+    assert query["transparent"] == ["true"]
+    assert query["width"] == ["256"]
+    assert query["height"] == ["256"]
+    assert query["bbox"] == [
+        ",".join(str(value) for value in web_mercator_tile_bbox(4, 5, 6))
+    ]
 
 ###############################################################################
 def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time() -> None:
@@ -496,6 +502,55 @@ def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time(
     )
 
 ###############################################################################
+###############################################################################
+def test_static_gibs_fire_capability_uses_current_provider_native_layer() -> None:
+    captured: dict[str, str] = {}
+
+    class GibsRegistry:
+        async def describe_layer(self, provider_id: str, layer_id: str):
+            captured["provider_id"] = provider_id
+            captured["layer_id"] = layer_id
+            return GeospatialProviderLayerDescriptor(
+                provider="gibs",
+                layer_id=layer_id,
+                title="MODIS Combined Thermal Anomalies",
+                rendering_mode="wms",
+                source_protocol="wms",
+                data_format="image/png",
+                geometry_type="raster-grid",
+                render=GeospatialLayerRenderDescriptor(
+                    provider="gibs",
+                    layer_id=layer_id,
+                    rendering_mode="wms",
+                    source_protocol="wms",
+                    url="https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+                    crs="EPSG:3857",
+                    format="image/png",
+                ),
+            )
+
+    async def fake_fetch_binary_url(url: str) -> bytes:
+        captured["url"] = url
+        return b"\\x89PNG\\r\\n\\x1a\\npng-tile"
+
+    service = _build_api_service(GibsRegistry())
+    service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get(
+        "/api/geospatial/tiles/MODIS_Combined_Thermal_Anomalies_Fire/2/1/3.png"
+        "?time=2026-09-29"
+    )
+
+    assert response.status_code == 200
+    assert captured["provider_id"] == "gibs"
+    assert captured["layer_id"] == "MODIS_Combined_Thermal_Anomalies_All"
+    assert "layers=MODIS_Combined_Thermal_Anomalies_All" in captured["url"]
+    assert "time=2026-09-29" in captured["url"]
+
 def test_geospatial_tile_proxy_rejects_malformed_coordinates_before_network() -> None:
     captured: list[str] = []
 
@@ -714,15 +769,15 @@ def test_geospatial_raster_features_forward_manifest_metadata_to_provider() -> N
 
     assert response.status_code == 200
     assert response.json()["payload"]["serviceUrl"] == (
-        "https://services.terrascope.be/wmts/v2"
+        "https://titiler.terrascope.be/wms"
     )
-    assert response.json()["payload"]["layerId"] == "WORLDCOVER_2021_MAP"
+    assert response.json()["payload"]["layerId"] == "esa-worldcover-map-10m-2021-v2_map"
     request = captured["request"]
     assert request.params["metadata"]["url"] == (  # type: ignore[attr-defined]
-        "https://services.terrascope.be/wmts/v2"
+        "https://titiler.terrascope.be/wms"
     )
     assert request.params["metadata"]["layer_id"] == (  # type: ignore[attr-defined]
-        "WORLDCOVER_2021_MAP"
+        "esa-worldcover-map-10m-2021-v2_map"
     )
 
 ###############################################################################

@@ -111,6 +111,36 @@ def test_esa_provider_returns_wmts_descriptor() -> None:
     assert response.attribution == ["ESA"]
 
 ###############################################################################
+def test_esa_provider_returns_wms_descriptor_for_current_manifest() -> None:
+    response = run_async_in_thread(
+        ESAProvider().fetch(
+            ProviderRequest(
+                capability_id="esa_worldcover",
+                params={
+                    "metadata": {
+                        "url": "https://titiler.terrascope.be/wms",
+                        "layer_id": "esa-worldcover-map-10m-2021-v2_map",
+                        "source_protocol": "WMS",
+                        "crs": "EPSG:3857",
+                        "wms_format": "image/png",
+                        "wms_version": "1.3.0",
+                        "attribution": "ESA / Terrascope",
+                    }
+                },
+            )
+        )
+    )
+
+    assert response.payload["renderingMode"] == "wms"
+    assert response.payload["layerId"] == "esa-worldcover-map-10m-2021-v2_map"
+    assert response.payload["serviceUrl"] == "https://titiler.terrascope.be/wms"
+    assert response.payload["crs"] == "EPSG:3857"
+    assert response.payload["format"] == "image/png"
+    assert response.payload["version"] == "1.3.0"
+    assert response.result_type == "raster"
+    assert response.attribution == ["ESA / Terrascope"]
+
+###############################################################################
 def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
     clock = 0.0
 

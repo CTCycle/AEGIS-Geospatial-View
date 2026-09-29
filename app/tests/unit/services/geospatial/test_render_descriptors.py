@@ -273,7 +273,7 @@ def test_catalog_raster_overlays_expose_provider_tile_templates(
 @pytest.mark.parametrize(
     ("overlay_id", "expected_host", "expected_protocol"),
     [
-        ("esa_worldcover", "services.terrascope.be", "wmts"),
+        ("esa_worldcover", "titiler.terrascope.be", "wms"),
         ("IMERG_Precipitation_Rate", "gibs.earthdata.nasa.gov", "wms"),
     ],
 )

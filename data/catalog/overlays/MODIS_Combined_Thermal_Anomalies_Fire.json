@@ -46,14 +46,15 @@
       "where are thermal hotspots in Greece"
     ],
     "disambiguation_notes": [
-      "Prefer for active fire detection requests; combine with basemap for local context."
+      "Prefer for active fire detection requests; combine with basemap for local context.",
+      "The stable AEGIS capability id is retained for compatibility; live GIBS transport uses the provider-native MODIS_Combined_Thermal_Anomalies_All layer."
     ],
     "location_dependency": "Location-dependent and dynamic.",
     "integration_requirements": [
       "No API key required"
     ],
-    "layer_id": "MODIS_Combined_Thermal_Anomalies_Fire",
-    "layers": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_id": "MODIS_Combined_Thermal_Anomalies_All",
+    "layers": "MODIS_Combined_Thermal_Anomalies_All",
     "url": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
     "wms_version": "1.1.1",
     "wms_exceptions": "application/vnd.ogc.se_inimage",
@@ -67,10 +68,10 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "last_validated": "2026-04-27"
+    "last_validated": "2026-09-29"
   },
   "version": 1,
-  "last_modified": "2026-04-06T17:08:00.882573+02:00",
+  "last_modified": "2026-09-29T16:13:00+00:00",
   "capabilityKind": "raster-overlay",
   "renderingMode": "wms",
   "sourceOfficialDocs": [
@@ -92,7 +93,10 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "domains": ["data_retrieval", "map_rendering"],
+    "domains": [
+      "data_retrieval",
+      "map_rendering"
+    ],
     "plannerHints": [
       "imagery",
       "fires",
@@ -107,7 +111,7 @@
   },
   "reliability": {
     "status": "functional",
-    "lastAudited": "2026-05-11",
+    "lastAudited": "2026-09-29",
     "knownLimitations": []
   },
   "cachePolicy": {
