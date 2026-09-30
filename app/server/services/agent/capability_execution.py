@@ -473,6 +473,8 @@ def _provider_params(
         params.setdefault("evidence_refs", list(request.evidence_refs))
     if request.radius_m is not None:
         params.setdefault("radius_m", request.radius_m)
+    if request.temporal_mode is not None:
+        params.setdefault("temporal_mode", request.temporal_mode)
     if request.filters:
         params["filters"] = dict(request.filters)
     if request.end_time_iso is not None:

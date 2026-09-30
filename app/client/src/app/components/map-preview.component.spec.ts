@@ -333,6 +333,28 @@ describe('components/map-preview.component', () => {
     );
   });
 
+  it('honors an overlay fit zoom hint without changing the default map cap', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{
+          id: 'rainviewer_precipitation_radar',
+          provider: 'rainviewer',
+          type: 'metadata-only',
+          rendering_mode: 'metadata-only',
+          fit_max_zoom: 6,
+        }],
+        bounds: [12.4963044, 41.902725, 12.4964044, 41.902825],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(fakeMap.fitBounds).toHaveBeenCalledWith(
+      [[12.4963044, 41.902725], [12.4964044, 41.902825]],
+      { padding: 30, duration: 0, maxZoom: 6 },
+    );
+  });
+
   it('ignores invalid bounds for fitBounds', () => {
     component.payload = {
       map_session: makeMapSession({

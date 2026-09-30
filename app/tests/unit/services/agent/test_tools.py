@@ -388,6 +388,7 @@ def test_execute_binding_preserves_semantics_but_owns_scope_and_coordinates() ->
 
     assert bound.operation == "search"
     assert bound.location_ref == "zurich"
+    assert bound.temporal_mode == "forecast"
     assert bound.radius_m == 5000
     assert bound.start_time_iso == "2026-09-15T00:00:00Z"
     assert bound.end_time_iso == "2026-09-16T00:00:00Z"

@@ -22,6 +22,7 @@
     "tile_smooth": 1,
     "tile_snow": 1,
     "max_zoom": 7,
+    "fit_max_zoom": 6,
     "keywords": [
       "rainviewer",
       "radar",
@@ -43,7 +44,7 @@
     ],
     "coverage_scope": "global-partial",
     "temporal_behavior": "near-real-time-history",
-    "constraints": "Free public RainViewer access provides recent past radar only, no future nowcast or satellite IR, with public tiles capped at zoom 7.",
+    "constraints": "Free public RainViewer access provides recent past radar only, no future nowcast or satellite IR, with public tiles capped at zoom 7; keep browser fit views at zoom 6 so a transparent zoom-7 tile does not hide the latest frame.",
     "content_hash": "rainviewer_precipitation_radar_overlay_v3",
     "human_summary": "Recent radar precipitation overlay for rain and storm intensity context in a selected area.",
     "primary_use_cases": [
@@ -127,7 +128,7 @@
     "lastAudited": "2026-09-30",
     "knownLimitations": [
       "Free public API provides recent past radar only, not future nowcast.",
-      "Public tile zoom is capped at 7 and uses Universal Blue color scheme 2.",
+      "Public tile zoom is capped at 7 and uses Universal Blue color scheme 2; browser fit views use zoom 6 because the latest frame can be transparent at zoom 7 for a requested city.",
       "Best-effort public service has no SLA."
     ]
   },
@@ -169,7 +170,7 @@
     "coverage": "global-partial",
     "limitations": [
       "Free public API provides recent past radar only, not future nowcast or satellite infrared imagery.",
-      "Public tile zoom is capped at 7 and uses Universal Blue color scheme 2.",
+      "Public tile zoom is capped at 7 and uses Universal Blue color scheme 2; browser fit views use zoom 6 because the latest frame can be transparent at zoom 7 for a requested city.",
       "The first executable slice exposes the latest observed frame; arbitrary historical frame selection is not supported.",
       "Best-effort public service has no SLA."
     ],

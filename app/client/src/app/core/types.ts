@@ -323,6 +323,7 @@ export interface MapOverlayEntry {
   tile_size?: number;
   min_zoom?: number;
   max_zoom?: number;
+  fit_max_zoom?: number;
   bounds?: [number, number, number, number];
   attribution?: string;
   attribution_url?: string | null;

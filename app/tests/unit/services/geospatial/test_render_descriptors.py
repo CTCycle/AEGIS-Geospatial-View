@@ -386,6 +386,7 @@ def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
                 "metadata": {
                     "url": "/api/geospatial/tiles/rainviewer_precipitation_radar/{z}/{x}/{y}.png",
                     "default_opacity": 0.7,
+                        "fit_max_zoom": 6,
                 },
             }
         ),
@@ -400,6 +401,7 @@ def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
     assert result is not None
     descriptor, _warnings = result
     assert descriptor["max_zoom"] == 7
+    assert descriptor["fit_max_zoom"] == 6
     assert descriptor["tile_url_template"] == (
         "/api/geospatial/tiles/rainviewer_precipitation_radar/{z}/{x}/{y}.png"
     )

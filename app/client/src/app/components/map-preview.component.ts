@@ -674,9 +674,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.bindInspectionListeners(candidate);
       const bounds = normalizeBounds(this.mapSession?.bounds);
       if (bounds) {
-        const maxZoom = nextBasemapId === 'esri_world_imagery'
+        const defaultMaxZoom = nextBasemapId === 'esri_world_imagery'
           ? DEFAULT_SATELLITE_MAP_FIT_MAX_ZOOM
           : DEFAULT_MAP_FIT_MAX_ZOOM;
+        const maxZoom = this.fitMaxZoom(defaultMaxZoom);
         candidate.fitBounds(bounds, { padding: 30, duration: 0, maxZoom });
       }
       if (!this.hasRenderableCanvas(candidate, candidateContainer)) {
@@ -1121,6 +1122,14 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     return this.overlays.some((overlay) => (
       isRasterOverlay(overlay) && Boolean(buildRasterOverlayTiles(overlay)?.[0])
     ));
+  }
+
+  private fitMaxZoom(defaultMaxZoom: number): number {
+    return this.overlays.reduce((maxZoom, overlay) => (
+      isFiniteNumber(overlay.fit_max_zoom)
+        ? Math.min(maxZoom, overlay.fit_max_zoom)
+        : maxZoom
+    ), defaultMaxZoom);
   }
 
   private safeRenderError(error: unknown): string {
