@@ -46,12 +46,12 @@ gate can pass while its broader application-foundation slice remains partial.
 | Tier 4B | Model-provider parity | 5 | `UNRUN` | Never substitute provider or model. |
 | Tier 5 | Recovery, races, difficult boundaries, hosted CI | 13 | `UNRUN` | Open only after lower-tier contracts are classified. |
 
-Campaign-slice status is 31 `PASS`, 3 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`
+Campaign-slice status is 31 `PASS`, 2 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`
 of 68 slices. These are the latest per-slice classifications across their
 linked source boundaries, not a common-commit campaign result. Tier 0 is now
 `PASS` for its functional Windows startup slice; the historical timing
 comparator is unavailable and non-gating. Tier 1 is `PASS`; Tier 2 has seven
-`PASS` slices, and Tier 3 now has six `PASS` slices after the NOAA affected-zone
+`PASS` slices, and Tier 3 now has seven `PASS` slices after the NOAA affected-zone
 remediation. The current exact-lane
 [T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md)
 and [browser evidence](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/browser-evidence.md)
@@ -59,6 +59,12 @@ record the completed inventory, startup, and NOAA boundaries; the earlier contin
 and the [2026-09-25 direct-tool report](../../QA/tier2-validation-develop-20260925-next-slices/report.md)
 retains the location, coverage-guardrail, direct-tool, saved-history, and
 evidence-inspection boundaries.
+
+The remaining campaign inventory is explicit even where detailed objectives
+are not yet preserved: `T3-10`–`T3-18` (9 `UNRUN`), `T4-01`–`T4-08` (8
+`UNRUN`), `T4-09`–`T4-13` (5 `UNRUN`), and `T5-01`–`T5-13` (13 `UNRUN`).
+These 35 IDs are not additional partial gates and must not be promoted without
+recovered or newly established acceptance criteria.
 
 The local T1-10 credential slice passed on
 `develop@8e32f82e3f094e5fb17c3978fad69b9f80b7af0b`; its exact pushed-head CI
@@ -135,7 +141,8 @@ keeps temporary zone failures partial rather than converting non-renderable
 data into a renderer success.
 
 The current-head P0 raster visibility remediation is recorded in the
-[remediation report](../../QA/tier3-remediation-20260930/report.md). Its
+[current-head follow-up](../../QA/tier3-remediation-20260930/current-head-followup-889066b3.md);
+the earlier controlled run remains in the [historical remediation report](../../QA/tier3-remediation-20260930/report.md). Its
 controlled contract tests pass for opaque, transparent, non-image, hidden,
 outside-viewport, unsupported-zoom, temporal, missing-source/layer, and
 failure/recovery cases. This does not promote a live raster gate: a real
@@ -150,9 +157,9 @@ required for provider and composition claims.
 | `T3-04` | NOAA alert geometry fallback and valid-empty boundary | `PASS` | 2026-09-28 | `develop@acf01a58` plus scoped changes | [NOAA remediation report](../../QA/tier3-validation-develop-20260928-noaa/report.md), [browser evidence](../../QA/tier3-validation-develop-20260928-noaa/browser-evidence.md), [API response](../../QA/tier3-validation-develop-20260928-noaa/api-response.json), [slice manifest](../../QA/tier3-validation-develop-20260928-noaa/slice.json) | Official affected-zone geometry now makes null-geometry NOAA alerts renderable in the exact lane. Keep temporary zone-fetch failures explicitly partial/data-only and never promote them to render success. |
 | `T3-05` | Live Census TIGERweb hydrography overlay and standalone rendered-vector verification | `PASS` | 2026-09-26 | `develop@d3f719465a7c185cd7b5035b965083b1c602b369` | [Vector-composition report](../../QA/tier3-validation-develop-20260926-vector-composition/report.md), [browser evidence](../../QA/tier3-validation-develop-20260926-vector-composition/browser-evidence.md), [slice manifest](../../QA/tier3-validation-develop-20260926-vector-composition/slice.json) | Continue selected provider-family coverage while preserving visible source/layer, attribution, viewport, and render-ack evidence. |
 | `T3-06` | Renderable vector composition and selective removal of retained overlays | `PASS` | 2026-09-26 | `develop@d3f719465a7c185cd7b5035b965083b1c602b369` | [Vector-composition report](../../QA/tier3-validation-develop-20260926-vector-composition/report.md), [browser evidence](../../QA/tier3-validation-develop-20260926-vector-composition/browser-evidence.md), [slice manifest](../../QA/tier3-validation-develop-20260926-vector-composition/slice.json) | Extend composition and retention only across overlays that actually render; FEMA/ESA retention remains blocked by source loading. |
-| `T3-07` | Live FEMA and ESA public raster source/layer loading plus dependent FEMA composition/removal boundary | `PARTIAL` | 2026-09-30 | `develop@db3d650a931d3e22367bb4d11992b8c1c71e6b84` plus working-tree remediation | [current remediation report](../../QA/tier3-remediation-20260930/report.md), [controlled results](../../QA/tier3-remediation-20260930/controlled-results.json), [2026-09-30 provider report](../../QA/tier3-validation-develop-20260930-t3-07-t3-09/report.md), [transport matrix](../../QA/tier3-validation-develop-20260930-t3-07-t3-09/provider-probe.json) | The local raster contract now fails closed and validates acknowledged raster semantics. ESA and FEMA bounded probes still return `502` in this environment; no FEMA image, visible pixels, accepted raster `map.render_ack`, composition, or selective-removal proof exists. |
+| `T3-07` | Live FEMA and ESA public raster source/layer loading plus dependent FEMA composition/removal boundary | `PARTIAL` | 2026-09-30 | `develop@889066b3` for the raster contract; live provider evidence retains the earlier scoped boundary | [current-head follow-up](../../QA/tier3-remediation-20260930/current-head-followup-889066b3.md), [historical controlled results](../../QA/tier3-remediation-20260930/controlled-results.json), [2026-09-30 provider report](../../QA/tier3-validation-develop-20260930-t3-07-t3-09/report.md), [transport matrix](../../QA/tier3-validation-develop-20260930-t3-07-t3-09/provider-probe.json) | The local raster contract now fails closed and validates acknowledged raster semantics. ESA and FEMA bounded probes still return `502` in this environment; no FEMA image, visible pixels, accepted raster `map.render_ack`, composition, or selective-removal proof exists. |
 | `T3-08` | Complete NASA GIBS advertised raster-family discovery, proxy transport, rendering, attribution, temporal handling, and acknowledgement | `PASS` | 2026-09-29 | `develop` working tree, base `643ecf3f` plus scoped raster-provider fixes | [raster-provider-fixes report](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/report.md), [GIBS network summary](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/network-summary.json), [GIBS trace summaries](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/gibs-trace-summaries.json), [provider probe](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/provider-probe.json) | All 12 advertised prompts met the target `200 image/png`, MapLibre source/layer/pixel, NASA attribution, temporal, zero-direct-upstream, and accepted `render_observed` criteria. The stable fire capability maps to provider-native `MODIS_Combined_Thermal_Anomalies_All` over the standard AEGIS WMS proxy. |
-| `T3-09` | RainViewer recent observed precipitation radar, same-origin raster proxy, routing, and render acknowledgement | `PARTIAL` | 2026-09-30 | `develop@db3d650a931d3e22367bb4d11992b8c1c71e6b84` plus working-tree remediation | [current remediation report](../../QA/tier3-remediation-20260930/report.md), [browser evidence](../../QA/tier3-remediation-20260930/browser-evidence.md), [2026-09-30 exact-lane report](../../QA/tier3-validation-develop-20260930-t3-07-t3-09/report.md), [run trace](../../QA/tier3-validation-develop-20260930-t3-07-t3-09/run-trace.json) | Functional local proxy PNG evidence passes, but the isolated runtime still has no selected exact-model agent route, so an accepted MapLibre `map.render_ack` is not claimed here. No forecast/nowcast/IR or timestamp-derived frame semantics were reintroduced. |
+| `T3-09` | RainViewer recent observed precipitation radar, same-origin raster proxy, routing, and render acknowledgement | `PARTIAL` | 2026-09-30 | `develop@889066b3` for the raster contract; live provider evidence retains the earlier scoped boundary | [current-head follow-up](../../QA/tier3-remediation-20260930/current-head-followup-889066b3.md), [browser evidence](../../QA/tier3-remediation-20260930/browser-evidence.md), [2026-09-30 exact-lane report](../../QA/tier3-validation-develop-20260930-t3-07-t3-09/report.md), [run trace](../../QA/tier3-validation-develop-20260930-t3-07-t3-09/run-trace.json) | Functional local proxy PNG evidence passes, but the isolated runtime still has no selected exact-model agent route, so an accepted MapLibre `map.render_ack` is not claimed here. No forecast/nowcast/IR or timestamp-derived frame semantics were reintroduced. |
 
 | Gate ID / name | Subsystem | Lane / environment | Status | Verification date | Tested commit | Evidence link | Next action / boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- |

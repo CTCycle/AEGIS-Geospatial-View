@@ -72,7 +72,23 @@ trusting downstream feature evidence.
 | Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
 | Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Requires the lower-tier contracts and exact-head evidence to be stable. |
 
-The current roll-up is 31 `PASS`, 3 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`.
+The current roll-up is 31 `PASS`, 2 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`.
+
+### Campaign inventory reconciliation
+
+The 68 campaign slices are counted exactly once as follows:
+
+| Status | Explicit slice IDs | Count |
+| --- | --- | ---: |
+| `PASS` | `T0-01`–`T0-05`, `T1-01`–`T1-12`, `T2-01`–`T2-07`, `T3-01`–`T3-06`, `T3-08` | 31 |
+| `PARTIAL` | `T3-07`, `T3-09` | 2 |
+| `UNRUN` | `T3-10`–`T3-18`, `T4-01`–`T4-08`, `T4-09`–`T4-13`, `T5-01`–`T5-13` | 35 |
+
+`T3-10`–`T3-18` remain explicit `UNRUN` inventory entries even though the
+current source documents do not preserve one verified objective for each ID.
+Their acceptance criteria must be recovered or established before execution;
+they must not be inferred from the broad Tier 3 description. The grouped Tier
+4 and Tier 5 ranges are counted by their declared cardinalities above.
 
 The 2026-09-30 T3-07/T3-09 implementation follow-up centralizes public
 raster browser transport at the manifest-backed AEGIS tile proxy, including
@@ -86,6 +102,12 @@ boundary remains valid. `T3-07` remains `PARTIAL`, `T3-08` remains `PASS`, and
 `T3-09` remains `PARTIAL` because the successful RainViewer browser run used
 the launcher's configured canonical data root after a fresh QA root proved
 unable to supply the exact OpenCode Go model assignment.
+The subsequent current-head contract follow-up at
+`develop@889066b3` closes a repository defect where `tile`, `xyz`, `wms`, and
+`wmts` raster candidates bypassed the visibility-proof requirement; it does
+not change the live T3-07/T3-09 classifications. A bounded CSV/GeoJSON
+ingestion fixture run is recorded as supporting evidence only because the
+grouped Tier 4A IDs and production rollback boundary remain open.
 
 The recommended execution order is numeric order within each tier. A blocked
 credential or optional dataset slice may be deferred without stopping unrelated
@@ -140,7 +162,7 @@ The Tier 1 application-foundations baseline remains recorded at
 `loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 31 `PASS`, 3 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
+The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 31 `PASS`, 2 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
 Tier 1 remains 12/12 `PASS`; the current Tier 2 ledger has seven `PASS` slices.
 Preserve historical source boundaries in the linked T1 reports.
 
