@@ -52,6 +52,13 @@ Naples, `render_observed=ready`, and committed `render_verified=true`.
   while scanning protected historical QA cache directories).
 - Pyright: `0 errors, 0 warnings, 0 informations`.
 
+Hosted CI for exact pushed implementation SHA
+`bd1fe60b1e272936bc7b02d284c7bcc48d064acb` is run
+`36692241300`; all four jobs passed: capability-contract-validation,
+backend-unit-tests, persistence-conformance, and frontend-build-and-tests.
+The only annotations were non-gating Node.js 20 action deprecation and
+`ubuntu-latest` migration notices. See `hosted-ci.json`.
+
 The initial broad `app/tests` command was stopped when it entered live E2E
 tests without servers; it is not counted as a validation result. The final
 unit suite used the repository's canonical pytest cache and disposable
