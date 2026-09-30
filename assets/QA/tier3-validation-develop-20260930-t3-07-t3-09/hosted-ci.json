@@ -1,0 +1,18 @@
+{
+  "workflow": "CI",
+  "run_id": 36692241300,
+  "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36692241300",
+  "head_sha": "bd1fe60b1e272936bc7b02d284c7bcc48d064acb",
+  "head_branch": "develop",
+  "conclusion": "success",
+  "jobs": [
+    {"name": "capability-contract-validation", "job_id": 109811899004, "conclusion": "success"},
+    {"name": "backend-unit-tests", "job_id": 109811899219, "conclusion": "success"},
+    {"name": "persistence-conformance", "job_id": 109811899238, "conclusion": "success"},
+    {"name": "frontend-build-and-tests", "job_id": 109811899290, "conclusion": "success"}
+  ],
+  "non_gating_annotations": [
+    "Node.js 20 action deprecation notice",
+    "ubuntu-latest migration notice"
+  ]
+}
