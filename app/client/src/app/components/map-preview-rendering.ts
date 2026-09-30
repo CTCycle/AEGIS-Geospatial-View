@@ -606,7 +606,7 @@ const addVectorTileOverlayLayer = (
   return true;
 };
 
-const buildRasterOverlayTiles = (overlay: OverlayEntry): string[] | null => {
+export const buildRasterOverlayTiles = (overlay: OverlayEntry): string[] | null => {
   const render = overlay.render;
   if (render?.tile_url_template) {
     return [applyTimeIfNeeded(render.tile_url_template, render)];

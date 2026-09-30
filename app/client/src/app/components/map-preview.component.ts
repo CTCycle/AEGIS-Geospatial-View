@@ -35,6 +35,7 @@ import { OverlayControlsComponent } from './overlay-controls.component';
 import {
   OverlayEntry,
   addOverlayLayers,
+  buildRasterOverlayTiles,
   buildStyle,
   getOverlayLayerIds,
   isGeoJsonOverlay,
@@ -44,6 +45,12 @@ import {
   recordNumberEqual,
   removeOverlayLayers,
 } from './map-preview-rendering';
+import {
+  GeographicBounds,
+  isRasterOverlay,
+  observeRasterOverlay,
+  RasterVisibilityObservation,
+} from './raster-visibility';
 import { isFiniteNumber } from '../core/type-guards';
 
 export type MapRenderState = 'preparing' | 'ready' | 'failed';
@@ -128,6 +135,8 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   private destroyed = false;
   private candidateGeneration = 0;
   private renderWatchdog?: number;
+  private rasterEvidenceMap: Map | null = null;
+  private rasterVisibilityEvidence: Record<string, RasterVisibilityObservation> = {};
   private pendingCandidate?: {
     map: Map;
     container: HTMLDivElement;
@@ -548,8 +557,19 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.overlayRenderStatuses = addOverlayLayers(this.mapRef, this.mapSession);
       this.bindInspectionListeners(this.mapRef);
       this.applyOverlayStateToMap();
-      this.emitRenderState('ready');
-      this.changeDetector.detectChanges();
+      const currentMap = this.mapRef;
+      const finishInPlaceUpdate = (): void => {
+        if (this.destroyed || this.mapRef !== currentMap) {
+          return;
+        }
+        this.emitRenderState('ready');
+        this.changeDetector.detectChanges();
+      };
+      if (this.hasRasterVisibilityProbe()) {
+        void this.collectRasterVisibilityEvidence(currentMap).finally(finishInPlaceUpdate);
+      } else {
+        finishInPlaceUpdate();
+      }
       return;
     }
 
@@ -677,11 +697,38 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       // `load` precedes the requests initiated by addOverlayLayers. Keep the
       // candidate and its error handler alive until those sources settle.
       candidate.on('idle', () => {
+        if (!this.hasRasterVisibilityProbe()) {
+          if (!isCurrentCandidate()) {
+            return;
+          }
+          candidateSettled = true;
+          clearCandidate();
+          this.mapPreparing = false;
+          this.mapRef = candidate;
+          this.activeMapContainer = candidateContainer;
+          this.activeBasemapId = nextBasemapId;
+          this.activeCenterKey = nextCenterKey;
+          this.activeSessionKey = nextSessionKey;
+          this.awaitingBackendAcknowledgment = Boolean(candidateIdentity);
+          this.awaitingCandidateMap = candidateIdentity ? candidate : null;
+          this.applyOverlayStateToMap();
+          if (previousMap && previousMap !== candidate) {
+            this.retainedPrevious = {
+              map: previousMap,
+              container: previousContainer,
+              basemapId: previousBasemapId,
+              centerKey: previousCenterKey,
+              sessionKey: previousSessionKey,
+            };
+          }
+          this.emitRenderState('ready', undefined, candidateIdentity);
+          this.changeDetector.detectChanges();
+          this.scheduleMapResize();
+          return;
+        }
         if (!isCurrentCandidate()) {
           return;
         }
-        candidateSettled = true;
-        clearCandidate();
         this.mapPreparing = false;
         this.mapRef = candidate;
         this.activeMapContainer = candidateContainer;
@@ -700,9 +747,21 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
             sessionKey: previousSessionKey,
           };
         }
-        this.emitRenderState('ready', undefined, candidateIdentity);
-        this.changeDetector.detectChanges();
-        this.scheduleMapResize();
+        const finishCandidate = (): void => {
+          if (!isCurrentCandidate()) {
+            return;
+          }
+          candidateSettled = true;
+          clearCandidate();
+          this.emitRenderState('ready', undefined, candidateIdentity);
+          this.changeDetector.detectChanges();
+          this.scheduleMapResize();
+        };
+        if (this.hasRasterVisibilityProbe()) {
+          void this.collectRasterVisibilityEvidence(candidate).finally(finishCandidate);
+        } else {
+          finishCandidate();
+        }
       });
     });
   }
@@ -874,6 +933,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       });
       const desiredVisible = metadataOnly || (this.overlayVisibility[overlay.id] ?? overlay.visible ?? true);
       const status = this.overlayRenderStatuses.find((item) => item.overlayId === overlay.id)?.status;
+      const isRaster = isRasterOverlay(overlay);
+      const rasterEvidence = isRaster && this.rasterEvidenceMap === map
+        ? this.rasterVisibilityEvidence[overlay.id]
+        : undefined;
       let renderedFeatureCount: number | null = null;
       if (!metadataOnly && map && present && typeof (map as unknown as {
         queryRenderedFeatures?: (geometry?: unknown, options?: unknown) => unknown;
@@ -898,6 +961,8 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
           renderedFeatureCount = null;
         }
       }
+      const loaded = (status === 'loaded' || status === 'no-results' || metadataOnly)
+        && (!isRaster || rasterEvidence?.sourceLoaded !== false);
       return {
         overlay_id: overlay.id,
         capability_id: overlay.capability_id || overlay.id,
@@ -905,16 +970,29 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
           mapApi?.getSource?.call(map, `overlay-source-${overlay.id}`),
         ),
         layer_present: present && styleValid && zoomRangeValid,
-        loaded: status === 'loaded' || status === 'no-results' || metadataOnly,
+        loaded,
         metadata_only: metadataOnly,
         visibility_matches: metadataOnly || visible === desiredVisible,
         style_valid: styleValid,
         zoom_range_valid: zoomRangeValid,
-          rendered_feature_count: renderedFeatureCount,
-          // Tile loading cannot establish meaningful pixels, particularly
-          // for cross-origin rasters. Keep that observation explicitly unknown.
-          result_visible: renderedFeatureCount === null ? null : renderedFeatureCount > 0,
-        failure_code: status === 'failed' ? 'overlay_render_failed' : null,
+        rendered_feature_count: renderedFeatureCount,
+        result_visible: isRaster
+          ? rasterEvidence?.resultVisible ?? null
+          : renderedFeatureCount === null ? null : renderedFeatureCount > 0,
+        ...(isRaster
+          ? {
+            raster_source_loaded: rasterEvidence?.sourceLoaded ?? null,
+            raster_tile_intersects_viewport: rasterEvidence?.tileIntersectsViewport ?? null,
+            raster_zoom_supported: rasterEvidence?.zoomSupported ?? null,
+            raster_nontransparent_pixel_count: rasterEvidence?.nonTransparentPixelCount ?? null,
+            raster_tile_z: rasterEvidence?.tile?.z ?? null,
+            raster_tile_x: rasterEvidence?.tile?.x ?? null,
+            raster_tile_y: rasterEvidence?.tile?.y ?? null,
+          }
+          : {}),
+        failure_code: status === 'failed'
+          ? 'overlay_render_failed'
+          : rasterEvidence?.failureCode || null,
       };
     });
     const required = overlayResults.filter((item) => item.metadata_only !== true);
@@ -954,6 +1032,95 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       // older MapLibre adapter does not expose camera bounds.
     }
     return undefined;
+  }
+
+  private async collectRasterVisibilityEvidence(map: Map): Promise<void> {
+    const mapApi = map as unknown as {
+      getCenter?: () => { lng?: unknown; lat?: unknown };
+      getLayer?: (id: string) => unknown;
+      getLayoutProperty?: (id: string, property: string) => unknown;
+      getPaintProperty?: (id: string, property: string) => unknown;
+      getSource?: (id: string) => unknown;
+      getZoom?: () => unknown;
+      isSourceLoaded?: (id: string) => boolean;
+    };
+    const rawBounds = this.readMapBounds(map) ?? this.mapSession?.bounds ?? this.mapSession?.viewport?.bbox;
+    const viewportBounds: GeographicBounds | undefined = Array.isArray(rawBounds)
+      && rawBounds.length === 4
+      && rawBounds.every(isFiniteNumber)
+      ? rawBounds as GeographicBounds
+      : undefined;
+    const rawCenter = typeof mapApi.getCenter === 'function' ? mapApi.getCenter.call(map) : undefined;
+    const center: [number, number] | undefined = isFiniteNumber(rawCenter?.lng)
+      && isFiniteNumber(rawCenter?.lat)
+      ? [Number(rawCenter?.lng), Number(rawCenter?.lat)]
+      : undefined;
+    const rawZoom = typeof mapApi.getZoom === 'function' ? mapApi.getZoom.call(map) : undefined;
+    const zoom = isFiniteNumber(rawZoom) ? Number(rawZoom) : undefined;
+    const rasterOverlays = this.overlays.filter(isRasterOverlay);
+    const observations = await Promise.all(rasterOverlays.map(async (overlay) => {
+      const layerId = getOverlayLayerIds(overlay)[0];
+      const sourceId = `overlay-source-${overlay.id}`;
+      const layer = typeof mapApi.getLayer === 'function'
+        ? mapApi.getLayer.call(map, layerId)
+        : undefined;
+      const sourcePresent = typeof mapApi.getSource === 'function'
+        && Boolean(mapApi.getSource.call(map, sourceId));
+      const layerPresent = Boolean(layer);
+      let sourceLoaded: boolean | null = null;
+      if (sourcePresent && typeof mapApi.isSourceLoaded === 'function') {
+        try {
+          sourceLoaded = Boolean(mapApi.isSourceLoaded.call(map, sourceId));
+        } catch {
+          sourceLoaded = null;
+        }
+      }
+      let visibility: unknown;
+      try {
+        visibility = mapApi.getLayoutProperty?.call(map, layerId, 'visibility');
+      } catch {
+        visibility = undefined;
+      }
+      if (visibility === undefined && layer && typeof layer === 'object') {
+        const layout = (layer as Record<string, unknown>)['layout'];
+        visibility = layout && typeof layout === 'object'
+          ? (layout as Record<string, unknown>)['visibility']
+          : undefined;
+      }
+      let opacity = this.overlayOpacity[overlay.id]
+        ?? overlay.default_opacity
+        ?? DEFAULT_OVERLAY_OPACITY;
+      try {
+        const paintOpacity = mapApi.getPaintProperty?.call(map, layerId, 'raster-opacity');
+        if (isFiniteNumber(paintOpacity)) {
+          opacity = Number(paintOpacity);
+        }
+      } catch {
+        // Keep the persisted/default opacity when MapLibre cannot expose it.
+      }
+      const observation = await observeRasterOverlay(overlay, {
+        viewportBounds,
+        zoom,
+        center,
+        sourcePresent,
+        layerPresent,
+        sourceLoaded,
+        layerVisible: visibility !== 'none',
+        opacity,
+      });
+      return [overlay.id, observation] as const;
+    }));
+    if (this.mapRef !== map && this.pendingCandidate?.map !== map) {
+      return;
+    }
+    this.rasterEvidenceMap = map;
+    this.rasterVisibilityEvidence = Object.fromEntries(observations);
+  }
+
+  private hasRasterVisibilityProbe(): boolean {
+    return this.overlays.some((overlay) => (
+      isRasterOverlay(overlay) && Boolean(buildRasterOverlayTiles(overlay)?.[0])
+    ));
   }
 
   private safeRenderError(error: unknown): string {
@@ -1047,6 +1214,8 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.activeSessionKey = null;
     this.awaitingBackendAcknowledgment = false;
     this.awaitingCandidateMap = null;
+    this.rasterEvidenceMap = null;
+    this.rasterVisibilityEvidence = {};
   }
 
   private mapSessionIdentityKey(session?: MapSession): string | null {
