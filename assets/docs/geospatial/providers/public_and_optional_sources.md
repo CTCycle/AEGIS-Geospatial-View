@@ -1,6 +1,6 @@
 # Public And Optional Sources
 
-Last updated: 2026-09-15
+Last updated: 2026-09-30
 
 ## Canonical POI path
 
@@ -94,9 +94,32 @@ Use `fema_nfhl_flood_zones` for National Flood Hazard Layer map context.
   `{bbox-epsg-3857}` raster template in the catalog.
 - The current service base is
   `https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer`; the
-  browser template uses its bounded `export` operation.
+  browser template uses its bounded `export` operation with NFHL layer `28`.
+- The 2026-09-30 deterministic transport matrix tested REST export and WMS
+  GetMap for layer `28` through the AEGIS pooled client, fresh httpx clients
+  with `trust_env=true` and `trust_env=false`, and native Windows curl. Every
+  lane failed before HTTP status, content type, body, or pixels, so FEMA is
+  externally transport-blocked on this validation boundary. Do not replace it
+  with a mirror or infer render success from the descriptor.
 - Keep FEMA attribution visible; authoritative flood-zone interpretation still
   requires FEMA source context and applicable local regulation.
+
+### RainViewer recent observed radar
+
+Use `rainviewer_precipitation_radar` for the latest observed precipitation
+radar frame.
+
+- Metadata comes from the official RainViewer public weather-maps endpoint;
+  frame paths are provider-supplied opaque `/v2/radar/...` paths and are never
+  reconstructed from timestamps.
+- AEGIS serves the raster through its same-origin backend tile proxy using
+  `/256/{z}/{x}/{y}/2/{smooth}_{snow}.png`, Universal Blue color scheme `2`,
+  and maximum zoom `7`.
+- The capability is recent observed radar only: no future nowcast, forecast,
+  satellite IR, or arbitrary historical-frame claim. Metadata is cached for
+  300 seconds, and `© RainViewer` attribution remains visible.
+- Public access is best effort and subject to the provider's documented
+  rate/availability limits; it is not a guaranteed operational SLA.
 
 ### GBIF
 

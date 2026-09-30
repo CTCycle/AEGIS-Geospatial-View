@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import pytest
+
 from server.services.geospatial.rainviewer import (
     RainViewerRequestError,
     RainViewerService,
@@ -48,6 +50,7 @@ def test_rainviewer_ignores_discontinued_nowcast_frames() -> None:
 def test_rainviewer_filters_malformed_past_timestamps() -> None:
     async def fetcher(_url: str, _headers: dict[str, str]) -> dict[str, Any]:
         return {
+            "host": "https://tilecache.rainviewer.com",
             "radar": {
                 "past": [
                     {"time": "not-a-timestamp", "path": "/v2/radar/bad"},
@@ -85,3 +88,57 @@ def test_rainviewer_rejects_when_no_past_frame_has_a_valid_timestamp() -> None:
         assert "recent radar history frames" in str(exc)
     else:
         raise AssertionError("RainViewerRequestError was not raised.")
+
+###############################################################################
+@pytest.mark.parametrize(
+    "host",
+    [
+        "http://tilecache.rainviewer.com",
+        "https://evil.example",
+        "https://tilecache.rainviewer.com:443",
+        "https://user:password@tilecache.rainviewer.com",
+    ],
+)
+def test_rainviewer_rejects_untrusted_metadata_hosts(host: str) -> None:
+    async def fetcher(_url: str, _headers: dict[str, str]) -> dict[str, Any]:
+        return {
+            "host": host,
+            "radar": {"past": [{"time": 100, "path": "/v2/radar/100"}]},
+        }
+
+    with pytest.raises(RainViewerRequestError, match="host"):
+        asyncio.run(RainViewerService(fetcher=fetcher).get_latest_radar_metadata())
+
+
+def test_rainviewer_ignores_invalid_frame_paths_and_keeps_latest_safe_frame() -> None:
+    async def fetcher(_url: str, _headers: dict[str, str]) -> dict[str, Any]:
+        return {
+            "host": "https://tilecache.rainviewer.com",
+            "radar": {
+                "past": [
+                    {"time": 300, "path": "https://evil.example/v2/radar/300"},
+                    {"time": 200, "path": "/v2/radar/200"},
+                ]
+            },
+        }
+
+    result = asyncio.run(RainViewerService(fetcher=fetcher).get_latest_radar_metadata())
+
+    assert result["latest_time"] == 200
+    assert result["tile_url_template"].startswith(
+        "https://tilecache.rainviewer.com/v2/radar/200/256/"
+    )
+
+
+def test_rainviewer_forces_universal_blue_color_scheme() -> None:
+    async def fetcher(_url: str, _headers: dict[str, str]) -> dict[str, Any]:
+        return {
+            "host": "https://tilecache.rainviewer.com",
+            "radar": {"past": [{"time": 100, "path": "/v2/radar/100"}]},
+        }
+
+    result = asyncio.run(
+        RainViewerService(fetcher=fetcher, tile_color_scheme=6).get_latest_radar_metadata()
+    )
+
+    assert "/2/1_1.png" in result["tile_url_template"]

@@ -105,6 +105,7 @@ class RainViewerProvider(GeospatialProvider):
                 "maxZoom": metadata.get("max_zoom", 7),
                 "resolvedAt": metadata.get("resolved_at"),
             },
+            result_type="raster",
             attribution=[str(metadata.get("attribution") or "© RainViewer")],
             warnings=warnings or [],
             stale=stale,
@@ -128,6 +129,7 @@ class RainViewerProvider(GeospatialProvider):
                 "maxZoom": 7,
                 "resolvedAt": None,
             },
+            result_type="raster",
             attribution=["© RainViewer"],
             warnings=[warning],
         )

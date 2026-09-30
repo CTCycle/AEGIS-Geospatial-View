@@ -43,6 +43,10 @@ from server.services.geospatial.providers.http import (
     fetch_raster_image_url,
     raster_diagnostic_scope,
 )
+from server.services.geospatial.rainviewer import (
+    RainViewerRequestError,
+    RainViewerService,
+)
 from server.services.geospatial.providers.tomtom import build_tomtom_tile_url
 from server.services.geospatial.raster_tiles import (
     RasterTileTemplateError,
@@ -254,6 +258,7 @@ class GeospatialApiService:
         runtime_registry: RuntimeRegistry,
         provider_registry: ProviderRegistry,
         credential_resolver: GeospatialCredentialResolver | None = None,
+        rainviewer_service: RainViewerService | None = None,
     ) -> None:
         self.catalog_service = catalog_service
         loader = manifest_loader or GeospatialManifestLoader()
@@ -266,6 +271,7 @@ class GeospatialApiService:
         self.credential_resolver = (
             credential_resolver or runtime_registry.credential_resolver
         )
+        self.rainviewer_service = rainviewer_service or RainViewerService()
 
     # -------------------------------------------------------------------------
     def list_capabilities(self) -> dict[str, list[dict[str, Any]]]:
@@ -669,6 +675,30 @@ class GeospatialApiService:
                 y=y,
                 requested_time=requested_time,
             )
+
+        if provider == "rainviewer":
+            if requested_time is not None:
+                raise GeospatialUnsupportedTileError(
+                    "RainViewer exposes the latest observed radar frame only."
+                )
+            if z > RainViewerService.MAX_TILE_ZOOM:
+                raise GeospatialUnsupportedTileError(
+                    "RainViewer public tiles are limited to zoom 7."
+                )
+            try:
+                radar_metadata = await self.rainviewer_service.get_latest_radar_metadata()
+            except RainViewerRequestError as exc:
+                raise GeospatialTileRequestError(
+                    "RainViewer radar metadata is unavailable."
+                ) from exc
+            tile_template = str(
+                radar_metadata.get("tile_url_template") or ""
+            ).strip()
+            if not tile_template:
+                raise GeospatialUnsupportedTileError(
+                    "RainViewer radar metadata has no tile URL."
+                )
+            return materialize_tile_template(tile_template, z, x, y)
 
         template = str(
             metadata.get("tile_url_template")
@@ -1279,6 +1309,7 @@ class GeospatialApiService:
             "fema": "FEMA",
             "esa": "ESA WorldCover",
             "gibs": "NASA GIBS",
+            "rainviewer": "RainViewer",
         }
         return lookup.get(provider, provider or "Provider")
 

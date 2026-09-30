@@ -156,6 +156,7 @@ def build_geospatial_runtime(
         runtime_registry=runtime_registry,
         provider_registry=provider_registry,
         credential_resolver=credential_resolver,
+        rainviewer_service=rainviewer_service,
     )
     return GeospatialRuntime(
         catalog_snapshot=catalog_snapshot,

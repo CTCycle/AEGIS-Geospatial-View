@@ -386,7 +386,7 @@ def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
                 "capabilityKind": "raster-overlay",
                 "renderingMode": "raster-tile",
                 "metadata": {
-                    "url": "https://tilecache.rainviewer.com/v2/radar/test/256/{z}/{x}/{y}/2/1_1.png",
+                    "url": "/api/geospatial/tiles/rainviewer_precipitation_radar/{z}/{x}/{y}.png",
                     "default_opacity": 0.7,
                 },
             }
@@ -402,6 +402,9 @@ def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
     assert result is not None
     descriptor, _warnings = result
     assert descriptor["max_zoom"] == 7
+    assert descriptor["tile_url_template"] == (
+        "/api/geospatial/tiles/rainviewer_precipitation_radar/{z}/{x}/{y}.png"
+    )
 
 ###############################################################################
 def test_census_demographic_render_uses_server_provider_endpoint() -> None:

@@ -16,7 +16,11 @@
     "default_opacity": 0.7,
     "requires_key": false,
     "attribution": "© RainViewer",
-    "url_template": "https://tilecache.rainviewer.com/v2/radar/{time}/{z}/{x}/{y}/2/1_1.png",
+    "url_template": "/api/geospatial/tiles/rainviewer_precipitation_radar/{z}/{x}/{y}.png",
+    "tile_size": 256,
+    "color_scheme": 2,
+    "tile_smooth": 1,
+    "tile_snow": 1,
     "max_zoom": 7,
     "keywords": [
       "rainviewer",
@@ -40,7 +44,7 @@
     "coverage_scope": "global-partial",
     "temporal_behavior": "near-real-time-history",
     "constraints": "Free public RainViewer access provides recent past radar only, no future nowcast or satellite IR, with public tiles capped at zoom 7.",
-    "content_hash": "rainviewer_precipitation_radar_overlay_v2",
+    "content_hash": "rainviewer_precipitation_radar_overlay_v3",
     "human_summary": "Recent radar precipitation overlay for rain and storm intensity context in a selected area.",
     "primary_use_cases": [
       "recent storm monitoring",
@@ -60,24 +64,26 @@
       "Attribution required",
       "Public use limits and non-commercial scope must be respected"
     ],
-    "official_docs_url": "https://www.rainviewer.com/api.html",
-    "source_protocol": "raster-tile",
+    "official_docs_url": "https://www.rainviewer.com/api/weather-maps-api.html",
+    "source_protocol": "RainViewer Weather Maps API via AEGIS backend proxy",
     "data_format": "image tiles",
     "geometry_type": "raster-grid",
     "queryable": false,
     "vectorizable": false,
-    "endpoint_health": "validated-by-sampled-health-check",
+    "endpoint_health": "public-best-effort",
     "auth_mode": "none",
     "rate_limit_notes": "Free public API limit documented as 100 requests per IP per minute; cache metadata and tiles conservatively.",
-    "retrieval_mode": "direct",
-    "last_validated": "2026-09-03"
+    "retrieval_mode": "backend-dynamic",
+    "last_validated": "2026-09-30"
   },
-  "version": 2,
-  "last_modified": "2026-09-03T12:55:00+00:00",
+  "version": 3,
+  "last_modified": "2026-09-30T00:00:00+00:00",
   "capabilityKind": "raster-overlay",
   "renderingMode": "raster-tile",
   "sourceOfficialDocs": [
-    "https://www.rainviewer.com/api.html"
+    "https://www.rainviewer.com/api/weather-maps-api.html",
+    "https://www.rainviewer.com/api/transition-faq.html",
+    "https://www.rainviewer.com/api/color-schemes.html"
   ],
   "license": {
     "name": "RainViewer public API terms",
@@ -111,16 +117,17 @@
     "avoidWhen": [
       "general chat",
       "no geographic context",
-      "future radar nowcast",
-      "satellite infrared imagery"
+      "future nowcast",
+      "satellite infrared imagery",
+      "arbitrary historical frame selection"
     ]
   },
   "reliability": {
     "status": "partial",
-    "lastAudited": "2026-09-03",
+    "lastAudited": "2026-09-30",
     "knownLimitations": [
       "Free public API provides recent past radar only, not future nowcast.",
-      "Public tile zoom is capped at 7.",
+      "Public tile zoom is capped at 7 and uses Universal Blue color scheme 2.",
       "Best-effort public service has no SLA."
     ]
   },
@@ -140,31 +147,30 @@
     "supported_operations": [
       "show",
       "overlay",
-      "inspect",
-      "forecast"
+      "inspect"
     ],
     "supported_scope_kinds": [
       "bbox",
       "viewport"
     ],
     "temporal_modes": [
-      "current",
-      "forecast"
+      "current"
     ],
     "temporal_windows": [
-      "provider_forecast_window"
+      "recent_observed_history"
     ],
     "supported_aggregations": [],
     "required_inputs": [
       "location",
-      "temporal_mode"
+      "analysis_scope"
     ],
     "output_geometry_type": "Raster",
     "render_support": "raster",
     "coverage": "global-partial",
     "limitations": [
-      "Free public API provides recent past radar only, not future nowcast.",
-      "Public tile zoom is capped at 7.",
+      "Free public API provides recent past radar only, not future nowcast or satellite infrared imagery.",
+      "Public tile zoom is capped at 7 and uses Universal Blue color scheme 2.",
+      "The first executable slice exposes the latest observed frame; arbitrary historical frame selection is not supported.",
       "Best-effort public service has no SLA."
     ],
     "fallback_ids": []

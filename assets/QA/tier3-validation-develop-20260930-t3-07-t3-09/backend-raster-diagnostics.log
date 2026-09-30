@@ -1,0 +1,10 @@
+T3-07 FEMA transport matrix: deterministic New Orleans z14 x4092 y6762, layer 28.
+AEGIS pooled REST/WMS: connection_failure before HTTP status, content type, body, or pixels.
+fresh httpx trust_env=true/false REST/WMS: ConnectError / connection_failure.
+native Windows curl REST/WMS: exit 35, zero bytes, no PNG signature, connection_or_tls_failure.
+Conclusion: Case C external/provider transport blocker; no TLS downgrade, retry expansion, mirror, or renderer substitution.
+
+T3-09 RainViewer backend proxy excerpt (sanitized; no response bodies retained):
+2026-09-30 10:02:44 geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=tilecache.rainviewer.com opaque recent-frame path /256/7/69/48/2/1_1.png
+2026-09-30 10:06:18 supplemental proxy check provider=rainviewer capability=rainviewer_precipitation_radar upstream=tilecache.rainviewer.com opaque recent-frame path /256/7/69/48/2/1_1.png
+Browser run used the first proxy request; the second was the supplemental 200 image/png probe.

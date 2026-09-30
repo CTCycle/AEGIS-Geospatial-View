@@ -588,3 +588,50 @@ def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> No
 
     charging = shortlist("EV charging stations", "retrieve_infrastructure", rome)
     assert charging == []
+
+
+###############################################################################
+def test_rainviewer_recent_radar_routes_for_naples_and_venice_but_not_nowcast() -> None:
+    registry = CapabilityRegistry()
+    runtime = RuntimeRegistry()
+    locations = (
+        ResolvedLocation(
+            label="Naples",
+            latitude=40.8518,
+            longitude=14.2681,
+            country="Italy",
+        ),
+        ResolvedLocation(
+            label="Venice",
+            latitude=45.4408,
+            longitude=12.3155,
+            country="Italy",
+        ),
+    )
+
+    for location in locations:
+        candidates = registry.shortlist(
+            domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+            queries=["RainViewer recent precipitation radar"],
+            explicit_ids=[],
+            runtime_registry=runtime,
+            operation="show",
+            scope_kind="bbox",
+            temporal_mode="current",
+            requires_render=True,
+            location=location,
+        )
+        assert candidates[0]["id"] == "rainviewer_precipitation_radar"
+
+    nowcast = registry.shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        queries=["RainViewer future radar nowcast"],
+        explicit_ids=[],
+        runtime_registry=runtime,
+        operation="show",
+        scope_kind="bbox",
+        temporal_mode="current",
+        requires_render=True,
+        location=locations[0],
+    )
+    assert nowcast == []

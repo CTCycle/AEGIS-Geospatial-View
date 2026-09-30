@@ -4,10 +4,12 @@ from server.common.typing import is_json_object, json_array, json_object
 
 import asyncio
 import math
+import re
 import threading
 import time
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlsplit
 
 from server.configurations.settings import JsonRainViewerSettings, RainViewerSettings
 from server.services.geospatial.providers.base import ProviderUnavailableError
@@ -27,6 +29,10 @@ class RainViewerRequestError(RainViewerServiceError):
 
 ###############################################################################
 class RainViewerService:
+
+    MAX_TILE_ZOOM = 7
+    COLOR_SCHEME = 2
+    _FRAME_PATH = re.compile(r"^/v2/radar/[A-Za-z0-9._~/-]+$")
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -59,11 +65,8 @@ class RainViewerService:
             else configured.min_call_interval_s,
             0.05,
         )
-        self.tile_color_scheme = (
-            tile_color_scheme
-            if tile_color_scheme is not None
-            else configured.tile_color_scheme
-        )
+        # Universal Blue is the stable public palette for this capability.
+        self.tile_color_scheme = self.COLOR_SCHEME
         self.tile_smooth = (
             tile_smooth if tile_smooth is not None else configured.tile_smooth
         )
@@ -82,13 +85,14 @@ class RainViewerService:
             raise RainViewerRequestError("RainViewer did not return recent radar history frames.")
 
         latest, latest_time = max(past_frames, key=lambda item: item[1])
-        latest_path = str(latest.get("path") or "").strip()
-        if not latest_path:
-            raise RainViewerRequestError("RainViewer radar frame path is missing.")
+        host = self._validated_host(payload.get("host"))
+        latest_path = self._validated_frame_path(latest.get("path"))
+        if latest_path is None:
+            raise RainViewerRequestError("RainViewer radar frame path is invalid.")
 
         frame_times = sorted(timestamp for _, timestamp in past_frames)
         tile_url_template = (
-            f"https://tilecache.rainviewer.com{latest_path}/256/{{z}}/{{x}}/{{y}}/"
+            f"{host}{latest_path}/256/{{z}}/{{x}}/{{y}}/"
             f"{self.tile_color_scheme}/{self.tile_smooth}_{self.tile_snow}.png"
         )
         return {
@@ -99,8 +103,8 @@ class RainViewerService:
             "history_end_time": frame_times[-1] if frame_times else latest_time,
             "tile_url_template": tile_url_template,
             "frame_count": len(past_frames),
-            "max_zoom": 7,
-            "host": payload.get("host"),
+            "max_zoom": self.MAX_TILE_ZOOM,
+            "host": host,
             "resolved_at": datetime.now(UTC).isoformat(),
             "attribution": "© RainViewer",
         }
@@ -115,9 +119,61 @@ class RainViewerService:
             if not is_json_object(raw_frame):
                 continue
             timestamp = cls._frame_timestamp(raw_frame.get("time"))
-            if timestamp is not None:
-                validated.append((raw_frame, timestamp))
+            path = cls._validated_frame_path(raw_frame.get("path"))
+            if timestamp is not None and path is not None:
+                validated.append((dict(raw_frame, path=path), timestamp))
         return validated
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _validated_host(value: object) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise RainViewerRequestError("RainViewer metadata host is missing.")
+        try:
+            parsed = urlsplit(value.strip())
+            port = parsed.port
+        except ValueError as exc:
+            raise RainViewerRequestError("RainViewer metadata host is invalid.") from exc
+        hostname = (parsed.hostname or "").lower()
+        if (
+            parsed.scheme.lower() != "https"
+            or parsed.username is not None
+            or parsed.password is not None
+            or port is not None
+            or parsed.path not in {"", "/"}
+            or parsed.query
+            or parsed.fragment
+            or not (
+                hostname == "rainviewer.com"
+                or hostname.endswith(".rainviewer.com")
+            )
+        ):
+            raise RainViewerRequestError("RainViewer metadata host is not trusted.")
+        return f"https://{hostname}"
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _validated_frame_path(cls, value: object) -> str | None:
+        if not isinstance(value, str) or not value.strip():
+            return None
+        raw_path = value.strip()
+        try:
+            parsed = urlsplit(raw_path)
+        except ValueError:
+            return None
+        path = parsed.path.rstrip("/")
+        if (
+            parsed.scheme
+            or parsed.netloc
+            or parsed.query
+            or parsed.fragment
+            or "\\" in raw_path
+            or "//" in path
+            or any(part in {"", ".", ".."} for part in path.split("/")[1:])
+            or cls._FRAME_PATH.fullmatch(path) is None
+        ):
+            return None
+        return path
 
     # -------------------------------------------------------------------------
     @staticmethod

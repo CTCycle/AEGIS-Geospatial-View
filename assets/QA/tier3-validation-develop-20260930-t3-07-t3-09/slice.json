@@ -1,0 +1,64 @@
+{
+  "slice": "T3-07/T3-09",
+  "date": "2026-09-30",
+  "branch": "develop",
+  "starting_sha": "ff1b0f3e928fe5dc3376928556261b85183b3c96",
+  "required_lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "verification": "selected in Settings and native tool probe passed"
+  },
+  "status": {
+    "T3-07": "PARTIAL",
+    "T3-08": "PASS unchanged",
+    "T3-09": "PARTIAL",
+    "FEMA-COVERAGE-GUARDRAIL": "PASS unchanged"
+  },
+  "T3-07_boundary": {
+    "deterministic_tile": "New Orleans z14 x4092 y6762",
+    "FEMA_layer": "28",
+    "rest_and_wms": "both tested",
+    "fetchers": [
+      "AEGIS pooled client",
+      "fresh httpx trust_env=true",
+      "fresh httpx trust_env=false",
+      "native Windows curl"
+    ],
+    "result": "Case C: all tested transport lanes failed before HTTP status, content type, body, or image pixels",
+    "classification": "external FEMA transport blocker; no mirror, TLS downgrade, or renderer substitution"
+  },
+  "T3-09_boundary": {
+    "provider": "rainviewer",
+    "metadata": "recent observed history only",
+    "latest_frame": "2026-09-30T08:00:00Z",
+    "history": "2026-09-30T06:00:00Z through 2026-09-30T08:00:00Z, 13 frames",
+    "max_zoom": 7,
+    "color_scheme": 2,
+    "proxy": "same-origin AEGIS backend raster proxy",
+    "browser_result": "exact lane produced visible attributed raster map and accepted render observation",
+    "status_reason": "functional browser proof is PASS, but the successful exact-lane run used the launcher-configured canonical data root; a fresh QA root had no OpenCode Go credential/model assignment, so the complete isolated-run requirement remains PARTIAL"
+  },
+  "evidence": {
+    "conversation_id": "conv_d8234922d261406d83efac6bf660d63e",
+    "run_id": "run_94d634de796542c19c9d75e1877e02fc",
+    "evidence_ref": "evidence_39ae9bb46b004538a95ae5f9a28bda5b",
+    "map_session_id": "candidate-1bfb4d5ab600477687bddf54bf7be0b3",
+    "source_id": "overlay-source-evidence:evidence_39ae9bb46b004538a95ae5f9a28bda5b:rainviewer_precipitation_radar",
+    "layer_id": "overlay-layer-evidence:evidence_39ae9bb46b004538a95ae5f9a28bda5b:rainviewer_precipitation_radar",
+    "render_observed": "ready",
+    "render_verified": true
+  },
+  "artifacts": {
+    "report": "report.md",
+    "browser_evidence": "browser-evidence.md",
+    "network_summary": "network-summary.json",
+    "backend_diagnostics": "backend-raster-diagnostics.log",
+    "provider_probe": "provider-probe.json",
+    "run_trace": "run-trace.json",
+    "focused_tests": "focused-tests-final.log",
+    "focused_contract_tests": "focused-contracts-final.log",
+    "full_unit": "full-unit-final.log",
+    "ruff": "ruff-final.log",
+    "pyright": "pyright-final.log"
+  }
+}

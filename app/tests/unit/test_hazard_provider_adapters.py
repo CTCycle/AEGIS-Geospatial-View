@@ -325,6 +325,8 @@ def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
     assert "/arcgis/rest/services/public/NFHL/MapServer/export" in response.payload[
         "tileUrl"
     ]
+    assert "layers=show:28" in response.payload["tileUrl"]
+    assert response.payload["layer"] == "28"
     assert response.payload["legend"]["type"]
 
 ###############################################################################
