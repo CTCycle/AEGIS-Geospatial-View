@@ -868,13 +868,16 @@ def test_resumable_ready_check_rejection_becomes_render_failure_observation(
     assert result.observation.recovery == "revise_map"
     assert any(str(event[0]) == "render_observed" for event in publisher.events)
 
+@pytest.mark.parametrize('rendering_mode', ['raster-tile', 'tile', 'xyz', 'wms', 'wmts'])
 @pytest.mark.parametrize('visible', [None, False])
-def test_loaded_raster_without_visibility_proof_resumes_with_original_policy(render_context, visible) -> None:
+def test_loaded_raster_without_visibility_proof_resumes_with_original_policy(
+    render_context, rendering_mode, visible
+) -> None:
     repository, publisher, conversation_id, run_id = render_context
     service = RenderCompletionService(run_repository=repository, event_publisher=publisher,
         resume_mode=True, max_render_attempts=3)
     candidate = _session(OverlayInstance(instance_id='raster', capability_id='raster', label='Raster',
-        provider='test', overlay_type='tile', rendering_mode='raster-tile', descriptor={'result_type': 'raster'}))
+        provider='test', overlay_type='tile', rendering_mode=rendering_mode, descriptor={'result_type': 'raster'}))
     presentation, _ = service.prepare(run_id=run_id, run_version=1, response_payload={
         'map_session': candidate.model_dump(mode='json'),
         'execution_trace': {'checkpoint': {'render_attempts': 0, 'budget_snapshot': {},
