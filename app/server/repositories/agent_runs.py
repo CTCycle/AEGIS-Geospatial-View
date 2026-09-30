@@ -80,6 +80,9 @@ class AgentRunRepository:
     MAX_PAGE_LIMIT = 50
     MAX_TRACE_LIMIT = 200
     MAX_QUERY_CHARS = 300
+    RASTER_RENDERING_MODES = frozenset(
+        {"raster-tile", "tile", "xyz", "wms", "wmts"}
+    )
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -975,8 +978,7 @@ class AgentRunRepository:
                             missing_overlays.append(overlay_id)
                         else:
                             instance = candidate_instances.get(overlay_id) or {}
-                            rendering_mode = str(instance.get("rendering_mode") or "")
-                            if rendering_mode.startswith("raster"):
+                            if self._candidate_is_raster(instance):
                                 valid_empty = self._candidate_is_valid_empty(instance)
                                 if valid_empty and result.get("result_visible") is True:
                                     missing_overlays.append(overlay_id)
@@ -1539,6 +1541,11 @@ class AgentRunRepository:
             "valid_empty",
             "empty",
         }
+
+    @classmethod
+    def _candidate_is_raster(cls, instance: dict[str, Any]) -> bool:
+        rendering_mode = str(instance.get("rendering_mode") or "").casefold()
+        return rendering_mode in cls.RASTER_RENDERING_MODES
 
     # -------------------------------------------------------------------------
     @staticmethod
