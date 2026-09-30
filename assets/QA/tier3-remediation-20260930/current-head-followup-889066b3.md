@@ -2,8 +2,9 @@
 
 Date: 2026-09-30
 Source boundary: `develop@889066b3` (`fix: enforce raster visibility across
-render modes`). The working tree was clean before the documentation and QA
-updates recorded after this source commit.
+render modes`). The source/test change was committed separately from the
+reconciliation documentation and QA evidence, which were subsequently
+committed in the final delivery commit.
 
 ## Confirmed remediation
 
