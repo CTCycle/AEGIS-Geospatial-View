@@ -973,10 +973,19 @@ class AgentRunRepository:
                             missing_overlays.append(overlay_id)
                         elif result.get("visibility_matches") is not True:
                             missing_overlays.append(overlay_id)
-                        elif (str((candidate_instances.get(overlay_id) or {}).get("rendering_mode") or "").startswith("raster")
-                              and (candidate_instances.get(overlay_id) or {}).get("visible") is not False
-                              and result.get("result_visible") is not True):
-                            missing_overlays.append(overlay_id)
+                        else:
+                            instance = candidate_instances.get(overlay_id) or {}
+                            rendering_mode = str(instance.get("rendering_mode") or "")
+                            if rendering_mode.startswith("raster"):
+                                valid_empty = self._candidate_is_valid_empty(instance)
+                                if valid_empty and result.get("result_visible") is True:
+                                    missing_overlays.append(overlay_id)
+                                elif (
+                                    not valid_empty
+                                    and instance.get("visible") is not False
+                                    and result.get("result_visible") is not True
+                                ):
+                                    missing_overlays.append(overlay_id)
                     if missing_overlays:
                         raise ValueError(
                             "Required overlay render checks failed: "
@@ -1516,6 +1525,20 @@ class AgentRunRepository:
         data = _json_object(descriptor.get("data"))
         features = data.get("features")
         return isinstance(features, list) and len(cast(list[Any], features)) > 0
+
+    @staticmethod
+    def _candidate_is_valid_empty(instance: dict[str, Any]) -> bool:
+        descriptor = _json_object(instance.get("descriptor"))
+        result_status = str(
+            descriptor.get("result_status") or descriptor.get("resultStatus") or ""
+        ).casefold()
+        result_type = str(
+            descriptor.get("result_type") or descriptor.get("resultType") or ""
+        ).casefold()
+        return result_status in {"valid_empty", "empty"} or result_type in {
+            "valid_empty",
+            "empty",
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod

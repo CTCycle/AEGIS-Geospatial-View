@@ -891,3 +891,61 @@ def test_loaded_raster_without_visibility_proof_resumes_with_original_policy(ren
     assert result.observation.recovery == 'terminal'
     duplicate = run_async_in_thread(service.acknowledge(conversation_id, ack))
     assert duplicate.duplicate is True
+
+
+def test_valid_empty_raster_does_not_require_visible_pixels(render_context) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,
+    )
+    candidate = _session(
+        OverlayInstance(
+            instance_id="empty-raster",
+            capability_id="empty-raster",
+            label="Empty raster",
+            provider="fixture",
+            overlay_type="raster-tile",
+            rendering_mode="raster-tile",
+            descriptor={
+                "result_type": "raster",
+                "result_status": "valid_empty",
+            },
+        )
+    )
+    _presentation, prepared = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={"map_session": candidate.model_dump(mode="json")},
+    )
+    assert prepared is True
+    acknowledgment = RealtimeRenderAckPayload(
+        run_id=run_id,
+        run_version=1,
+        map_session_id=candidate.session_id,
+        collection_revision=candidate.overlay_collection.revision,
+        status="ready",
+        viewport_bounds=candidate.bounds,
+        checks={
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+        overlay_results=[
+            {
+                "overlay_id": "empty-raster",
+                "source_present": True,
+                "layer_present": True,
+                "loaded": True,
+                "visibility_matches": True,
+                "result_visible": False,
+                "raster_tile_intersects_viewport": True,
+                "raster_nontransparent_pixel_count": 0,
+            }
+        ],
+    )
+
+    result = run_async_in_thread(service.acknowledge(conversation_id, acknowledgment))
+
+    assert result.state == "completed"
+    assert result.presentation_status == "ready"

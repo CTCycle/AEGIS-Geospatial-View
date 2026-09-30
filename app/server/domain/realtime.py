@@ -166,6 +166,13 @@ class RealtimeRenderAckPayload(BaseModel):
             "zoom_range_valid",
             "rendered_feature_count",
             "result_visible",
+            "raster_source_loaded",
+            "raster_tile_intersects_viewport",
+            "raster_zoom_supported",
+            "raster_nontransparent_pixel_count",
+            "raster_tile_z",
+            "raster_tile_x",
+            "raster_tile_y",
             "failure_code",
         }
         sanitized: list[dict[str, Any]] = []
@@ -193,11 +200,30 @@ class RealtimeRenderAckPayload(BaseModel):
                     raise ValueError(f"overlay result {key} must be boolean")
             if item.get("result_visible") is not None and not isinstance(item["result_visible"], bool):
                 raise ValueError("overlay result result_visible must be boolean or null")
+            for key in (
+                "raster_source_loaded",
+                "raster_tile_intersects_viewport",
+                "raster_zoom_supported",
+            ):
+                if key in item and item[key] is not None and not isinstance(item[key], bool):
+                    raise ValueError(f"overlay result {key} must be boolean or null")
             if "rendered_feature_count" in item and item["rendered_feature_count"] is not None and (
                 not isinstance(item["rendered_feature_count"], int)
                 or item["rendered_feature_count"] < 0
             ):
                 raise ValueError("rendered_feature_count must be non-negative")
+            for key in (
+                "raster_nontransparent_pixel_count",
+                "raster_tile_z",
+                "raster_tile_x",
+                "raster_tile_y",
+            ):
+                if key in item and item[key] is not None and (
+                    not isinstance(item[key], int) or item[key] < 0
+                ):
+                    raise ValueError(f"overlay result {key} must be a non-negative integer or null")
+            if item.get("raster_tile_z") is not None and item["raster_tile_z"] > 30:
+                raise ValueError("overlay result raster_tile_z is out of range")
             if "failure_code" in item and (
                 item["failure_code"] is not None
                 and (not isinstance(item["failure_code"], str) or len(item["failure_code"]) > 120)
