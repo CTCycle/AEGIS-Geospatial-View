@@ -1,0 +1,30 @@
+{
+  "tested_at": "2026-09-30",
+  "branch": "develop",
+  "source_commit": "c8e6f416",
+  "working_tree_changes": "source clean; retained QA evidence under assets/QA",
+  "campaign": "T3-07/T3-09 ordered validation follow-up",
+  "status": "PARTIAL",
+  "slices": {
+    "T3-07": {
+      "status": "PARTIAL",
+      "esa_worldcover": "transport_and_proxy_raster_pass",
+      "fema_nfhl_flood_zones": "transport_blocked_before_http_response",
+      "map_render_ack": "not_claimed"
+    },
+    "T3-09": {
+      "status": "PASS",
+      "exact_lane": "settings_api_structured_probe_pass",
+      "provider": "opencode-go",
+      "model": "deepseek-v4.1-flash",
+      "credential_source": "canonical_db_authorized_transient_process_input",
+      "fallback_used": false,
+      "map_render_ack": "pass",
+      "browser_run_id": "run_e9325598bce1432ca73642b0b7b2920b",
+      "raster_nontransparent_pixel_count": 90,
+      "raster_tile": "z6/x34/y24"
+    }
+  },
+  "secret_recorded": false,
+  "fallback_used": false
+}

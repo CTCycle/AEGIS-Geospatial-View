@@ -1,0 +1,41 @@
+{
+  "tested_at": "2026-09-30",
+  "provider": "esa",
+  "capability_id": "esa_worldcover",
+  "source_url": "https://mapproxy.terrascope.be/mapproxy/service",
+  "layer_id": "esa-worldcover-map-10m-2021-v2_map",
+  "request": {
+    "service": "WMS",
+    "request": "GetMap",
+    "version": "1.3.0",
+    "crs": "EPSG:3857",
+    "width": 256,
+    "height": 256,
+    "time_parameter": null
+  },
+  "capabilities_validation": {
+    "url": "https://mapproxy.terrascope.be/mapproxy/service?service=WMS&request=GetCapabilities",
+    "http_status": 200,
+    "ok": true
+  },
+  "direct_upstream": {
+    "http_status": 200,
+    "content_type": "image/png",
+    "bytes": 30107,
+    "image_size": [256, 256],
+    "nontransparent_pixels": 65536,
+    "nonwhite_pixels": 65536,
+    "sha256": "b54db8e07961611570abc4c95143acaf50f2c55aaeefa789df7c16f277ef0301"
+  },
+  "aegis_proxy": {
+    "http_status": 200,
+    "tile": "8/136/93",
+    "content_type": "image/png",
+    "bytes": 13984,
+    "image_size": [256, 256],
+    "nontransparent_pixels": 65536,
+    "nonwhite_pixels": 65536,
+    "sha256": "4c4ca4194c7732b94768e635347b304d6849d70119045235ba61185db94a355f"
+  },
+  "attribution": "© ESA WorldCover / Terrascope"
+}

@@ -1,0 +1,26 @@
+﻿{
+    "status":  "PASS",
+    "reason":  "Exact OpenCode Go model lane persisted through Settings API and passed the native structured probe.",
+    "tested_at":  "2026-09-30T20:43:00.2317726Z",
+    "provider":  "opencode-go",
+    "model":  "deepseek-v4.1-flash",
+    "backend":  "http://127.0.0.1:5079",
+    "data_root_isolated":  true,
+    "secret_environment_variable":  "AEGIS_T3_OPENCODE_GO_API_KEY",
+    "secret_recorded":  false,
+    "secret_leaked_to_logs":  false,
+    "credential_present":  true,
+    "credential_health":  "healthy",
+    "selected_provider":  "opencode-go",
+    "selected_model":  "deepseek-v4.1-flash",
+    "probe":  {
+                  "http_status":  200,
+                  "provider":  "opencode-go",
+                  "model":  "deepseek-v4.1-flash",
+                  "protocol":  "openai-chat-completions",
+                  "status":  "passed",
+                  "parse_status":  "complete",
+                  "duration_ms":  4548
+              },
+    "runtime_cleaned":  true
+}
