@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
 import asyncio
+from copy import deepcopy
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
@@ -220,7 +221,8 @@ class GoogleProvider(LLMProvider):
     def _parse_tool_calls(raw: dict[str, Any]) -> list[LLMToolCall]:
         calls: list[LLMToolCall] = []
         candidates = raw.get("candidates") if is_json_object(raw) else None
-        for candidate in json_array(candidates):
+        # Only the selected candidate is executed and continued.
+        for candidate in json_array(candidates)[:1]:
             candidate_object = json_object(candidate)
             content = json_object(candidate_object.get("content"))
             for part in json_array(content.get("parts")):
@@ -328,6 +330,23 @@ class GoogleProvider(LLMProvider):
             tool_calls=self._parse_tool_calls(raw),
             finish_reason=self._extract_finish_reason(raw),
             context_usage=usage.to_dict(),
+            provider_continuation=self._continuation_content(response),
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _continuation_content(response: object) -> dict[str, Any] | None:
+        raw = dump_response_payload(response)
+        candidates = json_array(raw.get("candidates"))
+        if not candidates:
+            return None
+        content = json_object(json_object(candidates[0]).get("content"))
+        if not content.get("parts"):
+            return None
+        # SDK JSON mode encodes signatures as base64. Validate through the SDK
+        # to preserve every native part and round-trip bytes on the next call.
+        return genai_types.Content.model_validate(content).model_dump(
+            mode="json", exclude_none=True
         )
 
     # -------------------------------------------------------------------------
@@ -503,6 +522,10 @@ class GoogleProvider(LLMProvider):
             role = str(message.get("role") or "").strip().lower()
             if role == "system":
                 continue
+            native_content = message.get("google_content")
+            if role == "assistant" and is_json_object(native_content):
+                contents.append(deepcopy(native_content))
+                continue
             if role == "assistant" and is_json_array(message.get("tool_calls")):
                 contents.append(
                     {
@@ -510,6 +533,7 @@ class GoogleProvider(LLMProvider):
                         "parts": [
                             {
                                 "function_call": {
+                                    **({"id": call["id"]} if call.get("id") else {}),
                                     "name": call.get("name"),
                                     "args": call.get("arguments") or {},
                                 }
@@ -521,19 +545,21 @@ class GoogleProvider(LLMProvider):
                 )
                 continue
             if role == "tool":
-                contents.append(
-                    {
-                        "role": "user",
-                        "parts": [
-                            {
-                                "function_response": {
-                                    "name": message.get("name"),
-                                    "response": {"content": message.get("content")},
-                                }
-                            }
-                        ],
+                part = {
+                    "function_response": {
+                        **({"id": message["tool_call_id"]} if message.get("tool_call_id") else {}),
+                        "name": message.get("name"),
+                        "response": {"content": message.get("content")},
                     }
-                )
+                }
+                # Parallel function responses belong to one user content in
+                # the same order as the preceding model's call parts.
+                if contents and contents[-1]["role"] == "user" and all(
+                    "function_response" in item for item in contents[-1]["parts"]
+                ):
+                    contents[-1]["parts"].append(part)
+                else:
+                    contents.append({"role": "user", "parts": [part]})
                 continue
             mapped_role = "model" if role == "assistant" else "user"
             contents.append(

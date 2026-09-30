@@ -12,7 +12,7 @@ from server.common.time import utc_now
 from server.contracts.events import RunEventType, RunEventVisibility, RunProgressStage
 from server.contracts.geospatial import MapSession
 from server.domain.realtime import RealtimeRenderAckPayload
-from server.domain.agent.capability_route import AgentGoal, CompletionContract
+from server.domain.agent.capability_route import AgentGoal, AgentRunState, CompletionContract
 from server.domain.agent.capability_route import RenderObservation
 from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
 from server.repositories.agent_runs import AgentRunRepository
@@ -109,6 +109,19 @@ class RenderCompletionService:
             ),
             map_session=candidate_model,
         )
+        checkpoint = _json_object(
+            _json_object(response_payload.get("execution_trace")).get("checkpoint")
+        )
+        if checkpoint.get("request_id"):
+            state = AgentRunState.from_checkpoint(checkpoint)
+            checks = CompletionEvaluator.data_checks(state)
+            for requirement in render_requirements:
+                if requirement.name in checks and state.completion_contract and (
+                    (requirement.name == "required_data_retrieved" and state.completion_contract.evidence_required)
+                    or (requirement.name == "spatial_scope_applied" and state.completion_contract.spatial_scope_required)
+                    or (requirement.name == "temporal_scope_applied" and state.completion_contract.temporal_scope_required)
+                ):
+                    requirement.status = "satisfied" if checks[requirement.name] else "pending"
         render_requirements_payload = [
             item.model_dump(mode="json") for item in render_requirements
         ]
@@ -118,6 +131,12 @@ class RenderCompletionService:
             if not RenderCompletionService._metadata_only(instance)
         ]
         presentation = {
+            "render_ack_timeout_seconds": float(_json_object(
+                _json_object(_json_object(response_payload.get("execution_trace")).get("checkpoint")).get("execution_policy")
+            ).get("render_ack_seconds") or self.render_ack_timeout_seconds),
+            "max_render_attempts": int(_json_object(
+                _json_object(_json_object(response_payload.get("execution_trace")).get("checkpoint")).get("execution_policy")
+            ).get("max_render_attempts") or self.max_render_attempts),
             "status": "pending",
             "map_session_id": session_id,
             "collection_revision": revision,
@@ -225,6 +244,17 @@ class RenderCompletionService:
         prior_presentation = _json_object(
             prior_snapshot.presentation if prior_snapshot else None
         )
+        original_acknowledgment = dict(acknowledgment)
+        prior_acknowledgment = _json_object(prior_presentation.get("acknowledgment"))
+        if prior_acknowledgment.get("original_acknowledgment") == acknowledgment:
+            # Server-rejected ready observations are stored as failures. Replay
+            # the same normalized acknowledgment so retries remain idempotent,
+            # including after the final render attempt has been consumed.
+            acknowledgment = prior_acknowledgment
+            payload = RealtimeRenderAckPayload.model_validate({
+                key: value for key, value in acknowledgment.items()
+                if key != "original_acknowledgment"
+            })
         prior_attempt = int(
             prior_presentation.get("render_attempts")
             or 0
@@ -233,6 +263,8 @@ class RenderCompletionService:
         pending_checkpoint = _json_object(
             _json_object(pending_response.get("execution_trace")).get("checkpoint")
         )
+        max_render_attempts = int(prior_presentation.get("max_render_attempts") or self.max_render_attempts)
+        render_ack_timeout_seconds = float(prior_presentation.get("render_ack_timeout_seconds") or self.render_ack_timeout_seconds)
         action_fingerprint = str(
             pending_checkpoint.get("prepared_map_action_fingerprint") or ""
         ) or None
@@ -243,7 +275,7 @@ class RenderCompletionService:
         if (
             self.resume_mode
             and prior_snapshot is not None
-            and prior_attempt >= self.max_render_attempts
+            and prior_attempt >= max_render_attempts
             and prior_presentation.get("acknowledgment") != acknowledgment
         ):
             raise RenderAcknowledgementError(
@@ -256,7 +288,7 @@ class RenderCompletionService:
                     "continue"
                     if payload.status == "ready"
                     else "terminal"
-                    if prior_attempt + 1 >= self.max_render_attempts
+                    if prior_attempt + 1 >= max_render_attempts
                     else "revise_map"
                 ),
                 "action_fingerprint": action_fingerprint,
@@ -268,7 +300,7 @@ class RenderCompletionService:
                 conversation_id=conversation_id,
                 run_id=payload.run_id,
                 run_version=payload.run_version,
-                timeout_seconds=self.render_ack_timeout_seconds,
+                timeout_seconds=render_ack_timeout_seconds,
             )
         try:
             snapshot, duplicate, pending_response = self.run_repository.acknowledge_render(
@@ -336,12 +368,13 @@ class RenderCompletionService:
                 }
             )
             acknowledgment = failure_payload.model_dump(mode="json")
+            acknowledgment["original_acknowledgment"] = original_acknowledgment
             observation = self._observation_from_ack(failure_payload).model_copy(
                 update={
                     "attempt": prior_attempt + 1,
                     "recovery": (
                         "terminal"
-                        if prior_attempt + 1 >= self.max_render_attempts
+                        if prior_attempt + 1 >= max_render_attempts
                         else "revise_map"
                     ),
                     "action_fingerprint": action_fingerprint,

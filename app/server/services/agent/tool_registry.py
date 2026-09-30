@@ -85,6 +85,11 @@ class ToolRegistry:
                 capability_schema = dict(properties.get("capability_id") or {})
                 capability_schema["enum"] = list(state.capability_ids)
                 properties["capability_id"] = capability_schema
+                if len(state.capability_ids) > 1:
+                    properties["arguments"] = {
+                        **dict(properties.get("arguments") or {}),
+                        "description": "Capability-specific arguments. Call describe_geospatial_capability for the selected capability's argument_schema before execution; contracts differ between capabilities.",
+                    }
                 if len(state.capability_ids) == 1 and registered.argument_schema_provider:
                     try:
                         request = registered.input_model.model_validate(

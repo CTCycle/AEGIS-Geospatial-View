@@ -160,6 +160,7 @@ const createDefaultRuntimeSettings = (): RuntimeSettingsResponse => ({
     max_tool_result_chars: 4096,
     max_iterations: 12,
     max_render_attempts: 3,
+    max_discovery_attempts: 2,
     max_no_progress_corrections: 2,
     simple_max_model_calls: 4,
     complex_max_model_calls: 10,
@@ -1149,7 +1150,18 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       message: _message,
       ...blocks
     } = this.runtimeSettingsDraft;
-    return blocks;
+    return Object.fromEntries(Object.entries(blocks).flatMap(([name, draft]) => {
+      const saved = this.runtimeSettings[name as keyof RuntimeSettingsResponse] as unknown as Record<string, unknown>;
+      const changed = Object.fromEntries(Object.entries(draft).filter(
+        ([key, value]) => JSON.stringify(value) !== JSON.stringify(saved[key]),
+      ));
+      return Object.keys(changed).length ? [[name, changed]] : [];
+    })) as RuntimeSettingsUpdateRequest;
+  }
+
+  restoreAgentExecutionDefaults(): void {
+    this.runtimeSettingsDraft.agent_execution = createDefaultRuntimeSettings().agent_execution;
+    this.statusText = 'Agent defaults restored in the form. Save to apply them to new runs.';
   }
 
   private async ensureProviderModelsLoaded(

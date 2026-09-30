@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-09-28
+Last updated: 2026-09-30
 
 ## Layering
 
@@ -71,6 +71,18 @@ The geospatial runtime is composed once at startup and accessed through
 request time.
 
 ## Native agent loop
+
+Each new run snapshots the saved `agent_execution` policy. Checkpoint resumes
+restore that policy before context assembly and execution. Request-scoped model,
+tool, and provider policies avoid mutating the shared runtime. Google native
+continuation preserves ordered SDK parts and signatures in private checkpoints;
+transport projections omit those fields. Completion separately checks execution,
+validity, relevance, and requested spatial/temporal coverage. Preparing a map or
+loading a raster source cannot substitute for those checks. Unknown raster
+visibility remains unsatisfied and enters the existing bounded render recovery.
+
+See the [2026-09-30 implementation report](../../QA/native-reliability-report-20260930.md)
+for validation and remaining live-render/benchmark limitations.
 
 There is one application execution path. It has no legacy/shadow/native mode
 switch:

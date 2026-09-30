@@ -305,6 +305,9 @@ class AgentExecutionBudget:
         remaining_ms = max(0, int(self.remaining_seconds() * 1000))
         return {
             "total_budget_ms": int(self.total_seconds * 1000),
+            "hard_max_seconds": self.hard_max_seconds,
+            "simple_run_seconds": self.simple_run_seconds,
+            "stage_limits": dict(self.stage_limits),
             "remaining_ms": remaining_ms,
             # Monotonic clocks cannot survive a process restart.  Keep a wall
             # clock deadline as a resume hint while in-process enforcement
@@ -339,6 +342,20 @@ class AgentExecutionBudget:
         self.tool_calls = _nonnegative_int("tool_calls")
         self.state_transitions = _nonnegative_int("state_transitions")
         self.retry_count = _nonnegative_int("retry_count")
+        for name in ("max_model_calls", "max_tool_calls", "max_state_transitions"):
+            value = snapshot.get(name)
+            if isinstance(value, int) and value > 0:
+                setattr(self, name, value)
+        for name in ("hard_max_seconds", "simple_run_seconds"):
+            value = snapshot.get(name)
+            if isinstance(value, (int, float)) and 0 < value <= COMPLEX_RUN_SECONDS:
+                setattr(self, name, float(value))
+        limits = snapshot.get("stage_limits")
+        if is_json_object(limits):
+            self.stage_limits = {
+                key: float(value) for key, value in limits.items()
+                if isinstance(value, (int, float)) and value > 0
+            }
         profile = snapshot.get("run_profile")
         if isinstance(profile, str) and profile in {"initial", "simple", "complex"}:
             self.run_profile = profile

@@ -14,7 +14,8 @@ from server.contracts.geospatial import (
 )
 from server.contracts.events import RunEventType
 from server.domain.agent.decision import ResolvedLocation
-from server.domain.agent.capability_route import AgentGoal, CompletionContract
+from server.domain.agent.capability_route import AgentGoal, AgentRunState, CapabilityRoute, CompletionContract
+from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.realtime import RealtimeRenderAckPayload
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
@@ -25,6 +26,22 @@ from server.services.agent_runs.render_completion import (
     RenderAcknowledgementError,
     RenderCompletionService,
 )
+def test_map_preparation_cannot_override_missing_checkpoint_evidence(render_context) -> None:
+    repository, publisher, _, run_id = render_context
+    state = AgentRunState(request_id="request", conversation_id="conversation", user_message="Show data", phase="update_state")
+    state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute", presentation="map", requires_location=False, explicit_capability_ids=["missing"])
+    state.completion_contract = CompletionContract(operation="show", evidence_required=True,
+        requirements=["required_data_retrieved"])
+    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
+    candidate = _session(OverlayInstance(instance_id="raster", capability_id="missing", label="Raster",
+        provider="test", overlay_type="tile", rendering_mode="raster-tile", descriptor={"result_type": "raster"}))
+    presentation, _ = service.prepare(run_id=run_id, run_version=1, response_payload={
+        "map_session": candidate.model_dump(mode="json"),
+        "completion_contract": state.completion_contract.model_dump(mode="json"),
+        "execution_trace": {"checkpoint": state.checkpoint()}})
+    requirement = next(item for item in presentation["completion_requirements"] if item["name"] == "required_data_retrieved")
+    assert requirement["status"] == "pending"
 
 ###############################################################################
 class _EventPublisher:
@@ -850,3 +867,27 @@ def test_resumable_ready_check_rejection_becomes_render_failure_observation(
     assert result.observation.failure_stage == "backend_validation"
     assert result.observation.recovery == "revise_map"
     assert any(str(event[0]) == "render_observed" for event in publisher.events)
+
+@pytest.mark.parametrize('visible', [None, False])
+def test_loaded_raster_without_visibility_proof_resumes_with_original_policy(render_context, visible) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    service = RenderCompletionService(run_repository=repository, event_publisher=publisher,
+        resume_mode=True, max_render_attempts=3)
+    candidate = _session(OverlayInstance(instance_id='raster', capability_id='raster', label='Raster',
+        provider='test', overlay_type='tile', rendering_mode='raster-tile', descriptor={'result_type': 'raster'}))
+    presentation, _ = service.prepare(run_id=run_id, run_version=1, response_payload={
+        'map_session': candidate.model_dump(mode='json'),
+        'execution_trace': {'checkpoint': {'render_attempts': 0, 'budget_snapshot': {},
+            'execution_policy': {'max_render_attempts': 1, 'render_ack_seconds': 7}}}})
+    assert presentation['max_render_attempts'] == 1
+    assert presentation['render_ack_timeout_seconds'] == 7
+    ack = RealtimeRenderAckPayload(run_id=run_id, run_version=1, map_session_id=candidate.session_id,
+        collection_revision=4, status='ready', viewport_bounds=candidate.bounds,
+        checks={'required_sources_loaded': True, 'required_layers_present': True, 'viewport_valid': True},
+        overlay_results=[{'overlay_id': 'raster', 'source_present': True, 'layer_present': True,
+            'loaded': True, 'visibility_matches': True, 'result_visible': visible}])
+    result = run_async_in_thread(service.acknowledge(conversation_id, ack))
+    assert result.observation.status == 'failed'
+    assert result.observation.recovery == 'terminal'
+    duplicate = run_async_in_thread(service.acknowledge(conversation_id, ack))
+    assert duplicate.duplicate is True

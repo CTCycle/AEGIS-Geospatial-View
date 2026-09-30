@@ -1,6 +1,6 @@
 # Settings And Access
 
-Last updated: 2026-09-21
+Last updated: 2026-09-30
 
 ## Geospatial Access
 
@@ -55,8 +55,23 @@ and credential presence.
 
 The Settings sidebar also exposes Application, Map & Search, Data Sources, and
 Agent Runtime. These sections edit typed, SQLite-backed runtime blocks through
-the runtime settings API. Saves are atomic and display a restart-required
-notice; credentials remain in the separate encrypted credential workflow.
+the runtime settings API. Each save submits only changed blocks and fields; the
+server validates and commits the update atomically. Credentials remain in the
+separate encrypted credential workflow.
+
+Agent Runtime contains 31 controls covering execution budgets, failure
+recovery, timeouts and retries, and advanced limits. Their defaults and the
+complete field inventory are documented in
+[`runtime/configuration.md`](../runtime/configuration.md). Agent-only changes
+take effect for new runs without restarting AEGIS. A new run receives the
+latest saved execution policy as an immutable snapshot; an active or
+render-suspended run keeps the policy stored in its checkpoint.
+
+Use `Restore agent defaults` to replace the Agent Runtime draft with the
+published defaults. This changes the form only; select Save to persist the
+defaults and apply them to new runs. Changes to Application, Map & Search, or
+Data Sources continue to show a restart-required notice because those services
+are composed at startup.
 
 ### Chat Composer
 

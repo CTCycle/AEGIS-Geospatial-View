@@ -452,7 +452,7 @@ class CapabilityRegistry:
         queries: list[str],
         explicit_ids: list[str],
         runtime_registry: RuntimeEligibility,
-        limit: int = 12,
+        limit: int | None = 12,
         operation: str | None = None,
         scope_kind: str | None = None,
         temporal_mode: str | None = None,
@@ -468,7 +468,9 @@ class CapabilityRegistry:
         to the model/tool boundary.
         """
 
-        bounded_limit = max(1, min(int(limit), 50))
+        # Inventory discovery paginates the complete ranked catalog at its
+        # handler boundary. Ordinary routing remains a bounded shortlist.
+        bounded_limit = max(1, min(int(limit), 50)) if limit is not None else None
         normalized_queries = _query_tokens(queries)
         raw_query_terms = _raw_query_tokens(queries)
         meaningful_queries = raw_query_terms.difference(_ROUTING_CONTEXT_TOKENS)

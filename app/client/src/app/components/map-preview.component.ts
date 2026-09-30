@@ -910,7 +910,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         visibility_matches: metadataOnly || visible === desiredVisible,
         style_valid: styleValid,
         zoom_range_valid: zoomRangeValid,
-        rendered_feature_count: renderedFeatureCount,
+          rendered_feature_count: renderedFeatureCount,
+          // Tile loading cannot establish meaningful pixels, particularly
+          // for cross-origin rasters. Keep that observation explicitly unknown.
+          result_visible: renderedFeatureCount === null ? null : renderedFeatureCount > 0,
         failure_code: status === 'failed' ? 'overlay_render_failed' : null,
       };
     });

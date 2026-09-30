@@ -34,7 +34,7 @@ from server.domain.agent.reliability import (
     AgentExecutionBudget,
     ExecutionBudgetExceeded,
 )
-from server.domain.agent.trace import AgentTraceEvent
+from server.domain.agent.trace import AgentTraceEvent, redact_trace_value
 from server.domain.agent.tool_result import (
     ModelObservation,
     ToolExecutionError,
@@ -50,6 +50,7 @@ from server.services.agent.capability_router import (
 )
 from server.services.agent.context_assembler import select_pair_safe_messages
 from server.services.agent.tool_executor import ToolExecutor
+from server.services.agent.completion import CompletionEvaluator
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.context_budget import (
     compute_context_usage,
@@ -412,10 +413,17 @@ class AgentLoop:
             ),
         )
         model_limit = request.budget.max_model_calls or request.max_model_calls
-        if state.model_calls >= model_limit:
+        catalog_cursor = self._pending_catalog_discovery_cursor(state)
+        if state.model_calls >= model_limit and catalog_cursor is None:
             return self._budget_outcome(state, request, "model_budget_exhausted")
         self._transition(state, AgentPhase.BUILD_TOOL_CONTEXT, request.budget)
         tools = self.tool_registry.expose(state)
+        await self._emit_trace(request, AgentTraceEvent(
+            kind="tools_available", run_id=state.run_id or state.request_id,
+            run_version=state.run_version, sequence=self._trace_sequence(state),
+            iteration=state.current_iteration,
+            payload={"tools": [tool.name for tool in tools], "phase": state.phase.value},
+        ))
         exposed_tool_names = frozenset(item.name for item in tools)
         if not tools and route.task_mode == "execute" and not state.tool_results:
             return self._failed(
@@ -425,31 +433,24 @@ class AgentLoop:
                 category="model_capability",
             )
         self._transition(state, AgentPhase.MODEL_STEP, request.budget)
-        result = await self._model_step(request, provider, messages, tools)
-        if not result.tool_calls:
-            cursor = self._pending_catalog_discovery_cursor(state)
-            if (
-                cursor is not None
-                and "discover_geospatial_capabilities" in exposed_tool_names
-            ):
-                # Inventory pagination is deterministic once the catalog has
-                # returned a continuation cursor. Do not rely on the model to
-                # notice the cursor before it attempts a final response.
-                result = LLMResult(
-                    content="",
-                    raw=result.raw,
-                    tool_calls=[
-                        LLMToolCall(
-                            id=f"catalog-page-{state.current_iteration}-{cursor}",
-                            name="discover_geospatial_capabilities",
-                            arguments={"cursor": cursor, "limit": 12},
-                        )
-                    ],
-                    finish_reason="tool_calls",
-                    context_usage=result.context_usage,
-                )
+        result = (
+            LLMResult(content="", tool_calls=[LLMToolCall(
+                id=f"catalog-page-{state.current_iteration}-{catalog_cursor}",
+                name="discover_geospatial_capabilities",
+                arguments={"cursor": catalog_cursor, "limit": 12},
+            )]) if catalog_cursor is not None
+            else await self._model_step(request, provider, messages, tools)
+        )
+        await self._emit_trace(request, AgentTraceEvent(
+            kind="stage", run_id=state.run_id or state.request_id,
+            run_version=state.run_version, sequence=self._trace_sequence(state),
+            iteration=state.current_iteration,
+            payload={"stage": "model_decision", "tool_names": [call.name for call in result.tool_calls],
+                     "finish_reason": result.finish_reason, "model_calls": state.model_calls},
+        ))
         if result.tool_calls:
-            messages.extend(self._assistant_and_tool_messages(result))
+            if catalog_cursor is None:
+                messages.extend(self._assistant_and_tool_messages(result))
             tool_results = await self._execute_calls(
                 request,
                 result.tool_calls,
@@ -468,13 +469,14 @@ class AgentLoop:
                 # exhausted instead of issuing the required map plan.
                 tool_results.extend(location_map_recovery)
             self._ensure_run_control(request)
-            messages.extend(
-                self._tool_result_messages(
-                    result.tool_calls,
-                    tool_results,
-                    max_chars=request.max_tool_result_chars,
+            if catalog_cursor is None:
+                messages.extend(
+                    self._tool_result_messages(
+                        result.tool_calls,
+                        tool_results,
+                        max_chars=request.max_tool_result_chars,
+                    )
                 )
-            )
             state.provider_continuation = [
                 dict(item) for item in self._protocol_messages(messages)
             ]
@@ -609,6 +611,15 @@ class AgentLoop:
         callback = request.trace_callback
         if callback is None:
             return
+        payload, redactions = redact_trace_value({
+            "request_id": request.state.request_id,
+            "conversation_id": request.state.conversation_id,
+            "provider": request.provider, "model": request.model,
+            **event.payload,
+        })
+        event = event.model_copy(update={
+            "payload": payload, "redaction": {"fields": redactions, "raw_payload_omitted": True},
+        })
         result = callback(event)
         if inspect.isawaitable(result):
             await result
@@ -1166,26 +1177,8 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     @staticmethod
     def _completion_checks(state: AgentRunState) -> dict[str, bool]:
-        completed_data = any(
-            (
-                result.status in {"success", "partial"}
-                or (
-                    result.status == "valid_empty"
-                    and result.semantic_outcome != "not_found"
-                )
-            )
-            and result.tool_name
-            in {
-                "execute_geospatial_capability",
-                "inspect_evidence",
-                "transform_evidence",
-            }
-            and (
-                not state.capability_ids
-                or result.metadata.capability_id in state.capability_ids
-            )
-            for result in state.tool_results
-        )
+        evidence_checks = CompletionEvaluator.data_checks(state)
+        completed_data = evidence_checks["required_data_retrieved"]
         discovery_results = [
             result
             for result in state.tool_results
@@ -1240,15 +1233,17 @@ class AgentLoop:
             "required_data_retrieved": data_completed,
             "evidence_inspected": evidence_inspected,
             "capabilities_discovered": capabilities_discovered,
-            "temporal_scope_applied": completed_data,
+            "temporal_scope_applied": evidence_checks["temporal_scope_applied"],
             # A successful map-plan observation is the server-owned proof
             # that the requested spatial scope was applied.  Location-only
             # map requests have no data tool result, so using ``completed_data``
             # alone left their spatial task pending even after a valid
             # candidate had been prepared.
-            "spatial_scope_applied": data_completed
-            or state.prepared_map_session is not None
-            or (state.active_map_session is not None and state.render_verified),
+            "spatial_scope_applied": evidence_checks["spatial_scope_applied"]
+            or geocode_location_resolved
+            or (not (state.completion_contract and state.completion_contract.evidence_required)
+                and (state.prepared_map_session is not None
+                     or (state.active_map_session is not None and state.render_verified))),
             "map_candidate_prepared": state.prepared_map_session is not None
             or (state.active_map_session is not None and state.render_verified),
             "render_verified": bool(state.render_verified),
@@ -1642,6 +1637,11 @@ class AgentLoop:
         # only the latest provider protocol window here so Responses reasoning
         # and function-call items remain paired without pinning every historical
         # tool exchange forever.
+        if any(message.get("google_content") for message in protocol):
+            # Gemini validates every signature in the current tool-calling
+            # turn. Run iteration/tool budgets bound this history; slicing a
+            # window would discard required sequential continuation state.
+            return protocol
         return select_pair_safe_messages(protocol, max_items=16)
 
     # -------------------------------------------------------------------------
@@ -2841,6 +2841,15 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     @staticmethod
     def _assistant_and_tool_messages(result: LLMResult) -> list[dict[str, Any]]:
+        if result.provider_continuation is not None:
+            return [{
+                "role": "assistant",
+                "google_content": result.provider_continuation,
+                "tool_calls": [
+                    {"id": call.id, "name": call.name, "arguments": call.arguments or {}}
+                    for call in result.tool_calls
+                ],
+            }]
         raw_output = result.raw.get("output")
         if is_json_array(raw_output):
             protocol_items: list[dict[str, Any]] = []

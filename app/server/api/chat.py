@@ -38,6 +38,7 @@ from server.contracts.runs import AgentRunCreateRequest
 from server.contracts.runs import AgentRunState
 from server.domain.jobs import BackgroundJobCreateResponse
 from server.services.chat.composition import ChatRuntime
+from server.domain.agent.trace import public_protocol_projection
 from server.services.chat.model_library import DYNAMIC_CLOUD_PROVIDERS
 from server.services.chat.settings_service import ChatSettingsValidationError
 from server.services.chat.streaming import ChatStreamingService
@@ -75,7 +76,7 @@ def get_run_lifecycle_service(request: Request) -> RunLifecycleService | None:
 
 ###############################################################################
 def _stream_event(event: ChatStreamEvent) -> str:
-    return json.dumps(event.model_dump(mode="json")) + "\n"
+    return json.dumps(public_protocol_projection(event.model_dump(mode="json"))) + "\n"
 
 ###############################################################################
 async def _serialize_chat_event_stream(
@@ -148,7 +149,7 @@ async def chat_turn(
             ),
         )
         if response is not None:
-            return response
+            return response.model_copy(update={"execution_trace": public_protocol_projection(response.execution_trace)})
         snapshot = lifecycle_service.run_repository.get_run(result.run_id)
         if snapshot is not None and snapshot.error_message:
             raise HTTPException(

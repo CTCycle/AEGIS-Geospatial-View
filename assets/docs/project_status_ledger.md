@@ -57,6 +57,18 @@ later implementation or evidence push still requires its own hosted result.
 
 ## Purpose and document roles
 
+The 2026-09-30 native reliability implementation remains **PARTIAL** overall.
+Google multi-step native continuation, task-aware evidence checks, deterministic
+catalog pagination, private protocol projection, and hot execution settings with
+checkpoint snapshots pass local regression checks. The full backend suite passed
+1,025 tests; the final focused suite passed 366, and the focused client suite
+passed 71. The Settings save/default restoration flow was inspected in the
+in-app browser. Required raster visibility is fail-closed when unknown; a real
+browser pixel-proof producer and complete recovery matrix remain open. No fresh
+live model parity or A–E performance comparison was run. This does not promote
+MATRIX-22 or existing provider/raster gates. See the
+[implementation report](../QA/native-reliability-report-20260930.md).
+
 Use this ledger for the current answer to “what works, what is incomplete, and
 what should happen next?”. It is intentionally compact and is not a debugging
 diary or a replacement for detailed validation reports.

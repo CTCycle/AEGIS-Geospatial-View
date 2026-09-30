@@ -14,6 +14,7 @@ from typing import Any, Callable, Generator, cast
 from uuid import uuid4
 
 from server.common.typing import is_json_object
+from server.configurations.settings import AgentExecutionSettings
 from server.contracts.chat import ChatTurnRequest, ChatTurnResponse
 from server.domain.agent.context import ConversationDirective
 from server.domain.agent.conversation import ConversationState, PendingClarification
@@ -54,6 +55,7 @@ class NativeAgentOrchestrator:
         evidence_repository: Any | None = None,
         context_profile_resolver: ModelContextProfileResolver | None = None,
         execution_settings: Any | None = None,
+        execution_settings_provider: Callable[[], Any] | None = None,
         application_timezone: str = "UTC",
         agent_loop: AgentLoop | None = None,
     ) -> None:
@@ -64,6 +66,7 @@ class NativeAgentOrchestrator:
         self.evidence_repository = evidence_repository
         self.context_profile_resolver = context_profile_resolver
         self.execution_settings = execution_settings
+        self.execution_settings_provider = execution_settings_provider
         self.application_timezone = application_timezone
         self.agent_loop = agent_loop
         self.policy_engine = (
@@ -142,7 +145,13 @@ class NativeAgentOrchestrator:
             require_canonical_provider(stored_provider)
         except ValueError as exc:
             raise LLMConfigurationError(str(exc)) from exc
-        budget = self._new_execution_budget()
+        execution_settings = (
+            self.execution_settings_provider()
+            if self.execution_settings_provider is not None else self.execution_settings
+        )
+        if checkpoint and is_json_object(checkpoint.get("execution_policy")) and checkpoint.get("execution_policy"):
+            execution_settings = AgentExecutionSettings(**checkpoint["execution_policy"])
+        budget = self._new_execution_budget(execution_settings)
         persisted = self.conversation_repository.read_state(conversation_id)
         conversation_state = ConversationState.from_persisted(
             conversation_id,
@@ -242,6 +251,7 @@ class NativeAgentOrchestrator:
                 provider=settings.agent_model_provider,
                 model=settings.agent_model_name,
                 budget=budget,
+                execution_settings=execution_settings,
                 messages=[
                     *context_package.recent_messages,
                     {"role": "user", "content": payload.message},
@@ -431,8 +441,8 @@ class NativeAgentOrchestrator:
         )
 
     # -------------------------------------------------------------------------
-    def _new_execution_budget(self) -> AgentExecutionBudget:
-        configured = self.execution_settings
+    def _new_execution_budget(self, configured: Any = None) -> AgentExecutionBudget:
+        configured = configured if configured is not None else self.execution_settings
         stage_limits = dict(DEFAULT_STAGE_LIMITS)
         if configured is not None:
             stage_limits.update(
@@ -455,6 +465,7 @@ class NativeAgentOrchestrator:
                     "persistence": float(
                         getattr(configured, "persistence_seconds", 5.0)
                     ),
+                    "render_ack": float(getattr(configured, "render_ack_seconds", 90.0)),
                 }
             )
         return AgentExecutionBudget(

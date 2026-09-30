@@ -35,6 +35,7 @@ def test_runtime_settings_api_returns_typed_blocks_and_restart_metadata(tmp_path
     assert payload["schema_version"] == 1
     assert payload["chat"]["max_history_messages"] == 12
     assert payload["agent_execution"]["max_iterations"] == 12
+    assert payload["agent_execution"]["max_discovery_attempts"] == 2
     assert payload["restart_required"] is False
     assert "credentials" not in payload
     serialized = json.dumps(payload).casefold()
@@ -57,6 +58,17 @@ def test_runtime_settings_api_merges_partial_blocks_atomically(tmp_path: Path) -
     assert response.json()["chat"]["max_history_messages"] == 24
     assert response.json()["restart_required"] is True
     assert repository.get_required().chat.max_history_messages == 24
+
+
+def test_agent_policy_patch_applies_to_new_runs_and_rejects_invalid_values_atomically(tmp_path: Path) -> None:
+    client, repository = _client(tmp_path)
+    response = client.patch("/api/settings/runtime", json={"agent_execution": {"max_iterations": 7, "max_discovery_attempts": 5}})
+    assert response.status_code == 200
+    assert response.json()["restart_required"] is False
+    assert repository.get_required().agent_execution.max_discovery_attempts == 5
+    response = client.patch("/api/settings/runtime", json={"agent_execution": {"max_iterations": 8, "max_discovery_attempts": 0}})
+    assert response.status_code == 400
+    assert repository.get_required().agent_execution.max_iterations == 7
 
 
 def test_runtime_settings_api_rejects_unknown_nested_fields(tmp_path: Path) -> None:

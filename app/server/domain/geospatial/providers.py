@@ -1,4 +1,7 @@
 from __future__ import annotations
+from contextvars import ContextVar
+from contextlib import contextmanager
+from collections.abc import Generator
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -44,6 +47,22 @@ class ProviderExecutionPolicy:
     retry_backoff_max_seconds: float = 2.0
     circuit_breaker_failures: int = 3
     circuit_recovery_seconds: float = 60.0
+
+
+_RUN_PROVIDER_POLICY: ContextVar[ProviderExecutionPolicy | None] = ContextVar("run_provider_policy", default=None)
+
+
+def current_provider_policy(default: ProviderExecutionPolicy) -> ProviderExecutionPolicy:
+    return _RUN_PROVIDER_POLICY.get() or default
+
+
+@contextmanager
+def provider_execution_scope(policy: ProviderExecutionPolicy | None) -> Generator[None]:
+    token = _RUN_PROVIDER_POLICY.set(policy)
+    try:
+        yield
+    finally:
+        _RUN_PROVIDER_POLICY.reset(token)
 
 
 FeatureRequest = ProviderRequest

@@ -91,6 +91,19 @@ class ToolExecutionMetadata(BaseModel):
     source_url: str | None = None
 
 ###############################################################################
+class EvidenceAssessment(BaseModel):
+    """Server-owned evidence facts; None means unverified, never success."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tool_execution_success: bool
+    data_valid: bool | None = None
+    data_relevant: bool | None = None
+    spatial_scope_satisfied: bool | None = None
+    temporal_scope_satisfied: bool | None = None
+    reasons: list[str] = Field(default_factory=list, max_length=8)
+
+
 class ToolResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -106,6 +119,7 @@ class ToolResult(BaseModel):
     metadata: ToolExecutionMetadata
     truncated: bool = False
     continuation: str | None = None
+    assessment: EvidenceAssessment | None = None
 
 ###############################################################################
 class ModelObservation(BaseModel):
@@ -135,6 +149,7 @@ class ModelObservation(BaseModel):
     recovery: ToolRecovery | None = None
     truncated: bool = False
     continuation: str | None = None
+    assessment: EvidenceAssessment | None = None
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -183,6 +198,7 @@ class ModelObservation(BaseModel):
             recovery=value.error.recovery if value.error is not None else None,
             truncated=value.truncated or projected_truncated,
             continuation=value.continuation,
+            assessment=value.assessment,
         )
 
 ###############################################################################

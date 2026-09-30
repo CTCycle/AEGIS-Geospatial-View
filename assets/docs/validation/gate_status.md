@@ -179,6 +179,17 @@ data into a renderer success.
 
 ## 2026-09-19 live browser diary
 
+### 2026-09-30 native reliability working-tree validation
+
+Local backend unit tests (1,025), focused final backend checks (366), focused
+client checks (71), production build, Ruff, and strict Pyright passed for the
+implementation described in the [dated report](../../QA/native-reliability-report-20260930.md).
+Settings hot-save/default restoration was verified visually. Native protocol
+round-trip and fault contracts are controlled evidence. Complete live provider
+parity, raster pixel visibility, the full recovery matrix, architecture latency
+comparisons, and hosted validation of this working tree are unrun. Overall
+acceptance remains PARTIAL; existing MATRIX-22 and raster statuses are unchanged.
+
 The representative browser run covered Lugano, Springfield, direct
 coordinates, Mount Etna, Tokyo, overlay lifecycle actions, and the Rome to
 Florence multi-turn path. The exact provider/model lane was visible in the UI;

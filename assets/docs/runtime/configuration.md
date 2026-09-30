@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-09-28
+Last updated: 2026-09-30
 
 ## Environment file
 
@@ -47,8 +47,10 @@ Application runtime settings are validated typed blocks stored in the SQLite
 `GET/PATCH /api/settings/runtime`. The blocks cover Nominatim, geospatial
 bounds, map defaults, job polling, chat defaults, Open-Meteo, Overpass,
 RainViewer, NASA GIBS request tuning, and the native agent execution policy.
-Partial updates merge one or more blocks and commit atomically. Responses never
-contain credentials or secret values and identify when a restart is required.
+The PATCH body may contain one or more changed blocks; each block contains only
+the changed fields, and the server merges and validates the patch before one
+atomic commit. Responses never contain credentials or secret values and identify
+when a restart is required.
 
 Older installations with `settings/configurations.json` are migrated once at
 startup: the legacy file is validated, the SQLite row is committed, and only
@@ -56,15 +58,39 @@ then is the file retired. Invalid legacy data fails visibly and remains in
 place for correction; SQLite is not silently replaced with defaults.
 
 The `agent_execution` runtime block owns the complete native-agent deadline
-policy. Its defaults are 90 seconds for the initial run, 150 seconds for
-simple runs, and 300 seconds for the complex hard ceiling; stage defaults are
-5 seconds for context assembly, 60 seconds per native model decision, 45
-seconds of tool execution, 90 seconds of tool absolute time, 20 seconds for
-map assembly, 5 seconds for persistence, and 90 seconds for browser render
-acknowledgement. Smaller provider/model limits still win. These values are one
-typed policy block rather than independent environment knobs. Provider
-request settings are injected into the same runtime provider policy, and
-there is no legacy/shadow execution-mode setting.
+policy and exposes 31 editable fields. Defaults are grouped as follows:
+
+- Execution budgets: `initial_run_seconds=90`, `simple_seconds=150`,
+  `complex_seconds=300`, `simple_max_model_calls=4`,
+  `complex_max_model_calls=10`, `simple_max_tool_calls=6`,
+  `complex_max_tool_calls=20`, `simple_max_state_transitions=32`,
+  `complex_max_state_transitions=64`, and `max_iterations=12`.
+- Failure recovery: `max_render_attempts=3`, `max_discovery_attempts=2`,
+  `max_no_progress_corrections=2`, `max_consecutive_tool_failures=3`,
+  `max_same_failed_fingerprint=2`, `max_route_corrections=1`, and
+  `max_validation_corrections=2`.
+- Timeouts and retries, in seconds unless noted: `context_assembly_seconds=5`,
+  `native_model_call_seconds=60`, `tool_execution_seconds=45`,
+  `tool_absolute_seconds=90`, `map_assembly_seconds=20`,
+  `persistence_seconds=5`, `render_ack_seconds=90`,
+  `model_max_attempts=2`, `provider_max_attempts=2`,
+  `retry_backoff_base_seconds=0.25`, `retry_backoff_max_seconds=2`, and
+  `provider_request_seconds=10`.
+- Advanced limits: `max_parallel_tool_calls=8` and
+  `max_tool_result_chars=4096`.
+
+Smaller provider/model limits still win. These values are one typed policy block
+rather than independent environment knobs. Provider request settings are
+injected into the same runtime provider policy, and there is no
+legacy/shadow execution-mode setting.
+
+Agent-only PATCH updates are hot-applied for future work: each new agent run
+reads the latest saved policy and receives an immutable execution-policy
+snapshot. The snapshot is retained in the run checkpoint, so active and
+render-suspended runs keep the policy with which they started, including model,
+tool, provider, and render timeouts. Agent-only updates return
+`restart_required=false`; changes to other runtime blocks still require a
+restart, and a mixed patch reports that requirement.
 
 Model provider API keys are entered through Settings and stored as encrypted
 database records. They are not database connection settings.
