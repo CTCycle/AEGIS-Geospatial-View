@@ -30,6 +30,7 @@ RASTER_HOSTS = {
     "hazards.fema.gov",
     "services.terrascope.be",
     "titiler.terrascope.be",
+    "mapproxy.terrascope.be",
     "gibs.earthdata.nasa.gov",
 }
 SENSITIVE_QUERY_MARKERS = (

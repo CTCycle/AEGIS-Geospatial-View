@@ -273,7 +273,7 @@ def test_catalog_raster_overlays_expose_provider_tile_templates(
 @pytest.mark.parametrize(
     ("overlay_id", "expected_host", "expected_protocol"),
     [
-        ("esa_worldcover", "titiler.terrascope.be", "wms"),
+        ("esa_worldcover", "mapproxy.terrascope.be", "wms"),
         ("IMERG_Precipitation_Rate", "gibs.earthdata.nasa.gov", "wms"),
     ],
 )
@@ -290,8 +290,6 @@ def test_catalog_public_raster_descriptors_use_backend_proxy(
     descriptor, warnings = result
     assert warnings == []
     expected_template = f"/api/geospatial/tiles/{overlay_id}/{{z}}/{{x}}/{{y}}.png"
-    if overlay_id == "esa_worldcover":
-        expected_template += "?time={time}"
     assert descriptor["tile_url_template"] == expected_template
     assert expected_host in str(descriptor["source_url"])
     assert descriptor["source_protocol"].lower() == expected_protocol
@@ -305,10 +303,10 @@ def test_catalog_public_raster_descriptors_use_backend_proxy(
         assert render["layer_id"] == "esa-worldcover-map-10m-2021-v2_map"
         assert render["crs"] == "EPSG:3857"
         assert render["format"] == "image/png"
-        assert render["default_time"] == "2021-01-01"
+        assert render["default_time"] is None
         assert render["attribution"] == ["© ESA WorldCover / Terrascope"]
         assert descriptor["url"] == (
-            "/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png?time={time}"
+            "/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png"
         )
 
 ###############################################################################
