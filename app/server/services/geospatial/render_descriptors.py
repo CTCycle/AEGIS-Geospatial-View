@@ -4,7 +4,6 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 
 import math
 import os
-from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlencode
 
@@ -828,14 +827,13 @@ class RenderDescriptorService:
             return None, credential_warning
         if "{time}" not in template:
             return template, None
+        provider = str((capability or {}).get("provider") or "").strip().lower()
+        if provider != "rainviewer":
+            return template, None
         rainviewer_url = await self._resolve_rainviewer_tile_url()
         if rainviewer_url is not None:
             return rainviewer_url, None
-        timestamp = int(datetime.now(UTC).timestamp())
-        rounded_timestamp = timestamp - (timestamp % 600)
-        return template.replace(
-            "{time}", str(rounded_timestamp)
-        ), "RainViewer metadata could not be fetched; using a timestamp fallback."
+        return None, "RainViewer metadata could not be fetched; no tile URL was emitted."
 
     # -------------------------------------------------------------------------
     def _resolve_credential_placeholders(

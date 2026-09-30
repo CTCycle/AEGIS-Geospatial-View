@@ -227,6 +227,61 @@ async def fetch_raster_image_url(
                     chunks.append(chunk)
             except RasterHttpError:
                 raise
+            except httpx.ConnectTimeout as exc:
+                raise _raster_http_error(
+                    message="Provider request timed out.",
+                    url=safe_upstream,
+                    context=context,
+                    category="connect_timeout",
+                    failure_phase=failure_phase,
+                    status_code=response.status_code,
+                    content_type=content_type,
+                    content_length=content_length,
+                ) from exc
+            except httpx.ReadTimeout as exc:
+                raise _raster_http_error(
+                    message="Provider response timed out.",
+                    url=safe_upstream,
+                    context=context,
+                    category="read_timeout",
+                    failure_phase=failure_phase,
+                    status_code=response.status_code,
+                    content_type=content_type,
+                    content_length=content_length,
+                ) from exc
+            except httpx.ProxyError as exc:
+                raise _raster_http_error(
+                    message="Provider proxy request failed.",
+                    url=safe_upstream,
+                    context=context,
+                    category="proxy_failure",
+                    failure_phase=failure_phase,
+                    status_code=response.status_code,
+                    content_type=content_type,
+                    content_length=content_length,
+                ) from exc
+            except (httpx.RemoteProtocolError, httpx.ReadError) as exc:
+                raise _raster_http_error(
+                    message="Provider connection was interrupted.",
+                    url=safe_upstream,
+                    context=context,
+                    category="remote_protocol_failure",
+                    failure_phase=failure_phase,
+                    status_code=response.status_code,
+                    content_type=content_type,
+                    content_length=content_length,
+                ) from exc
+            except httpx.ConnectError as exc:
+                raise _raster_http_error(
+                    message="Provider connection failed.",
+                    url=safe_upstream,
+                    context=context,
+                    category="connection_failure",
+                    failure_phase=failure_phase,
+                    status_code=response.status_code,
+                    content_type=content_type,
+                    content_length=content_length,
+                ) from exc
             except httpx.TimeoutException as exc:
                 raise _raster_http_error(
                     message="Provider request timed out.",
@@ -288,6 +343,56 @@ async def fetch_raster_image_url(
             return body
     except RasterHttpError:
         raise
+    except httpx.ConnectTimeout as exc:
+        raise _raster_http_error(
+            message="Provider request timed out.",
+            url=safe_upstream,
+            context=context,
+            category="connect_timeout",
+            failure_phase=failure_phase,
+            content_type=content_type,
+            content_length=content_length,
+        ) from exc
+    except httpx.ReadTimeout as exc:
+        raise _raster_http_error(
+            message="Provider response timed out.",
+            url=safe_upstream,
+            context=context,
+            category="read_timeout",
+            failure_phase=failure_phase,
+            content_type=content_type,
+            content_length=content_length,
+        ) from exc
+    except httpx.ProxyError as exc:
+        raise _raster_http_error(
+            message="Provider proxy request failed.",
+            url=safe_upstream,
+            context=context,
+            category="proxy_failure",
+            failure_phase=failure_phase,
+            content_type=content_type,
+            content_length=content_length,
+        ) from exc
+    except (httpx.RemoteProtocolError, httpx.ReadError) as exc:
+        raise _raster_http_error(
+            message="Provider connection was interrupted.",
+            url=safe_upstream,
+            context=context,
+            category="remote_protocol_failure",
+            failure_phase=failure_phase,
+            content_type=content_type,
+            content_length=content_length,
+        ) from exc
+    except httpx.ConnectError as exc:
+        raise _raster_http_error(
+            message="Provider connection failed.",
+            url=safe_upstream,
+            context=context,
+            category="connection_failure",
+            failure_phase=failure_phase,
+            content_type=content_type,
+            content_length=content_length,
+        ) from exc
     except httpx.TimeoutException as exc:
         raise _raster_http_error(
             message="Provider request timed out.",

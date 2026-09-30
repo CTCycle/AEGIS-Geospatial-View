@@ -29,6 +29,7 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.catalog import GeospatialCatalogService
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.provider_registry import ProviderRegistry
+from server.services.geospatial.rainviewer import RainViewerService
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.geospatial.providers.base import (
     ProviderRateLimitError,
@@ -55,7 +56,9 @@ class _NoCredentials:
         return None
 
 ###############################################################################
-def _build_api_service(provider_registry) -> GeospatialApiService:  # noqa: ANN001
+def _build_api_service(
+    provider_registry, *, rainviewer_service: RainViewerService | None = None
+) -> GeospatialApiService:  # noqa: ANN001
     manifest_loader = GeospatialManifestLoader()
     runtime_registry = RuntimeRegistry(
         manifest_loader=manifest_loader,
@@ -69,6 +72,7 @@ def _build_api_service(provider_registry) -> GeospatialApiService:  # noqa: ANN0
         manifest_loader=manifest_loader,
         runtime_registry=runtime_registry,
         provider_registry=provider_registry,
+        rainviewer_service=rainviewer_service,
     )
 
 ###############################################################################
@@ -744,6 +748,77 @@ def test_geospatial_tile_proxy_sanitizes_sensitive_query_values_in_logs() -> Non
     assert "secret-value" not in sanitized
     assert "api_key=%5BREDACTED%5D" in sanitized
     assert "format=image%2Fpng" in sanitized
+
+###############################################################################
+def test_rainviewer_tile_proxy_uses_cached_latest_metadata_and_same_origin_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    metadata_calls: list[str] = []
+    tile_calls: list[str] = []
+
+    async def metadata_fetcher(
+        url: str, headers: dict[str, str] | None = None
+    ) -> dict[str, object]:
+        metadata_calls.append(url)
+        _ = headers
+        return {
+            "host": "https://tilecache.rainviewer.com",
+            "radar": {"past": [{"time": 200, "path": "/v2/radar/200"}]},
+        }
+
+    async def tile_fetcher(url: str, headers: dict[str, str]) -> bytes:
+        tile_calls.append(url)
+        _ = headers
+        return b"\x89PNG\r\n\x1a\npng"
+
+    monkeypatch.setattr(
+        "server.services.geospatial.api_service.fetch_raster_image_url",
+        tile_fetcher,
+    )
+    service = _build_api_service(
+        ProviderRegistry(),
+        rainviewer_service=RainViewerService(fetcher=metadata_fetcher),
+    )
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    first = client.get(
+        "/api/geospatial/tiles/rainviewer_precipitation_radar/7/64/48.png"
+    )
+    second = client.get(
+        "/api/geospatial/tiles/rainviewer_precipitation_radar/7/65/48.png"
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.headers["content-type"].startswith("image/png")
+    assert metadata_calls == ["https://api.rainviewer.com/public/weather-maps.json"]
+    assert tile_calls == [
+        "https://tilecache.rainviewer.com/v2/radar/200/256/7/64/48/2/1_1.png",
+        "https://tilecache.rainviewer.com/v2/radar/200/256/7/65/48/2/1_1.png",
+    ]
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    ["/8/128/128.png", "/7/64/48.png?time=2026-09-30T12:00:00Z"],
+)
+def test_rainviewer_tile_proxy_rejects_unsupported_zoom_and_forecast_time(
+    suffix: str,
+) -> None:
+    service = _build_api_service(ProviderRegistry())
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get(
+        f"/api/geospatial/tiles/rainviewer_precipitation_radar{suffix}"
+    )
+
+    assert response.status_code == 404
 
 ###############################################################################
 def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:

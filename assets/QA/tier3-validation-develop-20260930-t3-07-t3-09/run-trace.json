@@ -1,0 +1,20 @@
+{
+  "conversation_id": "conv_d8234922d261406d83efac6bf660d63e",
+  "run_id": "run_94d634de796542c19c9d75e1877e02fc",
+  "lane": "opencode-go / deepseek-v4.1-flash",
+  "request": "Show the latest RainViewer precipitation radar over Naples, Italy",
+  "events": [
+    {"type": "location_resolved", "label": "Naples, Campania, Italy", "latitude": 40.8358846, "longitude": 14.2487679},
+    {"type": "capability_discovered", "capability_id": "rainviewer_precipitation_radar", "provider": "rainviewer", "status": "success"},
+    {"type": "tool_result", "capability_id": "rainviewer_precipitation_radar", "provider": "rainviewer", "result_type": "raster", "map_eligibility": "renderable", "result_status": "ok", "stale": false, "evidence_ref": "evidence_39ae9bb46b004538a95ae5f9a28bda5b"},
+    {"type": "map_prepared", "map_session_id": "candidate-1bfb4d5ab600477687bddf54bf7be0b3", "rendering_mode": "raster-tile"},
+    {"type": "render_observed", "status": "ready", "render_verified": true},
+    {"type": "completed", "presentation_status": "ready"}
+  ],
+  "pre_fix_diagnostic": {
+    "result": "first live attempt stopped at map application because the provider response was classified as unknown",
+    "fix": "provider response and empty response now explicitly declare result_type=raster",
+    "regression": "covered by test_rainviewer_provider.py"
+  },
+  "raw_reasoning_or_payloads_retained": false
+}

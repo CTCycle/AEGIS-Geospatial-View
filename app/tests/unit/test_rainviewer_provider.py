@@ -52,6 +52,7 @@ def test_rainviewer_provider_returns_resolved_raster_tile_payload() -> None:
     )
 
     assert response.provider_id == "rainviewer"
+    assert response.result_type == "raster"
     assert response.payload["renderingMode"] == "raster-tile"
     assert response.payload["tileUrl"] == "https://tiles.test/{z}/{x}/{y}.png"
     assert response.stale is False
@@ -94,6 +95,7 @@ def test_rainviewer_provider_returns_empty_state_when_no_cache_exists() -> None:
     )
 
     assert response.payload["status"] == "empty"
+    assert response.result_type == "raster"
     assert response.payload["tileUrl"] is None
     assert response.warnings
 

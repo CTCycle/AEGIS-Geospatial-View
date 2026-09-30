@@ -9,7 +9,7 @@ from server.services.geospatial.providers.base import (
 FEMA_NFHL_EXPORT_URL = (
     "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?"
     "bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32"
-    "&transparent=true&f=image"
+    "&transparent=true&layers=show:28&f=image"
 )
 
 ###############################################################################
@@ -24,7 +24,8 @@ class FEMAProvider(GeospatialProvider):
             payload={
                 "renderingMode": "raster-tile",
                 "tileUrl": FEMA_NFHL_EXPORT_URL,
-                "layer": "NFHL",
+                "layer": "28",
+                "layerName": "NFHL Flood Hazard Zones",
                 "legend": {"type": "flood-zone", "label": "NFHL flood hazard zone"},
                 "freshnessLabel": "FEMA NFHL public map service",
             },

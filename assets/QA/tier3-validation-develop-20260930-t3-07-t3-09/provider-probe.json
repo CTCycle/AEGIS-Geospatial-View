@@ -1,0 +1,136 @@
+{
+  "generated_at": "2026-09-30T07:35:09.102064+00:00",
+  "location": {
+    "label": "New Orleans, Louisiana",
+    "latitude": 29.9511,
+    "longitude": -90.0715,
+    "zoom": 14,
+    "tile": {
+      "z": 14,
+      "x": 4092,
+      "y": 6762
+    },
+    "bbox_epsg_3857": [
+      -10028538.111015124,
+      3495312.429424539,
+      -10026092.126109999,
+      3497758.414329665
+    ]
+  },
+  "requests": {
+    "rest_export": {
+      "endpoint": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export",
+      "layer": "28",
+      "parameters": [
+        "bbox",
+        "bboxSR=3857",
+        "imageSR=3857",
+        "size=256,256",
+        "format=png32",
+        "transparent=true",
+        "layers=show:28",
+        "f=image"
+      ]
+    },
+    "wms_get_map": {
+      "endpoint": "https://hazards.fema.gov/arcgis/services/public/NFHLWMS/MapServer/WMSServer",
+      "layer": "28",
+      "version": "1.3.0",
+      "parameters": [
+        "SERVICE=WMS",
+        "REQUEST=GetMap",
+        "LAYERS=28",
+        "FORMAT=image/png",
+        "TRANSPARENT=true",
+        "CRS=EPSG:3857",
+        "BBOX",
+        "WIDTH=256",
+        "HEIGHT=256"
+      ]
+    }
+  },
+  "results": [
+    {
+      "label": "rest_export_layer_28",
+      "fetcher": "aegis_global_pooled_client",
+      "trust_env": true,
+      "outcome": "raster_http_failure",
+      "category": "connection_failure",
+      "failure_phase": "request",
+      "status_code": null,
+      "content_type": null,
+      "content_length": null,
+      "upstream": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export"
+    },
+    {
+      "label": "nfhl_wms_layer_28",
+      "fetcher": "aegis_global_pooled_client",
+      "trust_env": true,
+      "outcome": "raster_http_failure",
+      "category": "connection_failure",
+      "failure_phase": "request",
+      "status_code": null,
+      "content_type": null,
+      "content_length": null,
+      "upstream": "https://hazards.fema.gov/arcgis/services/public/NFHLWMS/MapServer/WMSServer"
+    },
+    {
+      "label": "rest_export_layer_28",
+      "fetcher": "fresh_httpx_async_client",
+      "trust_env": true,
+      "outcome": "transport_failure",
+      "exception_class": "ConnectError",
+      "category": "connection_failure"
+    },
+    {
+      "label": "rest_export_layer_28",
+      "fetcher": "fresh_httpx_async_client",
+      "trust_env": false,
+      "outcome": "transport_failure",
+      "exception_class": "ConnectError",
+      "category": "connection_failure"
+    },
+    {
+      "label": "nfhl_wms_layer_28",
+      "fetcher": "fresh_httpx_async_client",
+      "trust_env": true,
+      "outcome": "transport_failure",
+      "exception_class": "ConnectError",
+      "category": "connection_failure"
+    },
+    {
+      "label": "nfhl_wms_layer_28",
+      "fetcher": "fresh_httpx_async_client",
+      "trust_env": false,
+      "outcome": "transport_failure",
+      "exception_class": "ConnectError",
+      "category": "connection_failure"
+    },
+    {
+      "label": "rest_export_layer_28",
+      "fetcher": "native_curl",
+      "curl_path": "C:\\Windows\\system32\\curl.exe",
+      "outcome": "transport_failure",
+      "exit_code": 35,
+      "status_code": null,
+      "content_type": null,
+      "content_length": null,
+      "bytes": 0,
+      "image_signature": false,
+      "transport_detail": "connection_or_tls_failure"
+    },
+    {
+      "label": "nfhl_wms_layer_28",
+      "fetcher": "native_curl",
+      "curl_path": "C:\\Windows\\system32\\curl.exe",
+      "outcome": "transport_failure",
+      "exit_code": 35,
+      "status_code": null,
+      "content_type": null,
+      "content_length": null,
+      "bytes": 0,
+      "image_signature": false,
+      "transport_detail": "connection_or_tls_failure"
+    }
+  ]
+}

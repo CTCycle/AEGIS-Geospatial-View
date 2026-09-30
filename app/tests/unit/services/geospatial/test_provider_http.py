@@ -102,12 +102,15 @@ def test_raster_http_classifies_upstream_statuses(
     assert "secret-token" not in diagnostic.upstream
 
 
-def test_raster_http_classifies_timeout_and_transport_failures(
+def test_raster_http_classifies_transport_failure_categories(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for expected_category, exception in (
-        ("timeout", httpx.ReadTimeout("secret-timeout")),
-        ("transport_error", _request_error("secret-transport")),
+        ("connect_timeout", httpx.ConnectTimeout("secret-connect-timeout")),
+        ("read_timeout", httpx.ReadTimeout("secret-read-timeout")),
+        ("proxy_failure", httpx.ProxyError("secret-proxy")),
+        ("remote_protocol_failure", httpx.RemoteProtocolError("secret-reset")),
+        ("connection_failure", _request_error("secret-connection")),
     ):
         monkeypatch.setattr(
             provider_http,
