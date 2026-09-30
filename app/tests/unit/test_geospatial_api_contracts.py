@@ -431,8 +431,8 @@ def test_geospatial_esa_tile_proxy_materializes_bounded_wms_get_map_request() ->
     assert response.status_code == 200
     parsed = urlsplit(captured["url"])
     query = parse_qs(parsed.query)
-    assert parsed.netloc == "titiler.terrascope.be"
-    assert parsed.path == "/wms"
+    assert parsed.netloc == "mapproxy.terrascope.be"
+    assert parsed.path == "/mapproxy/service"
     assert query["service"] == ["WMS"]
     assert query["request"] == ["GetMap"]
     assert query["layers"] == ["esa-worldcover-map-10m-2021-v2_map"]
@@ -442,7 +442,7 @@ def test_geospatial_esa_tile_proxy_materializes_bounded_wms_get_map_request() ->
     assert query["transparent"] == ["true"]
     assert query["width"] == ["256"]
     assert query["height"] == ["256"]
-    assert query["time"] == ["2021-01-01"]
+    assert "time" not in query
     assert query["bbox"] == [
         ",".join(str(value) for value in web_mercator_tile_bbox(4, 5, 6))
     ]
@@ -866,14 +866,14 @@ def test_geospatial_raster_features_forward_manifest_metadata_to_provider() -> N
 
     assert response.status_code == 200
     assert response.json()["payload"]["serviceUrl"] == (
-        "https://titiler.terrascope.be/wms"
+        "https://mapproxy.terrascope.be/mapproxy/service"
     )
     assert response.json()["payload"]["layerId"] == (
         "esa-worldcover-map-10m-2021-v2_map"
     )
     request = captured["request"]
     assert request.params["metadata"]["url"] == (  # type: ignore[attr-defined]
-        "https://titiler.terrascope.be/wms"
+        "https://mapproxy.terrascope.be/mapproxy/service"
     )
     assert request.params["metadata"]["layer_id"] == (  # type: ignore[attr-defined]
         "esa-worldcover-map-10m-2021-v2_map"

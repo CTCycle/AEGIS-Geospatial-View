@@ -13,14 +13,13 @@
     "label": "ESA WorldCover",
     "default_opacity": 0.45,
     "requires_key": false,
-    "url": "https://titiler.terrascope.be/wms",
+    "url": "https://mapproxy.terrascope.be/mapproxy/service",
     "layer_id": "esa-worldcover-map-10m-2021-v2_map",
     "layers": "esa-worldcover-map-10m-2021-v2_map",
     "crs": "EPSG:3857",
     "format": "image/png",
     "wms_version": "1.3.0",
     "wms_exceptions": "application/vnd.ogc.se_inimage",
-    "default_time": "2021-01-01",
     "attribution": "© ESA WorldCover / Terrascope",
     "keywords": [
       "wms",
@@ -41,7 +40,7 @@
     ],
     "coverage_scope": "global",
     "temporal_behavior": "static",
-    "constraints": "Static 2021 WorldCover map; use bounded WMS GetMap requests through the AEGIS raster proxy and preserve ESA/Terrascope attribution.",
+    "constraints": "Static 2021 WorldCover map; use bounded WMS GetMap requests through the Terrascope MapProxy service and AEGIS raster proxy, and preserve ESA/Terrascope attribution.",
     "content_hash": "d155f809aaf624f14b66d5f9900844890a719d514b7e46ea507e3b4b0cfe835e",
     "human_summary": "Global land-cover classification layer for consistent thematic surface analysis.",
     "primary_use_cases": [
@@ -60,7 +59,7 @@
     "integration_requirements": [
       "No API key required"
     ],
-    "official_docs_url": "https://docs.terrascope.be/Developers/WebServices/OGC/WMS.html",
+    "official_docs_url": "https://docs.terrascope.be/Developers/WebServices/OGC/MapProxy.html",
     "source_protocol": "WMS",
     "data_format": "image/png via WMS",
     "geometry_type": "raster-grid",
@@ -70,13 +69,14 @@
     "auth_mode": "none",
     "rate_limit_notes": "Use bounded WMS GetMap requests through the AEGIS raster proxy.",
     "retrieval_mode": "direct",
-    "last_validated": "2026-09-29"
+    "last_validated": "2026-09-30"
   },
   "version": 1,
-  "last_modified": "2026-09-29T00:00:00+00:00",
+  "last_modified": "2026-09-30T00:00:00+00:00",
   "capabilityKind": "raster-overlay",
   "renderingMode": "wms",
   "sourceOfficialDocs": [
+    "https://docs.terrascope.be/Developers/WebServices/OGC/MapProxy.html",
     "https://docs.terrascope.be/Developers/WebServices/OGC/WMS.html",
     "https://docs.terrascope.be/DataProducts/WorldCover/WorldCover.html"
   ],
@@ -112,9 +112,9 @@
   },
   "reliability": {
     "status": "functional",
-    "lastAudited": "2026-09-29",
+    "lastAudited": "2026-09-30",
     "knownLimitations": [
-      "Static 2021 WorldCover data; live availability and visible raster rendering depend on the Terrascope WMS endpoint."
+      "Static 2021 WorldCover data; live availability and visible raster rendering depend on the Terrascope MapProxy WMS endpoint."
     ]
   },
   "cachePolicy": {

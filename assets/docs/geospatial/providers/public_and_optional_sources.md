@@ -66,7 +66,7 @@ Use for transit updates, alerts, and vehicle positions.
 Use for global land-cover context.
 
 - No API key is required for the current manifest.
-- Use the current Terrascope WMS endpoint `https://titiler.terrascope.be/wms` with layer `esa-worldcover-map-10m-2021-v2_map`.
+- Use the current Terrascope MapProxy WMS endpoint `https://mapproxy.terrascope.be/mapproxy/service` with layer `esa-worldcover-map-10m-2021-v2_map`.
 - The legacy `services.terrascope.be/wmts` service was retired in 2026 and must not be used by the runtime manifest.
 - Keep ESA and Terrascope attribution visible.
 
