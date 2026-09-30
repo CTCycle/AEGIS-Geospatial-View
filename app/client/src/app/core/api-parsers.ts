@@ -785,6 +785,7 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
     tile_size: numberOrNull(value.tile_size ?? render?.tile_size) ?? undefined,
     min_zoom: numberOrNull(value.min_zoom ?? render?.min_zoom) ?? undefined,
     max_zoom: numberOrNull(value.max_zoom ?? render?.max_zoom) ?? undefined,
+    fit_max_zoom: numberOrNull(value.fit_max_zoom) ?? undefined,
     bounds: normalizedBounds,
     attribution: stringOrNull(value.attribution) ?? render?.attribution?.join('; '),
     attribution_url: safeHttpUrl(value.attribution_url ?? render?.attribution_url),

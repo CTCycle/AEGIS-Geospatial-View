@@ -419,6 +419,9 @@ def _bind_execute_request(
     }
     temporal = goal.temporal_scope
     if temporal:
+        temporal_mode = _optional_string(temporal.get("mode"))
+        if temporal_mode and temporal_mode != "none":
+            updates["temporal_mode"] = temporal_mode
         updates["start_time_iso"] = _optional_string(temporal.get("start_time_iso"))
         updates["end_time_iso"] = _optional_string(temporal.get("end_time_iso"))
         reference_time = _optional_string(temporal.get("reference_time_iso"))

@@ -320,7 +320,13 @@ class RenderDescriptorService:
             normalized = self._optional_string(value)
             if normalized is not None:
                 descriptor[key] = normalized
-        for key in ("default_opacity", "tile_size", "min_zoom", "max_zoom"):
+        for key in (
+            "default_opacity",
+            "tile_size",
+            "min_zoom",
+            "max_zoom",
+            "fit_max_zoom",
+        ):
             if isinstance(metadata.get(key), int | float):
                 descriptor[key] = (
                     int(metadata[key])

@@ -5,10 +5,12 @@ from typing import Any
 
 import pytest
 
+from server.domain.geospatial.providers import ProviderRequest
 from server.services.geospatial.rainviewer import (
     RainViewerRequestError,
     RainViewerService,
 )
+from server.services.geospatial.providers.rainviewer import RainViewerProvider
 
 ###############################################################################
 def test_rainviewer_ignores_discontinued_nowcast_frames() -> None:
@@ -142,3 +144,37 @@ def test_rainviewer_forces_universal_blue_color_scheme() -> None:
     )
 
     assert "/2/1_1.png" in result["tile_url_template"]
+
+
+def test_rainviewer_provider_reports_server_bound_scope_evidence() -> None:
+    class _Service:
+        async def get_latest_radar_metadata(self) -> dict[str, Any]:
+            return {
+                "tile_url_template": "https://tilecache.rainviewer.com/v2/radar/200/256/{z}/{x}/{y}/2/1_1.png",
+                "latest_time": 200,
+                "history_start_time": 100,
+                "history_end_time": 200,
+                "frame_count": 2,
+                "max_zoom": 7,
+                "resolved_at": "2026-09-30T00:00:00+00:00",
+                "attribution": "© RainViewer",
+            }
+
+    response = asyncio.run(
+        RainViewerProvider(service=_Service()).fetch(
+            ProviderRequest(
+                capability_id="rainviewer_precipitation_radar",
+                params={
+                    "latitude": 40.8358846,
+                    "longitude": 14.2487679,
+                    "temporal_mode": "current",
+                },
+            )
+        )
+    )
+
+    assert response.coverage == {
+        "spatial_scope_satisfied": True,
+        "temporal_scope_satisfied": True,
+    }
+    assert response.observation_time == "1970-01-01T00:03:20+00:00"

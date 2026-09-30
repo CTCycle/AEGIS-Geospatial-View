@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+import math
+
 from server.common.typing import is_json_object
 
 from typing import Any
@@ -92,6 +95,19 @@ class RainViewerProvider(GeospatialProvider):
         stale: bool = False,
         warnings: list[str] | None = None,
     ) -> ProviderResponse:
+        latest_time = metadata.get("latest_time")
+        observation_time = (
+            datetime.fromtimestamp(latest_time, UTC).isoformat()
+            if isinstance(latest_time, int) and latest_time > 0
+            else None
+        )
+        has_resolved_location = all(
+            isinstance(request.params.get(key), (int, float))
+            and not isinstance(request.params.get(key), bool)
+            and math.isfinite(float(request.params[key]))
+            for key in ("latitude", "longitude")
+        )
+        temporal_mode = str(request.params.get("temporal_mode") or "").strip().casefold()
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,
@@ -109,6 +125,11 @@ class RainViewerProvider(GeospatialProvider):
             attribution=[str(metadata.get("attribution") or "© RainViewer")],
             warnings=warnings or [],
             stale=stale,
+            observation_time=observation_time,
+            coverage={
+                "spatial_scope_satisfied": has_resolved_location,
+                "temporal_scope_satisfied": temporal_mode == "current",
+            },
         )
 
     # -------------------------------------------------------------------------
