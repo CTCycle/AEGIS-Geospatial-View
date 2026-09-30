@@ -23,6 +23,16 @@ from server.services.geospatial.providers.base import (
     ProviderInvalidQueryError,
     ProviderTimeoutError,
 )
+@pytest.mark.asyncio
+@pytest.mark.parametrize("coordinates, expected", [([8.5, 47.3], True), ([100, 0], False), ([8.5], False)])
+async def test_provider_geometry_is_checked_against_requested_bbox(coordinates, expected) -> None:
+    response = ProviderResponse(capability_id="places:hospitals", provider_id="overpass",
+        result_type="features", payload={"type": "FeatureCollection", "features": [
+            {"type": "Feature", "geometry": {"type": "Point", "coordinates": coordinates}}]})
+    result = await _service(FakeProviderRegistry(response)).execute_capability(
+        ExecuteCapabilityInput(capability_id="places:hospitals", bbox=[8, 47, 9, 48]),
+        ToolExecutionContext(conversation_id="conversation-1"))
+    assert result.metadata.coverage["spatial_scope_satisfied"] is expected
 
 ###############################################################################
 class FakeCapabilityRegistry:

@@ -75,7 +75,7 @@ class CatalogToolHandler:
             runtime_registry=self.runtime_registry,
             # Pagination is applied after deterministic ranking so a cursor
             # always addresses the same catalog snapshot.
-            limit=50,
+            limit=None if catalog_discovery else 50,
             operation=(
                 None
                 if catalog_discovery
@@ -243,7 +243,8 @@ def _cursor_offset(cursor: str | None) -> int | None:
     if cursor is None or not cursor.strip():
         return 0
     try:
-        return max(0, int(cursor))
+        offset = int(cursor)
+        return offset if offset >= 0 else None
     except ValueError:
         return None
 

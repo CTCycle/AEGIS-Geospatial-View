@@ -570,40 +570,56 @@
               <p>Adjust execution budgets, correction limits, and retry behavior used by the native agent loop.</p>
             </div>
           </header>
+          <h3>Execution budgets</h3>
+          <p>New runs use saved values immediately. Active and suspended runs retain their original limits.</p>
           <div class="runtime-settings__fields runtime-settings__fields--wide">
-            <label>Initial run seconds <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.initial_run_seconds" /></label>
-            <label>Simple run seconds <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_seconds" /></label>
-            <label>Complex run seconds <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_seconds" /></label>
+            <label>Initial run seconds <input class="settings-control" type="number" max="300.0" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.initial_run_seconds" /></label>
+            <label>Simple run seconds <input class="settings-control" type="number" max="300.0" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_seconds" /></label>
+            <label>Complex run seconds <input class="settings-control" type="number" max="300.0" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_seconds" /></label>
+            <label>Simple model calls <input class="settings-control" type="number" max="100" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_model_calls" /></label>
+            <label>Complex model calls <input class="settings-control" type="number" max="100" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_model_calls" /></label>
+            <label>Simple tool calls <input class="settings-control" type="number" max="200" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_tool_calls" /></label>
+            <label>Complex tool calls <input class="settings-control" type="number" max="500" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_tool_calls" /></label>
+            <label>Simple state transitions <input class="settings-control" type="number" max="500" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_state_transitions" /></label>
+            <label>Complex state transitions <input class="settings-control" type="number" max="1000" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_state_transitions" /></label>
+            <label>Maximum iterations <input class="settings-control" type="number" max="100" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_iterations" /></label>
+          </div>
+          <h3>Failure recovery</h3>
+          <p>Bound retries and corrections before the agent returns an incomplete result.</p>
+          <div class="runtime-settings__fields runtime-settings__fields--wide">
+            <label>Maximum render attempts <input class="settings-control" type="number" max="32" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_render_attempts" /></label>
+            <label>Maximum discovery attempts <input class="settings-control" type="number" min="1" max="100" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_discovery_attempts" /></label>
+            <label>No-progress corrections <input class="settings-control" type="number" max="8" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_no_progress_corrections" /></label>
+            <label>Consecutive tool failures <input class="settings-control" type="number" max="20" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_consecutive_tool_failures" /></label>
+            <label>Same failed fingerprint limit <input class="settings-control" type="number" max="20" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_same_failed_fingerprint" /></label>
+            <label>Route corrections <input class="settings-control" type="number" max="10" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_route_corrections" /></label>
+            <label>Validation corrections <input class="settings-control" type="number" max="20" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_validation_corrections" /></label>
+          </div>
+          <h3>Timeouts and retries</h3>
+          <p>Stage deadlines are capped by the remaining run budget. Provider attempts include the first request.</p>
+          <div class="runtime-settings__fields runtime-settings__fields--wide">
             <label>Context assembly seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.context_assembly_seconds" /></label>
             <label>Native model call seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.native_model_call_seconds" /></label>
-            <label>Tool execution seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_execution_seconds" /></label>
-            <label>Tool absolute seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_absolute_seconds" /></label>
+            <label>Tool execution seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_execution_seconds" /></label>
+            <label>Tool absolute seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_absolute_seconds" /></label>
             <label>Map assembly seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.map_assembly_seconds" /></label>
             <label>Persistence seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.persistence_seconds" /></label>
-            <label>Render acknowledgement seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.render_ack_seconds" /></label>
-            <label>Maximum tool result characters <input class="settings-control" type="number" min="128" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_tool_result_chars" /></label>
-            <label>Maximum iterations <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_iterations" /></label>
-            <label>Maximum render attempts <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_render_attempts" /></label>
-            <label>No-progress corrections <input class="settings-control" type="number" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_no_progress_corrections" /></label>
-            <label>Simple model calls <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_model_calls" /></label>
-            <label>Complex model calls <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_model_calls" /></label>
-            <label>Simple tool calls <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_tool_calls" /></label>
-            <label>Complex tool calls <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_tool_calls" /></label>
-            <label>Simple state transitions <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_state_transitions" /></label>
-            <label>Complex state transitions <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_state_transitions" /></label>
-            <label>Maximum parallel tool calls <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_parallel_tool_calls" /></label>
-            <label>Consecutive tool failures <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_consecutive_tool_failures" /></label>
-            <label>Same failed fingerprint limit <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_same_failed_fingerprint" /></label>
-            <label>Route corrections <input class="settings-control" type="number" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_route_corrections" /></label>
-            <label>Validation corrections <input class="settings-control" type="number" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_validation_corrections" /></label>
-            <label>Model attempts <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.model_max_attempts" /></label>
-            <label>Provider attempts <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_max_attempts" /></label>
-            <label>Retry backoff base seconds <input class="settings-control" type="number" min="0" step="0.05" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_base_seconds" /></label>
-            <label>Retry backoff max seconds <input class="settings-control" type="number" min="0" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_max_seconds" /></label>
-            <label>Provider request seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_request_seconds" /></label>
+            <label>Render acknowledgement seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.render_ack_seconds" /></label>
+            <label>Model attempts <input class="settings-control" type="number" max="10" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.model_max_attempts" /></label>
+            <label>Provider attempts <input class="settings-control" type="number" max="10" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_max_attempts" /></label>
+            <label>Retry backoff base seconds <input class="settings-control" type="number" max="60.0" min="0" step="0.05" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_base_seconds" /></label>
+            <label>Retry backoff max seconds <input class="settings-control" type="number" max="120.0" min="0" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_max_seconds" /></label>
+            <label>Provider request seconds <input class="settings-control" type="number" max="120.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_request_seconds" /></label>
+          </div>
+          <h3>Advanced limits</h3>
+          <p>Limit parallel work and the size of each model-visible tool observation.</p>
+          <div class="runtime-settings__fields runtime-settings__fields--wide">
+            <label>Maximum parallel tool calls <input class="settings-control" type="number" max="32" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_parallel_tool_calls" /></label>
+            <label>Maximum tool result characters <input class="settings-control" type="number" max="100000" min="128" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_tool_result_chars" /></label>
           </div>
           <div class="settings-actions">
             <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save agent runtime settings' }}</button>
+            <button type="button" class="secondary-button" [disabled]="isSavingRuntimeSettings" (click)="restoreAgentExecutionDefaults()">Restore agent defaults</button>
           </div>
         </section>
       </section>

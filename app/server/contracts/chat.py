@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, field_serializer
+from server.domain.agent.trace import public_protocol_projection
 
 from server.common.time import utc_now
 from server.domain.agent.decision import ResolvedLocation
@@ -218,6 +219,10 @@ class ChatStreamEvent(BaseModel):
         "error",
     ]
     data: dict[str, Any]
+
+    @field_serializer("data")
+    def serialize_public_data(self, value: dict[str, Any]) -> dict[str, Any]:
+        return public_protocol_projection(value)
 
 ###############################################################################
 class ModelCardDescriptor(BaseModel):

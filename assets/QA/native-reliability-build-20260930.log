@@ -1,0 +1,11 @@
+> Building...
+√ Building...
+Initial chunk files | Names         | Raw size | Estimated transfer size
+main-WI5NQ74V.js    | main          |  1.55 MB |               353.98 kB
+styles-NFZPBYYM.css | styles        | 68.72 kB |                 8.48 kB
+
+                    | Initial total |  1.62 MB |               362.46 kB
+
+Application bundle generation complete. [6.492 seconds] - 2026-09-30T10:12:12.304Z
+
+Output location: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\client\dist

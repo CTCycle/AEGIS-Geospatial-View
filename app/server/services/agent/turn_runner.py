@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass, field
+from dataclasses import asdict
+from copy import copy
 from typing import Any, Callable, Literal, cast
 
 from server.contracts.chat import (
@@ -13,10 +15,14 @@ from server.contracts.chat import (
     ContextUsageResponse,
 )
 from server.contracts.geospatial import MapSession
+from server.configurations.settings import AgentExecutionSettings
+from server.services.llm.factory import LLMFactory
+from server.services.llm.transport import LLMTransportPolicy
 from server.domain.agent.context import AgentContextPackage
 from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.reliability import AgentExecutionBudget
+from server.domain.geospatial.providers import ProviderExecutionPolicy, provider_execution_scope
 from server.services.agent.agent_loop import AgentLoop, AgentLoopOutcome, AgentLoopRequest
 from server.services.agent.agent_state_factory import AgentStateFactory
 
@@ -51,6 +57,7 @@ class AgentTurnRequest:
     provider: str
     model: str
     budget: AgentExecutionBudget
+    execution_settings: AgentExecutionSettings | None = None
     messages: list[dict[str, Any]] = field(
         default_factory=lambda: list[dict[str, Any]]()
     )
@@ -107,75 +114,96 @@ class AgentTurnRunner:
                 run_version=request.run_version,
                 conversation_revision=request.conversation_revision,
             )
-        outcome = await self.agent_loop.run(
-            AgentLoopRequest(
-                provider=request.provider,
-                model=request.model,
-                state=state,
-                budget=request.budget,
-                messages=list(request.messages),
-                context_profile_metadata=(
-                    dict(request.context_package.context_profile_metadata)
-                    if request.context_package is not None
-                    else {}
-                ),
-                max_model_call_seconds=_setting(
-                    self.execution_settings, "native_model_call_seconds", 60.0
-                ),
-                max_iterations=_setting(
-                    self.execution_settings, "max_iterations", 12
-                ),
-                max_model_calls=_setting(
-                    self.execution_settings, "complex_max_model_calls", 10
-                ),
-                max_tool_calls=_setting(
-                    self.execution_settings, "complex_max_tool_calls", 20
-                ),
-                max_state_transitions=_setting(
-                    self.execution_settings, "complex_max_state_transitions", 64
-                ),
-                simple_max_model_calls=_setting(
-                    self.execution_settings, "simple_max_model_calls", 4
-                ),
-                simple_max_tool_calls=_setting(
-                    self.execution_settings, "simple_max_tool_calls", 6
-                ),
-                simple_max_state_transitions=_setting(
-                    self.execution_settings, "simple_max_state_transitions", 32
-                ),
-                max_parallel_tool_calls=_setting(
-                    self.execution_settings, "max_parallel_tool_calls", 8
-                ),
-                max_consecutive_tool_failures=_setting(
-                    self.execution_settings, "max_consecutive_tool_failures", 3
-                ),
-                max_same_failed_fingerprint=_setting(
-                    self.execution_settings, "max_same_failed_fingerprint", 2
-                ),
-                max_route_corrections=_setting(
-                    self.execution_settings, "max_route_corrections", 1
-                ),
-                max_validation_corrections=_setting(
-                    self.execution_settings, "max_validation_corrections", 2
-                ),
-                max_discovery_attempts=_setting(
-                    self.execution_settings, "max_discovery_attempts", 2
-                ),
-                max_tool_result_chars=_setting(
-                    self.execution_settings, "max_tool_result_chars", 4096
-                ),
-                max_no_progress_corrections=_setting(
-                    self.execution_settings, "max_no_progress_corrections", 2
-                ),
-                max_render_attempts=_setting(
-                    self.execution_settings, "max_render_attempts", 3
-                ),
-                context_usage_callback=request.context_usage_callback,
-                trace_callback=request.trace_callback,
-                checkpoint_callback=request.checkpoint_callback,
-                run_state_check=request.run_state_check,
+        configured = request.execution_settings or self.execution_settings
+        if state.execution_policy:
+            configured = AgentExecutionSettings(**state.execution_policy)
+        elif isinstance(configured, AgentExecutionSettings):
+            state.execution_policy = asdict(configured)
+        # Policy holders are request-scoped; handlers and registries stay shared.
+        scoped_loop = copy(self.agent_loop)
+        if isinstance(configured, AgentExecutionSettings):
+            scoped_loop.transport_policy = LLMTransportPolicy.from_execution_settings(configured)
+            scoped_loop.tool_executor = copy(self.agent_loop.tool_executor)
+            scoped_loop.tool_executor.timeout_seconds = configured.tool_execution_seconds
+            if isinstance(self.agent_loop.provider_factory, LLMFactory):
+                scoped_loop.provider_factory = copy(self.agent_loop.provider_factory)
+                scoped_loop.provider_factory.transport_policy = scoped_loop.transport_policy
+        provider_policy = ProviderExecutionPolicy(
+            timeout_seconds=configured.provider_request_seconds,
+            max_attempts=configured.provider_max_attempts,
+            retry_backoff_base_seconds=configured.retry_backoff_base_seconds,
+            retry_backoff_max_seconds=configured.retry_backoff_max_seconds,
+        ) if isinstance(configured, AgentExecutionSettings) else None
+        with provider_execution_scope(provider_policy):
+            outcome = await scoped_loop.run(
+                AgentLoopRequest(
+                    provider=request.provider,
+                    model=request.model,
+                    state=state,
+                    budget=request.budget,
+                    messages=list(request.messages),
+                    context_profile_metadata=(
+                        dict(request.context_package.context_profile_metadata)
+                        if request.context_package is not None
+                        else {}
+                    ),
+                    max_model_call_seconds=_setting(
+                        configured, "native_model_call_seconds", 60.0
+                    ),
+                    max_iterations=_setting(
+                        configured, "max_iterations", 12
+                    ),
+                    max_model_calls=_setting(
+                        configured, "complex_max_model_calls", 10
+                    ),
+                    max_tool_calls=_setting(
+                        configured, "complex_max_tool_calls", 20
+                    ),
+                    max_state_transitions=_setting(
+                        configured, "complex_max_state_transitions", 64
+                    ),
+                    simple_max_model_calls=_setting(
+                        configured, "simple_max_model_calls", 4
+                    ),
+                    simple_max_tool_calls=_setting(
+                        configured, "simple_max_tool_calls", 6
+                    ),
+                    simple_max_state_transitions=_setting(
+                        configured, "simple_max_state_transitions", 32
+                    ),
+                    max_parallel_tool_calls=_setting(
+                        configured, "max_parallel_tool_calls", 8
+                    ),
+                    max_consecutive_tool_failures=_setting(
+                        configured, "max_consecutive_tool_failures", 3
+                    ),
+                    max_same_failed_fingerprint=_setting(
+                        configured, "max_same_failed_fingerprint", 2
+                    ),
+                    max_route_corrections=_setting(
+                        configured, "max_route_corrections", 1
+                    ),
+                    max_validation_corrections=_setting(
+                        configured, "max_validation_corrections", 2
+                    ),
+                    max_discovery_attempts=_setting(
+                        configured, "max_discovery_attempts", 2
+                    ),
+                    max_tool_result_chars=_setting(
+                        configured, "max_tool_result_chars", 4096
+                    ),
+                    max_no_progress_corrections=_setting(
+                        configured, "max_no_progress_corrections", 2
+                    ),
+                    max_render_attempts=_setting(
+                        configured, "max_render_attempts", 3
+                    ),
+                    context_usage_callback=request.context_usage_callback,
+                    trace_callback=request.trace_callback,
+                    checkpoint_callback=request.checkpoint_callback,
+                    run_state_check=request.run_state_check,
+                )
             )
-        )
         return AgentResponseBuilder.build(
             request=request,
             outcome=outcome,

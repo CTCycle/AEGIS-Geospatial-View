@@ -19,6 +19,7 @@ from server.domain.agent.reliability import (
     ExecutionBudgetExceeded,
 )
 from server.domain.agent.trace import AgentTraceEvent, redact_trace_value
+from server.services.agent.completion import CompletionEvaluator
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -99,6 +100,8 @@ class ToolExecutor:
             call_id=call_id,
             exposed_tool_names=exposed_tool_names,
         )
+        if result.tool_name in {"execute_geospatial_capability", "inspect_evidence", "transform_evidence"}:
+            result.assessment = CompletionEvaluator.assess_evidence(state, result)
         if not any(item.call_id == result.call_id for item in state.tool_results):
             # The executor is the only application boundary that may publish a
             # normalized result.  The loop can still merge it idempotently when
@@ -250,6 +253,7 @@ class ToolExecutor:
             "status": result.status,
             "summary": result.summary[:1000],
             "semantic_outcome": result.semantic_outcome,
+            "assessment": result.assessment.model_dump(mode="json") if result.assessment else None,
             "result": projected,
             "evidence_refs": list(dict.fromkeys(result.evidence_refs))[:16],
             "map_candidate_id": result.map_candidate_id,

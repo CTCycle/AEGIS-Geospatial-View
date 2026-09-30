@@ -447,6 +447,7 @@ class AgentRunState(BaseModel):
         default_factory=lambda: list[dict[str, object]]()
     )
     context_hydrated: bool = False
+    execution_policy: dict[str, Any] = Field(default_factory=dict)
     route: CapabilityRoute | None = None
     capability_ids: list[str] = Field(default_factory=lambda: list[str]())
     excluded_capability_ids: list[str] = Field(
@@ -547,7 +548,7 @@ class AgentRunState(BaseModel):
         payload["tool_trace"] = list(self.tool_trace[-32:])
         payload["transition_trace"] = list(self.transition_trace[-64:])
         payload["exposure_trace"] = list(self.exposure_trace[-64:])
-        payload["provider_continuation"] = list(self.provider_continuation[-16:])
+        payload["provider_continuation"] = list(self.provider_continuation)
         payload["render_observations"] = [
             item.model_dump(mode="json") for item in self.render_observations[-8:]
         ]

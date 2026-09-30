@@ -75,6 +75,10 @@ class LLMResult:
     )
     finish_reason: str | None = None
     context_usage: dict[str, Any] | None = None
+    # JSON-safe provider-native continuation, isolated from observations/traces.
+    provider_continuation: dict[str, Any] | None = None
+    # JSON-safe provider-native continuation, isolated from observations/traces.
+    provider_continuation: dict[str, Any] | None = None
 
 ###############################################################################
 class LLMStructuredOutput(dict[str, Any]):

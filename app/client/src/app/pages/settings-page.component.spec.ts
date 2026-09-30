@@ -55,7 +55,7 @@ describe('pages/settings-page.component', () => {
       initial_run_seconds: 90, simple_seconds: 150, complex_seconds: 300, context_assembly_seconds: 5,
       native_model_call_seconds: 60, tool_execution_seconds: 45, tool_absolute_seconds: 90, map_assembly_seconds: 20,
       persistence_seconds: 5, render_ack_seconds: 90, max_tool_result_chars: 4096, max_iterations: 12,
-      max_render_attempts: 3, max_no_progress_corrections: 2, simple_max_model_calls: 4, complex_max_model_calls: 10,
+      max_render_attempts: 3, max_discovery_attempts: 2, max_no_progress_corrections: 2, simple_max_model_calls: 4, complex_max_model_calls: 10,
       simple_max_tool_calls: 6, complex_max_tool_calls: 20, simple_max_state_transitions: 32,
       complex_max_state_transitions: 64, max_parallel_tool_calls: 8, max_consecutive_tool_failures: 3,
       max_same_failed_fingerprint: 2, max_route_corrections: 1, max_validation_corrections: 2,
@@ -816,5 +816,15 @@ describe('pages/settings-page.component', () => {
     fixture.componentInstance.navigateBack();
     expect(store.updateSettingsPage).toHaveBeenCalled();
     expect(navigateSpy).toHaveBeenCalledWith('/');
+  });
+  it('saves only changed execution fields and restores defaults in the draft', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance.runtimeSettingsDraft.agent_execution.max_discovery_attempts = 5;
+    await fixture.componentInstance.saveRuntimeSettings();
+    expect(updateRuntimeSettingsMock).toHaveBeenCalledWith({agent_execution: {max_discovery_attempts: 5}});
+    fixture.componentInstance.restoreAgentExecutionDefaults();
+    expect(fixture.componentInstance.runtimeSettingsDraft.agent_execution.max_discovery_attempts).toBe(2);
   });
 });

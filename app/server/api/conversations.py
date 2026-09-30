@@ -20,6 +20,7 @@ from server.contracts.runs import (
     RunTraceResponse,
 )
 from server.repositories.agent_runs import AgentRunRepository
+from server.domain.agent.trace import public_protocol_projection
 from server.repositories.conversations import ConversationRepository
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.chat.conversation_snapshot import (
@@ -157,10 +158,11 @@ def get_conversation_snapshot(
         # The snapshot service keeps the repository access check as its
         # canonical guard.  Auth middleware can additionally place the owner
         # identity on request.state; anonymous local mode remains unowned-only.
-        return snapshot_service.get_snapshot(
+        snapshot = snapshot_service.get_snapshot(
             conversation_id,
             owner_user_id=_owner_user_id(request),
         )
+        return ConversationSnapshotResponse.model_validate(public_protocol_projection(snapshot.model_dump(mode="json")))
     except PermissionError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -208,7 +210,10 @@ def get_run_status(
             snapshot = snapshot.model_copy(
                 update={"response": response.model_dump(mode="json")}
             )
-        return snapshot
+        return snapshot.model_copy(update={
+            "presentation": public_protocol_projection(snapshot.presentation),
+            "response": public_protocol_projection(snapshot.response),
+        })
     except PermissionError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

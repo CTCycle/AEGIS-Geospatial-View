@@ -1088,6 +1088,7 @@ export interface RuntimeAgentExecutionSettings {
   max_tool_result_chars: number;
   max_iterations: number;
   max_render_attempts: number;
+  max_discovery_attempts: number;
   max_no_progress_corrections: number;
   simple_max_model_calls: number;
   complex_max_model_calls: number;

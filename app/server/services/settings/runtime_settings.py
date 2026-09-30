@@ -23,12 +23,15 @@ class RuntimeSettingsService:
         self, patch: Mapping[str, Any]
     ) -> RuntimeSettingsResponse:
         updated = self.repository.update(patch)
+        restart_required = any(key != "agent_execution" and bool(value) for key, value in patch.items())
         return self._response(
             updated,
-            restart_required=bool(patch),
+            restart_required=restart_required,
             message=(
                 "Settings saved. Restart AEGIS to apply runtime changes."
-                if patch
+                if restart_required
+                else "Agent settings saved. New runs use these values; active runs retain their original limits."
+                if patch.get("agent_execution")
                 else None
             ),
         )

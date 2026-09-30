@@ -973,6 +973,10 @@ class AgentRunRepository:
                             missing_overlays.append(overlay_id)
                         elif result.get("visibility_matches") is not True:
                             missing_overlays.append(overlay_id)
+                        elif (str((candidate_instances.get(overlay_id) or {}).get("rendering_mode") or "").startswith("raster")
+                              and (candidate_instances.get(overlay_id) or {}).get("visible") is not False
+                              and result.get("result_visible") is not True):
+                            missing_overlays.append(overlay_id)
                     if missing_overlays:
                         raise ValueError(
                             "Required overlay render checks failed: "
@@ -1865,6 +1869,9 @@ _TRACE_SECRET_MARKERS = (
     "client_secret",
 )
 _TRACE_REASONING_KEYS = {
+    "provider_continuation",
+    "google_content",
+    "thought_signature",
     "analysis",
     "chain_of_thought",
     "chainofthought",

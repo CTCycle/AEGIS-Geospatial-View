@@ -9,6 +9,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from shapely.geometry import box, shape
+from shapely.errors import GEOSException
 
 from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.evidence import EvidenceKind, EvidenceStatus
@@ -209,6 +211,23 @@ class CapabilityExecutionService:
 
         status = _tool_status(response)
         summary = _response_summary(response, request=request, location=location)
+        coverage = dict(response.coverage or {})
+        if request.bbox is not None:
+            features = response.payload.get("features")
+            if is_json_array(features) and features:
+                area = box(request.bbox[0], request.bbox[1], request.bbox[2], request.bbox[3])
+                try:
+                    coverage["spatial_scope_satisfied"] = all(
+                        is_json_object(feature)
+                        and is_json_object(feature.get("geometry"))
+                        and not shape(feature["geometry"]).is_empty
+                        and shape(feature["geometry"]).is_valid
+                        and area.intersects(shape(feature["geometry"]))
+                        for feature in features
+                    )
+                except (ValueError, TypeError, KeyError, GEOSException):
+                    coverage["spatial_scope_satisfied"] = False
+        summary["coverage"] = coverage
         try:
             evidence_ref = self._persist_evidence(
                 context=context,
@@ -246,11 +265,7 @@ class CapabilityExecutionService:
                 observation_time=response.observation_time,
                 spatial_resolution=response.spatial_resolution,
                 units=dict(response.units),
-                coverage=(
-                    dict(response.coverage)
-                    if response.coverage is not None
-                    else None
-                ),
+                coverage=coverage or None,
                 warnings=[str(item)[:300] for item in response.warnings[:8]],
                 source_url=response.source_url[:500] if response.source_url else None,
             ),

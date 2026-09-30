@@ -1,6 +1,6 @@
 # AEGIS native-agent harness reference
 
-Last updated: 2026-09-15
+Last updated: 2026-09-30
 
 AEGIS keeps one orchestrating agent.  Planning, scheduling, validation, and
 checkpointing are ordinary typed Python services; no LangGraph/LangChain agent
@@ -69,8 +69,10 @@ completion until a matching MapLibre `map.render_ack` is accepted.
 They record the objective, checkpoint state hash, native run-state checkpoint,
 conversation projection, completion reason, model/tool counts, and operational
 decisions. Native checkpoints are bounded and reloadable for active-run
-restart. They never contain hidden chain-of-thought or credentials and are not
-fanned out to the user stream.
+restart. Operational traces redact reasoning and credentials. Private provider
+continuation retains opaque SDK parts required for protocol correctness;
+REST, polling, streaming, realtime, and trace projections omit that continuation.
+Internal checkpoints are not fanned out to the user stream.
 
 ## Provider contract
 
@@ -78,6 +80,50 @@ The OpenAI Responses adapter uses Responses-native top-level function tools and
 `function_call` / `function_call_output` input items.  Responses output items
 are retained for the next iteration, while Chat Completions-shaped adapters
 remain isolated to their own providers.
+
+The Google GenAI adapter retains the selected model `Content` as opaque native
+continuation metadata: ordered `Part` values, thought signatures, function-call
+IDs, and matching function-response IDs, including parallel calls.  The
+continuation is serialized in the native provider field and survives JSON
+checkpoint round-trips before being reconstructed as provider-native `Content`;
+it is not flattened into the common semantic message model or exposed as
+ordinary reasoning text.
+
+## Slice 7 — MCP architecture assessment (2026-09-30)
+
+Slice 7 is an evaluation boundary, not a production migration.  Current
+evidence retains **C — native dynamic tools** as the production architecture,
+with **E — optional hybrid** reserved for a concrete independently hosted,
+read-only capability that provides measurable interoperability or isolation
+value.
+
+| Architecture | Assessment against the current AEGIS baseline |
+| --- | --- |
+| **A — Direct tools** | No implementation or comparative run exists.  It would expose a broader capability schema surface than the bounded native meta-tool registry; its token, correctness, recovery, latency, and complexity effects are unmeasured. |
+| **B — Thematic MCP** | No MCP integration or requirement is present.  A blanket weather/traffic/satellite migration would add a separate protocol and deployment boundary without demonstrated benefit. |
+| **C — Native dynamic tools** | Current production path: route validation precedes bounded tool exposure, one executor owns validation and normalization, and evidence, completion, checkpoint, cancellation, and render acknowledgment remain application-owned. |
+| **D — Hierarchical routing** | Already partly represented inside C: the internal `route_request` phase and `CapabilityRouter` constrain domains and operations before shortlist and execution.  A second routing hierarchy has no demonstrated benefit. |
+| **E — Hybrid** | No MCP side is implemented.  Keep this as an optional future boundary only when an independent capability has a verified external-client or isolation requirement. |
+
+The official [MCP specification](https://modelcontextprotocol.io/specification)
+currently resolves to revision `2026-07-28`, which defines JSON-RPC 2.0,
+stateless self-contained requests, and per-request capability negotiation.  The
+official [Python SDK v2.0.0 release](https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.0.0)
+supports that revision and earlier protocol eras.  The release warning in the
+architecture plan is therefore current and carries migration cost.
+
+Comparative metrics remain unmeasured: model-visible schema token count,
+selection/completion/recovery correctness across A–E, request latency,
+connection and discovery overhead, implementation complexity, debuggability,
+error propagation, security and credential boundaries, deployment requirements,
+state and checkpoint behavior, provider extensibility, schema safety, and reuse
+by external MCP clients.  Native trace, budget, and checkpoint instrumentation
+does not constitute a cross-architecture benchmark.
+
+No MCP pilot is justified at this boundary because no external MCP client or
+independent isolation requirement is documented.  Retain C, keep map rendering,
+persistence, and the agent loop native, and revisit E only when that requirement
+appears with shared fixtures and a measurable comparison target.
 
 ## Research basis
 

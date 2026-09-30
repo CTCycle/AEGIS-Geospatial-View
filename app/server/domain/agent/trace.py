@@ -11,7 +11,8 @@ from server.common.time import utc_now
 
 _SENSITIVE_KEY = re.compile(
     r"(?:api[_-]?key|access[_-]?token|auth(?:orization)?|credential|password|"
-    r"private[_-]?key|secret|session[_-]?token|token|bearer|cookie)",
+    r"private[_-]?key|secret|session[_-]?token|token|bearer|cookie|"
+    r"thought|reasoning|google_content|provider_continuation)",
     re.IGNORECASE,
 )
 _SENSITIVE_QUERY_KEY = re.compile(
@@ -22,6 +23,14 @@ _SENSITIVE_QUERY_KEY = re.compile(
 _MAX_TRACE_DEPTH = 5
 _MAX_TRACE_ITEMS = 48
 _MAX_TRACE_STRING = 4_096
+def public_protocol_projection(value: Any) -> Any:
+    """Omit private SDK continuation from transport output without mutating checkpoints."""
+    if isinstance(value, dict):
+        return {key: public_protocol_projection(item) for key, item in cast(dict[str, Any], value).items()
+                if key not in {"provider_continuation", "google_content"}}
+    if isinstance(value, list):
+        return [public_protocol_projection(item) for item in cast(list[Any], value)]
+    return value
 
 
 TraceKind = Literal[

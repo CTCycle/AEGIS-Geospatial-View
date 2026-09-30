@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, field_serializer
+from server.domain.agent.trace import public_protocol_projection
 
 REALTIME_PROTOCOL_VERSION = 1
 REALTIME_SUBPROTOCOL = "aegis.realtime.v1"
@@ -164,6 +165,7 @@ class RealtimeRenderAckPayload(BaseModel):
             "style_valid",
             "zoom_range_valid",
             "rendered_feature_count",
+            "result_visible",
             "failure_code",
         }
         sanitized: list[dict[str, Any]] = []
@@ -189,6 +191,8 @@ class RealtimeRenderAckPayload(BaseModel):
             ):
                 if key in item and not isinstance(item[key], bool):
                     raise ValueError(f"overlay result {key} must be boolean")
+            if item.get("result_visible") is not None and not isinstance(item["result_visible"], bool):
+                raise ValueError("overlay result result_visible must be boolean or null")
             if "rendered_feature_count" in item and item["rendered_feature_count"] is not None and (
                 not isinstance(item["rendered_feature_count"], int)
                 or item["rendered_feature_count"] < 0
@@ -216,3 +220,7 @@ class RealtimeServerMessage(BaseModel):
     )
     conversation_id: str
     payload: dict[str, Any] = Field(default_factory=dict)
+
+    @field_serializer("payload")
+    def serialize_public_payload(self, value: dict[str, Any]) -> dict[str, Any]:
+        return public_protocol_projection(value)

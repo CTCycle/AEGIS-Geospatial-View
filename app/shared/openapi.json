@@ -5491,6 +5491,13 @@
             "title": "Max Render Attempts",
             "default": 3
           },
+          "max_discovery_attempts": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Discovery Attempts",
+            "default": 2
+          },
           "max_no_progress_corrections": {
             "type": "integer",
             "maximum": 8.0,

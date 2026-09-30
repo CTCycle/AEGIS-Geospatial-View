@@ -319,3 +319,32 @@ async def test_native_runner_persists_safe_checkpoint_boundaries() -> None:
     assert len(checkpoints) >= 2
     assert checkpoints[0].route is not None
     assert checkpoints[-1].budget_snapshot["model_calls"] == 2
+
+@pytest.mark.asyncio
+async def test_run_policy_snapshot_survives_settings_change_and_checkpoint(monkeypatch) -> None:
+    from dataclasses import asdict
+    from server.configurations.settings import AgentExecutionSettings
+    from server.domain.geospatial.providers import current_provider_policy, ProviderExecutionPolicy
+    from server.services.agent.agent_loop import AgentLoopOutcome
+    captured = []
+    async def capture(loop, request):
+        captured.append((request, loop.tool_executor.timeout_seconds,
+            current_provider_policy(ProviderExecutionPolicy()).timeout_seconds))
+        return AgentLoopOutcome(state=request.state, final_text='Done', stopped_reason='goal_satisfied', model_calls=0)
+    monkeypatch.setattr(AgentLoop, 'run', capture)
+    runner = _runner(_Provider([]))
+    original_timeout = runner.agent_loop.tool_executor.timeout_seconds
+    old = AgentExecutionSettings(max_iterations=4, tool_execution_seconds=8, provider_request_seconds=3)
+    new = AgentExecutionSettings(max_iterations=9, tool_execution_seconds=18, provider_request_seconds=6)
+    def request(policy, checkpoint=None):
+        return AgentTurnRequest(request_id='r', conversation_id='c', user_message='test', provider='fake',
+            model='fake-model', budget=AgentExecutionBudget(), execution_settings=policy, checkpoint=checkpoint)
+    await runner.run(request(old))
+    checkpoint = captured[0][0].state.checkpoint()
+    await runner.run(request(new))
+    await runner.run(request(new, checkpoint))
+    assert [item[0].max_iterations for item in captured] == [4, 9, 4]
+    assert [item[1:] for item in captured] == [(8, 3), (18, 6), (8, 3)]
+    assert captured[-1][0].state.execution_policy == asdict(old)
+    assert runner.agent_loop.tool_executor.timeout_seconds == original_timeout
+    assert current_provider_policy(ProviderExecutionPolicy()).timeout_seconds == 10

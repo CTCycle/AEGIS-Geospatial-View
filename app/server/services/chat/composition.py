@@ -8,6 +8,7 @@ from server.repositories.conversations import ConversationRepository
 from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.model_settings import ModelSettingsRepository
+from server.repositories.runtime_settings import RuntimeSettingsRepository
 from server.services.agent.agent_loop import AgentLoop
 from server.services.agent.turn_runner import AgentTurnRunner
 from server.services.agent.capability_router import CapabilityRouter
@@ -146,6 +147,9 @@ def build_chat_runtime(
         context_profile_resolver=context_profile_resolver,
         execution_settings=execution_settings,
         application_timezone=application_timezone,
+        execution_settings_provider=lambda: AgentExecutionSettings(
+            **RuntimeSettingsRepository(database).get_required().agent_execution.model_dump()
+        ),
         agent_loop=agent_loop,
     )
 

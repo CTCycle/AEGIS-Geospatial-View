@@ -36,8 +36,50 @@ from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.transport import LLMTransportPolicy
 
 ###############################################################################
-class FakeProvider:
+@pytest.mark.asyncio
+async def test_catalog_pages_continue_without_additional_model_calls() -> None:
+    from server.services.agent.tool_definitions import CapabilityDiscoveryInput
 
+    provider = FakeProvider([])
+    loop = _loop(provider)
+    async def page(arguments, state):
+        cursor = int(arguments.cursor)
+        end = min(cursor + 12, 117)
+        return ToolResult(call_id="page", tool_name="discover_geospatial_capabilities",
+            status="success", summary="Inventory page.",
+            data={"capabilities": [{"id": f"source-{i}"} for i in range(cursor, end)],
+                "total": 117, "next_cursor": str(end) if end < 117 else None},
+            metadata=ToolExecutionMetadata(duration_ms=0))
+    loop.tool_registry.register(RegisteredTool(
+        definition=LLMToolDefinition(name="discover_geospatial_capabilities", description="Inventory",
+            parameters_json_schema=CapabilityDiscoveryInput.model_json_schema()),
+        input_model=CapabilityDiscoveryInput, handler=page,
+        domains=frozenset({CapabilityDomain.MIXED}), phases=frozenset({AgentPhase.BUILD_TOOL_CONTEXT}),
+        visibility="model", prerequisites=frozenset({"route"}), timeout_key="tool_execution_seconds", idempotent=True,
+        result_normalizer=lambda value, call_id: value.model_copy(update={"call_id": call_id})))
+    state = _state()
+    state.phase = AgentPhase.UPDATE_STATE
+    state.route = CapabilityRoute(primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
+        task_mode="execute", presentation="text", operation="discover_available_map_data", requires_location=False)
+    AgentLoop._compile_native_goal(state, state.route)
+    state.max_iterations = 12
+    state.model_calls = 1
+    state.tool_results = [ToolResult(call_id="first", tool_name="discover_geospatial_capabilities",
+        status="success", summary="First page", data={"capabilities": [{"id": "source-0"}],
+        "next_cursor": "12", "total": 117}, metadata=ToolExecutionMetadata(duration_ms=0))]
+    budget = AgentExecutionBudget(total_seconds=10, hard_max_seconds=10)
+    budget.configure_limits(max_model_calls=1, max_tool_calls=20, max_state_transitions=128)
+    request = AgentLoopRequest(provider="fake", model="fake", state=state, budget=budget)
+    messages = []
+    for iteration in range(9):
+        await loop._run_iteration(request, provider, messages, state.route, iteration)
+    assert AgentLoop._pending_catalog_discovery_cursor(state) is None
+    assert state.tool_results[-1].data["total"] == 117
+    assert state.model_calls == 1
+    assert provider.requests == []
+    assert messages == []
+
+class FakeProvider:
     # -------------------------------------------------------------------------
     def __init__(self, results: list[LLMResult]) -> None:
         self.results = deque(results)
@@ -496,12 +538,14 @@ async def test_verified_render_emits_tools_disabled_finalization_trace() -> None
     assert all(event.payload["tool_choice"] == "none" for event in finalization)
     assert [event.payload["model_call_index"] for event in finalization] == [0, 1]
     assert set(finalization[0].payload) == {
+        "request_id", "conversation_id", "provider", "model",
         "reason",
         "tools_exposed",
         "tool_choice",
         "model_call_index",
     }
     assert set(finalization[1].payload) == {
+        "request_id", "conversation_id", "provider", "model",
         "reason",
         "tools_exposed",
         "tool_choice",
@@ -1892,3 +1936,34 @@ async def test_map_route_text_cannot_stop_before_a_map_candidate_exists() -> Non
 
     assert outcome.stopped_reason == "failed"
     assert outcome.failure_category == "model_capability"
+
+@pytest.mark.parametrize('coverage,observed,expected', [
+    ({'spatial_scope_satisfied': False}, '2026-09-01T00:00:00Z', False),
+    ({'spatial_scope_satisfied': True}, '2026-08-01T00:00:00Z', False),
+    ({}, None, False),
+    ({'spatial_scope_satisfied': True}, '2026-09-01T00:00:00Z', True),
+])
+def test_completion_requires_verified_scope_for_every_requested_source(coverage, observed, expected) -> None:
+    from server.services.agent.completion import CompletionEvaluator
+    state = _state()
+    state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode='execute',
+        presentation='text', requires_location=False, explicit_capability_ids=['first', 'second'])
+    state.goal = AgentGoal(goal='Compare both sources', task_mode='execute', presentation='text',
+        operation='compare', requires_location=False, temporal_scope={'reference_time_iso': '2026-09-01T00:00:00Z'})
+    state.completion_contract = CompletionContract(operation='compare', evidence_required=True,
+        temporal_scope_required=True, spatial_scope_required=True)
+    def result(capability):
+        return ToolResult(call_id=capability, tool_name='execute_geospatial_capability', status='success',
+            summary='Provider returned 200', data={'feature_count': 1}, evidence_refs=[capability],
+            metadata=ToolExecutionMetadata(duration_ms=0, capability_id=capability,
+                coverage=coverage, observation_time=observed))
+    state.tool_results = [result('first')]
+    assert CompletionEvaluator.data_checks(state)['required_data_retrieved'] is False
+    state.tool_results.append(result('second'))
+    checks = CompletionEvaluator.data_checks(state)
+    assert (checks['spatial_scope_applied'] and checks['temporal_scope_applied']) is expected
+    state.tool_results.append(result('unrelated'))
+    assessment = CompletionEvaluator.assess_evidence(state, state.tool_results[-1])
+    assert assessment.data_relevant is False
+    if not expected:
+        assert CompletionEvaluator.assess_evidence(state, state.tool_results[0]).reasons
