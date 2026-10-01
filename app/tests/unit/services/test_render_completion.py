@@ -39,9 +39,34 @@ def test_map_preparation_cannot_override_missing_checkpoint_evidence(render_cont
     presentation, _ = service.prepare(run_id=run_id, run_version=1, response_payload={
         "map_session": candidate.model_dump(mode="json"),
         "completion_contract": state.completion_contract.model_dump(mode="json"),
-        "execution_trace": {"checkpoint": state.checkpoint()}})
+"execution_trace": {"checkpoint": state.checkpoint()}})
     requirement = next(item for item in presentation["completion_requirements"] if item["name"] == "required_data_retrieved")
     assert requirement["status"] == "pending"
+
+###############################################################################
+def test_presentation_carries_vision_capture_requested_from_execution_trace(render_context) -> None:
+    repository, publisher, _, run_id = render_context
+    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
+    candidate = _session(OverlayInstance(instance_id="raster", capability_id="missing", label="Raster",
+        provider="test", overlay_type="tile", rendering_mode="raster-tile", descriptor={"result_type": "raster"}))
+    base_payload = {
+        "map_session": candidate.model_dump(mode="json"),
+        "execution_trace": {"checkpoint": AgentRunState(
+            request_id="request", conversation_id="conversation", user_message="Show map", phase="update_state",
+        ).checkpoint()},
+    }
+    disabled, _ = service.prepare(run_id=run_id, run_version=1, response_payload=base_payload)
+    assert disabled["vision_capture_requested"] is False
+
+    enabled_payload = dict(base_payload)
+    enabled_payload["execution_trace"] = {
+        "vision_capture_requested": True,
+        "checkpoint": AgentRunState(
+            request_id="request", conversation_id="conversation", user_message="Show map", phase="update_state",
+        ).checkpoint(),
+    }
+    enabled, _ = service.prepare(run_id=run_id, run_version=2, response_payload=enabled_payload)
+    assert enabled["vision_capture_requested"] is True
 
 ###############################################################################
 class _EventPublisher:

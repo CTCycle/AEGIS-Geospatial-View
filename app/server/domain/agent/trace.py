@@ -57,6 +57,8 @@ TraceKind = Literal[
     "render_retry_exhausted",
     "finalization_started",
     "finalization_completed",
+    "vision_attached",
+    "capture_missing",
 ]
 
 ###############################################################################

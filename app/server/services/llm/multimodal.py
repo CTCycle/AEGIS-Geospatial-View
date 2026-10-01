@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
-from typing import Any
-
-###############################################################################
+from typing import Any, TypeGuard, cast
 # Canonical neutral content-part schema.
 #
 # Messages remain plain ``dict``s with a ``content`` field.  When ``content``
@@ -28,43 +26,48 @@ IMAGE_TOKEN_ESTIMATE = 1024
 TEXT_PART_TYPE = "text"
 IMAGE_PART_TYPE = "image"
 
+
 ###############################################################################
-def is_multimodal_content(content: object) -> bool:
+def is_multimodal_content(content: object) -> TypeGuard[list[Any]]:
     """True when ``content`` is a list of typed parts (not a plain string)."""
 
-    return isinstance(content, list) and bool(content)
+    if not isinstance(content, list):
+        return False
+    if not content:
+        return False
+    return all(
+        isinstance(item, dict) for item in cast("list[object]", content)
+    )
 
 
 ###############################################################################
-def iter_image_parts(content: object) -> Iterator[dict[str, Any]]:
+def iter_image_parts(content: Any) -> Iterator[dict[str, Any]]:
     """Yield image parts from a neutral multimodal ``content`` value."""
 
     if not is_multimodal_content(content):
         return
-    for raw_item in content:
-        item = raw_item if isinstance(raw_item, dict) else None
-        if item and item.get("type") == IMAGE_PART_TYPE:
+    for item in content:
+        if item.get("type") == IMAGE_PART_TYPE:
             data = item.get("data")
             if isinstance(data, str) and data.strip():
                 yield item
 
 
 ###############################################################################
-def iter_text_parts(content: object) -> Iterator[str]:
+def iter_text_parts(content: Any) -> Iterator[str]:
     """Yield the text fragments of a neutral multimodal ``content`` value."""
 
     if not is_multimodal_content(content):
         return
-    for raw_item in content:
-        item = raw_item if isinstance(raw_item, dict) else None
-        if item and item.get("type") == TEXT_PART_TYPE:
+    for item in content:
+        if item.get("type") == TEXT_PART_TYPE:
             text = item.get("text")
             if isinstance(text, str) and text.strip():
                 yield text
 
 
 ###############################################################################
-def content_has_image(content: object) -> bool:
+def content_has_image(content: Any) -> bool:
     return any(True for _ in iter_image_parts(content))
 
 
@@ -99,7 +102,7 @@ def attach_image(
     canonical context already carry).
     """
 
-    if not isinstance(data, str) or not data.strip():
+    if not data.strip():
         return messages
     if mime_type not in SUPPORTED_IMAGE_MIME_TYPES:
         raise ValueError(
@@ -132,7 +135,7 @@ def estimate_image_tokens(messages: Iterable[dict[str, Any]]) -> int:
 
 
 ###############################################################################
-def text_from_multimodal_content(content: object) -> str:
+def text_from_multimodal_content(content: Any) -> str:
     """Return the text projection of a neutral content value.
 
     Plain string content is returned unchanged; list content is joined from
@@ -148,20 +151,18 @@ def text_from_multimodal_content(content: object) -> str:
 
 ###############################################################################
 def _normalize_part_list(
-    content: object,
+    content: Any,
 ) -> list[dict[str, Any]] | None:
     """Return the raw part list when content is a JSON array of objects."""
 
-    if not isinstance(content, list):
-        return None
-    if not all(isinstance(item, dict) for item in content):
+    if not is_multimodal_content(content):
         return None
     return list(content)
 
 
 ###############################################################################
 def normalize_image_content_for_ollama(
-    content: object,
+    content: Any,
 ) -> tuple[str, list[str]]:
     """Split neutral content into Ollama's ``(text, images)`` form.
 
@@ -182,7 +183,7 @@ def normalize_image_content_for_ollama(
 
 ###############################################################################
 def normalize_image_content_for_openai_chat(
-    content: object,
+    content: Any,
 ) -> list[dict[str, Any]] | None:
     """Project neutral content into OpenAI chat-completions parts.
 
@@ -218,7 +219,7 @@ def normalize_image_content_for_openai_chat(
 
 ###############################################################################
 def normalize_image_content_for_openai_responses(
-    content: object,
+    content: Any,
 ) -> list[dict[str, Any]] | None:
     """Project neutral content into OpenAI Responses input items.
 
@@ -251,7 +252,7 @@ def normalize_image_content_for_openai_responses(
 
 ###############################################################################
 def normalize_image_content_for_google(
-    content: object,
+    content: Any,
 ) -> list[dict[str, Any]] | None:
     """Project neutral content into Google ``parts`` (inline_data images)."""
 

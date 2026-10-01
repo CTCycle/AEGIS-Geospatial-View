@@ -199,7 +199,7 @@ class AgentTurnRunner:
                         configured, "max_render_attempts", 3
                     ),
                     vision_policy=str(
-                        _setting(configured, "vision_policy", "disabled")
+                        getattr(configured, "vision_policy", None) or "disabled"
                     ),
                     vision_max_calls=int(
                         _setting(configured, "vision_max_calls", 2)

@@ -34,7 +34,7 @@ from server.domain.agent.reliability import (
     AgentExecutionBudget,
     ExecutionBudgetExceeded,
 )
-from server.domain.agent.trace import AgentTraceEvent, redact_trace_value
+from server.domain.agent.trace import AgentTraceEvent, TraceKind, redact_trace_value
 from server.domain.agent.tool_result import (
     ModelObservation,
     ToolExecutionError,
@@ -78,6 +78,9 @@ class AgentProvider(Protocol):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult: ...
+
+    # -------------------------------------------------------------------------
+    def supports_vision(self, model: str) -> bool | None: ...
 
 ###############################################################################
 class AgentProviderFactory(Protocol):
@@ -160,6 +163,7 @@ class AgentLoopOutcome:
     ]
     model_calls: int
     tool_results: list[ToolResult] = field(default_factory=lambda: list[ToolResult]())
+    failure_category: str | None = None
     failure_detail: str | None = None
     # Set only when the loop suspends for a render handshake: whether the
     # browser should capture the rendered map for a vision-enabled model step.
@@ -1644,6 +1648,8 @@ class AgentLoop:
             return model_messages
         if capture is None:
             return model_messages
+        if capture_ref is None:
+            return model_messages
         caption = self._vision_caption(state, capture_ref)
         model_messages = attach_image(
             model_messages,
@@ -1707,7 +1713,7 @@ class AgentLoop:
     async def _emit_vision_trace(
         self,
         request: AgentLoopRequest,
-        kind: str,
+        kind: TraceKind,
         capture_ref: str | None,
         extra: dict[str, Any] | None = None,
     ) -> None:
@@ -1720,9 +1726,9 @@ class AgentLoop:
             AgentTraceEvent(
                 kind=kind,
                 run_id=state.run_id or state.request_id,
-                run_version=state.run_version,
+                run_version=max(1, int(state.run_version or 1)),
                 sequence=self._trace_sequence(state),
-                iteration=state.current_iteration,
+                iteration=state.current_iteration if state.current_iteration > 0 else None,
                 payload=payload,
             ),
         )
