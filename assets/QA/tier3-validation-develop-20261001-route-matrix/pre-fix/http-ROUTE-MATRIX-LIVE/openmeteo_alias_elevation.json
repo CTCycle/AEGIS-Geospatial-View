@@ -1,0 +1,214 @@
+{
+  "scenario_id": "openmeteo_alias_elevation",
+  "prompt": "What is the elevation of Rome, Italy?",
+  "expected_kind": "text",
+  "classification": "text_pass",
+  "assistant_response_visible": true,
+  "ui_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history What is the elevation of Rome, Italy? Elevation of Rome, Italy I resolved Rome (Roma Capitale, Lazio, Italy) and retrieved elevation data from the available provider capability — NASA GIBS \"Elevation DEM (SRTM)\" color-relief raster, which covers the Rome area (spatial scope satisfied). Important limitation: the only registered elevation capability available is a raster color-relief overlay, not a numeric elevation service. It returns a renderable terrain image, not a specific elevation value in meters. So I can confirm elevation data exists for Rome and can display the terrain relief, but I cannot state a precise numeric elevation figure from this source. For reference, Rome's commonly cited elevation is roughly 21 m above sea level (city center, near the Tiber), with the surrounding area ranging from about 13 m to over 100 m across the city's hills — but that figure is general knowledge, not something this tool returned. If you'd like, I can render the SRTM elevation overlay on a map of Rome so you can view the terrain relief directly. Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Verified Satellite Available Optional Keys Optional Tool activity 4 calls",
+  "map_evidence": {
+    "maplibre_map_count": 0,
+    "maplibre_canvas_count": 0,
+    "attribution_present": false,
+    "attribution_text": "",
+    "target_overlay_status": null,
+    "target_overlay_visible": null,
+    "overlay_rows": []
+  },
+  "network": {
+    "proxy_request_count": 0,
+    "proxy_response_statuses": [],
+    "proxy_capabilities_seen": [],
+    "direct_upstream_browser_request_count": 0,
+    "events": []
+  },
+  "console": [],
+  "page_errors": [],
+  "run_trace": {
+    "status": "ok",
+    "conversation_id": "conv_370606c63e764a5bbe6ffbeb982bc088",
+    "run_id": "run_787247ed10e241a395990949988f9b03",
+    "run_version": 1,
+    "resolved_route": {
+      "primary_domain": "data_retrieval",
+      "secondary_domains": [],
+      "task_mode": "execute",
+      "operation": "retrieve_elevation",
+      "target_refs": [
+        "Rome, Italy"
+      ],
+      "temporal_scope": {
+        "mode": "none",
+        "granularity": "none",
+        "aggregation": "none"
+      }
+    },
+    "selected_capability_ids": [
+      "SRTM_Color_Index"
+    ],
+    "iteration_count": 3,
+    "model_call_count": 5,
+    "tool_call_count": 4,
+    "state_transition_count": 22,
+    "terminal_or_stopped_reason": "completed",
+    "exposed_tools_by_iteration": {
+      "1": [
+        "resolve_geospatial_location",
+        "discover_geospatial_capabilities"
+      ],
+      "2": [
+        "describe_geospatial_capability",
+        "execute_geospatial_capability"
+      ],
+      "3": [
+        "execute_geospatial_capability",
+        "describe_geospatial_capability"
+      ]
+    },
+    "selected_tool_names": [
+      "resolve_geospatial_location",
+      "discover_geospatial_capabilities",
+      "describe_geospatial_capability",
+      "execute_geospatial_capability"
+    ],
+    "tool_result_statuses": [
+      {
+        "tool": "resolve_geospatial_location",
+        "status": "success",
+        "iteration": 1,
+        "error_type": null
+      },
+      {
+        "tool": "discover_geospatial_capabilities",
+        "status": "success",
+        "iteration": 1,
+        "error_type": null
+      },
+      {
+        "tool": "describe_geospatial_capability",
+        "status": "success",
+        "iteration": 2,
+        "error_type": null
+      },
+      {
+        "tool": "execute_geospatial_capability",
+        "status": "success",
+        "iteration": 3,
+        "error_type": null
+      }
+    ],
+    "evidence_references": [
+      "evidence_a0613de9384946baa49a3cd776c069c0"
+    ],
+    "apply_map_plan_attempts": 0,
+    "render_preparation": [
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 1,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 2,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 3,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "iteration": 3,
+        "render_verified": null,
+        "render_status": "terminal",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "completed",
+        "render_checks": null,
+        "prepared_map": false
+      }
+    ],
+    "temporal_evidence": {
+      "requested_scope": {
+        "mode": "none",
+        "granularity": "none",
+        "aggregation": "none"
+      },
+      "reference_time_iso": "[depth-limited]",
+      "start_time_iso": "[depth-limited]",
+      "end_time_iso": "[depth-limited]"
+    }
+  },
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20261001-route-matrix\\screenshots\\ROUTE-MATRIX-LIVE\\openmeteo_alias_elevation.png",
+  "backend_routed_diagnostics": []
+}
