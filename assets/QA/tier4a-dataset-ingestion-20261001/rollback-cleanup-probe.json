@@ -1,0 +1,58 @@
+﻿{
+  "probe_workspace": "os_temp_disposable_removed"
+}
+[
+  {
+    "case": "checksum_mismatch",
+    "raised": true,
+    "leftover_files": {
+      "data\\geospatial\\raw\\probe\\checksum.geojson": 42
+    },
+    "error_type": "IngestionExecutionError",
+    "raw_file_retained": true
+  },
+  {
+    "case": "min_feature_count",
+    "raised": true,
+    "leftover_files": {
+      "data\\geospatial\\normalized\\probe\\probe_capability.geojson": 54,
+      "data\\geospatial\\raw\\probe\\few.geojson": 42,
+      "data\\geospatial\\raw\\probe\\source_metadata.json": 544
+    },
+    "error_type": "IngestionExecutionError"
+  },
+  {
+    "case": "bbox_non_intersect",
+    "raised": true,
+    "leftover_files": {
+      "data\\geospatial\\normalized\\probe\\probe_capability.geojson": 266,
+      "data\\geospatial\\raw\\probe\\outside.geojson": 138,
+      "data\\geospatial\\raw\\probe\\source_metadata.json": 548
+    },
+    "error_type": "IngestionExecutionError"
+  },
+  {
+    "case": "heavy_format_partial",
+    "raised": false,
+    "leftover_files": {
+      "data\\geospatial\\normalized\\probe\\health.json": 250,
+      "data\\geospatial\\raw\\probe\\heavy.zip": 14,
+      "data\\geospatial\\raw\\probe\\source_metadata.json": 539,
+      "data\\geospatial\\tiles\\probe\\tile_manifest.json": 163
+    },
+    "result": {
+      "feature_count": 0,
+      "normalized_file": null,
+      "warnings": [
+        "shapefile normalization requires optional geospatial ingestion dependencies."
+      ],
+      "health": "C:\\Users\\Thomas V\\AppData\\Local\\Temp\\t4a-rollback-probe-5lz50_v_\\case_heavy\\data\\geospatial\\normalized\\probe\\health.json"
+    }
+  },
+  {
+    "case": "unsupported_source_scheme",
+    "raised": true,
+    "leftover_files": {},
+    "error_type": "IngestionExecutionError"
+  }
+]

@@ -1,6 +1,6 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-09-30 (`T3-07` remains PARTIAL because FEMA transport/render and composition/removal are unproven; `T3-08` remains PASS; `T3-09` is PASS because the exact Settings-API bootstrap and browser-authoritative RainViewer acknowledgement passed; the current-head P0 raster visibility contract is PASS in controlled tests but does not replace browser-authoritative MapLibre evidence)
+Last updated: 2026-10-01 (`T3-07` remains PARTIAL because FEMA transport/render and composition/removal are unproven; `T3-08` remains PASS; `T3-09` is PASS because the exact Settings-API bootstrap and browser-authoritative RainViewer acknowledgement passed; the current-head P0 raster visibility contract is PASS in controlled tests but does not replace browser-authoritative MapLibre evidence; Tier 4A is now OPEN with `T4-01`/`T4-02`/`T4-08` PASS, `T4-03`/`T4-04`/`T4-05` PARTIAL, and `T4-06`/`T4-07` BLOCKED on the deterministic isolated boundary)
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -42,11 +42,11 @@ gate can pass while its broader application-foundation slice remains partial.
 | Tier 1 | Application foundations | 12 | `PASS` | [Tier 1 checklist](tier1_application_foundations.md), [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [T1-09 continuation](../../QA/tier1-validation-develop-20260923/T1-09/report.md), [T1-07 continuation](../../QA/tier1-validation-develop-20260923/T1-07/report.md), [T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), and [T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md); 12 `PASS`. The 2026-09-21 [baseline ledger](../../QA/tier1-application-foundations-20260921/ledger.md) remains historical. |
 | Tier 2 | Core agent workflows | 7 | `PASS` | `T2-01`/`T2-02`/`T2-03`, `T2-05`/`T2-06`/`T2-07`, and the 2026-09-25 `T2-04` inventory run are `PASS`. The bounded inventory completed five pages and 50 unique candidates under the approved isolated `max_model_calls=6` budget. See the [T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md), [inventory trace](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/inventory-run-trace.json), and [browser evidence](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/browser-evidence.md). |
 | Tier 3 | Rendering and geospatial feature families | 18 | `PARTIAL` | `T3-01`/`T3-02`/`T3-03`/`T3-04`/`T3-05`/`T3-06`, `T3-08`, and `T3-09` pass current browser-authoritative checks. `T3-07` remains `PARTIAL`: ESA WorldCover reaches the current Terrascope WMS through the AEGIS proxy and renders, while FEMA layer `28` fails the 2026-09-30 REST/WMS/fresh-httpx/curl matrix before status, content, or pixels, leaving acknowledgement and composition/removal unproven. `T3-08` remains `PASS`: all 12 advertised GIBS cases reached target proxy `200 image/png`, MapLibre source/layer/pixel state, NASA attribution, temporal evidence where applicable, and `render_observed`. `T3-09` is `PASS`: the exact Settings-API bootstrap persisted `opencode-go / deepseek-v4.1-flash`, the native structured probe passed, and the browser acknowledgement recorded source/layer/pixel evidence. See the [final 2026-09-30 T3-07/T3-09 report](../../QA/tier3-validation-develop-20260930-t3-07-t3-09-final/report.md), [2026-09-29 raster-provider-fixes follow-up](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/report.md), and [vector-composition report](../../QA/tier3-validation-develop-20260926-vector-composition/report.md). |
-| Tier 4A | Ingestion, local sources, optional integrations | 8 | `UNRUN` | Use isolated data and approved credentials/snapshots. |
+| Tier 4A | Ingestion, local sources, optional integrations | 8 | `PARTIAL` | The [2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md) established the ID-to-scenario mapping: `T4-01` CSV, `T4-02` GeoJSON, and `T4-08` catalog-only descriptors are `PASS`; `T4-03` optional heavy formats, `T4-04` mobility/GTFS, and `T4-05` local/configured sources are `PARTIAL`; `T4-06` cameras and `T4-07` credentialed providers are `BLOCKED`. Use isolated data and approved credentials/snapshots. |
 | Tier 4B | Model-provider parity | 5 | `UNRUN` | Never substitute provider or model. |
 | Tier 5 | Recovery, races, difficult boundaries, hosted CI | 13 | `UNRUN` | Open only after lower-tier contracts are classified. |
 
-Campaign-slice status is 32 `PASS`, 1 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`
+Campaign-slice status is 35 `PASS`, 4 `PARTIAL`, 2 `BLOCKED`, and 27 `UNRUN`
 of 68 slices. These are the latest per-slice classifications across their
 linked source boundaries, not a common-commit campaign result. Tier 0 is now
 `PASS` for its functional Windows startup slice; the historical timing
@@ -61,10 +61,13 @@ retains the location, coverage-guardrail, direct-tool, saved-history, and
 evidence-inspection boundaries.
 
 The remaining campaign inventory is explicit even where detailed objectives
-are not yet preserved: `T3-10`–`T3-18` (9 `UNRUN`), `T4-01`–`T4-08` (8
-`UNRUN`), `T4-09`–`T4-13` (5 `UNRUN`), and `T5-01`–`T5-13` (13 `UNRUN`).
-These 35 IDs are not additional partial gates and must not be promoted without
-recovered or newly established acceptance criteria.
+are not yet preserved: `T3-10`–`T3-18` (9 `UNRUN`), `T4-09`–`T4-13` (5
+`UNRUN`), and `T5-01`–`T5-13` (13 `UNRUN`).
+These 27 IDs are not additional partial gates and must not be promoted without
+recovered or newly established acceptance criteria. `T4-01`–`T4-08` are now
+mapped and classified by the [2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md);
+the durable rollback/cleanup boundary for failed materializations is recorded
+as an open validated limitation (no product change was made).
 
 The local T1-10 credential slice passed on
 `develop@8e32f82e3f094e5fb17c3978fad69b9f80b7af0b`; its exact pushed-head CI
@@ -95,7 +98,11 @@ unavailable historical Windows startup timing comparator is non-gating. The over
 now `PASS` after all 12 advertised GIBS cases met the browser acceptance boundary;
 the repaired fire case uses provider-native `MODIS_Combined_Thermal_Anomalies_All`. `T3-09` is
 `PASS`: the exact-lane Settings-API bootstrap and browser-authoritative RainViewer proof passed; the
-fresh disposable runtime persisted the exact provider/model lane. `T3-10`–`T3-18` and Tier 4–5 remain
+fresh disposable runtime persisted the exact provider/model lane. Tier 4A is now `PARTIAL`
+per the [2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md):
+`T4-01`/`T4-02`/`T4-08` are `PASS`, `T4-03`/`T4-04`/`T4-05` are `PARTIAL`, and
+`T4-06`/`T4-07` are `BLOCKED` on the deterministic isolated boundary.
+`T3-10`–`T3-18`, `T4-09`–`T4-13`, and Tier 5 remain
 `UNRUN`, and broader live/browser/provider
 boundaries remain partial or blocked. Historical
 source and controlled matrix boundaries are retained below. The prior exact validation
@@ -160,6 +167,30 @@ required for provider and composition claims.
 | `T3-07` | Live FEMA and ESA public raster source/layer loading plus dependent FEMA composition/removal boundary | `PARTIAL` | 2026-09-30 | `develop@889066b3` for the raster contract; live provider evidence retains the earlier scoped boundary | [current-head follow-up](../../QA/tier3-remediation-20260930/current-head-followup-889066b3.md), [historical controlled results](../../QA/tier3-remediation-20260930/controlled-results.json), [2026-09-30 provider report](../../QA/tier3-validation-develop-20260930-t3-07-t3-09/report.md), [transport matrix](../../QA/tier3-validation-develop-20260930-t3-07-t3-09/provider-probe.json) | The local raster contract now fails closed and validates acknowledged raster semantics. FEMA REST/WMS, fresh `httpx`, pooled-client, and native-curl probes fail before an HTTP response; ESA's corrected MapProxy route returns bounded raster content, but no FEMA image, visible pixels, accepted FEMA raster `map.render_ack`, composition, or selective-removal proof exists. |
 | `T3-08` | Complete NASA GIBS advertised raster-family discovery, proxy transport, rendering, attribution, temporal handling, and acknowledgement | `PASS` | 2026-09-29 | `develop` working tree, base `643ecf3f` plus scoped raster-provider fixes | [raster-provider-fixes report](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/report.md), [GIBS network summary](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/network-summary.json), [GIBS trace summaries](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/gibs-trace-summaries.json), [provider probe](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/provider-probe.json) | All 12 advertised prompts met the target `200 image/png`, MapLibre source/layer/pixel, NASA attribution, temporal, zero-direct-upstream, and accepted `render_observed` criteria. The stable fire capability maps to provider-native `MODIS_Combined_Thermal_Anomalies_All` over the standard AEGIS WMS proxy. |
 | `T3-09` | RainViewer recent observed precipitation radar, same-origin raster proxy, routing, and render acknowledgement | `PASS` | 2026-09-30 | `develop@c8e6f416`; evidence committed at `develop@8635fe25` | [final T3-07/T3-09 report](../../QA/tier3-validation-develop-20260930-t3-07-t3-09-final/report.md), [exact-lane bootstrap](../../QA/tier3-validation-develop-20260930-t3-07-t3-09-final/T3-09/exact-lane-bootstrap.json), [browser evidence](../../QA/tier3-validation-develop-20260930-t3-07-t3-09-final/T3-09/live-browser/browser-evidence.md) | Exact Settings-API/model bootstrap and browser-authoritative source/layer/pixel/acknowledgement evidence pass for `opencode-go / deepseek-v4.1-flash`; preserve the no-fallback and latest-observed-only semantics. |
+
+### Current Tier 4A slice ledger
+
+The 2026-10-01 T4A slice opens the grouped Tier 4A IDs by establishing the
+ID-to-scenario mapping and validating the deterministic, isolated dataset-
+ingestion contract (CSV/GeoJSON materialization, checksums, indexes, health,
+materialization filtering, GTFS static/realtime, catalog-only descriptors)
+against fixture data under `runtimes/cache/pytest-tmp`. No runtime database,
+user data, or credentials were used. The durable rollback/cleanup boundary is
+recorded as a validated limitation: `execute_ingestion_plan` raises on
+checksum/`minFeatureCount`/bbox failures but leaves partial raw/metadata/
+normalized artifacts behind; heavy formats return a designed partial health
+result. No product change was made in this slice.
+
+| Slice | Scope | Status | Verification date | Tested source boundary | Evidence | Next action |
+| --- | --- | --- | --- | --- | --- | --- |
+| `T4-01` | CSV ingestion: normalization, checksums, indexes, health | `PASS` | 2026-10-01 | `validation@ee6c36bf` (equals `develop`); isolated fixture data | [T4A report](../../QA/tier4a-dataset-ingestion-20261001/report.md), [focused suite](../../QA/tier4a-dataset-ingestion-20261001/focused-suite.log), [configured-source materialization](../../QA/tier4a-dataset-ingestion-20261001/configured-source-materialization.json) | Preserve the fixture/manifest boundary; a live configured CSV download remains unrun. |
+| `T4-02` | GeoJSON ingestion: normalization, invalid-geometry dropping, bbox | `PASS` | 2026-10-01 | `validation@ee6c36bf` (equals `develop`); isolated fixture data | [T4A report](../../QA/tier4a-dataset-ingestion-20261001/report.md), [focused suite](../../QA/tier4a-dataset-ingestion-20261001/focused-suite.log), [configured-source materialization](../../QA/tier4a-dataset-ingestion-20261001/configured-source-materialization.json) | Preserve the fixture/manifest boundary; a live configured GeoJSON download remains unrun. |
+| `T4-03` | Optional heavy formats (shapefile/parquet/raster) | `PARTIAL` | 2026-10-01 | `validation@ee6c36bf` (equals `develop`); optional `geospatial-ingestion` extra not installed | [T4A report](../../QA/tier4a-dataset-ingestion-20261001/report.md), [rollback/cleanup probe](../../QA/tier4a-dataset-ingestion-20261001/rollback-cleanup-probe.json) | The fail-closed partial path (raw artifact + `health.status=partial` + warning) is validated; successful heavy-format materialization requires installing the optional extra and a real source. |
+| `T4-04` | Mobility data: GTFS static/realtime | `PARTIAL` | 2026-10-01 | `validation@ee6c36bf` (equals `develop`); deterministic tests; no configured live feed | [T4A report](../../QA/tier4a-dataset-ingestion-20261001/report.md), [focused suite](../../QA/tier4a-dataset-ingestion-20261001/focused-suite.log) | Deterministic GTFS static parse and realtime tests pass; configure `AEGIS_GTFS_STATIC_FEED_URL`/realtime feed for the live boundary. |
+| `T4-05` | Local/configured sources | `PARTIAL` | 2026-10-01 | `validation@ee6c36bf` (equals `develop`); local fixture source passes | [T4A report](../../QA/tier4a-dataset-ingestion-20261001/report.md), [configured-source materialization](../../QA/tier4a-dataset-ingestion-20261001/configured-source-materialization.json) | Local fixture manifests materialize functionally; configured external/local datasets (parcel, Overture index, OCM snapshot) remain unconfigured. |
+| `T4-06` | Cameras (local/configured) | `BLOCKED` | 2026-10-01 | — | [T4A report](../../QA/tier4a-dataset-ingestion-20261001/report.md) | No configured local camera sources/feeds are available; block remains until an approved configured source exists. |
+| `T4-07` | Credentialed providers (OpenAQ, TomTom, OpenTripMap, NASA FIRMS, OpenChargeMap) | `BLOCKED` | 2026-10-01 | — | [T4A report](../../QA/tier4a-dataset-ingestion-20261001/report.md) | No approved credentials are available; live validator reports skip. |
+| `T4-08` | Catalog-only descriptors | `PASS` | 2026-10-01 | `validation@ee6c36bf` (equals `develop`); descriptor/API contract suites | [T4A report](../../QA/tier4a-dataset-ingestion-20261001/report.md), [descriptor/API suite](../../QA/tier4a-dataset-ingestion-20261001/descriptor-api-suite.log), [strict audit](../../QA/tier4a-dataset-ingestion-20261001/strict-audit.log) | Render-descriptor and geospatial API contracts pass; strict production auditor reports 86 manifests, 0 errors, 0 warnings. |
 
 | Gate ID / name | Subsystem | Lane / environment | Status | Verification date | Tested commit | Evidence link | Next action / boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- |
