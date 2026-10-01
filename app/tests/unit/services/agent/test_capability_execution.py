@@ -67,6 +67,102 @@ async def test_raster_result_satisfies_spatial_scope_for_bounded_request(
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_vector_result_over_resolved_location_satisfies_spatial_and_temporal_scope() -> None:
+    response = ProviderResponse(
+        capability_id="places:hospitals",
+        provider_id="overpass",
+        payload={
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": "a",
+                    "geometry": {"type": "Point", "coordinates": [8.54, 47.37]},
+                    "properties": {"name": "Hospital"},
+                }
+            ],
+        },
+        result_type="features",
+    )
+    result = await _service(FakeProviderRegistry(response)).execute_capability(
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals",
+            location_ref="location:zurich-hb",
+            radius_m=5000,
+            temporal_mode="current",
+        ),
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert result.metadata.coverage["spatial_scope_satisfied"] is True
+    assert result.metadata.coverage["temporal_scope_satisfied"] is True
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("feature", "expected"),
+    [
+        (
+            {
+                "id": "a",
+                "name": "Event",
+                "latitude": 35.6,
+                "longitude": 140.7,
+                "metadata": {"magnitude": 4.2},
+            },
+            True,
+        ),
+        (
+            {
+                "id": "b",
+                "name": "Event",
+                "latitude": -70.0,
+                "longitude": 0.0,
+                "metadata": {"magnitude": 4.2},
+            },
+            False,
+        ),
+    ],
+)
+async def test_normalized_point_feature_is_checked_against_requested_bbox(
+    feature: dict[str, object], expected: bool
+) -> None:
+    response = ProviderResponse(
+        capability_id="places:hospitals",
+        provider_id="usgs",
+        payload={"renderingMode": "clustered-points", "features": [feature]},
+        result_type="features",
+    )
+    result = await _service(FakeProviderRegistry(response)).execute_capability(
+        ExecuteCapabilityInput(capability_id="places:hospitals", bbox=[135, 30, 145, 40]),
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert result.metadata.coverage["spatial_scope_satisfied"] is expected
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_valid_empty_vector_result_satisfies_spatial_scope_for_bounded_request() -> None:
+    response = ProviderResponse(
+        capability_id="places:hospitals",
+        provider_id="usgs",
+        payload={"renderingMode": "clustered-points", "features": [], "totalResults": 0},
+        result_type="features",
+        result_status="valid_empty",
+    )
+    result = await _service(FakeProviderRegistry(response)).execute_capability(
+        ExecuteCapabilityInput(capability_id="places:hospitals", bbox=[-145, -5, -135, 5]),
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "valid_empty"
+    assert result.metadata.coverage["spatial_scope_satisfied"] is True
+    assert result.metadata.coverage["query_complete"] is True
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_raster_result_without_scope_leaves_spatial_scope_unsatisfied() -> None:
     response = ProviderResponse(
         capability_id="places:hospitals",

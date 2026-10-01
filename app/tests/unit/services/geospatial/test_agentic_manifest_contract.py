@@ -635,3 +635,132 @@ def test_rainviewer_recent_radar_routes_for_naples_and_venice_but_not_nowcast() 
         location=locations[0],
     )
     assert nowcast == []
+
+
+###############################################################################
+def test_real_catalog_keyless_vector_point_capabilities_route_for_tier3() -> None:
+    """Guard the T3-10..T3-14 keyless campaign capabilities at the router.
+
+    Each target capability must be shortlisted for a representative
+    browser-authoritative prompt (requires_render) and filtered for an
+    out-of-scope prompt, independent of any manual-toggle settings action.
+    """
+    registry = CapabilityRegistry()
+    runtime = RuntimeRegistry()
+    domains = {
+        CapabilityDomain.DATA_RETRIEVAL,
+        CapabilityDomain.MAP_RENDERING,
+        CapabilityDomain.PLACE_SEARCH,
+        CapabilityDomain.SPATIAL_ANALYSIS,
+    }
+
+    def ids(
+        query: str,
+        operation: str,
+        location: ResolvedLocation,
+        temporal_mode: str = "current",
+    ) -> list[str]:
+        return [
+            str(item["id"])
+            for item in registry.shortlist(
+                domains=domains,
+                queries=[query],
+                explicit_ids=[],
+                runtime_registry=runtime,
+                operation=operation,
+                scope_kind="bbox",
+                temporal_mode=temporal_mode,
+                requires_render=True,
+                location=location,
+            )
+        ]
+
+    tokyo = ResolvedLocation(
+        label="Tokyo",
+        latitude=35.6762,
+        longitude=139.6503,
+        country="Japan",
+    )
+    charleston = ResolvedLocation(
+        label="Charleston, South Carolina",
+        latitude=32.7765,
+        longitude=-79.9311,
+        country="United States",
+    )
+    houston = ResolvedLocation(
+        label="Houston, Texas",
+        latitude=29.7604,
+        longitude=-95.3698,
+        country="United States",
+    )
+    rome = ResolvedLocation(
+        label="Rome",
+        latitude=41.9028,
+        longitude=12.4964,
+        country="Italy",
+    )
+    bologna = ResolvedLocation(
+        label="Bologna",
+        latitude=44.4949,
+        longitude=11.3426,
+        country="Italy",
+    )
+    lugano = ResolvedLocation(
+        label="Lugano",
+        latitude=46.0037,
+        longitude=8.9511,
+        country="Switzerland",
+    )
+
+    earthquakes = ids(
+        "earthquake events seismic activity recent earthquakes",
+        "show_earthquakes",
+        tokyo,
+    )
+    assert earthquakes[0] == "usgs_earthquakes"
+
+    water_levels = ids("coastal water level stations", "show", charleston)
+    assert water_levels[0] == "noaa_coops_water_levels"
+
+    radar = ids("current weather radar", "show", houston)
+    assert radar[0] == "noaa_radar"
+
+    buildings = ids("residential buildings", "show", rome)
+    assert buildings[0] == "overpass_residential_buildings"
+
+    amenities = ids("nearby pharmacies amenities", "show", bologna)
+    assert "overpass_poi_amenities" in amenities
+
+    atmospheric = ids("wind humidity pressure", "show", rome)
+    assert atmospheric[0] == "openmeteo_pressure_humidity_wind"
+    assert "openmeteo_air_quality_forecast" not in atmospheric
+
+    occurrences = ids(
+        "species occurrences biodiversity",
+        "show",
+        lugano,
+        temporal_mode="none",
+    )
+    assert occurrences[0] == "gbif_species_occurrences"
+
+    # gbif must still be avoided for its intended non-occurrence intents.
+    exhaustive = ids(
+        "exhaustive species inventory all records",
+        "show",
+        lugano,
+        temporal_mode="none",
+    )
+    assert "gbif_species_occurrences" not in exhaustive
+
+    bulk = ids(
+        "bulk export occurrences",
+        "show",
+        lugano,
+        temporal_mode="none",
+    )
+    assert "gbif_species_occurrences" not in bulk
+
+    # The same prompts must not leak an unrelated credentialed or
+    # non-renderable capability into the shortlist.
+    assert "opentripmap_tourism_pois" not in amenities
+    assert "openmeteo_elevation" not in atmospheric

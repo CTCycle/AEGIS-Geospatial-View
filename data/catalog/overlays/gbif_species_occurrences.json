@@ -103,8 +103,8 @@
     "requiredUserAction": [],
     "avoidWhen": [
       "no geographic context",
-      "exhaustive species inventory",
-      "species absence claims",
+      "exhaustive inventory",
+      "absence claims",
       "bulk export"
     ]
   },
