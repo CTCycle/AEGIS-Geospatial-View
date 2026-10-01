@@ -61,6 +61,7 @@ describe('pages/settings-page.component', () => {
       max_same_failed_fingerprint: 2, max_route_corrections: 1, max_validation_corrections: 2,
       model_max_attempts: 2, provider_max_attempts: 2, retry_backoff_base_seconds: 0.25,
       retry_backoff_max_seconds: 2, provider_request_seconds: 10,
+      vision_policy: 'disabled', vision_max_calls: 2,
     },
     restart_required: false,
     message: null,
