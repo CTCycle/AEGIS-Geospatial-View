@@ -27,6 +27,7 @@ from server.services.chat.settings_service import ChatSettingsService
 from server.services.chat.structured_probe import StructuredProbeService
 from server.services.chat.history_service import ChatHistoryService
 from server.services.geospatial.composition import GeospatialRuntime
+from server.services.geospatial.render_capture import RenderCaptureStore
 from server.services.llm.factory import LLMFactory
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
@@ -52,6 +53,7 @@ def build_chat_runtime(
     geospatial_runtime: GeospatialRuntime,
     application_timezone: str = "UTC",
     execution_settings: AgentExecutionSettings | None = None,
+    render_capture_store: RenderCaptureStore | None = None,
 ) -> ChatRuntime:
     settings_repo = ModelSettingsRepository(database)
     credentials_repo = geospatial_runtime.credentials_repo
@@ -132,6 +134,7 @@ def build_chat_runtime(
             ),
         ),
         transport_policy=llm_transport_policy,
+        capture_store=render_capture_store,
     )
     agent_turn_runner = AgentTurnRunner(
         agent_loop=agent_loop,

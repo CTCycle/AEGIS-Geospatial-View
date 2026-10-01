@@ -22,6 +22,7 @@ from server.services.llm.context_budget import (
     compute_context_usage,
     prepare_request,
 )
+from server.services.llm.multimodal import normalize_image_content_for_openai_responses
 from server.services.llm.errors import (
     LLMProviderRequestError,
     LLMResponseParsingError,
@@ -142,6 +143,15 @@ class OpenAIProvider(LLMProvider):
             if entry.name == model:
                 return bool(
                     {"structured", "structured_output"} & set(entry.capabilities)
+                )
+        return None
+
+    # -------------------------------------------------------------------------
+    def supports_vision(self, model: str) -> bool | None:
+        for entry in self.list_models():
+            if entry.name == model:
+                return "vision" in entry.capabilities or bool(
+                    entry.metadata.get("supports_vision")
                 )
         return None
 
@@ -289,6 +299,22 @@ class OpenAIProvider(LLMProvider):
                 )
                 continue
             if role in {"system", "developer", "user", "assistant"}:
+                content = message.get("content")
+                if isinstance(content, list) and any(
+                    isinstance(item, dict) and item.get("type") == "image"
+                    for item in content
+                ):
+                    response_items = normalize_image_content_for_openai_responses(
+                        content
+                    )
+                    if response_items is not None:
+                        normalized.append(
+                            {
+                                "role": role,
+                                "content": response_items,
+                            }
+                        )
+                        continue
                 normalized.append(
                     {
                         "role": role,

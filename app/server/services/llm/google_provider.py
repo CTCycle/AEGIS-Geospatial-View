@@ -23,6 +23,7 @@ from server.services.llm.context_budget import (
     compute_context_usage,
     prepare_request,
 )
+from server.services.llm.multimodal import normalize_image_content_for_google
 from server.services.llm.errors import (
     LLMProviderRequestError,
     LLMResponseParsingError,
@@ -197,6 +198,15 @@ class GoogleProvider(LLMProvider):
             if entry.name == model:
                 return bool(
                     {"structured", "structured_output"} & set(entry.capabilities)
+                )
+        return None
+
+    # -------------------------------------------------------------------------
+    def supports_vision(self, model: str) -> bool | None:
+        for entry in self.list_models():
+            if entry.name == model:
+                return "vision" in entry.capabilities or bool(
+                    entry.metadata.get("supports_vision")
                 )
         return None
 
@@ -562,6 +572,12 @@ class GoogleProvider(LLMProvider):
                     contents.append({"role": "user", "parts": [part]})
                 continue
             mapped_role = "model" if role == "assistant" else "user"
+            content = message.get("content")
+            if isinstance(content, list):
+                google_parts = normalize_image_content_for_google(content)
+                if google_parts is not None:
+                    contents.append({"role": mapped_role, "parts": google_parts})
+                    continue
             contents.append(
                 {
                     "role": mapped_role,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -90,6 +90,8 @@ class AgentExecutionSettings:
     retry_backoff_base_seconds: float = 0.25
     retry_backoff_max_seconds: float = 2.0
     provider_request_seconds: float = 10.0
+    vision_policy: str = "disabled"
+    vision_max_calls: int = 2
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -234,6 +236,10 @@ class JsonAgentExecutionSettings(StrictJsonSettings):
     retry_backoff_base_seconds: float = Field(default=0.25, ge=0.0, le=60.0)
     retry_backoff_max_seconds: float = Field(default=2.0, ge=0.0, le=120.0)
     provider_request_seconds: float = Field(default=10.0, ge=0.1, le=120.0)
+    vision_policy: Literal["disabled", "always", "on_failure", "final_check"] = (
+        "disabled"
+    )
+    vision_max_calls: int = Field(default=2, ge=1, le=8)
 
 ###############################################################################
 class JsonOpenMeteoSettings(StrictJsonSettings):
@@ -458,6 +464,8 @@ class AppSettings(BaseSettings):
                 retry_backoff_base_seconds=self.agent_execution.retry_backoff_base_seconds,
                 retry_backoff_max_seconds=self.agent_execution.retry_backoff_max_seconds,
                 provider_request_seconds=self.agent_execution.provider_request_seconds,
+                vision_policy=self.agent_execution.vision_policy,
+                vision_max_calls=self.agent_execution.vision_max_calls,
             ),
             openmeteo=OpenMeteoSettings(
                 weather_base_url=self.openmeteo.weather_base_url,

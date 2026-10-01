@@ -10,6 +10,10 @@ from typing import Any
 from server.common.typing import json_object
 from server.services.llm.cloud_catalog import get_model_context_profile
 from server.services.llm.errors import LLMContextLimitError
+from server.services.llm.multimodal import (
+    estimate_image_tokens,
+    text_from_multimodal_content,
+)
 from server.services.llm.types import (
     ContextMetadataAuthority,
     ContextUsage,
@@ -163,11 +167,12 @@ def estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
     total = 0
     for message in messages:
         role = str(message.get("role") or "")
-        content = str(message.get("content") or "")
+        content = text_from_multimodal_content(message.get("content"))
         # Lightweight deterministic estimate: roughly four chars per token,
         # plus a small per-message role/formatting overhead.
         total += max(1, math.ceil((len(role) + len(content)) / 4)) + 4
         total += estimate_json_tokens(message.get("tool_calls"))
+    total += estimate_image_tokens(messages)
     return max(total, 1)
 
 ###############################################################################
@@ -671,7 +676,7 @@ def _compact_messages(
         while True:
             snippets: list[str] = []
             for message in reversed(dropped):
-                content = str(message.get("content") or "").strip()
+                content = text_from_multimodal_content(message.get("content")).strip()
                 if content:
                     snippet_limit = min(320, summary_char_limit)
                     snippets.append(

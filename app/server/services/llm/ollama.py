@@ -22,6 +22,7 @@ from server.services.llm.context_budget import (
     compute_context_usage,
     prepare_request,
 )
+from server.services.llm.multimodal import normalize_image_content_for_ollama
 from server.prompts.providers import OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT
 from server.services.llm.errors import (
     LLMProviderRequestError,
@@ -392,6 +393,13 @@ class OllamaProvider(LLMProvider):
         return True
 
     # -------------------------------------------------------------------------
+    def supports_vision(self, model: str) -> bool | None:
+        show_capabilities = self._show_capabilities(model)
+        if show_capabilities is not None:
+            return "vision" in show_capabilities
+        return None
+
+    # -------------------------------------------------------------------------
     def get_model_context_metadata(self, model: str) -> dict[str, Any]:
         """Read an exact context declaration from Ollama's model metadata.
 
@@ -670,7 +678,7 @@ class OllamaProvider(LLMProvider):
             raise
         payload: dict[str, Any] = {
             "model": effective_request.model,
-            "messages": effective_request.messages,
+            "messages": self._normalize_ollama_messages(effective_request.messages),
             "stream": False,
             "options": {"temperature": effective_request.temperature},
         }
@@ -709,12 +717,39 @@ class OllamaProvider(LLMProvider):
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_ollama_messages(
+        messages: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Project neutral multimodal parts into Ollama's ``images`` form.
+
+        Plain string content is passed through untouched.  When a message's
+        content is a parts list the text is folded into ``content`` and the
+        base64 images into the message's ``images`` array (Ollama's native
+        multimodal field).
+        """
+
+        normalized: list[dict[str, Any]] = []
+        for message in messages:
+            content = message.get("content")
+            if isinstance(content, list):
+                text, images = normalize_image_content_for_ollama(content)
+                if images:
+                    copy = dict(message)
+                    copy["content"] = text
+                    copy["images"] = images
+                    normalized.append(copy)
+                    continue
+            normalized.append(message)
+        return normalized
+
+    # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
         request = prepare_request(request, provider=self.provider_name)
         usage = compute_context_usage(request, provider=self.provider_name)
         payload: dict[str, Any] = {
             "model": request.model,
-            "messages": request.messages,
+            "messages": self._normalize_ollama_messages(request.messages),
             "stream": True,
             "options": {"temperature": request.temperature},
         }
@@ -773,7 +808,7 @@ class OllamaProvider(LLMProvider):
             raise
         payload: dict[str, Any] = {
             "model": effective_request.model,
-            "messages": effective_request.messages,
+            "messages": self._normalize_ollama_messages(effective_request.messages),
             "stream": False,
             "format": schema_json,
             "options": {"temperature": effective_request.temperature},

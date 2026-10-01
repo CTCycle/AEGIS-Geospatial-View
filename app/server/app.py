@@ -47,6 +47,7 @@ from server.services.agent_runs.steering import RunSteeringService
 from server.services.agent_runs.realtime import RealtimeConnectionRegistry
 from server.services.agent_runs.metrics import RealtimeMetrics
 from server.services.geospatial.composition import build_geospatial_runtime
+from server.services.geospatial.render_capture import RenderCaptureStore
 from server.services.jobs import BackgroundJobService
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
@@ -120,6 +121,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     settings = runtime_app_settings.to_server_settings(database_settings)
     runtime_settings_service = RuntimeSettingsService(runtime_repository)
     geospatial_runtime = build_geospatial_runtime(database, settings=settings)
+    render_capture_store = RenderCaptureStore()
     chat_runtime = build_chat_runtime(
         database,
         geospatial_runtime=geospatial_runtime,
@@ -127,6 +129,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
             getattr(settings, "chat", None), "application_timezone", "UTC"
         ),
         execution_settings=getattr(settings, "agent_execution", None),
+        render_capture_store=render_capture_store,
     )
     event_repository = AgentRunEventRepository(database)
     run_event_publisher = RunEventPublisher(event_repository)
@@ -197,6 +200,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     application.state.run_repository = run_repository
     application.state.run_event_publisher = run_event_publisher
     application.state.render_completion_service = render_completion_service
+    application.state.render_capture_store = render_capture_store
     application.state.realtime_connections = realtime_connections
     application.state.realtime_metrics = realtime_metrics
     application.state.job_service = job_service

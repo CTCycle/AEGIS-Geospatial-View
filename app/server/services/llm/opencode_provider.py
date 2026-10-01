@@ -145,6 +145,12 @@ class _OpenCodeResponsesTransport(OpenAIProvider):
         _ = model
         return True
 
+    # -------------------------------------------------------------------------
+    def supports_vision(self, model: str) -> bool | None:
+        # Vision entrypoints are explicitly suffixed; fail closed otherwise so
+        # images are never sent to an unverified OpenCode model.
+        return "vision" in model.strip().lower()
+
 ###############################################################################
 class OpenCodeProvider(DeepSeekProvider):
     """OpenCode Go/Zen adapter for explicitly published endpoint families."""
@@ -244,6 +250,12 @@ class OpenCodeProvider(DeepSeekProvider):
             model.strip().lower(), {}
         ).get("supports_structured_output")
         return declared if isinstance(declared, bool) else True
+
+    # -------------------------------------------------------------------------
+    def supports_vision(self, model: str) -> bool | None:
+        if self.protocol_for_model(model) not in SUPPORTED_OPENCODE_PROTOCOLS:
+            return False
+        return "vision" in model.strip().lower()
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:

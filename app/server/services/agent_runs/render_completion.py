@@ -165,6 +165,12 @@ class RenderCompletionService:
             },
             "required_overlay_ids": required_overlay_ids,
             "completion_requirements": render_requirements_payload,
+            "vision_capture_requested": bool(
+                _json_object(
+                    _json_object(response_payload.get("execution_trace"))
+                ).get("vision_capture_requested")
+                or False
+            ),
         }
         _snapshot, transitioned = self.run_repository.prepare_render(
             run_id,
