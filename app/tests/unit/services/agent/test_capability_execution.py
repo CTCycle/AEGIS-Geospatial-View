@@ -147,7 +147,7 @@ async def test_normalized_point_feature_is_checked_against_requested_bbox(
 async def test_valid_empty_vector_result_satisfies_spatial_scope_for_bounded_request() -> None:
     response = ProviderResponse(
         capability_id="places:hospitals",
-        provider_id="usgs",
+        provider_id="overpass",
         payload={"renderingMode": "clustered-points", "features": [], "totalResults": 0},
         result_type="features",
         result_status="valid_empty",
@@ -160,6 +160,49 @@ async def test_valid_empty_vector_result_satisfies_spatial_scope_for_bounded_req
     assert result.status == "valid_empty"
     assert result.metadata.coverage["spatial_scope_satisfied"] is True
     assert result.metadata.coverage["query_complete"] is True
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_provider_declared_circle_coverage_satisfies_spatial_scope() -> None:
+    # A POI/landmark "around <place>" request may carry a narrow geocoder bbox
+    # while the provider returns a wider radius-bounded set. The provider's
+    # declared circle coverage is the authoritative spatial scope.
+    response = ProviderResponse(
+        capability_id="places:hospitals",
+        provider_id="overpass",
+        payload={
+            "renderingMode": "geojson",
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": "way/1",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [[12.48, 41.89], [12.50, 41.89], [12.50, 41.90], [12.48, 41.90], [12.48, 41.89]]
+                        ],
+                    },
+                }
+            ],
+        },
+        result_type="features",
+        coverage={
+            "type": "circle",
+            "center": {"latitude": 41.8902, "longitude": 12.4922},
+            "radius_m": 2500,
+        },
+    )
+    result = await _service(FakeProviderRegistry(response)).execute_capability(
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals",
+            bbox=[12.492, 41.889, 12.493, 41.891],
+            location_ref="colosseum",
+        ),
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert result.metadata.coverage["spatial_scope_satisfied"] is True
 
 ###############################################################################
 @pytest.mark.asyncio
