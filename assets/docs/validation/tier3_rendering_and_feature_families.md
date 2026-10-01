@@ -402,11 +402,12 @@ All Tier 3 slices share the standing campaign rules:
 
 ## Next actionable slice
 
-`T3-10`, `T3-12`, and `T3-13` are now `PASS` (2026-10-01). Continue the
-reconstructed keyless vector/point family campaign with `T3-14` (GBIF species
-occurrences), then `T3-11` (NOAA CO-OPS/radar): both are public keyless
-providers with existing adapters and manifests and reuse the proven exact-lane
-browser harness (`app/tests/e2e/test_live_vector_point_matrix.py`). The six
-campaign capabilities are `enabled_by_default: true` in `runtime_profiles.json`,
-so no Geospatial Access manual-toggle action is required; record each slice per
-the strategy evidence package and status vocabulary.
+`T3-10`, `T3-12`, `T3-13`, and `T3-14` are now `PASS` (2026-10-01). The
+remaining keyless Tier 3 slice is `T3-11` (NOAA CO-OPS water levels + CONUS
+radar), which reuses the proven exact-lane browser harness
+(`app/tests/e2e/test_live_vector_point_matrix.py`). The NOAA campaign
+capabilities are `enabled_by_default: true` in `runtime_profiles.json`, so no
+Geospatial Access manual-toggle action is required; the radar sub-scenario
+requires routing the same-origin AEGIS tile proxy (a code change) or an honest
+BLOCKED/PARTIAL classification on the recorded transport boundary. Record the
+slice per the strategy evidence package and status vocabulary.
