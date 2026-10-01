@@ -1,0 +1,216 @@
+{
+  "scenario_id": "t3_13_text_vs_map_boundary",
+  "prompt": "What is the current wind speed in Milan, Italy?",
+  "expected_kind": "text",
+  "expected_capability": "openmeteo_pressure_humidity_wind",
+  "expected_capability_selected": true,
+  "classification": "text_pass",
+  "assistant_response_visible": true,
+  "ui_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history What is the current wind speed in Milan, Italy? The requested information is ready. Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Verified Satellite Available Optional Keys Optional Tool activity 4 calls",
+  "map_evidence": {
+    "maplibre_map_count": 0,
+    "maplibre_canvas_count": 0,
+    "attribution_present": false,
+    "attribution_text": "",
+    "target_overlay_status": null,
+    "target_overlay_visible": null,
+    "overlay_rows": []
+  },
+  "network": {
+    "proxy_request_count": 0,
+    "proxy_response_statuses": [],
+    "proxy_capabilities_seen": [],
+    "direct_upstream_browser_request_count": 0,
+    "events": []
+  },
+  "console": [],
+  "page_errors": [],
+  "run_trace": {
+    "status": "ok",
+    "conversation_id": "conv_32243fb003244f4b823c2113ab35208a",
+    "run_id": "run_3c4bd634110a468d9a6173469e4aab6e",
+    "run_version": 1,
+    "resolved_route": {
+      "primary_domain": "data_retrieval",
+      "secondary_domains": [],
+      "task_mode": "execute",
+      "operation": "retrieve_current_conditions",
+      "target_refs": [
+        "Milan, Italy"
+      ],
+      "temporal_scope": {
+        "mode": "current",
+        "granularity": "none",
+        "aggregation": "none"
+      }
+    },
+    "selected_capability_ids": [
+      "openmeteo_pressure_humidity_wind",
+      "get_weather_forecast"
+    ],
+    "iteration_count": 3,
+    "model_call_count": 4,
+    "tool_call_count": 4,
+    "state_transition_count": 20,
+    "terminal_or_stopped_reason": "completed",
+    "exposed_tools_by_iteration": {
+      "1": [
+        "resolve_geospatial_location"
+      ],
+      "2": [
+        "describe_geospatial_capability",
+        "execute_geospatial_capability"
+      ],
+      "3": [
+        "execute_geospatial_capability",
+        "describe_geospatial_capability"
+      ]
+    },
+    "selected_tool_names": [
+      "resolve_geospatial_location",
+      "describe_geospatial_capability",
+      "execute_geospatial_capability"
+    ],
+    "tool_result_statuses": [
+      {
+        "tool": "resolve_geospatial_location",
+        "status": "success",
+        "iteration": 1,
+        "error_type": null
+      },
+      {
+        "tool": "describe_geospatial_capability",
+        "status": "success",
+        "iteration": 2,
+        "error_type": null
+      },
+      {
+        "tool": "describe_geospatial_capability",
+        "status": "success",
+        "iteration": 2,
+        "error_type": null
+      },
+      {
+        "tool": "execute_geospatial_capability",
+        "status": "success",
+        "iteration": 3,
+        "error_type": null
+      }
+    ],
+    "evidence_references": [
+      "evidence_6a187579cbd54605a3f59ddae85bb95d"
+    ],
+    "apply_map_plan_attempts": 0,
+    "render_preparation": [
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 1,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 2,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 3,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "iteration": 3,
+        "render_verified": null,
+        "render_status": "terminal",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "completed",
+        "render_checks": null,
+        "prepared_map": false
+      }
+    ],
+    "temporal_evidence": {
+      "requested_scope": {
+        "mode": "current",
+        "granularity": "none",
+        "aggregation": "none"
+      },
+      "reference_time_iso": "[depth-limited]",
+      "start_time_iso": "[depth-limited]",
+      "end_time_iso": "[depth-limited]",
+      "observation_time": "2026-10-01T17:45"
+    }
+  },
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20261001-t3-10-t3-14\\T3-13\\screenshots\\VECTOR-POINT-MATRIX-LIVE\\t3_13_text_vs_map_boundary.png",
+  "backend_routed_diagnostics": []
+}

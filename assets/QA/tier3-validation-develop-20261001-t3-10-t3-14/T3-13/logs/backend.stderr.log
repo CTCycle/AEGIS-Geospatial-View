@@ -1,0 +1,111 @@
+INFO:     Started server process [22120]
+INFO:     Waiting for application startup.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite migration check: current=base, head=202609210001
+[INFO] Applying pending SQLite migrations to head 202609210001.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] Running upgrade  -> 202608200001, Create the initial SQLite schema.
+[INFO] Running upgrade 202608200001 -> 202608310001, Remove derived model capability metadata from persisted settings.
+[INFO] Running upgrade 202608310001 -> 202609050001, Persist the prepared map presentation and browser acknowledgment state.
+[INFO] Running upgrade 202609050001 -> 202609050002, Persist the client timezone captured for an agent run.
+[INFO] Running upgrade 202609050002 -> 202609090001, Persist bounded native-agent evidence for a conversation lifetime.
+[INFO] Running upgrade 202609090001 -> 202609090002
+[INFO] Running upgrade 202609090002 -> 202609140001, Add the canonical durable native conversation state.
+[INFO] Running upgrade 202609140001 -> 202609150001, Make native conversation state the only durable conversation snapshot.
+[INFO] Running upgrade 202609150001 -> 202609170001, Migrate legacy unresolved questions to scoped native clarification state.
+[INFO] Running upgrade 202609170001 -> 202609210001, Add the canonical SQLite-backed application runtime settings row.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite synchronization complete: path=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\t3-07-live-20261001T155643Z\database.db, revisions=202609210001
+[INFO] SQLite database is ready: fresh=True, migrations_applied=True
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5079 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56264 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61223 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55301 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:51860 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:53012 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:53959 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:58567 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61311 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50831 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55670 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:65281 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50361 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:62856 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:49296 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:62388 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:54851 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:49849 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:64989 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:60252 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:58447 - "WebSocket /api/conversations/conv_2b4053fbfa5144619c7ed61c44e1ddf9/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:59848 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50705 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:62364 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280323/194833.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280324/194833.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280323/194834.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280323/194832.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280322/194833.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280324/194834.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280324/194832.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280322/194834.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280322/194832.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280325/194833.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280321/194833.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280325/194834.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280325/194832.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280321/194832.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/280321/194834.png relay=no
+INFO:     127.0.0.1:50362 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55193 - "WebSocket /api/conversations/conv_2b4053fbfa5144619c7ed61c44e1ddf9/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:62021 - "WebSocket /api/conversations/conv_32243fb003244f4b823c2113ab35208a/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:61899 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:64261 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:57904 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50789 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)

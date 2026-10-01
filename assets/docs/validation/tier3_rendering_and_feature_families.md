@@ -402,12 +402,11 @@ All Tier 3 slices share the standing campaign rules:
 
 ## Next actionable slice
 
-`T3-10` and `T3-12` are now `PASS` (2026-10-01). Continue the reconstructed
-keyless vector/point family campaign with `T3-13` (Open-Meteo atmospheric),
-then `T3-14` (GBIF), then `T3-11` (NOAA CO-OPS/radar): all are public keyless
-providers with existing adapters and manifests, require no credentials or
-manifest re-point, and reuse the proven exact-lane browser harness
-(`app/tests/e2e/test_live_vector_point_matrix.py`). All six campaign
-capabilities are `enabled_by_default: true` in `runtime_profiles.json`, so no
-Geospatial Access manual-toggle action is required; record each slice per the
-strategy evidence package and status vocabulary.
+`T3-10`, `T3-12`, and `T3-13` are now `PASS` (2026-10-01). Continue the
+reconstructed keyless vector/point family campaign with `T3-14` (GBIF species
+occurrences), then `T3-11` (NOAA CO-OPS/radar): both are public keyless
+providers with existing adapters and manifests and reuse the proven exact-lane
+browser harness (`app/tests/e2e/test_live_vector_point_matrix.py`). The six
+campaign capabilities are `enabled_by_default: true` in `runtime_profiles.json`,
+so no Geospatial Access manual-toggle action is required; record each slice per
+the strategy evidence package and status vocabulary.

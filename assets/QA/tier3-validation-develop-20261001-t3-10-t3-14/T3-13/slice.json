@@ -1,0 +1,38 @@
+{
+  "slice_id": "T3-13",
+  "name": "Open-Meteo atmospheric point insight family and numeric-insight-vs-map boundary",
+  "date": "2026-10-01",
+  "branch": "validation",
+  "provider_lane": "opencode-go / deepseek-v4.1-flash",
+  "runtime": "isolated runtimes/cache/test-runtime/t3-07-live-* (disposable, port 5079)",
+  "status": "PASS",
+  "scenarios": [
+    {
+      "id": "t3_13_atmospheric_rome",
+      "prompt": "Show wind, humidity and pressure around Rome, Italy.",
+      "expected_kind": "map",
+      "expected_capability": "openmeteo_pressure_humidity_wind",
+      "classification": "map_render_pass",
+      "evidence": "http/VECTOR-POINT-MATRIX-LIVE/t3_13_atmospheric_rome.json"
+    },
+    {
+      "id": "t3_13_text_vs_map_boundary",
+      "prompt": "What is the current wind speed in Milan, Italy?",
+      "expected_kind": "text",
+      "expected_capability": "openmeteo_pressure_humidity_wind",
+      "classification": "text_pass",
+      "evidence": "http/VECTOR-POINT-MATRIX-LIVE/t3_13_text_vs_map_boundary.json"
+    }
+  ],
+  "fixes": [],
+  "remaining_limitation": "Valid-empty/partial semantics per Open-Meteo response were not separately exercised this slice (the provider returned full data for the Rome point); the direct-tool/text boundary and the map render are the new evidence recorded here.",
+  "quality": {
+    "backend_unit_passed": true,
+    "focused_backend_passed": true,
+    "frontend_karma_passed": null,
+    "ruff": "pass",
+    "pyright_errors": 0,
+    "strict_manifest_audit": "pass"
+  },
+  "harness": "app/tests/e2e/test_live_vector_point_matrix.py"
+}
