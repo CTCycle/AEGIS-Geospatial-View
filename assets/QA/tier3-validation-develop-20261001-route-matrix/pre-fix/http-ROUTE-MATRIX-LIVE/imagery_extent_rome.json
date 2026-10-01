@@ -1,0 +1,258 @@
+{
+  "scenario_id": "imagery_extent_rome",
+  "prompt": "Show current satellite context for Rome, Italy.",
+  "expected_kind": "map",
+  "classification": "map_absent",
+  "assistant_response_visible": true,
+  "ui_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Show current satellite context for Rome, Italy. Render recovery requires a materially different map action. Previous map render failed (render_validation_failed) during backend_validation: Required map completion checks failed: temporal_scope_applied, spatial_scope_applied The last-known-good map was left unchanged. Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Needs attention Satellite Available Optional Keys Optional Tool activity Needs attention",
+  "map_evidence": {
+    "maplibre_map_count": 0,
+    "maplibre_canvas_count": 0,
+    "attribution_present": false,
+    "attribution_text": "",
+    "target_overlay_status": null,
+    "target_overlay_visible": null,
+    "overlay_rows": []
+  },
+  "network": {
+    "proxy_request_count": 0,
+    "proxy_response_statuses": [],
+    "proxy_capabilities_seen": [],
+    "direct_upstream_browser_request_count": 0,
+    "events": []
+  },
+  "console": [],
+  "page_errors": [],
+  "run_trace": {
+    "status": "ok",
+    "conversation_id": "conv_0f3117822c2543e5815147c92b13b57d",
+    "run_id": "run_8c0a5350077249dc86eda34f7f8ca1e8",
+    "run_version": 1,
+    "resolved_route": {
+      "primary_domain": "map_rendering",
+      "secondary_domains": [
+        "place_search"
+      ],
+      "task_mode": "execute",
+      "operation": "show_satellite_context",
+      "target_refs": [
+        "Rome, Italy"
+      ],
+      "temporal_scope": {
+        "mode": "current",
+        "granularity": "none",
+        "aggregation": "none"
+      }
+    },
+    "selected_capability_ids": [
+      "esri_world_imagery",
+      "VIIRS_SNPP_CorrectedReflectance_TrueColor"
+    ],
+    "iteration_count": 5,
+    "model_call_count": 6,
+    "tool_call_count": 4,
+    "state_transition_count": 34,
+    "terminal_or_stopped_reason": "failed",
+    "exposed_tools_by_iteration": {
+      "1": [
+        "resolve_geospatial_location"
+      ],
+      "2": [
+        "apply_map_plan"
+      ],
+      "0": [],
+      "3": [
+        "discover_capabilities",
+        "apply_map_plan"
+      ],
+      "4": [
+        "execute_capability",
+        "apply_map_plan"
+      ],
+      "5": [
+        "apply_map_plan"
+      ]
+    },
+    "selected_tool_names": [
+      "resolve_geospatial_location",
+      "apply_map_plan",
+      "discover_capabilities",
+      "execute_capability"
+    ],
+    "tool_result_statuses": [
+      {
+        "tool": "resolve_geospatial_location",
+        "status": "success",
+        "iteration": 1,
+        "error_type": null
+      },
+      {
+        "tool": "apply_map_plan",
+        "status": "success",
+        "iteration": 2,
+        "error_type": null
+      },
+      {
+        "tool": "discover_geospatial_capabilities",
+        "status": "failed",
+        "iteration": 3,
+        "error_type": null
+      },
+      {
+        "tool": "execute_capability",
+        "status": "failed",
+        "iteration": 4,
+        "error_type": null
+      }
+    ],
+    "evidence_references": [],
+    "apply_map_plan_attempts": 1,
+    "render_preparation": [
+      {
+        "kind": "render_observed",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "failed",
+        "render_checks": {
+          "required_sources_loaded": true,
+          "required_layers_present": true,
+          "viewport_valid": true
+        },
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": 2,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 3,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "iteration": 3,
+        "render_verified": null,
+        "render_status": "continue",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 4,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "iteration": 4,
+        "render_verified": null,
+        "render_status": "continue",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 5,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "iteration": 5,
+        "render_verified": null,
+        "render_status": "terminal",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "completed",
+        "render_checks": null,
+        "prepared_map": false
+      }
+    ],
+    "temporal_evidence": {
+      "requested_scope": {
+        "mode": "current",
+        "granularity": "none",
+        "aggregation": "none"
+      },
+      "reference_time_iso": "[depth-limited]",
+      "start_time_iso": "[depth-limited]",
+      "end_time_iso": "[depth-limited]",
+      "observation_time": "[depth-limited]"
+    }
+  },
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20261001-route-matrix\\screenshots\\ROUTE-MATRIX-LIVE\\imagery_extent_rome.png",
+  "backend_routed_diagnostics": []
+}

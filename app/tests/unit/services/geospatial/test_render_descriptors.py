@@ -274,6 +274,7 @@ def test_catalog_raster_overlays_expose_provider_tile_templates(
     ("overlay_id", "expected_host", "expected_protocol"),
     [
         ("esa_worldcover", "mapproxy.terrascope.be", "wms"),
+        ("eea_noise_2019", "noise.discomap.eea.europa.eu", "wms"),
         ("IMERG_Precipitation_Rate", "gibs.earthdata.nasa.gov", "wms"),
     ],
 )

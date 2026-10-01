@@ -522,6 +522,48 @@ def test_geospatial_esa_tile_proxy_materializes_bounded_wms_get_map_request() ->
     assert "tilematrix" not in query
 
 ###############################################################################
+def test_geospatial_eea_tile_proxy_materializes_bounded_wms_get_map_request() -> None:
+    captured: dict[str, str] = {}
+
+    async def fake_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
+        captured["url"] = url
+        return b"\x89PNG\r\n\x1a\npng-tile"
+
+    service = _build_api_service(ProviderRegistry())
+    service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get("/api/geospatial/tiles/eea_noise_2019/4/5/6.png")
+
+    assert response.status_code == 200
+    parsed = urlsplit(captured["url"])
+    query = parse_qs(parsed.query)
+    assert parsed.netloc == "noise.discomap.eea.europa.eu"
+    assert parsed.path == (
+        "/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer"
+    )
+    assert query["service"] == ["WMS"]
+    assert query["request"] == ["GetMap"]
+    assert query["layers"] == ["0"]
+    assert query["srs"] == ["EPSG:3857"]
+    assert query["version"] == ["1.1.1"]
+    assert query["format"] == ["image/png"]
+    assert query["transparent"] == ["true"]
+    assert query["width"] == ["256"]
+    assert query["height"] == ["256"]
+    assert "time" not in query
+    assert query["bbox"] == [
+        ",".join(str(value) for value in web_mercator_tile_bbox(4, 5, 6))
+    ]
+    assert query["exceptions"] == ["application/vnd.ogc.se_inimage"]
+    assert "tilematrix" not in query
+
+###############################################################################
 def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time() -> None:
     captured: dict[str, str] = {}
 

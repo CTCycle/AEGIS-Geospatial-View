@@ -1,0 +1,40 @@
+{
+  "slice_id": "ROUTE-MATRIX-LIVE-20261001",
+  "name": "Tier 3 route-matrix continuation: ISSUE-006 / ROUTE-LIVE rows + EEA raster render retry",
+  "date": "2026-10-01",
+  "branch": "validation",
+  "provider_lane": "opencode-go / deepseek-v4.1-flash",
+  "runtime": "isolated runtimes/cache/test-runtime; backend 127.0.0.1:5079",
+  "probe": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "status": "passed",
+    "parse_status": "complete"
+  },
+  "harness": "app/tests/e2e/test_route_matrix_live.py",
+  "evidence": "reports/ROUTE-MATRIX-LIVE.json, http/ROUTE-MATRIX-LIVE/, screenshots/ROUTE-MATRIX-LIVE/, pre-fix/ (archived pre-fix run)",
+  "scenarios": [
+    {"id": "acropolis_athens", "prompt": "Show me the Acropolis.", "result": "PASS", "detail": "Resolved Acropolis, Athens, Greece (23.7263E, 37.9717N); OSM basemap rendered; render verified ready."},
+    {"id": "openmeteo_alias_milan_air", "prompt": "How is the air quality in Milan right now?", "result": "PASS", "detail": "get_air_quality_forecast returned PM10/PM2.5/NO2/O3, Moderate."},
+    {"id": "openmeteo_alias_oslo_weather", "prompt": "Is it cold in Oslo right now?", "result": "PASS", "detail": "get_weather_forecast returned 16.9C, 0.0 mm, humidity 68%."},
+    {"id": "generic_infrastructure_rome", "prompt": "Show infrastructure in Rome.", "result": "PASS", "detail": "ambiguous_infrastructure_category clarification; no provider execution; no map."},
+    {"id": "census_demographics_chicago", "prompt": "Show census tracts around Chicago, Illinois.", "result": "PARTIAL", "detail": "Route reached manual-toggle census capabilities (defaultEnabled:false); execution failed; no map/data."},
+    {"id": "openmeteo_alias_elevation", "prompt": "What is the elevation of Rome, Italy?", "result": "PARTIAL", "detail": "Selected SRTM raster overlay, not numeric openmeteo_elevation (defaultEnabled:false); narrated limitation."},
+    {"id": "imagery_extent_rome", "prompt": "Show current satellite context for Rome, Italy.", "result": "PARTIAL", "detail": "Map plan failed render validation (temporal/spatial scope); model used non-exposed tool names; no map."},
+    {"id": "weather_budget_denver", "prompt": "What will the weather be in Denver, Colorado tomorrow?", "result": "FAIL", "detail": "Reproducible: 'The agent reached its configured execution limit.' after the 4-call budget; no final answer."},
+    {"id": "eea_noise_milan", "prompt": "Show noise exposure in Milan.", "result": "PARTIAL", "detail": "Provider retrieval passes; proxy transport fixed (0 direct upstream); render blocked by retired upstream (EEA 2019 WMS 404)."}
+  ],
+  "fixes": [
+    "app/server/services/geospatial/raster_tiles.py: added eea to _BACKEND_RASTER_PROVIDERS so EEA WMS descriptors route through the same-origin AEGIS tile proxy",
+    "app/tests/unit/services/geospatial/test_render_descriptors.py: EEA proxy-template parametrization",
+    "app/tests/unit/test_geospatial_api_contracts.py: EEA WMS tile-proxy contract test"
+  ],
+  "remaining_limitation": "EEA render blocked by upstream retirement (noise.discomap.eea.europa.eu 2019 WMS returns 404; EEA moved to noise.eea.europa.eu / portal.discomap END-2022). Census demographics, numeric elevation, and satellite-context imagery rows remain PARTIAL on manual-toggle/model/render-scope boundaries. Weather forecast with day-ahead temporal scope reproducibly exhausts the runtime budget.",
+  "quality": {
+    "focused_suite_passed": 231,
+    "render_api_contracts_passed": 84,
+    "ruff": "pass",
+    "pyright_errors": 0,
+    "strict_manifest_audit": "86 manifests, 0 errors, 0 warnings"
+  }
+}

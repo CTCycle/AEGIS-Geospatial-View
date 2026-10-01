@@ -1,0 +1,290 @@
+INFO:     Started server process [31548]
+INFO:     Waiting for application startup.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite migration check: current=base, head=202609210001
+[INFO] Applying pending SQLite migrations to head 202609210001.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] Running upgrade  -> 202608200001, Create the initial SQLite schema.
+[INFO] Running upgrade 202608200001 -> 202608310001, Remove derived model capability metadata from persisted settings.
+[INFO] Running upgrade 202608310001 -> 202609050001, Persist the prepared map presentation and browser acknowledgment state.
+[INFO] Running upgrade 202609050001 -> 202609050002, Persist the client timezone captured for an agent run.
+[INFO] Running upgrade 202609050002 -> 202609090001, Persist bounded native-agent evidence for a conversation lifetime.
+[INFO] Running upgrade 202609090001 -> 202609090002
+[INFO] Running upgrade 202609090002 -> 202609140001, Add the canonical durable native conversation state.
+[INFO] Running upgrade 202609140001 -> 202609150001, Make native conversation state the only durable conversation snapshot.
+[INFO] Running upgrade 202609150001 -> 202609170001, Migrate legacy unresolved questions to scoped native clarification state.
+[INFO] Running upgrade 202609170001 -> 202609210001, Add the canonical SQLite-backed application runtime settings row.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite synchronization complete: path=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\t3-07-live-20261001T104709Z\database.db, revisions=202609210001
+[INFO] SQLite database is ready: fresh=True, migrations_applied=True
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5079 (Press CTRL+C to quit)
+INFO:     127.0.0.1:54437 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:59704 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:51715 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55825 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:52545 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:58726 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:51721 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:49463 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61161 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50409 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:60593 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:64535 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:63486 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:49998 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55303 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:56956 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:58412 - "WebSocket /api/conversations/conv_84198f23d6d84a65ac868f7fc00bf875/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:59000 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:62542 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:58203 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:56950 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61752 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55142 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:58573 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:51312 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:60524 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:58643 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[ERROR] Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "asyncio\events.py", line 94, in _run
+  File "asyncio\proactor_events.py", line 166, in _call_connection_lost
+ConnectionResetError: [WinError 10054] Connessione in corso interrotta forzatamente dall'host remoto
+INFO:     127.0.0.1:62115 - "WebSocket /api/conversations/conv_25c14d7016fd47d09b21de44934d394a/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:60764 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:57928 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:53644 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:56587 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:57553 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50369 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:64803 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:60525 - "WebSocket /api/conversations/conv_25c14d7016fd47d09b21de44934d394a/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:53270 - "WebSocket /api/conversations/conv_093c030b155c4a0b9607bf7d7ae6f122/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:60086 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:64776 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:53461 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:57789 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:59730 - "WebSocket /api/conversations/conv_ea536f82febd4122a17f528497ce1f4d/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:52545 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:62254 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:57009 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:51860 - "WebSocket /api/conversations/conv_ea536f82febd4122a17f528497ce1f4d/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:61381 - "WebSocket /api/conversations/conv_8433304154c54614b2241c3dc56ffdd1/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:59447 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4635/3160.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4636/3160.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4635/3161.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4636/3161.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4635/3159.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4636/3159.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4634/3160.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4634/3161.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4637/3160.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4637/3161.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4634/3159.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4637/3159.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148349/101142.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148348/101142.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148349/101143.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148348/101143.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148348/101141.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148349/101141.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148350/101142.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148347/101142.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148350/101143.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148347/101143.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148350/101141.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/18/148347/101141.png relay=no
+INFO:     127.0.0.1:56456 - "WebSocket /api/conversations/conv_8433304154c54614b2241c3dc56ffdd1/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:58037 - "WebSocket /api/conversations/conv_941463c3f0a34e7da5b7d737e04d7326/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:63232 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50360 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:62976 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:62741 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61643 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:57215 - "WebSocket /api/conversations/conv_941463c3f0a34e7da5b7d737e04d7326/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:55200 - "WebSocket /api/conversations/conv_567a8793c00447ae9774109c6ce5a8ec/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:62125 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61333 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:56926 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:63979 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:52548 - "WebSocket /api/conversations/conv_567a8793c00447ae9774109c6ce5a8ec/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:65449 - "WebSocket /api/conversations/conv_f3f169e3483245f199afcdc3a7e4e7d1/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:54606 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:54944 - "WebSocket /api/conversations/conv_f3f169e3483245f199afcdc3a7e4e7d1/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:60912 - "WebSocket /api/conversations/conv_22187041bd184d16a4e1022d271d7ef3/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:56481 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:52548 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4305/2931.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4304/2931.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4305/2932.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4304/2932.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4306/2931.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4305/2930.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4304/2930.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4306/2932.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4303/2931.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4305/2933.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4304/2933.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4303/2932.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4306/2930.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4303/2930.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4306/2933.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4303/2933.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2152/1465.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2152/1466.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2151/1465.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2151/1466.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2153/1465.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2153/1466.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2152/1464.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2152/1467.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2151/1464.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2150/1466.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2150/1465.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2151/1467.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2153/1464.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2150/1464.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2153/1467.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2150/1467.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2154/1466.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2154/1465.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2154/1464.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/12/2154/1467.png relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5694252.859132491%2C1027313.6601527671%2C5704036.798752993&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5684468.919511989%2C1027313.6601527671%2C5694252.859132491&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5694252.859132491%2C1017529.7205322648%2C5704036.798752993&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5684468.919511989%2C1017529.7205322648%2C5694252.859132491&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5694252.859132491%2C1037097.5997732731%2C5704036.798752993&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5684468.919511989%2C1037097.5997732731%2C5694252.859132491&width=256&height=256 relay=no
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5674684.979891485%2C1027313.6601527671%2C5684468.919511987&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5704036.798752993%2C1027313.6601527671%2C5713820.738373496&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5704036.798752993%2C1017529.7205322648%2C5713820.738373496&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5674684.979891485%2C1017529.7205322648%2C5684468.919511987&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5694252.859132491%2C1007745.7809117625%2C5704036.798752993&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5684468.919511989%2C1007745.7809117625%2C5694252.859132491&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5704036.798752993%2C1037097.5997732731%2C5713820.738373496&width=256&height=256 relay=no
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+INFO:     127.0.0.1:60973 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:64497 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:56758 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5694252.859132491%2C1027313.6601527671%2C5704036.798752993&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5684468.919511989%2C1027313.6601527671%2C5694252.859132491&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5694252.859132491%2C1017529.7205322648%2C5704036.798752993&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5684468.919511989%2C1017529.7205322648%2C5694252.859132491&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5694252.859132491%2C1037097.5997732731%2C5704036.798752993&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5704036.798752993%2C1027313.6601527671%2C5713820.738373496&width=256&height=256 relay=no
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5674684.979891485%2C1027313.6601527671%2C5684468.919511987&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5704036.798752993%2C1017529.7205322648%2C5713820.738373496&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5684468.919511989%2C1037097.5997732731%2C5694252.859132491&width=256&height=256 relay=no
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5674684.979891485%2C1017529.7205322648%2C5684468.919511987&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5694252.859132491%2C1007745.7809117625%2C5704036.798752993&width=256&height=256 relay=no
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5684468.919511989%2C1007745.7809117625%2C5694252.859132491&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=eea capability=eea_noise_2019 upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5704036.798752993%2C1037097.5997732731%2C5713820.738373496&width=256&height=256 relay=no
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+[WARNING] geospatial_tile_proxy_failure category=invalid_request provider=eea capability=eea_noise_2019 status=404 content_type=text/html content_length=418 phase=response_headers upstream=https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer
+INFO:     127.0.0.1:54922 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:59313 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:52851 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
