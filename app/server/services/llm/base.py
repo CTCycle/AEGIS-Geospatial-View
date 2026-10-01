@@ -119,6 +119,17 @@ class LLMProvider(ABC):
         return None
 
     # -------------------------------------------------------------------------
+    def supports_vision(self, model: str) -> bool | None:
+        """Report whether ``model`` can accept image content parts.
+
+        ``True``/``False`` are explicit; ``None`` means unknown.  Vision
+        attachment is gated on this predicate so images are never sent to a
+        model that cannot consume them.
+        """
+        _ = model
+        return None
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def normalize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return messages
@@ -189,6 +200,24 @@ class LLMProvider(ABC):
                 detail=(
                     f"Model '{request.model}' for provider '{self.provider_name}' "
                     "does not support structured output."
+                ),
+            )
+        request_vision_state = request.metadata.get("requires_vision")
+        supports_vision = (
+            request_vision_state
+            if isinstance(request_vision_state, bool)
+            else None
+        )
+        if request_vision_state is True and supports_vision is not True:
+            raise LLMStructuredOutputError(
+                category="model_capability",
+                provider=self.provider_name,
+                model=request.model,
+                stage="vision_content",
+                code="model_vision_unsupported",
+                detail=(
+                    f"Model '{request.model}' for provider '{self.provider_name}' "
+                    "does not support vision content."
                 ),
             )
 

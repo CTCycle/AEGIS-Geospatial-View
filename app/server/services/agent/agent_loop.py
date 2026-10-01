@@ -52,11 +52,17 @@ from server.services.agent.context_assembler import select_pair_safe_messages
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.completion import CompletionEvaluator
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.agent.vision_policy import (
+    ITERATION_CALL_KIND,
+    TERMINAL_CALL_KIND,
+    VisionPolicyEngine,
+)
 from server.services.llm.context_budget import (
     compute_context_usage,
     merge_provider_context_usage,
 )
 from server.services.llm.errors import LLMProviderRequestError, LLMStructuredOutputError
+from server.services.llm.multimodal import attach_image, messages_contain_image
 from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
 from server.services.llm.transport import LLMTransportPolicy
 
@@ -120,6 +126,8 @@ class AgentLoopRequest:
     max_tool_result_chars: int = 4096
     max_no_progress_corrections: int = 2
     max_render_attempts: int = 3
+    vision_policy: str = "disabled"
+    vision_max_calls: int = 2
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
     checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None
     trace_callback: Callable[
@@ -152,8 +160,10 @@ class AgentLoopOutcome:
     ]
     model_calls: int
     tool_results: list[ToolResult] = field(default_factory=lambda: list[ToolResult]())
-    failure_category: str | None = None
     failure_detail: str | None = None
+    # Set only when the loop suspends for a render handshake: whether the
+    # browser should capture the rendered map for a vision-enabled model step.
+    vision_capture_requested: bool = False
 
 
 ###############################################################################
@@ -169,12 +179,14 @@ class AgentLoop:
         tool_registry: ToolRegistry,
         tool_executor: ToolExecutor,
         transport_policy: LLMTransportPolicy | None = None,
+        capture_store: Any | None = None,
     ) -> None:
         self.provider_factory = provider_factory
         self.capability_router = capability_router
         self.tool_registry = tool_registry
         self.tool_executor = tool_executor
         self.transport_policy = transport_policy or LLMTransportPolicy()
+        self.capture_store = capture_store
 
     # -------------------------------------------------------------------------
     async def run(self, request: AgentLoopRequest) -> AgentLoopOutcome:
@@ -747,7 +759,7 @@ class AgentLoop:
             )
             outcome = "empty"
             try:
-                result = await self._model_step(request, provider, messages, [])
+                result = await self._model_step(request, provider, messages, [], call_kind=TERMINAL_CALL_KIND)
                 # A provider violating ``tools=[]`` is treated as an empty
                 # finalization result; the deterministic explanation remains
                 # the safe terminal response.
@@ -850,7 +862,7 @@ class AgentLoop:
             )
             outcome = "empty"
             try:
-                result = await self._model_step(request, provider, messages, [])
+                result = await self._model_step(request, provider, messages, [], call_kind=TERMINAL_CALL_KIND)
                 if not result.tool_calls:
                     candidate, protocol_text_suppressed = (
                         self._sanitize_finalization_candidate(result.content)
@@ -964,7 +976,7 @@ class AgentLoop:
             )
             outcome = "empty"
             try:
-                result = await self._model_step(request, provider, messages, [])
+                result = await self._model_step(request, provider, messages, [], call_kind=TERMINAL_CALL_KIND)
                 if not result.tool_calls:
                     candidate, protocol_text_suppressed = (
                         self._sanitize_finalization_candidate(result.content)
@@ -1557,18 +1569,162 @@ class AgentLoop:
         provider: AgentProvider,
         messages: list[dict[str, Any]],
         tools: list[LLMToolDefinition],
+        *,
+        call_kind: str = ITERATION_CALL_KIND,
     ) -> LLMResult:
         working = self._working_state_message(request.state, request.max_tool_result_chars)
         model_messages = [
             *self._model_context_messages(request, messages),
             {"role": "system", "content": working},
         ]
+        model_messages = await self._attach_vision_capture(
+            request,
+            provider,
+            model_messages,
+            call_kind=call_kind,
+        )
         return await self._model_call(
             request,
             provider,
             model_messages,
             tools,
             tool_choice="auto" if tools else "none",
+        )
+
+    # -------------------------------------------------------------------------
+    async def _attach_vision_capture(
+        self,
+        request: AgentLoopRequest,
+        provider: AgentProvider,
+        model_messages: list[dict[str, Any]],
+        *,
+        call_kind: str,
+    ) -> list[dict[str, Any]]:
+        """Attach a captured map image when the vision policy allows it.
+
+        Vision degrades cleanly: a missing/unsupported capability, a missing
+        capture, or an exhausted vision budget simply leaves the messages
+        unchanged and records a trace event.  This never alters retry counts
+        or budgets.
+        """
+
+        state = request.state
+        capture_store = getattr(self, "capture_store", None)
+        if capture_store is None:
+            return model_messages
+        supports_vision = (
+            provider.supports_vision(request.model)
+            if hasattr(provider, "supports_vision")
+            else None
+        )
+        engine = VisionPolicyEngine(
+            policy=request.vision_policy,
+            vision_supported=supports_vision,
+            max_vision_calls=request.vision_max_calls,
+        )
+        capture_ref = engine.current_capture_ref(state)
+        capture = None
+        if capture_ref and self._is_capture_identity(capture_ref):
+            map_session_id, collection_revision = self._split_capture_identity(
+                capture_ref
+            )
+            capture = capture_store.get(
+                request.state.run_id or request.state.request_id,
+                map_session_id,
+                collection_revision,
+            )
+        if not engine.should_attach(
+            state,
+            capture_ref=capture_ref,
+            capture_present=capture is not None,
+            call_kind=call_kind,
+        ):
+            if capture_ref and capture is None and call_kind == TERMINAL_CALL_KIND:
+                await self._emit_vision_trace(request, "capture_missing", capture_ref)
+            return model_messages
+        if capture is None:
+            return model_messages
+        caption = self._vision_caption(state, capture_ref)
+        model_messages = attach_image(
+            model_messages,
+            data=capture.image_base64,
+            mime_type=capture.mime_type,
+            caption=caption,
+        )
+        engine.mark_attached(state, capture_ref=capture_ref)
+        await self._emit_vision_trace(
+            request,
+            "vision_attached",
+            capture_ref,
+            {
+                "mime_type": capture.mime_type,
+                "width": capture.width,
+                "height": capture.height,
+                "call_kind": call_kind,
+                "vision_calls": (
+                    state.vision_state.vision_calls if state.vision_state else 0
+                ),
+            },
+        )
+        return model_messages
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_capture_identity(value: str) -> bool:
+        return value.count(":") == 1
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _split_capture_identity(value: str) -> tuple[str, int]:
+        map_session_id, _, revision = value.partition(":")
+        return map_session_id, int(revision)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _vision_caption(state: AgentRunState, capture_ref: str) -> str:
+        """Concise caption telling the model what the image represents."""
+
+        session = state.prepared_map_session
+        basemap_id = ""
+        overlay_count = 0
+        if session is not None:
+            basemap_id = str(getattr(session, "basemap_id", "") or "")
+            collection = getattr(session, "overlay_collection", None)
+            overlay_count = (
+                len(getattr(collection, "items", []))
+                if collection is not None
+                else 0
+            )
+        return (
+            "This is a capture of the map rendered by the agent for this request "
+            f"(render {capture_ref}). "
+            f"Basemap: {basemap_id or 'default'}; overlay count: {overlay_count}. "
+            "Inspect the rendered map directly for anything the structured "
+            "state does not capture."
+        )
+
+    # -------------------------------------------------------------------------
+    async def _emit_vision_trace(
+        self,
+        request: AgentLoopRequest,
+        kind: str,
+        capture_ref: str | None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        state = request.state
+        payload: dict[str, Any] = {"capture_ref": capture_ref}
+        if extra:
+            payload.update(extra)
+        await self._emit_trace(
+            request,
+            AgentTraceEvent(
+                kind=kind,
+                run_id=state.run_id or state.request_id,
+                run_version=state.run_version,
+                sequence=self._trace_sequence(state),
+                iteration=state.current_iteration,
+                payload=payload,
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -1661,6 +1817,10 @@ class AgentLoop:
             "supports_tools": True,
             REQUEST_DEADLINE_METADATA_KEY: request.budget.deadline_monotonic,
         }
+        if messages_contain_image(messages):
+            # Fail closed at the provider boundary if a non-vision model is
+            # ever handed image content.
+            metadata["requires_vision"] = True
         protocol = self._provider_protocol(provider, request.model)
         endpoint_host = self._provider_endpoint_host(provider)
         metadata["protocol"] = protocol
@@ -2968,7 +3128,39 @@ class AgentLoop:
             stopped_reason=reason,  # type: ignore[arg-type]
             model_calls=state.model_calls,
             tool_results=list(state.tool_results),
+            vision_capture_requested=(
+                self._capture_requested_for_outcome(request)
+                if reason == "awaiting_render"
+                else False
+            ),
         )
+
+    # -------------------------------------------------------------------------
+    def _capture_requested_for_outcome(
+        self,
+        request: AgentLoopRequest,
+    ) -> bool:
+        """Whether the render handshake should request a browser capture.
+
+        Resolved only when the loop suspends for a render; the routing and
+        iteration paths never trigger captures.
+        """
+
+        try:
+            provider = self.provider_factory.get_provider(request.provider)
+        except Exception:
+            return False
+        supports_vision = (
+            provider.supports_vision(request.model)
+            if hasattr(provider, "supports_vision")
+            else None
+        )
+        engine = VisionPolicyEngine(
+            policy=request.vision_policy,
+            vision_supported=supports_vision,
+            max_vision_calls=request.vision_max_calls,
+        )
+        return engine.should_capture(request.state)
 
     # -------------------------------------------------------------------------
     def _failed(

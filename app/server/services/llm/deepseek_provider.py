@@ -23,6 +23,7 @@ from server.services.llm.context_budget import (
     prepare_request,
     RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY,
 )
+from server.services.llm.multimodal import normalize_image_content_for_openai_chat
 from server.prompts.providers import build_deepseek_json_schema_instruction
 from server.services.llm.errors import (
     LLMProviderRequestError,
@@ -234,6 +235,13 @@ class DeepSeekProvider(LLMProvider):
         if isinstance(declared, bool):
             return declared
         return True if model.strip().lower().startswith("deepseek-") else None
+
+    # -------------------------------------------------------------------------
+    def supports_vision(self, model: str) -> bool | None:
+        # The DeepSeek chat-completions lane is text-only; vision entrypoints
+        # are served through the OpenCode adapter (``*vision*`` models).
+        _ = model
+        return False
 
     # -------------------------------------------------------------------------
     def _capabilities_for_model(self, model: str) -> set[str]:
@@ -876,6 +884,17 @@ class DeepSeekProvider(LLMProvider):
                     }
                 )
                 continue
+            content = message.get("content")
+            if isinstance(content, list):
+                chat_parts = normalize_image_content_for_openai_chat(content)
+                if chat_parts is not None:
+                    normalized.append(
+                        {
+                            "role": role,
+                            "content": chat_parts,
+                        }
+                    )
+                    continue
             normalized.append(message)
         return normalized
 

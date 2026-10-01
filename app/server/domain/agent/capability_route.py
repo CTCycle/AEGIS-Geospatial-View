@@ -11,6 +11,7 @@ from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.tool_result import ModelObservation, ToolResult
+from server.domain.agent.vision_policy import VisionState
 
 ###############################################################################
 class CapabilityRoute(BaseModel):
@@ -505,6 +506,7 @@ class AgentRunState(BaseModel):
     budget_snapshot: dict[str, object] = Field(
         default_factory=lambda: dict[str, object]()
     )
+    vision_state: VisionState | None = None
     termination_reason: str | None = None
 
     # -------------------------------------------------------------------------

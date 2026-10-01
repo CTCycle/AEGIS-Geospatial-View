@@ -198,6 +198,12 @@ class AgentTurnRunner:
                     max_render_attempts=_setting(
                         configured, "max_render_attempts", 3
                     ),
+                    vision_policy=str(
+                        _setting(configured, "vision_policy", "disabled")
+                    ),
+                    vision_max_calls=int(
+                        _setting(configured, "vision_max_calls", 2)
+                    ),
                     context_usage_callback=request.context_usage_callback,
                     trace_callback=request.trace_callback,
                     checkpoint_callback=request.checkpoint_callback,
@@ -268,6 +274,7 @@ class AgentResponseBuilder:
                 ],
                 "render_attempts": state.render_attempts,
                 "render_verified": state.render_verified,
+                "vision_capture_requested": outcome.vision_capture_requested,
                 "task_state": state.typed_task_state().model_dump(
                     mode="json", exclude_none=True
                 ),

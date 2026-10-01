@@ -18,6 +18,10 @@ from server.contracts.geospatial import (
     GeospatialProviderPayloadResponse,
     LayerAuditReport,
 )
+from server.contracts.render_capture import (
+    RenderCaptureCreateRequest,
+    RenderCaptureResponse,
+)
 from server.services.geospatial.api_service import (
     GeospatialApiService,
     GeospatialApiServiceError,
@@ -28,6 +32,7 @@ from server.services.geospatial.api_service import (
     GeospatialTileRequestError,
     GeospatialUnsupportedTileError,
 )
+from server.services.geospatial.render_capture import RenderCaptureStore
 
 router = APIRouter(prefix="/geospatial", tags=["geospatial"])
 
@@ -48,6 +53,16 @@ def get_geospatial_api_service(request: Request) -> GeospatialApiService:
             detail="Geospatial runtime is not initialized.",
         )
     return runtime.api_service
+
+###############################################################################
+def get_render_capture_store(request: Request) -> RenderCaptureStore:
+    store = getattr(request.app.state, "render_capture_store", None)
+    if store is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Render capture store is not initialized.",
+        )
+    return store
 
 ###############################################################################
 def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
@@ -264,6 +279,39 @@ async def proxy_tomtom_tile(
         content=body,
         media_type="image/png",
         headers={"Cache-Control": "private, max-age=60"},
+    )
+
+###############################################################################
+@router.post(
+    "/render-captures",
+    response_model=RenderCaptureResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def store_render_capture(
+    payload: RenderCaptureCreateRequest,
+    store: RenderCaptureStore = Depends(get_render_capture_store),
+) -> RenderCaptureResponse:
+    try:
+        store.save(
+            run_id=payload.run_id,
+            map_session_id=payload.map_session_id,
+            collection_revision=payload.collection_revision,
+            mime_type=payload.mime_type,
+            image_base64=payload.image_base64,
+            width=payload.width,
+            height=payload.height,
+            viewport_bounds=payload.viewport_bounds,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    return RenderCaptureResponse(
+        run_id=payload.run_id,
+        map_session_id=payload.map_session_id,
+        collection_revision=payload.collection_revision,
+        stored=True,
     )
 
 ###############################################################################
