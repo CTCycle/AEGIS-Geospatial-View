@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-09-28
+Last updated: 2026-10-01
 
 ## Purpose
 
@@ -129,6 +129,9 @@ conversation-scoped `agent_evidence` store rather than model messages.
   contract, browser boundary, and comprehensive-pass rule.
 - [`validation/tier1_application_foundations.md`](validation/tier1_application_foundations.md)
   Tier 1 application-foundations checklist and current hand-off boundary.
+- [`validation/tier3_rendering_and_feature_families.md`](validation/tier3_rendering_and_feature_families.md)
+  Tier 3 rendering and feature-family checklist, including the reconstructed
+  per-gate acceptance contracts for `T3-10`–`T3-18`.
 - [validation/gate_status.md](validation/gate_status.md)
   Canonical PASS/PARTIAL/FAIL/BLOCKED/UNRUN ledger for native-loop,
   presentation, browser-fault, provider, and hosted-CI gates. It is the
