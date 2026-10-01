@@ -259,9 +259,9 @@ def test_catalog_raster_overlays_expose_provider_tile_templates(
     assert warnings == []
     assert descriptor["rendering_mode"] == "raster-tile"
     tile_url_template = str(descriptor["tile_url_template"])
-    if overlay_id == "fema_nfhl_flood_zones":
+    if overlay_id in {"fema_nfhl_flood_zones", "noaa_radar"}:
         assert tile_url_template == (
-            "/api/geospatial/tiles/fema_nfhl_flood_zones/{z}/{x}/{y}.png"
+            f"/api/geospatial/tiles/{overlay_id}/{{z}}/{{x}}/{{y}}.png"
         )
         assert expected_host in str(descriptor["source_url"])
     else:
