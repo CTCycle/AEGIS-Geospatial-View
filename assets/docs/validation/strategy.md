@@ -68,11 +68,11 @@ trusting downstream feature evidence.
 | Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 checklist](tier1_application_foundations.md), [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [2026-09-23 T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), [2026-09-22 T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md), and [2026-09-21 baseline](../../QA/tier1-application-foundations-20260921/report.md). Tier 1 remains 12/12 `PASS`. |
 | Tier 2 | `T2-01` through `T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | The [2026-09-24 continuation](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md) passes `T2-01`/`T2-02` on the exact OpenCode Go lane; `T2-03` remains `PASS`. The [2026-09-25 continuation](../../QA/tier2-validation-develop-20260925-next-slices/report.md) passes the tested `T2-05`/`T2-06`/`T2-07` scenarios, and the [T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) passes `T2-04` with five pages, 50 unique candidates, and `next_cursor=null` under an approved isolated six-call budget restored to four afterward. `ISSUE-001` is resolved. |
 | Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | `T3-01`/`T3-02`/`T3-03`/`T3-04`/`T3-05`/`T3-06`, `T3-08`, and `T3-09` pass current browser-authoritative checks. `T3-07` remains `PARTIAL`: FEMA layer `28` fails the current REST/WMS/fresh-httpx/curl transport matrix before a provider image or live raster acknowledgement; the dependent FEMA composition boundary remains gated on standalone FEMA rendering. `T3-08` remains `PASS` after all 12 advertised GIBS cases met the browser acceptance boundary. `T3-09` is `PASS`: the exact Settings-API bootstrap persisted `opencode-go / deepseek-v4.1-flash`, the native structured probe passed, and the browser acknowledgement recorded source/layer/pixel evidence. See the [final 2026-09-30 T3-07/T3-09 report](../../QA/tier3-validation-develop-20260930-t3-07-t3-09-final/report.md), [raster-provider-fixes follow-up](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/report.md), [environmental follow-up](../../QA/tier3-validation-develop-20260928-environmental/report.md), and [vector-composition report](../../QA/tier3-validation-develop-20260926-vector-composition/report.md). Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
-| Tier 4A | `T4-01`–`T4-08` | CSV/GeoJSON ingestion, optional heavy formats, mobility data, local/configured sources, cameras, credentialed providers, and catalog-only descriptors. | Run only with isolated data and approved credentials/snapshots. |
+| Tier 4A | `T4-01`–`T4-08` | CSV/GeoJSON ingestion, optional heavy formats, mobility data, local/configured sources, cameras, credentialed providers, and catalog-only descriptors. | The [2026-10-01 T4A dataset-ingestion slice](../../QA/tier4a-dataset-ingestion-20261001/report.md) establishes the ID-to-scenario mapping and passes the deterministic isolated contract: `T4-01` CSV, `T4-02` GeoJSON, and `T4-08` catalog-only descriptors are `PASS`; `T4-03` optional heavy formats, `T4-04` mobility/GTFS, and `T4-05` local/configured sources are `PARTIAL` (optional deps not installed; no configured live feeds/datasets); `T4-06` cameras and `T4-07` credentialed providers are `BLOCKED` on missing configured sources/credentials. Run only with isolated data and approved credentials/snapshots. |
 | Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
 | Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Requires the lower-tier contracts and exact-head evidence to be stable. |
 
-The current roll-up is 32 `PASS`, 1 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`.
+The current roll-up is 35 `PASS`, 4 `PARTIAL`, 2 `BLOCKED`, and 27 `UNRUN`.
 
 ### Campaign inventory reconciliation
 
@@ -80,15 +80,25 @@ The 68 campaign slices are counted exactly once as follows:
 
 | Status | Explicit slice IDs | Count |
 | --- | --- | ---: |
-| `PASS` | `T0-01`–`T0-05`, `T1-01`–`T1-12`, `T2-01`–`T2-07`, `T3-01`–`T3-06`, `T3-08`, `T3-09` | 32 |
-| `PARTIAL` | `T3-07` | 1 |
-| `UNRUN` | `T3-10`–`T3-18`, `T4-01`–`T4-08`, `T4-09`–`T4-13`, `T5-01`–`T5-13` | 35 |
+| `PASS` | `T0-01`–`T0-05`, `T1-01`–`T1-12`, `T2-01`–`T2-07`, `T3-01`–`T3-06`, `T3-08`, `T3-09`, `T4-01`, `T4-02`, `T4-08` | 35 |
+| `PARTIAL` | `T3-07`, `T4-03`, `T4-04`, `T4-05` | 4 |
+| `BLOCKED` | `T4-06`, `T4-07` | 2 |
+| `UNRUN` | `T3-10`–`T3-18`, `T4-09`–`T4-13`, `T5-01`–`T5-13` | 27 |
+
+`T4-01`/`T4-02`/`T4-08` are `PASS` for the deterministic isolated fixture and
+descriptor boundaries recorded in the [2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md).
+`T4-03`/`T4-04`/`T4-05` are `PARTIAL` (optional `geospatial-ingestion`
+dependencies are not installed; no configured live feeds or datasets),
+and `T4-06`/`T4-07` are `BLOCKED` on missing configured camera sources and
+approved credentials respectively. These classifications do not claim live
+configured-source or credentialed-provider behavior.
 
 `T3-10`–`T3-18` remain explicit `UNRUN` inventory entries even though the
 current source documents do not preserve one verified objective for each ID.
 Their acceptance criteria must be recovered or established before execution;
 they must not be inferred from the broad Tier 3 description. The grouped Tier
-4 and Tier 5 ranges are counted by their declared cardinalities above.
+4B (`T4-09`–`T4-13`) and Tier 5 (`T5-01`–`T5-13`) ranges are counted by their
+declared cardinalities above.
 
 The 2026-09-30 T3-07/T3-09 implementation follow-up centralizes public
 raster browser transport at the manifest-backed AEGIS tile proxy, including
@@ -106,8 +116,11 @@ The subsequent current-head contract follow-up at
 `develop@889066b3` closes a repository defect where `tile`, `xyz`, `wms`, and
 `wmts` raster candidates bypassed the visibility-proof requirement; it does
 not change the live T3-07/T3-09 classifications. A bounded CSV/GeoJSON
-ingestion fixture run is recorded as supporting evidence only because the
-grouped Tier 4A IDs and production rollback boundary remain open.
+ingestion fixture run was recorded as supporting evidence only until the
+[2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md)
+established the grouped Tier 4A ID-to-scenario mapping and opened `T4-01`–`T4-08`;
+the durable production rollback/cleanup boundary remains an open validated
+limitation (see the slice report).
 
 The recommended execution order is numeric order within each tier. A blocked
 credential or optional dataset slice may be deferred without stopping unrelated
@@ -162,7 +175,7 @@ The Tier 1 application-foundations baseline remains recorded at
 `loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 32 `PASS`, 1 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
+The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 35 `PASS`, 4 `PARTIAL`, 2 `BLOCKED`, and 27 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
 Tier 1 remains 12/12 `PASS`; the current Tier 2 ledger has seven `PASS` slices.
 Preserve historical source boundaries in the linked T1 reports.
 

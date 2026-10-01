@@ -1,0 +1,46 @@
+﻿{
+  "materialized": [
+    {
+      "capabilityId": "census_cartographic_boundaries",
+      "featureCount": 1,
+      "warnings": [],
+      "normalizedFeatureCount": 1,
+      "healthStatus": "functional"
+    },
+    {
+      "capabilityId": "local_parcel_template",
+      "featureCount": 1,
+      "warnings": [],
+      "normalizedFeatureCount": 1,
+      "healthStatus": "functional"
+    },
+    {
+      "capabilityId": "natural_earth_admin_boundaries",
+      "featureCount": 1,
+      "warnings": [],
+      "normalizedFeatureCount": 1,
+      "healthStatus": "functional"
+    },
+    {
+      "capabilityId": "openaddresses_points",
+      "featureCount": 2,
+      "warnings": [],
+      "normalizedFeatureCount": 2,
+      "healthStatus": "functional"
+    },
+    {
+      "capabilityId": "ourairports_airports",
+      "featureCount": 2,
+      "warnings": [],
+      "normalizedFeatureCount": 2,
+      "healthStatus": "functional"
+    },
+    {
+      "capabilityId": "overture_maps_places",
+      "featureCount": 1,
+      "warnings": [],
+      "normalizedFeatureCount": 1,
+      "healthStatus": "functional"
+    }
+  ]
+}
