@@ -402,12 +402,11 @@ All Tier 3 slices share the standing campaign rules:
 
 ## Next actionable slice
 
-`T3-10`, `T3-12`, `T3-13`, and `T3-14` are now `PASS` (2026-10-01). The
-remaining keyless Tier 3 slice is `T3-11` (NOAA CO-OPS water levels + CONUS
-radar), which reuses the proven exact-lane browser harness
-(`app/tests/e2e/test_live_vector_point_matrix.py`). The NOAA campaign
-capabilities are `enabled_by_default: true` in `runtime_profiles.json`, so no
-Geospatial Access manual-toggle action is required; the radar sub-scenario
-requires routing the same-origin AEGIS tile proxy (a code change) or an honest
-BLOCKED/PARTIAL classification on the recorded transport boundary. Record the
-slice per the strategy evidence package and status vocabulary.
+The T3-10..T3-14 keyless campaign is complete (all five slices `PASS`,
+2026-10-01, including the NOAA radar proxy remediation for `T3-11`). The next
+open Tier 3 slices are `T3-15` (EEA public raster, currently `BLOCKED` on the
+retired `noise.discomap.eea.europa.eu` 2019 WMS until the manifest is
+re-pointed), then `T3-16` (basemap families), `T3-17` (mixed raster+vector
+composition), and `T3-18` (map inspection controls). Reuse the exact-lane
+browser harness (`app/tests/e2e/test_live_vector_point_matrix.py`) and record
+each slice per the strategy evidence package and status vocabulary.

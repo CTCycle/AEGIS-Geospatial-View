@@ -9,7 +9,9 @@ from urllib.parse import quote, urlsplit, urlunsplit
 WEB_MERCATOR_HALF_WORLD = 20037508.342789244
 MAX_TILE_ZOOM = 30
 _UNRESOLVED_PLACEHOLDER = re.compile(r"\{[^{}]+\}")
-_BACKEND_RASTER_PROVIDERS = frozenset({"eea", "esa", "fema", "gibs", "rainviewer"})
+_BACKEND_RASTER_PROVIDERS = frozenset(
+    {"eea", "esa", "fema", "gibs", "noaa", "rainviewer"}
+)
 _BACKEND_RASTER_RENDERING_MODES = frozenset(
     {"raster-tile", "tile", "xyz", "wms", "wmts"}
 )

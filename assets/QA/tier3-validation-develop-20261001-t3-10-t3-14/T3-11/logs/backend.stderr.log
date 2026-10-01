@@ -1,0 +1,183 @@
+INFO:     Started server process [29060]
+INFO:     Waiting for application startup.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite migration check: current=base, head=202609210001
+[INFO] Applying pending SQLite migrations to head 202609210001.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] Running upgrade  -> 202608200001, Create the initial SQLite schema.
+[INFO] Running upgrade 202608200001 -> 202608310001, Remove derived model capability metadata from persisted settings.
+[INFO] Running upgrade 202608310001 -> 202609050001, Persist the prepared map presentation and browser acknowledgment state.
+[INFO] Running upgrade 202609050001 -> 202609050002, Persist the client timezone captured for an agent run.
+[INFO] Running upgrade 202609050002 -> 202609090001, Persist bounded native-agent evidence for a conversation lifetime.
+[INFO] Running upgrade 202609090001 -> 202609090002
+[INFO] Running upgrade 202609090002 -> 202609140001, Add the canonical durable native conversation state.
+[INFO] Running upgrade 202609140001 -> 202609150001, Make native conversation state the only durable conversation snapshot.
+[INFO] Running upgrade 202609150001 -> 202609170001, Migrate legacy unresolved questions to scoped native clarification state.
+[INFO] Running upgrade 202609170001 -> 202609210001, Add the canonical SQLite-backed application runtime settings row.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite synchronization complete: path=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\t3-07-live-20261001T160706Z\database.db, revisions=202609210001
+[INFO] SQLite database is ready: fresh=True, migrations_applied=True
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5079 (Press CTRL+C to quit)
+INFO:     127.0.0.1:62534 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:52545 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61426 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:64467 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61303 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:49833 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55634 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55868 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:56352 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:60918 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:57860 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50361 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:60777 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50411 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:54186 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:58068 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-1252344.271424327%2C5009377.085697311%2C6.984919309616089e-10%2C6261721.357121639&width=256&height=256 relay=no
+INFO:     127.0.0.1:61267 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-1252344.271424327%2C5009377.085697312%2C-626172.1357121632%2C5635549.221409475&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-1252344.271424327%2C5009377.085697311%2C-939258.203568245%2C5322463.153553393&width=256&height=256 relay=no
+INFO:     127.0.0.1:65313 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:58266 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61907 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:59491 - "WebSocket /api/conversations/conv_94603faeaa0d495195f95e6db6f00157/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:56105 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55339 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61811 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:52759 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:59161 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2277/3305.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2276/3305.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2277/3306.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2276/3306.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2277/3304.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2278/3305.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2276/3304.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2278/3306.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2278/3304.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2275/3305.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2275/3306.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2279/3305.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2275/3304.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2279/3306.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/2279/3304.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145746/211563.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145746/211562.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145747/211563.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145747/211562.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145745/211563.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145746/211564.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145745/211562.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145747/211564.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145746/211561.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145748/211563.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145747/211561.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145748/211562.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145745/211564.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145745/211561.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145748/211561.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/145748/211564.png relay=no
+[ERROR] Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "asyncio\events.py", line 94, in _run
+  File "asyncio\proactor_events.py", line 166, in _call_connection_lost
+ConnectionResetError: [WinError 10054] Connessione in corso interrotta forzatamente dall'host remoto
+INFO:     127.0.0.1:51495 - "WebSocket /api/conversations/conv_94603faeaa0d495195f95e6db6f00157/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:55113 - "WebSocket /api/conversations/conv_1dc7c0a8ab85441ea8ed619286fd187c/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:61894 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55107 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55461 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50363 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1925/3386.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1925/3385.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1926/3386.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1926/3385.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1924/3386.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1925/3387.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1925/3384.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1926/3387.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1924/3385.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1927/3386.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1926/3384.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1927/3385.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1924/3387.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1924/3384.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1927/3387.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/1927/3384.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/240/423.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/240/422.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/239/422.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/239/423.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/241/423.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/241/422.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/240/424.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/241/424.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/239/424.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/238/423.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/238/422.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/242/423.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/242/422.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/238/424.png relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10684062.065588797%2C3443946.7464169012%2C-10644926.307106785%2C3483082.5048989113&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/10/242/424.png relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10644926.307106785%2C3483082.5048989123%2C-10605790.548624774%2C3522218.2633809224&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10644926.307106785%2C3443946.7464169012%2C-10605790.548624774%2C3483082.5048989113&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10684062.065588797%2C3483082.5048989123%2C-10644926.307106785%2C3522218.2633809224&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10605790.548624776%2C3443946.7464169012%2C-10566654.790142765%2C3483082.5048989113&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10605790.548624776%2C3483082.5048989123%2C-10566654.790142765%2C3522218.2633809224&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10644926.307106785%2C3404810.987934892%2C-10605790.548624774%2C3443946.746416902&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10684062.065588797%2C3404810.987934892%2C-10644926.307106785%2C3443946.746416902&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10605790.548624776%2C3404810.987934892%2C-10566654.790142765%2C3443946.746416902&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10723197.824070806%2C3443946.7464169012%2C-10684062.065588795%2C3483082.5048989113&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10723197.824070806%2C3483082.5048989123%2C-10684062.065588795%2C3522218.2633809224&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10566654.790142765%2C3443946.7464169012%2C-10527519.031660754%2C3483082.5048989113&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10566654.790142765%2C3483082.5048989123%2C-10527519.031660754%2C3522218.2633809224&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10723197.824070806%2C3404810.987934892%2C-10684062.065588795%2C3443946.746416902&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10566654.790142765%2C3404810.987934892%2C-10527519.031660754%2C3443946.746416902&width=256&height=256 relay=no
+[INFO] geospatial_tile_proxy provider=noaa capability=noaa_radar upstream=https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetMap&layers=conus_bref_qcd&styles=&format=image%2Fpng&transparent=true&version=1.3.0&crs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=-10644926.307106785%2C3443946.7464169017%2C-10566654.790142765%2C3522218.2633809224&width=256&height=256 relay=no
+INFO:     127.0.0.1:52546 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61436 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:62668 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:51923 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
