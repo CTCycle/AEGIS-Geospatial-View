@@ -274,3 +274,28 @@ def test_runtime_repository_updates_one_block_atomically(tmp_path: Path) -> None
         repository.update({"map": {"legacy_tiles": "ignored"}})
 
     assert repository.get_required().map.tiles == "CartoDB Positron"
+
+
+###############################################################################
+def test_agent_execution_vision_policy_defaults_and_round_trip() -> None:
+    defaults = AppSettings().agent_execution
+    assert defaults.vision_policy == "disabled"
+    assert defaults.vision_max_calls == 2
+
+    payload = AppSettings().runtime_payload()
+    payload["agent_execution"]["vision_policy"] = "on_failure"
+    payload["agent_execution"]["vision_max_calls"] = 4
+    reloaded = AppSettings.model_validate(payload)
+    assert reloaded.agent_execution.vision_policy == "on_failure"
+    assert reloaded.agent_execution.vision_max_calls == 4
+
+    server_settings = reloaded.to_server_settings(DatabaseSettings(":memory:"))
+    assert server_settings.agent_execution.vision_policy == "on_failure"
+    assert server_settings.agent_execution.vision_max_calls == 4
+
+
+def test_agent_execution_rejects_unknown_vision_policy() -> None:
+    payload = AppSettings().runtime_payload()
+    payload["agent_execution"]["vision_policy"] = "sometimes"
+    with pytest.raises(Exception):
+        AppSettings.model_validate(payload)

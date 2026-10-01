@@ -101,13 +101,15 @@ class RenderCaptureStore:
                 f"Unsupported capture mime type '{mime_type}'. "
                 f"Supported: {sorted(SUPPORTED_CAPTURE_MIME_TYPES)}."
             )
-        if not isinstance(image_base64, str) or not _is_valid_base64(image_base64):
-            raise ValueError("image_base64 must be valid base64 image data.")
+        if not image_base64.strip():
+            raise ValueError("image_base64 must be non-empty.")
         if len(image_base64) > MAX_CAPTURE_BASE64_CHARS:
             raise ValueError(
                 "Capture exceeds the base64 size bound "
                 f"({MAX_CAPTURE_BASE64_CHARS} characters)."
             )
+        if not _is_valid_base64(image_base64):
+            raise ValueError("image_base64 must be valid base64 image data.")
         if width <= 0 or height <= 0:
             raise ValueError("Capture width and height must be positive.")
         bounds: tuple[float, float, float, float] | None = None

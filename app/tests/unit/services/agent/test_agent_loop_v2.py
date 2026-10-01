@@ -24,7 +24,11 @@ from server.domain.agent.capability_route import (
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.reliability import AgentExecutionBudget
-from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
+from server.domain.agent.tool_result import (
+    ToolExecutionError,
+    ToolExecutionMetadata,
+    ToolResult,
+)
 from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
 from server.services.agent.agent_loop import AgentLoop, AgentLoopRequest
@@ -32,6 +36,8 @@ from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.tool_definitions import RouteRequestInput
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.agent.vision_policy import TERMINAL_CALL_KIND
+from server.services.geospatial.render_capture import RenderCaptureStore
 from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.transport import LLMTransportPolicy
 
@@ -90,6 +96,19 @@ class FakeProvider:
         self.requests.append({"request": request, "kwargs": kwargs})
         return self.results.popleft()
 
+
+###############################################################################
+class VisionFakeProvider(FakeProvider):
+    # -------------------------------------------------------------------------
+    def __init__(self, results: list[LLMResult], *, vision: bool | None = True) -> None:
+        super().__init__(results)
+        self._vision = vision
+
+    # -------------------------------------------------------------------------
+    def supports_vision(self, model: str) -> bool | None:
+        _ = model
+        return self._vision
+
 ###############################################################################
 class FakeFactory:
 
@@ -144,6 +163,7 @@ def _loop(
     provider: FakeProvider,
     *,
     transport_policy: LLMTransportPolicy | None = None,
+    capture_store: Any | None = None,
 ) -> AgentLoop:
     capability_registry = FakeCapabilityRegistry()
     registry = ToolRegistry(runtime_registry=FakeRuntimeRegistry())  # type: ignore[arg-type]
@@ -196,6 +216,7 @@ def _loop(
         tool_registry=registry,
         tool_executor=ToolExecutor(tool_registry=registry),
         transport_policy=transport_policy,
+        capture_store=capture_store,
     )
 
 ###############################################################################
@@ -1967,3 +1988,207 @@ def test_completion_requires_verified_scope_for_every_requested_source(coverage,
     assert assessment.data_relevant is False
     if not expected:
         assert CompletionEvaluator.assess_evidence(state, state.tool_results[0]).reasons
+
+###############################################################################
+def _vision_state(render_verified: bool = True) -> AgentRunState:
+    state = _state()
+    state.render_verified = render_verified
+    state.render_observations = [
+        RenderObservation(
+            map_session_id="map-1",
+            collection_revision=1,
+            attempt=1,
+            status="ready",
+            viewport_bounds=[-73.0, 40.0, -72.0, 41.0],
+        )
+    ]
+    return state
+
+
+###############################################################################
+def _vision_capture_store(run_id: str = "request-1") -> RenderCaptureStore:
+    import base64
+
+    store = RenderCaptureStore()
+    store.save(
+        run_id=run_id,
+        map_session_id="map-1",
+        collection_revision=1,
+        mime_type="image/jpeg",
+        image_base64=base64.b64encode(b"fake-image-bytes").decode("ascii"),
+        width=640,
+        height=480,
+        viewport_bounds=[-73.0, 40.0, -72.0, 41.0],
+    )
+    return store
+
+
+###############################################################################
+def _image_parts(request: Any) -> list[dict[str, Any]]:
+    for message in request.messages:
+        content = message.get("content")
+        if isinstance(content, list):
+            return content
+    return []
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_always_policy_attaches_captured_map_to_next_model_step() -> None:
+    provider = VisionFakeProvider([LLMResult(content="ok")])
+    store = _vision_capture_store()
+    state = _vision_state()
+    loop = _loop(provider, capture_store=store)
+    request = AgentLoopRequest(
+        provider="fake",
+        model="vision-model",
+        state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        vision_policy="always",
+        vision_max_calls=2,
+    )
+    await loop._model_step(request, provider, [], [])  # pyright: ignore[reportPrivateUsage]
+
+    image_parts = _image_parts(provider.requests[0]["request"])
+    assert image_parts and image_parts[-1]["type"] == "image"
+    assert image_parts[0]["type"] == "text"
+    assert state.vision_state is not None
+    assert state.vision_state.attached_capture_ref == "map-1:1"
+    assert state.vision_state.vision_calls == 1
+    assert provider.requests[0]["request"].metadata.get("requires_vision") is True
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_non_vision_model_never_attaches() -> None:
+    provider = VisionFakeProvider([LLMResult(content="ok")], vision=False)
+    store = _vision_capture_store()
+    state = _vision_state()
+    loop = _loop(provider, capture_store=store)
+    request = AgentLoopRequest(
+        provider="fake",
+        model="text-model",
+        state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        vision_policy="always",
+        vision_max_calls=2,
+    )
+    await loop._model_step(request, provider, [], [])  # pyright: ignore[reportPrivateUsage]
+
+    assert _image_parts(provider.requests[0]["request"]) == []
+    assert state.vision_state is None
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_on_failure_policy_attaches_only_after_a_relevant_failure() -> None:
+    provider = VisionFakeProvider([LLMResult(content="ok")])
+    store = _vision_capture_store()
+    state = _vision_state()
+    state.tool_results = [
+        ToolResult(
+            call_id="f1",
+            tool_name="apply_map_plan",
+            status="failed",
+            summary="Map plan rejected",
+            error=ToolExecutionError(
+                error_type="semantic_validation",
+                code="rejected",
+                message="rejected",
+                retryable=False,
+                recovery="replan",
+            ),
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    ]
+    loop = _loop(provider, capture_store=store)
+    request = AgentLoopRequest(
+        provider="fake",
+        model="vision-model",
+        state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        vision_policy="on_failure",
+        vision_max_calls=2,
+    )
+    await loop._model_step(request, provider, [], [])  # pyright: ignore[reportPrivateUsage]
+
+    assert _image_parts(provider.requests[0]["request"])[-1]["type"] == "image"
+    assert state.vision_state is not None
+    assert state.vision_state.vision_calls == 1
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_final_check_policy_skips_iteration_and_attaches_on_terminal_call() -> None:
+    provider = VisionFakeProvider([LLMResult(content="ok"), LLMResult(content="ok")])
+    store = _vision_capture_store()
+    state = _vision_state()
+    loop = _loop(provider, capture_store=store)
+    request = AgentLoopRequest(
+        provider="fake",
+        model="vision-model",
+        state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        vision_policy="final_check",
+        vision_max_calls=2,
+    )
+    await loop._model_step(request, provider, [], [])  # pyright: ignore[reportPrivateUsage]
+    assert _image_parts(provider.requests[0]["request"]) == []
+    await loop._model_step(
+        request, provider, [], [], call_kind=TERMINAL_CALL_KIND
+    )  # pyright: ignore[reportPrivateUsage]
+    assert _image_parts(provider.requests[1]["request"])[-1]["type"] == "image"
+    assert state.vision_state is not None
+    assert state.vision_state.vision_calls == 1
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_missing_capture_degrades_to_non_vision_without_failing() -> None:
+    provider = VisionFakeProvider([LLMResult(content="ok")])
+    store = RenderCaptureStore()
+    state = _vision_state()
+    loop = _loop(provider, capture_store=store)
+    request = AgentLoopRequest(
+        provider="fake",
+        model="vision-model",
+        state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        vision_policy="always",
+        vision_max_calls=2,
+    )
+    await loop._model_step(request, provider, [], [])  # pyright: ignore[reportPrivateUsage]
+
+    assert _image_parts(provider.requests[0]["request"]) == []
+    assert state.vision_state is None
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_awaiting_render_capture_flag_is_policy_and_capability_gated() -> None:
+    loop = _loop(VisionFakeProvider([]))
+    state = _vision_state()
+
+    def _request(policy: str, vision: bool | None) -> AgentLoopRequest:
+        return AgentLoopRequest(
+            provider="fake",
+            model="vision-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            vision_policy=policy,
+            vision_max_calls=2,
+        )
+
+    # Vision-capable provider + always policy => capture requested.
+    loop.provider_factory = FakeFactory(VisionFakeProvider([]))  # type: ignore[attr-defined]
+    assert loop._capture_requested_for_outcome(  # pyright: ignore[reportPrivateUsage]
+        _request("always", True)
+    ) is True
+    assert loop._capture_requested_for_outcome(  # pyright: ignore[reportPrivateUsage]
+        _request("disabled", True)
+    ) is False
+    # Unknown vision capability degrades closed.
+    loop.provider_factory = FakeFactory(VisionFakeProvider([], vision=None))  # type: ignore[attr-defined]
+    assert loop._capture_requested_for_outcome(  # pyright: ignore[reportPrivateUsage]
+        _request("always", None)
+    ) is False

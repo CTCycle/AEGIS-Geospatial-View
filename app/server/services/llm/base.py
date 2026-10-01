@@ -202,24 +202,20 @@ class LLMProvider(ABC):
                     "does not support structured output."
                 ),
             )
-        request_vision_state = request.metadata.get("requires_vision")
-        supports_vision = (
-            request_vision_state
-            if isinstance(request_vision_state, bool)
-            else None
-        )
-        if request_vision_state is True and supports_vision is not True:
-            raise LLMStructuredOutputError(
-                category="model_capability",
-                provider=self.provider_name,
-                model=request.model,
-                stage="vision_content",
-                code="model_vision_unsupported",
-                detail=(
-                    f"Model '{request.model}' for provider '{self.provider_name}' "
-                    "does not support vision content."
-                ),
-            )
+        if request.metadata.get("requires_vision") is True:
+            supports_vision = self.supports_vision(request.model)
+            if supports_vision is not True:
+                raise LLMStructuredOutputError(
+                    category="model_capability",
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="vision_content",
+                    code="model_vision_unsupported",
+                    detail=(
+                        f"Model '{request.model}' for provider '{self.provider_name}' "
+                        "does not support vision content."
+                    ),
+                )
 
     # -------------------------------------------------------------------------
     @staticmethod
