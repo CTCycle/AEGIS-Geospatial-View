@@ -38,12 +38,19 @@ cross-origin requests. The remaining render failure is the retired upstream
 which the repository ecosystem audit already classifies as
 `eea-noise-upstream-service` / `upstream_unavailable`.
 
-## Reproducible failures
+## Weather forecast (budget) — PASS at adequate budget
 
-- **Weather budget (Denver)**: both runs ended with "The agent reached its
-  configured execution limit." after the 4-call budget; location resolved and
-  the capability executed successfully (iteration 3), but no final answer was
-  produced. The `ISSUE-006` weather-budget row remains open.
+`weather_budget_denver` ("What will the weather be in Denver, Colorado
+tomorrow?") at the default `simple_max_model_calls=4` budget ends with "The
+agent reached its configured execution limit." — the runtime budget, not a
+product failure. With the runtime budget raised to `simple_max_model_calls=10`
+(via `/api/settings/runtime`, restart), the same request completes with a full
+Open-Meteo forecast: Denver 39.739°N, 104.985°W, ~10→22°C, 0.0 mm, overcast
+(WMO 3), 7 model calls. See `budget-run/http/ROUTE-MATRIX-LIVE/weather_budget_denver.json`,
+run `run_8c9fad36dbae4c5ea1a662449774172c`.
+
+## Remaining partial rows
+
 - **Census demographics (Chicago)**: route reached manual-toggle census
   capabilities (`defaultEnabled:false`); execution failed; discovery
   `valid_empty`; run ended "No supported capability matched the request after

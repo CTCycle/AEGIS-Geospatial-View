@@ -384,7 +384,12 @@ def test_route_matrix_live_diagnostics(
         pytest.skip(f"Exact live provider lane was not ready: {preflight}")
 
     results: list[dict[str, Any]] = []
-    for scenario_id, prompt, expected_kind, hints in SCENARIOS:
+    scenarios = SCENARIOS
+    only = os.environ.get("APP_TEST_SCENARIO_FILTER", "").strip()
+    if only:
+        allowed = {token.strip() for token in only.split(",") if token.strip()}
+        scenarios = tuple(item for item in SCENARIOS if item[0] in allowed)
+    for scenario_id, prompt, expected_kind, hints in scenarios:
         page.goto(base_url)
         page.get_by_role("button", name="Start new chat").click()
         expect(page.locator(".chat-message--assistant")).to_have_count(0)
