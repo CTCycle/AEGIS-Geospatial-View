@@ -72,7 +72,7 @@ trusting downstream feature evidence.
 | Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
 | Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Requires the lower-tier contracts and exact-head evidence to be stable. |
 
-The current roll-up is 38 `PASS`, 3 `PARTIAL`, 2 `BLOCKED`, and 25 `UNRUN`.
+The current roll-up is 39 `PASS`, 3 `PARTIAL`, 2 `BLOCKED`, and 24 `UNRUN`.
 
 ### Campaign inventory reconciliation
 
@@ -80,10 +80,10 @@ The 68 campaign slices are counted exactly once as follows:
 
 | Status | Explicit slice IDs | Count |
 | --- | --- | ---: |
-| `PASS` | `T0-01`–`T0-05`, `T1-01`–`T1-12`, `T2-01`–`T2-07`, `T3-01`–`T3-10`, `T3-12`, `T4-01`, `T4-02`, `T4-08` | 38 |
+| `PASS` | `T0-01`–`T0-05`, `T1-01`–`T1-12`, `T2-01`–`T2-07`, `T3-01`–`T3-10`, `T3-12`, `T3-13`, `T4-01`, `T4-02`, `T4-08` | 39 |
 | `PARTIAL` | `T4-03`, `T4-04`, `T4-05` | 3 |
 | `BLOCKED` | `T4-06`, `T4-07` | 2 |
-| `UNRUN` | `T3-11`, `T3-13`–`T3-18`, `T4-09`–`T4-13`, `T5-01`–`T5-13` | 25 |
+| `UNRUN` | `T3-11`, `T3-14`–`T3-18`, `T4-09`–`T4-13`, `T5-01`–`T5-13` | 24 |
 
 `T4-01`/`T4-02`/`T4-08` are `PASS` for the deterministic isolated fixture and
 descriptor boundaries recorded in the [2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md).
@@ -93,9 +93,10 @@ and `T4-06`/`T4-07` are `BLOCKED` on missing configured camera sources and
 approved credentials respectively. These classifications do not claim live
 configured-source or credentialed-provider behavior.
 
-`T3-13`–`T3-18` remain explicit `UNRUN` inventory entries (`T3-10` is `PASS`
-per the [2026-10-01 T3-10 slice](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-10/report.md)
-and `T3-12` is `PASS` per the [2026-10-01 T3-12 slice](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-12/report.md);
+`T3-14`–`T3-18` remain explicit `UNRUN` inventory entries (`T3-10` is `PASS`
+per the [2026-10-01 T3-10 slice](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-10/report.md),
+`T3-12` is `PASS` per the [2026-10-01 T3-12 slice](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-12/report.md),
+and `T3-13` is `PASS` per the [2026-10-01 T3-13 slice](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-13/report.md);
 `T3-11` remains unopened). Their individual
 acceptance criteria were never preserved in the repository or its history
 (verified against the campaign-creation commit `9c2da7a4` and the QA
@@ -197,7 +198,7 @@ The Tier 1 application-foundations baseline remains recorded at
 `loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 38 `PASS`, 3 `PARTIAL`, 2 `BLOCKED`, and 25 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
+The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 39 `PASS`, 3 `PARTIAL`, 2 `BLOCKED`, and 24 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
 Tier 1 remains 12/12 `PASS`; the current Tier 2 ledger has seven `PASS` slices.
 Preserve historical source boundaries in the linked T1 reports.
 
