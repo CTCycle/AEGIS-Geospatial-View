@@ -156,7 +156,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     runVersion: number;
     mapSessionId: string;
     collectionRevision: number;
-    captureRequested: boolean;
+    captureRequested?: boolean;
   };
   private renderAckQueued = false;
   private pendingRenderAckMessageId?: string;
@@ -2093,11 +2093,11 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       runVersion: number;
       mapSessionId: string;
       collectionRevision: number;
-      captureRequested: boolean;
+      captureRequested?: boolean;
     },
     acknowledgement: MapRenderAcknowledgement,
   ): Promise<void> {
-    if (pendingRenderContext.captureRequested) {
+    if (pendingRenderContext.captureRequested === true) {
       const captured = this.mapPreview?.captureCurrentMap();
       if (captured) {
         const payload: RenderCapturePayload = {
