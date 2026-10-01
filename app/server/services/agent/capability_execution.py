@@ -212,7 +212,14 @@ class CapabilityExecutionService:
         status = _tool_status(response)
         summary = _response_summary(response, request=request, location=location)
         coverage = dict(response.coverage or {})
-        if response.result_type == "raster":
+        if str(coverage.get("type") or "").strip().casefold() == "circle":
+            # Provider-bounded radius results (Overpass ``around``) declare a
+            # circle coverage (center + radius_m). The provider already bounded
+            # the feature set to that circle, which is the authoritative scope;
+            # the geocoder bbox is too narrow for POI/landmark "around <place>"
+            # requests and must not reject the render.
+            coverage["spatial_scope_satisfied"] = True
+        elif response.result_type == "raster":
             # Raster/descriptor results serve the requested bounds directly
             # instead of returning intersection-checkable geometries. A
             # successful renderable result over a bounded or resolved-location

@@ -1,0 +1,322 @@
+INFO:     Started server process [36592]
+INFO:     Waiting for application startup.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite migration check: current=base, head=202609210001
+[INFO] Applying pending SQLite migrations to head 202609210001.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] Running upgrade  -> 202608200001, Create the initial SQLite schema.
+[INFO] Running upgrade 202608200001 -> 202608310001, Remove derived model capability metadata from persisted settings.
+[INFO] Running upgrade 202608310001 -> 202609050001, Persist the prepared map presentation and browser acknowledgment state.
+[INFO] Running upgrade 202609050001 -> 202609050002, Persist the client timezone captured for an agent run.
+[INFO] Running upgrade 202609050002 -> 202609090001, Persist bounded native-agent evidence for a conversation lifetime.
+[INFO] Running upgrade 202609090001 -> 202609090002
+[INFO] Running upgrade 202609090002 -> 202609140001, Add the canonical durable native conversation state.
+[INFO] Running upgrade 202609140001 -> 202609150001, Make native conversation state the only durable conversation snapshot.
+[INFO] Running upgrade 202609150001 -> 202609170001, Migrate legacy unresolved questions to scoped native clarification state.
+[INFO] Running upgrade 202609170001 -> 202609210001, Add the canonical SQLite-backed application runtime settings row.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite synchronization complete: path=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\t3-07-live-20261001T154757Z\database.db, revisions=202609210001
+[INFO] SQLite database is ready: fresh=True, migrations_applied=True
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5079 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63117 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:57589 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:59404 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:62657 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:59135 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50361 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:52865 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:51496 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:59604 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:57106 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:56970 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:56614 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:49997 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:49226 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:53539 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50399 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55231 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:62084 - "WebSocket /api/conversations/conv_d2c92c3b8e344815a5b35b66426543b7/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:54851 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:63840 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4382/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4382/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4382/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8760/6088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8760/6089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8761/6088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8759/6088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8761/6089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8760/6087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8761/6087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8759/6089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8759/6087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8760/6090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8762/6088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8761/6090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8762/6089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8759/6090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8758/6088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8758/6089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8762/6087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8758/6087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8762/6090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8758/6090.png relay=no
+INFO:     127.0.0.1:64808 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[ERROR] Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "asyncio\events.py", line 94, in _run
+  File "asyncio\proactor_events.py", line 166, in _call_connection_lost
+ConnectionResetError: [WinError 10054] Connessione in corso interrotta forzatamente dall'host remoto
+INFO:     127.0.0.1:56646 - "WebSocket /api/conversations/conv_fc06b3fb55604a54b9f3f12d42bcd23e/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:55099 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4354/2963.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4354/2962.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4353/2963.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4353/2962.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4355/2963.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4355/2962.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4354/2964.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4354/2961.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4353/2964.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4353/2961.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4352/2963.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4352/2962.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4355/2964.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4355/2961.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4352/2964.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4352/2961.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8708/5926.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8708/5925.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8707/5926.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8707/5925.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8709/5926.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8709/5925.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8708/5927.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8708/5924.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8707/5924.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8707/5927.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8706/5926.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8706/5925.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8709/5927.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8709/5924.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8706/5927.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8706/5924.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8710/5926.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8710/5925.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8710/5927.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8710/5924.png relay=no
+INFO:     127.0.0.1:64667 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61519 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:65382 - "WebSocket /api/conversations/conv_1f34af789f2d4b2898565d55b0f9646c/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:52665 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61522 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55178 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:61760 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:55388 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:50611 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:60291 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:60525 - "WebSocket /api/conversations/conv_a3399a82fc894ae088589a3e82933fc7/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:50474 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:60135 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4391/3508.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4391/3507.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4392/3508.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4392/3507.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4390/3508.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4391/3509.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4390/3507.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4392/3509.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4391/3506.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4393/3508.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4392/3506.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4393/3507.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4390/3509.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4390/3506.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4393/3509.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4393/3506.png relay=no
+INFO:     127.0.0.1:49309 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:59258 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[ERROR] Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "asyncio\events.py", line 94, in _run
+  File "asyncio\proactor_events.py", line 166, in _call_connection_lost
+ConnectionResetError: [WinError 10054] Connessione in corso interrotta forzatamente dall'host remoto
+INFO:     127.0.0.1:56905 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:54041 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:57908 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:49651 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:54890 - "WebSocket /api/conversations/conv_984a72424f23453f9695f750dbf04c8a/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:56150 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:64765 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4382/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4382/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4382/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8760/6088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8760/6089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8761/6088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8759/6088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8761/6089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8760/6087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8759/6089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8761/6087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8759/6087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8760/6090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8762/6088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8761/6090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8762/6089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8759/6090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8758/6088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8762/6087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8758/6089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8758/6087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8762/6090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8758/6090.png relay=no
+INFO:     127.0.0.1:54602 - "WebSocket /api/conversations/conv_d2f7b4e26ba041e18c5e14ad4ef9b4fd/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:50947 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:49796 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:49519 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4354/2963.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4354/2962.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4353/2963.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4353/2962.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4355/2963.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4355/2962.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4354/2964.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4354/2961.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4353/2964.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4353/2961.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4352/2963.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4352/2962.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4355/2964.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4355/2961.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4352/2964.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4352/2961.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8708/5926.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8708/5925.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8707/5926.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8707/5925.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8709/5926.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8709/5925.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8708/5927.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8708/5924.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8707/5924.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8707/5927.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8706/5926.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8706/5925.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8709/5927.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8706/5927.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8709/5924.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8706/5924.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8710/5926.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8710/5925.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8710/5924.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/14/8710/5927.png relay=no
+INFO:     127.0.0.1:58510 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:53322 - "WebSocket /api/conversations/conv_e238cbe7a4eb45f690dc998e569f1d82/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:57731 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:65532 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4391/3508.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4391/3507.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4392/3508.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4392/3507.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4390/3508.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4391/3509.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4390/3507.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4392/3509.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4393/3508.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4391/3506.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4392/3506.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4393/3507.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4390/3509.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4390/3506.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4393/3509.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4393/3506.png relay=no
+INFO:     127.0.0.1:55482 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:63903 - "WebSocket /api/conversations/conv_a97593e77933475286891705008e2fa1/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:64468 - "WebSocket /api/conversations/conv_152e3462accd4f1ca935a43b43484df0/realtime" 403
+INFO:     connection rejected (403 Forbidden)
