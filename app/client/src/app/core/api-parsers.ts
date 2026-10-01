@@ -1670,7 +1670,7 @@ export const parseRuntimeSettingsResponse = (value: unknown): RuntimeSettingsRes
       record.agent_execution,
       endpoint,
       'agent_execution',
-      [],
+      ['vision_policy'],
       [
         'initial_run_seconds', 'simple_seconds', 'complex_seconds', 'context_assembly_seconds',
         'native_model_call_seconds', 'tool_execution_seconds', 'tool_absolute_seconds',
@@ -1681,6 +1681,7 @@ export const parseRuntimeSettingsResponse = (value: unknown): RuntimeSettingsRes
         'max_consecutive_tool_failures', 'max_same_failed_fingerprint', 'max_route_corrections',
         'max_validation_corrections', 'model_max_attempts', 'provider_max_attempts',
         'retry_backoff_base_seconds', 'retry_backoff_max_seconds', 'provider_request_seconds',
+        'vision_max_calls',
       ],
     ),
     restart_required: requireApiBoolean(record, 'restart_required', endpoint),

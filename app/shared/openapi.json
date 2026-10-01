@@ -1428,6 +1428,47 @@
         }
       }
     },
+    "/api/geospatial/render-captures": {
+      "post": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Store Render Capture",
+        "operationId": "store_render_capture_api_geospatial_render_captures_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderCaptureCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderCaptureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/geospatial/cameras": {
       "get": {
         "tags": [
@@ -5616,6 +5657,24 @@
             "minimum": 0.1,
             "title": "Provider Request Seconds",
             "default": 10.0
+          },
+          "vision_policy": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "always",
+              "on_failure",
+              "final_check"
+            ],
+            "title": "Vision Policy",
+            "default": "disabled"
+          },
+          "vision_max_calls": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Vision Max Calls",
+            "default": 2
           }
         },
         "additionalProperties": false,
@@ -7192,6 +7251,123 @@
         ],
         "title": "PendingClarification",
         "description": "A clarification tied to the request that produced it.\n\nThe legacy ``unresolved_questions`` value is read only while hydrating\npre-schema-v2 persisted state.  This record is the durable source of\ntruth: status and source terms let a later turn consume the clarification\nwithout making it a global blocker for unrelated work."
+      },
+      "RenderCaptureCreateRequest": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Run Id"
+          },
+          "run_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Run Version"
+          },
+          "map_session_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Map Session Id"
+          },
+          "collection_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Collection Revision"
+          },
+          "mime_type": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ],
+            "title": "Mime Type",
+            "default": "image/jpeg"
+          },
+          "image_base64": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Image Base64"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Height"
+          },
+          "viewport_bounds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewport Bounds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "run_version",
+          "map_session_id",
+          "collection_revision",
+          "image_base64",
+          "width",
+          "height"
+        ],
+        "title": "RenderCaptureCreateRequest"
+      },
+      "RenderCaptureResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "map_session_id": {
+            "type": "string",
+            "title": "Map Session Id"
+          },
+          "collection_revision": {
+            "type": "integer",
+            "title": "Collection Revision"
+          },
+          "stored": {
+            "type": "boolean",
+            "title": "Stored"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "map_session_id",
+          "collection_revision",
+          "stored"
+        ],
+        "title": "RenderCaptureResponse"
       },
       "ResolvedLocation": {
         "properties": {

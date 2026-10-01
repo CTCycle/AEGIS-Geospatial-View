@@ -200,6 +200,18 @@
     accent-color: #3bb5f2;
 }
 
+.settings-hint {
+    margin: 0.35rem 0 0;
+    max-width: 46rem;
+    color: #9db6c2;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.settings-select-field select {
+    min-height: var(--settings-control-height);
+}
+
 .settings-provider-card {
     display: grid;
     align-content: start;

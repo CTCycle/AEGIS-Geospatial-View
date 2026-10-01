@@ -45,6 +45,7 @@ export const API_GEOSPATIAL_CAMERAS_PATH = '/geospatial/cameras';
 export const API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH = (providerId: string): string =>
   `/geospatial/sources/${encodeURIComponent(providerId)}/credential-status`;
 export const API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH = '/geospatial/providers/account-setup';
+export const API_GEOSPATIAL_RENDER_CAPTURES_PATH = '/geospatial/render-captures';
 export const API_CHAT_TURN_PATH = '/chat/turn';
 export const API_CHAT_MODELS_PATH = '/chat/models';
 export const API_CHAT_STRUCTURED_PROBE_PATH = '/chat/models/structured-probe';

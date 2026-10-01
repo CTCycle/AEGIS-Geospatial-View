@@ -11,6 +11,7 @@ import {
   API_GEOSPATIAL_CAPABILITIES_PATH,
   API_GEOSPATIAL_LAYERS_PATH,
   API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH,
+  API_GEOSPATIAL_RENDER_CAPTURES_PATH,
   API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH,
   API_OLLAMA_HEALTH_PATH,
   API_OLLAMA_PULL_PATH,
@@ -319,6 +320,29 @@ export const updateRuntimeSettings = async (
 export const refreshOllamaModels = async (): Promise<GenericObjectResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_REFRESH_PATH}`, { method: 'POST' });
   return parseOllamaRefreshResponse(data);
+};
+
+export interface RenderCapturePayload {
+  run_id: string;
+  run_version: number;
+  map_session_id: string;
+  collection_revision: number;
+  mime_type: string;
+  image_base64: string;
+  width: number;
+  height: number;
+  viewport_bounds?: [number, number, number, number] | number[];
+}
+
+export const postRenderCapture = async (
+  payload: RenderCapturePayload,
+): Promise<boolean> => {
+  await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_RENDER_CAPTURES_PATH}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return true;
 };
 
 export const pullOllamaModel = async (model: string): Promise<GenericObjectResponse> => {

@@ -47,6 +47,8 @@ import {
   RuntimeSettingsResponse,
   RuntimeSettingsUpdateRequest,
   StructuredProbeResponse,
+  VISION_POLICY_VALUES,
+  type VisionPolicy,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
@@ -178,6 +180,8 @@ const createDefaultRuntimeSettings = (): RuntimeSettingsResponse => ({
     retry_backoff_base_seconds: 0.25,
     retry_backoff_max_seconds: 2,
     provider_request_seconds: 10,
+    vision_policy: 'disabled',
+    vision_max_calls: 2,
   },
   restart_required: false,
   message: null,
@@ -185,6 +189,31 @@ const createDefaultRuntimeSettings = (): RuntimeSettingsResponse => ({
 
 const cloneRuntimeSettings = (settings: RuntimeSettingsResponse): RuntimeSettingsResponse =>
   JSON.parse(JSON.stringify(settings)) as RuntimeSettingsResponse;
+
+export const VISION_POLICY_OPTIONS: Readonly<
+  Array<{ value: VisionPolicy; label: string; hint: string }>
+> = [
+  {
+    value: 'disabled',
+    label: 'Disabled',
+    hint: 'Never capture or send the rendered map to the model.',
+  },
+  {
+    value: 'always',
+    label: 'Always',
+    hint: 'Visually inspect each meaningful rendered map as part of the normal agent loop.',
+  },
+  {
+    value: 'on_failure',
+    label: 'On Failure',
+    hint: 'Start without vision; after the first map-generation, map-understanding, or map-validation failure, use vision on the following attempts.',
+  },
+  {
+    value: 'final_check',
+    label: 'Final Check',
+    hint: 'Avoid vision during normal attempts; use it only for the final permitted attempt or after retries are exhausted.',
+  },
+];
 
 interface GeoProviderAccess {
   id: string;
@@ -286,6 +315,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   isTestingStructuredProbe = false;
 
   runtimeSettings: RuntimeSettingsResponse = createDefaultRuntimeSettings();
+  readonly visionPolicyOptions = VISION_POLICY_OPTIONS;
   runtimeSettingsDraft: RuntimeSettingsResponse = cloneRuntimeSettings(this.runtimeSettings);
   runtimeSettingsError = '';
   isLoadingRuntimeSettings = false;
@@ -424,6 +454,19 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         mergeModelCards(this.localModels, this.cloudModels),
       ),
     );
+  }
+
+  get visionPolicyUnavailable(): boolean {
+    return this.selectedAgentModelSummary?.supportsVision !== true;
+  }
+
+  get visionPolicyHint(): string {
+    if (this.visionPolicyUnavailable) {
+      return 'The currently selected model does not advertise vision support, so the rendered map will not be sent to it.';
+    }
+    return VISION_POLICY_OPTIONS.find(
+      (item) => item.value === this.runtimeSettingsDraft.agent_execution.vision_policy,
+    )?.hint ?? '';
   }
 
   get structuredProbeLabel(): string {

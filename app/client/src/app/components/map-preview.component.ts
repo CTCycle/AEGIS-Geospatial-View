@@ -77,6 +77,14 @@ export interface MapRenderStateChange {
   failureSummary?: string;
 }
 
+export interface MapCapturePayload {
+  dataUrl: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  viewportBounds?: [number, number, number, number];
+}
+
 @Component({
   selector: 'app-map-preview',
   standalone: true,
@@ -597,6 +605,9 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       style: this.mapSession?.basemap?.style_url || buildStyle(this.mapSession),
       center: [longitude, latitude],
       zoom: 12,
+      // Preserve the drawing buffer so ``toDataURL``/``toBlob`` reliably
+      // captures the rendered canvas for vision inspection.
+      preserveDrawingBuffer: true,
       });
     } catch (error) {
       this.mapPreparing = false;
@@ -835,6 +846,50 @@ candidate.on('load', () => {
   private removeCandidateContainer(candidate: HTMLDivElement, original: HTMLDivElement): void {
     if (candidate !== original) {
       candidate.remove();
+    }
+  }
+
+  /**
+   * Capture the currently rendered map canvas as a JPEG data URL.
+   *
+   * Returns null when no map is available or the canvas cannot be serialized.
+   * The capture is synchronous (preserveDrawingBuffer keeps the WebGL buffer
+   * readable) so it can be posted before the render acknowledgment.
+   */
+  captureCurrentMap(maxDimension = 1024): MapCapturePayload | null {
+    const map = this.mapRef;
+    if (!map) {
+      return null;
+    }
+    const canvas = (map as unknown as { getCanvas?: () => HTMLCanvasElement }).getCanvas?.();
+    if (!canvas || canvas.width <= 0 || canvas.height <= 0) {
+      return null;
+    }
+    try {
+      const scale = Math.min(1, maxDimension / Math.max(canvas.width, canvas.height));
+      let source: HTMLCanvasElement = canvas;
+      if (scale < 1) {
+        const scaled = document.createElement('canvas');
+        scaled.width = Math.max(1, Math.round(canvas.width * scale));
+        scaled.height = Math.max(1, Math.round(canvas.height * scale));
+        const context = scaled.getContext('2d');
+        if (context) {
+          context.drawImage(canvas, 0, 0, scaled.width, scaled.height);
+          source = scaled;
+        }
+      }
+      const mimeType = 'image/jpeg';
+      const dataUrl = source.toDataURL(mimeType, 0.7);
+      const evidence = this.renderEvidence('ready');
+      return {
+        dataUrl,
+        mimeType,
+        width: source.width,
+        height: source.height,
+        viewportBounds: evidence.viewportBounds,
+      };
+    } catch {
+      return null;
     }
   }
 

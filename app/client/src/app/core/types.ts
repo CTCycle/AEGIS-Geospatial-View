@@ -1107,7 +1107,18 @@ export interface RuntimeAgentExecutionSettings {
   retry_backoff_base_seconds: number;
   retry_backoff_max_seconds: number;
   provider_request_seconds: number;
+  vision_policy: VisionPolicy;
+  vision_max_calls: number;
 }
+
+export type VisionPolicy = 'disabled' | 'always' | 'on_failure' | 'final_check';
+
+export const VISION_POLICY_VALUES: readonly VisionPolicy[] = [
+  'disabled',
+  'always',
+  'on_failure',
+  'final_check',
+];
 
 export interface RuntimeSettingsResponse {
   schema_version: number;

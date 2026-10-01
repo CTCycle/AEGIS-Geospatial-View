@@ -611,12 +611,28 @@
             <label>Retry backoff max seconds <input class="settings-control" type="number" max="120.0" min="0" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_max_seconds" /></label>
             <label>Provider request seconds <input class="settings-control" type="number" max="120.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_request_seconds" /></label>
           </div>
-          <h3>Advanced limits</h3>
+<h3>Advanced limits</h3>
           <p>Limit parallel work and the size of each model-visible tool observation.</p>
           <div class="runtime-settings__fields runtime-settings__fields--wide">
             <label>Maximum parallel tool calls <input class="settings-control" type="number" max="32" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_parallel_tool_calls" /></label>
             <label>Maximum tool result characters <input class="settings-control" type="number" max="100000" min="128" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_tool_result_chars" /></label>
           </div>
+          <h3>Vision inspection</h3>
+          <p>When the selected model supports image input, AEGIS can capture the rendered map and give it to the agent as visual context.</p>
+          <div class="runtime-settings__fields runtime-settings__fields--wide">
+            <label class="settings-select-field">Vision policy
+              <select class="settings-control" [value]="runtimeSettingsDraft.agent_execution.vision_policy"
+                [disabled]="visionPolicyUnavailable"
+                (change)="runtimeSettingsDraft.agent_execution.vision_policy = $any($event.target).value"
+                aria-label="Vision inspection policy">
+                @for (option of visionPolicyOptions; track option.value) {
+                  <option [value]="option.value">{{ option.label }}</option>
+                }
+              </select>
+            </label>
+            <label>Vision calls per run <input class="settings-control" type="number" max="8" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.vision_max_calls" /></label>
+          </div>
+          <p class="settings-hint">{{ visionPolicyHint }}</p>
           <div class="settings-actions">
             <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save agent runtime settings' }}</button>
             <button type="button" class="secondary-button" [disabled]="isSavingRuntimeSettings" (click)="restoreAgentExecutionDefaults()">Restore agent defaults</button>
