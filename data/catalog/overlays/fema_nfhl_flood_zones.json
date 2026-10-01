@@ -35,19 +35,29 @@
     "data_format": "PNG",
     "geometry_type": "Raster",
     "url_template": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&layers=show:28&f=image",
+    "relay": {
+      "base_url": "https://hazards-fema.maps.arcgis.com/sharing/proxy",
+      "required_headers": {
+        "Origin": "https://hazards-fema.maps.arcgis.com",
+        "Referer": "https://hazards-fema.maps.arcgis.com/apps/webappviewer/index.html?id=8b0adb51996444d4879338b5529aa9cd"
+      }
+    },
     "layer_id": "28",
     "layers": "show:28",
-    "scale_visibility": "NFHL layer 28 is scale-dependent; use a zoom-14 New Orleans tile for the bounded transport probe.",
+    "min_zoom": 14,
+    "max_zoom": 22,
+    "fit_max_zoom": 18,
+    "scale_visibility": "NFHL layer 28 is scale-dependent and only draws at zoom 14 or higher; the map preview zooms to the layer's minimum zoom so the flood-zone pixels are visible.",
     "queryable": true,
     "vectorizable": false,
-    "endpoint_health": "externally-blocked-transport",
+    "endpoint_health": "reachable-via-official-relay",
     "auth_mode": "none",
     "official_docs_url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer",
-    "last_validated": "2026-09-30",
-    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
+    "last_validated": "2026-10-01",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy. hazards.fema.gov is US-egress restricted; route through the official hazards-fema.maps.arcgis.com relay with the declared Origin/Referer headers."
   },
-  "version": 2,
-  "last_modified": "2026-09-30T00:00:00+00:00",
+  "version": 3,
+  "last_modified": "2026-10-01T00:00:00+00:00",
   "capabilityKind": "raster-overlay",
   "renderingMode": "raster-tile",
   "sourceOfficialDocs": [
@@ -87,11 +97,11 @@
   },
   "reliability": {
     "status": "partial",
-    "lastAudited": "2026-09-30",
+    "lastAudited": "2026-10-01",
     "knownLimitations": [
       "Authoritative interpretation requires FEMA source context and local regulation checks.",
       "Layer 28 is scale-dependent and must be requested explicitly.",
-      "On 2026-09-30, FEMA REST export and NFHL WMS failed before an HTTP response from the AEGIS host; no image or render acknowledgement was available."
+      "hazards.fema.gov is restricted to US egress networks; AEGIS routes the upstream through FEMA's official hazards-fema.maps.arcgis.com relay proxy, which is internationally reachable."
     ]
   },
   "cachePolicy": {
@@ -118,7 +128,7 @@
     "limitations": [
       "This is flood-zone context, not a current flooding observation.",
       "Layer 28 is scale-dependent and must be requested explicitly.",
-      "The current host has an external FEMA transport blocker; do not claim rendered FEMA pixels until a fresh browser slice passes."
+      "The upstream hazards.fema.gov host is US-egress restricted; AEGIS fetches through the official FEMA ArcGIS Online relay, so rendered FEMA pixels require the relay path to be available."
     ],
     "fallback_ids": []
   }

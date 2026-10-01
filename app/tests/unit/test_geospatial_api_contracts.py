@@ -350,7 +350,9 @@ def test_geospatial_tile_proxy_ignores_environment_credentials(
 ) -> None:
     captured: dict[str, str] = {}
 
-    async def fake_fetch_binary_url(url: str) -> bytes:
+    async def fake_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
         captured["url"] = url
         return b"tile-binary"
 
@@ -383,8 +385,11 @@ def test_raster_tile_utility_returns_exact_web_mercator_bbox() -> None:
 def test_geospatial_fema_tile_proxy_materializes_bounded_export_request() -> None:
     captured: dict[str, str] = {}
 
-    async def fake_fetch_binary_url(url: str) -> bytes:
+    async def fake_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
         captured["url"] = url
+        captured["headers"] = headers or {}
         return b"\x89PNG\r\n\x1a\npng-tile"
 
     service = _build_api_service(ProviderRegistry())
@@ -400,22 +405,89 @@ def test_geospatial_fema_tile_proxy_materializes_bounded_export_request() -> Non
     assert response.content.startswith(b"\x89PNG")
     parsed = urlsplit(captured["url"])
     query = parse_qs(parsed.query)
-    assert parsed.netloc == "hazards.fema.gov"
-    assert query["bbox"] == [
-        ",".join(str(value) for value in web_mercator_tile_bbox(1, 1, 1))
-    ]
+    assert parsed.netloc == "hazards-fema.maps.arcgis.com"
+    assert parsed.path == "/sharing/proxy"
     assert query["bboxSR"] == ["3857"]
     assert query["imageSR"] == ["3857"]
     assert query["size"] == ["256,256"]
     assert query["format"] == ["png32"]
     assert query["transparent"] == ["true"]
     assert query["f"] == ["image"]
+    inner_url = next(
+        key
+        for key in query
+        if key.startswith(
+            "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export"
+        )
+    )
+    assert inner_url == (
+        "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox"
+    )
+    assert query[inner_url] == [
+        ",".join(str(value) for value in web_mercator_tile_bbox(1, 1, 1))
+    ]
+    headers = captured["headers"]
+    assert headers["Origin"] == "https://hazards-fema.maps.arcgis.com"
+    assert "webappviewer" in headers["Referer"]
+
+###############################################################################
+def test_relay_config_validates_manifest_relay_transport() -> None:
+    service = _build_api_service(ProviderRegistry())
+
+    valid = service._relay_config(
+        {
+            "relay": {
+                "base_url": "https://hazards-fema.maps.arcgis.com/sharing/proxy",
+                "required_headers": {
+                    "Origin": "https://hazards-fema.maps.arcgis.com",
+                    "Referer": "https://hazards-fema.maps.arcgis.com/apps/viewer/index.html",
+                },
+            }
+        }
+    )
+    assert valid is not None
+    assert valid["base_url"] == "https://hazards-fema.maps.arcgis.com/sharing/proxy"
+    assert valid["required_headers"]["Origin"].startswith("https://")
+
+    assert (
+        service._relay_config(
+            {
+                "relay": {
+                    "base_url": "http://hazards-fema.maps.arcgis.com/sharing/proxy",
+                    "required_headers": {"Origin": "https://example.com"},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        service._relay_config(
+            {
+                "relay": {
+                    "base_url": "https://untrusted.example/sharing/proxy",
+                    "required_headers": {"Origin": "https://example.com"},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        service._relay_config(
+            {"relay": {"base_url": "https://hazards-fema.maps.arcgis.com/sharing/proxy"}}
+        )
+        is None
+    )
+    assert service._relay_config({"relay": None}) is None
+    assert service._relay_config({"relay": {"base_url": "not-a-url"}}) is None
+    assert service._relay_config({}) is None
 
 ###############################################################################
 def test_geospatial_esa_tile_proxy_materializes_bounded_wms_get_map_request() -> None:
     captured: dict[str, str] = {}
 
-    async def fake_fetch_binary_url(url: str) -> bytes:
+    async def fake_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
         captured["url"] = url
         return b"\x89PNG\r\n\x1a\npng-tile"
 
@@ -485,7 +557,9 @@ def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time(
                 ),
             )
 
-    async def fake_fetch_binary_url(url: str) -> bytes:
+    async def fake_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
         captured["url"] = url
         return b"\x89PNG\r\n\x1a\npng-tile"
 
@@ -542,7 +616,9 @@ def test_geospatial_gibs_stable_capability_maps_to_provider_layer_and_time() -> 
                 attribution=["© NASA GIBS"],
             )
 
-    async def fake_fetch_binary_url(url: str) -> bytes:
+    async def fake_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
         captured["url"] = url
         return b"\x89PNG\r\n\x1a\npng-tile"
 
@@ -580,7 +656,9 @@ def test_geospatial_gibs_stable_capability_maps_to_provider_layer_and_time() -> 
 def test_geospatial_tile_proxy_rejects_malformed_coordinates_before_network() -> None:
     captured: list[str] = []
 
-    async def fake_fetch_binary_url(url: str) -> bytes:
+    async def fake_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
         captured.append(url)
         return b"\x89PNG\r\n\x1a\npng-tile"
 
@@ -600,7 +678,9 @@ def test_geospatial_tile_proxy_rejects_malformed_coordinates_before_network() ->
 def test_geospatial_tile_proxy_rejects_unresolved_template_before_network() -> None:
     captured: list[str] = []
 
-    async def fake_fetch_binary_url(url: str) -> bytes:
+    async def fake_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
         captured.append(url)
         return b"\x89PNG\r\n\x1a\npng-tile"
 
@@ -635,7 +715,9 @@ def test_geospatial_tile_proxy_rejects_unresolved_template_before_network() -> N
 def test_geospatial_tile_proxy_rejects_unknown_capability_without_network() -> None:
     captured: list[str] = []
 
-    async def fake_fetch_binary_url(url: str) -> bytes:
+    async def fake_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
         captured.append(url)
         return b"\x89PNG\r\n\x1a\npng-tile"
 
@@ -663,7 +745,9 @@ def test_geospatial_tile_proxy_rejects_unknown_capability_without_network() -> N
 def test_geospatial_tile_proxy_normalizes_upstream_failures_without_details(
     provider_error: Exception,
 ) -> None:
-    async def failing_fetch_binary_url(url: str) -> bytes:
+    async def failing_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
         del url
         raise provider_error
 
@@ -711,7 +795,9 @@ def test_geospatial_tile_proxy_logs_safe_raster_diagnostic_and_normalizes_respon
         capability_id="fema_nfhl_flood_zones",
     )
 
-    async def failing_fetch_binary_url(url: str) -> bytes:
+    async def failing_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
         del url
         raise RasterHttpError("secret provider response", diagnostic)
 

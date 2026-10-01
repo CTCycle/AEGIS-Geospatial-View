@@ -69,6 +69,9 @@ _SENSITIVE_TILE_QUERY_MARKERS = (
     "token",
 )
 
+_FEMA_RELAY_HOST = "hazards-fema.maps.arcgis.com"
+_FEMA_RELAY_PATH = "/sharing/proxy"
+
 ###############################################################################
 class GeospatialApiServiceError(Exception):
     """Base exception for geospatial API service failures."""
@@ -469,18 +472,24 @@ class GeospatialApiService:
             raise GeospatialUnsupportedTileError(
                 f"Capability '{capability_id}' does not expose a complete tile request."
             ) from exc
+        relay = self._relay_config(metadata)
+        fetch_headers: dict[str, str] | None = None
+        if relay is not None:
+            upstream_url = f"{relay['base_url']}?{upstream_url}"
+            fetch_headers = relay["required_headers"]
         LOGGER.info(
-            "geospatial_tile_proxy provider=%s capability=%s upstream=%s",
+            "geospatial_tile_proxy provider=%s capability=%s upstream=%s relay=%s",
             provider or "unknown",
             capability_id,
             self._sanitize_tile_url(upstream_url),
+            "yes" if relay is not None else "no",
         )
         try:
             with raster_diagnostic_scope(
                 provider_id=provider or "unknown",
                 capability_id=capability_id,
             ):
-                return await self._fetch_binary_url(upstream_url)
+                return await self._fetch_binary_url(upstream_url, headers=fetch_headers)
         except ProviderAuthError as exc:
             raise GeospatialTileCredentialError(
                 f"{self._humanize_provider(provider)} rejected the configured credentials."
@@ -1314,8 +1323,48 @@ class GeospatialApiService:
         return lookup.get(provider, provider or "Provider")
 
     # -------------------------------------------------------------------------
-    async def _fetch_binary_url(self, url: str) -> bytes:
-        body = await fetch_raster_image_url(url, {"User-Agent": "AEGIS/1.0"})
+    @staticmethod
+    def _relay_config(metadata: dict[str, Any]) -> dict[str, Any] | None:
+        """Return a validated relay transport for a manifest, when declared.
+
+        Some public upstreams (for example FEMA hazards.fema.gov) are restricted
+        to specific egress networks and must be reached through an official relay
+        that is internationally reachable. The relay is declared in manifest
+        metadata and applied at fetch time so the canonical source URL remains
+        the recorded provenance.
+        """
+
+        relay = metadata.get("relay")
+        if not is_json_object(relay):
+            return None
+        base_url = str(relay.get("base_url") or "").strip().rstrip("?")
+        if not base_url.startswith("https://"):
+            return None
+        parsed = urlsplit(base_url)
+        if parsed.hostname != _FEMA_RELAY_HOST or parsed.path.rstrip("/") != _FEMA_RELAY_PATH:
+            return None
+        required_headers = relay.get("required_headers")
+        if not is_json_object(required_headers):
+            return None
+        headers = {
+            str(key).strip(): str(value).strip()
+            for key, value in required_headers.items()
+            if str(value).strip()
+        }
+        if not headers:
+            return None
+        return {"base_url": base_url, "required_headers": headers}
+
+    # -------------------------------------------------------------------------
+    async def _fetch_binary_url(
+        self,
+        url: str,
+        headers: dict[str, str] | None = None,
+    ) -> bytes:
+        fetch_headers = {"User-Agent": "AEGIS/1.0"}
+        if headers:
+            fetch_headers.update(headers)
+        body = await fetch_raster_image_url(url, fetch_headers)
         if not body:
             raise ProviderUnavailableError("Provider returned an empty tile body.")
         # Keep the service boundary defensive for test doubles and future helpers.

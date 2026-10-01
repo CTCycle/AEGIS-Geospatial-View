@@ -1,0 +1,18 @@
+{
+  "backend": "http://127.0.0.1:5079",
+  "credential_present": true,
+  "data_root_isolated": true,
+  "model": "deepseek-v4.1-flash",
+  "probe": {
+    "model": "deepseek-v4.1-flash",
+    "parse_status": "complete",
+    "provider": "opencode-go",
+    "status": "passed"
+  },
+  "provider": "opencode-go",
+  "reason": "Stop marker requested shutdown.",
+  "selected_model": "deepseek-v4.1-flash",
+  "selected_provider": "opencode-go",
+  "status": "STOPPED",
+  "tested_at": "2026-10-01T09:19:42.144470+00:00"
+}

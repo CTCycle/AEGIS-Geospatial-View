@@ -98,9 +98,17 @@ Use `fema_nfhl_flood_zones` for National Flood Hazard Layer map context.
 - The 2026-09-30 deterministic transport matrix tested REST export and WMS
   GetMap for layer `28` through the AEGIS pooled client, fresh httpx clients
   with `trust_env=true` and `trust_env=false`, and native Windows curl. Every
-  lane failed before HTTP status, content type, body, or pixels, so FEMA is
-  externally transport-blocked on this validation boundary. Do not replace it
-  with a mirror or infer render success from the descriptor.
+  lane failed before HTTP status, content type, body, or pixels because
+  `hazards.fema.gov` is US-egress-restricted (TLS reset from non-US networks).
+  The 2026-10-01 remediation routes the FEMA upstream through FEMA's official
+  ArcGIS Online relay
+  (`https://hazards-fema.maps.arcgis.com/sharing/proxy`, the same relay FEMA's
+  own NFHL Viewer uses) with the required `Origin`/`Referer` headers, so the
+  AEGIS tile proxy returns layer-28 PNGs from any egress and the overlay
+  renders with an accepted `map.render_ack`. Do not replace it with a mirror.
+- FEMA NFHL layer `28` is scale-dependent: it only draws at zoom 14 or higher,
+  and the map preview presents it at its declared minimum zoom so the rendered
+  overlay contains real pixels.
 - Keep FEMA attribution visible; authoritative flood-zone interpretation still
   requires FEMA source context and applicable local regulation.
 

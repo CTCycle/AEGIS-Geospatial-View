@@ -35,6 +35,54 @@ async def test_provider_geometry_is_checked_against_requested_bbox(coordinates, 
     assert result.metadata.coverage["spatial_scope_satisfied"] is expected
 
 ###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "input_overrides",
+    [
+        {"bbox": [8, 47, 9, 48]},
+        {"location_ref": "new-orleans"},
+    ],
+)
+async def test_raster_result_satisfies_spatial_scope_for_bounded_request(
+    input_overrides: dict[str, object],
+) -> None:
+    response = ProviderResponse(
+        capability_id="places:hospitals",
+        provider_id="fema",
+        payload={"renderingMode": "raster-tile", "tileUrl": "https://example.test/export"},
+        result_type="raster",
+    )
+    provider = FakeProviderRegistry(response)
+
+    result = await _service(provider).execute_capability(
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals",
+            **input_overrides,
+        ),
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert result.metadata.coverage["spatial_scope_satisfied"] is True
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_raster_result_without_scope_leaves_spatial_scope_unsatisfied() -> None:
+    response = ProviderResponse(
+        capability_id="places:hospitals",
+        provider_id="fema",
+        payload={"renderingMode": "raster-tile", "tileUrl": "https://example.test/export"},
+        result_type="raster",
+    )
+    result = await _service(FakeProviderRegistry(response)).execute_capability(
+        ExecuteCapabilityInput(capability_id="places:hospitals"),
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert result.metadata.coverage.get("spatial_scope_satisfied") is False
+
+###############################################################################
 class FakeCapabilityRegistry:
 
     # -------------------------------------------------------------------------
