@@ -27,6 +27,7 @@ import { normalizeMapSession, parseAgentTaskState, parseContextUsage } from '../
 import { PersistedChatPageState } from '../core/app-state';
 import { MAX_CHAT_MESSAGE_LENGTH } from '../core/constants';
 import { formatCompactTokenCount } from '../core/token-format';
+import { postRenderCapture, type RenderCapturePayload } from '../core/api';
 import {
   parseRunCompletionPayload,
   parseRunEvent,
@@ -155,6 +156,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     runVersion: number;
     mapSessionId: string;
     collectionRevision: number;
+    captureRequested: boolean;
   };
   private renderAckQueued = false;
   private pendingRenderAckMessageId?: string;
@@ -761,6 +763,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
             runVersion: activeRun.run_version,
             mapSessionId,
             collectionRevision: revision,
+            captureRequested: this.readBoolean(
+              pendingPresentation['vision_capture_requested'],
+            ),
           };
           this.handleMapSession(candidate);
           this.status = 'Map data ready; rendering';
@@ -1348,6 +1353,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
               runVersion: event.run_version,
               mapSessionId: sessionId,
               collectionRevision: revision,
+              captureRequested: this.readBoolean(
+                rawPresentation['vision_capture_requested'],
+              ),
             };
             this.pendingRenderAcknowledgement = undefined;
             this.renderAckRetryCount = 0;
@@ -1576,6 +1584,10 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   private readNumber(value: unknown): number | undefined {
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  }
+
+  private readBoolean(value: unknown): boolean {
+    return value === true;
   }
 
   private rememberAcceptedRunVersion(runId: string | undefined, runVersion: number | undefined): void {
@@ -1993,17 +2005,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.pendingRenderAcknowledgement = acknowledgement;
         this.status = 'Map data ready; rendering';
         this.progressLabel = 'Map data ready; rendering';
-        try {
-          const messageId = this.realtimeService.sendMapRenderAck(acknowledgement);
-          if (this.renderAckQueued) {
-            this.pendingRenderAckMessageId = messageId;
-          }
-        } catch {
-          this.renderAckQueued = false;
-          this.pendingRenderAckMessageId = undefined;
-          this.pendingRenderAcknowledgement = undefined;
-          this.restoreCommittedMap('Map update failed; previous map retained');
-        }
+        void this.deliverReadyAcknowledgement(pendingRenderContext, acknowledgement);
         this.syncState();
         this.changeDetectorRef.detectChanges();
         return;
@@ -2083,6 +2085,61 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   private clampToolbarWidth(value: number): number {
     return Math.max(this.minWidth, Math.min(this.maxWidth, value));
+  }
+
+  private async deliverReadyAcknowledgement(
+    pendingRenderContext: {
+      runId: string;
+      runVersion: number;
+      mapSessionId: string;
+      collectionRevision: number;
+      captureRequested: boolean;
+    },
+    acknowledgement: MapRenderAcknowledgement,
+  ): Promise<void> {
+    if (pendingRenderContext.captureRequested) {
+      const captured = this.mapPreview?.captureCurrentMap();
+      if (captured) {
+        const payload: RenderCapturePayload = {
+          run_id: pendingRenderContext.runId,
+          run_version: pendingRenderContext.runVersion,
+          map_session_id: pendingRenderContext.mapSessionId,
+          collection_revision: pendingRenderContext.collectionRevision,
+          mime_type: captured.mimeType,
+          image_base64: captured.dataUrl.split(',')[1] ?? captured.dataUrl,
+          width: captured.width,
+          height: captured.height,
+          viewport_bounds: captured.viewportBounds,
+        };
+        try {
+          const race = Promise.race([
+            postRenderCapture(payload),
+            new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error('capture timeout')), 2500);
+            }),
+          ]);
+          await race;
+        } catch {
+          // Vision degrades cleanly: the acknowledgment still proceeds without
+          // a capture so the run is never blocked on the screenshot.
+          console.warn('Map capture for vision inspection failed; continuing without it.');
+        }
+      }
+    }
+    if (!this.renderAckQueued) {
+      return;
+    }
+    try {
+      const messageId = this.realtimeService.sendMapRenderAck(acknowledgement);
+      if (this.renderAckQueued) {
+        this.pendingRenderAckMessageId = messageId;
+      }
+    } catch {
+      this.renderAckQueued = false;
+      this.pendingRenderAckMessageId = undefined;
+      this.pendingRenderAcknowledgement = undefined;
+      this.restoreCommittedMap('Map update failed; previous map retained');
+    }
   }
 
   private stopResize(): void {
