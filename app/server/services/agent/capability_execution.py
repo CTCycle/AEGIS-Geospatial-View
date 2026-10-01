@@ -212,7 +212,16 @@ class CapabilityExecutionService:
         status = _tool_status(response)
         summary = _response_summary(response, request=request, location=location)
         coverage = dict(response.coverage or {})
-        if request.bbox is not None:
+        if response.result_type == "raster":
+            # Raster/descriptor results serve the requested bounds directly
+            # instead of returning intersection-checkable geometries. A
+            # successful renderable result over a bounded or resolved-location
+            # request satisfies the spatial scope contract (mirrors
+            # RainViewer's provider coverage declaration).
+            coverage["spatial_scope_satisfied"] = (
+                request.bbox is not None or request.location_ref is not None
+            )
+        elif request.bbox is not None:
             features = response.payload.get("features")
             if is_json_array(features) and features:
                 area = box(request.bbox[0], request.bbox[1], request.bbox[2], request.bbox[3])

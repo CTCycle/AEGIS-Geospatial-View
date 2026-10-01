@@ -80,9 +80,11 @@ describe('components/map-preview.component', () => {
     addControl: jasmine.Spy;
     on: jasmine.Spy;
     fitBounds: jasmine.Spy;
-    getLayer: jasmine.Spy;
+getLayer: jasmine.Spy;
     setLayoutProperty: jasmine.Spy;
     setPaintProperty: jasmine.Spy;
+    setZoom: jasmine.Spy;
+    getZoom: jasmine.Spy;
     zoomIn: jasmine.Spy;
     zoomOut: jasmine.Spy;
     resize: jasmine.Spy;
@@ -99,6 +101,8 @@ describe('components/map-preview.component', () => {
       getLayer: jasmine.createSpy('getLayer').and.returnValue({}),
       setLayoutProperty: jasmine.createSpy('setLayoutProperty'),
       setPaintProperty: jasmine.createSpy('setPaintProperty'),
+      setZoom: jasmine.createSpy('setZoom'),
+      getZoom: jasmine.createSpy('getZoom').and.returnValue(9),
       zoomIn: jasmine.createSpy('zoomIn'),
       zoomOut: jasmine.createSpy('zoomOut'),
       resize: jasmine.createSpy('resize'),
@@ -353,6 +357,60 @@ describe('components/map-preview.component', () => {
       [[12.4963044, 41.902725], [12.4964044, 41.902825]],
       { padding: 30, duration: 0, maxZoom: 6 },
     );
+  });
+
+  it('zooms a scale-dependent raster overlay to its declared minimum zoom', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{
+          id: 'fema_nfhl_flood_zones',
+          provider: 'fema',
+          type: 'raster-overlay',
+          rendering_mode: 'raster-tile',
+          tile_url_template: '/api/geospatial/tiles/fema_nfhl_flood_zones/{z}/{x}/{y}.png',
+          min_zoom: 14,
+          render: {
+            provider: 'fema',
+            layer_id: '28',
+            rendering_mode: 'raster-tile',
+            tile_url_template: '/api/geospatial/tiles/fema_nfhl_flood_zones/{z}/{x}/{y}.png',
+            min_zoom: 14,
+          },
+        }],
+        bounds: [12.4963044, 41.902725, 12.4964044, 41.902825],
+      }) as never,
+    };
+    fakeMap.getZoom.and.returnValue(9);
+
+    fixture.detectChanges();
+
+    expect(fakeMap.setZoom).toHaveBeenCalledWith(14, { duration: 0 });
+  });
+
+  it('does not zoom an overlay whose minimum zoom is already reached', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{
+          id: 'esa_worldcover',
+          provider: 'esa',
+          type: 'raster-overlay',
+          rendering_mode: 'wms',
+          tile_url_template: '/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png',
+          render: {
+            provider: 'esa',
+            layer_id: 'esa-worldcover-map-10m-2021-v2_map',
+            rendering_mode: 'wms',
+            tile_url_template: '/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png',
+          },
+        }],
+        bounds: [12.4963044, 41.902725, 12.4964044, 41.902825],
+      }) as never,
+    };
+    fakeMap.getZoom.and.returnValue(9);
+
+    fixture.detectChanges();
+
+    expect(fakeMap.setZoom).not.toHaveBeenCalled();
   });
 
   it('ignores invalid bounds for fitBounds', () => {

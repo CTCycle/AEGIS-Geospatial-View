@@ -665,7 +665,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       }
     });
 
-    candidate.on('load', () => {
+candidate.on('load', () => {
       if (!isCurrentCandidate()) {
         return;
       }
@@ -679,6 +679,18 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
           : DEFAULT_MAP_FIT_MAX_ZOOM;
         const maxZoom = this.fitMaxZoom(defaultMaxZoom);
         candidate.fitBounds(bounds, { padding: 30, duration: 0, maxZoom });
+        const rasterMinZoom = this.requiredRasterMinZoom();
+        if (
+          rasterMinZoom !== null
+          && typeof candidate.getZoom === 'function'
+          && typeof candidate.setZoom === 'function'
+          && candidate.getZoom() < rasterMinZoom
+        ) {
+          // Scale-dependent raster overlays (for example FEMA NFHL layer 28)
+          // only draw above their declared minimum zoom. Present them at a
+          // visible zoom so the acknowledged map contains real pixels.
+          candidate.setZoom(rasterMinZoom, { duration: 0 });
+        }
       }
       if (!this.hasRenderableCanvas(candidate, candidateContainer)) {
         candidateSettled = true;
@@ -1124,12 +1136,46 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     ));
   }
 
-  private fitMaxZoom(defaultMaxZoom: number): number {
+private fitMaxZoom(defaultMaxZoom: number): number {
     return this.overlays.reduce((maxZoom, overlay) => (
       isFiniteNumber(overlay.fit_max_zoom)
         ? Math.min(maxZoom, overlay.fit_max_zoom)
         : maxZoom
     ), defaultMaxZoom);
+  }
+
+  private requiredRasterMinZoom(): number | null {
+    return this.overlays.reduce<number | null>((minZoom, overlay) => {
+      if (!isRasterOverlay(overlay) || !this.isRequiredOverlay(overlay)) {
+        return minZoom;
+      }
+      const overlayMinZoom = (
+        overlay.render?.min_zoom
+        ?? overlay.min_zoom
+      );
+      if (!isFiniteNumber(overlayMinZoom)) {
+        return minZoom;
+      }
+      return minZoom === null ? Math.ceil(overlayMinZoom) : Math.max(minZoom, Math.ceil(overlayMinZoom));
+    }, null);
+  }
+
+  private isRequiredOverlay(overlay: OverlayEntry): boolean {
+    if (overlay.visible === false) {
+      return false;
+    }
+    if (this.mapSession?.overlay_collection) {
+      const instance = this.mapSession.overlay_collection.instances.find(
+        (candidate) => (
+          candidate.instance_id === overlay.id
+          || candidate.capability_id === overlay.capability_id
+        ),
+      );
+      if (instance && instance.visible === false) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private safeRenderError(error: unknown): string {
