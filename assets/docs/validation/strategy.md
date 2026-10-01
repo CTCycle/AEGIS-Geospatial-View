@@ -1,6 +1,6 @@
 # Comprehensive validation strategy
 
-Last updated: 2026-09-30
+Last updated: 2026-10-01
 
 This document is the durable digest of the AEGIS comprehensive validation
 roadmap, first established on `loop-dev` and continued on `develop`. It defines
@@ -93,12 +93,17 @@ and `T4-06`/`T4-07` are `BLOCKED` on missing configured camera sources and
 approved credentials respectively. These classifications do not claim live
 configured-source or credentialed-provider behavior.
 
-`T3-10`–`T3-18` remain explicit `UNRUN` inventory entries even though the
-current source documents do not preserve one verified objective for each ID.
-Their acceptance criteria must be recovered or established before execution;
-they must not be inferred from the broad Tier 3 description. The grouped Tier
-4B (`T4-09`–`T4-13`) and Tier 5 (`T5-01`–`T5-13`) ranges are counted by their
-declared cardinalities above.
+`T3-10`–`T3-18` remain explicit `UNRUN` inventory entries. Their individual
+acceptance criteria were never preserved in the repository or its history
+(verified against the campaign-creation commit `9c2da7a4` and the QA
+consolidation `f3b819f2`); the reconstructed per-gate contracts are now
+preserved in the
+[Tier 3 rendering and feature families checklist](tier3_rendering_and_feature_families.md)
+so they must not be re-inferred from the broad Tier 3 description. The grouped
+Tier 4B (`T4-09`–`T4-13`) and Tier 5 (`T5-01`–`T5-13`) ranges are counted by
+their declared cardinalities above; Tier 4B carries a one-lane-per-gate mapping
+recoverable from this document, while Tier 5 has a 12-theme-to-13-gate
+cardinality mismatch that must be resolved before execution.
 
 The 2026-09-30 T3-07/T3-09 implementation follow-up centralizes public
 raster browser transport at the manifest-backed AEGIS tile proxy, including
