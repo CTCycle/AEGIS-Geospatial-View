@@ -672,6 +672,24 @@ def test_router_normalizes_undated_recent_historical_scope_to_current() -> None:
     assert "recent_scope_normalized_to_current" in decision.reason_codes
 
 ###############################################################################
+def test_router_normalizes_undated_recent_aggregation_scope_to_current() -> None:
+    decision = _router().validate_route(
+        _route(
+            temporal_scope={
+                "mode": "historical",
+                "granularity": "none",
+                "aggregation": "recent",
+            }
+        ),
+        user_message="Show recent earthquakes around Tokyo.",
+        active_state=_state(),
+    )
+
+    assert decision.status == "accepted"
+    assert decision.route.temporal_scope.mode == "current"
+    assert "recent_scope_normalized_to_current" in decision.reason_codes
+
+###############################################################################
 def test_router_preserves_dated_historical_scope() -> None:
     decision = _router().validate_route(
         _route(

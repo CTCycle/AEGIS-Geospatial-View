@@ -932,6 +932,7 @@ def _normalize_recent_scope(
 
     temporal = route.temporal_scope
     granularity = temporal.granularity.strip().casefold()
+    aggregation = temporal.aggregation.strip().casefold()
     has_explicit_time = any(
         value is not None
         for value in (
@@ -940,10 +941,11 @@ def _normalize_recent_scope(
             temporal.end_time_iso,
         )
     )
+    recent_markers = {"current", "latest", "live", "near_real_time", "recent"}
     if (
         temporal.mode == "historical"
         and not has_explicit_time
-        and granularity in {"current", "latest", "live", "near_real_time", "recent"}
+        and (granularity in recent_markers or aggregation in recent_markers)
     ):
         return (
             route.model_copy(

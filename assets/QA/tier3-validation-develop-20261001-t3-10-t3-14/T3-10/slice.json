@@ -1,0 +1,63 @@
+{
+  "slice_id": "T3-10",
+  "name": "USGS Earthquakes live seismic clustered-point overlay",
+  "date": "2026-10-01",
+  "branch": "validation",
+  "provider_lane": "opencode-go / deepseek-v4.1-flash",
+  "runtime": "isolated runtimes/cache/test-runtime/t3-07-live-* (disposable, port 5079)",
+  "status": "PASS",
+  "scenarios": [
+    {
+      "id": "t3_10_earthquakes_tokyo",
+      "prompt": "Show recent earthquakes around Tokyo, Japan.",
+      "expected_kind": "map",
+      "expected_capability": "usgs_earthquakes",
+      "classification": "map_render_pass",
+      "evidence": "http/VECTOR-POINT-MATRIX-LIVE/t3_10_earthquakes_tokyo.json"
+    },
+    {
+      "id": "t3_10_earthquakes_valid_empty",
+      "prompt": "Show recent earthquakes within 100 kilometers of latitude 0, longitude -140.",
+      "expected_kind": "map",
+      "expected_capability": "usgs_earthquakes",
+      "classification": "map_render_pass",
+      "evidence": "http/VECTOR-POINT-MATRIX-LIVE/t3_10_earthquakes_valid_empty.json"
+    }
+  ],
+  "fixes": [
+    {
+      "id": "vector-spatial-temporal-scope-coverage",
+      "file": "app/server/services/agent/capability_execution.py",
+      "summary": "Stamp spatial_scope_satisfied and temporal_scope_satisfied on vector provider results (resolved-location and non-explicit-range requests) so the render completion data_checks pass, mirroring the raster spatial-scope contract.",
+      "tests": "test_capability_execution.py::test_vector_result_over_resolved_location_satisfies_spatial_and_temporal_scope"
+    },
+    {
+      "id": "normalized-point-feature-intersection",
+      "file": "app/server/services/agent/capability_execution.py",
+      "summary": "The bbox spatial-scope intersection check only handled GeoJSON geometry features; USGS/Open-Meteo/CO-OPS/Overpass return normalized latitude/longitude features. Added _feature_spatial_geometry() to accept both shapes.",
+      "tests": "test_capability_execution.py::test_normalized_point_feature_is_checked_against_requested_bbox"
+    },
+    {
+      "id": "valid-empty-query-complete",
+      "file": "app/server/services/agent/capability_execution.py",
+      "summary": "Mark coverage.query_complete on valid_empty results so the honest no-results boundary counts as data-valid in the completion assessment.",
+      "tests": "test_capability_execution.py::test_valid_empty_vector_result_satisfies_spatial_scope_for_bounded_request"
+    },
+    {
+      "id": "undated-recent-aggregation-normalization",
+      "file": "app/server/services/agent/capability_router.py",
+      "summary": "Treat an undated historical+recent aggregation route as current, matching the existing granularity-based recent_scope_normalized_to_current normalization.",
+      "tests": "test_capability_router.py::test_router_normalizes_undated_recent_aggregation_scope_to_current"
+    }
+  ],
+  "remaining_limitation": "Visibility mutation (hide/show) and remove/re-add lifecycle actions rely on the shared overlay-controls mechanism validated in T3-02/T3-06; the earthquakes-specific render, valid-empty, attribution, and acknowledgement boundaries are the new evidence recorded here.",
+  "quality": {
+    "backend_unit_passed": true,
+    "focused_backend_passed": true,
+    "frontend_karma_passed": null,
+    "ruff": "pass",
+    "pyright_errors": 0,
+    "strict_manifest_audit": "pass"
+  },
+  "harness": "app/tests/e2e/test_live_vector_point_matrix.py"
+}

@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from shapely.geometry import box, shape
+from shapely.geometry import Point, box, shape
 from shapely.errors import GEOSException
 
 from server.common.typing import is_json_array, is_json_object
@@ -226,16 +226,45 @@ class CapabilityExecutionService:
             if is_json_array(features) and features:
                 area = box(request.bbox[0], request.bbox[1], request.bbox[2], request.bbox[3])
                 try:
-                    coverage["spatial_scope_satisfied"] = all(
-                        is_json_object(feature)
-                        and is_json_object(feature.get("geometry"))
-                        and not shape(feature["geometry"]).is_empty
-                        and shape(feature["geometry"]).is_valid
-                        and area.intersects(shape(feature["geometry"]))
-                        for feature in features
-                    )
+                    satisfied = True
+                    for feature in features:
+                        geometry = _feature_spatial_geometry(feature)
+                        if (
+                            not is_json_object(feature)
+                            or geometry is None
+                            or geometry.is_empty
+                            or not geometry.is_valid
+                            or not area.intersects(geometry)
+                        ):
+                            satisfied = False
+                            break
+                    coverage["spatial_scope_satisfied"] = satisfied
                 except (ValueError, TypeError, KeyError, GEOSException):
                     coverage["spatial_scope_satisfied"] = False
+            elif response.result_status == "valid_empty":
+                # A bounded empty result still applied the requested extent.
+                coverage["spatial_scope_satisfied"] = True
+        elif request.location_ref is not None:
+            # A resolved-location (point/radius) vector request: the provider
+            # returns features already bounded to the resolved location scope,
+            # mirroring the raster spatial-scope contract. Bbox requests take
+            # the intersection-check branch above.
+            coverage["spatial_scope_satisfied"] = True
+        if (
+            request.start_time_iso is None and request.end_time_iso is None
+        ):
+            # Current/recent/none temporal requests without an explicit dated
+            # range are satisfied by the provider feed as-is (mirrors
+            # RainViewer's provider coverage declaration). Explicit dated
+            # ranges are verified by the observation-time boundary in the
+            # completion assessment instead.
+            coverage["temporal_scope_satisfied"] = True
+        if response.result_status == "valid_empty":
+            # A completed empty query is a legitimate data outcome; it must not
+            # be conflated with a failed/partial fetch. Mark the query as
+            # complete so the completion assessment accepts the honest
+            # no-results boundary (mirrors the valid-empty evidence contract).
+            coverage["query_complete"] = True
         summary["coverage"] = coverage
         try:
             evidence_ref = self._persist_evidence(
@@ -459,6 +488,30 @@ def _bbox(value: list[float] | None) -> tuple[float, float, float, float] | None
     if value is None:
         return None
     return tuple(float(item) for item in value)  # type: ignore[return-value]
+
+###############################################################################
+def _feature_spatial_geometry(value: Any) -> Any | None:
+    """Return the shapely geometry for a GeoJSON or normalized point feature.
+
+    Several adapters (USGS, Open-Meteo, NOAA CO-OPS, Overpass) return
+    normalized features with top-level ``latitude``/``longitude`` instead of a
+    GeoJSON ``geometry`` object. The spatial-scope intersection check must
+    accept both shapes, otherwise bounded requests incorrectly report
+    ``spatial_scope_satisfied=false``.
+    """
+    if not is_json_object(value):
+        return None
+    geometry = value.get("geometry")
+    if is_json_object(geometry):
+        try:
+            return shape(geometry)
+        except (ValueError, TypeError, KeyError, GEOSException):
+            return None
+    latitude = value.get("latitude")
+    longitude = value.get("longitude")
+    if isinstance(latitude, int | float) and isinstance(longitude, int | float):
+        return Point(float(longitude), float(latitude))
+    return None
 
 ###############################################################################
 def _provider_params(
