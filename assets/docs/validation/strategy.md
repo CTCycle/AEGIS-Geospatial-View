@@ -67,12 +67,12 @@ trusting downstream feature evidence.
 | Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | The [2026-09-22 Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md) passed all five on its tested boundary. The [2026-09-25 T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) revalidated the exact-head Windows launcher boundary: fresh/warm readiness, outage startup, ownership/PID-reuse safety, injected cleanup, canonical-state protection, and final port cleanup pass. `T0-04` is `PASS`; its unavailable historical timing comparator is explicitly non-gating. |
 | Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 checklist](tier1_application_foundations.md), [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [2026-09-23 T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), [2026-09-22 T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md), and [2026-09-21 baseline](../../QA/tier1-application-foundations-20260921/report.md). Tier 1 remains 12/12 `PASS`. |
 | Tier 2 | `T2-01` through `T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | The [2026-09-24 continuation](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md) passes `T2-01`/`T2-02` on the exact OpenCode Go lane; `T2-03` remains `PASS`. The [2026-09-25 continuation](../../QA/tier2-validation-develop-20260925-next-slices/report.md) passes the tested `T2-05`/`T2-06`/`T2-07` scenarios, and the [T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) passes `T2-04` with five pages, 50 unique candidates, and `next_cursor=null` under an approved isolated six-call budget restored to four afterward. `ISSUE-001` is resolved. |
-| Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | `T3-01`/`T3-02`/`T3-03`/`T3-04`/`T3-05`/`T3-06` pass current location-only, NOAA, USGS/Census vector, visibility-mutation, basemap, composition, and selective-removal checks. `T3-07` remains `PARTIAL`: FEMA layer `28` fails the current REST/WMS/fresh-httpx/curl transport matrix before a provider image or live raster acknowledgement; the dependent FEMA composition boundary remains gated on standalone FEMA rendering. `T3-08` remains `PASS` after all 12 advertised GIBS cases met the browser acceptance boundary. `T3-09` is `PARTIAL`: the exact-lane RainViewer browser request rendered visibly and acknowledged, but the fresh QA runtime had no OpenCode Go model assignment. See the [2026-09-30 T3-07/T3-09 report](../../QA/tier3-validation-develop-20260930-t3-07-t3-09/report.md), [raster-provider-fixes follow-up](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/report.md), [environmental follow-up](../../QA/tier3-validation-develop-20260928-environmental/report.md), and [vector-composition report](../../QA/tier3-validation-develop-20260926-vector-composition/report.md). Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
+| Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | `T3-01`/`T3-02`/`T3-03`/`T3-04`/`T3-05`/`T3-06`, `T3-08`, and `T3-09` pass current browser-authoritative checks. `T3-07` remains `PARTIAL`: FEMA layer `28` fails the current REST/WMS/fresh-httpx/curl transport matrix before a provider image or live raster acknowledgement; the dependent FEMA composition boundary remains gated on standalone FEMA rendering. `T3-08` remains `PASS` after all 12 advertised GIBS cases met the browser acceptance boundary. `T3-09` is `PASS`: the exact Settings-API bootstrap persisted `opencode-go / deepseek-v4.1-flash`, the native structured probe passed, and the browser acknowledgement recorded source/layer/pixel evidence. See the [final 2026-09-30 T3-07/T3-09 report](../../QA/tier3-validation-develop-20260930-t3-07-t3-09-final/report.md), [raster-provider-fixes follow-up](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/report.md), [environmental follow-up](../../QA/tier3-validation-develop-20260928-environmental/report.md), and [vector-composition report](../../QA/tier3-validation-develop-20260926-vector-composition/report.md). Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
 | Tier 4A | `T4-01`–`T4-08` | CSV/GeoJSON ingestion, optional heavy formats, mobility data, local/configured sources, cameras, credentialed providers, and catalog-only descriptors. | Run only with isolated data and approved credentials/snapshots. |
 | Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
 | Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Requires the lower-tier contracts and exact-head evidence to be stable. |
 
-The current roll-up is 31 `PASS`, 2 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`.
+The current roll-up is 32 `PASS`, 1 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`.
 
 ### Campaign inventory reconciliation
 
@@ -80,8 +80,8 @@ The 68 campaign slices are counted exactly once as follows:
 
 | Status | Explicit slice IDs | Count |
 | --- | --- | ---: |
-| `PASS` | `T0-01`–`T0-05`, `T1-01`–`T1-12`, `T2-01`–`T2-07`, `T3-01`–`T3-06`, `T3-08` | 31 |
-| `PARTIAL` | `T3-07`, `T3-09` | 2 |
+| `PASS` | `T0-01`–`T0-05`, `T1-01`–`T1-12`, `T2-01`–`T2-07`, `T3-01`–`T3-06`, `T3-08`, `T3-09` | 32 |
+| `PARTIAL` | `T3-07` | 1 |
 | `UNRUN` | `T3-10`–`T3-18`, `T4-01`–`T4-08`, `T4-09`–`T4-13`, `T5-01`–`T5-13` | 35 |
 
 `T3-10`–`T3-18` remain explicit `UNRUN` inventory entries even though the
@@ -99,9 +99,9 @@ visible attributed RainViewer raster over Naples with `render_observed=ready`.
 FEMA layer `28` failed the deterministic transport matrix before status,
 content, or pixels, while the previously recorded 12-case GIBS browser
 boundary remains valid. `T3-07` remains `PARTIAL`, `T3-08` remains `PASS`, and
-`T3-09` remains `PARTIAL` because the successful RainViewer browser run used
-the launcher's configured canonical data root after a fresh QA root proved
-unable to supply the exact OpenCode Go model assignment.
+`T3-09` is now `PASS`: the exact Settings-API bootstrap persisted
+`opencode-go / deepseek-v4.1-flash` in a fresh disposable runtime, the native
+structured probe passed, and the subsequent browser run received an accepted visible-raster acknowledgement.
 The subsequent current-head contract follow-up at
 `develop@889066b3` closes a repository defect where `tile`, `xyz`, `wms`, and
 `wmts` raster candidates bypassed the visibility-proof requirement; it does
@@ -162,7 +162,7 @@ The Tier 1 application-foundations baseline remains recorded at
 `loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 31 `PASS`, 2 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
+The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 32 `PASS`, 1 `PARTIAL`, 0 `BLOCKED`, and 35 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
 Tier 1 remains 12/12 `PASS`; the current Tier 2 ledger has seven `PASS` slices.
 Preserve historical source boundaries in the linked T1 reports.
 
