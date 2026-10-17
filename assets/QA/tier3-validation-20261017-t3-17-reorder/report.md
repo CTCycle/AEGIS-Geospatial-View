@@ -3,7 +3,7 @@
 Date: 2026-10-17
 Status: `PASS`
 Branch: `validation`
-Tested source: `7dc62147219bd84ef259b4826c10ead9dfa3fadf` plus the scoped working-tree changes recorded in this commit.
+Tested source: `validation@1b1cf25b655d7c72941d35a4a9ed98b489268ff5` (the browser and local checks exercised the same source tree).
 Browser: Codex in-app Browser at `http://127.0.0.1:5079/`
 Agent lane: `opencode-go / deepseek-v4.1-flash` (isolated runtime probe passed; no model substitution).
 
@@ -53,5 +53,10 @@ isolated runtime. No credential value is included in this evidence. The runtime
 and isolated database were stopped and removed after evidence collection; the
 cleanup record is in [runtime-cleanup.json](runtime-cleanup.json).
 
-Hosted CI is recorded separately from this local/browser report after the
-scoped change is pushed.
+## Hosted CI boundary
+
+For exact source commit `1b1cf25b655d7c72941d35a4a9ed98b489268ff5`, GitHub's
+Actions query returned zero workflow runs and the combined commit status had
+no status entries. Hosted CI is therefore `NOT RUN / unavailable` for this
+head; the local Karma/build and browser results above are separate evidence
+and are not reported as hosted CI.
