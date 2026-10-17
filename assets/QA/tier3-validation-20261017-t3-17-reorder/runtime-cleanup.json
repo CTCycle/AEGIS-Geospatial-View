@@ -1,0 +1,9 @@
+{
+  "runtime": "isolated T3-17 exact-lane browser runtime",
+  "backend": "http://127.0.0.1:5079",
+  "backend_process_running": false,
+  "port_5079_listening": false,
+  "isolated_data_root": "runtimes/cache/test-runtime/t3-17-reorder",
+  "isolated_data_root_removed": true,
+  "verified_after_shutdown": "2026-10-17"
+}

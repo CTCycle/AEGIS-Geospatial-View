@@ -59,6 +59,15 @@ const parseNumberRecord = (value: unknown): Record<string, number> => {
   }, {});
 };
 
+const parseStringList = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return [...new Set(value.filter((entry): entry is string => (
+    typeof entry === 'string' && entry.trim().length > 0
+  )))];
+};
+
 const parseNonNegativeNumber = (value: unknown, fallback: number): number => (
   typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback
 );
@@ -90,6 +99,7 @@ export const defaultAppState = (): PersistedAppState => ({
     mapState: {
       overlayVisibility: {},
       overlayOpacity: {},
+      overlayOrder: [],
     },
     scrollY: 0,
   },
@@ -148,6 +158,7 @@ export const loadPersistedAppState = (): PersistedAppState => {
         next.chatPage.mapState = {
           overlayVisibility: parseBooleanRecord(parsed.chatPage.mapState.overlayVisibility),
           overlayOpacity: parseNumberRecord(parsed.chatPage.mapState.overlayOpacity),
+          overlayOrder: parseStringList(parsed.chatPage.mapState.overlayOrder),
         };
       }
 

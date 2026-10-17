@@ -83,6 +83,7 @@ describe('components/map-preview.component', () => {
 getLayer: jasmine.Spy;
     setLayoutProperty: jasmine.Spy;
     setPaintProperty: jasmine.Spy;
+    moveLayer: jasmine.Spy;
     setZoom: jasmine.Spy;
     getZoom: jasmine.Spy;
     zoomIn: jasmine.Spy;
@@ -101,6 +102,7 @@ getLayer: jasmine.Spy;
       getLayer: jasmine.createSpy('getLayer').and.returnValue({}),
       setLayoutProperty: jasmine.createSpy('setLayoutProperty'),
       setPaintProperty: jasmine.createSpy('setPaintProperty'),
+      moveLayer: jasmine.createSpy('moveLayer'),
       setZoom: jasmine.createSpy('setZoom'),
       getZoom: jasmine.createSpy('getZoom').and.returnValue(9),
       zoomIn: jasmine.createSpy('zoomIn'),
@@ -119,7 +121,7 @@ getLayer: jasmine.Spy;
   });
 
   it('does not emit an empty overlay state before a map session exists', () => {
-    const emitted: Array<{ overlayVisibility: Record<string, boolean>; overlayOpacity: Record<string, number> }> = [];
+    const emitted: Array<{ overlayVisibility: Record<string, boolean>; overlayOpacity: Record<string, number>; overlayOrder: string[] }> = [];
     component.overlayStateChange.subscribe((value) => emitted.push(value));
     fixture.componentRef.setInput('initialOverlayVisibility', { weather: false });
     fixture.componentRef.setInput('initialOverlayOpacity', { weather: 0.33 });
@@ -501,7 +503,7 @@ getLayer: jasmine.Spy;
   });
 
   it('emits visibility and opacity updates', () => {
-    const emitted: Array<{ overlayVisibility: Record<string, boolean>; overlayOpacity: Record<string, number> }> = [];
+    const emitted: Array<{ overlayVisibility: Record<string, boolean>; overlayOpacity: Record<string, number>; overlayOrder: string[] }> = [];
     component.overlayStateChange.subscribe((value) => emitted.push(value));
     component.payload = {
       map_session: makeMapSession({
@@ -513,6 +515,47 @@ getLayer: jasmine.Spy;
     component.setOverlayOpacity('ov1', '25');
     expect(emitted.at(-1)?.overlayVisibility['ov1']).toBeFalse();
     expect(emitted.at(-1)?.overlayOpacity['ov1']).toBeCloseTo(0.25, 2);
+  });
+
+  it('restores and emits a reconciled order for the active session', () => {
+    component.initialOverlayOrder = ['vector', 'removed'];
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          { id: 'raster', label: 'Raster', type: 'tile', provider: 'fixture' },
+          { id: 'vector', label: 'Vector', type: 'geojson', provider: 'fixture' },
+          { id: 'new', label: 'New', type: 'tile', provider: 'fixture' },
+        ],
+      }) as never,
+    };
+    const emitted: string[][] = [];
+    component.overlayStateChange.subscribe((state) => emitted.push(state.overlayOrder));
+
+    fixture.detectChanges();
+
+    expect(component.overlays.map((overlay) => overlay.id)).toEqual(['vector', 'raster', 'new']);
+    expect(emitted.at(-1)).toEqual(['vector', 'raster', 'new']);
+    expect(component.restoreNotice).toContain('1 removed or unknown overlay id');
+  });
+
+  it('applies user order to MapLibre layers from back to front', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          { id: 'raster', label: 'Raster', type: 'tile', rendering_mode: 'raster-tile', url: 'https://tiles.example/{z}/{x}/{y}.png', provider: 'fixture' },
+          { id: 'vector', label: 'Vector', type: 'tile', rendering_mode: 'raster-tile', url: 'https://tiles.example/{z}/{x}/{y}.png', provider: 'fixture' },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+    fakeMap.moveLayer.calls.reset();
+    component.setOverlayOrder(['vector', 'raster']);
+
+    expect(fakeMap.moveLayer.calls.allArgs()).toEqual([
+      ['overlay-layer-raster'],
+      ['overlay-layer-vector'],
+    ]);
   });
 
   it('clamps and ignores invalid overlay opacity values', () => {

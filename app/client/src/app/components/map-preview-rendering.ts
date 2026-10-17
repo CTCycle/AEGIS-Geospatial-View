@@ -34,6 +34,40 @@ export const mapSessionOverlayEntries = (mapSession?: MapSession): OverlayEntry[
   }) || []
 );
 
+export const reconcileOverlayOrder = (
+  overlays: readonly OverlayEntry[],
+  preferredOrder: readonly string[] = [],
+): string[] => {
+  const availableIds = new Set(overlays.map((overlay) => overlay.id));
+  const seenIds = new Set<string>();
+  const order: string[] = [];
+  for (const id of preferredOrder) {
+    if (availableIds.has(id) && !seenIds.has(id)) {
+      seenIds.add(id);
+      order.push(id);
+    }
+  }
+  for (const overlay of overlays) {
+    if (!seenIds.has(overlay.id)) {
+      seenIds.add(overlay.id);
+      order.push(overlay.id);
+    }
+  }
+  return order;
+};
+
+export const orderOverlayEntries = (
+  overlays: readonly OverlayEntry[],
+  preferredOrder: readonly string[] = [],
+): OverlayEntry[] => {
+  const order = reconcileOverlayOrder(overlays, preferredOrder);
+  const positionById = new globalThis.Map(order.map((id, index) => [id, index]));
+  return [...overlays].sort((left, right) => (
+    (positionById.get(left.id) ?? Number.MAX_SAFE_INTEGER)
+    - (positionById.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+  ));
+};
+
 const toMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
@@ -371,6 +405,29 @@ export const getOverlayLayerIds = (overlay: OverlayEntry): string[] => {
     ];
   }
   return [layerId];
+};
+
+export const applyOverlayLayerOrder = (
+  map: Map,
+  overlays: readonly OverlayEntry[],
+  preferredOrder: readonly string[] = [],
+): void => {
+  const overlaysById = new globalThis.Map(overlays.map((overlay) => [overlay.id, overlay]));
+  const order = reconcileOverlayOrder(overlays, preferredOrder);
+
+  // The control list is front-to-back. MapLibre appends moved layers to the
+  // top, so apply the order from back to front and keep clustered layers grouped.
+  for (const overlayId of [...order].reverse()) {
+    const overlay = overlaysById.get(overlayId);
+    if (!overlay) {
+      continue;
+    }
+    for (const layerId of getOverlayLayerIds(overlay)) {
+      if (map.getLayer(layerId)) {
+        map.moveLayer(layerId);
+      }
+    }
+  }
 };
 
 export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {

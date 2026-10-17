@@ -34,12 +34,15 @@ import {
 import { OverlayControlsComponent } from './overlay-controls.component';
 import {
   OverlayEntry,
+  applyOverlayLayerOrder,
   addOverlayLayers,
   buildRasterOverlayTiles,
   buildStyle,
   getOverlayLayerIds,
   isGeoJsonOverlay,
   mapSessionOverlayEntries,
+  orderOverlayEntries,
+  reconcileOverlayOrder,
   normalizeBounds,
   recordBooleanEqual,
   recordNumberEqual,
@@ -61,6 +64,10 @@ export interface MapRenderIdentity {
   mapSessionId: string;
   collectionRevision: number;
 }
+
+const stringArrayEqual = (left: readonly string[], right: readonly string[]): boolean => (
+  left.length === right.length && left.every((value, index) => value === right[index])
+);
 
 export interface MapRenderStateChange {
   sessionId: string;
@@ -99,6 +106,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   @Input() emptyMessage = 'Run a search to display the map.';
   @Input() initialOverlayVisibility: Record<string, boolean> = {};
   @Input() initialOverlayOpacity: Record<string, number> = {};
+  @Input() initialOverlayOrder: string[] = [];
   @Input() availableBasemaps: CapabilityDescriptor[] = [];
   @Input() renderIdentity?: MapRenderIdentity;
   @Output() overlayStateChange = new EventEmitter<OverlayStateChange>();
@@ -123,6 +131,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   mapSession?: MapSession;
   overlayVisibility: Record<string, boolean> = {};
   overlayOpacity: Record<string, number> = {};
+  overlayOrder: string[] = [];
   overlayRenderStatuses: OverlayRenderStatus[] = [];
   restoreNotice = '';
   selectedInspection?: MapInspection;
@@ -175,7 +184,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   get overlays(): OverlayEntry[] {
-    return mapSessionOverlayEntries(this.mapSession);
+    return orderOverlayEntries(mapSessionOverlayEntries(this.mapSession), this.overlayOrder);
   }
 
   get complianceWarnings(): string[] {
@@ -320,7 +329,11 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     }
     const payloadChanged = Boolean(changes['payload']);
     const sessionChanged = Boolean(payloadChanged || changes['renderIdentity']);
-    const overlayStateChanged = Boolean(changes['initialOverlayVisibility'] || changes['initialOverlayOpacity']);
+    const overlayStateChanged = Boolean(
+      changes['initialOverlayVisibility']
+      || changes['initialOverlayOpacity']
+      || changes['initialOverlayOrder']
+    );
     if (sessionChanged || overlayStateChanged) {
       const hadMapSession = Boolean(this.mapSession);
       if (payloadChanged) {
@@ -376,6 +389,22 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   onOverlayOpacityChange(change: OverlayOpacityChange): void {
     this.setOverlayOpacity(change.overlayId, change.percentValue);
+  }
+
+  setOverlayOrder(order: string[]): void {
+    const nextOrder = reconcileOverlayOrder(mapSessionOverlayEntries(this.mapSession), order);
+    if (stringArrayEqual(this.overlayOrder, nextOrder)) {
+      return;
+    }
+    this.overlayOrder = nextOrder;
+    this.emitOverlayState();
+    if (this.mapRef) {
+      applyOverlayLayerOrder(this.mapRef, this.overlays, this.overlayOrder);
+    }
+  }
+
+  onOverlayOrderChange(order: string[]): void {
+    this.setOverlayOrder(order);
   }
 
   openInspection(inspection: MapInspection): void {
@@ -480,11 +509,13 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   private rebuildOverlayStateFromSession(preferInitialState = false): void {
-    const overlays = this.overlays;
+    const sourceOverlays = mapSessionOverlayEntries(this.mapSession);
+    const overlays = orderOverlayEntries(sourceOverlays, this.overlayOrder);
     const overlayIds = new Set(overlays.map((overlay) => overlay.id));
     const staleVisibilityKeys = Object.keys(this.initialOverlayVisibility).filter((key) => !overlayIds.has(key));
     const staleOpacityKeys = Object.keys(this.initialOverlayOpacity).filter((key) => !overlayIds.has(key));
-    const staleIds = new Set([...staleVisibilityKeys, ...staleOpacityKeys]);
+    const staleOrderKeys = this.initialOverlayOrder.filter((key) => !overlayIds.has(key));
+    const staleIds = new Set([...staleVisibilityKeys, ...staleOpacityKeys, ...staleOrderKeys]);
 
     this.restoreNotice = staleIds.size > 0
       ? `Some saved overlay preferences could not be restored (${staleIds.size} removed or unknown overlay id${staleIds.size === 1 ? '' : 's'}).`
@@ -514,6 +545,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     });
     this.overlayOpacity = recordNumberEqual(this.overlayOpacity, nextOpacity) ? this.overlayOpacity : nextOpacity;
 
+    const nextOrder = reconcileOverlayOrder(
+      sourceOverlays,
+      preferInitialState ? this.initialOverlayOrder : this.overlayOrder,
+    );
+    this.overlayOrder = stringArrayEqual(this.overlayOrder, nextOrder) ? this.overlayOrder : nextOrder;
+
     if (this.mapSession) {
       this.emitOverlayState();
     }
@@ -523,6 +560,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.overlayStateChange.emit({
       overlayVisibility: this.overlayVisibility,
       overlayOpacity: this.overlayOpacity,
+      overlayOrder: this.overlayOrder,
     });
   }
 
@@ -1289,6 +1327,7 @@ private fitMaxZoom(defaultMaxZoom: number): number {
         map.setPaintProperty(layerIds[0], 'raster-opacity', opacityValue);
       }
     });
+    applyOverlayLayerOrder(map, overlays, this.overlayOrder);
   }
 
   private destroyMap(): void {

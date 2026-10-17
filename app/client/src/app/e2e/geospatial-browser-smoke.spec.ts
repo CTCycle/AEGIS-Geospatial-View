@@ -43,6 +43,7 @@ describe('e2e/geospatial browser smoke', () => {
     getLayer: jasmine.Spy;
     setLayoutProperty: jasmine.Spy;
     setPaintProperty: jasmine.Spy;
+    moveLayer: jasmine.Spy;
     zoomIn: jasmine.Spy;
     zoomOut: jasmine.Spy;
     resize: jasmine.Spy;
@@ -309,6 +310,7 @@ describe('e2e/geospatial browser smoke', () => {
       getLayer: jasmine.createSpy('getLayer').and.returnValue({}),
       setLayoutProperty: jasmine.createSpy('setLayoutProperty'),
       setPaintProperty: jasmine.createSpy('setPaintProperty'),
+      moveLayer: jasmine.createSpy('moveLayer'),
       zoomIn: jasmine.createSpy('zoomIn'),
       zoomOut: jasmine.createSpy('zoomOut'),
       resize: jasmine.createSpy('resize'),
@@ -409,6 +411,36 @@ describe('e2e/geospatial browser smoke', () => {
     expect(mapRequestInputs).not.toContain(forbiddenSecret);
     expect(mapRequestInputs).not.toContain('api_key=');
     expect(mapRequestInputs).not.toContain('x-windy-api-key');
+  });
+
+  it('reorders layers with accessible controls and updates the active map state', async () => {
+    const component = fixture.componentInstance;
+    component.composerDraft = 'show mocked map';
+    await component.sendMessage();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const pageElement: HTMLElement = fixture.nativeElement;
+    const expandButton = pageElement.querySelector('.overlay-controls__toggle') as HTMLButtonElement | null;
+    expect(expandButton).not.toBeNull();
+    expandButton?.click();
+    fixture.detectChanges();
+
+    const moveUp = pageElement.querySelector(
+      'button[aria-label="Move RainViewer stale radar up"]',
+    ) as HTMLButtonElement | null;
+    expect(moveUp).not.toBeNull();
+    expect(moveUp?.disabled).toBeFalse();
+    fakeMap.moveLayer.calls.reset();
+    moveUp?.click();
+    fixture.detectChanges();
+
+    expect(component.mapState.overlayOrder[0]).toBe('rainviewer_precipitation_radar_stale');
+    expect(pageElement.querySelector('#map-layers-panel .overlay-control-row label span')?.textContent)
+      .toContain('RainViewer stale radar');
+    expect(fakeMap.moveLayer).toHaveBeenCalled();
+    expect(store.updateChatPage).toHaveBeenCalled();
   });
 
   it('renders a bounded valid-empty layer as an explicit no-results state', async () => {
