@@ -12,7 +12,7 @@ still returns upstream 404. Manual preference persists visually but backend
 narration can name OSM incorrectly. Those broader components remain PARTIAL;
 VISION-INSPECT remains UNRUN.
 
-The [T3-17 continuation](../QA/tier3-validation-20261017-t3-17/report.md) is `PARTIAL`: mixed GIBS raster/Open-Meteo vector rendering, independent opacity, and selective raster removal pass. The raster probe now supports MapLibre source-tile overzoom. Three-layer composition and reverse retention remain unproven after routing/tool failures and a valid-empty USGS result. A current-head exact-lane bootstrap retry was blocked because the required process credential was absent; see the [follow-up](../QA/tier3-validation-20261017-t3-17-followup/report.md). T3-17 remains PARTIAL.
+The [T3-17 live follow-up](../QA/tier3-validation-20261017-t3-17-followup/report.md) advances the gate: exact-lane Open-Meteo, NASA GIBS MODIS, and historical GBIF layers composed and rendered together; independent opacity changes and both selective-removal directions passed in the browser. T3-17 remains `PARTIAL` because the layer panel exposes no manual reorder control, so an interactive order change was not validated. The provider key was resolved in-process from the user-authorized local database and used only in the isolated runtime; no credential was persisted in evidence.
 
 This is the canonical high-level catalog of the current operational state of
 AEGIS Geospatial View. The 2026-09-23 T1-03 continuation began from clean
