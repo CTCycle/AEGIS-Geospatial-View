@@ -12,7 +12,7 @@ still returns upstream 404. Manual preference persists visually but backend
 narration can name OSM incorrectly. Those broader components remain PARTIAL;
 VISION-INSPECT remains UNRUN.
 
-The [T3-17 continuation](../../QA/tier3-validation-20261017-t3-17/report.md) is `PARTIAL`: mixed GIBS raster/Open-Meteo vector rendering, independent opacity, and selective raster removal pass. The raster probe now supports MapLibre source-tile overzoom. Three-layer composition and reverse retention remain unproven after routing/tool failures and a valid-empty USGS result.
+The [2026-10-17 T3-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md) closes the gate as `PASS`: exact-lane three-layer Open-Meteo/GIBS/GBIF composition, ready render acknowledgements and raster pixels, keyboard ordering with visible stack changes, independent opacity, both selective-removal directions, and retained order across map updates passed. `T3-18` remains `UNRUN`.
 
 This is the canonical current-status source for the native-agent loop,
 geospatial routing, durable map presentation, browser recovery harness,
@@ -63,9 +63,9 @@ of 68 slices. These are the latest per-slice classifications across their
 linked source boundaries, not a common-commit campaign result. Tier 0 is now
 `PASS` for its functional Windows startup slice; the historical timing
 comparator is unavailable and non-gating. Tier 1 is `PASS`; Tier 2 has seven
-`PASS` slices, and Tier 3 now has fourteen `PASS` slices after the FEMA/ESA
-raster remediation and the T3-10..T3-14 keyless campaign (USGS earthquakes,
-NOAA CO-OPS/radar, Overpass, Open-Meteo atmospheric, GBIF). The current exact-lane
+`PASS` slices, and Tier 3 now has sixteen `PASS` slices (`T3-01`–`T3-14`,
+`T3-16`, and `T3-17`) after the FEMA/ESA raster remediation, the T3-10..T3-14
+keyless campaign, and the T3-16/T3-17 follow-ups. The current exact-lane
 [T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md)
 and [browser evidence](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/browser-evidence.md)
 record the completed inventory, startup, and NOAA boundaries; the earlier continuation
@@ -110,8 +110,9 @@ plus the [T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t
 
 Tier 1 is `PASS`; Tier 0 is `PASS` for its functional boundary because the
 unavailable historical Windows startup timing comparator is non-gating. The overall campaign is
-`PARTIAL`: Tier 2 now has seven `PASS` slices; Tier 3 has nine current
-`PASS` slices after the exact-lane NOAA affected-zone remediation and the
+`PARTIAL`: Tier 2 now has seven `PASS` slices; Tier 3 has sixteen current
+`PASS` slices, including the 2026-10-17 T3-16 and T3-17 follow-ups, after the
+exact-lane NOAA affected-zone and FEMA/ESA raster remediations and the
 FEMA/ESA raster remediation. `T3-07` is now
 `PASS` after the FEMA/ESA public-raster boundary run (FEMA via FEMA's official ArcGIS Online relay, ESA via the corrected Terrascope route), and `T3-08` is
 now `PASS` after all 12 advertised GIBS cases met the browser acceptance boundary;
@@ -193,7 +194,7 @@ required for provider and composition claims.
 | `T3-14` | GBIF species occurrence point-insight overlay with provenance/citation semantics | `PASS` | 2026-10-01 | `validation` working tree (reuses T3-10 gbif avoidWhen routing fix) | [2026-10-01 T3-14 slice report](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-14/report.md), [slice manifest](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-14/slice.json), [browser evidence](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-14/browser-evidence.md), [live diagnostics](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-14/reports/VECTOR-POINT-MATRIX-LIVE.json) | GBIF species-occurrence point-insight overlay renders (Lugano and a remote Pacific point) with GBIF.org attribution and an accepted `map.render_ack` (0 direct-upstream); bounded occurrence records carry dataset-level provenance and are never presented as absence evidence. The chosen remote location returned marine records, so a strictly empty no-observations boundary was not separately demonstrated this run. |
 | `T3-15` | EEA public raster (noise) family through the same-origin proxy | `UNRUN` | — | — | [Tier 3 checklist](tier3_rendering_and_feature_families.md#t3-15--eea-public-raster-noise-family) | Reconstructed at MEDIUM; currently `BLOCKED` on the retired `noise.discomap.eea.europa.eu` 2019 WMS until the manifest is re-pointed. |
 | `T3-16` | Remaining basemap families and manual-preference retention/reset | `PASS` | 2026-10-17 | `validation@7faf0c1e` plus spatial-completion fix | [2026-10-17 report](../../QA/tier3-validation-validation-20261017-t3-16/report.md), [run evidence](../../QA/tier3-validation-validation-20261017-t3-16/run-evidence.json) | Liberty/Positron/Esri render; exact-ID satellite acknowledgement, overlay add/remove, location change, reload/new-chat defaults pass. Backend narration of client-local preference remains a separate partial. |
-| `T3-17` | Mixed raster+vector composition and three-layer overlay lifecycle (opacity, ordering, selective removal) | `PARTIAL` | 2026-10-17 | `validation@9164b22e` (tested HEAD; docs/evidence recorded afterward) | [Live follow-up report](../../QA/tier3-validation-20261017-t3-17-followup/report.md), [isolated runtime metadata](../../QA/tier3-validation-20261017-t3-17-followup/live-runtime.json), [sanitized run evidence](../../QA/tier3-validation-20261017-t3-17-followup/run-evidence.json) | Exact `opencode-go / deepseek-v4.1-flash` lane passed its isolated health probe using the user-authorized database key. Open-Meteo, NASA GIBS MODIS, and historical GBIF rendered together with attribution and accepted browser acknowledgements; independent opacity changes, raster removal retaining both vectors, and vector removal retaining the raster and other vector passed. The gate remains PARTIAL because no manual layer reorder control is exposed, so an interactive order change was not validated. |
+| `T3-17` | Mixed raster+vector composition and three-layer overlay lifecycle (opacity, ordering, selective removal) | `PASS` | 2026-10-17 | `validation@7dc62147` plus the scoped source/test changes in this commit (local/browser evidence; hosted CI tracked separately) | [Ordering follow-up report](../../QA/tier3-validation-20261017-t3-17-reorder/report.md), [browser evidence](../../QA/tier3-validation-20261017-t3-17-reorder/browser-evidence.md), [sanitized render evidence](../../QA/tier3-validation-20261017-t3-17-reorder/run-evidence.json), [isolated runtime probe](../../QA/tier3-validation-20261017-t3-17-reorder/runtime/live-runtime.json), [runtime cleanup](../../QA/tier3-validation-20261017-t3-17-reorder/runtime-cleanup.json) | Exact `opencode-go / deepseek-v4.1-flash` lane passed its isolated probe. Open-Meteo, NASA GIBS MODIS, and bounded GBIF layers rendered with attribution and ready browser acknowledgements. Keyboard move controls changed the visible MapLibre stack, boundary buttons were disabled, and moves were announced. Independent opacity (80/50/30%), raster removal retaining both vectors, fresh raster re-add retaining survivor order, and GBIF removal retaining the raster and weather layer passed. Focused Karma (176) and production client build passed. |
 | `T3-18` | Map inspection controls and family-wide valid-empty / non-renderable recovery | `UNRUN` | — | — | [Tier 3 checklist](tier3_rendering_and_feature_families.md#t3-18--map-inspection-controls-and-family-wide-valid-empty--non-renderable-recovery) | Reconstructed at LOW; scenarios most need upstream review before execution. |
 
 ### Current Tier 4A slice ledger

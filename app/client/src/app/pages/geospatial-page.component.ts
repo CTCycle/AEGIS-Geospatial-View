@@ -62,7 +62,7 @@ import {
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
-import { mapSessionOverlayEntries } from '../components/map-preview-rendering';
+import { mapSessionOverlayEntries, reconcileOverlayOrder } from '../components/map-preview-rendering';
 
 @Component({
   selector: 'app-geospatial-page',
@@ -89,7 +89,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   payload?: SearchResponsePayload;
   toolbarWidthState = 480;
   isToolbarCollapsed = false;
-  mapState = { overlayVisibility: {}, overlayOpacity: {} } as PersistedChatPageState['mapState'];
+  mapState = { overlayVisibility: {}, overlayOpacity: {}, overlayOrder: [] } as PersistedChatPageState['mapState'];
 
   conversationId?: string;
   contextRevision?: number;
@@ -490,7 +490,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.assistantDraft = '';
     this.composerDraft = '';
     this.transcriptScrollTop = 0;
-    this.mapState = { overlayVisibility: {}, overlayOpacity: {} };
+    this.mapState = { overlayVisibility: {}, overlayOpacity: {}, overlayOrder: [] };
     this.progressPercent = 0;
     this.isAlertsOpen = false;
     this.isConversationHistoryOpen = false;
@@ -1941,6 +1941,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     const opacity = Object.fromEntries(
       Object.entries(this.mapState.overlayOpacity).filter(([id]) => ids.has(id)),
     );
+    const overlayOrder = reconcileOverlayOrder(overlays, this.mapState.overlayOrder);
     overlays.forEach((overlay) => {
       if (!preservePreferences || typeof visibility[overlay.id] !== 'boolean') {
         if (typeof overlay.visible === 'boolean') {
@@ -1953,7 +1954,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         }
       }
     });
-    this.mapState = { overlayVisibility: visibility, overlayOpacity: opacity };
+    this.mapState = { overlayVisibility: visibility, overlayOpacity: opacity, overlayOrder };
   }
 
   onMapRenderStateChange(change: MapRenderStateChange): void {

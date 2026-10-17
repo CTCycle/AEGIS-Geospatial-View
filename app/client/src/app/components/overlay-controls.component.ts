@@ -23,8 +23,10 @@ export class OverlayControlsComponent {
 
   @Output() overlayVisibilityChange = new EventEmitter<OverlayVisibilityChange>();
   @Output() overlayOpacityChange = new EventEmitter<OverlayOpacityChange>();
+  @Output() overlayOrderChange = new EventEmitter<string[]>();
 
   isExpanded = false;
+  reorderAnnouncement = '';
 
   toggleExpanded(): void {
     this.isExpanded = !this.isExpanded;
@@ -75,5 +77,18 @@ export class OverlayControlsComponent {
     }
     const clampedPercent = Math.min(100, Math.max(0, parsed));
     this.overlayOpacityChange.emit({ overlayId, percentValue: String(clampedPercent) });
+  }
+
+  moveOverlay(overlayId: string, offset: -1 | 1): void {
+    const currentIndex = this.overlays.findIndex((overlay) => overlay.id === overlayId);
+    const nextIndex = currentIndex + offset;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= this.overlays.length) {
+      return;
+    }
+
+    const nextOrder = this.overlays.map((overlay) => overlay.id);
+    [nextOrder[currentIndex], nextOrder[nextIndex]] = [nextOrder[nextIndex], nextOrder[currentIndex]];
+    this.overlayOrderChange.emit(nextOrder);
+    this.reorderAnnouncement = `${this.overlays[currentIndex].label} moved to position ${nextIndex + 1} of ${this.overlays.length}.`;
   }
 }

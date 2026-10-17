@@ -445,6 +445,7 @@ export interface SearchResponsePayload {
 export interface OverlayStateChange {
   overlayVisibility: Record<string, boolean>;
   overlayOpacity: Record<string, number>;
+  overlayOrder: string[];
 }
 
 export interface OverlayRenderStatus {

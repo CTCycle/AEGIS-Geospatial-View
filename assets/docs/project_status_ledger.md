@@ -12,7 +12,7 @@ still returns upstream 404. Manual preference persists visually but backend
 narration can name OSM incorrectly. Those broader components remain PARTIAL;
 VISION-INSPECT remains UNRUN.
 
-The [T3-17 live follow-up](../QA/tier3-validation-20261017-t3-17-followup/report.md) advances the gate: exact-lane Open-Meteo, NASA GIBS MODIS, and historical GBIF layers composed and rendered together; independent opacity changes and both selective-removal directions passed in the browser. T3-17 remains `PARTIAL` because the layer panel exposes no manual reorder control, so an interactive order change was not validated. The provider key was resolved in-process from the user-authorized local database and used only in the isolated runtime; no credential was persisted in evidence.
+The [2026-10-17 T3-17 follow-up](../QA/tier3-validation-20261017-t3-17-reorder/report.md) closes the gate as `PASS`: the exact `opencode-go / deepseek-v4.1-flash` lane rendered Open-Meteo, NASA GIBS MODIS, and GBIF together; keyboard ordering changed the rendered stack; independent opacity changes, both selective-removal directions, and retained order across map updates passed. The isolated lane probe and sanitized render acknowledgements are linked in the report; no credential value was persisted in evidence.
 
 This is the canonical high-level catalog of the current operational state of
 AEGIS Geospatial View. The 2026-09-23 T1-03 continuation began from clean
@@ -68,7 +68,7 @@ elevation, and imagery extent remain `PARTIAL`; EEA is now routed through the
 same-origin AEGIS tile proxy but its render stays blocked by the retired
 `noise.discomap.eea.europa.eu` 2019 WMS. See the
 [route-matrix report](../QA/tier3-validation-develop-20261001-route-matrix/report.md).
-The remaining Tier 3 slices are still unrun.
+`T3-17` is now `PASS`; `T3-15` and `T3-18` remain `UNRUN` (with `T3-15` blocked on the retired EEA WMS).
 See the [NOAA remediation report](../QA/tier3-validation-develop-20260928-noaa/report.md),
 [map rendering report](../QA/tier3-validation-develop-20260926-map-rendering/report.md),
 and [vector-composition report](../QA/tier3-validation-develop-20260926-vector-composition/report.md).

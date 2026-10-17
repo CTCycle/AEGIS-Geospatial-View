@@ -95,4 +95,39 @@ describe('OverlayControlsComponent', () => {
     expect(panel?.hidden).toBeFalse();
     expect((fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement).getAttribute('aria-label')).toBe('Opacity for Overlay 1');
   });
+
+  it('emits front-to-back order changes and exposes accessible boundary controls', () => {
+    component.overlays = [
+      { id: 'ov1', label: 'Overlay 1', provider: 'x', type: 'tile' },
+      { id: 'ov2', label: 'Overlay 2', provider: 'x', type: 'geojson' },
+      { id: 'ov3', label: 'Overlay 3', provider: 'x', type: 'tile' },
+    ];
+    component.isExpanded = true;
+    const spy = jasmine.createSpy('order');
+    component.overlayOrderChange.subscribe(spy);
+
+    fixture.detectChanges();
+
+    const firstUp = fixture.nativeElement.querySelector('button[aria-label="Move Overlay 1 up"]') as HTMLButtonElement;
+    const secondUp = fixture.nativeElement.querySelector('button[aria-label="Move Overlay 2 up"]') as HTMLButtonElement;
+    const lastDown = fixture.nativeElement.querySelector('button[aria-label="Move Overlay 3 down"]') as HTMLButtonElement;
+    expect(firstUp.disabled).toBeTrue();
+    expect(secondUp.disabled).toBeFalse();
+    expect(lastDown.disabled).toBeTrue();
+
+    secondUp.click();
+    fixture.detectChanges();
+
+    expect(spy).toHaveBeenCalledWith(['ov2', 'ov1', 'ov3']);
+    expect(fixture.nativeElement.querySelector('[aria-live="polite"]')?.textContent).toContain('Overlay 2 moved to position 1 of 3.');
+  });
+
+  it('does not emit an order for a boundary move', () => {
+    const spy = jasmine.createSpy('order');
+    component.overlayOrderChange.subscribe(spy);
+
+    component.moveOverlay('ov1', -1);
+
+    expect(spy).not.toHaveBeenCalled();
+  });
 });

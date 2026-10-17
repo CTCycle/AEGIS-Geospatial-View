@@ -12,7 +12,7 @@ still returns upstream 404. Manual preference persists visually but backend
 narration can name OSM incorrectly. Those broader components remain PARTIAL;
 VISION-INSPECT remains UNRUN.
 
-The [2026-10-17 T3-17 follow-up](../../QA/tier3-validation-20261017-t3-17-followup/report.md) passes three-layer Open-Meteo/GIBS/GBIF composition, independent opacity changes, and selective removal in both raster/vector directions using accepted browser renders. The exact provider/model lane was bootstrapped from the user-authorized database credential into an isolated runtime. T3-17 remains `PARTIAL` because the overlay panel has no manual reorder control and an interactive ordering change could not be validated.
+The [2026-10-17 T3-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md) closes the gate as `PASS`: exact-lane three-layer Open-Meteo/GIBS/GBIF composition, ready browser render acknowledgements, keyboard-accessible ordering with visible stack changes, independent opacity, both selective-removal directions, and retained order across map updates. The exact provider/model lane passed its isolated runtime probe. `T3-18` remains `UNRUN`.
 
 Tier 3 is the rendering and geospatial feature-family gate. It must establish
 browser-authoritative evidence that basemaps, vector/raster families,
@@ -43,7 +43,7 @@ architecture and is labeled accordingly:
   but the precise scenarios are inferred from neighboring gates.
 - `UNRESOLVED` — evidence was insufficient to reconstruct reliably.
 
-T3-01–T3-14 and T3-16 are PASS; T3-17 is PARTIAL; T3-15/T3-18 remain UNRUN.
+T3-01–T3-14 and T3-16–T3-17 are PASS; T3-15/T3-18 remain UNRUN.
 Executing agents must record the
 branch, exact SHA, environment, provider/model lane, and isolation boundary per
 the [validation strategy](strategy.md), and must never promote an inference to
@@ -343,8 +343,13 @@ All Tier 3 slices share the standing campaign rules:
      accepted ack.
   2. Three layers (raster + two vector).
   3. Opacity slider mutation per layer.
-  4. Selective removal retains the other layers.
-  5. Remove the raster retains the vector layers and vice versa.
+4. Keyboard-accessible **Move up**/**Move down** controls reorder the stack,
+   announce the resulting position, and disable moves at both boundaries;
+   verify the rendered stack changes with the order.
+5. Selective removal retains the other layers and their relative order; a newly
+   added layer appends after surviving layers.
+6. Remove the raster retains both vector layers and remove a vector retains
+   the raster and other vector.
 - **Depends on:** `T3-06`, `T3-08`, `T3-10`–`T3-14`, and a rendered raster
   partner (`T3-15` or `T3-08`).
 - **Depended on by:** `T3-18`.
@@ -415,4 +420,4 @@ All Tier 3 slices share the standing campaign rules:
 
 ## Next actionable slice
 
-Continue `T3-17` from its [2026-10-17 partial report](../../QA/tier3-validation-20261017-t3-17/report.md): validate a non-empty third vector partner, reverse vector-removal retention, and ordering before promoting the gate. `T3-16` is PASS. `T3-15` remains deferred on the retired EEA WMS; `T3-18` remains UNRUN pending its composition prerequisites. Preserve the exact provider/model lane and browser acknowledgement boundary.
+`T3-17` is now `PASS`; its [2026-10-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md) records the exact-lane browser acknowledgement and full layer lifecycle. `T3-15` remains deferred on the retired EEA WMS. `T3-18` remains `UNRUN` pending review of its reconstructed scope and remaining prerequisites; T3-17 no longer blocks it. Preserve the exact provider/model lane and browser acknowledgement boundary.

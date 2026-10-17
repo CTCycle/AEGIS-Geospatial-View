@@ -1059,8 +1059,13 @@ describe('pages/geospatial-page.component', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
-    component.onOverlayStateChange({ overlayVisibility: { overlay_a: false }, overlayOpacity: { overlay_a: 0.3 } });
+    component.onOverlayStateChange({
+      overlayVisibility: { overlay_a: false },
+      overlayOpacity: { overlay_a: 0.3 },
+      overlayOrder: ['overlay_a'],
+    });
     expect(component.mapState.overlayVisibility['overlay_a']).toBeFalse();
+    expect(component.mapState.overlayOrder).toEqual(['overlay_a']);
     expect(store.updateChatPage).toHaveBeenCalled();
   });
 
@@ -1097,12 +1102,14 @@ describe('pages/geospatial-page.component', () => {
     component.mapState = {
       overlayVisibility: { weather: false },
       overlayOpacity: { weather: 0.34 },
+      overlayOrder: ['weather'],
     };
 
     component['handleMapSession'](session);
 
     expect(component.mapState.overlayVisibility['weather']).toBeFalse();
     expect(component.mapState.overlayOpacity['weather']).toBe(0.34);
+    expect(component.mapState.overlayOrder).toEqual(['weather']);
   });
 
   it('handles zoom commands locally without chat API request', async () => {

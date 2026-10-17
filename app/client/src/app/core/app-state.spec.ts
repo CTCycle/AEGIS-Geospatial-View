@@ -111,9 +111,29 @@ describe('core/app-state', () => {
     const state = defaultAppState();
     state.chatPage.mapState.overlayVisibility = { removed_overlay: true };
     state.chatPage.mapState.overlayOpacity = { removed_overlay: 0.4 };
+    state.chatPage.mapState.overlayOrder = ['vector', 'raster'];
     persistAppState(state);
     const loaded = loadPersistedAppState();
     expect(loaded.chatPage.mapState.overlayVisibility['removed_overlay']).toBeTrue();
     expect(loaded.chatPage.mapState.overlayOpacity['removed_overlay']).toBe(0.4);
+    expect(loaded.chatPage.mapState.overlayOrder).toEqual(['vector', 'raster']);
+  });
+
+  it('filters invalid and duplicate persisted overlay order entries', () => {
+    const state = defaultAppState();
+    const persisted = {
+      ...state,
+      savedAt: Date.now(),
+      chatPage: {
+        ...state.chatPage,
+        mapState: {
+          ...state.chatPage.mapState,
+          overlayOrder: ['raster', '', 'vector', 'raster', 3],
+        },
+      },
+    };
+    window.sessionStorage.setItem(storageKey, JSON.stringify(persisted));
+
+    expect(loadPersistedAppState().chatPage.mapState.overlayOrder).toEqual(['raster', 'vector']);
   });
 });

@@ -64,7 +64,7 @@
 
 .overlay-control-row {
     display: grid;
-    grid-template-columns: 1fr 5.5rem;
+    grid-template-columns: minmax(0, 1fr) 5.5rem auto;
     gap: 0.4rem;
     align-items: center;
 }
@@ -79,6 +79,33 @@
 
 .overlay-control-row__opacity {
     min-width: 0;
+}
+
+.overlay-control-row__order {
+    display: inline-flex;
+    gap: 0.2rem;
+}
+
+.overlay-control-row__order-button {
+    min-width: 1.45rem;
+    min-height: 1.45rem;
+    border: 1px solid #3d5965;
+    border-radius: 0.2rem;
+    background: #162833;
+    color: #dcecf1;
+    font-size: 0.8rem;
+    line-height: 1;
+}
+
+.overlay-control-row__order-button:hover:not(:disabled),
+.overlay-control-row__order-button:focus-visible {
+    border-color: #73c7ed;
+    background: #1b3340;
+}
+
+.overlay-control-row__order-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
 .overlay-control-row input[type="range"] {

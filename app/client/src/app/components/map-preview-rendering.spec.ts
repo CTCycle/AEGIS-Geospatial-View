@@ -2,10 +2,13 @@ import { DEFAULT_BASE_TILE_PROXY_URL } from '../core/constants';
 import { MapOverlayEntry, MapSession } from '../core/types';
 import {
   addOverlayLayers,
+  applyOverlayLayerOrder,
   buildStyle,
   getOverlayLayerIds,
   isGeoJsonOverlay,
   normalizeBounds,
+  orderOverlayEntries,
+  reconcileOverlayOrder,
   recordBooleanEqual,
   recordNumberEqual,
 } from './map-preview-rendering';
@@ -47,6 +50,57 @@ describe('map-preview-rendering', () => {
     expect(recordNumberEqual({ a: 0.5 }, { a: 0.5 })).toBeTrue();
     expect(recordNumberEqual({ a: 0.5 }, { a: 0.6 })).toBeFalse();
     expect(recordNumberEqual({ a: 0.5 }, { a: 0.5, b: 1 })).toBeFalse();
+  });
+
+  it('reconciles saved overlay order by retaining valid IDs and appending new entries', () => {
+    const overlays = [
+      { id: 'raster', label: 'Raster', provider: 'x', type: 'tile' },
+      { id: 'vector', label: 'Vector', provider: 'x', type: 'geojson' },
+      { id: 'new', label: 'New', provider: 'x', type: 'tile' },
+    ] as MapOverlayEntry[];
+
+    expect(reconcileOverlayOrder(overlays, ['vector', 'removed', 'vector'])).toEqual([
+      'vector', 'raster', 'new',
+    ]);
+    expect(orderOverlayEntries(overlays, ['new', 'raster']).map((overlay) => overlay.id)).toEqual([
+      'new', 'raster', 'vector',
+    ]);
+  });
+
+  it('moves overlay layer groups to the requested front-to-back order without moving the basemap', () => {
+    const overlays = [
+      { id: 'clustered', label: 'Clustered', provider: 'x', type: 'geojson', rendering_mode: 'clustered-points' },
+      { id: 'raster', label: 'Raster', provider: 'x', type: 'tile' },
+      { id: 'vector', label: 'Vector', provider: 'x', type: 'geojson' },
+    ] as MapOverlayEntry[];
+    const layerStack = [
+      'basemap',
+      'overlay-layer-raster',
+      'overlay-layer-clustered-clusters',
+      'overlay-layer-clustered-cluster-count',
+      'overlay-layer-clustered-points',
+      'overlay-layer-vector',
+    ];
+    const map = {
+      getLayer: (id: string) => layerStack.includes(id) ? { id } : undefined,
+      moveLayer: (id: string) => {
+        const index = layerStack.indexOf(id);
+        if (index >= 0) {
+          layerStack.push(...layerStack.splice(index, 1));
+        }
+      },
+    };
+
+    applyOverlayLayerOrder(map as never, overlays, ['clustered', 'raster', 'vector']);
+
+    expect(layerStack).toEqual([
+      'basemap',
+      'overlay-layer-vector',
+      'overlay-layer-raster',
+      'overlay-layer-clustered-clusters',
+      'overlay-layer-clustered-cluster-count',
+      'overlay-layer-clustered-points',
+    ]);
   });
 
   it('returns null for malformed bounds', () => {
