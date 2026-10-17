@@ -279,7 +279,7 @@ PROVIDER_SMOKE_CHECKS = (
         source_env="AEGIS_GTFS_REALTIME_FEED_URL",
         request_env=(("feed_url", "AEGIS_GTFS_REALTIME_FEED_URL"),),
         response_contract="dataset",
-        required_payload_keys=("entities",),
+        required_payload_keys=("vehicles", "alerts", "tripUpdates", "summary"),
     ),
     LiveCheck(
         provider_id="natural_earth",

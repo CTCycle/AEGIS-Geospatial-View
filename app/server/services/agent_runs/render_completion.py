@@ -118,7 +118,11 @@ class RenderCompletionService:
             for requirement in render_requirements:
                 if requirement.name in checks and state.completion_contract and (
                     (requirement.name == "required_data_retrieved" and state.completion_contract.evidence_required)
-                    or (requirement.name == "spatial_scope_applied" and state.completion_contract.spatial_scope_required)
+                    or (
+                        requirement.name == "spatial_scope_applied"
+                        and state.completion_contract.spatial_scope_required
+                        and state.completion_contract.evidence_required
+                    )
                     or (requirement.name == "temporal_scope_applied" and state.completion_contract.temporal_scope_required)
                 ):
                     requirement.status = "satisfied" if checks[requirement.name] else "pending"

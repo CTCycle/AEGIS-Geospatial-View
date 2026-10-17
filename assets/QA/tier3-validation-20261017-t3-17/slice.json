@@ -1,0 +1,72 @@
+{
+  "gate": "T3-17",
+  "status": "PARTIAL",
+  "feature_exists": true,
+  "feature_exercised": true,
+  "feature_passed": true,
+  "feature_fully_passed": false,
+  "branch": "validation",
+  "base_sha": "7faf0c1e778c7cf19f6f55177002e079f29a9733",
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "fallback": false,
+  "source_sha256": {
+    "app/client/src/app/components/raster-visibility.ts": "fddc48a54da2568eae60b1cee7573930f1961c1becbb67e04c55ce73da287aa9",
+    "app/client/src/app/components/raster-visibility.spec.ts": "9f2658978f5cb8a64a89fe2803de33a2a3183d89ed44699194e135eb18aca606",
+    "app/server/services/agent_runs/render_completion.py": "6ebe810090e6a7d1ebfc9f5cd5eff944c90d30605799082779d77a9ad411a595",
+    "app/server/services/geospatial/live_validator.py": "2600ffdce7407c2de28830804ea83bff21178466ce46bf338ce77275a4a25f33",
+    "app/tests/unit/services/test_render_completion.py": "66fa775b9b994aa60914421e1343bcc070a50d316a6819b0cbaa8274f702451b",
+    "app/tests/unit/test_geospatial_live_validator.py": "0fe91aeeda2d0b4904f1a10569ad6e6668e3eac4687a35d09db8b3fdae225f9f"
+  },
+  "validation": {
+    "backend_unit": 1088,
+    "frontend_focused": 33,
+    "ruff": "PASS",
+    "strict_pyright": "PASS",
+    "production_build": "PASS"
+  },
+  "accepted_runs": [
+    {
+      "run_id": "run_46342b0093a64bf89be95ada2e3bd330",
+      "request": "Remove only the MODIS temperature raster layer. Keep the Open-Meteo atmospheric point layer and the Rome viewport."
+    },
+    {
+      "run_id": "run_9d5556b45fee4fcd98f8f1a387009a71",
+      "request": "Add recent earthquakes within 300 kilometers of Rome using usgs_earthquakes, keeping both current layers."
+    },
+    {
+      "run_id": "run_84900194d3824f82bb80a9e3b25f38bf",
+      "request": "Fetch fresh MODIS_Terra_Land_Surface_Temp_Day data for Rome using execute_geospatial_capability, then add that new evidence as a raster overlay while retaining the existing Open-Meteo layer. Do not reuse evidence from failed runs."
+    }
+  ],
+  "campaign_rollup": {
+    "PASS": 43,
+    "PARTIAL": 3,
+    "BLOCKED": 2,
+    "UNRUN": 20
+  },
+  "cleanup": {
+    "port_5079_listening": false,
+    "recent_owned_runtime_roots": [],
+    "keeper_status": "STOPPED",
+    "canonical_database_sha256_after": "bd7e139d4f0a9662a730618ac4c117b43febc038f36264a4b046744cbdceb0d3",
+    "settings_sha256_after": "7278133add9d891805619ccfac9741e8da4f23b2ff5b4cd4653b1cf609399034",
+    "settings_unchanged": true,
+    "task_pytest_temp_removed": true
+  },
+  "artifacts_sha256": {
+    "backend-unit.log": "8fb5dfe99ad6cd955cf64750f04494f27c45657034c4aa1b03c5e8dc36876f71",
+    "capture_runs.py": "10aa7ac48476427690f91e42328910652a3cdf651cdda0f6d7f3e833a9560427",
+    "frontend-build.log": "aade7548145c59a9518c6688aa01a47e451990458848cdcecbf06c6aa5c1e2da",
+    "frontend-tests.log": "33b9da8134bbc6ed856839fd2998b6673f0432f0be61237130abb9c05011ec66",
+    "live-runtime.json": "7e2db24a5426b4aabe82cbf0f3baa46b98549361d88b2f6cd12f62eff1f55916",
+    "pyright.log": "48f3e9ae0be7de9f90d3bef5c7af625de32555de060bb5f8d9aeeec688fb6408",
+    "report.md": "598f595aef63e77e05b432fd2508fcb81f289c1a64052e281cc21328a13a4011",
+    "ruff.log": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0",
+    "run-evidence.json": "2f2b0fd91d6cdd6a4966973ea64c69fa9acd6ad278e57a2aec4a102262fcce50",
+    "captures\\final-preserved.jpg": "61f01365cca7943bc6d77664ae3aa6e08302c42598c368464837a4bcb6f95332",
+    "captures\\mixed-final.jpg": "4d49bd215a06c55e98465a8e1970ab4babe0f86e41fe5873609e6dbeb1e64157",
+    "captures\\opacity.jpg": "05b45184e37e04a62f481186efd9d6c7e60847432b6a2ff1531313e0be926a07",
+    "captures\\raster-removed.jpg": "5bcd6e4da803094153f613789a8a44ca687e8c14443599cc271dd89735011a20"
+  }
+}

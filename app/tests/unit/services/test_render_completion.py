@@ -201,6 +201,40 @@ def test_location_only_map_still_requires_browser_ack() -> None:
     assert RenderCompletionService.requires_browser_ack(_session()) is True
 
 ###############################################################################
+@pytest.mark.parametrize("evidence_required", [False, True])
+def test_spatial_render_requirement_uses_viewport_only_for_location_requests(
+    render_context, evidence_required: bool,
+) -> None:
+    repository, publisher, _, run_id = render_context
+    goal = _goal(spatial_scope=[{"kind": "point"}])
+    contract = CompletionContract(
+        operation="show_location" if not evidence_required else "show_data",
+        evidence_required=evidence_required,
+        spatial_scope_required=True,
+        requirements=["spatial_scope_applied"],
+    )
+    state = AgentRunState(
+        request_id="request", conversation_id="conversation",
+        user_message="Show Rome", phase="update_state",
+        goal=goal, completion_contract=contract,
+    )
+    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
+    presentation, _ = service.prepare(
+        run_id=run_id, run_version=1,
+        response_payload={
+            "map_session": _session().model_dump(mode="json"),
+            "goal": goal.model_dump(mode="json"),
+            "completion_contract": contract.model_dump(mode="json"),
+            "execution_trace": {"checkpoint": state.checkpoint()},
+        },
+    )
+    spatial = next(
+        item for item in presentation["completion_requirements"]
+        if item["name"] == "spatial_scope_applied"
+    )
+    assert spatial["status"] == ("pending" if evidence_required else "satisfied")
+
+###############################################################################
 def test_unavailable_provider_is_not_treated_as_metadata_only() -> None:
     unavailable = OverlayInstance(
         instance_id="fires-1",

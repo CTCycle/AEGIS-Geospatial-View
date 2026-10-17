@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
+from datetime import UTC, datetime
+
+from google.transit import gtfs_realtime_pb2
+
 from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.live_validator import (
@@ -8,8 +13,9 @@ from server.services.geospatial.live_validator import (
     _run_check,
     validate_live_geospatial_sources,
 )
-from server.services.geospatial.provider_registry import PROVIDER_FACTORIES
+from server.services.geospatial.provider_registry import PROVIDER_FACTORIES, ProviderRegistry
 from server.services.geospatial.providers.base import ProviderRequest, ProviderResponse
+from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 
 ###############################################################################
 class _LiveValidationRegistry:
@@ -173,3 +179,24 @@ def test_live_validator_runs_configured_openchargemap_snapshot(monkeypatch, tmp_
     result = run_async_in_thread(_run_check(_LiveValidationRegistry(), check))
 
     assert result.status == "passed"
+
+###############################################################################
+def test_live_validator_accepts_production_gtfs_realtime_normalization(monkeypatch) -> None:
+    monkeypatch.setenv("AEGIS_GTFS_REALTIME_FEED_URL", "https://example.test/vehicles.pb")
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.header.gtfs_realtime_version = "2.0"
+    feed.header.timestamp = int(datetime.now(UTC).timestamp())
+    entity = feed.entity.add()
+    entity.id = "vehicle-1"
+    entity.vehicle.position.latitude = 42.36
+    entity.vehicle.position.longitude = -71.06
+    check = next(item for item in PROVIDER_SMOKE_CHECKS if item.provider_id == "gtfs_realtime")
+    check = replace(check, request=ProviderRequest(
+        capability_id="gtfs_realtime", params={"feed_bytes": feed.SerializeToString()},
+    ))
+    result = run_async_in_thread(_run_check(
+        ProviderRegistry(providers=[GTFSRealtimeProvider()]), check,
+    ))
+
+    assert result.status == "passed", result.message
+    assert result.feature_count == 1
