@@ -1,6 +1,18 @@
 # Tier 3 rendering and geospatial feature families
 
-Last updated: 2026-10-01
+Last updated: 2026-10-17
+
+The [2026-10-17 follow-up](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16`
+basemap rendering/preferences and advances `T4-04` to `PASS` for configured live
+GTFS static/realtime validation. Location-only spatial completion and the
+realtime-validator contract were repaired; 1,088 backend unit tests, changed-file
+Ruff, and full strict Pyright pass. Census now reaches execution but times out,
+numeric elevation remains disabled, imagery temporal completion fails, and EEA
+still returns upstream 404. Manual preference persists visually but backend
+narration can name OSM incorrectly. Those broader components remain PARTIAL;
+VISION-INSPECT remains UNRUN.
+
+The [T3-17 continuation](../../QA/tier3-validation-20261017-t3-17/report.md) is `PARTIAL`: mixed GIBS raster/Open-Meteo vector rendering, independent opacity, and selective raster removal pass. The raster probe now supports MapLibre source-tile overzoom. Three-layer composition and reverse retention remain unproven after routing/tool failures and a valid-empty USGS result.
 
 Tier 3 is the rendering and geospatial feature-family gate. It must establish
 browser-authoritative evidence that basemaps, vector/raster families,
@@ -31,7 +43,8 @@ architecture and is labeled accordingly:
   but the precise scenarios are inferred from neighboring gates.
 - `UNRESOLVED` — evidence was insufficient to reconstruct reliably.
 
-These statuses remain `UNRUN` until executed. Executing agents must record the
+T3-01–T3-14 and T3-16 are PASS; T3-17 is PARTIAL; T3-15/T3-18 remain UNRUN.
+Executing agents must record the
 branch, exact SHA, environment, provider/model lane, and isolation boundary per
 the [validation strategy](strategy.md), and must never promote an inference to
 historical fact in evidence.
@@ -402,11 +415,4 @@ All Tier 3 slices share the standing campaign rules:
 
 ## Next actionable slice
 
-The T3-10..T3-14 keyless campaign is complete (all five slices `PASS`,
-2026-10-01, including the NOAA radar proxy remediation for `T3-11`). The next
-open Tier 3 slices are `T3-15` (EEA public raster, currently `BLOCKED` on the
-retired `noise.discomap.eea.europa.eu` 2019 WMS until the manifest is
-re-pointed), then `T3-16` (basemap families), `T3-17` (mixed raster+vector
-composition), and `T3-18` (map inspection controls). Reuse the exact-lane
-browser harness (`app/tests/e2e/test_live_vector_point_matrix.py`) and record
-each slice per the strategy evidence package and status vocabulary.
+Continue `T3-17` from its [2026-10-17 partial report](../../QA/tier3-validation-20261017-t3-17/report.md): validate a non-empty third vector partner, reverse vector-removal retention, and ordering before promoting the gate. `T3-16` is PASS. `T3-15` remains deferred on the retired EEA WMS; `T3-18` remains UNRUN pending its composition prerequisites. Preserve the exact provider/model lane and browser acknowledgement boundary.

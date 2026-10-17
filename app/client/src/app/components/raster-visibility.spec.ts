@@ -188,11 +188,26 @@ describe('raster visibility evidence', () => {
     expect(missingLayer.failureCode).toBe('raster_source_not_loaded');
   });
 
-  it('does not claim support outside the declared zoom range', () => {
+  it('probes the maximum source tile when MapLibre overzooms a raster', () => {
     const probe = buildRasterTileProbe(
       overlay({ min_zoom: 4, max_zoom: 6 }),
       [12, 41, 13, 42],
       8,
+      [12.5, 41.5],
+    );
+
+    expect(probe?.zoomSupported).toBeTrue();
+    expect(probe?.z).toBe(6);
+    expect(probe?.url).toContain('/6/');
+    expect(probe?.tileIntersectsViewport).toBeTrue();
+    expect(probe?.failureCode).toBeNull();
+  });
+
+  it('rejects map zoom below the source minimum', () => {
+    const probe = buildRasterTileProbe(
+      overlay({ min_zoom: 4, max_zoom: 6 }),
+      [12, 41, 13, 42],
+      3,
       [12.5, 41.5],
     );
 

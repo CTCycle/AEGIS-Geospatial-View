@@ -171,8 +171,10 @@ export const buildRasterTileProbe = (
   const maximumZoom = typeof render.max_zoom === 'number'
     ? Math.floor(render.max_zoom)
     : MAX_PROBE_ZOOM;
+  // Raster source maxzoom caps tile requests; MapLibre overzooms those tiles
+  // at higher map zooms. Probe the same capped tile instead of rejecting it.
   const zoomSupported = requestedZoom >= minimumZoom
-    && requestedZoom <= maximumZoom
+    && requestedZoom <= MAX_PROBE_ZOOM
     && maximumZoom >= minimumZoom;
   const probeZoom = clamp(requestedZoom, minimumZoom, Math.min(MAX_PROBE_ZOOM, maximumZoom));
   const fallbackCenter: [number, number] = requestedBounds

@@ -1,0 +1,7 @@
+{
+  "http_status": 502,
+  "content_type": "application/json",
+  "response": {
+    "detail": "eea tile request failed."
+  }
+}
