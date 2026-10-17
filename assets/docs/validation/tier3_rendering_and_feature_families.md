@@ -12,7 +12,7 @@ still returns upstream 404. Manual preference persists visually but backend
 narration can name OSM incorrectly. Those broader components remain PARTIAL;
 VISION-INSPECT remains UNRUN.
 
-The [T3-17 continuation](../../QA/tier3-validation-20261017-t3-17/report.md) is `PARTIAL`: mixed GIBS raster/Open-Meteo vector rendering, independent opacity, and selective raster removal pass. The raster probe now supports MapLibre source-tile overzoom. Three-layer composition and reverse retention remain unproven after routing/tool failures and a valid-empty USGS result.
+The [2026-10-17 T3-17 follow-up](../../QA/tier3-validation-20261017-t3-17-followup/report.md) passes three-layer Open-Meteo/GIBS/GBIF composition, independent opacity changes, and selective removal in both raster/vector directions using accepted browser renders. The exact provider/model lane was bootstrapped from the user-authorized database credential into an isolated runtime. T3-17 remains `PARTIAL` because the overlay panel has no manual reorder control and an interactive ordering change could not be validated.
 
 Tier 3 is the rendering and geospatial feature-family gate. It must establish
 browser-authoritative evidence that basemaps, vector/raster families,
