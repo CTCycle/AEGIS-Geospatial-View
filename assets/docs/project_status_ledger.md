@@ -12,7 +12,7 @@ still returns upstream 404. Manual preference persists visually but backend
 narration can name OSM incorrectly. Those broader components remain PARTIAL;
 VISION-INSPECT remains UNRUN.
 
-The [2026-10-17 T3-17 follow-up](../QA/tier3-validation-20261017-t3-17-reorder/report.md) closes the gate as `PASS`: the exact `opencode-go / deepseek-v4.1-flash` lane rendered Open-Meteo, NASA GIBS MODIS, and GBIF together; keyboard ordering changed the rendered stack; independent opacity changes, both selective-removal directions, and retained order across map updates passed. The isolated lane probe and sanitized render acknowledgements are linked in the report; no credential value was persisted in evidence.
+The [2026-10-17 T3-17 follow-up](../QA/tier3-validation-20261017-t3-17-reorder/report.md) closes the gate as `PASS` on `validation@1b1cf25b655d7c72941d35a4a9ed98b489268ff5`: the exact `opencode-go / deepseek-v4.1-flash` lane rendered Open-Meteo, NASA GIBS MODIS, and GBIF together; keyboard ordering changed the rendered stack; independent opacity changes, both selective-removal directions, and retained order across map updates passed. The isolated lane probe and sanitized render acknowledgements are linked in the report; no credential value was persisted in evidence. GitHub reported no Actions run or combined status for that exact head, which remains separate from the local/browser PASS.
 
 This is the canonical high-level catalog of the current operational state of
 AEGIS Geospatial View. The 2026-09-23 T1-03 continuation began from clean
