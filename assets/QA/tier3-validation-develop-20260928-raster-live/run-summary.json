@@ -1,0 +1,53 @@
+{
+  "data_root": "runtimes/cache/test-runtime/tier3-raster-live-20260928",
+  "runs": [
+    {
+      "id": "run_ac2d464afe2d4e46a7abd0b896ad62a6",
+      "request": "Show FEMA flood zones around New Orleans, Louisiana.",
+      "state": "failed",
+      "presentation_status": "failed",
+      "error_code": "agent_operation_failed",
+      "render_boundary": "render_failed: MapLibre source could not be loaded"
+    },
+    {
+      "id": "run_82f6eb89429f47228d4f56522a63a7fb",
+      "request": "Show ESA WorldCover around Rome, Italy.",
+      "state": "failed",
+      "presentation_status": "failed",
+      "error_code": "agent_operation_failed",
+      "render_boundary": "render_failed: MapLibre source could not be loaded"
+    },
+    {
+      "id": "run_6b575e031941484eacc64521c46d174c",
+      "request": "Add nearby active USGS water gauges around New Orleans, Louisiana.",
+      "state": "completed",
+      "presentation_status": "ready",
+      "render_boundary": "USGS-only map acknowledged; FEMA was not retained because it never rendered"
+    },
+    {
+      "id": "run_7580850fe5ce4bc4b433a83fb71c1d11",
+      "request": "Remove the water gauges but keep the FEMA flood zones.",
+      "state": "completed",
+      "presentation_status": "ready",
+      "render_boundary": "basemap-only state acknowledged; no FEMA overlay was visible"
+    }
+  ],
+  "raster_evidence": [
+    {
+      "id": "evidence_33d49fac491144cf83bf54a77f225d31",
+      "capability_id": "fema_nfhl_flood_zones",
+      "provider_id": "fema",
+      "result_status": "ok",
+      "map_eligibility": "renderable",
+      "attribution": ["Federal Emergency Management Agency"]
+    },
+    {
+      "id": "evidence_c1737e02dce6462ebb220ea95440dc08",
+      "capability_id": "esa_worldcover",
+      "provider_id": "esa",
+      "result_status": "ok",
+      "map_eligibility": "renderable",
+      "attribution": ["© ESA WorldCover / Terrascope"]
+    }
+  ]
+}

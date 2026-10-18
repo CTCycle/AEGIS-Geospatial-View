@@ -1,31 +1,91 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import maplibregl from 'maplibre-gl';
 
-import { DEFAULT_BASE_TILE_MAX_ZOOM, DEFAULT_BASE_TILE_PROXY_URL, DEFAULT_MAP_FIT_MAX_ZOOM } from '../core/constants';
+import {
+  DEFAULT_BASE_TILE_MAX_ZOOM,
+  DEFAULT_BASE_TILE_PROXY_URL,
+  DEFAULT_MAP_FIT_MAX_ZOOM,
+  DEFAULT_SATELLITE_MAP_FIT_MAX_ZOOM,
+} from '../core/constants';
 import { MapPreviewComponent } from './map-preview.component';
+import { OverlayControlsComponent } from './overlay-controls.component';
 
 describe('components/map-preview.component', () => {
   let fixture: ComponentFixture<MapPreviewComponent>;
   let component: MapPreviewComponent;
-  const makeMapSession = (overrides: Record<string, unknown> = {}) => ({
-    session_id: 'map-1',
-    resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
-    basemap_id: 'osm_default',
-    overlay_ids: [],
-    viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
-    center: { latitude: 41.9, longitude: 12.5 },
-    overlays: [],
-    ...overrides,
-  });
+  const makeOverlayInstance = (overlay: Record<string, unknown>) => {
+    const id = String(overlay.id ?? overlay.instance_id ?? 'overlay');
+    return {
+      instance_id: String(overlay.instance_id ?? id),
+      capability_id: String(overlay.capability_id ?? id),
+      label: String(overlay.label ?? id),
+      provider: String(overlay.provider ?? 'fixture'),
+      overlay_type: String(overlay.type ?? 'overlay'),
+      rendering_mode: String(overlay.rendering_mode ?? overlay.type ?? 'metadata-only'),
+      scope_key: 'global',
+      scope: { kind: 'global' },
+      visible: typeof overlay.visible === 'boolean' ? overlay.visible : true,
+      opacity: typeof overlay.default_opacity === 'number' ? overlay.default_opacity : 1,
+      render_variant: {},
+      descriptor: { ...overlay, id },
+      inspections: Array.isArray(overlay.inspections) ? overlay.inspections : [],
+    };
+  };
+  const makeMapSession = (overrides: Record<string, unknown> = {}) => {
+    const overlayFixtures = Array.isArray(overrides.overlays)
+      ? overrides.overlays.filter((item): item is Record<string, unknown> => (
+        item !== null && typeof item === 'object'
+      ))
+      : [];
+    const overlayIds = Array.isArray(overrides.overlay_ids)
+      ? overrides.overlay_ids.filter((item): item is string => typeof item === 'string')
+      : [];
+    const explicitCollection = overrides.overlay_collection;
+    const overlayCollection = explicitCollection && typeof explicitCollection === 'object'
+      ? explicitCollection
+      : {
+        collection_id: 'active-map',
+        revision: 0,
+        instances: overlayFixtures.length > 0
+          ? overlayFixtures.map(makeOverlayInstance)
+          : overlayIds.map((id) => makeOverlayInstance({ id })),
+      };
+    const {
+      overlays: _legacyOverlays,
+      overlay_ids: _legacyOverlayIds,
+      overlay_collection: _explicitCollection,
+      ...canonicalOverrides
+    } = overrides;
+    return {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      basemap: {
+        id: 'osm_default',
+        label: 'OpenStreetMap',
+        provider: 'openstreetmap',
+        tile_url: DEFAULT_BASE_TILE_PROXY_URL,
+        render_status: 'available',
+      },
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      center: { latitude: 41.9, longitude: 12.5 },
+      overlay_collection: overlayCollection,
+      ...canonicalOverrides,
+    };
+  };
   let fakeMap: {
     addSource: jasmine.Spy;
     addLayer: jasmine.Spy;
     addControl: jasmine.Spy;
     on: jasmine.Spy;
     fitBounds: jasmine.Spy;
-    getLayer: jasmine.Spy;
+getLayer: jasmine.Spy;
     setLayoutProperty: jasmine.Spy;
     setPaintProperty: jasmine.Spy;
+    moveLayer: jasmine.Spy;
+    setZoom: jasmine.Spy;
+    getZoom: jasmine.Spy;
     zoomIn: jasmine.Spy;
     zoomOut: jasmine.Spy;
     resize: jasmine.Spy;
@@ -42,6 +102,9 @@ describe('components/map-preview.component', () => {
       getLayer: jasmine.createSpy('getLayer').and.returnValue({}),
       setLayoutProperty: jasmine.createSpy('setLayoutProperty'),
       setPaintProperty: jasmine.createSpy('setPaintProperty'),
+      moveLayer: jasmine.createSpy('moveLayer'),
+      setZoom: jasmine.createSpy('setZoom'),
+      getZoom: jasmine.createSpy('getZoom').and.returnValue(9),
       zoomIn: jasmine.createSpy('zoomIn'),
       zoomOut: jasmine.createSpy('zoomOut'),
       resize: jasmine.createSpy('resize'),
@@ -57,7 +120,33 @@ describe('components/map-preview.component', () => {
     component = fixture.componentInstance;
   });
 
-  it('builds basemap style with defaults when basemap not provided', () => {
+  it('does not emit an empty overlay state before a map session exists', () => {
+    const emitted: Array<{ overlayVisibility: Record<string, boolean>; overlayOpacity: Record<string, number>; overlayOrder: string[] }> = [];
+    component.overlayStateChange.subscribe((value) => emitted.push(value));
+    fixture.componentRef.setInput('initialOverlayVisibility', { weather: false });
+    fixture.componentRef.setInput('initialOverlayOpacity', { weather: 0.33 });
+
+    fixture.detectChanges();
+
+    expect(emitted).toEqual([]);
+  });
+
+  it('restores persisted overlay state in the view-init payload fallback', () => {
+    component.initialOverlayVisibility = { weather: false };
+    component.initialOverlayOpacity = { weather: 0.33 };
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'fixture', visible: true, default_opacity: 0.65 }],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(component.overlayVisibility['weather']).toBeFalse();
+    expect(component.overlayOpacity['weather']).toBe(0.33);
+  });
+
+  it('uses the backend basemap descriptor when rendering the base map', () => {
     component.payload = { map_session: makeMapSession() as never };
     fixture.detectChanges();
     expect(maplibregl.Map).toHaveBeenCalled();
@@ -65,6 +154,155 @@ describe('components/map-preview.component', () => {
     expect(style.sources.basemap.tiles[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
     expect(style.sources.basemap.maxzoom).toBe(DEFAULT_BASE_TILE_MAX_ZOOM);
     expect(style.layers.find((layer: { id: string }) => layer.id === 'basemap')?.maxzoom).toBe(DEFAULT_BASE_TILE_MAX_ZOOM);
+  });
+
+  it('disposes a pending candidate and ignores its late load callback after teardown', () => {
+    let loadCallback: (() => void) | undefined;
+    fakeMap.on.and.callFake((event: string, callback: () => void) => {
+      if (event === 'load') {
+        loadCallback = callback;
+      }
+    });
+    const states: string[] = [];
+    component.renderStateChange.subscribe((change) => states.push(change.state));
+    component.payload = { map_session: makeMapSession() as never };
+
+    fixture.detectChanges();
+    expect(states).toContain('preparing');
+
+    fixture.destroy();
+    expect(fakeMap.remove).toHaveBeenCalledTimes(1);
+
+    loadCallback?.();
+    expect(states.filter((state) => state === 'ready')).toEqual([]);
+    expect(fakeMap.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the active map when a replacement candidate fails', () => {
+    let candidateError: ((event: unknown) => void) | undefined;
+    let candidateLoad: (() => void) | undefined;
+    const candidateMap = {
+      ...fakeMap,
+      on: jasmine.createSpy('candidateOn'),
+      remove: jasmine.createSpy('candidateRemove'),
+    };
+    candidateMap.on.and.callFake((event: string, callback: (value?: unknown) => void) => {
+      if (event === 'error') {
+        candidateError = callback as (event: unknown) => void;
+      }
+      if (event === 'load') {
+        candidateLoad = callback;
+      }
+    });
+    (maplibregl.Map as unknown as jasmine.Spy).and.returnValues(fakeMap as never, candidateMap as never);
+
+    const states: string[] = [];
+    component.renderStateChange.subscribe((change) => states.push(change.state));
+    component.payload = { map_session: makeMapSession() as never };
+    fixture.detectChanges();
+    expect(states).toContain('ready');
+
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({
+        basemap_id: 'esri_world_imagery',
+        basemap: {
+          id: 'esri_world_imagery',
+          label: 'Satellite Imagery',
+          provider: 'arcgis',
+          tile_url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        },
+      }) as never,
+    });
+    fixture.detectChanges();
+    candidateLoad?.();
+    expect(states.at(-1)).toBe('preparing');
+    candidateError?.({ error: new Error('candidate failed') });
+
+    expect(candidateMap.remove).toHaveBeenCalledTimes(1);
+    expect(fakeMap.remove).not.toHaveBeenCalled();
+    expect(states.at(-1)).toBe('failed');
+  });
+
+  it('discards an initial candidate when its backend acknowledgment is rejected', () => {
+    component.renderIdentity = {
+      runId: 'run-1',
+      runVersion: 1,
+      mapSessionId: 'map-1',
+      collectionRevision: 1,
+    };
+    component.payload = {
+      map_session: makeMapSession({
+        overlay_collection: {
+          collection_id: 'active-map',
+          revision: 1,
+          instances: [],
+        },
+      }) as never,
+    };
+    fixture.detectChanges();
+
+    expect(fakeMap.remove).not.toHaveBeenCalled();
+    component.rejectRenderedCandidate();
+
+    expect(fakeMap.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the committed map when a replacement has invalid center coordinates', () => {
+    const states: string[] = [];
+    component.renderStateChange.subscribe((change) => states.push(change.state));
+    component.payload = { map_session: makeMapSession() as never };
+    fixture.detectChanges();
+    const mapCallCount = (maplibregl.Map as unknown as jasmine.Spy).calls.count();
+
+    component.renderIdentity = {
+      runId: 'run-2',
+      runVersion: 1,
+      mapSessionId: 'map-2',
+      collectionRevision: 2,
+    };
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({
+        session_id: 'map-2',
+        center: { latitude: Number.NaN, longitude: 12.5 },
+      }) as never,
+    });
+    fixture.detectChanges();
+
+    expect((maplibregl.Map as unknown as jasmine.Spy).calls.count()).toBe(mapCallCount);
+    expect(states.at(-1)).toBe('failed');
+    expect(fakeMap.remove).not.toHaveBeenCalled();
+  });
+
+  it('cancels a pre-idle candidate and ignores its late load callback on rollback', () => {
+    let candidateLoad: (() => void) | undefined;
+    const candidateMap = {
+      ...fakeMap,
+      on: jasmine.createSpy('candidateOn'),
+      remove: jasmine.createSpy('candidateRemove'),
+    };
+    candidateMap.on.and.callFake((event: string, callback: () => void) => {
+      if (event === 'load') {
+        candidateLoad = callback;
+      }
+    });
+    (maplibregl.Map as unknown as jasmine.Spy).and.returnValues(fakeMap as never, candidateMap as never);
+
+    const states: string[] = [];
+    component.renderStateChange.subscribe((change) => states.push(change.state));
+    component.payload = { map_session: makeMapSession() as never };
+    fixture.detectChanges();
+    expect(states).toContain('ready');
+
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({ session_id: 'map-2', center: { latitude: 42, longitude: 13 } }) as never,
+    });
+    fixture.detectChanges();
+    component.rejectRenderedCandidate();
+    candidateLoad?.();
+
+    expect(candidateMap.remove).toHaveBeenCalledTimes(1);
+    expect(fakeMap.remove).not.toHaveBeenCalled();
+    expect(states.at(-1)).toBe('preparing');
   });
 
   it('preserves external satellite imagery tile URLs', () => {
@@ -99,6 +337,82 @@ describe('components/map-preview.component', () => {
       [[12.4963044, 41.902725], [12.4964044, 41.902825]],
       { padding: 30, duration: 0, maxZoom: DEFAULT_MAP_FIT_MAX_ZOOM },
     );
+  });
+
+  it('honors an overlay fit zoom hint without changing the default map cap', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{
+          id: 'rainviewer_precipitation_radar',
+          provider: 'rainviewer',
+          type: 'metadata-only',
+          rendering_mode: 'metadata-only',
+          fit_max_zoom: 6,
+        }],
+        bounds: [12.4963044, 41.902725, 12.4964044, 41.902825],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(fakeMap.fitBounds).toHaveBeenCalledWith(
+      [[12.4963044, 41.902725], [12.4964044, 41.902825]],
+      { padding: 30, duration: 0, maxZoom: 6 },
+    );
+  });
+
+  it('zooms a scale-dependent raster overlay to its declared minimum zoom', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{
+          id: 'fema_nfhl_flood_zones',
+          provider: 'fema',
+          type: 'raster-overlay',
+          rendering_mode: 'raster-tile',
+          tile_url_template: '/api/geospatial/tiles/fema_nfhl_flood_zones/{z}/{x}/{y}.png',
+          min_zoom: 14,
+          render: {
+            provider: 'fema',
+            layer_id: '28',
+            rendering_mode: 'raster-tile',
+            tile_url_template: '/api/geospatial/tiles/fema_nfhl_flood_zones/{z}/{x}/{y}.png',
+            min_zoom: 14,
+          },
+        }],
+        bounds: [12.4963044, 41.902725, 12.4964044, 41.902825],
+      }) as never,
+    };
+    fakeMap.getZoom.and.returnValue(9);
+
+    fixture.detectChanges();
+
+    expect(fakeMap.setZoom).toHaveBeenCalledWith(14, { duration: 0 });
+  });
+
+  it('does not zoom an overlay whose minimum zoom is already reached', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{
+          id: 'esa_worldcover',
+          provider: 'esa',
+          type: 'raster-overlay',
+          rendering_mode: 'wms',
+          tile_url_template: '/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png',
+          render: {
+            provider: 'esa',
+            layer_id: 'esa-worldcover-map-10m-2021-v2_map',
+            rendering_mode: 'wms',
+            tile_url_template: '/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png',
+          },
+        }],
+        bounds: [12.4963044, 41.902725, 12.4964044, 41.902825],
+      }) as never,
+    };
+    fakeMap.getZoom.and.returnValue(9);
+
+    fixture.detectChanges();
+
+    expect(fakeMap.setZoom).not.toHaveBeenCalled();
   });
 
   it('ignores invalid bounds for fitBounds', () => {
@@ -136,8 +450,60 @@ describe('components/map-preview.component', () => {
     expect(component.restoreNotice).toContain('could not be restored');
   });
 
+  it('preserves restored overlay preferences for same-session payload echoes and applies new-session visibility', () => {
+    fixture.componentRef.setInput('initialOverlayVisibility', { weather: false });
+    fixture.componentRef.setInput('initialOverlayOpacity', { weather: 0.12 });
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({
+        session_id: 'map-1',
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }],
+      }) as never,
+    });
+    fixture.detectChanges();
+    expect(component.overlayVisibility['weather']).toBeFalse();
+    expect(component.overlayOpacity['weather']).toBe(0.12);
+
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({
+        session_id: 'map-1',
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }],
+      }) as never,
+    });
+    fixture.detectChanges();
+
+    expect(component.overlayVisibility['weather']).toBeFalse();
+    expect(component.overlayOpacity['weather']).toBe(0.12);
+
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({
+        session_id: 'map-2',
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }],
+      }) as never,
+    });
+    fixture.detectChanges();
+
+    expect(component.overlayVisibility['weather']).toBeTrue();
+    expect(component.overlayOpacity['weather']).toBe(0.12);
+  });
+
+  it('keeps a local visibility toggle when the parent echoes map state', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true }],
+      }) as never,
+    };
+    fixture.detectChanges();
+
+    component.setOverlayVisibility('weather', false);
+    fixture.componentRef.setInput('initialOverlayVisibility', { weather: false });
+    fixture.detectChanges();
+
+    expect(component.overlayVisibility['weather']).toBeFalse();
+    expect(fakeMap.setLayoutProperty).toHaveBeenCalledWith('overlay-layer-weather', 'visibility', 'none');
+  });
+
   it('emits visibility and opacity updates', () => {
-    const emitted: Array<{ overlayVisibility: Record<string, boolean>; overlayOpacity: Record<string, number> }> = [];
+    const emitted: Array<{ overlayVisibility: Record<string, boolean>; overlayOpacity: Record<string, number>; overlayOrder: string[] }> = [];
     component.overlayStateChange.subscribe((value) => emitted.push(value));
     component.payload = {
       map_session: makeMapSession({
@@ -149,6 +515,47 @@ describe('components/map-preview.component', () => {
     component.setOverlayOpacity('ov1', '25');
     expect(emitted.at(-1)?.overlayVisibility['ov1']).toBeFalse();
     expect(emitted.at(-1)?.overlayOpacity['ov1']).toBeCloseTo(0.25, 2);
+  });
+
+  it('restores and emits a reconciled order for the active session', () => {
+    component.initialOverlayOrder = ['vector', 'removed'];
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          { id: 'raster', label: 'Raster', type: 'tile', provider: 'fixture' },
+          { id: 'vector', label: 'Vector', type: 'geojson', provider: 'fixture' },
+          { id: 'new', label: 'New', type: 'tile', provider: 'fixture' },
+        ],
+      }) as never,
+    };
+    const emitted: string[][] = [];
+    component.overlayStateChange.subscribe((state) => emitted.push(state.overlayOrder));
+
+    fixture.detectChanges();
+
+    expect(component.overlays.map((overlay) => overlay.id)).toEqual(['vector', 'raster', 'new']);
+    expect(emitted.at(-1)).toEqual(['vector', 'raster', 'new']);
+    expect(component.restoreNotice).toContain('1 removed or unknown overlay id');
+  });
+
+  it('applies user order to MapLibre layers from back to front', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          { id: 'raster', label: 'Raster', type: 'tile', rendering_mode: 'raster-tile', url: 'https://tiles.example/{z}/{x}/{y}.png', provider: 'fixture' },
+          { id: 'vector', label: 'Vector', type: 'tile', rendering_mode: 'raster-tile', url: 'https://tiles.example/{z}/{x}/{y}.png', provider: 'fixture' },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+    fakeMap.moveLayer.calls.reset();
+    component.setOverlayOrder(['vector', 'raster']);
+
+    expect(fakeMap.moveLayer.calls.allArgs()).toEqual([
+      ['overlay-layer-raster'],
+      ['overlay-layer-vector'],
+    ]);
   });
 
   it('clamps and ignores invalid overlay opacity values', () => {
@@ -327,7 +734,107 @@ describe('components/map-preview.component', () => {
       .find((layer) => layer.id === 'overlay-layer-natural_earth');
     expect(vectorLayer?.['source-layer']).toBe('admin_boundaries');
     expect(component.metadataOnlyOverlays.map((overlay) => overlay.id)).toContain('parcel_template');
-    expect(component.attributionEntries).toContain('Natural Earth');
+    expect(component.attributionEntries.map((entry) => entry.label)).toContain('Natural Earth');
+  });
+
+  it('uses a lower fit cap for satellite imagery on tight bounds', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        basemap_id: 'esri_world_imagery',
+        basemap: {
+          id: 'esri_world_imagery',
+          label: 'Satellite Imagery',
+          provider: 'arcgis',
+          tile_url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          render_status: 'available',
+        },
+        bounds: [145.89995, -16.35005, 145.90005, -16.34995],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(fakeMap.fitBounds).toHaveBeenCalledWith(
+      [[145.89995, -16.35005], [145.90005, -16.34995]],
+      { padding: 30, duration: 0, maxZoom: DEFAULT_SATELLITE_MAP_FIT_MAX_ZOOM },
+    );
+  });
+
+  it('renders valid-empty overlays as accessible no-results and successful evidence', () => {
+    const renderEvents: Array<{
+      state: string;
+      overlayResults?: Array<Record<string, string | number | boolean | null>>;
+    }> = [];
+    component.renderStateChange.subscribe((change) => renderEvents.push(change));
+    component.payload = {
+      map_session: makeMapSession({
+        bounds: [12.4, 41.8, 12.6, 42.0],
+        overlays: [{
+          id: 'empty_flood_zones',
+          label: 'Flood Zones',
+          type: 'geojson',
+          rendering_mode: 'choropleth',
+          provider: 'fixture',
+          data_format: 'GeoJSON',
+          geometry_type: 'Polygon',
+          result_status: 'valid_empty',
+          data: { type: 'FeatureCollection', features: [] },
+        }],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(component.overlayRenderStatuses).toEqual([
+      jasmine.objectContaining({
+        overlayId: 'empty_flood_zones',
+        status: 'no-results',
+      }),
+    ]);
+    expect(component.noResultsOverlays.map((overlay) => overlay.id)).toEqual(['empty_flood_zones']);
+    const noResultsPanel = fixture.nativeElement.querySelector('[aria-label="No results"]') as HTMLElement | null;
+    expect(noResultsPanel?.getAttribute('role')).toBe('status');
+    expect(noResultsPanel?.textContent).toContain('Flood Zones');
+    expect(noResultsPanel?.textContent).toContain('no results');
+
+    const overlayControls = fixture.debugElement.query(By.directive(OverlayControlsComponent)).componentInstance as OverlayControlsComponent;
+    overlayControls.isExpanded = true;
+    fixture.detectChanges();
+    const layerNote = fixture.nativeElement.querySelector('.overlay-render-note') as HTMLElement | null;
+    expect(layerNote?.getAttribute('role')).toBe('status');
+    expect(layerNote?.textContent).toContain('no-results');
+    expect(layerNote?.textContent).toContain('No results in the requested area or time window.');
+
+    const readyEvent = renderEvents.filter((event) => event.state === 'ready').at(-1);
+    expect(readyEvent?.overlayResults?.[0]).toEqual(jasmine.objectContaining({
+      overlay_id: 'empty_flood_zones',
+      loaded: true,
+    }));
+  });
+
+  it('renders attribution labels as links when a safe attribution URL is provided', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          {
+            id: 'rainviewer_precipitation_radar',
+            label: 'RainViewer Recent Precipitation Radar',
+            type: 'tile',
+            rendering_mode: 'raster-tile',
+            provider: 'rainviewer',
+            url: 'https://example.test/radar/{z}/{x}/{y}.png',
+            attribution: '© RainViewer',
+            attribution_url: 'https://www.rainviewer.com/api.html',
+          },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('.attribution-panel a') as HTMLAnchorElement | null;
+    expect(link?.textContent).toContain('RainViewer');
+    expect(link?.href).toBe('https://www.rainviewer.com/api.html');
   });
 
   it('surfaces a layer-specific failure when vector source_layer metadata is missing', () => {
@@ -375,6 +882,10 @@ describe('components/map-preview.component', () => {
 
     fixture.detectChanges();
 
+    const overlayControls = fixture.debugElement.query(By.directive(OverlayControlsComponent)).componentInstance as OverlayControlsComponent;
+    overlayControls.isExpanded = true;
+    fixture.detectChanges();
+
     const opacityInput = fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement | null;
     expect(component.overlayRenderStatuses).toEqual([
       jasmine.objectContaining({
@@ -389,6 +900,36 @@ describe('components/map-preview.component', () => {
     component.payload = {};
     fixture.detectChanges();
     expect(component.mapSession).toBeUndefined();
+  });
+
+  it('clears an inspection that no longer belongs to the active map session', () => {
+    const inspection = {
+      inspection_id: 'hospital-1',
+      title: 'Hospital',
+      association: 'feature',
+      fields: [{ key: 'category', label: 'Category', value: 'hospital' }],
+    };
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{
+          id: 'hospitals',
+          label: 'Hospitals',
+          type: 'geojson',
+          provider: 'overpass',
+          inspections: [inspection],
+        }],
+      }) as never,
+    };
+    fixture.detectChanges();
+    component.openInspection(inspection);
+    expect(component.selectedInspection?.inspection_id).toBe('hospital-1');
+
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({ overlays: [] }) as never,
+    });
+    fixture.detectChanges();
+
+    expect(component.selectedInspection).toBeUndefined();
   });
 
   it('does not materialize credential-bearing URLs into chosen map session state or source definitions', () => {
@@ -416,23 +957,64 @@ describe('components/map-preview.component', () => {
     expect(fixture.nativeElement.outerHTML).not.toContain('api_key=');
   });
 
-  it('maps overlay ids directly when overlay descriptors are absent', () => {
+  it('renders overlays from the canonical collection state', () => {
     component.payload = {
       map_session: {
         ...makeMapSession(),
         center: { latitude: 45.4642, longitude: 9.19 },
         basemap_id: 'osm_default',
-        overlay_ids: ['openmeteo_weather_forecast', 'rainviewer_precipitation_radar'],
+        overlay_collection: {
+          collection_id: 'active-map',
+          revision: 2,
+          instances: [
+            {
+              instance_id: 'weather-instance',
+              capability_id: 'openmeteo_weather_forecast',
+              label: 'Weather',
+              provider: 'openmeteo',
+              overlay_type: 'tile',
+              rendering_mode: 'xyz',
+              scope_key: 'global',
+              scope: { kind: 'global' },
+              visible: true,
+              opacity: 1,
+              render_variant: {},
+              descriptor: {
+                id: 'weather-instance',
+                url: 'https://weather.example/{z}/{x}/{y}.png',
+              },
+              inspections: [],
+            },
+            {
+              instance_id: 'radar-instance',
+              capability_id: 'rainviewer_precipitation_radar',
+              label: 'Radar',
+              provider: 'rainviewer',
+              overlay_type: 'tile',
+              rendering_mode: 'xyz',
+              scope_key: 'global',
+              scope: { kind: 'global' },
+              visible: true,
+              opacity: 1,
+              render_variant: {},
+              descriptor: {
+                id: 'radar-instance',
+                url: 'https://radar.example/{z}/{x}/{y}.png',
+              },
+              inspections: [],
+            },
+          ],
+        },
       } as never,
     };
     fixture.detectChanges();
-    expect(component.mapSession?.overlay_ids).toEqual([
+    expect(component.mapSession?.overlay_collection.instances.map((instance) => instance.capability_id)).toEqual([
       'openmeteo_weather_forecast',
       'rainviewer_precipitation_radar',
     ]);
     expect(component.overlays.map((overlay) => overlay.id)).toEqual([
-      'openmeteo_weather_forecast',
-      'rainviewer_precipitation_radar',
+      'weather-instance',
+      'radar-instance',
     ]);
     expect(component.mapSession?.basemap?.id).toBe('osm_default');
   });

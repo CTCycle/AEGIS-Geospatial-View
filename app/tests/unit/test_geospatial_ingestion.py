@@ -129,7 +129,9 @@ def test_execute_ingestion_plan_accepts_checksum_url(tmp_path) -> None:
     result = execute_ingestion_plan(plan, workspace_root=tmp_path)
 
     assert result.feature_count == 0
-    assert '"checksumSource": "checksumUrl"' in Path(result.metadata_file).read_text(encoding="utf-8")
+    assert '"checksumSource": "checksumUrl"' in Path(result.metadata_file).read_text(
+        encoding="utf-8"
+    )
 
 ###############################################################################
 def test_execute_ingestion_plan_drops_invalid_geojson_geometry(tmp_path) -> None:
@@ -210,7 +212,9 @@ def test_execute_ingestion_plan_rejects_non_intersecting_bbox(tmp_path) -> None:
         raise AssertionError("Non-intersecting bbox did not fail ingestion.")
 
 ###############################################################################
-def test_dataset_materialization_fixtures_produce_normalized_indexes_tiles_and_health(tmp_path) -> None:
+def test_dataset_materialization_fixtures_produce_normalized_indexes_tiles_and_health(
+    tmp_path,
+) -> None:
     fixture_root = Path(__file__).resolve().parents[1] / "fixtures/geospatial"
     cases = [
         (
@@ -284,10 +288,18 @@ def test_dataset_materialization_fixtures_produce_normalized_indexes_tiles_and_h
         assert result.spatial_index_file is not None
         assert result.text_index_file is not None
         assert result.tile_manifest_file is not None
-        normalized = json.loads(Path(result.normalized_file).read_text(encoding="utf-8"))
-        spatial_index = json.loads(Path(result.spatial_index_file).read_text(encoding="utf-8"))
-        text_index = json.loads(Path(result.text_index_file).read_text(encoding="utf-8"))
-        tile_manifest = json.loads(Path(result.tile_manifest_file).read_text(encoding="utf-8"))
+        normalized = json.loads(
+            Path(result.normalized_file).read_text(encoding="utf-8")
+        )
+        spatial_index = json.loads(
+            Path(result.spatial_index_file).read_text(encoding="utf-8")
+        )
+        text_index = json.loads(
+            Path(result.text_index_file).read_text(encoding="utf-8")
+        )
+        tile_manifest = json.loads(
+            Path(result.tile_manifest_file).read_text(encoding="utf-8")
+        )
         health = json.loads(Path(result.health_file).read_text(encoding="utf-8"))
 
         assert normalized["type"] == "FeatureCollection"

@@ -1,10 +1,10 @@
 # State Preservation
 
-Last updated: 2026-06-22
+Last updated: 2026-09-21
 
 ## Overview
 
-The web app stores per-tab UI state in `sessionStorage` under `aegis:webapp-state:v3` with a 6-hour TTL.
+The web app stores per-tab UI state in `sessionStorage` under `aegis:webapp-state:v5` with a 6-hour TTL.
 
 Older schema payloads are invalidated and discarded.
 
@@ -22,13 +22,14 @@ Older schema payloads are invalidated and discarded.
 
 Persisted chat state includes:
 
-- `sessionId`
-- `conversationId`, `activeRunId`, `activeRunVersion`, and `lastRunEventId`
+- `conversationId`, `contextRevision`, `taskSnapshot`, `activeRunId`, and `activeRunVersion`
 - `conversationNonce`
 - `messages`
 - `lastDecision`
 - `memorySnapshot`
 - `mapSession`
+- candidate presentation identity and status (`runVersion`, `mapSessionId`,
+  `collectionRevision`, and pending render requirements)
 - status and composer/transcript UI state
 - bounded run event duplicate-protection state
 
@@ -36,6 +37,24 @@ Persisted map UI state includes:
 
 - `overlayVisibility`
 - `overlayOpacity`
+- stable overlay instance IDs and the active collection revision carried by the
+  current `mapSession`
+
+The basemap selector is a live session preference: a manual choice is retained
+when subsequent location requests prepare a new map candidate, while a new
+chat or browser reload starts from the catalog default basemap.
+
+The v5 boundary invalidates pre-collection active-map/task snapshots. A small
+one-time migration retains conversation ID and messages, while old map/task
+state is discarded; messages are never removed solely because the map schema
+changed.
+
+Prepared map state is a candidate, not committed visualization memory. The
+client validates it locally and acknowledges the exact run/version/session/
+revision tuple. Until the server accepts that acknowledgment, the previous
+committed map remains authoritative. Reconnect hydrates a still-pending
+candidate; a duplicate matching acknowledgment updates neither transcript nor
+context revision, while a stale or conflicting acknowledgment is discarded.
 
 ## Restore Rules
 
@@ -47,6 +66,28 @@ State is restored only when:
 - payload shape remains valid
 
 Otherwise the app falls back to `defaultAppState()`.
+
+Settings section selection is URL-owned rather than session-storage-owned. The
+`tab` query parameter deep-links to any Settings section (`models`,
+`model-providers`, `geospatial-access`, `application`, `map-search`,
+`data-sources`, or `agent-runtime`); missing and invalid values resolve to
+`models`. Runtime form drafts remain local to the active Settings page until an
+explicit save commits them through the runtime settings API.
+
+Late completion payloads with older context revisions are discarded. Numeric
+backend chat-session identifiers are neither restored nor transmitted.
+
+The browser sends bounded render evidence only: source/layer presence, loaded
+state, viewport validity, and rendered feature counts where applicable. It does
+not send geometry, raw tile URLs, or browser error objects. A new run locally
+invalidates an older pending candidate, and the server atomically supersedes it
+when the new run is created.
+
+The active run also persists the last realtime event sequence and bounded seen-
+event IDs so WebSocket reconnects can replay without duplicating transcript
+output. Event IDs protect against duplicate delivery; sequence remains the
+durable replay cursor. Steering refinements are already represented in the
+persisted message list and do not need a separate persisted field.
 
 ## Tab Isolation And Clear Behavior
 

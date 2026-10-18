@@ -1,10 +1,25 @@
 # Project Overview
 
-Last updated: 2026-06-02
+Last updated: 2026-10-01
 
 ## Purpose
 
-This file is the root index for `assets/docs`. Read it first, then open the smallest leaf document that answers the current question.
+This file is the root index for `assets/docs`. Read it first, then open the smallest leaf document that answers the current question. For the current operational project state, read [`project_status_ledger.md`](project_status_ledger.md); detailed reports explain how each status was established.
+
+## Current Implementation Snapshot
+
+The runtime catalog currently contains 92 JSON documents: 6 basemaps, 48
+overlays, 18 provider descriptors, 4 direct tools, 7 camera networks, 3
+transit capabilities, and 4 reference catalogs. `runtime_profiles.json` adds
+environment and credential availability on top of those manifests.
+
+The implemented chat model surface includes static cloud catalog entries,
+Ollama local models, and on-demand catalogs for DeepSeek, OpenCode Zen, and
+OpenCode Go. Agent execution uses one native harness: a model-owned route,
+progressively constrained typed tools, one normalized execution boundary, and
+bounded evidence/result contracts. Legacy and shadow execution paths have
+been removed. Normalized provider results and derived datasets live in the
+conversation-scoped `agent_evidence` store rather than model messages.
 
 ## Navigation Rules
 
@@ -12,7 +27,7 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 2. Choose one topic branch.
 3. Open the narrowest leaf file under that branch.
 4. Open sibling files only when the task clearly crosses boundaries.
-5. Treat `app/resources/catalog` as the runtime source of truth for geospatial capabilities.
+5. Treat `data/catalog` as the runtime source of truth for geospatial capabilities.
 
 ## Ontology
 
@@ -20,6 +35,13 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 
 - `project_index.md`
   Root index, reading rules, and documentation governance.
+
+### Operational Status
+
+- [`project_status_ledger.md`](project_status_ledger.md)
+  Canonical current operational status catalog for project components, active
+  issues, resolved findings, and validation debt. Update it when implementation
+  status, evidence, blockers, or remediation state changes.
 
 ### Architecture
 
@@ -52,11 +74,11 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 - `runtime/modes.md`
   Supported runtime modes and their operational differences.
 - `runtime/startup.md`
-  Launcher, manual startup, test, and packaging commands.
+  Launcher, manual startup, and test commands.
 - `runtime/configuration.md`
   Environment variables, settings files, and profile differences.
 - `runtime/deployment.md`
-  Packaging outputs, interoperability, and runtime constraints.
+  Local distribution, interoperability, and runtime constraints.
 
 ### Geospatial
 
@@ -75,6 +97,10 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
   Seedable static catalog/reference data and startup seeding behavior.
 - `geospatial/manifests/agent_catalog_contract.md`
   Stable native tools used to expose manifests to the agent.
+
+- `geospatial/native_harness_bootstrap.md`
+  Resume point, completed implementation slices, deletion order, and
+  validation gates for the native-agent consolidation.
 
 #### Providers
 
@@ -96,6 +122,22 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 - `geospatial/ingestion/validation.md`
   Manifest audit, backend, frontend, browser, CI, and live-provider validation workflow.
 
+#### Validation Ledger
+
+- [`validation/strategy.md`](validation/strategy.md)
+  Durable digest of the ordered Tier 0–5 campaign, status semantics, evidence
+  contract, browser boundary, and comprehensive-pass rule.
+- [`validation/tier1_application_foundations.md`](validation/tier1_application_foundations.md)
+  Tier 1 application-foundations checklist and current hand-off boundary.
+- [`validation/tier3_rendering_and_feature_families.md`](validation/tier3_rendering_and_feature_families.md)
+  Tier 3 rendering and feature-family checklist, including the reconstructed
+  per-gate acceptance contracts for `T3-10`–`T3-18`.
+- [validation/gate_status.md](validation/gate_status.md)
+  Canonical PASS/PARTIAL/FAIL/BLOCKED/UNRUN ledger for native-loop,
+  presentation, browser-fault, provider, and hosted-CI gates. It is the
+  detailed evidence ledger beneath the current component summary in
+  `project_status_ledger.md`.
+
 ### UI
 
 - `ui/design_tokens.md`
@@ -116,7 +158,7 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 - `user/workflows.md`
   Core end-user journeys, chat patterns, and key features.
 - `user/settings_and_access.md`
-  Model settings, access configuration, and user-facing controls.
+  Unified Models, Model Providers, and Geospatial Access settings controls.
 - `user/troubleshooting.md`
   Troubleshooting basics and operational notes for end users.
 
@@ -130,6 +172,9 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 - Keep file and folder names lower-case.
 - Prefer narrow topic files over large omnibus documents.
 - Update affected docs in the same change set as behavior changes.
+- Update `project_status_ledger.md` whenever a component status, active issue,
+  blocker, validation result, or revalidation requirement changes. Keep detailed
+  reports in `assets/QA/` and link them instead of duplicating their narratives.
 - Include `Last updated: YYYY-MM-DD` whenever a document changes.
 - Remove obsolete docs and QA artifacts from `assets/docs`; keep validation artifacts under root-level `assets/QA/` when they must be preserved.
 
@@ -137,4 +182,4 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 
 - Windows is the default operating environment.
 - Keep PowerShell and CMD examples aligned with actual repo entry points.
-- Document environment-specific constraints when they affect runtime, validation, or packaging.
+- Document environment-specific constraints when they affect runtime or validation.

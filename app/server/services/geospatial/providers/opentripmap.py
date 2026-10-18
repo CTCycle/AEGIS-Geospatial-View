@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import os
+from server.common.typing import is_json_array, is_json_object
+
 from urllib.parse import urlencode
 
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
@@ -41,9 +42,11 @@ class OpenTripMapProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
-        api_key = (self.api_key or os.getenv("OPENTRIPMAP_API_KEY") or "").strip()
+        api_key = (self.api_key or "").strip()
         if not api_key:
-            raise ProviderAuthError("OPENTRIPMAP_API_KEY is required for OpenTripMap tourism POIs.")
+            raise ProviderAuthError(
+                "OPENTRIPMAP_API_KEY is required for OpenTripMap tourism POIs."
+            )
         latitude, longitude = request_center(request)
         radius_m = request_radius_m(request, 2500.0)
         params = {
@@ -62,9 +65,11 @@ class OpenTripMapProvider(GeospatialProvider):
                 provider_id=self.provider_id,
                 payload={
                     "renderingMode": "clustered-points",
-                    "featuresUrl": url,
+                    "status": "server-side-only",
+                    "message": "OpenTripMap credentials are retained and used only by the server.",
                 },
                 attribution=["OpenTripMap"],
+                result_type="metadata",
             )
         cache_key = f"{self.provider_id}:{url}"
         try:
@@ -77,16 +82,25 @@ class OpenTripMapProvider(GeospatialProvider):
                 "center": {"latitude": latitude, "longitude": longitude},
                 "radiusM": radius_m,
             }
-            self.cache.set(cache_key, normalized, ttl_seconds=900, stale_while_revalidate_seconds=86400)
+            self.cache.set(
+                cache_key,
+                normalized,
+                ttl_seconds=900,
+                stale_while_revalidate_seconds=86400,
+            )
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
                 payload=normalized,
                 attribution=["OpenTripMap"],
+                result_status="valid_empty" if not features else "ok",
+                result_type="features",
             )
         except (ProviderError, ValueError) as exc:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return ProviderResponse(
                     capability_id=request.capability_id,
                     provider_id=self.provider_id,
@@ -94,6 +108,8 @@ class OpenTripMapProvider(GeospatialProvider):
                     attribution=["OpenTripMap"],
                     warnings=["OpenTripMap request failed; serving stale cached POIs."],
                     stale=True,
+                    result_status="stale",
+                    result_type="features",
                 )
             if isinstance(exc, ProviderError):
                 raise
@@ -101,23 +117,25 @@ class OpenTripMapProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     def _features(self, payload: object) -> list[dict[str, object]]:
-        if not isinstance(payload, dict):
+        if not is_json_object(payload):
             raise ValueError("OpenTripMap payload must be an object.")
         raw_features = payload.get("features")
-        if not isinstance(raw_features, list):
+        if not is_json_array(raw_features):
             return []
         features: list[dict[str, object]] = []
         for item in raw_features:
-            if not isinstance(item, dict):
+            if not is_json_object(item):
                 continue
             geometry = item.get("geometry")
             properties = item.get("properties")
-            if not isinstance(geometry, dict) or not isinstance(properties, dict):
+            if not is_json_object(geometry) or not is_json_object(properties):
                 continue
             coordinates = geometry.get("coordinates")
-            if not isinstance(coordinates, list) or len(coordinates) < 2:
+            if not is_json_array(coordinates) or len(coordinates) < 2:
                 continue
-            category = normalize_poi_category(str(properties.get("kinds") or "tourism").split(",")[0])
+            category = normalize_poi_category(
+                str(properties.get("kinds") or "tourism").split(",")[0]
+            )
             features.append(
                 {
                     "id": str(properties.get("xid") or properties.get("id") or ""),

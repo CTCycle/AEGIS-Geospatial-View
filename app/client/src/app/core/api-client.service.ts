@@ -2,14 +2,17 @@ import { Injectable } from '@angular/core';
 
 import {
   checkOllamaHealth,
-  cancelAgentRun,
-  createAgentRun,
   createConversation,
   fetchCatalog,
   fetchChatModels,
+  fetchStructuredProbe,
+  fetchConversationSnapshot,
+  fetchConversationRunStatus,
+  fetchConversations,
+  fetchConversationRunTrace,
   fetchChatSettings,
+  fetchRuntimeSettings,
   fetchGeospatialCameras,
-  fetchGeospatialCapabilities,
   fetchGeospatialCredentialStatus,
   fetchGeospatialProviderAccountSetups,
   fetchGeospatialLayerFeatures,
@@ -17,19 +20,20 @@ import {
   pullOllamaModel,
   refreshOllamaModels,
   sendChatTurn,
-  sendRunSteering,
-  openRunEventSource,
   updateChatSettings,
+  updateRuntimeSettings,
+  runStructuredProbe,
 } from './api';
 import {
   CatalogResponse,
-  AgentRunCancelResponse,
-  AgentRunCreateRequest,
-  AgentRunCreateResponse,
+  AgentRunSnapshot,
   ChatTurnRequest,
-  ChatTurnResponse,
+  ChatTurnApiResponse,
   ConversationCreateRequest,
   ConversationCreateResponse,
+  ConversationSnapshotResponse,
+  ConversationListResponse,
+  RunTraceResponse,
   GenericObjectResponse,
   GeospatialCredentialStatus,
   GeospatialProviderAccountSetupListResponse,
@@ -37,19 +41,16 @@ import {
   ModelLibraryResponse,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
+  RuntimeSettingsResponse,
+  RuntimeSettingsUpdateRequest,
+  StructuredProbeResponse,
   OllamaHealthResponse,
-  SteeringMessageRequest,
-  SteeringMessageResponse,
 } from './types';
 
 @Injectable({ providedIn: 'root' })
 export class ApiClientService {
   fetchCatalog(): Promise<CatalogResponse> {
     return fetchCatalog();
-  }
-
-  fetchGeospatialCapabilities(): Promise<CatalogResponse> {
-    return fetchGeospatialCapabilities();
   }
 
   fetchGeospatialLayers(): Promise<Pick<CatalogResponse, 'basemaps' | 'overlays' | 'cameras' | 'transit'>> {
@@ -77,7 +78,7 @@ export class ApiClientService {
     return fetchGeospatialProviderAccountSetups();
   }
 
-  sendChatTurn(payload: ChatTurnRequest): Promise<ChatTurnResponse> {
+  sendChatTurn(payload: ChatTurnRequest): Promise<ChatTurnApiResponse> {
     return sendChatTurn(payload);
   }
 
@@ -85,27 +86,29 @@ export class ApiClientService {
     return createConversation(payload);
   }
 
-  createAgentRun(conversationId: string, payload: AgentRunCreateRequest): Promise<AgentRunCreateResponse> {
-    return createAgentRun(conversationId, payload);
+  fetchConversationSnapshot(conversationId: string): Promise<ConversationSnapshotResponse> {
+    return fetchConversationSnapshot(conversationId);
   }
 
-  sendRunSteering(
+  fetchConversationRunStatus(conversationId: string, runId: string): Promise<AgentRunSnapshot> {
+    return fetchConversationRunStatus(conversationId, runId);
+  }
+
+  fetchConversations(
+    params: { query?: string; limit?: number; cursor?: string } = {},
+  ): Promise<ConversationListResponse> {
+    return fetchConversations(params);
+  }
+
+  fetchConversationRunTrace(
     conversationId: string,
     runId: string,
-    payload: SteeringMessageRequest,
-  ): Promise<SteeringMessageResponse> {
-    return sendRunSteering(conversationId, runId, payload);
+    params: { limit?: number; cursor?: string } = {},
+  ): Promise<RunTraceResponse> {
+    return fetchConversationRunTrace(conversationId, runId, params);
   }
 
-  cancelAgentRun(conversationId: string, runId: string): Promise<AgentRunCancelResponse> {
-    return cancelAgentRun(conversationId, runId);
-  }
-
-  openRunEventSource(conversationId: string, runId: string, afterEventId?: string): EventSource {
-    return openRunEventSource(conversationId, runId, afterEventId);
-  }
-
-  fetchChatModels(provider?: 'deepseek'): Promise<ModelLibraryResponse> {
+  fetchChatModels(provider?: 'deepseek' | 'opencode' | 'opencode-go'): Promise<ModelLibraryResponse> {
     return fetchChatModels(provider);
   }
 
@@ -115,6 +118,22 @@ export class ApiClientService {
 
   updateChatSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {
     return updateChatSettings(payload);
+  }
+
+  fetchRuntimeSettings(): Promise<RuntimeSettingsResponse> {
+    return fetchRuntimeSettings();
+  }
+
+  updateRuntimeSettings(payload: RuntimeSettingsUpdateRequest): Promise<RuntimeSettingsResponse> {
+    return updateRuntimeSettings(payload);
+  }
+
+  fetchStructuredProbe(): Promise<StructuredProbeResponse> {
+    return fetchStructuredProbe();
+  }
+
+  runStructuredProbe(): Promise<StructuredProbeResponse> {
+    return runStructuredProbe();
   }
 
   refreshOllamaModels(): Promise<GenericObjectResponse> {

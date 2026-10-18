@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { marked } from 'marked';
 
 import { ChatMessage } from '../core/types';
@@ -8,6 +8,7 @@ import { ChatMessage } from '../core/types';
   standalone: true,
   templateUrl: './chat-message.component.html',
   styleUrl: './chat-message.component.css',
+  changeDetection: ChangeDetectionStrategy.Eager,
   host: {
     class: 'chat-message',
     '[class]': "'chat-message chat-message--' + message.role + (message.kind ? ' chat-message--' + message.kind : '')",

@@ -1,20 +1,36 @@
 from __future__ import annotations
 
-from server.common.constants import (
-    DEFAULT_MODEL_PROVIDER_MODE,
-)
-from server.domain.chat import (
+from typing import cast
+
+from server.common.typing import is_json_object, json_array
+
+from server.contracts.chat import (
     ModelProviderMode,
     ModelSettingsResponse,
+    ModelSettingsSnapshot,
     ModelSettingsUpdateRequest,
+    SelectedModelContextResponse,
 )
 from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.chat.model_library import (
     ChatModelLibraryService,
+    DYNAMIC_CLOUD_PROVIDERS,
     ModelLibrarySourceError,
 )
 from server.services.cryptography import CredentialEncryptionService
+from server.services.llm.context_budget import resolve_model_context_profile
+from server.services.llm.context_profile_resolver import ModelContextProfileResolver
+from server.services.llm.deepseek_provider import RETIRED_DEEPSEEK_MODELS
+from server.services.geospatial.provider_registry import PROVIDER_FACTORIES
+from server.services.llm.provider_contract import (
+    SUPPORTED_LLM_PROVIDERS,
+    require_canonical_provider,
+)
+
+CANONICAL_CREDENTIAL_PROVIDERS = frozenset(
+    {*SUPPORTED_LLM_PROVIDERS, *PROVIDER_FACTORIES}
+)
 
 ###############################################################################
 class ChatSettingsValidationError(ValueError):
@@ -27,42 +43,61 @@ class ChatSettingsService:
     def __init__(
         self,
         *,
-        settings_repo: ModelSettingsRepository | None = None,
-        credentials_repo: CredentialRepository | None = None,
-        crypto_service: CredentialEncryptionService | None = None,
-        model_library_service: ChatModelLibraryService | None = None,
+        settings_repo: ModelSettingsRepository,
+        credentials_repo: CredentialRepository,
+        crypto_service: CredentialEncryptionService,
+        model_library_service: ChatModelLibraryService,
+        context_profile_resolver: ModelContextProfileResolver | None = None,
     ) -> None:
-        self.settings_repo = settings_repo or ModelSettingsRepository()
-        self.credentials_repo = credentials_repo or CredentialRepository()
-        self.crypto_service = crypto_service or CredentialEncryptionService()
-        self.model_library_service = model_library_service or ChatModelLibraryService()
+        self.settings_repo = settings_repo
+        self.credentials_repo = credentials_repo
+        self.crypto_service = crypto_service
+        self.model_library_service = model_library_service
+        self.context_profile_resolver = context_profile_resolver
+        self.structured_probe_service: object | None = None
 
     # -------------------------------------------------------------------------
     def get_settings(self) -> ModelSettingsResponse:
-        record = self.settings_repo.get_or_create()
-        record = self._repair_incomplete_agent_assignment(record)
-        active_provider_mode: ModelProviderMode = (
-            record.active_provider_mode
-            if record.active_provider_mode in {"local", "cloud"}
-            else DEFAULT_MODEL_PROVIDER_MODE
-        )
-        active_credentials = self.credentials_repo.list_active()
-        credential_presence: dict[str, dict[str, bool]] = {}
-        credential_health: dict[str, dict[str, str]] = {}
-        for item in active_credentials:
-            provider_bucket = credential_presence.setdefault(item.provider, {})
-            provider_bucket[item.label] = True
-            health_bucket = credential_health.setdefault(item.provider, {})
+        (
+            record,
+            active_provider_mode,
+            credential_presence,
+            credential_health,
+        ) = self._load_validated_persisted_settings(require_decryptable=False)
+        profile = None
+        if record.agent_model_provider and record.agent_model_name:
             try:
-                self.crypto_service.decrypt(item.encrypted_value)
-            except ValueError:
-                health_bucket[item.label] = "unreadable"
-            else:
-                health_bucket[item.label] = (
-                    "healthy"
-                    if item.provider in {"openai", "google", "deepseek"}
-                    else "stored"
+                profile = (
+                    self.context_profile_resolver.resolve_selected(
+                        record.agent_model_provider,
+                        record.agent_model_name,
+                    )
+                    if self.context_profile_resolver is not None
+                    else resolve_model_context_profile(
+                        record.agent_model_provider,
+                        record.agent_model_name,
+                    )
                 )
+            except Exception:
+                # Selected-model metadata is advisory. A provider lookup
+                # failure must not make a usable model assignment disappear.
+                profile = None
+        selected_model_context = SelectedModelContextResponse(
+            provider=record.agent_model_provider,
+            model=record.agent_model_name,
+            context_window_tokens=(
+                profile.context_window_tokens if profile is not None else None
+            ),
+            maximum_output_tokens=(
+                profile.maximum_output_tokens if profile is not None else None
+            ),
+            context_profile_source=(
+                profile.metadata_source if profile is not None else "unknown"
+            ),
+            context_metadata_authority=(
+                profile.metadata_authority if profile is not None else "unknown"
+            ),
+        )
         return ModelSettingsResponse(
             active_provider_mode=active_provider_mode,
             agent_model_provider=record.agent_model_provider,
@@ -75,11 +110,79 @@ class ChatSettingsService:
             deepseek_base_url=record.deepseek_base_url,
             credentials=credential_presence,
             credential_health=credential_health,
+            selected_model_context=selected_model_context,
+        )
+
+    # -------------------------------------------------------------------------
+    def validate_persisted_settings(self) -> None:
+        """Validate local persisted settings without resolving provider metadata."""
+
+        self._load_validated_persisted_settings(require_decryptable=True)
+
+    # -------------------------------------------------------------------------
+    def _load_validated_persisted_settings(
+        self, *, require_decryptable: bool
+    ) -> tuple[
+        ModelSettingsSnapshot,
+        ModelProviderMode,
+        dict[str, dict[str, bool]],
+        dict[str, dict[str, str]],
+    ]:
+        record = self.settings_repo.get_required()
+        if record.active_provider_mode not in {"local", "cloud"}:
+            raise ChatSettingsValidationError(
+                "Stored model settings contain an invalid provider mode."
+            )
+        stored_provider = record.agent_model_provider
+        stored_model = record.agent_model_name
+        if bool(stored_provider) != bool(stored_model):
+            raise ChatSettingsValidationError(
+                "Stored model settings contain an incomplete agent assignment."
+            )
+        if stored_provider and stored_model:
+            try:
+                require_canonical_provider(stored_provider)
+            except ValueError as exc:
+                raise ChatSettingsValidationError(str(exc)) from exc
+        active_provider_mode: ModelProviderMode = cast(
+            ModelProviderMode, record.active_provider_mode
+        )
+        active_credentials = self.credentials_repo.list_active()
+        credential_presence: dict[str, dict[str, bool]] = {}
+        credential_health: dict[str, dict[str, str]] = {}
+        for item in active_credentials:
+            self._require_canonical_credential_provider(item.provider)
+            if item.label != "api_key":
+                raise ChatSettingsValidationError(
+                    f"Stored credentials for '{item.provider}' use unsupported label '{item.label}'."
+                )
+            provider_bucket = credential_presence.setdefault(item.provider, {})
+            provider_bucket[item.label] = True
+            health_bucket = credential_health.setdefault(item.provider, {})
+            try:
+                self.crypto_service.decrypt(item.encrypted_value)
+            except ValueError as exc:
+                if require_decryptable:
+                    raise ChatSettingsValidationError(
+                        f"Stored credentials for '{item.provider}' cannot be decrypted."
+                    ) from exc
+                health_bucket[item.label] = "unreadable"
+            else:
+                health_bucket[item.label] = (
+                    "healthy"
+                    if item.provider in {"openai", "google", *DYNAMIC_CLOUD_PROVIDERS}
+                    else "stored"
+                )
+        return (
+            record,
+            active_provider_mode,
+            credential_presence,
+            credential_health,
         )
 
     # -------------------------------------------------------------------------
     def get_ollama_url(self) -> str:
-        record = self.settings_repo.get_or_create()
+        record = self.settings_repo.get_required()
         return self.model_library_service.normalize_ollama_url(record.ollama_url)
 
     # -------------------------------------------------------------------------
@@ -112,9 +215,7 @@ class ChatSettingsService:
             else current.agent_model_name
         )
         next_ollama_url = self.model_library_service.normalize_ollama_url(
-            payload.ollama_url
-            if payload.ollama_url is not None
-            else current.ollama_url
+            payload.ollama_url if payload.ollama_url is not None else current.ollama_url
         )
         next_openai_base_url = (
             None
@@ -137,11 +238,15 @@ class ChatSettingsService:
             if payload.deepseek_base_url is not None
             else current.deepseek_base_url
         )
-        self._validate_agent_assignment(
-            agent_model_provider=next_agent_model_provider,
-            agent_model_name=next_agent_model_name,
+        has_agent_assignment = bool(
+            next_agent_model_provider.strip() and next_agent_model_name.strip()
         )
-        if should_validate_model_selection:
+        if has_agent_assignment or should_validate_model_selection:
+            self._validate_agent_assignment(
+                agent_model_provider=next_agent_model_provider,
+                agent_model_name=next_agent_model_name,
+            )
+        if should_validate_model_selection and has_agent_assignment:
             self._validate_local_model_selection(
                 agent_model_provider=next_agent_model_provider,
                 agent_model_name=next_agent_model_name,
@@ -153,7 +258,12 @@ class ChatSettingsService:
                 ollama_url=next_ollama_url,
             )
         for provider, labels in payload.credentials.items():
+            self._require_canonical_credential_provider(provider)
             for label, raw_value in labels.items():
+                if label != "api_key":
+                    raise ChatSettingsValidationError(
+                        f"Unsupported credential label '{label}' for '{provider}'."
+                    )
                 if not raw_value.strip():
                     self.credentials_repo.deactivate(provider=provider, label=label)
                     continue
@@ -162,7 +272,7 @@ class ChatSettingsService:
                     provider=provider,
                     label=label,
                     encrypted_value=encrypted.value,
-                    key_version=encrypted.key_version,
+                    key_version=cast(int, encrypted.key_version),
                 )
         self.settings_repo.update(
             active_provider_mode=next_active_provider_mode,
@@ -173,101 +283,27 @@ class ChatSettingsService:
             google_base_url=next_google_base_url,
             deepseek_base_url=next_deepseek_base_url,
         )
+        invalidate_catalogs = getattr(
+            self.model_library_service, "invalidate_dynamic_catalogs", None
+        )
+        if callable(invalidate_catalogs):
+            invalidate_catalogs()
+        invalidate_profile = getattr(self.context_profile_resolver, "invalidate", None)
+        if callable(invalidate_profile):
+            invalidate_profile()
+        clear_probe = getattr(self.structured_probe_service, "clear", None)
+        if callable(clear_probe):
+            clear_probe()
         return self.get_settings()
 
     # -------------------------------------------------------------------------
-    def _available_models(self, *, ollama_url: str) -> dict[str, list[dict[str, object]]]:
-        available: dict[str, list[dict[str, object]]] = {}
-        library = self.model_library_service.list_models(
-            ollama_url=ollama_url,
-            cloud_provider="deepseek",
-        )
-        active_credentials = self.credentials_repo.list_active()
-        configured_cloud_providers: set[str] = set()
-        for item in active_credentials:
-            if item.label != "api_key":
-                continue
-            try:
-                self.crypto_service.decrypt(item.encrypted_value)
-            except ValueError:
-                continue
-            configured_cloud_providers.add(item.provider)
-        for entry in library.get("cloud", []):
-            if not isinstance(entry, dict):
-                continue
-            provider = str(entry.get("provider") or "").strip()
-            if provider not in configured_cloud_providers:
-                continue
-            available.setdefault(provider, []).append(entry)
-        local_models = [
-            item
-            for item in library.get("local", [])
-            if isinstance(item, dict)
-        ]
-        if local_models:
-            available["ollama"] = local_models
-        return available
-
-    # -------------------------------------------------------------------------
-    def _repair_incomplete_agent_assignment(self, record):
-        assignment = self._normalized_agent_assignment(record)
-        if assignment["provider"] and assignment["model"]:
-            return record
-
-        available_models = self._available_models(
-            ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url)
-        )
-        repaired = self._select_agent_assignment(
-            current_provider=assignment["provider"],
-            current_model=assignment["model"],
-            active_provider_mode=str(getattr(record, "active_provider_mode", "") or ""),
-            available_models=available_models,
-        )
-        if repaired is None:
-            return record
-        self._validate_agent_assignment(
-            agent_model_provider=repaired["provider"],
-            agent_model_name=repaired["model"],
-        )
-        self._validate_local_model_selection(
-            agent_model_provider=repaired["provider"],
-            agent_model_name=repaired["model"],
-            ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url),
-        )
-        self._validate_agent_capabilities(
-            agent_model_provider=repaired["provider"],
-            agent_model_name=repaired["model"],
-            ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url),
-        )
-        return self._persist_agent_assignment(
-            record,
-            provider=repaired["provider"],
-            model=repaired["model"],
-        )
-
-    # -------------------------------------------------------------------------
-    def _persist_agent_assignment(
-        self,
-        record: object,
-        *,
-        provider: str,
-        model: str,
-    ):
-        return self.settings_repo.update(
-            active_provider_mode=(
-                getattr(record, "active_provider_mode", "")
-                if getattr(record, "active_provider_mode", "") in {"local", "cloud"}
-                else DEFAULT_MODEL_PROVIDER_MODE
-            ),
-            agent_model_provider=provider,
-            agent_model_name=model,
-            ollama_url=self.model_library_service.normalize_ollama_url(
-                str(getattr(record, "ollama_url", ""))
-            ),
-            openai_base_url=getattr(record, "openai_base_url", None),
-            google_base_url=getattr(record, "google_base_url", None),
-            deepseek_base_url=getattr(record, "deepseek_base_url", None),
-        )
+    @staticmethod
+    def _require_canonical_credential_provider(provider: object) -> str:
+        if not isinstance(provider, str) or provider not in CANONICAL_CREDENTIAL_PROVIDERS:
+            raise ChatSettingsValidationError(
+                f"Unsupported credential provider '{provider}'. Expected a registered provider ID."
+            )
+        return provider
 
     # -------------------------------------------------------------------------
     def _validate_local_model_selection(
@@ -281,10 +317,12 @@ class ChatSettingsService:
             return
         local_models = {
             str(item.get("id", ""))
-            for item in self.model_library_service.list_models(
-                ollama_url=ollama_url
-            ).get("local", [])
-            if isinstance(item, dict)
+            for item in json_array(
+                self.model_library_service.list_models(ollama_url=ollama_url).get(
+                    "local"
+                )
+            )
+            if is_json_object(item)
         }
         if agent_model_name not in local_models:
             raise ChatSettingsValidationError(
@@ -307,108 +345,39 @@ class ChatSettingsService:
                 require_provider_availability=True,
             )
         except ModelLibrarySourceError as exc:
+            raise ChatSettingsValidationError(str(exc)) from exc
+        if agent_model is not None and agent_model.get("supports_tools") is False:
             raise ChatSettingsValidationError(
-                f"Could not validate DeepSeek model selection: {exc}"
-            ) from exc
-        if agent_model is not None and not bool(agent_model.get("supports_tools")):
-            raise ChatSettingsValidationError(
-                "Selected agent model does not support native tool calling."
+                str(
+                    agent_model.get("agent_selection_disabled_reason")
+                    or "Selected agent model does not support native tool calling."
+                )
             )
-        if agent_model is not None and not bool(
-            agent_model.get("supports_structured_output")
+        if (
+            agent_model is not None
+            and agent_model.get("supports_structured_output") is False
         ):
             raise ChatSettingsValidationError(
-                "Selected agent model does not support structured output."
+                str(
+                    agent_model.get("agent_selection_disabled_reason")
+                    or "Selected agent model does not support structured output."
+                )
             )
-        if agent_model is None and agent_model_provider == "deepseek" and agent_model_name:
+        if (
+            agent_model is None
+            and agent_model_provider in DYNAMIC_CLOUD_PROVIDERS
+            and agent_model_name
+        ):
+            if (
+                agent_model_provider == "deepseek"
+                and agent_model_name.strip().lower() in RETIRED_DEEPSEEK_MODELS
+            ):
+                raise ChatSettingsValidationError(
+                    "DeepSeek retired this model; choose a model from the live catalog."
+                )
             raise ChatSettingsValidationError(
-                "Selected DeepSeek agent model could not be found in the live DeepSeek catalog."
+                f"Selected {agent_model_provider} agent model could not be found in the live provider catalog."
             )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _normalized_agent_assignment(record: object) -> dict[str, str]:
-        return {
-            "provider": str(getattr(record, "agent_model_provider", "") or "").strip(),
-            "model": str(getattr(record, "agent_model_name", "") or "").strip(),
-        }
-
-    # -------------------------------------------------------------------------
-    def _select_agent_assignment(
-        self,
-        *,
-        current_provider: str,
-        current_model: str,
-        active_provider_mode: str,
-        available_models: dict[str, list[dict[str, object]]],
-    ) -> dict[str, str] | None:
-        provider_preferences: list[str] = []
-        if current_provider:
-            provider_preferences.append(current_provider)
-        if active_provider_mode == "local":
-            provider_preferences.append("ollama")
-        provider_preferences.extend(["deepseek", "openai", "google", "ollama"])
-
-        seen: set[str] = set()
-        deduped_providers = [
-            provider
-            for provider in provider_preferences
-            if provider not in seen and not seen.add(provider)
-        ]
-        for provider in deduped_providers:
-            assignment = self._select_agent_model(
-                provider=provider,
-                current_model=current_model,
-                models=available_models.get(provider, []),
-            )
-            if assignment is not None:
-                return assignment
-        return None
-
-    # -------------------------------------------------------------------------
-    def _select_agent_model(
-        self,
-        *,
-        provider: str,
-        current_model: str,
-        models: list[dict[str, object]],
-    ) -> dict[str, str] | None:
-        if not models:
-            return None
-        preferred_models = [current_model] if current_model else []
-        preferred_models.extend(
-            {
-                "openai": ["gpt-4.1", "gpt-5-mini", "gpt-4.1-mini"],
-                "google": ["gemini-2.5-pro", "gemini-2.5-flash"],
-                "deepseek": ["deepseek-chat", "deepseek-reasoner"],
-            }.get(provider, [])
-        )
-        candidates = [
-            item
-            for item in models
-            if self._agent_requirements_met(model=item)
-        ]
-        if not candidates:
-            return None
-        by_name = {
-            str(item.get("name") or item.get("id") or "").strip(): item
-            for item in candidates
-        }
-        for name in preferred_models:
-            normalized_name = str(name or "").strip()
-            if normalized_name and normalized_name in by_name:
-                return {"provider": provider, "model": normalized_name}
-        fallback_name = str(
-            candidates[0].get("name") or candidates[0].get("id") or ""
-        ).strip()
-        return {"provider": provider, "model": fallback_name} if fallback_name else None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _agent_requirements_met(*, model: dict[str, object]) -> bool:
-        return bool(model.get("supports_tools")) and bool(
-            model.get("supports_structured_output")
-        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -421,5 +390,7 @@ class ChatSettingsService:
             raise ChatSettingsValidationError(
                 "Agent model provider and model name must both be configured."
             )
-
-
+        try:
+            require_canonical_provider(agent_model_provider)
+        except ValueError as exc:
+            raise ChatSettingsValidationError(str(exc)) from exc

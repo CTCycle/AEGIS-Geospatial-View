@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from server.repositories.schemas.models import (
     Base,
+    ApplicationRuntimeSettingsRecord,
     ChatMessageRecord,
-    ChatSessionRecord,
     CredentialEncryptionMaterial,
     ModelCredentialRecord,
     ModelProviderSettingsRecord,
@@ -18,8 +18,8 @@ from server.repositories.schemas.models import (
 
 __all__ = [
     "Base",
+    "ApplicationRuntimeSettingsRecord",
     "ChatMessageRecord",
-    "ChatSessionRecord",
     "CredentialEncryptionMaterial",
     "ModelCredentialRecord",
     "ModelProviderSettingsRecord",

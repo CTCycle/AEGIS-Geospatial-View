@@ -2,14 +2,44 @@ import { DEFAULT_BASE_TILE_PROXY_URL } from '../core/constants';
 import { MapOverlayEntry, MapSession } from '../core/types';
 import {
   addOverlayLayers,
+  applyOverlayLayerOrder,
   buildStyle,
+  getOverlayLayerIds,
   isGeoJsonOverlay,
   normalizeBounds,
+  orderOverlayEntries,
+  reconcileOverlayOrder,
   recordBooleanEqual,
   recordNumberEqual,
 } from './map-preview-rendering';
 
 describe('map-preview-rendering', () => {
+  const makeMapSession = (overlays: MapOverlayEntry[]): MapSession => ({
+    session_id: 'map-1',
+    resolved_location: { label: 'Test', latitude: 0, longitude: 0 },
+    basemap_id: 'osm_default',
+    viewport: { center_latitude: 0, center_longitude: 0, radius_m: 2500 },
+    overlay_collection: {
+      collection_id: 'active-map',
+      revision: 0,
+      instances: overlays.map((overlay) => ({
+        instance_id: overlay.id,
+        capability_id: overlay.capability_id || overlay.id,
+        label: overlay.label,
+        provider: overlay.provider,
+        overlay_type: overlay.type,
+        rendering_mode: overlay.rendering_mode || overlay.type,
+        scope_key: 'global',
+        scope: { kind: 'global' },
+        visible: overlay.visible !== false,
+        opacity: overlay.default_opacity ?? 1,
+        render_variant: {},
+        descriptor: overlay as never,
+        inspections: overlay.inspections || [],
+      })),
+    },
+  });
+
   it('compares boolean records by keys and values', () => {
     expect(recordBooleanEqual({ a: true }, { a: true })).toBeTrue();
     expect(recordBooleanEqual({ a: true }, { a: false })).toBeFalse();
@@ -20,6 +50,57 @@ describe('map-preview-rendering', () => {
     expect(recordNumberEqual({ a: 0.5 }, { a: 0.5 })).toBeTrue();
     expect(recordNumberEqual({ a: 0.5 }, { a: 0.6 })).toBeFalse();
     expect(recordNumberEqual({ a: 0.5 }, { a: 0.5, b: 1 })).toBeFalse();
+  });
+
+  it('reconciles saved overlay order by retaining valid IDs and appending new entries', () => {
+    const overlays = [
+      { id: 'raster', label: 'Raster', provider: 'x', type: 'tile' },
+      { id: 'vector', label: 'Vector', provider: 'x', type: 'geojson' },
+      { id: 'new', label: 'New', provider: 'x', type: 'tile' },
+    ] as MapOverlayEntry[];
+
+    expect(reconcileOverlayOrder(overlays, ['vector', 'removed', 'vector'])).toEqual([
+      'vector', 'raster', 'new',
+    ]);
+    expect(orderOverlayEntries(overlays, ['new', 'raster']).map((overlay) => overlay.id)).toEqual([
+      'new', 'raster', 'vector',
+    ]);
+  });
+
+  it('moves overlay layer groups to the requested front-to-back order without moving the basemap', () => {
+    const overlays = [
+      { id: 'clustered', label: 'Clustered', provider: 'x', type: 'geojson', rendering_mode: 'clustered-points' },
+      { id: 'raster', label: 'Raster', provider: 'x', type: 'tile' },
+      { id: 'vector', label: 'Vector', provider: 'x', type: 'geojson' },
+    ] as MapOverlayEntry[];
+    const layerStack = [
+      'basemap',
+      'overlay-layer-raster',
+      'overlay-layer-clustered-clusters',
+      'overlay-layer-clustered-cluster-count',
+      'overlay-layer-clustered-points',
+      'overlay-layer-vector',
+    ];
+    const map = {
+      getLayer: (id: string) => layerStack.includes(id) ? { id } : undefined,
+      moveLayer: (id: string) => {
+        const index = layerStack.indexOf(id);
+        if (index >= 0) {
+          layerStack.push(...layerStack.splice(index, 1));
+        }
+      },
+    };
+
+    applyOverlayLayerOrder(map as never, overlays, ['clustered', 'raster', 'vector']);
+
+    expect(layerStack).toEqual([
+      'basemap',
+      'overlay-layer-vector',
+      'overlay-layer-raster',
+      'overlay-layer-clustered-clusters',
+      'overlay-layer-clustered-cluster-count',
+      'overlay-layer-clustered-points',
+    ]);
   });
 
   it('returns null for malformed bounds', () => {
@@ -35,6 +116,21 @@ describe('map-preview-rendering', () => {
     const style = buildStyle();
     const basemapSource = style.sources['basemap'] as { tiles?: string[] };
     expect(basemapSource.tiles?.[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
+  });
+
+  it('does not silently substitute OSM when a non-OSM descriptor is unavailable', () => {
+    const style = buildStyle({
+      basemap_id: 'esri_world_imagery',
+      basemap: {
+        id: 'esri_world_imagery',
+        label: 'Satellite Imagery',
+        provider: 'arcgis',
+        render_status: 'unavailable',
+        unavailable_reason: 'render_descriptor_missing',
+      },
+    } as never);
+    const basemapSource = style.sources['basemap'] as { tiles?: string[] };
+    expect(basemapSource.tiles).toEqual([]);
   });
 
   it('treats GeoJSON rendering modes as GeoJSON when descriptor metadata is sparse', () => {
@@ -152,15 +248,13 @@ describe('map-preview-rendering', () => {
         addSource: (_id: string, source: unknown) => sources.push(source),
         addLayer: (layer: unknown) => layers.push(layer),
       };
-      const session = {
-        overlays: [{
+      const session = makeMapSession([{
           id: `test-${mode}`,
           label: mode,
           provider: 'test',
           rendering_mode: mode,
           ...overlay,
-        }],
-      } as unknown as MapSession;
+        } as MapOverlayEntry]);
 
       const result = addOverlayLayers(map as never, session);
 
@@ -181,8 +275,7 @@ describe('map-preview-rendering', () => {
       addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
       addLayer: () => undefined,
     };
-    const session = {
-      overlays: [{
+    const session = makeMapSession([{
         id: 'canonical-wms',
         label: 'WMS',
         provider: 'test',
@@ -197,12 +290,171 @@ describe('map-preview-rendering', () => {
           min_zoom: 2,
           max_zoom: 9,
         },
-      }],
-    } as unknown as MapSession;
+      } as MapOverlayEntry]);
 
     expect(addOverlayLayers(map as never, session)[0].status).toBe('loaded');
     expect(sources[0]['minzoom']).toBe(2);
     expect(sources[0]['maxzoom']).toBe(9);
     expect((sources[0]['tiles'] as string[])[0]).toContain('request=GetMap');
+  });
+
+  it('passes same-origin raster proxy templates unchanged to MapLibre', () => {
+    const sources: Array<Record<string, unknown>> = [];
+    const layers: Array<Record<string, unknown>> = [];
+    const proxyTemplate = '/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png';
+    const map = {
+      addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
+      addLayer: (layer: Record<string, unknown>) => layers.push(layer),
+    };
+
+    const result = addOverlayLayers(map as never, makeMapSession([{
+      id: 'esa-worldcover-proxy',
+      label: 'ESA WorldCover',
+      provider: 'esa',
+      type: 'raster-tile',
+      rendering_mode: 'raster-tile',
+      tile_url_template: proxyTemplate,
+      default_opacity: 0.42,
+    } as MapOverlayEntry]));
+
+    expect(result[0].status).toBe('loaded');
+    expect(sources[0]).toEqual(jasmine.objectContaining({
+      type: 'raster',
+      tiles: [proxyTemplate],
+    }));
+    expect(layers[0]).toEqual(jasmine.objectContaining({
+      type: 'raster',
+      paint: { 'raster-opacity': 0.42 },
+    }));
+    expect((sources[0].tiles as string[])[0]).not.toContain('terrascope');
+  });
+
+  it('uses verified inline GeoJSON data without issuing a browser fetch', () => {
+    const sources: Array<Record<string, unknown>> = [];
+    const layers: Array<Record<string, unknown>> = [];
+    const map = {
+      addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
+      addLayer: (layer: Record<string, unknown>) => layers.push(layer),
+    };
+    const session = makeMapSession([{
+        id: 'overpass_poi',
+        label: 'Rail stations',
+        provider: 'overpass',
+        type: 'clustered-points',
+        rendering_mode: 'clustered-points',
+        data: {
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [139.767, 35.681] },
+            properties: { category: 'station' },
+          }],
+        },
+      } as MapOverlayEntry]);
+
+    expect(addOverlayLayers(map as never, session)[0].status).toBe('loaded');
+    expect(sources[0].type).toBe('geojson');
+    expect((sources[0].data as { type: string }).type).toBe('FeatureCollection');
+    expect(layers[0].type).toBe('circle');
+  });
+
+  it('classifies a valid-empty overlay as no-results after successful layer setup', () => {
+    const sources: Array<Record<string, unknown>> = [];
+    const layers: Array<Record<string, unknown>> = [];
+    const map = {
+      addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
+      addLayer: (layer: Record<string, unknown>) => layers.push(layer),
+    };
+    const session = makeMapSession([{
+      id: 'empty-flood-zones',
+      label: 'Flood Zones',
+      provider: 'fixture',
+      type: 'geojson',
+      rendering_mode: 'choropleth',
+      data_format: 'GeoJSON',
+      geometry_type: 'Polygon',
+      result_status: 'valid_empty',
+      data: { type: 'FeatureCollection', features: [] },
+    } as MapOverlayEntry]);
+
+    const result = addOverlayLayers(map as never, session);
+
+    expect(result).toEqual([
+      jasmine.objectContaining({
+        overlayId: 'empty-flood-zones',
+        status: 'no-results',
+        message: 'No results in the requested area or time window.',
+      }),
+    ]);
+    expect(sources[0]).toEqual(jasmine.objectContaining({ type: 'geojson' }));
+    expect(layers[0]).toEqual(jasmine.objectContaining({ type: 'fill' }));
+  });
+
+  it('clusters point overlays and creates expansion/count layers', () => {
+    const sources: Array<Record<string, unknown>> = [];
+    const layers: Array<Record<string, unknown>> = [];
+    const map = {
+      addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
+      addLayer: (layer: Record<string, unknown>) => layers.push(layer),
+    };
+    const overlay = {
+      id: 'clustered-pois',
+      label: 'POIs',
+      provider: 'fixture',
+      type: 'clustered-points',
+      rendering_mode: 'clustered-points',
+      data: {
+        type: 'FeatureCollection',
+        features: [],
+      },
+    } as unknown as MapOverlayEntry;
+
+    expect(getOverlayLayerIds(overlay)).toEqual([
+      'overlay-layer-clustered-pois-clusters',
+      'overlay-layer-clustered-pois-cluster-count',
+      'overlay-layer-clustered-pois-points',
+    ]);
+    expect(addOverlayLayers(map as never, makeMapSession([overlay]))[0].status)
+      .toBe('loaded');
+    expect(sources[0]).toEqual(jasmine.objectContaining({
+      type: 'geojson',
+      cluster: true,
+      clusterMaxZoom: 14,
+      clusterRadius: 50,
+    }));
+    expect(layers.map((layer) => layer.id)).toEqual([
+      'overlay-layer-clustered-pois-clusters',
+      'overlay-layer-clustered-pois-cluster-count',
+      'overlay-layer-clustered-pois-points',
+    ]);
+    expect(layers[0]['filter']).toEqual(['has', 'point_count']);
+    expect(layers[2]['filter']).toEqual(['!', ['has', 'point_count']]);
+  });
+
+  it('keeps clustered points renderable when the style has no glyphs', () => {
+    const layers: Array<Record<string, unknown>> = [];
+    const map = {
+      addSource: () => undefined,
+      addLayer: (layer: Record<string, unknown>) => layers.push(layer),
+      getStyle: () => ({}),
+    };
+    const overlay = {
+      id: 'clustered-no-glyphs',
+      label: 'POIs',
+      provider: 'fixture',
+      type: 'clustered-points',
+      rendering_mode: 'clustered-points',
+      data: {
+        type: 'FeatureCollection',
+        features: [],
+      },
+    } as unknown as MapOverlayEntry;
+
+    expect(addOverlayLayers(map as never, makeMapSession([overlay]))[0].status)
+      .toBe('loaded');
+    expect(layers.map((layer) => layer.id)).toEqual([
+      'overlay-layer-clustered-no-glyphs-clusters',
+      'overlay-layer-clustered-no-glyphs-points',
+    ]);
   });
 });

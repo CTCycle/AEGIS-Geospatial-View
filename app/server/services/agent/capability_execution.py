@@ -1,0 +1,942 @@
+"""Canonical provider-backed capability execution for native agent tools."""
+
+from __future__ import annotations
+
+import json
+import time
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from typing import Any, Protocol
+from uuid import uuid4
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from shapely.geometry import Point, box, shape
+from shapely.errors import GEOSException
+
+from server.common.typing import is_json_array, is_json_object
+from server.domain.agent.evidence import EvidenceKind, EvidenceStatus
+from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.tool_result import (
+    ToolExecutionError,
+    ToolExecutionMetadata,
+    ToolResult,
+)
+from server.domain.geospatial.providers import ProviderRequest, ProviderResponse
+from server.repositories.agent_evidence import AgentEvidenceRepository
+from server.services.agent.tool_definitions import ExecuteCapabilityInput
+from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.provider_registry import (
+    ProviderNotRegisteredError,
+    ProviderRegistry,
+)
+from server.services.geospatial.providers.base import (
+    ProviderAuthError,
+    ProviderCircuitOpenError,
+    ProviderError,
+    ProviderInvalidQueryError,
+    ProviderMalformedPayloadError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+)
+from server.services.geospatial.runtime_registry import RuntimeRegistry
+
+###############################################################################
+class EvidenceStore(Protocol):
+
+    # -------------------------------------------------------------------------
+    def create(
+        self,
+        *,
+        conversation_id: str,
+        run_id: str | None,
+        kind: EvidenceKind,
+        media_type: str,
+        status: EvidenceStatus,
+        payload: Any,
+        summary: dict[str, Any],
+        provenance: dict[str, Any],
+        parent_evidence_ids: list[str] | None = None,
+    ) -> Any: ...
+
+###############################################################################
+@dataclass(frozen=True)
+class ToolExecutionContext:
+    """Bounded context needed to execute and persist one capability call."""
+
+    conversation_id: str
+    run_id: str | None = None
+    call_id: str = field(default_factory=lambda: f"call_{uuid4().hex}")
+
+###############################################################################
+class CapabilityExecutionService:
+    """Execute one manifest capability and normalize it to ``ToolResult``.
+
+    Provider retries, rate limiting, and circuit breaking remain owned by
+    ``ProviderRegistry``.  This service only performs capability/runtime
+    checks, builds the provider-neutral request, persists complete evidence,
+    and returns a bounded model-facing summary.
+    """
+
+    TOOL_NAME = "execute_geospatial_capability"
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        *,
+        capability_registry: CapabilityRegistry,
+        runtime_registry: RuntimeRegistry,
+        provider_registry: ProviderRegistry,
+        evidence_repository: EvidenceStore | AgentEvidenceRepository | None = None,
+    ) -> None:
+        self.capability_registry = capability_registry
+        self.runtime_registry = runtime_registry
+        self.provider_registry = provider_registry
+        self.evidence_repository = evidence_repository
+
+    # -------------------------------------------------------------------------
+    async def execute_capability(
+        self,
+        request: ExecuteCapabilityInput,
+        context: ToolExecutionContext,
+        *,
+        location: ResolvedLocation | None = None,
+    ) -> ToolResult:
+        started = time.perf_counter()
+        capability_id = request.capability_id
+
+        try:
+            manifest = self.capability_registry.get_capability(capability_id)
+        except Exception:
+            return self._failure(
+                context=context,
+                capability_id=capability_id,
+                started=started,
+                error_type="internal_error",
+                code="capability_lookup_failed",
+                message="The capability could not be inspected.",
+                recovery="terminal",
+            )
+        if manifest is None:
+            return self._failure(
+                context=context,
+                capability_id=capability_id,
+                started=started,
+                error_type="unknown_tool",
+                code="unknown_capability",
+                message="The requested capability is not in the validated catalog.",
+                recovery="choose_alternate_tool",
+            )
+
+        try:
+            if not self.runtime_registry.is_enabled(capability_id):
+                return self._failure(
+                    context=context,
+                    capability_id=capability_id,
+                    started=started,
+                    error_type="policy_rejection",
+                    code="capability_disabled",
+                    message="The requested capability is disabled.",
+                    recovery="choose_alternate_tool",
+                )
+            if not self.runtime_registry.access_available(capability_id):
+                return self._failure(
+                    context=context,
+                    capability_id=capability_id,
+                    started=started,
+                    error_type="provider_unavailable",
+                    code="capability_access_unavailable",
+                    message="The requested capability is not currently available.",
+                    recovery="choose_alternate_tool",
+                )
+        except Exception:
+            return self._failure(
+                context=context,
+                capability_id=capability_id,
+                started=started,
+                error_type="internal_error",
+                code="runtime_eligibility_failed",
+                message="Capability availability could not be verified.",
+                recovery="terminal",
+            )
+
+        provider_id = _provider_id(manifest)
+        if not provider_id:
+            return self._failure(
+                context=context,
+                capability_id=capability_id,
+                started=started,
+                error_type="semantic_validation",
+                code="provider_not_declared",
+                message="The capability does not declare an executable provider.",
+                recovery="choose_alternate_tool",
+            )
+
+        request_time, time_error = _parse_request_time(request.start_time_iso)
+        if time_error is not None:
+            return self._failure(
+                context=context,
+                capability_id=capability_id,
+                provider_id=provider_id,
+                started=started,
+                error_type="semantic_validation",
+                code="invalid_start_time",
+                message=time_error,
+                recovery="correct_arguments",
+                retryable=True,
+            )
+
+        provider_params = _provider_params(request, location=location)
+        manifest_metadata = manifest.get("metadata")
+        if is_json_object(manifest_metadata):
+            provider_params.setdefault("metadata", dict(manifest_metadata))
+        provider_request = ProviderRequest(
+            capability_id=capability_id,
+            bbox=_bbox(request.bbox),
+            time=request_time,
+            params=provider_params,
+        )
+        try:
+            response = await self.provider_registry.fetch(
+                provider_id,
+                provider_request,
+            )
+        except Exception as exc:
+            return self._provider_failure(
+                context=context,
+                capability_id=capability_id,
+                provider_id=provider_id,
+                started=started,
+                error=exc,
+            )
+
+        status = _tool_status(response)
+        summary = _response_summary(response, request=request, location=location)
+        coverage = dict(response.coverage or {})
+        if str(coverage.get("type") or "").strip().casefold() == "circle":
+            # Provider-bounded radius results (Overpass ``around``) declare a
+            # circle coverage (center + radius_m). The provider already bounded
+            # the feature set to that circle, which is the authoritative scope;
+            # the geocoder bbox is too narrow for POI/landmark "around <place>"
+            # requests and must not reject the render.
+            coverage["spatial_scope_satisfied"] = True
+        elif response.result_type == "raster":
+            # Raster/descriptor results serve the requested bounds directly
+            # instead of returning intersection-checkable geometries. A
+            # successful renderable result over a bounded or resolved-location
+            # request satisfies the spatial scope contract (mirrors
+            # RainViewer's provider coverage declaration).
+            coverage["spatial_scope_satisfied"] = (
+                request.bbox is not None or request.location_ref is not None
+            )
+        elif request.bbox is not None:
+            features = response.payload.get("features")
+            if is_json_array(features) and features:
+                area = box(request.bbox[0], request.bbox[1], request.bbox[2], request.bbox[3])
+                try:
+                    satisfied = True
+                    for feature in features:
+                        geometry = _feature_spatial_geometry(feature)
+                        if (
+                            not is_json_object(feature)
+                            or geometry is None
+                            or geometry.is_empty
+                            or not geometry.is_valid
+                            or not area.intersects(geometry)
+                        ):
+                            satisfied = False
+                            break
+                    coverage["spatial_scope_satisfied"] = satisfied
+                except (ValueError, TypeError, KeyError, GEOSException):
+                    coverage["spatial_scope_satisfied"] = False
+            elif response.result_status == "valid_empty":
+                # A bounded empty result still applied the requested extent.
+                coverage["spatial_scope_satisfied"] = True
+        elif request.location_ref is not None:
+            # A resolved-location (point/radius) vector request: the provider
+            # returns features already bounded to the resolved location scope,
+            # mirroring the raster spatial-scope contract. Bbox requests take
+            # the intersection-check branch above.
+            coverage["spatial_scope_satisfied"] = True
+        if (
+            request.start_time_iso is None and request.end_time_iso is None
+        ):
+            # Current/recent/none temporal requests without an explicit dated
+            # range are satisfied by the provider feed as-is (mirrors
+            # RainViewer's provider coverage declaration). Explicit dated
+            # ranges are verified by the observation-time boundary in the
+            # completion assessment instead.
+            coverage["temporal_scope_satisfied"] = True
+        if response.result_status == "valid_empty":
+            # A completed empty query is a legitimate data outcome; it must not
+            # be conflated with a failed/partial fetch. Mark the query as
+            # complete so the completion assessment accepts the honest
+            # no-results boundary (mirrors the valid-empty evidence contract).
+            coverage["query_complete"] = True
+        summary["coverage"] = coverage
+        try:
+            evidence_ref = self._persist_evidence(
+                context=context,
+                request=request,
+                response=response,
+                summary=summary,
+            )
+        except Exception as exc:
+            return self._provider_failure(
+                context=context,
+                capability_id=capability_id,
+                provider_id=provider_id,
+                started=started,
+                error=exc,
+            )
+        evidence_refs = [evidence_ref] if evidence_ref else []
+        result_size = _json_size(response.payload)
+        return ToolResult(
+            call_id=context.call_id,
+            tool_name=self.TOOL_NAME,
+            status=status,
+            summary=_summary_text(response, summary),
+            data=summary,
+            evidence_refs=evidence_refs,
+            metadata=ToolExecutionMetadata(
+                capability_id=capability_id,
+                provider_id=provider_id,
+                duration_ms=_duration_ms(started),
+                result_size_bytes=result_size,
+                evidence_refs=evidence_refs,
+                result_type=response.result_type,
+                result_status=response.result_status,
+                stale=response.stale,
+                fetched_at=response.fetched_at.isoformat(),
+                observation_time=response.observation_time,
+                spatial_resolution=response.spatial_resolution,
+                units=dict(response.units),
+                coverage=coverage or None,
+                warnings=[str(item)[:300] for item in response.warnings[:8]],
+                source_url=response.source_url[:500] if response.source_url else None,
+            ),
+        )
+
+    # -------------------------------------------------------------------------
+    def _persist_evidence(
+        self,
+        *,
+        context: ToolExecutionContext,
+        request: ExecuteCapabilityInput,
+        response: ProviderResponse,
+        summary: dict[str, Any],
+    ) -> str | None:
+        repository = self.evidence_repository
+        if repository is None:
+            return None
+        try:
+            record = repository.create(
+                conversation_id=context.conversation_id,
+                run_id=context.run_id,
+                kind=_evidence_kind(response.result_type),
+                media_type="application/json",
+                status=_evidence_status(response),
+                payload=response.payload,
+                summary=summary,
+                provenance={
+                    "capability_id": request.capability_id,
+                    "provider_id": response.provider_id,
+                    "fetched_at": response.fetched_at.isoformat(),
+                    "result_type": response.result_type,
+                    "observation_time": response.observation_time,
+                    "parent_evidence_refs": list(request.evidence_refs),
+                },
+                parent_evidence_ids=list(request.evidence_refs),
+            )
+            return str(getattr(record, "evidence_id", "")).strip() or None
+        except Exception as exc:
+            raise ProviderMalformedPayloadError(
+                "Normalized provider evidence could not be persisted."
+            ) from exc
+
+    # -------------------------------------------------------------------------
+    def _provider_failure(
+        self,
+        *,
+        context: ToolExecutionContext,
+        capability_id: str,
+        provider_id: str,
+        started: float,
+        error: Exception,
+    ) -> ToolResult:
+        if isinstance(error, ProviderInvalidQueryError):
+            return self._failure(
+                context=context,
+                capability_id=capability_id,
+                provider_id=provider_id,
+                started=started,
+                error_type="semantic_validation",
+                code="provider_invalid_query",
+                message="The provider rejected the validated query.",
+                recovery="correct_arguments",
+                retryable=True,
+            )
+        if isinstance(error, ProviderAuthError):
+            return self._failure(
+                context=context,
+                capability_id=capability_id,
+                provider_id=provider_id,
+                started=started,
+                error_type="authentication",
+                code="provider_authentication",
+                message="Provider authentication is unavailable.",
+                recovery="choose_alternate_tool",
+            )
+        if isinstance(error, ProviderRateLimitError):
+            return self._failure(
+                context=context,
+                capability_id=capability_id,
+                provider_id=provider_id,
+                started=started,
+                error_type="rate_limit",
+                code="provider_rate_limit",
+                message="The provider rate limit was reached.",
+                recovery="choose_alternate_tool",
+            )
+        if isinstance(error, ProviderTimeoutError):
+            return self._failure(
+                context=context,
+                capability_id=capability_id,
+                provider_id=provider_id,
+                started=started,
+                error_type="timeout",
+                code="provider_timeout",
+                message="The provider did not respond within its execution deadline.",
+                recovery="replan",
+                timeout_origin="provider_transport",
+            )
+        if isinstance(error, ProviderMalformedPayloadError):
+            return self._failure(
+                context=context,
+                capability_id=capability_id,
+                provider_id=provider_id,
+                started=started,
+                error_type="provider_malformed_response",
+                code="provider_malformed_response",
+                message="The provider response could not be normalized or stored.",
+                recovery="choose_alternate_tool",
+            )
+        if isinstance(
+            error,
+            (
+                ProviderCircuitOpenError,
+                ProviderUnavailableError,
+                ProviderNotRegisteredError,
+                ProviderError,
+            ),
+        ):
+            return self._failure(
+                context=context,
+                capability_id=capability_id,
+                provider_id=provider_id,
+                started=started,
+                error_type="provider_unavailable",
+                code="provider_unavailable",
+                message="The provider is temporarily unavailable.",
+                recovery="choose_alternate_tool",
+            )
+        return self._failure(
+            context=context,
+            capability_id=capability_id,
+            provider_id=provider_id,
+            started=started,
+            error_type="internal_error",
+            code="capability_execution_failed",
+            message="The capability failed during execution.",
+            recovery="terminal",
+        )
+
+    # -------------------------------------------------------------------------
+    def _failure(
+        self,
+        *,
+        context: ToolExecutionContext,
+        capability_id: str,
+        started: float,
+        error_type: Any,
+        code: str,
+        message: str,
+        recovery: Any,
+        provider_id: str | None = None,
+        retryable: bool = False,
+        timeout_origin: str | None = None,
+    ) -> ToolResult:
+        error = ToolExecutionError(
+            error_type=error_type,
+            code=code,
+            message=message,
+            retryable=retryable,
+            recovery=recovery,
+            timeout_origin=timeout_origin,
+        )
+        return ToolResult(
+            call_id=context.call_id,
+            tool_name=self.TOOL_NAME,
+            status="failed",
+            summary=message,
+            error=error,
+            metadata=ToolExecutionMetadata(
+                capability_id=capability_id,
+                provider_id=provider_id,
+                duration_ms=_duration_ms(started),
+            ),
+        )
+
+###############################################################################
+def _provider_id(manifest: dict[str, Any]) -> str:
+    return str(manifest.get("provider") or manifest.get("provider_id") or "").strip()
+
+###############################################################################
+def _bbox(value: list[float] | None) -> tuple[float, float, float, float] | None:
+    if value is None:
+        return None
+    return tuple(float(item) for item in value)  # type: ignore[return-value]
+
+###############################################################################
+def _feature_spatial_geometry(value: Any) -> Any | None:
+    """Return the shapely geometry for a GeoJSON or normalized point feature.
+
+    Several adapters (USGS, Open-Meteo, NOAA CO-OPS, Overpass) return
+    normalized features with top-level ``latitude``/``longitude`` instead of a
+    GeoJSON ``geometry`` object. The spatial-scope intersection check must
+    accept both shapes, otherwise bounded requests incorrectly report
+    ``spatial_scope_satisfied=false``.
+    """
+    if not is_json_object(value):
+        return None
+    geometry = value.get("geometry")
+    if is_json_object(geometry):
+        try:
+            return shape(geometry)
+        except (ValueError, TypeError, KeyError, GEOSException):
+            return None
+    latitude = value.get("latitude")
+    longitude = value.get("longitude")
+    if isinstance(latitude, int | float) and isinstance(longitude, int | float):
+        return Point(float(longitude), float(latitude))
+    return None
+
+###############################################################################
+def _provider_params(
+    request: ExecuteCapabilityInput,
+    *,
+    location: ResolvedLocation | None = None,
+) -> dict[str, Any]:
+    params = dict(request.arguments)
+    if location is not None:
+        # Provider adapters are deliberately location-agnostic at the model
+        # boundary.  Inject the server-resolved point after tool validation so
+        # a location_ref is useful to every provider without trusting model
+        # supplied coordinates.
+        params["latitude"] = location.latitude
+        params["longitude"] = location.longitude
+    if request.operation is not None:
+        params.setdefault("operation", request.operation)
+    if request.location_ref is not None:
+        params.setdefault("location_ref", request.location_ref)
+    if request.evidence_refs:
+        params.setdefault("evidence_refs", list(request.evidence_refs))
+    if request.radius_m is not None:
+        params.setdefault("radius_m", request.radius_m)
+    if request.temporal_mode is not None:
+        params.setdefault("temporal_mode", request.temporal_mode)
+    if request.filters:
+        params["filters"] = dict(request.filters)
+    if request.end_time_iso is not None:
+        params.setdefault("end_time_iso", request.end_time_iso)
+    return params
+
+###############################################################################
+def _parse_request_time(value: str | None) -> tuple[datetime | None, str | None]:
+    if not value:
+        return None, None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None, "The start time must be a valid ISO-8601 timestamp."
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed, None
+
+###############################################################################
+def _tool_status(response: ProviderResponse) -> Any:
+    if response.result_status == "valid_empty":
+        return "valid_empty"
+    if response.result_status in {"partial", "stale"} or response.partial:
+        return "partial"
+    return "success"
+
+###############################################################################
+def _evidence_status(response: ProviderResponse) -> EvidenceStatus:
+    if response.result_status == "valid_empty":
+        return "valid_empty"
+    if response.result_status in {"partial", "stale"} or response.partial:
+        return "partial"
+    return "available"
+
+###############################################################################
+def _evidence_kind(result_type: str) -> EvidenceKind:
+    if result_type == "features":
+        return "vector"
+    if result_type == "raster":
+        return "raster_descriptor"
+    return "capability_result"
+
+###############################################################################
+def _response_summary(
+    response: ProviderResponse,
+    *,
+    request: ExecuteCapabilityInput | None = None,
+    location: ResolvedLocation | None = None,
+) -> dict[str, Any]:
+    payload = response.payload
+    features = payload.get("features")
+    summary: dict[str, Any] = {
+        "capability_id": response.capability_id,
+        "provider_id": response.provider_id,
+        "result_status": response.result_status,
+        "result_type": response.result_type,
+        "feature_count": len(features) if is_json_array(features) else None,
+        "map_eligibility": _map_eligibility(response),
+        "stale": response.stale,
+        "fetched_at": response.fetched_at.isoformat(),
+    }
+    feature_bbox = _feature_bbox(features)
+    if feature_bbox is not None:
+        summary["bbox"] = feature_bbox
+    if response.result_type == "features" and is_json_array(features):
+        feature_preview = _feature_preview(features)
+        if feature_preview:
+            summary["feature_preview"] = feature_preview
+            summary["feature_preview_limit"] = 10
+            summary["feature_preview_truncated"] = len(features) > len(feature_preview)
+    if response.attribution:
+        summary["attribution"] = [str(item)[:200] for item in response.attribution[:8]]
+    if response.warnings:
+        summary["warnings"] = [str(item)[:300] for item in response.warnings[:8]]
+    if response.observation_time:
+        summary["observation_time"] = response.observation_time
+    if response.spatial_resolution:
+        summary["spatial_resolution"] = response.spatial_resolution
+    if response.units:
+        summary["units"] = dict(list(response.units.items())[:16])
+    if response.coverage:
+        summary["coverage"] = dict(list(response.coverage.items())[:16])
+    if response.source_url:
+        summary["source_url"] = response.source_url[:500]
+    if response.partial:
+        summary["partial"] = True
+    yearly_kwh_per_kwp = payload.get("yearlyKwhPerKwpEstimate")
+    if isinstance(yearly_kwh_per_kwp, (int, float)) and not isinstance(
+        yearly_kwh_per_kwp, bool
+    ):
+        summary["solar_potential"] = {
+            "yearly_kwh_per_kwp": float(yearly_kwh_per_kwp),
+            "unit": "kWh/kWp/year",
+        }
+    if payload.get("kind") == "weather_forecast":
+        current = payload.get("current")
+        if is_json_object(current):
+            observations = {
+                key: current[key]
+                for key in (
+                    "temperature_2m",
+                    "precipitation",
+                    "weather_code",
+                    "relative_humidity_2m",
+                    "surface_pressure",
+                    "wind_speed_10m",
+                    "wind_direction_10m",
+                    "wind_gusts_10m",
+                )
+                if key in current
+            }
+            if observations:
+                # Keep current weather values available for bounded answer
+                # synthesis without exposing the complete provider payload.
+                summary["observations"] = observations
+    if payload.get("kind") in {"weather_forecast", "air_quality_forecast"}:
+        kind = str(payload.get("kind"))
+        summary["kind"] = kind
+        hourly = payload.get("hourlyForecast")
+        if is_json_array(hourly):
+            fields = (
+                (
+                    "time",
+                    "temperature_2m",
+                    "relative_humidity_2m",
+                    "precipitation",
+                    "weather_code",
+                    "surface_pressure",
+                    "wind_speed_10m",
+                    "wind_direction_10m",
+                    "wind_gusts_10m",
+                )
+                if payload.get("kind") == "weather_forecast"
+                else (
+                    "time",
+                    "pm10",
+                    "pm2_5",
+                    "carbon_monoxide",
+                    "nitrogen_dioxide",
+                    "ozone",
+                    "sulphur_dioxide",
+                )
+            )
+            timezone = payload.get("timezone")
+            try:
+                timezone_info = (
+                    ZoneInfo(timezone) if isinstance(timezone, str) else UTC
+                )
+            except (ZoneInfoNotFoundError, ValueError):
+                timezone_info = None
+            selected_rows: list[dict[str, Any]] = []
+            if timezone_info is not None:
+                window_start = response.fetched_at.astimezone(timezone_info)
+                window_end = window_start + timedelta(hours=24)
+                for raw_row in hourly:
+                    if not is_json_object(raw_row) or not raw_row.get("time"):
+                        continue
+                    try:
+                        row_time = datetime.fromisoformat(
+                            str(raw_row["time"]).replace("Z", "+00:00")
+                        )
+                    except ValueError:
+                        continue
+                    if row_time.tzinfo is None:
+                        row_time = row_time.replace(tzinfo=timezone_info)
+                    else:
+                        row_time = row_time.astimezone(timezone_info)
+                    if window_start <= row_time < window_end:
+                        selected_rows.append(raw_row)
+                    if len(selected_rows) == 24:
+                        break
+            rows = [
+                {key: row[key] for key in fields if key in row}
+                for row in selected_rows
+            ]
+            summary["forecast_hours_requested"] = 24
+            summary["forecast_hours"] = len(rows)
+            summary["forecast_truncated"] = len(rows) < 24
+            summary["forecast_window_status"] = (
+                "ok" if len(rows) == 24 else "partial"
+            )
+            if rows:
+                summary["hourly_forecast"] = rows
+                summary["forecast_window_start"] = rows[0].get("time")
+                summary["forecast_window_end"] = rows[-1].get("time")
+        timezone = payload.get("timezone")
+        if isinstance(timezone, str) and timezone:
+            summary["timezone"] = timezone[:80]
+    if request is not None:
+        # Keep the semantic query visible to the model without exposing the
+        # provider payload or trusting model-owned geometry/time fields.
+        summary["query"] = {
+            "operation": request.operation,
+            "location_ref": request.location_ref,
+            "resolved_location": location.label if location is not None else None,
+            "bbox": list(request.bbox) if request.bbox is not None else None,
+            "radius_m": request.radius_m,
+            "start_time_iso": request.start_time_iso,
+            "end_time_iso": request.end_time_iso,
+            "filter_keys": sorted(str(key) for key in request.filters)[:32],
+        }
+    return summary
+
+
+def _feature_preview(features: list[Any]) -> list[dict[str, Any]]:
+    """Expose a small, allowlisted feature sample for bounded answer synthesis."""
+
+    preview: list[dict[str, Any]] = []
+    for feature in features[:10]:
+        if not is_json_object(feature):
+            continue
+        properties = feature.get("properties")
+        values = properties if is_json_object(properties) else feature
+        item: dict[str, Any] = {}
+        for key in ("id", "name", "category", "latitude", "longitude", "address"):
+            value = values.get(key, feature.get(key))
+            if isinstance(value, (str, int, float)):
+                item[key] = value[:160] if isinstance(value, str) else value
+        metadata = values.get("metadata")
+        distance = values.get("distance_m")
+        if distance is None and is_json_object(metadata):
+            distance = metadata.get("distance_m")
+        if isinstance(distance, (int, float)):
+            item["distance_m"] = distance
+        geometry = feature.get("geometry")
+        coordinates = geometry.get("coordinates") if is_json_object(geometry) else None
+        if (
+            "latitude" not in item
+            and "longitude" not in item
+            and is_json_array(coordinates)
+            and len(coordinates) >= 2
+            and isinstance(coordinates[0], (int, float))
+            and isinstance(coordinates[1], (int, float))
+        ):
+            item["longitude"], item["latitude"] = coordinates[:2]
+        if item:
+            preview.append(item)
+    return preview
+
+###############################################################################
+def _map_eligibility(response: ProviderResponse) -> str:
+    """Classify provider evidence before it is admitted to a map plan."""
+
+    if response.result_status == "valid_empty":
+        return "not_renderable"
+
+    payload = response.payload
+    features = payload.get("features")
+    if is_json_array(features):
+        if any(_feature_has_geometry(item) for item in features):
+            return "renderable"
+        return "not_renderable"
+
+    if response.result_type == "raster" and _has_render_source(payload):
+        return "renderable"
+
+    render = payload.get("render")
+    if is_json_object(render) and _has_render_source(render):
+        return "renderable"
+
+    if response.result_type == "metadata":
+        return "not_renderable"
+    return "unknown"
+
+###############################################################################
+def _feature_has_geometry(value: object) -> bool:
+    feature = value if is_json_object(value) else {}
+    geometry = feature.get("geometry")
+    if is_json_object(geometry):
+        return bool(geometry.get("type")) and (
+            geometry.get("coordinates") is not None
+            or geometry.get("geometries") is not None
+        )
+    latitude = feature.get("latitude")
+    longitude = feature.get("longitude")
+    return (
+        isinstance(latitude, (int, float))
+        and not isinstance(latitude, bool)
+        and isinstance(longitude, (int, float))
+        and not isinstance(longitude, bool)
+    )
+
+###############################################################################
+def _has_render_source(value: object) -> bool:
+    payload = value if is_json_object(value) else {}
+    mode = str(
+        payload.get("renderingMode")
+        or payload.get("rendering_mode")
+        or ""
+    ).strip().casefold()
+    if mode in {"metadata-only", "metadata_only"}:
+        return False
+    return any(
+        isinstance(payload.get(key), str) and payload[key].strip()
+        for key in (
+            "url",
+            "tileUrl",
+            "tile_url_template",
+            "tileUrlTemplate",
+            "url_template",
+            "serviceUrl",
+            "service_url",
+            "featuresUrl",
+            "features_url",
+        )
+    )
+
+###############################################################################
+def _feature_bbox(value: object) -> list[float] | None:
+    if not is_json_array(value):
+        return None
+    coordinates: list[tuple[float, float]] = []
+    for raw_feature in value:
+        feature = raw_feature if is_json_object(raw_feature) else {}
+        latitude = feature.get("latitude")
+        longitude = feature.get("longitude")
+        if (
+            isinstance(latitude, (int, float))
+            and not isinstance(latitude, bool)
+            and isinstance(longitude, (int, float))
+            and not isinstance(longitude, bool)
+        ):
+            coordinates.append((float(longitude), float(latitude)))
+            continue
+        geometry = feature.get("geometry")
+        if is_json_object(geometry):
+            for longitude, latitude in _geometry_positions(geometry):
+                coordinates.append((longitude, latitude))
+    if not coordinates:
+        return None
+    longitudes = [item[0] for item in coordinates]
+    latitudes = [item[1] for item in coordinates]
+    return [min(longitudes), min(latitudes), max(longitudes), max(latitudes)]
+
+
+###############################################################################
+def _geometry_positions(value: object) -> list[tuple[float, float]]:
+    """Extract coordinate pairs from any bounded GeoJSON geometry."""
+
+    geometry = value if is_json_object(value) else {}
+    if geometry.get("type") == "GeometryCollection":
+        geometries = geometry.get("geometries")
+        if not is_json_array(geometries):
+            return []
+        positions: list[tuple[float, float]] = []
+        for item in geometries:
+            positions.extend(_geometry_positions(item))
+        return positions
+    coordinates = geometry.get("coordinates")
+    positions: list[tuple[float, float]] = []
+
+    def visit(value: object) -> None:
+        if is_json_array(value):
+            if (
+                len(value) >= 2
+                and isinstance(value[0], (int, float))
+                and not isinstance(value[0], bool)
+                and isinstance(value[1], (int, float))
+                and not isinstance(value[1], bool)
+            ):
+                positions.append((float(value[0]), float(value[1])))
+                return
+            for item in value:
+                visit(item)
+
+    visit(coordinates)
+    return positions
+
+###############################################################################
+def _summary_text(response: ProviderResponse, summary: dict[str, Any]) -> str:
+    count = summary.get("feature_count")
+    if response.result_status == "valid_empty":
+        return f"Capability '{response.capability_id}' returned no matching data."
+    if isinstance(count, int):
+        return (
+            f"Capability '{response.capability_id}' returned {count} feature(s) "
+            f"from provider '{response.provider_id}'."
+        )
+    return (
+        f"Capability '{response.capability_id}' returned a "
+        f"{response.result_type} result from provider '{response.provider_id}'."
+    )
+
+###############################################################################
+def _json_size(value: Any) -> int | None:
+    try:
+        return len(json.dumps(value, ensure_ascii=False, default=str).encode("utf-8"))
+    except (TypeError, ValueError):
+        return None
+
+###############################################################################
+def _duration_ms(started: float) -> int:
+    return max(0, int((time.perf_counter() - started) * 1000))
+
+
+__all__ = ["CapabilityExecutionService", "ToolExecutionContext"]

@@ -1,22 +1,29 @@
 from __future__ import annotations
 
+import math
 from urllib.parse import urlencode
+
+from server.common.typing import is_json_array, is_json_object, json_object
 
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
+    ProviderMalformedPayloadError,
     ProviderRequest,
     ProviderResponse,
-    ProviderUnavailableError,
 )
 from server.services.geospatial.providers.http import (
     JsonFetcher,
     call_json_fetcher,
     fetch_json_url,
 )
+from server.services.geospatial.spatial_constraints import geodesic_distance_m
 
 ###############################################################################
 class USGSProvider(GeospatialProvider):
     provider_id = "usgs"
+    WATER_DATA_ITEMS_URL = (
+        "https://api.waterdata.usgs.gov/ogcapi/v0/collections/latest-continuous/items"
+    )
 
     # -------------------------------------------------------------------------
     def __init__(self, *, fetcher: JsonFetcher | None = None) -> None:
@@ -31,10 +38,14 @@ class USGSProvider(GeospatialProvider):
     # -------------------------------------------------------------------------
     async def _earthquakes(self, request: ProviderRequest) -> ProviderResponse:
         feed = str(request.params.get("feed") or "all_day").strip()
-        features_url = f"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/{feed}.geojson"
+        features_url = (
+            f"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/{feed}.geojson"
+        )
         if request.params.get("live"):
             payload = await call_json_fetcher(self.fetcher, features_url)
             features = _normalize_earthquake_features(payload)
+            features = _filter_features_to_bbox(features, request.bbox)
+            features = _filter_features_to_radius(features, request.params)
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -47,6 +58,8 @@ class USGSProvider(GeospatialProvider):
                     "freshnessLabel": "USGS all-day earthquake feed",
                 },
                 attribution=["U.S. Geological Survey"],
+                result_status="valid_empty" if not features else "ok",
+                result_type="features",
             )
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -59,22 +72,25 @@ class USGSProvider(GeospatialProvider):
                 "freshnessLabel": "USGS all-day earthquake feed",
             },
             attribution=["U.S. Geological Survey"],
+            result_type="metadata",
         )
 
     # -------------------------------------------------------------------------
     async def _water_services(self, request: ProviderRequest) -> ProviderResponse:
-        params = {
-            "format": "json",
-            "siteStatus": "active",
-            "parameterCd": request.params.get("parameterCd") or "00065",
+        params: dict[str, str | int] = {
+            "f": "json",
+            "limit": max(1, min(int(request.params.get("limit") or 1000), 10000)),
+            "parameter_code": str(request.params.get("parameterCd") or "00065"),
         }
         if request.bbox is not None:
             west, south, east, north = request.bbox
-            params["bBox"] = f"{west},{south},{east},{north}"
-        features_url = f"https://waterservices.usgs.gov/nwis/iv/?{urlencode(params)}"
+            params["bbox"] = f"{west},{south},{east},{north}"
+        features_url = f"{self.WATER_DATA_ITEMS_URL}?{urlencode(params)}"
         if request.params.get("live"):
             payload = await call_json_fetcher(self.fetcher, features_url)
             features = _normalize_water_gauge_features(payload)
+            features = _filter_features_to_bbox(features, request.bbox)
+            features = _filter_features_to_radius(features, request.params)
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -82,11 +98,16 @@ class USGSProvider(GeospatialProvider):
                     "renderingMode": "clustered-points",
                     "features": features,
                     "totalResults": len(features),
-                    "format": "json",
-                    "legend": {"type": "water-level", "label": "Latest gauge observation"},
-                    "freshnessLabel": "USGS instantaneous values feed",
+                    "format": "geojson",
+                    "legend": {
+                        "type": "water-level",
+                        "label": "Latest gauge observation",
+                    },
+                    "freshnessLabel": "USGS latest-continuous observations",
                 },
                 attribution=["U.S. Geological Survey"],
+                result_status="valid_empty" if not features else "ok",
+                result_type="features",
             )
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -94,31 +115,36 @@ class USGSProvider(GeospatialProvider):
             payload={
                 "renderingMode": "clustered-points",
                 "featuresUrl": features_url,
-                "format": "json",
+                "format": "geojson",
                 "legend": {"type": "water-level", "label": "Latest gauge observation"},
-                "freshnessLabel": "USGS instantaneous values feed",
+                "freshnessLabel": "USGS latest-continuous observations",
             },
             attribution=["U.S. Geological Survey"],
+            result_type="metadata",
         )
 
 ###############################################################################
 def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
-    if not isinstance(payload, dict):
-        raise ProviderUnavailableError("USGS earthquake payload must be a GeoJSON object.")
+    if not is_json_object(payload):
+        raise ProviderMalformedPayloadError(
+            "USGS earthquake payload must be a GeoJSON object."
+        )
     raw_features = payload.get("features")
-    if not isinstance(raw_features, list):
-        raise ProviderUnavailableError("USGS earthquake payload is missing features.")
+    if not is_json_array(raw_features):
+        raise ProviderMalformedPayloadError(
+            "USGS earthquake payload is missing features."
+        )
     features: list[dict[str, object]] = []
     for item in raw_features:
-        if not isinstance(item, dict):
+        if not is_json_object(item):
             continue
-        properties = item.get("properties") if isinstance(item.get("properties"), dict) else {}
-        geometry = item.get("geometry") if isinstance(item.get("geometry"), dict) else {}
+        properties = json_object(item.get("properties"))
+        geometry = json_object(item.get("geometry"))
         coordinates = geometry.get("coordinates")
-        if not isinstance(coordinates, list) or len(coordinates) < 2:
+        if not is_json_array(coordinates) or len(coordinates) < 2:
             continue
         longitude, latitude = coordinates[0], coordinates[1]
-        if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
+        if not _valid_coordinates(latitude, longitude):
             continue
         features.append(
             {
@@ -141,60 +167,132 @@ def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
 
 ###############################################################################
 def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
-    if not isinstance(payload, dict):
-        raise ProviderUnavailableError("USGS water-services payload must be an object.")
-    value = payload.get("value") if isinstance(payload.get("value"), dict) else {}
-    raw_series = value.get("timeSeries") if isinstance(value.get("timeSeries"), list) else []
+    if not is_json_object(payload) or payload.get("type") != "FeatureCollection":
+        raise ProviderMalformedPayloadError(
+            "USGS latest-continuous payload must be a GeoJSON FeatureCollection."
+        )
+    raw_features = payload.get("features")
+    if not is_json_array(raw_features):
+        raise ProviderMalformedPayloadError(
+            "USGS latest-continuous payload is missing features."
+        )
     features: list[dict[str, object]] = []
-    for series in raw_series:
-        if not isinstance(series, dict):
+    for raw_feature in raw_features:
+        feature = json_object(raw_feature)
+        geometry = json_object(feature.get("geometry"))
+        properties = json_object(feature.get("properties"))
+        coordinates = geometry.get("coordinates")
+        if not is_json_array(coordinates) or len(coordinates) < 2:
             continue
-        source_info = series.get("sourceInfo") if isinstance(series.get("sourceInfo"), dict) else {}
-        geo = source_info.get("geoLocation") if isinstance(source_info.get("geoLocation"), dict) else {}
-        geog = geo.get("geogLocation") if isinstance(geo.get("geogLocation"), dict) else {}
-        latitude = geog.get("latitude")
-        longitude = geog.get("longitude")
-        if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
+        longitude, latitude = coordinates[0], coordinates[1]
+        value = _float_or_none(properties.get("value"))
+        if not _valid_coordinates(latitude, longitude) or value is None:
             continue
-        values = series.get("values") if isinstance(series.get("values"), list) else []
-        latest_value = _latest_usgs_value(values)
+        station_id = (
+            properties.get("monitoring_location_id")
+            or properties.get("monitoringLocationId")
+            or feature.get("id")
+        )
         features.append(
             {
-                "id": source_info.get("siteCode", [{}])[0].get("value")
-                if isinstance(source_info.get("siteCode"), list)
-                and source_info.get("siteCode")
-                and isinstance(source_info.get("siteCode")[0], dict)
-                else source_info.get("siteName"),
-                "name": source_info.get("siteName"),
+                "id": str(station_id or ""),
+                "name": properties.get("monitoring_location_name")
+                or properties.get("name")
+                or station_id,
                 "category": "water_gauge",
                 "latitude": float(latitude),
                 "longitude": float(longitude),
-                "value": latest_value.get("value"),
-                "timestamp": latest_value.get("dateTime"),
+                "value": value,
+                "timestamp": properties.get("time"),
                 "metadata": {
-                    "variable": (
-                        series.get("variable", {}).get("variableName")
-                        if isinstance(series.get("variable"), dict)
-                        else None
-                    ),
-                    "unit": _unit_code(series),
+                    "parameterCode": properties.get("parameter_code"),
+                    "unit": properties.get("unit_of_measure"),
+                    "observedProperty": properties.get("observed_property"),
+                    "verticalDatum": properties.get("vertical_datum"),
+                    "huc": properties.get("huc"),
                 },
             }
         )
     return features
 
 ###############################################################################
-def _latest_usgs_value(values: list[object]) -> dict[str, object]:
-    if not values or not isinstance(values[0], dict):
-        return {}
-    entries = values[0].get("value")
-    if not isinstance(entries, list) or not entries:
-        return {}
-    latest = entries[-1]
-    return latest if isinstance(latest, dict) else {}
+def _float_or_none(value: object) -> float | None:
+    if not isinstance(value, int | float | str):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
 
 ###############################################################################
-def _unit_code(series: dict[str, object]) -> object:
-    variable = series.get("variable") if isinstance(series.get("variable"), dict) else {}
-    unit = variable.get("unit") if isinstance(variable.get("unit"), dict) else {}
-    return unit.get("unitCode")
+def _valid_coordinates(latitude: object, longitude: object) -> bool:
+    return (
+        isinstance(latitude, int | float)
+        and not isinstance(latitude, bool)
+        and isinstance(longitude, int | float)
+        and not isinstance(longitude, bool)
+        and math.isfinite(float(latitude))
+        and math.isfinite(float(longitude))
+        and -90.0 <= float(latitude) <= 90.0
+        and -180.0 <= float(longitude) <= 180.0
+    )
+
+###############################################################################
+def _filter_features_to_bbox(
+    features: list[dict[str, object]],
+    bbox: tuple[float, float, float, float] | None,
+) -> list[dict[str, object]]:
+    if bbox is None:
+        return features
+    west, south, east, north = bbox
+    filtered: list[dict[str, object]] = []
+    for feature in features:
+        latitude = _float_or_none(feature.get("latitude"))
+        longitude = _float_or_none(feature.get("longitude"))
+        if (
+            latitude is not None
+            and longitude is not None
+            and south <= latitude <= north
+            and (
+                west <= longitude <= east
+                if west <= east
+                else longitude >= west or longitude <= east
+            )
+        ):
+            filtered.append(feature)
+    return filtered
+
+###############################################################################
+def _filter_features_to_radius(
+    features: list[dict[str, object]],
+    params: dict[str, object],
+) -> list[dict[str, object]]:
+    """Apply the exact requested radius after the bbox prefilter."""
+
+    latitude = _float_or_none(params.get("latitude"))
+    longitude = _float_or_none(params.get("longitude"))
+    radius_m = _float_or_none(params.get("radius_m"))
+    if (
+        latitude is None
+        or longitude is None
+        or radius_m is None
+        or radius_m <= 0
+        or not _valid_coordinates(latitude, longitude)
+    ):
+        return features
+    return [
+        feature
+        for feature in features
+        if (
+            (feature_latitude := _float_or_none(feature.get("latitude"))) is not None
+            and (feature_longitude := _float_or_none(feature.get("longitude"))) is not None
+            and geodesic_distance_m(
+                latitude,
+                longitude,
+                feature_latitude,
+                feature_longitude,
+            )
+            <= radius_m
+        )
+    ]

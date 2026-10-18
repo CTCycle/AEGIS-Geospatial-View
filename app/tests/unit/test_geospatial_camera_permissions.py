@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 
+from tests.conftest import run_async_in_thread
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
@@ -30,7 +30,7 @@ def test_webcam_embedding_requires_explicit_provider_permission() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         WindyWebcamsProvider(api_key="windy-test", fetcher=fetcher).fetch(
             ProviderRequest(capability_id="windy_webcams", params={"live": True})
         )

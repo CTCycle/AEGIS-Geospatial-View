@@ -1,0 +1,53 @@
+{
+  "slice_id": "T1-09",
+  "name": "Seven-section Settings navigation and drafts",
+  "status": "PASS",
+  "verified_at": "2026-09-23",
+  "branch": "develop",
+  "implementation_commit": "c090abd1ca9d6d78e82e798da9167b9d19b3fc23",
+  "source_fingerprints": "source-sha256.txt",
+  "evidence": {
+    "settings_component_suite": {
+      "status": "PASS",
+      "passed": 31
+    },
+    "settings_browser_regressions": {
+      "status": "PASS",
+      "passed": 2,
+      "deselected": 6,
+      "log": "settings-focused-e2e.log"
+    },
+    "toolbar_browser_regression": {
+      "status": "PASS",
+      "passed": 1,
+      "deselected": 6,
+      "log": "toolbar-e2e.log"
+    },
+    "rendered_sections": {
+      "status": "PASS",
+      "sections": [
+        "Models",
+        "Model Providers",
+        "Geospatial Access",
+        "Application",
+        "Map & Search",
+        "Data Sources",
+        "Agent Runtime"
+      ],
+      "draft_retained": true,
+      "saved_value_after_return": true,
+      "screenshots": "screenshots/"
+    },
+    "angular_production_build": "PASS",
+    "ruff_changed_e2e_files": "PASS",
+    "git_diff_check": "PASS",
+    "hosted_ci": {
+      "status": "PASS",
+      "implementation_commit": "c090abd1ca9d6d78e82e798da9167b9d19b3fc23",
+      "run_id": 35873578752,
+      "conclusion": "success",
+      "jobs_passed": 4,
+      "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35873578752"
+    }
+  }
+}

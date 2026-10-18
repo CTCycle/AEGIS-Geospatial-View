@@ -1,0 +1,153 @@
+{
+  "id": "openchargemap_ev_charging",
+  "name": "Open Charge Map EV Charging",
+  "provider": "openchargemap",
+  "type": "vector-overlay",
+  "description": "EV charging station points from Open Charge Map for bounded searches.",
+  "capabilities": [
+    "ev",
+    "charging",
+    "infrastructure",
+    "poi"
+  ],
+  "coverage": "global-partial",
+  "metadata": {
+    "label": "EV Charging",
+    "requires_key": false,
+    "attribution": "Open Charge Map",
+    "keywords": [
+      "ev charging",
+      "charger",
+      "electric vehicle",
+      "infrastructure"
+    ],
+    "action_tags": [
+      "ev",
+      "charging",
+      "infrastructure"
+    ],
+    "task_tags": [
+      "find chargers",
+      "route charging"
+    ],
+    "source_protocol": "JSON API",
+    "data_format": "JSON",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "partial",
+    "auth_mode": "optional_api_key",
+    "constraints": "Configure an Open Charge Map API key in Settings under Geospatial Access or a local snapshot via AEGIS_OCM_SNAPSHOT_PATH.",
+    "official_docs_url": "https://openchargemap.org/site/develop/api",
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://openchargemap.org/site/develop/api"
+  ],
+  "license": {
+    "name": "Open Charge Map terms",
+    "url": "https://openchargemap.org/site/about/terms",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "api-key",
+    "required": false,
+    "providerKey": "openchargemap",
+    "accessPageProviderId": "openchargemap"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "domains": ["data_retrieval", "map_rendering"],
+    "plannerHints": [
+      "ev charging",
+      "charger",
+      "electric vehicle",
+      "charging station"
+    ],
+    "requiredUserAction": [
+      "ev",
+      "charging",
+      "nearby"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": [
+      "Provider may require an API key or stricter usage terms depending on request volume."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 604800
+  },
+  "normalization": {
+    "geometryPath": "[].AddressInfo.Latitude,[].AddressInfo.Longitude",
+    "idPath": "[].ID",
+    "timestampPath": "[].DateLastVerified",
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  },
+  "account_setup": {
+    "automation": {
+      "support": "agent_assisted",
+      "signup_url": "https://openchargemap.org/site/develop/api",
+      "developer_portal_url": "https://openchargemap.org/site/develop/api",
+      "docs_url": "https://openchargemap.org/site/develop/api",
+      "required_fields": [],
+      "user_action_notes": [
+        "Open the provider portal from AEGIS and complete account-controlled steps in the provider site.",
+        "Pause for any CAPTCHA, login, email verification, 2FA, billing, consent, or key-generation prompts.",
+        "Paste the generated API key back into AEGIS when the provider flow is complete."
+      ],
+      "safety_notes": [
+        "AEGIS does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials.",
+        "Guided setup is experimental and best-effort; manual provider instructions remain the fallback."
+      ],
+      "experimental": true,
+      "experimental_label": "Experimental guided setup"
+    }
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "inspect",
+      "search"
+    ],
+    "supported_scope_kinds": [
+      "point",
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "global-partial",
+    "limitations": [
+      "Provider may require an API key or stricter usage terms depending on request volume."
+    ],
+    "fallback_ids": []
+  }
+}

@@ -86,11 +86,11 @@ def test_deduplicate_poi_features_by_name_category_and_coordinates() -> None:
         category="ev_charging",
     )
     different = normalize_poi_feature(
-        {"id": "nrel-1", "name": "Central Fuel", "lat": 45.0, "lon": 7.0},
-        source="nrel",
+        {"id": "other-1", "name": "Central Fuel", "lat": 45.0, "lon": 7.0},
+        source="overpass",
         category="fuel",
     )
 
     deduplicated = deduplicate_poi_features([first, duplicate, different])
 
-    assert [feature.id for feature in deduplicated] == ["osm-1", "nrel-1"]
+    assert [feature.id for feature in deduplicated] == ["osm-1", "other-1"]

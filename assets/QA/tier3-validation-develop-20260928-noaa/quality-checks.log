@@ -1,0 +1,6 @@
+Quality checks
+Source: acf01a580166fc685eb5bde52f4e4cca2482d4a3
+
+Ruff (six changed implementation/test files): All checks passed.
+Pyright (three changed implementation files): 0 errors, 0 warnings, 0 informations.
+Fresh provider instance live check: result_status=ok, partial=false, feature_count=1, geometry_type=GeometryCollection, geometry_source=affected_zones, warnings=[];

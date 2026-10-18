@@ -1,24 +1,24 @@
 from __future__ import annotations
 
-import ast
 import asyncio
-from collections.abc import AsyncIterator
-from pathlib import Path
+from collections.abc import AsyncIterator, Callable
+from typing import Any
 
-from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
-from server.domain.chat import (
+from tests.conftest import run_async_in_thread
+
+from server.contracts.chat import (
     ChatOperationResult,
     ChatStreamEvent,
     ChatTurnRequest,
     ChatTurnResponse,
 )
-from server.domain.extraction.models import (
-    ConversationContextSnapshot,
-    LocationSignal,
-    NormalizedAction,
-    TurnParseResult,
+from server.domain.agent.capability_domains import CapabilityDomain
+from server.domain.agent.capability_route import (
+    AgentGoal,
+    CapabilityRoute,
+    CompletionContract,
 )
-from server.domain.geographics import MapSession
+from server.domain.agent.conversation import ConversationState
 from server.services.chat.streaming import ChatStreamingService
 from server.services.llm.errors import LLMConfigurationError
 
@@ -29,207 +29,199 @@ async def collect_stream_events(
     return [event async for event in stream]
 
 ###############################################################################
-def turn_contract() -> TurnParseResult:
-    return TurnParseResult(
-        user_text="show weather",
-        conversation_context=ConversationContextSnapshot(),
-        task_class="map_search",
-        location_signals=[
-            LocationSignal(
-                signal_type="city",
-                raw_value="Rome",
-                normalized_value="Rome",
-                latitude=41.9028,
-                longitude=12.4964,
-                confidence=0.9,
-            )
-        ],
-        normalized_action=NormalizedAction(
-            action_id="weather",
-            action_label="Weather",
-            requires_location=True,
-        ),
+def native_response(payload: ChatTurnRequest) -> ChatTurnResponse:
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="answer",
+        presentation="text",
+        requires_location=False,
     )
-
-###############################################################################
-def policy_decision() -> PolicyDecision:
-    return PolicyDecision(
-        plan=ExecutionPlan(
-            state="direct_response",
-            mode="direct_text",
-            action_id="weather",
-        ),
-        trace=DecisionTrace(steps=["test"]),
-    )
-
-###############################################################################
-def chat_response(
-    payload: ChatTurnRequest,
-    *,
-    tool_payload: dict[str, object] | None = None,
-    map_session: MapSession | None = None,
-    operation: ChatOperationResult | None = None,
-) -> ChatTurnResponse:
     return ChatTurnResponse(
         request_id=payload.request_id or "chat-req",
-        session_id=7,
+        conversation_id=payload.conversation_id,
         assistant_message="hello world",
-        turn_contract=turn_contract(),
-        decision=policy_decision(),
-        operation=operation,
-        tool_payload=tool_payload,
-        map_session=map_session,
-        memory_snapshot={"k": "v"},
+        operation=ChatOperationResult(
+            kind="direct_answer",
+            status="success",
+            message="hello world",
+        ),
+        context_revision=0,
+        route=route,
+        goal=AgentGoal(
+            goal=payload.message,
+            task_mode="answer",
+            presentation="text",
+            operation="answer",
+            requires_location=False,
+        ),
+        completion_contract=CompletionContract(operation="answer"),
+        conversation_state=ConversationState.empty(payload.conversation_id),
     )
 
 ###############################################################################
 class ToolStatusAgentOrchestrator:
 
     # -------------------------------------------------------------------------
-    async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
-        return chat_response(
-            payload,
-            tool_payload={
-                "tool_calls": [
-                    {"id": "tool-1", "name": "execute_geospatial_capability", "arguments": {"capability_id": "weather_overlay"}},
-                ],
-                "tool_results": [
-                    {
-                        "tool_call_id": "tool-1",
-                        "name": "execute_geospatial_capability",
-                        "content": {
-                            "ok": True,
-                            "data": {"map_session": {"overlay_ids": ["weather_overlay"]}},
-                            "error": None,
-                            "metadata": {},
-                        },
-                        "is_error": False,
-                        "error": None,
-                    }
-                ],
-            },
-            map_session=MapSession(
-                session_id="map-1",
-                resolved_location={
-                    "label": "Rome",
-                    "latitude": 41.9028,
-                    "longitude": 12.4964,
-                    "source": "resolver",
-                    "confidence": 0.9,
-                },
-                basemap_id="osm_default",
-                overlay_ids=["weather_overlay"],
-                viewport={
-                    "center_latitude": 41.9028,
-                    "center_longitude": 12.4964,
-                    "radius_m": 2500.0,
-                },
-                basemap={"id": "osm_default", "label": "OpenStreetMap"},
-                overlays=[{"id": "weather_overlay", "label": "Weather Overlay"}],
-                center={"latitude": 41.9028, "longitude": 12.4964},
-                bounds=[12.0, 41.0, 13.0, 42.0],
-            ),
-            operation=ChatOperationResult(
-                kind="map_session",
-                status="success",
-                message="hello world",
-            ),
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None],
+    ) -> ChatTurnResponse:
+        progress_callback("stage", {"stage": "route_request"})
+        progress_callback(
+            "tool_call_started", {"name": "execute_geospatial_capability"}
         )
+        progress_callback(
+            "tool_call_completed",
+            {"name": "execute_geospatial_capability", "status": "success"},
+        )
+        progress_callback(
+            "map_session_created",
+            {"map_session": {"session_id": "map-1"}},
+        )
+        return native_response(payload)
 
 ###############################################################################
-class FinalMessageAgentOrchestrator:
+class ContextUsageAgentOrchestrator:
 
     # -------------------------------------------------------------------------
-    async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
-        return chat_response(
-            payload,
-            operation=ChatOperationResult(
-                kind="direct_answer",
-                status="success",
-                message="hello world",
-            ),
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None],
+    ) -> ChatTurnResponse:
+        progress_callback(
+            "context_usage",
+            {
+                "phase": "native_loop",
+                "context_usage": {
+                    "estimated_input_tokens": 700,
+                    "selected_context_window": 4096,
+                    "model_context_limit": 4096,
+                    "usage_percent": 17.1,
+                    "provider": "test",
+                    "model": "runtime-model",
+                    "usage_source": "estimated",
+                },
+            },
         )
+        return native_response(payload)
 
 ###############################################################################
 class ConfigurationErrorAgentOrchestrator:
 
     # -------------------------------------------------------------------------
-    async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None],
+    ) -> ChatTurnResponse:
+        del payload, progress_callback
         raise LLMConfigurationError("provider unavailable")
 
 ###############################################################################
 class UnexpectedErrorAgentOrchestrator:
 
     # -------------------------------------------------------------------------
-    async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None],
+    ) -> ChatTurnResponse:
+        del payload, progress_callback
         raise RuntimeError("boom")
+
+###############################################################################
+class CancellableAgentOrchestrator:
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.cancelled = False
+
+    # -------------------------------------------------------------------------
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None],
+    ) -> ChatTurnResponse:
+        del payload, progress_callback
+        self.started.set()
+        try:
+            await asyncio.Future()
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
 
 ###############################################################################
 def stream_events(agent_orchestrator: object) -> list[ChatStreamEvent]:
     service = ChatStreamingService(agent_orchestrator)  # type: ignore[arg-type]
-    payload = ChatTurnRequest(message="hi", request_id="chat-123")
-    return asyncio.run(collect_stream_events(service.stream_turn(payload)))
+    payload = ChatTurnRequest(
+        conversation_id="test-conversation", message="hi", request_id="chat-123"
+    )
+    return run_async_in_thread(collect_stream_events(service.stream_turn(payload)))
 
 ###############################################################################
-def test_stream_turn_emits_lifecycle_and_map_events() -> None:
+async def cancel_stream_and_check_orchestrator() -> bool:
+    orchestrator = CancellableAgentOrchestrator()
+    service = ChatStreamingService(orchestrator)  # type: ignore[arg-type]
+    payload = ChatTurnRequest(
+        conversation_id="test-conversation", message="hi", request_id="chat-123"
+    )
+    consumer = asyncio.create_task(consume_stream(service, payload))
+    await orchestrator.started.wait()
+    consumer.cancel()
+    await asyncio.gather(consumer, return_exceptions=True)
+    return orchestrator.cancelled
+
+###############################################################################
+async def consume_stream(
+    service: ChatStreamingService,
+    payload: ChatTurnRequest,
+) -> None:
+    async for _event in service.stream_turn(payload):
+        pass
+
+###############################################################################
+def test_stream_turn_emits_native_lifecycle_and_map_events() -> None:
     events = stream_events(ToolStatusAgentOrchestrator())
 
     assert [event.event for event in events] == [
         "status",
-        "parsed",
-        "policy",
+        "stage",
         "tool_call_started",
         "tool_call_completed",
         "map_session_created",
         "final",
     ]
-    assert events[3].data["name"] == "execute_geospatial_capability"
-    assert events[4].data["ok"] is True
-    assert events[5].data["map_session"]["resolved_location"]["label"] == "Rome"
+    assert events[2].data["name"] == "execute_geospatial_capability"
+    assert events[3].data["status"] == "success"
+    assert events[-1].data["route"]["primary_domain"] == "data_retrieval"
+    assert "turn_contract" not in events[-1].data
+    assert "decision" not in events[-1].data
 
 ###############################################################################
-def test_stream_turn_final_assistant_event_emits_final_payload() -> None:
-    events = stream_events(FinalMessageAgentOrchestrator())
+def test_stream_turn_emits_context_usage_before_final_event() -> None:
+    events = stream_events(ContextUsageAgentOrchestrator())
 
-    assert [event.event for event in events] == [
-        "status",
-        "parsed",
-        "policy",
-        "final",
-    ]
-    assert events[-1].data["session_id"] == 7
-    assert (
-        events[-1].data["turn_contract"]["normalized_action"]["action_id"] == "weather"
-    )
-    assert events[-1].data["decision"]["plan"]["state"] == "direct_response"
-    assert events[-1].data["operation"]["kind"] == "direct_answer"
+    assert [event.event for event in events] == ["status", "context_usage", "final"]
+    assert events[1].data["phase"] == "native_loop"
+    assert events[1].data["context_usage"]["usage_percent"] == 17.1
 
 ###############################################################################
-def test_stream_turn_llm_configuration_error_maps_to_error_event() -> None:
+def test_stream_turn_configuration_error_maps_to_service_unavailable() -> None:
     events = stream_events(ConfigurationErrorAgentOrchestrator())
 
     assert events[-1].event == "error"
     assert events[-1].data["status"] == 503
 
 ###############################################################################
-def test_stream_turn_unexpected_exception_maps_to_500_error_event() -> None:
+def test_stream_turn_unexpected_exception_maps_to_internal_error() -> None:
     events = stream_events(UnexpectedErrorAgentOrchestrator())
 
     assert events[-1].event == "error"
     assert events[-1].data["status"] == 500
 
 ###############################################################################
-def test_streaming_service_test_file_contains_no_nested_functions() -> None:
-    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"), filename=__file__)
-    nested_functions: list[str] = []
-
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
-            continue
-        for child in ast.walk(node):
-            if child is node:
-                continue
-            if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef):
-                nested_functions.append(child.name)
-
-    assert nested_functions == []
+def test_stream_turn_cancels_backend_work_when_consumer_disconnects() -> None:
+    assert run_async_in_thread(cancel_stream_and_check_orchestrator()) is True

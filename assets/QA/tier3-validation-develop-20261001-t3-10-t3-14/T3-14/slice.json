@@ -1,0 +1,38 @@
+{
+  "slice_id": "T3-14",
+  "name": "GBIF species occurrence point-insight overlay with provenance/citation semantics",
+  "date": "2026-10-01",
+  "branch": "validation",
+  "provider_lane": "opencode-go / deepseek-v4.1-flash",
+  "runtime": "isolated runtimes/cache/test-runtime/t3-07-live-* (disposable, port 5079)",
+  "status": "PASS",
+  "scenarios": [
+    {
+      "id": "t3_14_gbif_lugano",
+      "prompt": "Show species occurrences within 5 kilometers of Lugano, Switzerland.",
+      "expected_kind": "map",
+      "expected_capability": "gbif_species_occurrences",
+      "classification": "map_render_pass",
+      "evidence": "http/VECTOR-POINT-MATRIX-LIVE/t3_14_gbif_lugano.json"
+    },
+    {
+      "id": "t3_14_gbif_valid_empty",
+      "prompt": "Show species occurrences within 10 kilometers of latitude 48.5, longitude -128.5.",
+      "expected_kind": "map",
+      "expected_capability": "gbif_species_occurrences",
+      "classification": "map_render_pass",
+      "evidence": "http/VECTOR-POINT-MATRIX-LIVE/t3_14_gbif_valid_empty.json"
+    }
+  ],
+  "fixes": [],
+  "remaining_limitation": "The chosen bounded valid-empty location (48.5N 128.5W) returned marine occurrence records, so a strictly empty GBIF no-observations boundary was not separately demonstrated this run; the point-insight render, GBIF attribution, provenance/citation semantics, and accepted acknowledgement are the new evidence recorded here. The gbif routing-gate fix (avoidWhen rewording) was landed in the T3-10 slice.",
+  "quality": {
+    "backend_unit_passed": true,
+    "focused_backend_passed": true,
+    "frontend_karma_passed": null,
+    "ruff": "pass",
+    "pyright_errors": 0,
+    "strict_manifest_audit": "pass"
+  },
+  "harness": "app/tests/e2e/test_live_vector_point_matrix.py"
+}

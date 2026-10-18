@@ -1,14 +1,16 @@
 import { TestBed } from '@angular/core/testing';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 
 import { ApiClientService } from '../core/api-client.service';
 import { defaultAppState } from '../core/app-state';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
+import { RuntimeSettingsResponse } from '../core/types';
 import { SettingsPageComponent } from './settings-page.component';
 
-@Component({ template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.Eager,
+ template: '' })
 class TestRouteComponent {}
 
 const libraryResponse = (overrides: Partial<{ cloud: unknown[]; local: unknown[]; sources: Record<string, unknown> }> = {}) => ({
@@ -28,6 +30,42 @@ describe('pages/settings-page.component', () => {
   let checkOllamaHealthMock: jasmine.Spy;
   let refreshOllamaModelsMock: jasmine.Spy;
   let pullOllamaModelMock: jasmine.Spy;
+  let fetchGeospatialProviderAccountSetupsMock: jasmine.Spy;
+  let fetchRuntimeSettingsMock: jasmine.Spy;
+  let updateRuntimeSettingsMock: jasmine.Spy;
+
+  const runtimeSettingsResponse = (): RuntimeSettingsResponse => ({
+    schema_version: 1,
+    nominatim: { base_url: 'https://nominatim.example/search', user_agent: 'AEGIS-test', timeout: 10 },
+    geospatial: { min_timeline_year: 1900, max_lat: 90, min_lat: -90, max_lon: 180, min_lon: -180, max_mercator_extent: 20037508 },
+    map: { default_size_m: 500, render_delay_s: 1, tiles: 'OpenStreetMap' },
+    jobs: { polling_interval: 1 },
+    chat: { max_history_messages: 12, application_timezone: 'UTC' },
+    openmeteo: { weather_base_url: 'https://weather.example', air_quality_base_url: 'https://air.example', user_agent: 'AEGIS-test', timeout: 15, cache_ttl_s: 600, min_call_interval_s: 0.15 },
+    overpass: { base_url: 'https://overpass.example', user_agent: 'AEGIS-test', timeout: 20, cache_ttl_s: 600, min_call_interval_s: 0.2, default_radius_m: 2500, default_limit: 30 },
+    rainviewer: { metadata_url: 'https://rain.example', user_agent: 'AEGIS-test', timeout: 15, cache_ttl_s: 300, min_call_interval_s: 0.2, tile_color_scheme: 2, tile_smooth: 1, tile_snow: 1 },
+    gibs: {
+      user_agent: 'AEGIS-test', timeout: 20, capabilities_ttl_s: 21600, max_cache_entries: 24, bbox_precision: 6,
+      wms_base_endpoints: { 'EPSG:3857': 'https://gibs.example/3857', 'EPSG:4326': 'https://gibs.example/4326' },
+      retry_backoff_s: 2, min_visual_radius_m: 20000, image_width: 1024, image_height: 1024,
+      default_layer: 'VIIRS', capabilities_endpoints: { 'EPSG:4326': 'https://gibs.example/4326-cap' },
+      ows_namespaces: { ows: 'https://ows.example' }, layer_sync_user_agent: 'AEGIS-test', layer_sync_timeout: 30,
+    },
+    agent_execution: {
+      initial_run_seconds: 90, simple_seconds: 150, complex_seconds: 300, context_assembly_seconds: 5,
+      native_model_call_seconds: 60, tool_execution_seconds: 45, tool_absolute_seconds: 90, map_assembly_seconds: 20,
+      persistence_seconds: 5, render_ack_seconds: 90, max_tool_result_chars: 4096, max_iterations: 12,
+      max_render_attempts: 3, max_discovery_attempts: 2, max_no_progress_corrections: 2, simple_max_model_calls: 4, complex_max_model_calls: 10,
+      simple_max_tool_calls: 6, complex_max_tool_calls: 20, simple_max_state_transitions: 32,
+      complex_max_state_transitions: 64, max_parallel_tool_calls: 8, max_consecutive_tool_failures: 3,
+      max_same_failed_fingerprint: 2, max_route_corrections: 1, max_validation_corrections: 2,
+      model_max_attempts: 2, provider_max_attempts: 2, retry_backoff_base_seconds: 0.25,
+      retry_backoff_max_seconds: 2, provider_request_seconds: 10,
+      vision_policy: 'disabled', vision_max_calls: 2,
+    },
+    restart_required: false,
+    message: null,
+  });
 
   beforeEach(async () => {
     store = jasmine.createSpyObj<AppStateStoreService>('AppStateStoreService', ['getSettingsPage', 'updateSettingsPage']);
@@ -44,6 +82,9 @@ describe('pages/settings-page.component', () => {
       'checkOllamaHealth',
       'refreshOllamaModels',
       'pullOllamaModel',
+      'fetchGeospatialProviderAccountSetups',
+      'fetchRuntimeSettings',
+      'updateRuntimeSettings',
     ]);
     fetchChatSettingsMock = jasmine.createSpy('fetchChatSettings').and.resolveTo({
       active_provider_mode: 'cloud',
@@ -65,6 +106,9 @@ describe('pages/settings-page.component', () => {
     checkOllamaHealthMock = jasmine.createSpy('checkOllamaHealth').and.resolveTo({ ok: true, detail: 'ok' });
     refreshOllamaModelsMock = jasmine.createSpy('refreshOllamaModels').and.resolveTo({});
     pullOllamaModelMock = jasmine.createSpy('pullOllamaModel').and.resolveTo({});
+    fetchGeospatialProviderAccountSetupsMock = jasmine.createSpy('fetchGeospatialProviderAccountSetups').and.resolveTo({ providers: [] });
+    fetchRuntimeSettingsMock = jasmine.createSpy('fetchRuntimeSettings').and.resolveTo(runtimeSettingsResponse());
+    updateRuntimeSettingsMock = jasmine.createSpy('updateRuntimeSettings').and.callFake(async () => runtimeSettingsResponse());
 
     apiClient.fetchChatSettings.and.callFake(() => fetchChatSettingsMock());
     apiClient.fetchChatModels.and.callFake((provider) => fetchChatModelsMock(provider));
@@ -72,6 +116,9 @@ describe('pages/settings-page.component', () => {
     apiClient.checkOllamaHealth.and.callFake(() => checkOllamaHealthMock());
     apiClient.refreshOllamaModels.and.callFake(() => refreshOllamaModelsMock());
     apiClient.pullOllamaModel.and.callFake((model) => pullOllamaModelMock(model));
+    apiClient.fetchGeospatialProviderAccountSetups.and.callFake(() => fetchGeospatialProviderAccountSetupsMock());
+    apiClient.fetchRuntimeSettings.and.callFake(() => fetchRuntimeSettingsMock());
+    apiClient.updateRuntimeSettings.and.callFake((payload) => updateRuntimeSettingsMock(payload));
 
     await TestBed.configureTestingModule({
       imports: [SettingsPageComponent],
@@ -85,13 +132,13 @@ describe('pages/settings-page.component', () => {
     router = TestBed.inject(Router);
   });
 
-  it('parses initial query params', () => {
+  it('parses only the UI catalog query params', () => {
     window.history.replaceState({}, '', '/settings?q=gpt&mode=cloud');
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
     expect(component.searchText).toBe('gpt');
-    expect(component.providerMode).toBe('cloud');
+    expect(component.settings.active_provider_mode).toBe('cloud');
   });
 
   it('loadData success and failure paths', async () => {
@@ -471,32 +518,69 @@ describe('pages/settings-page.component', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
-    component.openaiKey = 'bad-openai-key';
-    component.googleKey = 'bad-google-key';
-    component.deepseekKey = 'bad-deepseek-key';
-    await component.saveKeys();
+    component.setCloudCredentialValue('openai', 'bad-openai-key');
+    component.setCloudCredentialValue('google', 'bad-google-key');
+    component.setCloudCredentialValue('deepseek', 'bad-deepseek-key');
+    await component.saveCloudProvider('openai');
+    await component.saveCloudProvider('google');
+    await component.saveCloudProvider('deepseek');
     expect(component.keyValidationErrors.openai).toContain('sk-');
     expect(component.keyValidationErrors.google).toContain('AIza');
     expect(component.keyValidationErrors.deepseek).toContain('sk-');
   });
 
-  it('save keys success and failure', async () => {
+  it('saves one model-provider credential through the shared settings owner', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
-    component.openaiKey = 'sk-valid-openai-key-12345';
-    component.deepseekKey = 'sk-valid-deepseek-key-12345';
-    await component.saveKeys();
-    expect(component.statusText).toContain('API keys saved');
+    const updated = {
+      ...component.settings,
+      credentials: { 'opencode-go': { api_key: true } },
+      credential_health: { 'opencode-go': { api_key: 'healthy' } },
+    };
+    updateChatSettingsMock.and.resolveTo(updated);
+    component.opencodeGoKey = 'go-secret-value-12345';
+
+    await component.saveCloudProvider('opencode-go');
 
     const payload = updateChatSettingsMock.calls.mostRecent().args[0];
-    expect(payload.credentials.deepseek.api_key).toBe('sk-valid-deepseek-key-12345');
+    expect(payload.credentials).toEqual({ 'opencode-go': { api_key: 'go-secret-value-12345' } });
+    expect(payload.credential_health).toBeUndefined();
+    expect(component.settings.credentials['opencode-go']?.api_key).toBeTrue();
+    expect(component.opencodeGoKey).toBe('');
+    expect(component.modelProviderHealth('opencode-go')).toContain('readable');
+  });
 
-    updateChatSettingsMock.and.rejectWith(new Error('fail'));
-    component.openaiKey = 'sk-valid-openai-key-12345';
-    await component.saveKeys();
-    expect(component.statusText).toContain('Could not save API keys right now.');
+  it('requires an explicit clear action and treats a blank draft as no replacement', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    const configured = {
+      ...component.settings,
+      credentials: { 'opencode-go': { api_key: true } },
+      credential_health: { 'opencode-go': { api_key: 'healthy' } },
+    };
+    component.settings = configured;
+    component.opencodeGoKey = '  ';
+    const updateCallsBeforeBlankSave = updateChatSettingsMock.calls.count();
+
+    await component.saveCloudProvider('opencode-go');
+
+    expect(updateChatSettingsMock.calls.count()).toBe(updateCallsBeforeBlankSave);
+    expect(component.keyValidationErrors['opencode-go']).toContain('Clear saved key');
+
+    updateChatSettingsMock.and.resolveTo({
+      ...configured,
+      credentials: {},
+      credential_health: {},
+    });
+    await component.clearCloudProvider('opencode-go');
+
+    const clearPayload = updateChatSettingsMock.calls.mostRecent().args[0];
+    expect(clearPayload.credentials).toEqual({ 'opencode-go': { api_key: '' } });
+    expect(component.settings.credentials['opencode-go']).toBeUndefined();
   });
 
   it('saveOllamaSettings sends a sanitized update payload', async () => {
@@ -524,7 +608,7 @@ describe('pages/settings-page.component', () => {
     expect(payload.credential_health).toBeUndefined();
   });
 
-  it('reports unreadable credential health in API key modal state', async () => {
+  it('reports unreadable credential health in model provider state', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',
       agent_model_provider: 'openai',
@@ -540,7 +624,7 @@ describe('pages/settings-page.component', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    expect(fixture.componentInstance.openAiCredentialHealth()).toBe('unreadable');
+    expect(fixture.componentInstance.credentialHealthForTemplate('openai')).toBe('unreadable');
   });
 
   it('Ollama health success and degraded failure message formatting', async () => {
@@ -550,10 +634,12 @@ describe('pages/settings-page.component', () => {
     const component = fixture.componentInstance;
     await component.checkOllamaConnection();
     expect(component.statusText).toContain('Ollama:');
+    expect(fixture.nativeElement.textContent).toContain('Connection is healthy.');
 
     checkOllamaHealthMock.and.rejectWith(new Error('connection refused'));
     await component.checkOllamaConnection();
     expect(component.statusText).toContain('Unable to reach Ollama');
+    expect(fixture.nativeElement.textContent).toContain('Unable to reach Ollama');
   });
 
   it('refresh library and pull model flows update status', async () => {
@@ -597,7 +683,7 @@ describe('pages/settings-page.component', () => {
     component.setSearchText('gpt');
     await fixture.whenStable();
     expect(window.location.pathname).toBe('/settings');
-    expect(window.location.search).toBe('?q=gpt&mode=cloud');
+    expect(window.location.search).toBe('?q=gpt');
     expect(store.updateSettingsPage).toHaveBeenCalled();
   });
 
@@ -610,12 +696,117 @@ describe('pages/settings-page.component', () => {
     expect(input?.getAttribute('aria-label')).toBe('Search models');
   });
 
+  it('gives credential fields unique label associations', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance.activeSection = 'model-providers';
+    fixture.detectChanges();
+
+    const inputs = Array.from(fixture.nativeElement.querySelectorAll('input[type="password"]')) as HTMLInputElement[];
+    const ids = inputs.map((input) => input.id);
+    expect(ids.length).toBeGreaterThan(0);
+    expect(new Set(ids).size).toBe(ids.length);
+    ids.forEach((id) => {
+      expect(fixture.nativeElement.querySelector(`label[for="${id}"]`)).not.toBeNull();
+    });
+  });
+
   it('renders model cards through the extracted model card component host', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('article.model-card').length).toBeGreaterThan(0);
+  });
+
+  it('normalizes the Settings query and exposes the persistent sidebar sections', async () => {
+    window.history.replaceState({}, '', '/settings?tab=unknown');
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const sections = Array.from(fixture.nativeElement.querySelectorAll('.settings-sidebar__item')) as HTMLButtonElement[];
+    expect(fixture.componentInstance.activeSection).toBe('models');
+    expect(sections).toHaveSize(7);
+    expect(sections[0].getAttribute('aria-current')).toBe('page');
+    expect(fixture.nativeElement.querySelector('[role="tab"]')).toBeNull();
+  });
+
+  it('moves Settings sections with clicks and router history', async () => {
+    window.history.replaceState({}, '', '/settings');
+    const navigateSpy = spyOn(router, 'navigateByUrl').and.resolveTo(true);
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const sections = Array.from(fixture.nativeElement.querySelectorAll('.settings-sidebar__item')) as HTMLButtonElement[];
+    sections[1].click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.activeSection).toBe('model-providers');
+    expect(navigateSpy).toHaveBeenCalledWith('/settings?tab=model-providers');
+
+    sections[6].click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.activeSection).toBe('agent-runtime');
+    expect(navigateSpy).toHaveBeenCalledWith('/settings?tab=agent-runtime');
+  });
+
+  it('restores the active Settings section when browser history changes the URL', async () => {
+    window.history.replaceState({}, '', '/settings?tab=agent-runtime');
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.activeSection).toBe('agent-runtime');
+
+    window.history.pushState({}, '', '/settings?tab=data-sources');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.activeSection).toBe('data-sources');
+    const activeButton = fixture.nativeElement.querySelector(
+      '.settings-sidebar__item[aria-current="page"]',
+    ) as HTMLButtonElement | null;
+    expect(activeButton?.textContent?.trim()).toBe('Data Sources');
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('renders manifest-driven geospatial access providers in the shared Settings page', async () => {
+    fetchGeospatialProviderAccountSetupsMock.and.resolveTo({
+      providers: [{
+        providerId: 'tomtom',
+        name: 'TomTom',
+        requiresCredentials: true,
+        authMode: 'api-key',
+        docsUrl: 'https://developer.tomtom.com/',
+        configured: false,
+        instructions: ['Create a key in the provider portal.'],
+        automation: {
+          support: 'manual_only',
+          signupUrl: 'https://developer.tomtom.com/',
+          developerPortalUrl: 'https://developer.tomtom.com/',
+          docsUrl: 'https://developer.tomtom.com/',
+          requiredFields: [],
+          userActionNotes: ['Paste the key back into AEGIS.'],
+          safetyNotes: ['AEGIS never collects provider passwords.'],
+          experimental: true,
+          experimentalLabel: 'Manual setup guidance',
+        },
+        credentialStorageKey: 'tomtom',
+        credentialLabel: 'api_key',
+        keyFormatHint: 'TomTom API key',
+        validationSupported: true,
+      }],
+    });
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance.activeSection = 'geospatial-access';
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('TomTom');
+    expect(fixture.nativeElement.textContent).toContain('Save key');
+    expect(fixture.nativeElement.querySelector('input[type="password"]')).not.toBeNull();
   });
 
   it('navigateBack preserves state before routing', async () => {
@@ -626,5 +817,15 @@ describe('pages/settings-page.component', () => {
     fixture.componentInstance.navigateBack();
     expect(store.updateSettingsPage).toHaveBeenCalled();
     expect(navigateSpy).toHaveBeenCalledWith('/');
+  });
+  it('saves only changed execution fields and restores defaults in the draft', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance.runtimeSettingsDraft.agent_execution.max_discovery_attempts = 5;
+    await fixture.componentInstance.saveRuntimeSettings();
+    expect(updateRuntimeSettingsMock).toHaveBeenCalledWith({agent_execution: {max_discovery_attempts: 5}});
+    fixture.componentInstance.restoreAgentExecutionDefaults();
+    expect(fixture.componentInstance.runtimeSettingsDraft.agent_execution.max_discovery_attempts).toBe(2);
   });
 });

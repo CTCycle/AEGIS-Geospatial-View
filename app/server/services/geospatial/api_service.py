@@ -1,39 +1,76 @@
 from __future__ import annotations
 
-import os
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 from collections.abc import Iterator
 from datetime import datetime
-from typing import Any
-from urllib.parse import quote
+import logging
+import math
+from typing import Any, TypeGuard
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
-from server.domain.geographics import (
+from server.contracts.geospatial import (
     GeospatialProviderLayerResponse,
     GeospatialProviderLayersResponse,
     LayerAuditReport,
 )
+from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.catalog import GeospatialCatalogService
+from server.services.geospatial.credential_resolver import (
+    GeospatialCredentialResolutionError,
+    GeospatialCredentialResolver,
+)
 from server.services.geospatial.layer_auditor import audit_all_manifests
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.provider_registry import (
     ProviderNotRegisteredError,
+    ProviderRegistryError,
     ProviderRegistry,
 )
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
     ProviderCircuitOpenError,
     ProviderError,
+    ProviderInvalidQueryError,
+    ProviderMalformedPayloadError,
     ProviderRateLimitError,
     ProviderRequest,
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
-from server.services.geospatial.providers.http import fetch_bytes_url
+from server.services.geospatial.providers.http import (
+    RasterHttpError,
+    fetch_raster_image_url,
+    raster_diagnostic_scope,
+)
+from server.services.geospatial.rainviewer import (
+    RainViewerRequestError,
+    RainViewerService,
+)
 from server.services.geospatial.providers.tomtom import build_tomtom_tile_url
+from server.services.geospatial.raster_tiles import (
+    RasterTileTemplateError,
+    build_wms_get_map_url,
+    build_wmts_get_tile_url,
+    materialize_tile_template,
+    validate_tile_coordinates,
+)
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-CAMERA_PROVIDER_ALIASES = {
-    "windy": "windy_webcams",
-}
+LOGGER = logging.getLogger(__name__)
+
+_SENSITIVE_TILE_QUERY_MARKERS = (
+    "api_key",
+    "apikey",
+    "authorization",
+    "credential",
+    "password",
+    "secret",
+    "token",
+)
+
+_FEMA_RELAY_HOST = "hazards-fema.maps.arcgis.com"
+_FEMA_RELAY_PATH = "/sharing/proxy"
 
 ###############################################################################
 class GeospatialApiServiceError(Exception):
@@ -42,6 +79,10 @@ class GeospatialApiServiceError(Exception):
 ###############################################################################
 class GeospatialCapabilityNotFoundError(GeospatialApiServiceError):
     """Raised when a requested manifest capability does not exist."""
+
+###############################################################################
+class GeospatialCapabilityDisabledError(GeospatialApiServiceError):
+    """Raised when a manifest capability is disabled for this deployment."""
 
 ###############################################################################
 class GeospatialInvalidRequestError(GeospatialApiServiceError):
@@ -60,24 +101,156 @@ class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
 
 ###############################################################################
+class GeospatialProviderResponseError(GeospatialApiServiceError):
+    """Raised when a provider result cannot be exposed as GeoJSON."""
+
+    # -------------------------------------------------------------------------
+    def __init__(self, message: str, *, error_code: str, status_code: int) -> None:
+        super().__init__(message)
+        self.error_code = error_code
+        self.status_code = status_code
+
+###############################################################################
 def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
-    if isinstance(value, dict) and value.get("type") == "FeatureCollection":
+    if not is_json_object(value):
+        raise GeospatialProviderResponseError(
+            "Provider returned a non-object GeoJSON payload.",
+            error_code="malformed_response",
+            status_code=502,
+        )
+    if value.get("type") == "FeatureCollection":
         features = value.get("features")
-        return {
-            "type": "FeatureCollection",
-            "features": features if isinstance(features, list) else [],
-        }
-    if isinstance(value, dict) and value.get("type") == "Feature":
-        return {
-            "type": "FeatureCollection",
-            "features": [value],
-        }
-    if isinstance(value, dict) and isinstance(value.get("features"), list):
-        return {
-            "type": "FeatureCollection",
-            "features": value["features"],
-        }
-    return {"type": "FeatureCollection", "features": []}
+    elif value.get("type") == "Feature":
+        features = [value]
+    else:
+        features = value.get("features")
+    if not is_json_array(features):
+        raise GeospatialProviderResponseError(
+            "Provider returned a GeoJSON payload without a features array.",
+            error_code="malformed_response",
+            status_code=502,
+        )
+    return {
+        "type": "FeatureCollection",
+        "features": [_normalize_geojson_feature(item) for item in json_array(features)],
+    }
+
+###############################################################################
+def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
+    if not is_json_object(value):
+        raise GeospatialProviderResponseError(
+            "Provider returned a non-object feature.",
+            error_code="malformed_response",
+            status_code=502,
+        )
+    if value.get("type") == "Feature":
+        geometry = value.get("geometry")
+        if is_json_object(geometry) and _valid_geojson_geometry(geometry):
+            return dict(value)
+        raise GeospatialProviderResponseError(
+            "Provider returned a feature with invalid geometry.",
+            error_code="malformed_response",
+            status_code=502,
+        )
+    latitude = value.get("latitude")
+    longitude = value.get("longitude")
+    if (
+        not _valid_latitude(latitude)
+        or not _valid_longitude(longitude)
+    ):
+        raise GeospatialProviderResponseError(
+            "Provider feature is missing GeoJSON geometry or numeric coordinates.",
+            error_code="malformed_response",
+            status_code=502,
+        )
+    properties = dict(value)
+    properties.pop("id", None)
+    properties.pop("latitude", None)
+    properties.pop("longitude", None)
+    properties.pop("geometry", None)
+    properties.pop("type", None)
+    return {
+        "type": "Feature",
+        **({"id": value["id"]} if value.get("id") is not None else {}),
+        "geometry": {
+            "type": "Point",
+            "coordinates": [float(longitude), float(latitude)],
+        },
+        "properties": properties,
+    }
+
+###############################################################################
+def _valid_latitude(value: object) -> TypeGuard[int | float]:
+    return (
+        isinstance(value, int | float)
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+        and -90.0 <= float(value) <= 90.0
+    )
+
+###############################################################################
+def _valid_longitude(value: object) -> TypeGuard[int | float]:
+    return (
+        isinstance(value, int | float)
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+        and -180.0 <= float(value) <= 180.0
+    )
+
+###############################################################################
+def _valid_geojson_geometry(value: dict[str, Any]) -> bool:
+    geometry_type = value.get("type")
+    if geometry_type == "GeometryCollection":
+        geometries = value.get("geometries")
+        return is_json_array(geometries) and all(
+            is_json_object(item) and _valid_geojson_geometry(item)
+            for item in geometries
+        )
+    if geometry_type not in {
+        "Point",
+        "MultiPoint",
+        "LineString",
+        "MultiLineString",
+        "Polygon",
+        "MultiPolygon",
+    }:
+        return False
+    return _valid_coordinate_array(value.get("coordinates"))
+
+###############################################################################
+def _valid_coordinate_array(value: object) -> bool:
+    if not is_json_array(value) or not value:
+        return False
+    if all(
+        isinstance(item, int | float) and not isinstance(item, bool)
+        for item in value
+    ):
+        return (
+            len(value) >= 2
+            and _valid_longitude(value[0])
+            and _valid_latitude(value[1])
+        )
+    return all(_valid_coordinate_array(item) for item in value)
+
+###############################################################################
+def _provider_response_error(
+    payload: dict[str, Any],
+) -> GeospatialProviderResponseError:
+    error_code = str(payload.get("error_code") or "provider_unavailable")
+    error_status = {
+        "auth_required": 401,
+        "rate_limited": 429,
+        "invalid_query": 400,
+        "malformed_response": 502,
+        "provider_unavailable": 502,
+    }
+    if error_code not in error_status:
+        error_code = "provider_unavailable"
+    return GeospatialProviderResponseError(
+        str(payload.get("message") or "Provider did not return a renderable response."),
+        error_code=error_code,
+        status_code=error_status[error_code],
+    )
 
 ###############################################################################
 class GeospatialApiService:
@@ -86,15 +259,26 @@ class GeospatialApiService:
     def __init__(
         self,
         *,
-        catalog_service: GeospatialCatalogService | None = None,
+        catalog_service: GeospatialCatalogService,
+        catalog_snapshot: GeospatialManifestSnapshot | None = None,
         manifest_loader: GeospatialManifestLoader | None = None,
-        runtime_registry: RuntimeRegistry | None = None,
-        provider_registry: ProviderRegistry | None = None,
+        runtime_registry: RuntimeRegistry,
+        provider_registry: ProviderRegistry,
+        credential_resolver: GeospatialCredentialResolver | None = None,
+        rainviewer_service: RainViewerService | None = None,
     ) -> None:
-        self.catalog_service = catalog_service or GeospatialCatalogService()
-        self.manifest_loader = manifest_loader or GeospatialManifestLoader()
-        self.runtime_registry = runtime_registry or RuntimeRegistry()
-        self.provider_registry = provider_registry or ProviderRegistry()
+        self.catalog_service = catalog_service
+        loader = manifest_loader or GeospatialManifestLoader()
+        self.catalog_snapshot = (
+            catalog_snapshot
+            or GeospatialManifestSnapshot.from_payload(loader.load_all())
+        )
+        self.runtime_registry = runtime_registry
+        self.provider_registry = provider_registry
+        self.credential_resolver = (
+            credential_resolver or runtime_registry.credential_resolver
+        )
+        self.rainviewer_service = rainviewer_service or RainViewerService()
 
     # -------------------------------------------------------------------------
     def list_capabilities(self) -> dict[str, list[dict[str, Any]]]:
@@ -114,11 +298,16 @@ class GeospatialApiService:
     def get_layer_health(self, layer_id: str) -> dict[str, Any]:
         manifest = self._manifest_by_id(layer_id)
         reliability = manifest.get("reliability")
+        available = self.runtime_registry.is_enabled(
+            layer_id
+        ) and self.runtime_registry.access_available(layer_id)
         return {
             "id": layer_id,
             "provider": manifest.get("provider"),
-            "reliability": reliability if isinstance(reliability, dict) else {},
+            "reliability": json_object(reliability),
             "runtime": self.runtime_registry.provider_health(layer_id),
+            "available": available,
+            "availability_reason": self.runtime_registry.availability_reason(layer_id),
         }
 
     # -------------------------------------------------------------------------
@@ -130,7 +319,6 @@ class GeospatialApiService:
         limit: int,
         refresh: bool,
     ) -> GeospatialProviderLayersResponse:
-        self.provider_registry.build_from_manifests()
         try:
             layers = await self.provider_registry.list_layers(
                 provider_id,
@@ -140,7 +328,12 @@ class GeospatialApiService:
             )
         except ProviderNotRegisteredError as exc:
             raise GeospatialCapabilityNotFoundError(str(exc)) from exc
-        except (ProviderUnavailableError, ProviderTimeoutError, ProviderCircuitOpenError, ProviderError) as exc:
+        except (
+            ProviderUnavailableError,
+            ProviderTimeoutError,
+            ProviderCircuitOpenError,
+            ProviderError,
+        ) as exc:
             raise GeospatialTileRequestError(str(exc)) from exc
         return GeospatialProviderLayersResponse(provider=provider_id, layers=layers)
 
@@ -152,7 +345,6 @@ class GeospatialApiService:
         *,
         refresh: bool,
     ) -> GeospatialProviderLayerResponse:
-        self.provider_registry.build_from_manifests()
         try:
             layer = await self.provider_registry.describe_layer(
                 provider_id,
@@ -161,7 +353,12 @@ class GeospatialApiService:
             )
         except ProviderNotRegisteredError as exc:
             raise GeospatialCapabilityNotFoundError(str(exc)) from exc
-        except (ProviderUnavailableError, ProviderTimeoutError, ProviderCircuitOpenError, ProviderError) as exc:
+        except (
+            ProviderUnavailableError,
+            ProviderTimeoutError,
+            ProviderCircuitOpenError,
+            ProviderError,
+        ) as exc:
             raise GeospatialTileRequestError(str(exc)) from exc
         return GeospatialProviderLayerResponse(provider=provider_id, layer=layer)
 
@@ -177,8 +374,16 @@ class GeospatialApiService:
         incidents: bool,
     ) -> dict[str, Any]:
         manifest = self._manifest_by_id(layer_id)
+        if not self.runtime_registry.is_enabled(layer_id):
+            raise GeospatialCapabilityDisabledError(
+                self.runtime_registry.availability_reason(layer_id)
+                or "Capability is disabled."
+            )
         provider_id = str(manifest.get("provider") or "")
         params: dict[str, Any] = {}
+        metadata = json_object(manifest.get("metadata"))
+        if metadata:
+            params["metadata"] = metadata
         if live:
             params["live"] = True
         if incidents:
@@ -212,14 +417,19 @@ class GeospatialApiService:
             incidents=incidents,
         )
         if payload.get("status") != "ok":
-            return {"type": "FeatureCollection", "features": []}
+            raise _provider_response_error(payload)
         return normalize_geojson_feature_collection(payload.get("payload"))
 
     # -------------------------------------------------------------------------
     async def fetch_tomtom_tile(self, kind: str, z: int, x: int, y: int) -> bytes:
-        if kind not in {"basic", "traffic-flow"}:
+        if kind != "traffic-flow":
             raise GeospatialUnsupportedTileError("Unsupported TomTom tile type.")
-        api_key = os.getenv("TOMTOM_API_KEY", "").strip()
+        try:
+            api_key = self.credential_resolver.resolve("tomtom", mark_used=True)
+        except GeospatialCredentialResolutionError as exc:
+            raise GeospatialTileCredentialError(
+                "TomTom credentials are saved but cannot be used."
+            ) from exc
         if not api_key:
             raise GeospatialTileCredentialError("TomTom API key is required.")
         url = build_tomtom_tile_url(kind, z, x, y, api_key)
@@ -229,6 +439,12 @@ class GeospatialApiService:
             raise GeospatialTileCredentialError(
                 "TomTom rejected the configured API key."
             ) from exc
+        except RasterHttpError as exc:
+            if exc.diagnostic.category == "authentication_rejected":
+                raise GeospatialTileCredentialError(
+                    "TomTom rejected the configured API key."
+                ) from exc
+            raise GeospatialTileRequestError("TomTom tile request failed.") from exc
         except (ProviderTimeoutError, ProviderUnavailableError) as exc:
             raise GeospatialTileRequestError("TomTom tile request failed.") from exc
 
@@ -239,34 +455,64 @@ class GeospatialApiService:
         z: int,
         x: int,
         y: int,
+        time: str | None = None,
     ) -> bytes:
-        manifest = self._manifest_by_id(capability_id)
-        metadata = manifest.get("metadata") if isinstance(manifest.get("metadata"), dict) else {}
-        template = str(
-            metadata.get("tile_url_template")
-            or metadata.get("url_template")
-            or metadata.get("tile_url")
-            or metadata.get("url")
-            or ""
-        ).strip()
-        if not template:
-            raise GeospatialUnsupportedTileError("Tile URL is missing from provider metadata.")
+        try:
+            validate_tile_coordinates(z, x, y)
+        except RasterTileTemplateError as exc:
+            raise GeospatialInvalidRequestError(str(exc)) from exc
+
+        manifest = self._tile_manifest_by_id(capability_id)
+        metadata = json_object(manifest.get("metadata"))
         provider = str(manifest.get("provider") or "").strip().lower()
-        upstream_url = self._resolve_credentialed_tile_template(
-            template=template,
-            provider=provider,
-            capability_id=capability_id,
-            z=z,
-            x=x,
-            y=y,
+        requested_time = self._normalize_tile_time(time)
+        try:
+            upstream_url = await self._resolve_capability_tile_url(
+                manifest=manifest,
+                metadata=metadata,
+                provider=provider,
+                capability_id=capability_id,
+                z=z,
+                x=x,
+                y=y,
+                requested_time=requested_time,
+            )
+        except RasterTileTemplateError as exc:
+            raise GeospatialUnsupportedTileError(
+                f"Capability '{capability_id}' does not expose a complete tile request."
+            ) from exc
+        relay = self._relay_config(metadata)
+        fetch_headers: dict[str, str] | None = None
+        if relay is not None:
+            upstream_url = f"{relay['base_url']}?{upstream_url}"
+            fetch_headers = relay["required_headers"]
+        LOGGER.info(
+            "geospatial_tile_proxy provider=%s capability=%s upstream=%s relay=%s",
+            provider or "unknown",
+            capability_id,
+            self._sanitize_tile_url(upstream_url),
+            "yes" if relay is not None else "no",
         )
         try:
-            return await self._fetch_binary_url(upstream_url)
+            with raster_diagnostic_scope(
+                provider_id=provider or "unknown",
+                capability_id=capability_id,
+            ):
+                return await self._fetch_binary_url(upstream_url, headers=fetch_headers)
         except ProviderAuthError as exc:
             raise GeospatialTileCredentialError(
                 f"{self._humanize_provider(provider)} rejected the configured credentials."
             ) from exc
-        except (ProviderTimeoutError, ProviderUnavailableError) as exc:
+        except RasterHttpError as exc:
+            self._log_raster_failure(exc)
+            if exc.diagnostic.category == "authentication_rejected":
+                raise GeospatialTileCredentialError(
+                    f"{self._humanize_provider(provider)} rejected the configured credentials."
+                ) from exc
+            raise GeospatialTileRequestError(
+                f"{self._humanize_provider(provider)} tile request failed."
+            ) from exc
+        except ProviderError as exc:
             raise GeospatialTileRequestError(
                 f"{self._humanize_provider(provider)} tile request failed."
             ) from exc
@@ -304,7 +550,7 @@ class GeospatialApiService:
             camera_type=camera_type,
         )
         if payload.get("status") != "ok":
-            return {"type": "FeatureCollection", "features": []}
+            raise _provider_response_error(payload)
         return normalize_geojson_feature_collection(payload.get("payload"))
 
     # -------------------------------------------------------------------------
@@ -325,10 +571,10 @@ class GeospatialApiService:
                     or "Camera detail lookup is not available.",
                 }
             payload = listing.get("payload")
-            features = payload.get("features") if isinstance(payload, dict) else None
-            if isinstance(features, list):
+            features = payload.get("features") if is_json_object(payload) else None
+            if is_json_array(features):
                 for feature in features:
-                    if not isinstance(feature, dict):
+                    if not is_json_object(feature):
                         continue
                     feature_id = str(feature.get("id") or "")
                     if feature_id in {camera_id, provider_camera_id}:
@@ -350,13 +596,11 @@ class GeospatialApiService:
 
     # -------------------------------------------------------------------------
     def get_credential_status(self, provider_id: str) -> dict[str, Any]:
-        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider_id)
-        configured = bool(env_name and os.getenv(env_name, "").strip())
+        configured = self.credential_resolver.is_configured(provider_id)
         return {
             "provider": provider_id,
             "required": self._provider_requires_credentials(provider_id),
             "configured": configured,
-            "environmentVariable": env_name,
         }
 
     # -------------------------------------------------------------------------
@@ -388,7 +632,6 @@ class GeospatialApiService:
 
     # -------------------------------------------------------------------------
     def _manifest_by_id(self, capability_id: str) -> dict[str, Any]:
-        payload = self.manifest_loader.load_all()
         collection_names = (
             "basemaps",
             "overlays",
@@ -398,7 +641,7 @@ class GeospatialApiService:
             "providers",
         )
         for collection_name in collection_names:
-            for item in payload.get(collection_name) or []:
+            for item in getattr(self.catalog_snapshot, collection_name):
                 if str(item.get("id") or "") == capability_id:
                     return dict(item)
         raise GeospatialCapabilityNotFoundError(
@@ -406,10 +649,273 @@ class GeospatialApiService:
         )
 
     # -------------------------------------------------------------------------
+    def _tile_manifest_by_id(self, capability_id: str) -> dict[str, Any]:
+        try:
+            return self._manifest_by_id(capability_id)
+        except GeospatialCapabilityNotFoundError:
+            prefix = "gibs:"
+            layer_id = capability_id[len(prefix) :] if capability_id.startswith(prefix) else ""
+            if not layer_id or not all(
+                character.isalnum() or character in "_-." for character in layer_id
+            ):
+                raise
+            return {
+                "id": capability_id,
+                "provider": "gibs",
+                "type": "provider-layer",
+                "renderingMode": "provider",
+                "metadata": {"layer_id": layer_id},
+            }
+
+    # -------------------------------------------------------------------------
+    async def _resolve_capability_tile_url(
+        self,
+        *,
+        manifest: dict[str, Any],
+        metadata: dict[str, Any],
+        provider: str,
+        capability_id: str,
+        z: int,
+        x: int,
+        y: int,
+        requested_time: str | None,
+    ) -> str:
+        if provider == "gibs":
+            layer_id = str(
+                metadata.get("layer_id")
+                or metadata.get("layers")
+                or capability_id.removeprefix("gibs:")
+            ).strip()
+            return await self._resolve_gibs_tile_url(
+                layer_id=layer_id,
+                z=z,
+                x=x,
+                y=y,
+                requested_time=requested_time,
+            )
+
+        if provider == "rainviewer":
+            if requested_time is not None:
+                raise GeospatialUnsupportedTileError(
+                    "RainViewer exposes the latest observed radar frame only."
+                )
+            if z > RainViewerService.MAX_TILE_ZOOM:
+                raise GeospatialUnsupportedTileError(
+                    "RainViewer public tiles are limited to zoom 7."
+                )
+            try:
+                radar_metadata = await self.rainviewer_service.get_latest_radar_metadata()
+            except RainViewerRequestError as exc:
+                raise GeospatialTileRequestError(
+                    "RainViewer radar metadata is unavailable."
+                ) from exc
+            tile_template = str(
+                radar_metadata.get("tile_url_template") or ""
+            ).strip()
+            if not tile_template:
+                raise GeospatialUnsupportedTileError(
+                    "RainViewer radar metadata has no tile URL."
+                )
+            return materialize_tile_template(tile_template, z, x, y)
+
+        template = str(
+            metadata.get("tile_url_template")
+            or metadata.get("url_template")
+            or metadata.get("tile_url")
+            or metadata.get("url")
+            or ""
+        ).strip()
+        if not template:
+            raise GeospatialUnsupportedTileError(
+                "Tile URL is missing from provider metadata."
+            )
+
+        rendering_mode = str(
+            manifest.get("renderingMode") or manifest.get("type") or ""
+        ).strip().lower()
+        source_protocol = str(metadata.get("source_protocol") or "").strip().lower()
+        if rendering_mode in {"wmts"} or source_protocol == "wmts":
+            return build_wmts_get_tile_url(
+                url=template,
+                layer_id=str(
+                    metadata.get("layer_id") or metadata.get("layers") or capability_id
+                ),
+                style=str(metadata.get("style") or metadata.get("wmts_style") or "default"),
+                image_format=str(
+                    metadata.get("format")
+                    or metadata.get("wmts_format")
+                    or "image/png"
+                ),
+                tile_matrix_set=str(
+                    metadata.get("tile_matrix_set") or "EPSG:3857"
+                ),
+                z=z,
+                x=x,
+                y=y,
+                time=requested_time
+                or self._optional_tile_time(
+                    metadata.get("time") or metadata.get("default_time")
+                ),
+            )
+        if rendering_mode == "wms" or source_protocol == "wms":
+            return build_wms_get_map_url(
+                url=template,
+                layer_id=str(
+                    metadata.get("layer_id") or metadata.get("layers") or capability_id
+                ),
+                crs=str(metadata.get("crs") or "EPSG:3857"),
+                image_format=str(
+                    metadata.get("format") or metadata.get("wms_format") or "image/png"
+                ),
+                style=str(metadata.get("style") or ""),
+                version=str(metadata.get("wms_version") or "1.1.1"),
+                exceptions=str(
+                    metadata.get("wms_exceptions")
+                    or "application/vnd.ogc.se_inimage"
+                ),
+                z=z,
+                x=x,
+                y=y,
+                time=requested_time
+                or self._optional_tile_time(
+                    metadata.get("time") or metadata.get("default_time")
+                ),
+            )
+        return self._resolve_credentialed_tile_template(
+            template=template,
+            provider=provider,
+            capability_id=capability_id,
+            z=z,
+            x=x,
+            y=y,
+        )
+
+    # -------------------------------------------------------------------------
+    async def _resolve_gibs_tile_url(
+        self,
+        *,
+        layer_id: str,
+        z: int,
+        x: int,
+        y: int,
+        requested_time: str | None,
+    ) -> str:
+        if not layer_id or not all(
+            character.isalnum() or character in "_-." for character in layer_id
+        ):
+            raise GeospatialUnsupportedTileError("NASA GIBS layer id is invalid.")
+        try:
+            layer = await self.provider_registry.describe_layer("gibs", layer_id)
+        except (ProviderNotRegisteredError, ProviderRegistryError, ProviderError) as exc:
+            raise GeospatialTileRequestError(
+                "NASA GIBS layer description is unavailable."
+            ) from exc
+        render = layer.render
+        if render is None:
+            raise GeospatialUnsupportedTileError(
+                f"NASA GIBS layer '{layer_id}' is not renderable."
+            )
+
+        effective_time = requested_time or render.time or render.default_time
+        rendering_mode = str(render.rendering_mode).strip().lower()
+        if rendering_mode == "wmts" and self._is_web_mercator_render(render):
+            if render.tile_url_template:
+                replacements = {"time": effective_time} if effective_time else {}
+                return materialize_tile_template(
+                    render.tile_url_template,
+                    z,
+                    x,
+                    y,
+                    replacements=replacements,
+                )
+            if render.url:
+                return build_wmts_get_tile_url(
+                    url=render.url,
+                    layer_id=render.layer_id,
+                    style=render.style or "default",
+                    image_format=render.format or "image/png",
+                    tile_matrix_set=render.tile_matrix_set or "EPSG:3857",
+                    z=z,
+                    x=x,
+                    y=y,
+                    time=effective_time,
+                )
+        if rendering_mode == "wms" and render.url:
+            return build_wms_get_map_url(
+                url=render.url,
+                layer_id=render.layer_id,
+                crs=render.crs or "EPSG:3857",
+                image_format=render.format or "image/png",
+                style=render.style or "",
+                version="1.3.0",
+                # 1.3.0 exception formats are XML/INIMAGE/BLANK.  XML keeps an
+                # upstream error from passing as a rendered PNG tile.
+                exceptions="XML",
+                z=z,
+                x=x,
+                y=y,
+                time=effective_time,
+            )
+        raise GeospatialUnsupportedTileError(
+            f"NASA GIBS layer '{layer_id}' has no compatible raster render descriptor."
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_web_mercator_render(render: Any) -> bool:
+        matrix_set = str(getattr(render, "tile_matrix_set", "") or "").upper()
+        crs = str(getattr(render, "crs", "") or "").upper()
+        return (
+            crs in {"EPSG:3857", "EPSG:900913"}
+            or matrix_set in {"EPSG:3857", "EPSG:900913"}
+            or "GOOGLEMAPSCOMPATIBLE" in matrix_set
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_tile_time(value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not normalized:
+            return None
+        if len(normalized) > 64 or not all(
+            character.isalnum() or character in "-:TZ+./_"
+            for character in normalized
+        ):
+            raise GeospatialInvalidRequestError("Raster time is invalid.")
+        return normalized
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _optional_tile_time(value: object) -> str | None:
+        return value.strip() if isinstance(value, str) and value.strip() else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _sanitize_tile_url(url: str) -> str:
+        parsed = urlsplit(url)
+        query: list[tuple[str, str]] = []
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True):
+            if any(
+                marker in key.casefold() for marker in _SENSITIVE_TILE_QUERY_MARKERS
+            ):
+                value = "[REDACTED]"
+            query.append((key, value))
+        return urlunsplit(
+            (
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                urlencode(query, doseq=True),
+                "",
+            )
+        )
+
+    # -------------------------------------------------------------------------
     async def _fetch_provider_payload(
         self, provider_id: str, request: ProviderRequest
     ) -> dict[str, Any]:
-        self.provider_registry.build_from_manifests()
         try:
             response = await self.provider_registry.fetch(provider_id, request)
         except ProviderAuthError as exc:
@@ -417,12 +923,28 @@ class GeospatialApiService:
                 "status": "missing-credential",
                 "provider": provider_id,
                 "message": str(exc),
+                "error_code": "auth_required",
             }
         except ProviderRateLimitError as exc:
             return {
                 "status": "rate-limited",
                 "provider": provider_id,
                 "message": str(exc),
+                "error_code": "rate_limited",
+            }
+        except ProviderInvalidQueryError as exc:
+            return {
+                "status": "invalid-query",
+                "provider": provider_id,
+                "message": str(exc),
+                "error_code": "invalid_query",
+            }
+        except ProviderMalformedPayloadError as exc:
+            return {
+                "status": "malformed-response",
+                "provider": provider_id,
+                "message": str(exc),
+                "error_code": "malformed_response",
             }
         except (
             ProviderNotRegisteredError,
@@ -435,14 +957,29 @@ class GeospatialApiService:
                 "status": "unavailable",
                 "provider": provider_id,
                 "message": str(exc),
+                "error_code": "provider_unavailable",
             }
+        fetched_at = getattr(response, "fetched_at", None)
+        if not isinstance(fetched_at, datetime):
+            fetched_at = datetime.now().astimezone()
+        units_value = getattr(response, "units", {})
+        units = units_value if is_json_object(units_value) else {}
         return {
             "status": "ok",
             "provider": provider_id,
-            "payload": response.payload,
-            "attribution": response.attribution,
-            "warnings": response.warnings,
-            "stale": response.stale,
+            "payload": getattr(response, "payload", None),
+            "attribution": list(getattr(response, "attribution", [])),
+            "warnings": list(getattr(response, "warnings", [])),
+            "stale": bool(getattr(response, "stale", False)),
+            "result_status": getattr(response, "result_status", "ok"),
+            "result_type": getattr(response, "result_type", "unknown"),
+            "fetched_at": fetched_at.isoformat(),
+            "observation_time": getattr(response, "observation_time", None),
+            "coverage": getattr(response, "coverage", None),
+            "spatial_resolution": getattr(response, "spatial_resolution", None),
+            "units": dict(units),
+            "source_url": getattr(response, "source_url", None),
+            "partial": bool(getattr(response, "partial", False)),
         }
 
     # -------------------------------------------------------------------------
@@ -462,6 +999,21 @@ class GeospatialApiService:
                 "bbox must be four comma-separated numbers."
             )
         min_lon, min_lat, max_lon, max_lat = parts
+        if not all(math.isfinite(value) for value in parts):
+            raise GeospatialInvalidRequestError("bbox must contain finite numbers.")
+        if (
+            not _valid_longitude(min_lon)
+            or not _valid_longitude(max_lon)
+            or not _valid_latitude(min_lat)
+            or not _valid_latitude(max_lat)
+        ):
+            raise GeospatialInvalidRequestError(
+                "bbox coordinates are outside supported geographic ranges."
+            )
+        if min_lon > max_lon or min_lat > max_lat:
+            raise GeospatialInvalidRequestError(
+                "bbox must be ordered west,south,east,north."
+            )
         return min_lon, min_lat, max_lon, max_lat
 
     # -------------------------------------------------------------------------
@@ -482,36 +1034,30 @@ class GeospatialApiService:
                 provider_id = provider_id.strip()
                 provider_camera_id = provider_camera_id.strip()
                 if provider_id and provider_camera_id:
-                    canonical_provider_id = CAMERA_PROVIDER_ALIASES.get(
-                        provider_id, provider_id
-                    )
-                    return canonical_provider_id, provider_camera_id
+                    return provider_id, provider_camera_id
         return None, normalized
 
     # -------------------------------------------------------------------------
     def _provider_requires_credentials(self, provider_id: str) -> bool:
         for item in self._iter_manifest_payloads_for_account_setup():
-            auth = item.get("auth") if isinstance(item.get("auth"), dict) else {}
+            auth = json_object(item.get("auth"))
             manifest_provider = str(item.get("provider") or item.get("id") or "")
             access_id = str(auth.get("accessPageProviderId") or "")
             provider_key = str(auth.get("providerKey") or "")
             if provider_id in {manifest_provider, access_id, provider_key}:
                 return bool(auth.get("required"))
-        return provider_id in RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER
+        return False
 
     # -------------------------------------------------------------------------
     def _iter_manifest_payloads_for_account_setup(self) -> Iterator[dict[str, Any]]:
-        payload = self.manifest_loader.load_all()
         for collection_name in ("providers", "overlays", "transit", "cameras"):
-            for item in payload.get(collection_name) or []:
-                if isinstance(item, dict):
-                    yield item
+            yield from getattr(self.catalog_snapshot, collection_name)
 
     # -------------------------------------------------------------------------
     def _extract_account_setup_record(
         self, payload: dict[str, Any]
     ) -> dict[str, Any] | None:
-        auth = payload.get("auth") if isinstance(payload.get("auth"), dict) else {}
+        auth = json_object(payload.get("auth"))
         requires_credentials = bool(auth.get("required"))
         provider_key = str(
             auth.get("providerKey")
@@ -522,12 +1068,8 @@ class GeospatialApiService:
         access_provider_id = str(
             auth.get("accessPageProviderId") or provider_key
         ).strip()
-        account_setup = (
-            payload.get("account_setup")
-            if isinstance(payload.get("account_setup"), dict)
-            else {}
-        )
-        has_account_setup = isinstance(account_setup.get("automation"), dict)
+        account_setup = json_object(payload.get("account_setup"))
+        has_account_setup = is_json_object(account_setup.get("automation"))
         if (
             (not requires_credentials and not has_account_setup)
             or not provider_key
@@ -537,7 +1079,6 @@ class GeospatialApiService:
         if provider_key in {"census", "openaip", "sentinel_hub"}:
             return None
 
-        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider_key)
         docs_url = self._extract_docs_url(payload)
         automation = self._build_account_setup_automation(
             provider_key=provider_key,
@@ -547,27 +1088,23 @@ class GeospatialApiService:
         instructions = self._build_account_setup_instructions(
             provider_id=provider_key,
             docs_url=docs_url,
-            env_name=env_name,
             required=True,
         )
-        metadata = (
-            payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
-        )
+        metadata = json_object(payload.get("metadata"))
         return {
             "provider_id": provider_key,
             "name": str(metadata.get("label") or payload.get("name") or provider_key),
             "requires_credentials": True,
             "auth_mode": str(auth.get("type") or "api-key"),
             "docs_url": docs_url,
-            "environment_variable": env_name,
-            "configured": bool(env_name and os.getenv(env_name, "").strip()),
+            "configured": self.credential_resolver.is_configured(provider_key),
             "instructions": instructions,
             "automation": automation,
             "credential_storage_key": provider_key,
             "credential_label": "api_key",
             "key_format_hint": self._key_format_hint(provider_key),
             "validation_supported": provider_key
-            in {"tomtom", "windy_webcams", "openaq", "nrel", "nasa_firms"},
+            in {"tomtom", "windy_webcams", "openaq", "nasa_firms"},
         }
 
     # -------------------------------------------------------------------------
@@ -589,11 +1126,7 @@ class GeospatialApiService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _account_setup_specificity(record: dict[str, Any]) -> int:
-        automation = (
-            record.get("automation")
-            if isinstance(record.get("automation"), dict)
-            else {}
-        )
+        automation = json_object(record.get("automation"))
         return (
             sum(
                 1
@@ -612,11 +1145,7 @@ class GeospatialApiService:
         docs_url: str | None,
         account_setup: dict[str, Any],
     ) -> dict[str, Any]:
-        raw = (
-            account_setup.get("automation")
-            if isinstance(account_setup.get("automation"), dict)
-            else {}
-        )
+        raw = json_object(account_setup.get("automation"))
         support = str(
             raw.get("support") or self._default_automation_support(provider_key)
         )
@@ -638,8 +1167,8 @@ class GeospatialApiService:
             else None,
             "required_fields": [
                 field
-                for field in raw.get("required_fields", [])
-                if isinstance(field, dict) and not field.get("sensitive")
+                for field in json_array(raw.get("required_fields"))
+                if is_json_object(field) and not field.get("sensitive")
             ],
             "user_action_notes": self._string_list(raw.get("user_action_notes"))
             or self._default_user_action_notes(provider_key, support),
@@ -710,18 +1239,14 @@ class GeospatialApiService:
     def _string_list(value: Any) -> list[str]:
         return (
             [item for item in value if isinstance(item, str) and item.strip()]
-            if isinstance(value, list)
+            if is_json_array(value)
             else []
         )
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _extract_docs_url(provider: dict[str, Any]) -> str | None:
-        metadata = (
-            provider.get("metadata")
-            if isinstance(provider.get("metadata"), dict)
-            else {}
-        )
+        metadata = json_object(provider.get("metadata"))
         for value in (
             metadata.get("official_docs_url"),
             provider.get("official_docs_url"),
@@ -729,11 +1254,10 @@ class GeospatialApiService:
         ):
             if isinstance(value, str) and value.strip():
                 return value.strip()
-        docs = provider.get("sourceOfficialDocs")
-        if isinstance(docs, list):
-            for item in docs:
-                if isinstance(item, str) and item.strip():
-                    return item.strip()
+        docs = json_array(provider.get("sourceOfficialDocs"))
+        for item in docs:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
         return None
 
     # -------------------------------------------------------------------------
@@ -742,12 +1266,11 @@ class GeospatialApiService:
         *,
         provider_id: str,
         docs_url: str | None,
-        env_name: str | None,
         required: bool,
     ) -> list[str]:
         if not required:
             return ["No account setup is required for public access."]
-        instructions = []
+        instructions: list[str] = []
         if docs_url:
             instructions.append(
                 f"Create or sign in to a provider account using {docs_url}."
@@ -757,14 +1280,9 @@ class GeospatialApiService:
         instructions.append(
             "Generate an API key or access token with map/data read permissions."
         )
-        if env_name:
-            instructions.append(
-                f"Set the key in the {env_name} environment variable or save it through Access settings."
-            )
-        else:
-            instructions.append(
-                f"Store the key using the access configuration for {provider_id}."
-            )
+        instructions.append(
+            f"Store the key using the encrypted Access settings for {provider_id}."
+        )
         instructions.append("Refresh AEGIS so the runtime can detect the credential.")
         return instructions
 
@@ -779,41 +1297,107 @@ class GeospatialApiService:
         x: int,
         y: int,
     ) -> str:
-        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider)
         if "{api_key}" in template:
-            if not env_name:
-                raise GeospatialUnsupportedTileError(
-                    f"No credential mapping is configured for provider '{provider}'."
-                )
-            api_key = os.getenv(env_name, "").strip()
+            try:
+                api_key = self.credential_resolver.resolve(provider, mark_used=True)
+            except GeospatialCredentialResolutionError as exc:
+                raise GeospatialTileCredentialError(
+                    f"{self._humanize_provider(provider)} credentials cannot be used."
+                ) from exc
             if not api_key:
                 raise GeospatialTileCredentialError(
                     f"{self._humanize_provider(provider)} credentials are required."
                 )
             template = template.replace("{api_key}", quote(api_key, safe=""))
-        resolved = (
-            template.replace("{z}", str(z))
-            .replace("{x}", str(x))
-            .replace("{y}", str(y))
-        )
-        if resolved == template and all(token not in template for token in ("{z}", "{x}", "{y}")):
+        if not any(
+            token in template
+            for token in ("{z}", "{x}", "{y}", "{bbox-epsg-3857}")
+        ):
             raise GeospatialUnsupportedTileError(
                 f"Capability '{capability_id}' does not expose a tile template."
             )
-        return resolved
+        return materialize_tile_template(template, z, x, y)
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _humanize_provider(provider: str) -> str:
         lookup = {
             "tomtom": "TomTom",
-            "geoapify": "Geoapify",
             "google_maps": "Google Maps",
             "openaq": "OpenAQ",
             "arcgis": "ArcGIS",
+            "fema": "FEMA",
+            "esa": "ESA WorldCover",
+            "gibs": "NASA GIBS",
+            "rainviewer": "RainViewer",
         }
         return lookup.get(provider, provider or "Provider")
 
     # -------------------------------------------------------------------------
-    async def _fetch_binary_url(self, url: str) -> bytes:
-        return await fetch_bytes_url(url, {"User-Agent": "AEGIS/1.0"})
+    @staticmethod
+    def _relay_config(metadata: dict[str, Any]) -> dict[str, Any] | None:
+        """Return a validated relay transport for a manifest, when declared.
+
+        Some public upstreams (for example FEMA hazards.fema.gov) are restricted
+        to specific egress networks and must be reached through an official relay
+        that is internationally reachable. The relay is declared in manifest
+        metadata and applied at fetch time so the canonical source URL remains
+        the recorded provenance.
+        """
+
+        relay = metadata.get("relay")
+        if not is_json_object(relay):
+            return None
+        base_url = str(relay.get("base_url") or "").strip().rstrip("?")
+        if not base_url.startswith("https://"):
+            return None
+        parsed = urlsplit(base_url)
+        if parsed.hostname != _FEMA_RELAY_HOST or parsed.path.rstrip("/") != _FEMA_RELAY_PATH:
+            return None
+        required_headers = relay.get("required_headers")
+        if not is_json_object(required_headers):
+            return None
+        headers = {
+            str(key).strip(): str(value).strip()
+            for key, value in required_headers.items()
+            if str(value).strip()
+        }
+        if not headers:
+            return None
+        return {"base_url": base_url, "required_headers": headers}
+
+    # -------------------------------------------------------------------------
+    async def _fetch_binary_url(
+        self,
+        url: str,
+        headers: dict[str, str] | None = None,
+    ) -> bytes:
+        fetch_headers = {"User-Agent": "AEGIS/1.0"}
+        if headers:
+            fetch_headers.update(headers)
+        body = await fetch_raster_image_url(url, fetch_headers)
+        if not body:
+            raise ProviderUnavailableError("Provider returned an empty tile body.")
+        # Keep the service boundary defensive for test doubles and future helpers.
+        if not body.startswith(
+            (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"RIFF")
+        ):
+            raise ProviderUnavailableError("Provider returned a non-image tile body.")
+        return body
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _log_raster_failure(error: RasterHttpError) -> None:
+        diagnostic = error.diagnostic
+        LOGGER.warning(
+            "geospatial_tile_proxy_failure category=%s provider=%s capability=%s "
+            "status=%s content_type=%s content_length=%s phase=%s upstream=%s",
+            diagnostic.category,
+            diagnostic.provider_id or "unknown",
+            diagnostic.capability_id or "unknown",
+            diagnostic.status_code,
+            diagnostic.content_type or "unknown",
+            diagnostic.content_length,
+            diagnostic.failure_phase,
+            diagnostic.upstream,
+        )

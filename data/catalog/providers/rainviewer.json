@@ -1,0 +1,123 @@
+{
+  "id": "rainviewer",
+  "name": "RainViewer",
+  "provider": "rainviewer",
+  "type": "provider",
+  "description": "RainViewer recent precipitation radar history and time-aware metadata feeds for personal, educational, and small-community use.",
+  "capabilities": [
+    "radar",
+    "precipitation",
+    "recent-history",
+    "tile"
+  ],
+  "coverage": "global-partial",
+  "metadata": {
+    "docs_url": "https://www.rainviewer.com/api/weather-maps-api.html",
+    "commercial_notes": "The free public API is intended for personal, educational, and small-community use; do not treat anonymous access as commercial-use permission.",
+    "warning_level": "medium",
+    "keywords": [
+      "rainviewer",
+      "radar",
+      "precipitation",
+      "recent radar history",
+      "weather tiles"
+    ],
+    "action_tags": [
+      "rain radar",
+      "precipitation"
+    ],
+    "task_tags": [
+      "recent storm tracking",
+      "rainfall context"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global-partial",
+    "temporal_behavior": "near-real-time-history",
+    "constraints": "The 2026 free API exposes recent past radar only. Future nowcast and satellite IR are not available. Public tiles are limited to zoom 7 and the service is best-effort with no SLA.",
+    "content_hash": "rainviewer-provider-v3",
+    "requires_key": false,
+    "official_docs_url": "https://www.rainviewer.com/api/weather-maps-api.html",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "public-best-effort",
+    "auth_mode": "none",
+    "rate_limit_notes": "Free public API limit documented as 100 requests per IP per minute; cache metadata and tiles conservatively.",
+    "retrieval_mode": "backend-dynamic",
+    "last_validated": "2026-09-30",
+    "search_examples": [
+      "show recent RainViewer radar",
+      "show recent precipitation radar near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location."
+  },
+  "version": 3,
+  "last_modified": "2026-09-30T00:00:00+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://www.rainviewer.com/api/weather-maps-api.html",
+    "https://www.rainviewer.com/api/transition-faq.html",
+    "https://www.rainviewer.com/api/color-schemes.html"
+  ],
+  "license": {
+    "name": "RainViewer public API terms",
+    "url": "https://www.rainviewer.com/api.html",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "rain radar",
+      "precipitation",
+      "recent storm tracking",
+      "rainfall context",
+      "rainviewer",
+      "recent radar history",
+      "weather tiles"
+    ],
+    "requiredUserAction": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context",
+      "future nowcast",
+      "satellite infrared imagery",
+      "arbitrary historical frame selection"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-09-30",
+    "knownLimitations": [
+      "Free public API provides recent past radar only, not future nowcast.",
+      "Satellite IR is not available in the free API.",
+      "Public tile zoom is capped at 7 and uses Universal Blue color scheme 2.",
+      "Best-effort public service has no SLA."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 3600
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
+}

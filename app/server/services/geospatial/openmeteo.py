@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_array, json_object
+
 import asyncio
 import json
+import math
 import threading
 import time
 from datetime import UTC, datetime
@@ -10,7 +13,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from server.configurations import get_server_settings
+from server.configurations.settings import JsonOpenMeteoSettings, OpenMeteoSettings
+
+OPENMETEO_ELEVATION_BASE_URL = "https://api.open-meteo.com/v1/elevation"
 
 ###############################################################################
 class OpenMeteoServiceError(Exception):
@@ -22,32 +27,67 @@ class OpenMeteoRequestError(OpenMeteoServiceError):
 
 ###############################################################################
 class OpenMeteoService:
+    WEATHER_VARIABLES = (
+        "temperature_2m",
+        "precipitation",
+        "weather_code",
+        "relative_humidity_2m",
+        "surface_pressure",
+        "wind_speed_10m",
+        "wind_direction_10m",
+        "wind_gusts_10m",
+        "precipitation_probability",
+    )
+    WEATHER_CURRENT_VARIABLES = (
+        "temperature_2m",
+        "precipitation",
+        "weather_code",
+        "relative_humidity_2m",
+        "surface_pressure",
+        "wind_speed_10m",
+        "wind_direction_10m",
+        "wind_gusts_10m",
+    )
+    AIR_QUALITY_VARIABLES = (
+        "pm10",
+        "pm2_5",
+        "carbon_monoxide",
+        "nitrogen_dioxide",
+        "ozone",
+        "sulphur_dioxide",
+    )
 
     # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
+        settings: OpenMeteoSettings | None = None,
         weather_base_url: str | None = None,
         air_quality_base_url: str | None = None,
+        elevation_base_url: str | None = None,
         user_agent: str | None = None,
         timeout_s: float | None = None,
         cache_ttl_s: float | None = None,
         min_call_interval_s: float | None = None,
     ) -> None:
-        settings = get_server_settings().openmeteo
-        self.weather_base_url = weather_base_url or settings.weather_base_url
-        self.air_quality_base_url = (
-            air_quality_base_url or settings.air_quality_base_url
+        configured = settings or OpenMeteoSettings(
+            **JsonOpenMeteoSettings().model_dump()
         )
-        self.user_agent = user_agent or settings.user_agent
-        self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
+        self.weather_base_url = weather_base_url or configured.weather_base_url
+        self.air_quality_base_url = (
+            air_quality_base_url or configured.air_quality_base_url
+        )
+        self.elevation_base_url = elevation_base_url or OPENMETEO_ELEVATION_BASE_URL
+        self.user_agent = user_agent or configured.user_agent
+        self.timeout_s = timeout_s if timeout_s is not None else configured.timeout
         self.cache_ttl_s = max(
-            cache_ttl_s if cache_ttl_s is not None else settings.cache_ttl_s, 30.0
+            cache_ttl_s if cache_ttl_s is not None else configured.cache_ttl_s,
+            30.0,
         )
         self.min_call_interval_s = max(
             min_call_interval_s
             if min_call_interval_s is not None
-            else settings.min_call_interval_s,
+            else configured.min_call_interval_s,
             0.05,
         )
         self._lock = threading.Lock()
@@ -61,8 +101,8 @@ class OpenMeteoService:
         params = {
             "latitude": f"{latitude:.6f}",
             "longitude": f"{longitude:.6f}",
-            "hourly": "temperature_2m,precipitation,weather_code",
-            "current": "temperature_2m,precipitation,weather_code",
+            "hourly": ",".join(self.WEATHER_VARIABLES),
+            "current": ",".join(self.WEATHER_CURRENT_VARIABLES),
             "forecast_days": "3",
             "timezone": "auto",
         }
@@ -72,46 +112,64 @@ class OpenMeteoService:
             params=params,
             provider_key="openmeteo_weather",
         )
-        hourly = (
-            payload.get("hourly") if isinstance(payload.get("hourly"), dict) else {}
-        )
+        fetched_at = datetime.now(UTC).isoformat()
+        hourly = json_object(payload.get("hourly"))
         timeline = list(hourly.get("time") or [])
-        temperature = list(hourly.get("temperature_2m") or [])
-        precipitation = list(hourly.get("precipitation") or [])
-        weather_code = list(hourly.get("weather_code") or [])
+        series = {
+            name: self._series(hourly.get(name)) for name in self.WEATHER_VARIABLES
+        }
         preview: list[dict[str, Any]] = []
         hourly_forecast: list[dict[str, Any]] = []
         for index in range(min(72, len(timeline))):
-            row = {
-                "time": timeline[index],
-                "temperature_2m": temperature[index]
-                if index < len(temperature)
-                else None,
-                "precipitation": precipitation[index]
-                if index < len(precipitation)
-                else None,
-                "weather_code": weather_code[index]
-                if index < len(weather_code)
-                else None,
-            }
+            row = {"time": timeline[index]}
+            row.update(
+                {
+                    name: values[index] if index < len(values) else None
+                    for name, values in series.items()
+                }
+            )
             hourly_forecast.append(row)
             if len(preview) >= 6:
                 continue
-            preview.append(
-                row
-            )
+            preview.append(row)
+        current = json_object(payload.get("current"))
+        partial = self._is_partial(
+            timeline=timeline,
+            series=series,
+            current=current,
+            current_variables=self.WEATHER_CURRENT_VARIABLES,
+        )
+        result_status = self._result_status(
+            timeline=timeline,
+            current=current,
+            variables=self.WEATHER_CURRENT_VARIABLES,
+            partial=partial,
+        )
         return {
             "provider": "openmeteo",
             "kind": "weather_forecast",
+            "source_url": self.weather_base_url,
+            "fetched_at": fetched_at,
+            "result_status": result_status,
+            "result_type": "metadata",
+            "partial": partial,
             "latitude": latitude,
             "longitude": longitude,
             "timezone": payload.get("timezone"),
-            "current": payload.get("current")
-            if isinstance(payload.get("current"), dict)
-            else {},
+            "current": current,
             "hourly_preview": preview,
             "hourly_forecast": hourly_forecast,
-            "resolved_at": datetime.now(UTC).isoformat(),
+            "resolved_at": fetched_at,
+            "observation_time": current.get("time"),
+            "units": self._units(payload),
+            "requested_variables": list(self.WEATHER_VARIABLES),
+            "request_parameters": dict(params),
+            "spatial_resolution": "point forecast",
+            "coverage": {
+                "type": "point",
+                "latitude": latitude,
+                "longitude": longitude,
+            },
             "attribution": "Data from Open-Meteo",
         }
 
@@ -132,34 +190,162 @@ class OpenMeteoService:
             params=params,
             provider_key="openmeteo_air_quality",
         )
-        hourly = (
-            payload.get("hourly") if isinstance(payload.get("hourly"), dict) else {}
-        )
+        fetched_at = datetime.now(UTC).isoformat()
+        hourly = json_object(payload.get("hourly"))
         timeline = list(hourly.get("time") or [])
         pollutants = {
-            "pm2_5": list(hourly.get("pm2_5") or []),
-            "pm10": list(hourly.get("pm10") or []),
-            "nitrogen_dioxide": list(hourly.get("nitrogen_dioxide") or []),
-            "ozone": list(hourly.get("ozone") or []),
-            "sulphur_dioxide": list(hourly.get("sulphur_dioxide") or []),
-            "carbon_monoxide": list(hourly.get("carbon_monoxide") or []),
+            name: self._series(hourly.get(name)) for name in self.AIR_QUALITY_VARIABLES
         }
         preview: list[dict[str, Any]] = []
-        for index in range(min(6, len(timeline))):
+        hourly_forecast: list[dict[str, Any]] = []
+        for index in range(min(72, len(timeline))):
             row: dict[str, Any] = {"time": timeline[index]}
             for key, values in pollutants.items():
                 row[key] = values[index] if index < len(values) else None
-            preview.append(row)
+            hourly_forecast.append(row)
+            if len(preview) < 6:
+                preview.append(row)
+        partial = any(len(values) < len(timeline) for values in pollutants.values())
+        result_status = "ok" if timeline else "valid_empty"
+        if partial and timeline:
+            result_status = "partial"
         return {
             "provider": "openmeteo",
             "kind": "air_quality_forecast",
+            "source_url": self.air_quality_base_url,
+            "fetched_at": fetched_at,
+            "result_status": result_status,
+            "result_type": "metadata",
+            "partial": partial,
             "latitude": latitude,
             "longitude": longitude,
             "timezone": payload.get("timezone"),
             "hourly_preview": preview,
-            "resolved_at": datetime.now(UTC).isoformat(),
+            "hourly_forecast": hourly_forecast,
+            "resolved_at": fetched_at,
+            "observation_time": preview[0].get("time") if preview else None,
+            "units": self._units(payload),
+            "requested_variables": list(self.AIR_QUALITY_VARIABLES),
+            "request_parameters": dict(params),
+            "spatial_resolution": "point forecast",
+            "coverage": {
+                "type": "point",
+                "latitude": latitude,
+                "longitude": longitude,
+            },
             "attribution": "Data from Open-Meteo",
         }
+
+    # -------------------------------------------------------------------------
+    async def get_elevation(
+        self, *, latitude: float, longitude: float
+    ) -> dict[str, Any]:
+        params = {
+            "latitude": f"{latitude:.6f}",
+            "longitude": f"{longitude:.6f}",
+        }
+        payload = await asyncio.to_thread(
+            self._get_json,
+            endpoint=self.elevation_base_url,
+            params=params,
+            provider_key="openmeteo_elevation",
+        )
+        fetched_at = datetime.now(UTC).isoformat()
+        raw_elevations = payload.get("elevation")
+        if raw_elevations is not None and not isinstance(raw_elevations, list):
+            raise OpenMeteoRequestError(
+                "Open-Meteo elevation response field must be an array."
+            )
+        elevations = json_array(raw_elevations)
+        raw_elevation = elevations[0] if elevations else None
+        if raw_elevation is None:
+            elevation = None
+        elif (
+            isinstance(raw_elevation, (int, float))
+            and not isinstance(raw_elevation, bool)
+            and math.isfinite(float(raw_elevation))
+        ):
+            elevation = float(raw_elevation)
+        else:
+            raise OpenMeteoRequestError(
+                "Open-Meteo elevation response must contain a finite numeric value."
+            )
+        return {
+            "provider": "openmeteo",
+            "kind": "terrain_elevation",
+            "source_url": self.elevation_base_url,
+            "fetched_at": fetched_at,
+            "result_status": "ok" if elevation is not None else "valid_empty",
+            "result_type": "metadata",
+            "partial": False,
+            "latitude": latitude,
+            "longitude": longitude,
+            "elevation": elevation,
+            "resolved_at": fetched_at,
+            "observation_time": None,
+            "units": {"elevation": "m"},
+            "requested_variables": ["elevation"],
+            "request_parameters": dict(params),
+            "spatial_resolution": "90 m Copernicus DEM GLO-90",
+            "coverage": {
+                "type": "point",
+                "latitude": latitude,
+                "longitude": longitude,
+            },
+            "attribution": "Data from Open-Meteo; Copernicus DEM GLO-90",
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _units(payload: dict[str, Any]) -> dict[str, str]:
+        units: dict[str, str] = {}
+        for key in ("current_units", "hourly_units"):
+            declared = json_object(payload.get(key))
+            for name, unit in declared.items():
+                if isinstance(unit, str) and unit.strip():
+                    units.setdefault(name, unit.strip())
+        return units
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _series(value: object) -> list[Any]:
+        return list(json_array(value))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_partial(
+        *,
+        timeline: list[Any],
+        series: dict[str, list[Any]],
+        current: dict[str, Any],
+        current_variables: tuple[str, ...],
+    ) -> bool:
+        has_current_data = any(
+            current.get(name) is not None for name in current_variables
+        )
+        if not timeline and not has_current_data:
+            return False
+        if timeline and any(len(values) < len(timeline) for values in series.values()):
+            return True
+        return any(
+            name not in current or current.get(name) is None
+            for name in current_variables
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _result_status(
+        *,
+        timeline: list[Any],
+        current: dict[str, Any],
+        variables: tuple[str, ...],
+        partial: bool,
+    ) -> str:
+        if timeline:
+            return "partial" if partial else "ok"
+        if any(current.get(name) is not None for name in variables):
+            return "partial"
+        return "valid_empty"
 
     # -------------------------------------------------------------------------
     def _get_json(
@@ -183,7 +369,7 @@ class OpenMeteoService:
             raise OpenMeteoRequestError(
                 "Open-Meteo response was not valid JSON."
             ) from exc
-        if not isinstance(data, dict):
+        if not is_json_object(data):
             raise OpenMeteoRequestError("Open-Meteo response payload is malformed.")
         self._cache_set(cache_key, data)
         return data

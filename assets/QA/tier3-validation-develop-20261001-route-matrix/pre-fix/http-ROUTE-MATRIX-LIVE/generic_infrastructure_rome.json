@@ -1,0 +1,81 @@
+{
+  "scenario_id": "generic_infrastructure_rome",
+  "prompt": "Show infrastructure in Rome.",
+  "expected_kind": "clarification",
+  "classification": "clarification_pass",
+  "assistant_response_visible": true,
+  "ui_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Show infrastructure in Rome. Which infrastructure category do you need: EV charging stations, buildings, airports, roads/transit, or another specific category? Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Configured Satellite Available Optional Keys Optional Tool activity Complete",
+  "map_evidence": {
+    "maplibre_map_count": 0,
+    "maplibre_canvas_count": 0,
+    "attribution_present": false,
+    "attribution_text": "",
+    "target_overlay_status": null,
+    "target_overlay_visible": null,
+    "overlay_rows": []
+  },
+  "network": {
+    "proxy_request_count": 0,
+    "proxy_response_statuses": [],
+    "proxy_capabilities_seen": [],
+    "direct_upstream_browser_request_count": 0,
+    "events": []
+  },
+  "console": [],
+  "page_errors": [],
+  "run_trace": {
+    "status": "ok",
+    "conversation_id": "conv_b019b46b078a4ea7a4b3714bdce3ae1e",
+    "run_id": "run_3dde655991c84d0e836b82011faedc9b",
+    "run_version": 1,
+    "resolved_route": {},
+    "selected_capability_ids": [],
+    "iteration_count": 0,
+    "model_call_count": 1,
+    "tool_call_count": 0,
+    "state_transition_count": 2,
+    "terminal_or_stopped_reason": "completed",
+    "exposed_tools_by_iteration": {},
+    "selected_tool_names": [],
+    "tool_result_statuses": [],
+    "evidence_references": [],
+    "apply_map_plan_attempts": 0,
+    "render_preparation": [
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "completed",
+        "render_checks": null,
+        "prepared_map": false
+      }
+    ],
+    "temporal_evidence": {}
+  },
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20261001-route-matrix\\screenshots\\ROUTE-MATRIX-LIVE\\generic_infrastructure_rome.png",
+  "backend_routed_diagnostics": []
+}

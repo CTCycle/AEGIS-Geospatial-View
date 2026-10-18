@@ -1,6 +1,18 @@
 # Public And Optional Sources
 
-Last updated: 2026-06-19
+Last updated: 2026-09-30
+
+## Canonical POI path
+
+Overture Places is the primary bulk POI source after local ingestion into the configured GeoJSON index (`AEGIS_OVERTURE_PLACES_INDEX`). Interactive requests are bounded by bounding box, category, query, and limit. Overpass can be requested as an augmentation source with `augment_overpass=true`; results are normalized and deduplicated through the shared POI model.
+
+Overture Places is the bulk POI path and Overpass provides public bounded augmentation. Overture requires a locally ingested index; when it is not configured, bounded Overpass lookup remains available. Tourism-specific metadata remains a separate optional capability.
+
+Provider health is evaluated independently of catalog declaration. A timeout,
+rate limit, malformed payload, or unavailable upstream is reported as a warning
+or unavailable source; it is never promoted to a successful empty POI layer.
+
+Run `python -m server.services.geospatial.poi_benchmark --baseline <provider-payload.json> --candidate <overture-or-overpass-payload.json> --output assets/QA/poi_parity_report.json` against captured representative-location payloads. The command returns success only when all configured parity thresholds pass.
 
 ## Public Sources
 
@@ -14,11 +26,21 @@ Use for POI and amenity discovery through OSM tags.
 
 ### Open-Meteo
 
-Use for weather and air-quality forecasts.
+Use for weather and air-quality forecasts and numeric point elevation.
 
-- No API key is required in the default flow.
+- No API key is required in the eligible free hosted flow.
+- The free hosted service is restricted to non-commercial use; anonymous access
+  does not imply commercial-use permission.
+- Restricted Open-Meteo capabilities remain disabled unless the deployment
+  explicitly sets `AEGIS_ALLOW_RESTRICTED_SOURCES=true` after confirming use
+  eligibility.
 - Request only required variables.
-- Confirm high-volume and commercial-use limits before production scale.
+- `openmeteo_elevation` samples the Open-Meteo Elevation API backed by the
+  Copernicus DEM GLO-90 at approximately 90 m resolution.
+- Treat elevation as coarse terrain context, not survey-grade or parcel-scale
+  measurement.
+- Point elevation does not provide slope, aspect, hillshade, terrain profiles,
+  or zonal terrain statistics.
 
 ### NASA GIBS
 
@@ -29,6 +51,7 @@ Use for satellite imagery and thematic earth-observation layers.
 - Prefer WMTS render descriptors for tiled MapLibre rendering; use WMS only as fallback.
 - Preserve layer time dimensions and default time values in render descriptors.
 - Some products are raster-only and not machine-queryable vectors.
+- The stable AEGIS `MODIS_Combined_Thermal_Anomalies_Fire` capability maps to the current GIBS provider layer `MODIS_Combined_Thermal_Anomalies_All`; keep the AEGIS id stable for routing and persisted state.
 
 ### GTFS Realtime
 
@@ -43,6 +66,8 @@ Use for transit updates, alerts, and vehicle positions.
 Use for global land-cover context.
 
 - No API key is required for the current manifest.
+- Use the current Terrascope MapProxy WMS endpoint `https://mapproxy.terrascope.be/mapproxy/service` with layer `esa-worldcover-map-10m-2021-v2_map`.
+- The legacy `services.terrascope.be/wmts` service was retired in 2026 and must not be used by the runtime manifest.
 - Keep ESA and Terrascope attribution visible.
 
 ### EEA
@@ -52,21 +77,76 @@ Use for EU or EEA environmental noise layers.
 - No API key is required for public services.
 - Verify service availability and licensing before operational use.
 
+### NOAA Radar
+
+Use `noaa_radar` for CONUS precipitation radar context.
+
+- The public NOAA WMS-backed raster service is exposed through an explicit
+  bounded `{bbox-epsg-3857}` tile template in the catalog.
+- Keep NOAA/NCEP attribution visible and treat coverage as CONUS radar context,
+  not a global radar product.
+
+### FEMA NFHL
+
+Use `fema_nfhl_flood_zones` for National Flood Hazard Layer map context.
+
+- The public FEMA MapServer export is exposed through an explicit bounded
+  `{bbox-epsg-3857}` raster template in the catalog.
+- The current service base is
+  `https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer`; the
+  browser template uses its bounded `export` operation with NFHL layer `28`.
+- The 2026-09-30 deterministic transport matrix tested REST export and WMS
+  GetMap for layer `28` through the AEGIS pooled client, fresh httpx clients
+  with `trust_env=true` and `trust_env=false`, and native Windows curl. Every
+  lane failed before HTTP status, content type, body, or pixels because
+  `hazards.fema.gov` is US-egress-restricted (TLS reset from non-US networks).
+  The 2026-10-01 remediation routes the FEMA upstream through FEMA's official
+  ArcGIS Online relay
+  (`https://hazards-fema.maps.arcgis.com/sharing/proxy`, the same relay FEMA's
+  own NFHL Viewer uses) with the required `Origin`/`Referer` headers, so the
+  AEGIS tile proxy returns layer-28 PNGs from any egress and the overlay
+  renders with an accepted `map.render_ack`. Do not replace it with a mirror.
+- FEMA NFHL layer `28` is scale-dependent: it only draws at zoom 14 or higher,
+  and the map preview presents it at its declared minimum zoom so the rendered
+  overlay contains real pixels.
+- Keep FEMA attribution visible; authoritative flood-zone interpretation still
+  requires FEMA source context and applicable local regulation.
+
+### RainViewer recent observed radar
+
+Use `rainviewer_precipitation_radar` for the latest observed precipitation
+radar frame.
+
+- Metadata comes from the official RainViewer public weather-maps endpoint;
+  frame paths are provider-supplied opaque `/v2/radar/...` paths and are never
+  reconstructed from timestamps.
+- AEGIS serves the raster through its same-origin backend tile proxy using
+  `/256/{z}/{x}/{y}/2/{smooth}_{snow}.png`, Universal Blue color scheme `2`,
+  and maximum zoom `7`.
+- The capability is recent observed radar only: no future nowcast, forecast,
+  satellite IR, or arbitrary historical-frame claim. Metadata is cached for
+  300 seconds, and `© RainViewer` attribution remains visible.
+- Public access is best effort and subject to the provider's documented
+  rate/availability limits; it is not a guaranteed operational SLA.
+
+### GBIF
+
+Use `gbif_species_occurrences` for bounded biodiversity occurrence context.
+
+- AEGIS requests up to 300 records per interactive page, matching the
+  [GBIF occurrence API page limit](https://techdocs.gbif.org/en/openapi/v1/occurrence).
+- Interactive results remain a sampled page rather than an exhaustive species
+  inventory; use GBIF paging or downloads for larger result sets.
+- Preserve contributing-dataset attribution, per-record licences, event dates,
+  basis of record, coordinate uncertainty, and data-quality issues.
+
 ## Optional Credentialed Sources
-
-### Geoapify
-
-Use for optional polished basemaps and amenities.
-
-- Configure `GEOAPIFY_API_KEY` or Access credentials.
-- Review Places API quotas and pricing.
-- Confirm commercial-use rights before production deployment.
 
 ### TomTom
 
-Use for optional road basemap and traffic flow layers.
+Use for optional traffic flow and incident layers; it is no longer a basic basemap source.
 
-- Configure `TOMTOM_API_KEY` or Access credentials.
+- Configure the key through encrypted storage in Settings → Geospatial Access.
 - Coverage and refresh cadence vary by region.
 - Confirm evaluation and production licensing.
 
@@ -74,7 +154,7 @@ Use for optional road basemap and traffic flow layers.
 
 Use for air-quality station observations and measurements.
 
-- Configure `OPENAQ_API_KEY` or Access credentials.
+- Configure the key through encrypted storage in Settings → Geospatial Access.
 - Send the key with `X-API-Key`.
 - Respect rate-limit headers.
 
@@ -82,7 +162,7 @@ Use for air-quality station observations and measurements.
 
 Use for tourism-oriented points of interest.
 
-- Configure `OPENTRIPMAP_API_KEY` or Access credentials.
+- Configure the key through encrypted storage in Settings → Geospatial Access.
 - Keep requests bounded by location and radius.
 - If the key is missing, the source should remain unavailable and public alternatives should be preferred.
 
@@ -90,23 +170,21 @@ Use for tourism-oriented points of interest.
 
 Use for EV charging station discovery.
 
-- Configure `OPENCHARGEMAP_API_KEY` when deployment volume or endpoint policy requires it.
+- Hosted requests require an API key resolved from encrypted Settings storage;
+  raw secret environment variables are not used.
+- Prototype local snapshots with `AEGIS_OCM_SNAPSHOT_PATH` for bounded, keyless reads.
+- The runtime availability mode is `credential_or_local_source`: without either
+  the saved key or an existing snapshot, catalog and native-route availability are
+  false with an actionable configuration reason.
 - Bound requests by viewport, radius, and result count.
 - Cache station metadata and degrade gracefully on stale or empty results.
-
-### NREL AFDC
-
-Use for U.S. alternative fuel station discovery.
-
-- Configure `NREL_API_KEY` or Access credentials.
-- Use bounded searches only.
-- Keep fuel type, access, and station status visible in normalized metadata.
 
 ### NASA Open APIs
 
 Use for NASA API-backed capabilities that are distinct from public GIBS tiles.
 
-- Configure `NASA_API_KEY` only when a capability explicitly requires it.
+- Configure the key through encrypted Settings storage when a capability
+  explicitly requires it.
 - Public GIBS manifests should keep `auth.type` as `none`.
 
 ### Google Maps Platform

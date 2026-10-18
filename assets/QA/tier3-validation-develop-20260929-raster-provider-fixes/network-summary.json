@@ -1,0 +1,54 @@
+{
+  "date": "2026-09-29",
+  "browser_direct_provider_requests": 0,
+  "esa_worldcover": {
+    "aegis_capability": "esa_worldcover",
+    "browser_route": "/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png?time=2021-01-01",
+    "upstream_host": "titiler.terrascope.be",
+    "upstream_protocol": "WMS",
+    "layer": "esa-worldcover-map-10m-2021-v2_map",
+    "requests": 12,
+    "statuses": [200],
+    "content_types": ["image/png"],
+    "maplibre_source": true,
+    "maplibre_layer": true,
+    "visible_non_empty_pixels": true,
+    "attribution": true,
+    "render_ack": "render_observed"
+  },
+  "gibs_fire": {
+    "aegis_capability": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "provider_native_layer": "MODIS_Combined_Thermal_Anomalies_All",
+    "browser_route": "/api/geospatial/tiles/MODIS_Combined_Thermal_Anomalies_Fire/{z}/{x}/{y}.png?time=2026-09-29",
+    "upstream_host": "gibs.earthdata.nasa.gov",
+    "upstream_protocol": "WMS",
+    "requests": 12,
+    "statuses": [200],
+    "content_types": ["image/png"],
+    "maplibre_source": true,
+    "maplibre_layer": true,
+    "visible_non_empty_pixels": true,
+    "attribution": true,
+    "temporal_value": "2026-09-29",
+    "render_ack": "render_observed"
+  },
+  "fema_nfhl": {
+    "aegis_capability": "fema_nfhl_flood_zones",
+    "browser_route": "/api/geospatial/tiles/fema_nfhl_flood_zones/{z}/{x}/{y}.png",
+    "requests": 29,
+    "statuses": [502],
+    "content_types": ["application/json"],
+    "upstream_failure_classification": "transport_error",
+    "maplibre_source": false,
+    "maplibre_layer": false,
+    "visible_non_empty_pixels": false,
+    "attribution": false,
+    "render_ack": "render_failed",
+    "composition_removal": "UNPROVEN"
+  },
+  "gibs_matrix": {
+    "advertised_cases": 12,
+    "acceptance_passes": 12,
+    "zero_direct_browser_requests": true
+  }
+}

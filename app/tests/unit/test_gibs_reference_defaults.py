@@ -6,28 +6,19 @@ from server.configurations import DatabaseSettings
 from server.repositories.database.initializer import initialize_database
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
-from server.repositories.catalog.reference_seeder import ReferenceCatalogSeeder
+from server.services.catalog.startup import seed_reference_catalog
 
 ###############################################################################
 def _seeded_repository(tmp_path: Path) -> SQLiteRepository:
     repository = SQLiteRepository(
         DatabaseSettings(
             database_path=str(tmp_path / "database.db"),
-            embedded_database=True,
-            engine=None,
-            host=None,
-            port=None,
-            database_name=None,
-            username=None,
-            password=None,
-            ssl=False,
-            ssl_ca=None,
-            connect_timeout=10,
-            insert_batch_size=100,
         )
     )
-    initialize_database(repository)
-    ReferenceCatalogSeeder(repository).seed_if_needed()
+    initialize_database(
+        repository,
+        on_ready=lambda: seed_reference_catalog(repository),
+    )
     return repository
 
 ###############################################################################

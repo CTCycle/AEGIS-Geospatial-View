@@ -1,102 +1,152 @@
 from __future__ import annotations
 
-import json
+from typing import Any
+
+from server.common.typing import is_json_object, json_object
+
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
+from sqlalchemy.orm import Session
 
-from server.domain.run_events import RunEvent, RunEventCreate, RunEventType, RunEventVisibility
-from server.repositories.database.backend import get_database
-from server.repositories.schemas.models import AgentRunEventRecord, Base
+from server.contracts.events import (
+    RunEvent,
+    RunEventCreate,
+    RunEventType,
+    RunEventVisibility,
+)
+from server.repositories.database.sqlite import SQLiteRepository
+from server.repositories.schemas.models import AgentRunEventRecord, AgentRunRecord
 
 ###############################################################################
 class AgentRunEventRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        backend = get_database().backend
-        Base.metadata.create_all(backend.engine)
-        self._session_factory = backend.session
+    def __init__(self, database: SQLiteRepository) -> None:
+        self._session_factory = database.session
 
     # -------------------------------------------------------------------------
     def append_event(self, event: RunEventCreate) -> RunEvent:
         with self._session_factory() as session:
-            sequence = int(
-                session.scalar(
-                    select(func.coalesce(func.max(AgentRunEventRecord.sequence), 0)).where(
-                        AgentRunEventRecord.run_id == event.run_id
-                    )
-                )
-                or 0
-            ) + 1
-            record = AgentRunEventRecord(
-                id=f"evt_{uuid4().hex}",
-                run_id=event.run_id,
-                conversation_id=event.conversation_id,
-                sequence=sequence,
-                run_version=event.run_version,
-                type=event.type.value,
-                visibility=event.visibility.value,
-                payload_json=json.dumps(event.payload, default=str),
-                created_at=event.timestamp,
-            )
-            session.add(record)
+            domain_event = self.append_event_in_session(session, event)
             session.commit()
-            session.refresh(record)
-            return self._to_domain(record)
+            return domain_event
+
+    # -------------------------------------------------------------------------
+    def append_event_in_session(
+        self,
+        session: Session,
+        event: RunEventCreate,
+    ) -> RunEvent:
+        """Append an event without committing the caller's transaction.
+
+        Run acknowledgment needs the terminal event and the run/conversation
+        promotion to commit or roll back as one unit. Ordinary callers should
+        continue using :meth:`append_event`.
+        """
+
+        sequence = session.scalar(
+            update(AgentRunRecord)
+            .where(
+                AgentRunRecord.id == event.run_id,
+                AgentRunRecord.conversation_id == event.conversation_id,
+            )
+            .values(next_event_sequence=AgentRunRecord.next_event_sequence + 1)
+            .returning(AgentRunRecord.next_event_sequence)
+        )
+        if sequence is None:
+            raise ValueError("Run not found.")
+        record = AgentRunEventRecord(
+            id=f"evt_{uuid4().hex}",
+            run_id=event.run_id,
+            conversation_id=event.conversation_id,
+            sequence=sequence,
+            run_version=event.run_version,
+            type=event.type.value,
+            visibility=event.visibility.value,
+            payload_json=event.payload,
+            created_at=event.timestamp,
+        )
+        session.add(record)
+        session.flush()
+        return self._to_domain(record)
+
+    # -------------------------------------------------------------------------
+    def get_event(self, event_id: str) -> RunEvent | None:
+        with self._session_factory() as session:
+            record = session.get(AgentRunEventRecord, event_id)
+            return self._to_domain(record) if record is not None else None
 
     # -------------------------------------------------------------------------
     def list_events(
         self,
         run_id: str,
         *,
-        after_event_id: str | None = None,
         after_sequence: int | None = None,
         visibility: str = "user",
     ) -> list[RunEvent]:
         threshold = after_sequence
-        if threshold is None and after_event_id:
-            found = self.find_event(run_id, after_event_id)
-            threshold = found.sequence if found is not None else None
         with self._session_factory() as session:
-            statement = select(AgentRunEventRecord).where(AgentRunEventRecord.run_id == run_id)
+            statement = select(AgentRunEventRecord).where(
+                AgentRunEventRecord.run_id == run_id
+            )
             if visibility == "user":
                 statement = statement.where(AgentRunEventRecord.visibility == "user")
             if threshold is not None:
                 statement = statement.where(AgentRunEventRecord.sequence > threshold)
-            rows = session.execute(statement.order_by(AgentRunEventRecord.sequence.asc())).scalars().all()
-            return [self._to_domain(row) for row in rows]
+            rows = (
+                session.execute(statement.order_by(AgentRunEventRecord.sequence.asc()))
+                .scalars()
+                .all()
+            )
+        return [self._to_domain(row) for row in rows]
 
     # -------------------------------------------------------------------------
     def get_last_sequence(self, run_id: str) -> int:
         with self._session_factory() as session:
             return int(
                 session.scalar(
-                    select(func.coalesce(func.max(AgentRunEventRecord.sequence), 0)).where(
-                        AgentRunEventRecord.run_id == run_id
-                    )
+                    select(
+                        func.coalesce(func.max(AgentRunEventRecord.sequence), 0)
+                    ).where(AgentRunEventRecord.run_id == run_id)
                 )
                 or 0
             )
 
     # -------------------------------------------------------------------------
-    def find_event(self, run_id: str, event_id: str) -> RunEvent | None:
+    def get_latest_checkpoint_state(
+        self,
+        run_id: str,
+        *,
+        run_version: int,
+    ) -> dict[str, Any] | None:
+        """Load the last durable native run checkpoint for one version."""
+
         with self._session_factory() as session:
-            row = session.execute(
-                select(AgentRunEventRecord).where(
+            record = session.scalar(
+                select(AgentRunEventRecord)
+                .where(
                     AgentRunEventRecord.run_id == run_id,
-                    AgentRunEventRecord.id == event_id,
+                    AgentRunEventRecord.run_version == run_version,
+                    AgentRunEventRecord.type == RunEventType.CHECKPOINT.value,
+                    AgentRunEventRecord.visibility == RunEventVisibility.INTERNAL.value,
                 )
-            ).scalars().first()
-            return self._to_domain(row) if row is not None else None
+                .order_by(AgentRunEventRecord.sequence.desc())
+                .limit(1)
+            )
+        if record is None:
+            return None
+        payload = json_object(record.payload_json)
+        checkpoint = payload.get("payload")
+        if not is_json_object(checkpoint):
+            return None
+        run_state = checkpoint.get("run_state")
+        return dict(run_state) if is_json_object(run_state) else None
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _to_domain(record: AgentRunEventRecord) -> RunEvent:
-        try:
-            payload = json.loads(record.payload_json)
-        except json.JSONDecodeError:
-            payload = {}
+        payload = record.payload_json
         return RunEvent(
             event_id=record.id,
             sequence=record.sequence,
@@ -106,5 +156,5 @@ class AgentRunEventRepository:
             type=RunEventType(record.type),
             timestamp=record.created_at,
             visibility=RunEventVisibility(record.visibility),
-            payload=payload if isinstance(payload, dict) else {},
+            payload=json_object(payload),
         )

@@ -3,9 +3,14 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from server.domain.geographics import CapabilityKind, CapabilityManifestV2
+import pytest
+
+from server.contracts.geospatial import CapabilityKind, CapabilityManifestV2
 from server.services.geospatial.layer_auditor import audit_all_manifests
-from server.services.geospatial.manifest_loader import GeospatialManifestLoader
+from server.services.geospatial.manifest_loader import (
+    GeospatialManifestLoader,
+    ManifestValidationError,
+)
 
 ###############################################################################
 def test_all_geospatial_manifests_pass_schema_v2_audit() -> None:
@@ -22,7 +27,9 @@ def test_all_geospatial_manifests_pass_schema_v2_audit() -> None:
 
 ###############################################################################
 def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
-    manifests = Path("app/tests/artifacts/tmp_manifest_schema_v2")
+    manifests = (
+        Path(__file__).resolve().parents[2] / "artifacts" / "tmp_manifest_schema_v2"
+    )
     if manifests.exists():
         shutil.rmtree(manifests)
     basemaps = manifests / "basemaps"
@@ -86,6 +93,24 @@ def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
         shutil.rmtree(manifests, ignore_errors=True)
 
 ###############################################################################
+def test_manifest_loader_rejects_empty_agentic_domains() -> None:
+    loader = GeospatialManifestLoader()
+    entry = dict(loader.load_all()["overlays"][0])
+    entry.pop("source_filename", None)
+    entry.pop("source_path", None)
+    entry["agenticUse"] = {
+        **dict(entry["agenticUse"]),
+        "domains": [],
+    }
+
+    with pytest.raises(ManifestValidationError, match="agenticUse domain"):
+        loader._validate_entry(
+            entry,
+            source="missing_domains.json",
+            require_agentic_domains=True,
+        )
+
+###############################################################################
 def test_loaded_manifests_expose_v2_capability_kinds() -> None:
     loader = GeospatialManifestLoader()
     loaded = loader.load_all()
@@ -93,13 +118,20 @@ def test_loaded_manifests_expose_v2_capability_kinds() -> None:
     overlays = loaded["overlays"]
     transit = loaded["transit"]
 
+    def without_loader_metadata(item: dict[str, object]) -> dict[str, object]:
+        return {
+            key: value
+            for key, value in item.items()
+            if key not in {"source_filename", "source_path"}
+        }
+
     assert all(
-        CapabilityManifestV2.model_validate(item).capability_kind
+        CapabilityManifestV2.model_validate(without_loader_metadata(item)).capability_kind
         == CapabilityKind.BASEMAP
         for item in basemaps
     )
     assert any(item["capabilityKind"] == "metadata-only" for item in overlays)
     assert any(item["renderingMode"] == "clustered-points" for item in overlays)
     assert {item["id"] for item in transit}.issuperset(
-        {"gtfs_static", "gtfs_realtime", "transitland_feeds"}
+        {"gtfs_static", "gtfs_realtime", "mobility_database_feeds"}
     )

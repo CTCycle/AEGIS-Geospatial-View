@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import argparse
 import json
 import os
@@ -9,8 +11,8 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from server.common.paths import PROJECT_DIR
-from server.domain.geographics import (
+from server.common.paths import DATA_PATH, PROJECT_DIR
+from server.contracts.geospatial import (
     CapabilityImplementationStatus,
     CapabilityKind,
     CapabilityManifestV2,
@@ -19,10 +21,18 @@ from server.domain.geographics import (
     ProviderAuthType,
     RenderingMode,
 )
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
 type JsonDict = dict[str, Any]
 
-MANIFEST_DIRECTORIES = ("providers", "basemaps", "overlays", "tools", "cameras", "transit")
+MANIFEST_DIRECTORIES = (
+    "providers",
+    "basemaps",
+    "overlays",
+    "tools",
+    "cameras",
+    "transit",
+)
 SECRET_FIELD_MARKERS = ("key", "secret", "token", "password")
 SECRET_FIELD_ALLOWLIST = {"providerkey", "accesspageproviderid"}
 REQUIRED_INDEX_FIELDS = {
@@ -49,9 +59,7 @@ PLACEHOLDER_STATUSES = {
     "requires-ingestion",
     "requires-local-source",
 }
-PROVIDER_SOURCE_DIR = (
-    PROJECT_DIR / "server" / "services" / "geospatial" / "providers"
-)
+PROVIDER_SOURCE_DIR = PROJECT_DIR / "server" / "services" / "geospatial" / "providers"
 API_SOURCE_PATH = PROJECT_DIR / "server" / "api" / "geospatial.py"
 CLIENT_SOURCE_DIR = PROJECT_DIR / "client" / "src" / "app"
 TEST_SOURCE_DIR = PROJECT_DIR / "tests" / "unit"
@@ -77,7 +85,7 @@ BASEMAP_TEST_MARKERS = ("basemap", "tile")
 def _read_json(path: Path) -> JsonDict:
     with path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         raise ValueError("JSON document must be an object.")
     return payload
 
@@ -130,7 +138,7 @@ def _combined_text(paths: list[Path]) -> str:
 def _python_files(root: Path) -> list[Path]:
     if not root.is_dir():
         return []
-    ignored_parts = {"__pycache__", ".pytest_cache", ".angular", "dist", "node_modules"}
+    ignored_parts = {"__pycache__", "dist", "node_modules"}
     return [
         path
         for path in root.rglob("*.py")
@@ -141,7 +149,7 @@ def _python_files(root: Path) -> list[Path]:
 def _client_files(root: Path) -> list[Path]:
     if not root.is_dir():
         return []
-    ignored_parts = {"node_modules", ".angular", "dist"}
+    ignored_parts = {"node_modules", "dist"}
     return [
         path
         for path in root.rglob("*")
@@ -163,9 +171,17 @@ def _placeholder_statuses(source: str) -> list[str]:
 
 ###############################################################################
 def _basemap_fetch_implemented(manifest: CapabilityManifestV2) -> bool:
-    metadata = manifest.metadata if isinstance(manifest.metadata, dict) else {}
-    return manifest.capability_kind == CapabilityKind.BASEMAP and bool(
+    metadata = manifest.metadata if is_json_object(manifest.metadata) else {}
+    if manifest.capability_kind != CapabilityKind.BASEMAP:
+        return False
+    # Raster XYZ basemaps expose a tile URL, while MapLibre vector basemaps
+    # expose a style document. Both are concrete render-time fetch paths.
+    return bool(
         str(metadata.get("tile_url") or "").strip()
+        or (
+            manifest.rendering_mode.value == "vector-tile"
+            and str(metadata.get("style_url") or "").strip()
+        )
     )
 
 ###############################################################################
@@ -203,7 +219,8 @@ def _status_for_manifest(
         )
         or manifest.rendering_mode.value == "metadata-only",
         cache_implemented=manifest.cache_policy.mode.value != "none",
-        api_endpoint_covered=manifest.id in api_source or manifest.provider in api_source,
+        api_endpoint_covered=manifest.id in api_source
+        or manifest.provider in api_source,
         client_renderer_covered=manifest.rendering_mode.value in CLIENT_RENDERING_MODES
         and manifest.rendering_mode.value in client_source,
         unit_tested=unit_tested,
@@ -215,18 +232,17 @@ def _status_for_manifest(
 
 ###############################################################################
 def _contains_secret_value(value: Any) -> bool:
-    if isinstance(value, dict):
+    if is_json_object(value):
         for key, nested in value.items():
             key_text = str(key).lower()
-            if (
-                key_text not in SECRET_FIELD_ALLOWLIST
-                and any(marker in key_text for marker in SECRET_FIELD_MARKERS)
+            if key_text not in SECRET_FIELD_ALLOWLIST and any(
+                marker in key_text for marker in SECRET_FIELD_MARKERS
             ):
                 if isinstance(nested, str) and nested.strip():
                     return True
             if _contains_secret_value(nested):
                 return True
-    if isinstance(value, list):
+    if is_json_array(value):
         return any(_contains_secret_value(item) for item in value)
     return False
 
@@ -290,7 +306,10 @@ def _validate_renderability(
 ) -> None:
     metadata_only_capability = manifest.capability_kind == CapabilityKind.METADATA_ONLY
     renderable_mode = manifest.rendering_mode != RenderingMode.METADATA_ONLY
-    if metadata_only_capability and manifest.rendering_mode != RenderingMode.METADATA_ONLY:
+    if (
+        metadata_only_capability
+        and manifest.rendering_mode != RenderingMode.METADATA_ONLY
+    ):
         _add_issue(
             report,
             path=path,
@@ -309,7 +328,10 @@ def _validate_renderability(
             manifest_id=manifest.id,
             message="Renderable manifest must declare normalization.expectedGeometry.",
         )
-    if manifest.reliability.status.value == "broken" and manifest.agentic_use.manual_toggle:
+    if (
+        manifest.reliability.status.value == "broken"
+        and manifest.agentic_use.manual_toggle
+    ):
         _add_issue(
             report,
             path=path,
@@ -390,6 +412,19 @@ def _validate_manifest(path: Path, report: LayerAuditReport) -> None:
             manifest_id=manifest.id,
             message="Manifest appears to contain a secret-like value.",
         )
+    agentic_use = json_object(payload.get("agenticUse"))
+    if (
+        path.parent.name != "providers"
+        and bool(agentic_use.get("defaultEnabled"))
+        and not is_json_object(payload.get("executionContract"))
+    ):
+        _add_issue(
+            report,
+            path=path,
+            severity="error",
+            manifest_id=manifest.id,
+            message="Enabled executable capability must declare executionContract.",
+        )
     _validate_auth_policy(path, manifest, report)
     _validate_renderability(path, manifest, report)
 
@@ -399,7 +434,11 @@ def audit_all_manifests(
     root_path: str | os.PathLike[str] | None = None,
     production: bool = False,
 ) -> LayerAuditReport:
-    root = Path(root_path) if root_path is not None else PROJECT_DIR / "resources" / "catalog"
+    root = (
+        Path(root_path)
+        if root_path is not None
+        else DATA_PATH / "catalog"
+    )
     report = LayerAuditReport()
     _validate_index(root, report)
     manifest_items: list[tuple[Path, CapabilityManifestV2]] = []
@@ -411,11 +450,12 @@ def audit_all_manifests(
         manifest_items.append(
             (path, CapabilityManifestV2.model_validate(_read_json(path)))
         )
-    runtime_profiles = _read_json(root / "runtime_profiles.json").get("profiles") or []
+    runtime_catalog = GeospatialManifestLoader(root).load_all()
+    runtime_profiles = json_array(runtime_catalog.get("runtime_profiles"))
     runtime_ids = {
-        str(item.get("capability_id"))
+        str(json_object(item).get("capability_id"))
         for item in runtime_profiles
-        if isinstance(item, dict) and item.get("capability_id")
+        if json_object(item).get("capability_id")
     }
     api_source = _read_text_if_exists(API_SOURCE_PATH)
     client_source = _combined_text(_client_files(CLIENT_SOURCE_DIR))
@@ -439,7 +479,10 @@ def audit_all_manifests(
                 manifest_id=manifest.id,
                 message="Capability is not registered in runtime_profiles.json.",
             )
-        if manifest.reliability.status.value == "functional" and status.placeholder_statuses:
+        if (
+            manifest.reliability.status.value == "functional"
+            and status.placeholder_statuses
+        ):
             _add_issue(
                 report,
                 path=path,
@@ -516,7 +559,9 @@ def _format_report(report: LayerAuditReport) -> str:
 ###############################################################################
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Audit geospatial manifest schema v2.")
-    parser.add_argument("--strict", action="store_true", help="Fail on any audit issue.")
+    parser.add_argument(
+        "--strict", action="store_true", help="Fail on any audit issue."
+    )
     parser.add_argument(
         "--production",
         action="store_true",

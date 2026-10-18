@@ -9,12 +9,15 @@ from typing import Any
 from playwright.sync_api import ConsoleMessage, Page, Route, expect
 
 from tests.e2e.helpers.chat_stub_payloads import (
-    chat_turn_map_response,
+    chat_completion_map_payload,
+    conversation_snapshot_payload,
+    geospatial_catalog_payload,
     model_settings_payload,
 )
+from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
 PNG_1X1_TRANSPARENT = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Jte8AAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 
 ###############################################################################
@@ -31,26 +34,26 @@ def _models_payload() -> dict[str, Any]:
                 "description": "Cloud model",
                 "provider": "openai",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {},
             }
         ],
         "local": [],
+        "sources": {},
     }
 
 ###############################################################################
 def _turn_payload() -> dict[str, Any]:
-    payload = chat_turn_map_response(7001, "Search executed successfully.")
+    payload = chat_completion_map_payload(7001, "Search executed successfully.")
     payload["map_session"]["bounds"] = [12.4963044, 41.902725, 12.4964044, 41.902825]
-    payload["map_session"]["overlays"] = []
-    payload["map_session"]["overlay_ids"] = []
+    payload["map_session"]["overlay_collection"]["instances"] = []
     payload["tool_payload"] = {"execution": "map_search", "selected_overlay_ids": []}
     return payload
 
 ###############################################################################
 def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
-    page.route(
-        re.compile(r".*/api/chat/turn$"), lambda route: _json_ok(route, _turn_payload())
-    )
+    register_realtime_stub(page, lambda _message, _run_number: _turn_payload())
     page.route(
         re.compile(r".*/api/chat/settings$"),
         lambda route: _json_ok(route, model_settings_payload()),
@@ -61,22 +64,29 @@ def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
     )
     page.route(
         re.compile(r".*/api/geospatial/capabilities$"),
+        lambda route: _json_ok(route, geospatial_catalog_payload()),
+    )
+    page.route(
+        re.compile(r".*/api/conversations/[^/]+$"),
+        lambda route: _json_ok(route, conversation_snapshot_payload()),
+    )
+    page.route(
+        re.compile(r".*/api/conversations$"),
         lambda route: _json_ok(
-            route, {"providers": [], "basemaps": [], "overlays": []}
+            route, {"conversation_id": "conversation-e2e", "title": "E2E"}
         ),
     )
 
     def handle_osm_proxy(route: Route) -> None:
         match = re.search(
-            r"/api/geospatial/tiles/osm_default/(\d+)/\d+/\d+\.png$", route.request.url
+            r"/api/geospatial/tiles/osm_default/(\d+)/\d+/\d+\.png(?:\?.*)?$",
+            route.request.url,
         )
         if match:
             record_tile_zoom(int(match.group(1)))
         route.fulfill(status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT)
 
-    page.route(
-        re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png$"), handle_osm_proxy
-    )
+    page.route("**/api/geospatial/tiles/osm_default/**", handle_osm_proxy)
 
 ###############################################################################
 def _collect_console_errors(page: Page) -> list[str]:
@@ -106,6 +116,33 @@ def _assert_no_render_blockers(errors: list[str]) -> None:
     assert not blockers, f"Render-blocking console errors detected: {blockers}"
 
 ###############################################################################
+def _assert_map_uses_full_canvas(page: Page) -> None:
+    """Verify the rendered map and MapLibre canvas share the full map frame."""
+    boxes = {
+        "canvas panel": page.locator(".canvas-panel__body").bounding_box(),
+        "map preview host": page.locator("app-map-preview").bounding_box(),
+        "map frame": page.locator(".maplibre-wrap:visible").bounding_box(),
+        "map container": page.locator(".maplibre-container:visible").last.bounding_box(),
+        "map canvas": page.locator(".maplibregl-canvas:visible").last.bounding_box(),
+    }
+    missing = [name for name, box in boxes.items() if box is None]
+    assert not missing, f"Missing map geometry for: {missing}"
+
+    panel = boxes["canvas panel"]
+    assert panel is not None
+    for name in ("map preview host", "map frame", "map container", "map canvas"):
+        box = boxes[name]
+        assert box is not None
+        assert abs(box["x"] - panel["x"]) <= 2, f"{name} is not aligned to the canvas"
+        assert abs(box["y"] - panel["y"]) <= 2, f"{name} is not aligned to the canvas"
+        assert abs(
+            (box["x"] + box["width"]) - (panel["x"] + panel["width"])
+        ) <= 2, f"{name} does not use the full canvas width"
+        assert abs(
+            (box["y"] + box["height"]) - (panel["y"] + panel["height"])
+        ) <= 2, f"{name} does not use the full canvas height"
+
+###############################################################################
 def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
     page: Page, base_url: str
 ) -> None:
@@ -115,10 +152,12 @@ def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
 
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map at 41.9028, 12.4964")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
 
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     expect(page.locator(".maplibregl-canvas")).to_be_visible(timeout=15000)
+    page.wait_for_timeout(500)
+    _assert_map_uses_full_canvas(page)
     assert requested_zooms, "Expected raster tile requests for map rendering"
     assert max(requested_zooms) <= 19
     _assert_no_render_blockers(errors)
@@ -133,8 +172,9 @@ def test_refresh_restores_rendered_map_without_console_errors(
 
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map at 41.9028, 12.4964")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
     expect(page.locator(".maplibregl-canvas")).to_be_visible(timeout=15000)
+    page.wait_for_timeout(500)
 
     page.reload()
 

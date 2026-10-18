@@ -1,0 +1,23 @@
+
+> aegis-client@1.0.0 prebuild
+> node scripts/frontend-state.cjs invalidate-build
+
+
+> aegis-client@1.0.0 build
+> ng build
+
+> Building...
+√ Building...
+Initial chunk files | Names         | Raw size | Estimated transfer size
+main-PIJO5LCU.js    | main          |  1.57 MB |               358.61 kB
+styles-NFZPBYYM.css | styles        | 68.72 kB |                 8.48 kB
+
+                    | Initial total |  1.64 MB |               367.09 kB
+
+Application bundle generation complete. [12.006 seconds] - 2026-10-17T11:36:50.433Z
+
+Output location: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\client\dist
+
+
+> aegis-client@1.0.0 postbuild
+> node scripts/frontend-state.cjs record-build

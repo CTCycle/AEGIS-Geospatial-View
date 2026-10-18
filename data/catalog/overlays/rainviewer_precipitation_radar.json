@@ -1,0 +1,179 @@
+{
+  "id": "rainviewer_precipitation_radar",
+  "name": "RainViewer Recent Precipitation Radar",
+  "provider": "rainviewer",
+  "type": "tile",
+  "description": "Recent precipitation radar history from RainViewer for rain and storm intensity context. The free 2026 API does not provide future nowcast frames.",
+  "capabilities": [
+    "tile",
+    "radar",
+    "precipitation",
+    "recent-history"
+  ],
+  "coverage": "global-partial",
+  "metadata": {
+    "label": "RainViewer Recent Precipitation Radar",
+    "default_opacity": 0.7,
+    "requires_key": false,
+    "attribution": "© RainViewer",
+    "url_template": "/api/geospatial/tiles/rainviewer_precipitation_radar/{z}/{x}/{y}.png",
+    "tile_size": 256,
+    "color_scheme": 2,
+    "tile_smooth": 1,
+    "tile_snow": 1,
+    "max_zoom": 7,
+    "fit_max_zoom": 6,
+    "keywords": [
+      "rainviewer",
+      "radar",
+      "precipitation",
+      "rain intensity",
+      "recent radar history"
+    ],
+    "action_tags": [
+      "precipitation",
+      "recent storm tracking"
+    ],
+    "task_tags": [
+      "rain monitoring",
+      "recent storm awareness",
+      "commute weather checks"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global-partial",
+    "temporal_behavior": "near-real-time-history",
+    "constraints": "Free public RainViewer access provides recent past radar only, no future nowcast or satellite IR, with public tiles capped at zoom 7; keep browser fit views at zoom 6 so a transparent zoom-7 tile does not hide the latest frame.",
+    "content_hash": "rainviewer_precipitation_radar_overlay_v3",
+    "human_summary": "Recent radar precipitation overlay for rain and storm intensity context in a selected area.",
+    "primary_use_cases": [
+      "recent storm monitoring",
+      "rainfall awareness",
+      "short-horizon weather context"
+    ],
+    "search_examples": [
+      "show recent rain radar over Naples",
+      "display recent precipitation radar near Venice"
+    ],
+    "disambiguation_notes": [
+      "Use this for recent observed radar history. Do not present it as a future radar nowcast. For forecast conditions, use forecast weather layers."
+    ],
+    "location_dependency": "Location-specific and strongly time-dependent.",
+    "integration_requirements": [
+      "No API key required for the RainViewer free public API",
+      "Attribution required",
+      "Public use limits and non-commercial scope must be respected"
+    ],
+    "official_docs_url": "https://www.rainviewer.com/api/weather-maps-api.html",
+    "source_protocol": "RainViewer Weather Maps API via AEGIS backend proxy",
+    "data_format": "image tiles",
+    "geometry_type": "raster-grid",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "public-best-effort",
+    "auth_mode": "none",
+    "rate_limit_notes": "Free public API limit documented as 100 requests per IP per minute; cache metadata and tiles conservatively.",
+    "retrieval_mode": "backend-dynamic",
+    "last_validated": "2026-09-30"
+  },
+  "version": 3,
+  "last_modified": "2026-09-30T00:00:00+00:00",
+  "capabilityKind": "raster-overlay",
+  "renderingMode": "raster-tile",
+  "sourceOfficialDocs": [
+    "https://www.rainviewer.com/api/weather-maps-api.html",
+    "https://www.rainviewer.com/api/transition-faq.html",
+    "https://www.rainviewer.com/api/color-schemes.html"
+  ],
+  "license": {
+    "name": "RainViewer public API terms",
+    "url": "https://www.rainviewer.com/api.html",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "domains": ["data_retrieval", "map_rendering"],
+    "plannerHints": [
+      "precipitation",
+      "recent storm tracking",
+      "rain monitoring",
+      "recent storm awareness",
+      "commute weather checks",
+      "rainviewer",
+      "radar",
+      "rain intensity",
+      "recent radar history"
+    ],
+    "requiredUserAction": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context",
+      "future nowcast",
+      "satellite infrared imagery",
+      "arbitrary historical frame selection"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-09-30",
+    "knownLimitations": [
+      "Free public API provides recent past radar only, not future nowcast.",
+      "Public tile zoom is capped at 7 and uses Universal Blue color scheme 2; browser fit views use zoom 6 because the latest frame can be transparent at zoom 7 for a requested city.",
+      "Best-effort public service has no SLA."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 3600
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "raster-grid"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "overlay",
+      "inspect"
+    ],
+    "supported_scope_kinds": [
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "recent_observed_history"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location",
+      "analysis_scope"
+    ],
+    "output_geometry_type": "Raster",
+    "render_support": "raster",
+    "coverage": "global-partial",
+    "limitations": [
+      "Free public API provides recent past radar only, not future nowcast or satellite infrared imagery.",
+      "Public tile zoom is capped at 7 and uses Universal Blue color scheme 2; browser fit views use zoom 6 because the latest frame can be transparent at zoom 7 for a requested city.",
+      "The first executable slice exposes the latest observed frame; arbitrary historical frame selection is not supported.",
+      "Best-effort public service has no SLA."
+    ],
+    "fallback_ids": []
+  }
+}

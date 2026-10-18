@@ -1,12 +1,23 @@
 from __future__ import annotations
 
-import asyncio
+from datetime import UTC, datetime
+
+from tests.conftest import run_async_in_thread
 
 import pytest
 
-from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
+from server.contracts.geospatial import (
+    GeospatialLayerRenderDescriptor,
+    GeospatialProviderLayerDescriptor,
+    LocationSearchRequest,
+    ViewportPolicy,
+)
+from server.domain.agent.decision import ResolvedLocation
+from server.domain.geospatial.providers import ProviderResponse
+from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
-from server.services.search.request_builder import RequestBuilder
+from server.services.geospatial.providers.base import ProviderAuthError
 
 ###############################################################################
 class _CapabilityRegistry:
@@ -20,21 +31,166 @@ class _CapabilityRegistry:
         return self.capability if self.capability["id"] == capability_id else None
 
 ###############################################################################
+def test_openaq_auth_failure_cannot_be_a_deferred_success(monkeypatch) -> None:
+    registry = ProviderRegistry()
+
+    async def unavailable(*args, **kwargs):
+        raise ProviderAuthError("OpenAQ API key is required.")
+
+    monkeypatch.setattr(registry, "fetch", unavailable)
+    with pytest.raises(ProviderAuthError, match="Configure them in Settings under Geospatial Access"):
+        run_async_in_thread(
+            RenderDescriptorService(
+                provider_registry=registry
+            ).build_overlay_descriptor("openaq_air_quality", request=_request())
+        )
+
+###############################################################################
 def _request():
-    return RequestBuilder().build_location_search_request(
-        ExecutionPlan(
-            state="map_search",
-            action_id="map_search",
-            basemap_id="osm_default",
-            overlay_ids=["test-layer"],
-        ),
-        ResolvedLocation(
-            label="Rome",
-            latitude=41.9,
-            longitude=12.5,
-            confidence=1.0,
+    location = ResolvedLocation(
+        label="Rome", latitude=41.9, longitude=12.5, confidence=1.0
+    )
+    return LocationSearchRequest(
+        resolved_location=location,
+        action_id="map_search",
+        basemap_id="osm_default",
+        overlay_ids=["test-layer"],
+        viewport=ViewportPolicy(
+            center_latitude=location.latitude,
+            center_longitude=location.longitude,
+            radius_m=25_000,
         ),
     )
+
+###############################################################################
+def _sanremo_request():
+    location = ResolvedLocation(
+        label="Sanremo", latitude=43.817, longitude=7.777, confidence=1.0
+    )
+    return LocationSearchRequest(
+        resolved_location=location,
+        action_id="map_search",
+        basemap_id="osm_default",
+        overlay_ids=["openmeteo_pressure_humidity_wind"],
+        viewport=ViewportPolicy(
+            center_latitude=location.latitude,
+            center_longitude=location.longitude,
+            radius_m=25_000,
+        ),
+    )
+
+###############################################################################
+class _SanremoWeatherProvider:
+    provider_id = "openmeteo"
+
+    # -------------------------------------------------------------------------
+    async def fetch(self, request):  # noqa: ANN001
+        return ProviderResponse(
+            capability_id=request.capability_id,
+            provider_id=self.provider_id,
+            payload={
+                "features": [
+                    {
+                        "id": "sanremo-weather",
+                        "name": "Sanremo",
+                        "latitude": 43.817,
+                        "longitude": 7.777,
+                        "relative_humidity_2m": 68,
+                        "surface_pressure": 1011,
+                        "wind_speed_10m": 5.2,
+                        "metadata": {
+                            "forecastTime": "2026-09-02T10:00",
+                        },
+                    }
+                ],
+                "requested_variables": ["relative_humidity_2m"],
+                "request_parameters": {"latitude": 43.817, "longitude": 7.777},
+            },
+            fetched_at=datetime(2026, 9, 2, 9, tzinfo=UTC),
+            result_status="ok",
+            result_type="features",
+            observation_time="2026-09-02T09:00",
+            units={
+                "relative_humidity_2m": "%",
+                "surface_pressure": "hPa",
+                "wind_speed_10m": "km/h",
+            },
+            source_url="https://api.open-meteo.com/v1/forecast",
+            warnings=["Provider warning"],
+        )
+
+###############################################################################
+def test_provider_backed_sanremo_weather_descriptor_contains_renderable_data() -> None:
+    capability = {
+        "id": "openmeteo_pressure_humidity_wind",
+        "name": "Open-Meteo Pressure Humidity Wind Forecast",
+        "provider": "openmeteo",
+        "type": "time-series-insight",
+        "capabilityKind": "analysis-tool",
+        "renderingMode": "clustered-points",
+        "metadata": {
+            "label": "Open-Meteo Pressure Humidity Wind",
+            "render_backend": "provider",
+            "url": "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}",
+            "source_protocol": "JSON time series",
+            "data_format": "JSON",
+            "geometry_type": "point",
+        },
+    }
+    service = RenderDescriptorService(
+        capability_registry=_CapabilityRegistry(capability),  # type: ignore[arg-type]
+        provider_registry=ProviderRegistry(
+            providers=[_SanremoWeatherProvider()]  # type: ignore[list-item]
+        ),
+    )
+
+    result = run_async_in_thread(
+        service.build_overlay_descriptor(
+            "openmeteo_pressure_humidity_wind", request=_sanremo_request()
+        )
+    )
+
+    assert result is not None
+    descriptor, warnings = result
+    assert warnings == ["Provider warning"]
+    assert descriptor["warnings"] == ["Provider warning"]
+    assert descriptor["rendering_mode"] == "clustered-points"
+    assert str(descriptor["url"]).startswith(
+        "/api/geospatial/layers/openmeteo_pressure_humidity_wind/geojson?"
+    )
+    assert "api.open-meteo.com" not in str(descriptor["url"])
+    assert descriptor["source_url"] == "https://api.open-meteo.com/v1/forecast"
+    assert descriptor["result_status"] == "ok"
+    feature = descriptor["data"]["features"][0]
+    assert feature["geometry"]["coordinates"] == [7.777, 43.817]
+    assert feature["properties"]["relative_humidity_2m"] == 68
+
+###############################################################################
+def test_render_descriptor_service_exposes_configurable_openfreemap_style(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("OPENFREEMAP_STYLE_BASE_URL", "https://maps.internal.example")
+    service = RenderDescriptorService(
+        capability_registry=_CapabilityRegistry(
+            {
+                "id": "openfreemap_liberty",
+                "name": "OpenFreeMap Liberty",
+                "provider": "openfreemap",
+                "metadata": {
+                    "label": "OpenFreeMap Liberty",
+                    "style_url": "https://tiles.openfreemap.org/styles/liberty",
+                    "attribution": "OpenFreeMap",
+                },
+            }
+        ),
+    )
+
+    result = run_async_in_thread(
+        service.build_basemap_descriptor("openfreemap_liberty")
+    )
+
+    assert result is not None
+    assert result["style_url"] == "https://maps.internal.example/styles/liberty"
 
 ###############################################################################
 def test_render_descriptor_service_builds_complete_wms_template() -> None:
@@ -83,16 +239,216 @@ def test_render_descriptor_service_builds_complete_wmts_template() -> None:
 
 ###############################################################################
 @pytest.mark.parametrize(
+    ("overlay_id", "expected_host"),
+    [
+        ("noaa_radar", "opengeo.ncep.noaa.gov"),
+        ("fema_nfhl_flood_zones", "hazards.fema.gov"),
+    ],
+)
+def test_catalog_raster_overlays_expose_provider_tile_templates(
+    overlay_id: str, expected_host: str
+) -> None:
+    service = RenderDescriptorService(capability_registry=CapabilityRegistry())
+
+    result = run_async_in_thread(
+        service.build_overlay_descriptor(overlay_id, request=_request())
+    )
+
+    assert result is not None
+    descriptor, warnings = result
+    assert warnings == []
+    assert descriptor["rendering_mode"] == "raster-tile"
+    tile_url_template = str(descriptor["tile_url_template"])
+    if overlay_id in {"fema_nfhl_flood_zones", "noaa_radar"}:
+        assert tile_url_template == (
+            f"/api/geospatial/tiles/{overlay_id}/{{z}}/{{x}}/{{y}}.png"
+        )
+        assert expected_host in str(descriptor["source_url"])
+    else:
+        assert expected_host in tile_url_template
+        assert "{bbox-epsg-3857}" in tile_url_template
+    assert descriptor["render"]["tile_url_template"] == tile_url_template
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("overlay_id", "expected_host", "expected_protocol"),
+    [
+        ("esa_worldcover", "mapproxy.terrascope.be", "wms"),
+        ("eea_noise_2019", "noise.discomap.eea.europa.eu", "wms"),
+        ("IMERG_Precipitation_Rate", "gibs.earthdata.nasa.gov", "wms"),
+    ],
+)
+def test_catalog_public_raster_descriptors_use_backend_proxy(
+    overlay_id: str, expected_host: str, expected_protocol: str
+) -> None:
+    service = RenderDescriptorService(capability_registry=CapabilityRegistry())
+
+    result = run_async_in_thread(
+        service.build_overlay_descriptor(overlay_id, request=_request())
+    )
+
+    assert result is not None
+    descriptor, warnings = result
+    assert warnings == []
+    expected_template = f"/api/geospatial/tiles/{overlay_id}/{{z}}/{{x}}/{{y}}.png"
+    assert descriptor["tile_url_template"] == expected_template
+    assert expected_host in str(descriptor["source_url"])
+    assert descriptor["source_protocol"].lower() == expected_protocol
+    assert descriptor["attribution"]
+    if overlay_id == "esa_worldcover":
+        assert descriptor["layer_id"] == "esa-worldcover-map-10m-2021-v2_map"
+        render = descriptor["render"]
+        assert isinstance(render, dict)
+        assert render["rendering_mode"] == "wms"
+        assert render["source_protocol"] == "wms"
+        assert render["layer_id"] == "esa-worldcover-map-10m-2021-v2_map"
+        assert render["crs"] == "EPSG:3857"
+        assert render["format"] == "image/png"
+        assert render["default_time"] is None
+        assert render["attribution"] == ["© ESA WorldCover / Terrascope"]
+        assert descriptor["url"] == (
+            "/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png"
+        )
+
+###############################################################################
+class _GibsProvider:
+    provider_id = "gibs"
+
+    async def describe_layer(self, layer_id: str, *, refresh: bool = False):
+        del refresh
+        assert layer_id == "MODIS_Terra_NDVI_8Day"
+        return GeospatialProviderLayerDescriptor(
+            provider="gibs",
+            layer_id=layer_id,
+            title="MODIS Terra NDVI 8-Day",
+            rendering_mode="wmts",
+            source_protocol="wmts",
+            data_format="image/png",
+            geometry_type="raster-grid",
+            default_time="2026-09-28",
+            tile_matrix_sets=["GoogleMapsCompatible_Level9"],
+            render=GeospatialLayerRenderDescriptor(
+                provider="gibs",
+                layer_id=layer_id,
+                rendering_mode="wmts",
+                source_protocol="wmts",
+                url="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best",
+                tile_url_template=(
+                    "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/"
+                    "MODIS_Terra_NDVI_8Day/default/{time}/"
+                    "GoogleMapsCompatible_Level9/{z}/{y}/{x}.png"
+                ),
+                tile_matrix_set="GoogleMapsCompatible_Level9",
+                format="image/png",
+                default_time="2026-09-28",
+                attribution=["© NASA GIBS"],
+            ),
+            attribution=["© NASA GIBS"],
+        )
+
+###############################################################################
+def test_provider_discovered_gibs_raster_descriptor_uses_proxy_and_keeps_time() -> None:
+    service = RenderDescriptorService(
+        provider_registry=ProviderRegistry(
+            providers=[_GibsProvider()]  # type: ignore[list-item]
+        )
+    )
+
+    descriptor, warnings = run_async_in_thread(
+        service.build_provider_layer_overlay(
+            provider_id="gibs",
+            layer_id="MODIS_Terra_NDVI_8Day",
+            request=_request(),
+        )
+    )
+
+    assert warnings == []
+    assert descriptor["url"] == (
+        "/api/geospatial/tiles/gibs:MODIS_Terra_NDVI_8Day/"
+        "{z}/{x}/{y}.png?time={time}"
+    )
+    assert descriptor["source_url"] == (
+        "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best"
+    )
+    assert descriptor["default_time"] == "2026-09-28"
+    assert descriptor["render"]["tile_url_template"] == descriptor["url"]
+
+###############################################################################
+def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
+    service = RenderDescriptorService(
+        capability_registry=_CapabilityRegistry(
+            {
+                "id": "rainviewer_precipitation_radar",
+                "name": "RainViewer Precipitation Radar",
+                "provider": "rainviewer",
+                "type": "tile",
+                "capabilityKind": "raster-overlay",
+                "renderingMode": "raster-tile",
+                "metadata": {
+                    "url": "/api/geospatial/tiles/rainviewer_precipitation_radar/{z}/{x}/{y}.png",
+                    "default_opacity": 0.7,
+                        "fit_max_zoom": 6,
+                },
+            }
+        ),
+    )
+
+    result = run_async_in_thread(
+        service.build_overlay_descriptor(
+            "rainviewer_precipitation_radar", request=_request()
+        )
+    )
+
+    assert result is not None
+    descriptor, _warnings = result
+    assert descriptor["max_zoom"] == 7
+    assert descriptor["fit_max_zoom"] == 6
+    assert descriptor["tile_url_template"] == (
+        "/api/geospatial/tiles/rainviewer_precipitation_radar/{z}/{x}/{y}.png"
+    )
+
+###############################################################################
+def test_census_demographic_render_uses_server_provider_endpoint() -> None:
+    service = RenderDescriptorService(capability_registry=CapabilityRegistry())
+
+    result = run_async_in_thread(
+        service.build_overlay_descriptor(
+            "census_tigerweb_demographics",
+            request=_request(),
+        )
+    )
+
+    assert result is not None
+    descriptor, warnings = result
+    assert str(descriptor["url"]).startswith(
+        "/api/geospatial/layers/census_tigerweb_demographics/geojson?"
+    )
+    assert "live=true" in str(descriptor["url"])
+    assert descriptor["rendering_mode"] == "choropleth"
+    assert warnings == []
+
+###############################################################################
+@pytest.mark.parametrize(
     ("rendering_mode", "capability_kind", "capability_type", "metadata"),
     [
-        ("xyz", "raster-overlay", "tile", {"url": "https://example.test/{z}/{x}/{y}.png"}),
+        (
+            "xyz",
+            "raster-overlay",
+            "tile",
+            {"url": "https://example.test/{z}/{x}/{y}.png"},
+        ),
         (
             "raster-tile",
             "raster-overlay",
             "tile",
             {"url": "https://example.test/{z}/{x}/{y}.png"},
         ),
-        ("wms", "raster-overlay", "wms", {"url": "https://example.test/wms", "layers": "x"}),
+        (
+            "wms",
+            "raster-overlay",
+            "wms",
+            {"url": "https://example.test/wms", "layers": "x"},
+        ),
         (
             "wmts",
             "raster-overlay",
@@ -131,16 +487,22 @@ def test_overlay_descriptor_covers_every_declared_rendering_mode(
         "renderingMode": rendering_mode,
         "metadata": {
             "source_protocol": rendering_mode,
-            "data_format": "GeoJSON" if rendering_mode in {
+            "data_format": "GeoJSON"
+            if rendering_mode
+            in {
                 "geojson",
                 "clustered-points",
                 "choropleth",
                 "camera-points",
-            } else "tile",
-            "geometry_type": "Point" if rendering_mode in {
+            }
+            else "tile",
+            "geometry_type": "Point"
+            if rendering_mode
+            in {
                 "clustered-points",
                 "camera-points",
-            } else "Polygon",
+            }
+            else "Polygon",
             **metadata,
         },
     }
@@ -148,7 +510,7 @@ def test_overlay_descriptor_covers_every_declared_rendering_mode(
         capability_registry=_CapabilityRegistry(capability),  # type: ignore[arg-type]
     )
 
-    result = asyncio.run(
+    result = run_async_in_thread(
         service.build_overlay_descriptor("test-layer", request=_request())
     )
 

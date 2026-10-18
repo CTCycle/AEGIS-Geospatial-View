@@ -1,29 +1,32 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
-from fastapi.responses import StreamingResponse
+from typing import Any, cast
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from server.common.paths import (
-    CONVERSATION_RUN_CANCEL_ROUTE,
-    CONVERSATION_RUN_EVENTS_ROUTE,
-    CONVERSATION_RUN_STEERING_ROUTE,
-    CONVERSATION_RUNS_ROUTE,
+    CONVERSATION_RUN_STATUS_ROUTE,
     CONVERSATIONS_ROOT_ROUTE,
     CONVERSATIONS_ROUTER_PREFIX,
 )
-from server.domain.agent_runs import (
-    AgentRunCancelRequest,
-    AgentRunCancelResponse,
-    AgentRunCreateRequest,
-    AgentRunCreateResponse,
+from server.contracts.runs import (
+    ConversationListResponse,
+    ConversationSummary,
     ConversationCreateRequest,
     ConversationCreateResponse,
+    ConversationSnapshotResponse,
+    AgentRunSnapshot,
+    RunTraceEntry,
+    RunTraceResponse,
 )
-from server.domain.steering import SteeringMessageRequest, SteeringMessageResponse
-from server.services.agent_runs.exceptions import RunConflictError, RunNotFoundError
+from server.repositories.agent_runs import AgentRunRepository
+from server.domain.agent.trace import public_protocol_projection
+from server.repositories.conversations import ConversationRepository
 from server.services.agent_runs.lifecycle import RunLifecycleService
-from server.services.agent_runs.steering import RunSteeringService
-from server.services.agent_runs.streaming import RunEventStreamService
+from server.services.chat.conversation_snapshot import (
+    ConversationSnapshotContractError,
+    ConversationSnapshotService,
+)
 
 router = APIRouter(prefix=CONVERSATIONS_ROUTER_PREFIX, tags=["conversations"])
 
@@ -32,12 +35,25 @@ def get_run_lifecycle_service(request: Request) -> RunLifecycleService:
     return request.app.state.run_lifecycle_service
 
 ###############################################################################
-def get_run_steering_service(request: Request) -> RunSteeringService:
-    return request.app.state.run_steering_service
+def get_conversation_snapshot_service(
+    request: Request,
+) -> ConversationSnapshotService:
+    return request.app.state.conversation_snapshot_service
 
 ###############################################################################
-def get_run_event_stream_service(request: Request) -> RunEventStreamService:
-    return request.app.state.run_event_stream_service
+def get_conversation_repository(request: Request) -> ConversationRepository:
+    return request.app.state.conversation_repository
+
+###############################################################################
+def get_run_repository(request: Request) -> AgentRunRepository:
+    return request.app.state.run_repository
+
+###############################################################################
+def _owner_user_id(request: Request) -> str | None:
+    """Read the authenticated owner identity when an auth middleware provides it."""
+
+    value = getattr(request.state, "user_id", None)
+    return str(value).strip() if value is not None and str(value).strip() else None
 
 ###############################################################################
 @router.post(
@@ -47,86 +63,232 @@ def get_run_event_stream_service(request: Request) -> RunEventStreamService:
 )
 def create_conversation(
     payload: ConversationCreateRequest,
+    request: Request,
     lifecycle_service: RunLifecycleService = Depends(get_run_lifecycle_service),
 ) -> ConversationCreateResponse:
-    return lifecycle_service.create_conversation(title=payload.title)
-
-###############################################################################
-@router.post(
-    CONVERSATION_RUNS_ROUTE,
-    response_model=AgentRunCreateResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def create_agent_run(
-    conversation_id: str,
-    payload: AgentRunCreateRequest,
-    lifecycle_service: RunLifecycleService = Depends(get_run_lifecycle_service),
-) -> AgentRunCreateResponse:
-    try:
-        return await lifecycle_service.create_run(conversation_id, payload)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except RunConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-
-###############################################################################
-@router.get(
-    CONVERSATION_RUN_EVENTS_ROUTE,
-    status_code=status.HTTP_200_OK,
-)
-async def stream_agent_run_events(
-    conversation_id: str,
-    run_id: str,
-    after_event_id: str | None = Query(default=None),
-    last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
-    stream_service: RunEventStreamService = Depends(get_run_event_stream_service),
-) -> StreamingResponse:
-    try:
-        stream_service.verify_run_access(conversation_id, run_id)
-    except RunNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return StreamingResponse(
-        stream_service.stream_sse(
-            run_id,
-            conversation_id=conversation_id,
-            after_event_id=after_event_id or last_event_id,
-        ),
-        media_type="text/event-stream",
+    return lifecycle_service.create_conversation(
+        title=payload.title,
+        owner_user_id=_owner_user_id(request),
     )
 
 ###############################################################################
-@router.post(
-    CONVERSATION_RUN_STEERING_ROUTE,
-    response_model=SteeringMessageResponse,
+@router.get(
+    CONVERSATIONS_ROOT_ROUTE,
+    response_model=ConversationListResponse,
     status_code=status.HTTP_200_OK,
 )
-async def steer_agent_run(
-    conversation_id: str,
-    run_id: str,
-    payload: SteeringMessageRequest,
-    steering_service: RunSteeringService = Depends(get_run_steering_service),
-) -> SteeringMessageResponse:
+def list_conversations(
+    request: Request,
+    query: str | None = Query(default=None, max_length=300),
+    limit: int = Query(default=20, ge=1, le=50),
+    cursor: str | None = Query(default=None, max_length=500),
+    conversation_repository: ConversationRepository = Depends(
+        get_conversation_repository
+    ),
+    run_repository: AgentRunRepository = Depends(get_run_repository),
+) -> ConversationListResponse:
     try:
-        return await steering_service.steer(conversation_id, run_id, payload)
-    except RunNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except RunConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        page: dict[str, Any] = conversation_repository.list_conversation_page(
+            query=query,
+            cursor=cursor,
+            limit=limit,
+            owner_user_id=_owner_user_id(request),
+        )
+        summaries: list[ConversationSummary] = []
+        for item in page.get("conversations", []):
+            if not isinstance(item, dict):
+                continue
+            item_payload = cast(dict[str, Any], item)
+            recent_runs = run_repository.list_run_summaries(
+                str(item_payload.get("conversation_id") or ""),
+                limit=1,
+            )
+            latest_raw = recent_runs.get("runs", [])
+            latest = (
+                latest_raw[0]
+                if latest_raw and isinstance(latest_raw[0], dict)
+                else None
+            )
+            summary_payload: dict[str, Any] = {
+                key: item_payload.get(key)
+                for key in (
+                    "conversation_id",
+                    "title",
+                    "context_revision",
+                    "message_count",
+                    "last_message_preview",
+                    "created_at",
+                    "updated_at",
+                )
+            }
+            summary_payload["latest_run"] = latest
+            summaries.append(ConversationSummary.model_validate(summary_payload))
+        return ConversationListResponse(
+            conversations=summaries,
+            next_cursor=page.get("next_cursor"),
+            has_more=bool(page.get("has_more", False)),
+            total=int(page.get("total", len(summaries))),
+            pagination=cast(
+                dict[str, Any],
+                page.get("pagination")
+                if isinstance(page.get("pagination"), dict)
+                else {},
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 ###############################################################################
-@router.post(
-    CONVERSATION_RUN_CANCEL_ROUTE,
-    response_model=AgentRunCancelResponse,
+@router.get(
+    "/{conversation_id}",
+    response_model=ConversationSnapshotResponse,
     status_code=status.HTTP_200_OK,
 )
-async def cancel_agent_run(
+def get_conversation_snapshot(
+    conversation_id: str,
+    request: Request,
+    snapshot_service: ConversationSnapshotService = Depends(
+        get_conversation_snapshot_service
+    ),
+) -> ConversationSnapshotResponse:
+    try:
+        # The snapshot service keeps the repository access check as its
+        # canonical guard.  Auth middleware can additionally place the owner
+        # identity on request.state; anonymous local mode remains unowned-only.
+        snapshot = snapshot_service.get_snapshot(
+            conversation_id,
+            owner_user_id=_owner_user_id(request),
+        )
+        return ConversationSnapshotResponse.model_validate(public_protocol_projection(snapshot.model_dump(mode="json")))
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Conversation access denied.",
+        ) from exc
+    except ConversationSnapshotContractError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found.",
+        ) from exc
+
+###############################################################################
+@router.get(
+    CONVERSATION_RUN_STATUS_ROUTE,
+    response_model=AgentRunSnapshot,
+    status_code=status.HTTP_200_OK,
+)
+def get_run_status(
     conversation_id: str,
     run_id: str,
-    payload: AgentRunCancelRequest | None = None,
+    request: Request,
     lifecycle_service: RunLifecycleService = Depends(get_run_lifecycle_service),
-) -> AgentRunCancelResponse:
-    del payload
+    conversation_repository: ConversationRepository = Depends(
+        get_conversation_repository
+    ),
+    run_repository: AgentRunRepository = Depends(get_run_repository),
+) -> AgentRunSnapshot:
+    """Return active or terminal run state for 202 polling clients."""
+
     try:
-        return await lifecycle_service.cancel_run(conversation_id, run_id)
-    except RunNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        conversation_repository.verify_conversation_access(
+            conversation_id,
+            _owner_user_id(request),
+        )
+        snapshot = run_repository.get_run(run_id)
+        if snapshot is None or snapshot.conversation_id != conversation_id:
+            raise ValueError("Run not found.")
+        response = lifecycle_service.read_completed_response(conversation_id, run_id)
+        if response is not None:
+            snapshot = snapshot.model_copy(
+                update={"response": response.model_dump(mode="json")}
+            )
+        return snapshot.model_copy(update={
+            "presentation": public_protocol_projection(snapshot.presentation),
+            "response": public_protocol_projection(snapshot.response),
+        })
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Conversation access denied.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Run not found.",
+        ) from exc
+
+###############################################################################
+@router.get(
+    "/{conversation_id}/runs/{run_id}/trace",
+    response_model=RunTraceResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_run_trace(
+    conversation_id: str,
+    run_id: str,
+    request: Request,
+    run_version: int | None = Query(default=None, ge=1),
+    after_sequence: int | None = Query(default=None, ge=0),
+    cursor: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=100, ge=1, le=200),
+    include_internal: bool = Query(default=True),
+    conversation_repository: ConversationRepository = Depends(
+        get_conversation_repository
+    ),
+    run_repository: AgentRunRepository = Depends(get_run_repository),
+) -> RunTraceResponse:
+    try:
+        conversation_repository.verify_conversation_access(
+            conversation_id,
+            _owner_user_id(request),
+        )
+        page = run_repository.read_trace(
+            conversation_id,
+            run_id,
+            run_version=run_version,
+            after_sequence=after_sequence,
+            cursor=cursor,
+            limit=limit,
+            include_internal=include_internal,
+        )
+        entries = [
+            RunTraceEntry.model_validate(item)
+            for item in page.get("events", [])
+            if isinstance(item, dict)
+        ]
+        return RunTraceResponse(
+            conversation_id=conversation_id,
+            run_id=run_id,
+            run_version=run_version,
+            events=entries,
+            next_cursor=page.get("next_cursor"),
+            has_more=bool(page.get("has_more", False)),
+            total=int(page.get("total", len(entries))),
+            pagination=cast(
+                dict[str, Any],
+                page.get("pagination")
+                if isinstance(page.get("pagination"), dict)
+                else {},
+            ),
+        )
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Conversation access denied.",
+        ) from exc
+    except ValueError as exc:
+        detail = str(exc)
+        code = (
+            status.HTTP_404_NOT_FOUND
+            if "not found" in detail.casefold()
+            else status.HTTP_400_BAD_REQUEST
+        )
+        raise HTTPException(status_code=code, detail=detail) from exc

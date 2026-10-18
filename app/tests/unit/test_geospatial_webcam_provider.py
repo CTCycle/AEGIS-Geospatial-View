@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-import asyncio
+import pytest
+
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
@@ -14,7 +16,7 @@ def test_windy_webcam_provider_builds_bbox_camera_request() -> None:
         calls.append((url, headers))
         return {"webcams": []}
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         WindyWebcamsProvider(api_key="windy-test", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="windy_webcams",
@@ -24,10 +26,31 @@ def test_windy_webcam_provider_builds_bbox_camera_request() -> None:
         )
     )
 
-    assert "bbox=7.0,45.0,7.5,45.5" in calls[0][0]
-    assert "category=traffic" in calls[0][0]
+    assert "bbox=45.5,7.5,45.0,7.0" in calls[0][0]
+    assert "categories=traffic" in calls[0][0]
     assert calls[0][1] == {"x-windy-api-key": "windy-test"}
     assert response.payload["renderingMode"] == "camera-points"
+
+###############################################################################
+def test_windy_webcam_live_failure_after_descriptor_is_not_reported_stale() -> None:
+
+    async def fetcher(url: str, headers: dict[str, str] | None = None):
+        raise RuntimeError("upstream failure")
+
+    provider = WindyWebcamsProvider(api_key="windy-test", fetcher=fetcher)
+    request = ProviderRequest(capability_id="windy_webcams", bbox=(7.0, 45.0, 7.5, 45.5))
+    run_async_in_thread(provider.fetch(request))
+
+    with pytest.raises(RuntimeError):
+        run_async_in_thread(
+            provider.fetch(
+                ProviderRequest(
+                    capability_id="windy_webcams",
+                    bbox=(7.0, 45.0, 7.5, 45.5),
+                    params={"live": True},
+                )
+            )
+        )
 
 ###############################################################################
 def test_local_open_data_camera_template_fetches_configured_source() -> None:
@@ -44,7 +67,7 @@ def test_local_open_data_camera_template_fetches_configured_source() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         LocalOpenDataProvider(
             source_map={"dot_traffic_cameras": "https://agency.example/cameras.json"},
             fetcher=fetcher,
@@ -53,4 +76,6 @@ def test_local_open_data_camera_template_fetches_configured_source() -> None:
 
     assert response.payload["renderingMode"] == "camera-points"
     assert response.payload["features"][0]["id"] == "dot-1"
-    assert response.payload["features"][0]["properties"]["officialUrl"].startswith("https://")
+    assert response.payload["features"][0]["properties"]["officialUrl"].startswith(
+        "https://"
+    )

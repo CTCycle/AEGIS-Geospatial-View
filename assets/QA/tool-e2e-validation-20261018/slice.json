@@ -1,0 +1,30 @@
+{
+ "campaign": "tool-e2e-validation-20261018",
+ "branch": "develop",
+ "base": "c93996ea34df3d5f55201631c1207ce802cf2335",
+ "lane": "opencode-go / deepseek-v4.1-flash",
+ "live_agent_runs": 32,
+ "source_sha256": {
+  "app/client/src/app/pages/geospatial-page.component.ts": "58d4eeb0c4c3e31f1d37c38afe540d2628c5f76887c2e792d954368a0f301c8c",
+  "app/server/api/geospatial.py": "ec050e420bc84354fc12fbad66530411363b0991b7f48cd38611dec9b3ab3ff4",
+  "app/server/common/identifiers.py": "2d852cad2827f41f16cb6a85020f2b74f4d32f85de7f450720d50dd74fd08aab",
+  "app/server/services/agent/agent_loop.py": "b68013efb19317c61916262e315dff549f6116e92fab9cb659a008efa08f88ef",
+  "app/server/services/agent/capability_router.py": "e3752ff4ae4edcdb723bfe8e46f07f773c2534d9d6a8bd42c98883dd192d91cc",
+  "app/server/services/agent/native_tools.py": "f1f1335076462af159c97ddb3ab77e89955966a049aa7b94d9fd6d7fa5f43a38",
+  "app/server/services/agent/overlay_collection.py": "6b2fa1675e930f65209bad18ad1e5511611cab0746a2eb01c1fd4d460fb35e5a",
+  "app/server/services/agent/tool_registry.py": "455a02a7566fdf4a0840adb26483c32de4475dcd05731e0664bf4d8c2b253507",
+  "app/server/services/agent/vision_policy.py": "296d8c5ae92a306b58b1658310800923e349562c24976a2754140b541f9e1438",
+  "app/server/services/geospatial/api_service.py": "b057ed49213b884dd8825488d2f5e75728b888ba939a284a8f20fbc6f60492f5",
+  "app/server/services/geospatial/capability_registry.py": "cea7482168bee823dd1c4a641a43e5edc5bbcc6037b2fe8302f6b9f4001c3c27",
+  "app/server/services/geospatial/map_session_builder.py": "32dda7f5fe20fdc6176bd214c9b5f0207937d123a95a7842aac39ffe7ad24f42",
+  "app/server/services/llm/opencode_provider.py": "b8a47b8b0c9e91a78f022219d7176d20d6ec56eb67a9a1c3d0c734f0141a1452",
+  "app/tests/unit/services/agent/test_agent_loop_v2.py": "613b15fa5de0fc9991d7f781e6afdd626bdfd296c240ba5f28a9e60394f24576",
+  "app/tests/unit/services/agent/test_capability_router.py": "f0f6a6ab96e148d540f65260cff1836e92f7acd8fe35aa1387697a04dab5a82a",
+  "app/tests/unit/services/agent/test_map_plan_service.py": "a696ba2ce9bc7d5e1a55410924ae3fe218e549e2ef55b5f57c388a3b69283eae",
+  "app/tests/unit/services/agent/test_tools.py": "9338ec63a198dc8225a9ad571fca990f16294c4dbd441a203f7787d6f2141fe7",
+  "app/tests/unit/services/agent/test_vision_policy.py": "38f7536b1fe601df9f212edd797ab3e26680281d3cca2bf1e696a7d0db260900",
+  "app/tests/unit/services/geospatial/test_agentic_manifest_contract.py": "0c845360f929c517f9d2a840dac9422999d34a8b09630899057f505b5cce911f",
+  "app/tests/unit/services/llm/test_capabilities.py": "7d41cd6f6083c5b8c6e0ae8be3d6f31ffb15fca7731d4f738168e32730003e47",
+  "app/tests/unit/test_geospatial_api_contracts.py": "d7a1a44bc4466fd1f7fada6d273aa1f90e7c801917f88ffa587c214acab04796"
+ }
+}

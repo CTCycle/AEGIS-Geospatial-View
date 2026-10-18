@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from server.api.settings import router
+from server.configurations.settings import DatabaseSettings
+from server.repositories.database.sqlite import SQLiteRepository
+from server.repositories.runtime_settings import RuntimeSettingsRepository
+from server.repositories.schemas import Base
+from server.services.settings.runtime_settings import RuntimeSettingsService
+
+
+def _client(tmp_path: Path) -> tuple[TestClient, RuntimeSettingsRepository]:
+    database = SQLiteRepository(DatabaseSettings(str(tmp_path / "runtime.db")))
+    Base.metadata.create_all(database.engine)
+    repository = RuntimeSettingsRepository(database)
+    repository.initialize_defaults(legacy_path=tmp_path / "missing.json")
+    application = FastAPI()
+    application.include_router(router, prefix="/api")
+    application.state.runtime_settings_service = RuntimeSettingsService(repository)
+    return TestClient(application), repository
+
+
+def test_runtime_settings_api_returns_typed_blocks_and_restart_metadata(tmp_path: Path) -> None:
+    client, repository = _client(tmp_path)
+
+    response = client.get("/api/settings/runtime")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["schema_version"] == 1
+    assert payload["chat"]["max_history_messages"] == 12
+    assert payload["agent_execution"]["max_iterations"] == 12
+    assert payload["agent_execution"]["max_discovery_attempts"] == 2
+    assert payload["restart_required"] is False
+    assert "credentials" not in payload
+    serialized = json.dumps(payload).casefold()
+    assert not any(
+        secret_field in serialized
+        for secret_field in ("api_key", "password", "secret", "token")
+    )
+    assert repository.get_required().chat.max_history_messages == 12
+
+
+def test_runtime_settings_api_merges_partial_blocks_atomically(tmp_path: Path) -> None:
+    client, repository = _client(tmp_path)
+
+    response = client.patch(
+        "/api/settings/runtime",
+        json={"chat": {"max_history_messages": 24}},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["chat"]["max_history_messages"] == 24
+    assert response.json()["restart_required"] is True
+    assert repository.get_required().chat.max_history_messages == 24
+
+
+def test_agent_policy_patch_applies_to_new_runs_and_rejects_invalid_values_atomically(tmp_path: Path) -> None:
+    client, repository = _client(tmp_path)
+    response = client.patch("/api/settings/runtime", json={"agent_execution": {"max_iterations": 7, "max_discovery_attempts": 5}})
+    assert response.status_code == 200
+    assert response.json()["restart_required"] is False
+    assert repository.get_required().agent_execution.max_discovery_attempts == 5
+    response = client.patch("/api/settings/runtime", json={"agent_execution": {"max_iterations": 8, "max_discovery_attempts": 0}})
+    assert response.status_code == 400
+    assert repository.get_required().agent_execution.max_iterations == 7
+
+
+def test_runtime_settings_api_rejects_unknown_nested_fields(tmp_path: Path) -> None:
+    client, repository = _client(tmp_path)
+
+    response = client.patch(
+        "/api/settings/runtime",
+        json={"map": {"legacy_tiles": "ignored"}},
+    )
+
+    assert response.status_code == 400
+    assert "Unsupported runtime settings in map" in response.json()["detail"]
+    assert repository.get_required().map.tiles == "OpenStreetMap"
+
+
+def test_runtime_settings_api_rejects_unknown_blocks(tmp_path: Path) -> None:
+    client, repository = _client(tmp_path)
+
+    response = client.patch(
+        "/api/settings/runtime",
+        json={"unsupported": {"enabled": True}},
+    )
+
+    assert response.status_code == 422
+    assert repository.get_required().map.tiles == "OpenStreetMap"

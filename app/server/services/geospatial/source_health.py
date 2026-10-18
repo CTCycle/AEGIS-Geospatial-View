@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from server.domain.geographics import LayerHealthStatus
+from server.common.typing import is_json_object
+
+from server.contracts.geospatial import LayerHealthStatus
 from server.domain.geospatial.health import SourceHealthRecord
 
 ###############################################################################
@@ -21,7 +23,9 @@ class SourceHealthMonitor:
     ) -> SourceHealthRecord:
         normalized_provider = self._normalize_provider_id(provider_id)
         normalized_status = (
-            status if isinstance(status, LayerHealthStatus) else LayerHealthStatus(status)
+            status
+            if isinstance(status, LayerHealthStatus)
+            else LayerHealthStatus(status)
         )
         record = SourceHealthRecord(
             provider_id=normalized_provider,
@@ -44,7 +48,7 @@ class SourceHealthMonitor:
             if recorded is not None:
                 return recorded.status
         reliability = manifest.get("reliability")
-        if isinstance(reliability, dict):
+        if is_json_object(reliability):
             value = reliability.get("status")
             if isinstance(value, str) and value:
                 return LayerHealthStatus(value)

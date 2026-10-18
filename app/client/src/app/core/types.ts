@@ -39,6 +39,7 @@ export interface CapabilityDescriptor {
   provider: string;
   requires_credentials: boolean;
   is_available: boolean;
+  availability_reason?: string | null;
   supports_map: boolean;
   supports_direct_text: boolean;
   coverage: string;
@@ -56,6 +57,13 @@ export interface CapabilityDescriptor {
   reliability?: LayerReliability;
   auth?: ProviderAuthPolicy;
   metadata?: Record<string, JsonValue>;
+  render?: {
+    status?: 'available' | 'unavailable' | 'checking' | string;
+    tile_url?: string | null;
+    style_url?: string | null;
+    attribution?: string;
+    reason?: string;
+  };
 }
 
 export interface CatalogResponse {
@@ -111,6 +119,7 @@ export interface GeospatialLayerRenderDescriptor {
   min_zoom?: number | null;
   max_zoom?: number | null;
   attribution?: string[];
+  attribution_url?: string | null;
   warnings?: string[];
 }
 
@@ -164,6 +173,65 @@ export interface CameraFeature {
   metadata: Record<string, JsonValue>;
 }
 
+export interface InspectionField {
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+  unit?: string | null;
+  category?: string;
+  source_url?: string | null;
+  order?: number;
+}
+
+export interface MapInspection {
+  inspection_id: string;
+  title: string;
+  association: 'feature' | 'location' | 'overlay' | 'non_spatial' | string;
+  provider?: string | null;
+  feature_id?: string | null;
+  fields: InspectionField[];
+  source_url?: string | null;
+  freshness?: string | null;
+  stale?: boolean;
+  warnings?: string[];
+  geometry?: Record<string, JsonValue> | null;
+}
+
+export interface OverlayInstance {
+  instance_id: string;
+  capability_id: string;
+  label: string;
+  provider: string;
+  overlay_type: string;
+  rendering_mode: string;
+  scope_key: string;
+  scope: Record<string, JsonValue>;
+  resolved_location?: ResolvedLocation | null;
+  viewport?: ViewportPolicy | Record<string, JsonValue> | null;
+  visible: boolean;
+  opacity: number;
+  render_variant: Record<string, string | null>;
+  descriptor: Record<string, JsonValue>;
+  inspections: MapInspection[];
+}
+
+export interface OverlayCollectionState {
+  collection_id: string;
+  revision: number;
+  instances: OverlayInstance[];
+}
+
+export interface OverlayMutationResult {
+  collection_id: string;
+  revision: number;
+  added_instance_ids: string[];
+  removed_instance_ids: string[];
+  updated_instance_ids: string[];
+  unmatched_selectors: string[];
+  ambiguous_selectors: string[];
+  clarification?: string | null;
+}
+
 
 export type GeospatialProviderAutomationSupport =
   | 'manual_only'
@@ -198,7 +266,6 @@ export interface GeospatialProviderAccountSetup {
   requiresCredentials: boolean;
   authMode: string;
   docsUrl?: string | null;
-  environmentVariable?: string | null;
   configured: boolean;
   instructions: string[];
   automation: GeospatialProviderSignupAutomation;
@@ -216,7 +283,6 @@ export interface GeospatialCredentialStatus {
   provider: string;
   required: boolean;
   configured: boolean;
-  environmentVariable?: string | null;
 }
 
 export interface GeospatialProviderPayload {
@@ -227,13 +293,69 @@ export interface GeospatialProviderPayload {
   warnings?: string[];
   stale?: boolean;
   message?: string;
+  result_status?: string | null;
+  result_type?: string | null;
+  fetched_at?: string | null;
+  observation_time?: string | null;
+  coverage?: Record<string, JsonValue> | null;
+  spatial_resolution?: string | null;
+  units?: Record<string, string>;
+  source_url?: string | null;
+  partial?: boolean;
+}
+
+export interface MapOverlayEntry {
+  id: string;
+  instance_id?: string;
+  capability_id?: string;
+  label: string;
+  provider: string;
+  type: string;
+  rendering_mode?: RenderingMode | string;
+  default_opacity?: number;
+  visible?: boolean;
+  url?: string | null;
+  tile_url_template?: string;
+  layers?: string;
+  layer_id?: string;
+  source_layer?: string;
+  tile_matrix_set?: string;
+  tile_size?: number;
+  min_zoom?: number;
+  max_zoom?: number;
+  fit_max_zoom?: number;
+  bounds?: [number, number, number, number];
+  attribution?: string;
+  attribution_url?: string | null;
+  source_protocol?: string;
+  data_format?: string;
+  geometry_type?: string;
+  crs?: string | null;
+  format?: string | null;
+  style?: string | null;
+  time?: string | null;
+  default_time?: string | null;
+  result_status?: string | null;
+  fetched_at?: string | null;
+  observation_time?: string | null;
+  coverage?: Record<string, JsonValue> | null;
+  spatial_resolution?: string | null;
+  units?: Record<string, string>;
+  source_url?: string | null;
+  partial?: boolean;
+  stale?: boolean;
+  requested_variables?: string[];
+  request_parameters?: Record<string, JsonValue>;
+  warnings?: string[];
+  render?: GeospatialLayerRenderDescriptor | null;
+  data?: GeoJsonFeatureCollection;
+  inspections?: MapInspection[];
 }
 
 export interface MapSession {
   session_id: string;
   resolved_location: ResolvedLocation;
   basemap_id: string;
-  overlay_ids: string[];
   viewport: ViewportPolicy;
   generated_at?: string;
   payload?: Record<string, JsonValue>;
@@ -244,52 +366,76 @@ export interface MapSession {
     label?: string;
     provider?: string;
     tile_url?: string | null;
+    style_url?: string | null;
     attribution?: string;
+    render_status?: 'available' | 'unavailable' | 'checking' | string;
+    unavailable_reason?: string | null;
   };
-  overlays?: Array<{
-    id: string;
-    label: string;
-    provider: string;
-    type: string;
-    rendering_mode?: RenderingMode | string;
-    default_opacity?: number;
-    url?: string | null;
-    tile_url_template?: string;
-    layers?: string;
-    layer_id?: string;
-    source_layer?: string;
-    tile_matrix_set?: string;
-    tile_size?: number;
-    min_zoom?: number;
-    max_zoom?: number;
-    // Legacy aliases accepted only while reading older persisted map sessions.
-    minzoom?: number;
-    wmts_format?: string;
-    wmts_style?: string;
-    wms_version?: string;
-    wms_exceptions?: string;
-    render_params?: Record<string, JsonValue>;
-    bounds?: [number, number, number, number];
-    attribution?: string;
-    maxzoom?: number;
-    source_protocol?: string;
-    data_format?: string;
-    geometry_type?: string;
-    crs?: string | null;
-    format?: string | null;
-    style?: string | null;
-    time?: string | null;
-    default_time?: string | null;
-    warnings?: string[];
-    render?: GeospatialLayerRenderDescriptor | null;
-  }>;
-  requested_overlay_ids?: string[];
-  rendered_overlay_ids?: string[];
-  failed_overlays?: Array<{ id: string; reason: string }>;
   compliance_warnings?: string[];
+  overlay_collection: OverlayCollectionState;
+  presentation?: PresentationStatus | null;
 }
 
-export type MapOverlayEntry = NonNullable<MapSession['overlays']>[number];
+export type PresentationStatus =
+  | 'not_required'
+  | 'not_requested'
+  | 'pending'
+  | 'prepared'
+  | 'prepared_unverified'
+  | 'ready'
+  | 'failed'
+  | 'render_timeout';
+
+export interface RenderRequirement {
+  name: string;
+  required: boolean;
+  status: 'pending' | 'satisfied' | 'failed' | 'not_applicable';
+  target_id?: string | null;
+  evidence_ref?: string | null;
+  failure_code?: string | null;
+}
+
+export interface MapRenderAcknowledgement {
+  run_id: string;
+  run_version: number;
+  map_session_id: string;
+  collection_revision: number;
+  status: 'ready' | 'failed';
+  viewport_bounds?: number[] | null;
+  checks: Record<string, boolean>;
+  overlay_results: Array<Record<string, JsonValue>>;
+  failure_code?: string | null;
+  failure_stage?: string | null;
+  failure_summary?: string | null;
+}
+
+/** Bounded browser evidence fed back into the native agent run. */
+export interface RenderObservation {
+  map_session_id: string;
+  collection_revision: number;
+  attempt: number;
+  status: 'ready' | 'failed';
+  viewport_bounds?: [number, number, number, number] | null;
+  checks: Record<string, boolean>;
+  overlay_results: Array<Record<string, JsonValue>>;
+  failure_code?: string | null;
+  failure_stage?: string | null;
+  failure_summary?: string | null;
+  fingerprint?: string | null;
+  action_fingerprint?: string | null;
+  recovery: 'continue' | 'revise_map' | 'alternate_source' | 'terminal';
+  observed_at?: string | null;
+}
+
+export interface GeoJsonFeatureCollection {
+  type: 'FeatureCollection';
+  features: Array<{
+    type: 'Feature';
+    id?: string | number;
+    geometry: JsonObject | null;
+    properties?: JsonObject | null;
+  }>;
+}
 
 export interface SearchResponsePayload {
   map_session?: MapSession;
@@ -299,11 +445,12 @@ export interface SearchResponsePayload {
 export interface OverlayStateChange {
   overlayVisibility: Record<string, boolean>;
   overlayOpacity: Record<string, number>;
+  overlayOrder: string[];
 }
 
 export interface OverlayRenderStatus {
   overlayId: string;
-  status: 'pending' | 'loaded' | 'failed' | 'metadata-only';
+  status: 'pending' | 'loaded' | 'failed' | 'metadata-only' | 'no-results';
   message?: string;
 }
 
@@ -332,12 +479,62 @@ export type AgentRunState =
   | 'running'
   | 'updating'
   | 'waiting_for_clarification'
+  | 'awaiting_render'
   | 'completed'
   | 'failed'
   | 'cancelled';
 
+/**
+ * A small, run-scoped task projection.  Task state is operational UI data;
+ * it is deliberately separate from provider messages and never contains
+ * hidden model reasoning.
+ */
+export type AgentTaskStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'completed'
+  | 'failed'
+  | 'blocked'
+  | 'cancelled'
+  | 'superseded';
+
+export interface CompletionRequirement {
+  name: string;
+  required: boolean;
+  status: 'pending' | 'satisfied' | 'failed' | 'not_applicable';
+  target_id?: string | null;
+  evidence_ref?: string | null;
+  failure_code?: string | null;
+}
+
+export interface AgentTask {
+  id: string;
+  task_id?: string;
+  description: string;
+  status: AgentTaskStatus;
+  parent_task_id?: string | null;
+  dependencies?: string[];
+  result?: Record<string, JsonValue> | null;
+  failure_code?: string | null;
+  requirement_name?: string | null;
+  target_id?: string | null;
+}
+
+export interface AgentTaskState {
+  run_id?: string | null;
+  root_task_id?: string;
+  current_iteration?: number;
+  max_iterations?: number;
+  active_task_id?: string | null;
+  status?: AgentTaskStatus;
+  tasks: AgentTask[];
+  completion_requirements?: CompletionRequirement[];
+  unresolved_requirements?: string[];
+}
+
 export type RunEventType =
   | 'progress'
+  | 'context_usage'
   | 'assistant_text_delta'
   | 'assistant_text_completed'
   | 'tool_started'
@@ -346,7 +543,11 @@ export type RunEventType =
   | 'error'
   | 'completed'
   | 'cancelled'
-  | 'clarification_needed';
+  | 'clarification_needed'
+  | 'trace'
+  | 'checkpoint'
+  | 'map_prepared'
+  | 'render_observed';
 
 export type RunEventVisibility = 'user' | 'internal';
 
@@ -371,275 +572,338 @@ export interface ConversationCreateResponse {
   title?: string | null;
 }
 
-export interface AgentRunCreateRequest {
-  message: string;
-  client_request_id?: string;
-}
-
-export interface AgentRunCreateResponse {
-  conversation_id: string;
+export interface ActiveConversationRunSnapshot {
   run_id: string;
   run_version: number;
   state: AgentRunState;
-  stream_url: string;
+  presentation_status?: PresentationStatus;
+  presentation?: Record<string, JsonValue> | null;
+  task_state?: AgentTaskState | null;
+  current_iteration?: number | null;
+  max_iterations?: number | null;
 }
 
-export interface SteeringMessageRequest {
-  message: string;
-  client_mutation_id?: string;
-}
-
-export interface SteeringMessageResponse {
-  conversation_id: string;
+export interface ConversationRunSummary {
+  conversation_id?: string;
   run_id: string;
-  steering_id: string;
-  run_version: number;
-  aggregated_request: string;
+  original_request?: string;
+  aggregated_request?: string;
+  run_version?: number;
+  active_run_version?: number;
   state: AgentRunState;
-}
-
-export interface AgentRunCancelResponse {
-  conversation_id: string;
-  run_id: string;
-  state: AgentRunState;
+  created_at?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  request_timezone?: string | null;
   cancel_requested_at?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  presentation_status?: PresentationStatus;
+  presentation?: Record<string, JsonValue> | null;
+  task_state?: AgentTaskState | null;
+  current_iteration?: number | null;
+  max_iterations?: number | null;
+}
+
+export interface ConversationSummary {
+  conversation_id: string;
+  title?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  message_count?: number;
+  last_message_preview?: string | null;
+  active_run?: ActiveConversationRunSnapshot | null;
+  latest_run?: ConversationRunSummary | null;
+}
+
+export interface ConversationListResponse {
+  conversations: ConversationSummary[];
+  next_cursor?: string | null;
+}
+
+/** Safe, operational fields returned by the run-trace inspection endpoint. */
+export interface RunTraceEntry {
+  event_id: string;
+  sequence: number;
+  run_id: string;
+  run_version: number;
+  kind: string;
+  timestamp: string;
+  task_id?: string | null;
+  tool_name?: string | null;
+  call_id?: string | null;
+  iteration?: number | null;
+  label?: string | null;
+  status?: string | null;
+  summary?: string | null;
+  duration_ms?: number | null;
+  evidence_refs: string[];
+  retryable?: boolean | null;
+  error?: string | null;
+}
+
+export interface RunTraceResponse {
+  conversation_id: string;
+  run_id: string;
+  entries: RunTraceEntry[];
+  next_cursor?: string | null;
+}
+
+export type ToolProgressStatus = 'running' | 'success' | 'valid_empty' | 'partial' | 'failed';
+
+export interface ToolProgressItem {
+  call_id: string;
+  tool_name: string;
+  status: ToolProgressStatus;
+  label?: string;
+  task_id?: string | null;
+  iteration?: number | null;
+  summary?: string | null;
+  duration_ms?: number | null;
+  evidence_refs?: string[];
+  error?: string | null;
+  started_at?: string;
+  completed_at?: string;
+}
+
+export interface ConversationSnapshotResponse {
+  conversation_id: string;
+  title?: string | null;
+  context_revision: number;
+  messages: ChatMessage[];
+  conversation_state: ConversationState;
+  memory_snapshot: Record<string, JsonValue>;
+  map_session?: MapSession | null;
+  active_run?: ActiveConversationRunSnapshot | null;
+  recent_runs?: ConversationRunSummary[];
+}
+
+/** Response returned when the direct chat request is accepted asynchronously. */
+export interface AgentRunAcceptedResponse {
+  conversation_id: string;
+  run_id: string;
+  run_version: number;
+  state: AgentRunState;
+  presentation_status: PresentationStatus;
+  status_url: string;
+  realtime_url?: string | null;
+  terminal: boolean;
+}
+
+export interface AgentRunSnapshot {
+  conversation_id: string;
+  run_id: string;
+  original_request: string;
+  aggregated_request: string;
+  active_run_version: number;
+  state: AgentRunState;
+  created_at: string;
+  request_timezone?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  cancel_requested_at?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  presentation_status: PresentationStatus;
+  presentation?: Record<string, JsonValue> | null;
+  response?: ChatTurnResponse | null;
+  current_iteration?: number | null;
+  task_state?: AgentTaskState | null;
 }
 
 export interface ChatTurnRequest {
-  session_id?: number;
+  conversation_id: string;
   title?: string;
   message: string;
   datetime?: string;
+  timezone?: string;
   request_id?: string;
 }
 
 export interface ContextUsage {
   estimated_input_tokens: number;
+  reported_input_tokens?: number | null;
+  reported_output_tokens?: number | null;
   selected_context_window?: number | null;
   model_context_limit?: number | null;
-  usage_percent: number;
+  usage_percent: number | null;
   provider: string;
   model: string;
+  reserved_output_tokens?: number;
+  tool_schema_tokens?: number;
+  response_schema_tokens?: number;
+  safety_margin_tokens?: number;
+  usage_source?: 'not_measured' | 'estimated' | 'provider_reported' | 'hybrid' | string;
+  phases?: Record<string, unknown>;
+  peak_request_tokens?: number | null;
+  total_input_tokens?: number | null;
+  total_output_tokens?: number | null;
+  usable_prompt_budget_tokens?: number | null;
+  current_conversation_tokens?: number | null;
+  expected_output_tokens?: number | null;
+  context_profile_source?: string;
+  context_metadata_authority?: 'provider' | 'configured' | 'inferred' | 'unknown' | string;
+  compaction_applied?: boolean;
 }
 
-export interface NormalizedAction {
-  action_id: string;
-  action_label: string;
-  task_tags: string[];
-  action_tags: string[];
-  requested_visualizations?: string[];
-  requires_location: boolean;
-}
-
-export type AgentAction =
-  | 'map_search'
-  | 'location_render'
-  | 'geospatial_data_retrieval'
-  | 'data_layer_query'
-  | 'overlay_control'
-  | 'dataset_display'
-  | 'visible_layer_interrogation'
-  | 'map_external_source_combination'
-  | 'chat_response'
-  | 'unknown';
-
-export interface AgentToolCall {
-  id?: string;
-  name: string;
-  arguments: Record<string, unknown>;
-}
-
-export interface AgentMapOperation {
-  type:
-    | 'set_viewport'
-    | 'load_overlay'
-    | 'toggle_overlay'
-    | 'display_dataset'
-    | 'highlight_layer'
-    | 'show_layer_summary';
-  payload: Record<string, unknown>;
-}
-
-export interface TemporalSignal {
+export interface AgentTemporalScope {
   mode: 'current' | 'historical' | 'forecast' | 'none';
-  raw_text?: string | null;
   reference_time_iso?: string | null;
+  start_time_iso?: string | null;
+  end_time_iso?: string | null;
+  granularity: string;
+  aggregation: string;
 }
 
-export interface LocationSignal {
-  signal_type: 'address' | 'city' | 'country' | 'coordinates' | 'deictic' | 'poi' | 'region' | 'street';
-  raw_value: string;
-  normalized_value?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  confidence: number;
-  source: 'text' | 'memory' | 'model';
+export interface AgentSpatialScope {
+  kind: 'point' | 'bbox' | 'radius' | 'administrative_geometry' | 'feature_geometry' | 'viewport';
+  relationship: 'at' | 'in' | 'near' | 'around' | 'within_distance' | 'along' | 'visible_area' | 'here';
+  target_refs: string[];
+  distance_m?: number | null;
 }
 
-export interface TurnParseResult {
-  user_text: string;
-  task_class: 'map_search' | 'direct_query' | 'general_question' | 'unclear';
-  location_signals: LocationSignal[];
-  normalized_action: NormalizedAction;
-  temporal_signal: TemporalSignal;
-  ambiguities: string[];
-  parser_confidence: number;
-  relationship?: 'new_task' | 'follow_up' | 'correction' | 'clarification' | 'qa' | 'simple_chat' | 'failure_inquiry';
-  map_target?: string | null;
-  entity_target?: string | null;
-  requested_layers?: string[];
-  requested_basemap?: string | null;
-  requested_attributes?: string[];
-  required_data_sources?: string[];
-  required_tool_category?: string | null;
-  tools_needed?: boolean;
-  direct_response_sufficient?: boolean;
-  requires_reparse?: boolean;
-  capability_limitations?: string[];
-  expected_frontend_update?: string;
-  atomic_tasks?: Array<Record<string, JsonValue>>;
-  clarification_plan?: {
-    question: string;
-    reason: string;
-    blocking_fields: string[];
-    options: Array<{ option_id: string; label: string; description?: string | null }>;
-    preserve_valid_results: boolean;
-    apply_visualization_changes: boolean;
-  } | null;
+export interface AgentGoal {
+  goal: string;
+  task_mode: 'answer' | 'execute' | 'clarify';
+  presentation: 'text' | 'map' | 'both';
+  operation: string;
+  requires_location: boolean;
+  target_ids: string[];
+  temporal_scope: Record<string, JsonValue>;
+  spatial_scope: Array<Record<string, JsonValue>>;
+  filters: Record<string, JsonValue>;
 }
 
-export interface ClarificationRequest {
+export interface CompletionContract {
+  operation: string;
+  requirements: string[];
+  data_requirement?: 'none' | 'provider_data';
+  location_required: boolean;
+  evidence_required: boolean;
+  map_preparation_required: boolean;
+  temporal_scope_required: boolean;
+  spatial_scope_required: boolean;
+  render_verification_required?: boolean;
+  render_verified?: boolean;
+}
+
+export interface ConversationDirective {
+  directive: string;
+  value?: JsonValue;
+  source?: string;
+  active?: boolean;
+  created_at_turn?: number;
+}
+
+export interface PendingClarification {
   question: string;
-  reason: string;
-  missing_fields: string[];
+  source_turn_index: number;
+  source_request_id?: string | null;
+  scope: 'current_request';
+  scope_terms: string[];
+  kind?: 'generic' | 'infrastructure_subtype';
+  options?: string[];
+  selected_option?: string | null;
+  status: 'active' | 'deferred' | 'answered';
 }
 
-export interface PolicyDecision {
-  plan: {
-    state: 'clarify' | 'direct_tool' | 'map_search' | 'reject';
-    mode?: 'direct_text' | 'map' | null;
-    action_id: string;
-    basemap_id?: string | null;
-    overlay_ids: string[];
-    tool_id?: string | null;
-  };
-  clarification?: ClarificationRequest | null;
-  resolved_location?: ResolvedLocation | null;
-  trace?: { steps: string[] };
-}
-
-export interface ToolPayload {
-  tool_id?: string;
-  plan_state?: string;
-  location?: {
-    label: string;
-    latitude: number;
-    longitude: number;
-  };
-  result?: Record<string, JsonValue>;
-  error?: string;
+export interface ConversationState {
+  schema_version: 2;
+  conversation_id: string;
+  revision: number;
+  active_directives: Array<Record<string, JsonValue>>;
+  summary?: Record<string, JsonValue> | null;
+  goal?: AgentGoal | null;
+  route?: NativeCapabilityRoute | null;
+  constraints: Record<string, JsonValue>;
+  resolved_locations: Record<string, ResolvedLocation>;
+  evidence_refs: string[];
+  committed_map_session?: MapSession | null;
+  pending_clarification?: PendingClarification | null;
 }
 
 export interface ChatOperationResult {
-  kind: 'map_session' | 'direct_answer' | 'capability_catalog' | 'clarification' | 'rejection' | 'error' | 'failure_diagnostic';
-  status: 'success' | 'partial' | 'failed';
+  kind: 'map_session' | 'direct_answer' | 'capability_catalog' | 'clarification' | 'rejection' | 'error';
+  status: 'success' | 'partial' | 'pending' | 'failed';
   message: string;
   warnings?: string[];
-  map_session?: MapSession | null;
   direct_result?: Record<string, JsonValue> | null;
+  provider_error?: Record<string, JsonValue> | null;
+  failure_category?: 'model_capability' | 'provider_api' | 'provider_failure' | 'schema_definition' | 'response_parsing' | 'context_limit' | 'insufficient_evidence' | 'model_budget_exhausted' | 'tool_budget_exhausted' | 'transition_budget_exhausted' | 'iteration_budget_exhausted' | 'run_deadline_exhausted' | 'no_progress' | 'cancelled' | 'superseded' | null;
 }
 
-export interface TaskFailureDetail {
-  stage: string;
-  component?: string | null;
-  tool_name?: string | null;
-  sanitized_error: string;
-  missing_input: string[];
-  unsupported_capability?: string | null;
-  partial_results_available: boolean;
-  recovery_suggestion?: string | null;
-  user_explanation: string;
+export type RealtimeConnectionState =
+  | 'idle'
+  | 'connecting'
+  | 'open'
+  | 'reconnecting'
+  | 'closed'
+  | 'failed';
+
+export interface RealtimeServerMessage {
+  protocol_version: number;
+  type: string;
+  message_id?: string | null;
+  correlation_id?: string | null;
+  conversation_id: string;
+  payload: JsonObject;
 }
 
-export interface ToolPlanStep {
-  step_id: string;
+export interface NativeToolResultSummary {
+  call_id: string;
   tool_name: string;
-  capability_id?: string | null;
-  reason: string;
-  arguments: Record<string, JsonValue>;
-  depends_on: string[];
-  parallel_group?: string | null;
-  timeout_seconds: number;
-  required: boolean;
+  status: 'success' | 'valid_empty' | 'partial' | 'failed';
+  summary: string;
+  evidence_refs: string[];
+  map_candidate_id?: string | null;
+  error?: Record<string, JsonValue> | null;
 }
 
-export interface ToolPlan {
-  tool_group: string;
-  candidate_tools: string[];
-  selected_tools: string[];
-  steps: ToolPlanStep[];
-  frontend_derivation: string;
-  partial_failure_policy: string;
-}
-
-export interface ConversationTaskRecord {
-  task_id: string;
-  raw_user_text: string;
-  prompt_summary: string;
-  normalized_description: string;
-  task_type: string;
-  intent: string;
-  relationship: string;
-  required_entities: string[];
-  required_data_layers: string[];
-  visualization_changes: Record<string, JsonValue>;
-  specialist: string;
-  status: 'pending' | 'needs_clarification' | 'routed' | 'in_progress' | 'completed' | 'failed' | 'skipped';
-  is_current: boolean;
-  parent_task_id?: string | null;
-  blocking_ambiguity?: string | null;
-  failure?: TaskFailureDetail | null;
-  progress_summary?: string | null;
-}
-
-export interface ConversationTaskSnapshot {
-  conversation_key: string;
-  current_task_id?: string | null;
-  tasks: ConversationTaskRecord[];
-  active_visualization?: Record<string, JsonValue> | null;
-}
-
-export interface VisualizationUpdate {
-  basemap_replacement?: string | null;
-  add_layer_ids: string[];
-  remove_layer_ids: string[];
-  replace_layer_ids: Record<string, string>;
+export interface NativeCapabilityRoute {
+  primary_domain: string;
+  secondary_domains: string[];
+  task_mode: 'answer' | 'execute' | 'clarify';
+  presentation: 'text' | 'map' | 'both';
+  requires_location: boolean;
+  capability_queries: string[];
+  explicit_capability_ids: string[];
+  clarification_question?: string | null;
+  operation?: string | null;
+  target_refs: string[];
+  temporal_scope: AgentTemporalScope;
+  spatial_scope?: AgentSpatialScope | null;
+  filters: Record<string, JsonValue>;
 }
 
 export interface ChatTurnResponse {
+  conversation_id: string;
   request_id: string;
-  session_id: number;
   assistant_message: string;
-  turn_contract: TurnParseResult;
-  decision: PolicyDecision;
-  operation?: ChatOperationResult | null;
-  tool_payload?: ToolPayload | null;
+  operation: ChatOperationResult;
+  tool_payload?: Record<string, unknown> | null;
   map_session?: MapSession | null;
   memory_snapshot: Record<string, JsonValue>;
   context_usage?: ContextUsage | null;
-  task_snapshot?: ConversationTaskSnapshot | null;
-  tool_plan?: ToolPlan | null;
-  failure_diagnostic?: TaskFailureDetail | null;
-  visualization_update?: VisualizationUpdate | null;
+  context_revision: number;
+  execution_trace?: Record<string, JsonValue> | null;
+  route?: NativeCapabilityRoute | null;
+  goal?: AgentGoal | null;
+  completion_contract?: CompletionContract | null;
+  presentation_status: PresentationStatus;
+  tool_results: NativeToolResultSummary[];
+  conversation_state?: ConversationState | null;
+  task_state?: AgentTaskState | null;
 }
+
+export type ChatTurnApiResponse = ChatTurnResponse | AgentRunAcceptedResponse;
 
 export type ChatStreamEventType =
   | 'status'
-  | 'parsed'
-  | 'policy'
+  | 'context_usage'
   | 'tool_call_started'
   | 'tool_call_completed'
   | 'map_session_created'
+  | 'stage'
   | 'final'
   | 'error';
 
@@ -656,19 +920,43 @@ export interface ModelCardDescriptor {
   description: string;
   provider: string;
   capabilities: string[];
-  supports_tools?: boolean;
-  supports_structured_output?: boolean;
-  supports_vision?: boolean;
-  supports_embeddings?: boolean;
+  supports_tools?: boolean | null;
+  supports_structured_output?: boolean | null;
+  supports_vision?: boolean | null;
+  supports_embeddings?: boolean | null;
   tool_support_source?: string;
+  protocol?: string | null;
+  agent_selection_disabled_reason?: string | null;
+  context_window_tokens?: number | null;
+  maximum_output_tokens?: number | null;
+  context_profile_source?: string;
+  context_metadata_authority?: 'provider' | 'configured' | 'inferred' | 'unknown' | string;
   metadata: Record<string, JsonValue>;
 }
 
 export interface ModelLibrarySourceStatus {
   ok: boolean;
   reachable?: boolean | null;
+  stale?: boolean;
   message?: string | null;
   model_count?: number | null;
+  structured_probe_status?: StructuredProbeStatus;
+  structured_probe_checked_at?: string | null;
+  structured_probe_expires_at?: string | null;
+}
+
+export type StructuredProbeStatus = 'not_tested' | 'passed' | 'failed' | 'timeout' | 'unsupported';
+
+export interface StructuredProbeResponse {
+  provider: string;
+  model: string;
+  protocol: string;
+  status: StructuredProbeStatus;
+  parse_status: string;
+  duration_ms: number | null;
+  checked_at: string | null;
+  expires_at: string | null;
+  message: string | null;
 }
 
 export interface ModelLibraryResponse {
@@ -687,6 +975,16 @@ export interface ModelSettingsResponse {
   deepseek_base_url?: string | null;
   credentials: Record<string, Record<string, boolean>>;
   credential_health?: Record<string, Record<string, 'healthy' | 'unreadable' | string>>;
+  selected_model_context: SelectedModelContext;
+}
+
+export interface SelectedModelContext {
+  provider: string;
+  model: string;
+  context_window_tokens: number | null;
+  maximum_output_tokens: number | null;
+  context_profile_source: string;
+  context_metadata_authority?: 'provider' | 'configured' | 'inferred' | 'unknown' | string;
 }
 
 export interface ModelSettingsUpdateRequest {
@@ -700,9 +998,161 @@ export interface ModelSettingsUpdateRequest {
   credentials: Record<string, { api_key?: string }>;
 }
 
+export interface RuntimeNominatimSettings {
+  base_url: string;
+  user_agent: string;
+  timeout: number;
+}
+
+export interface RuntimeGeospatialSettings {
+  min_timeline_year: number;
+  max_lat: number;
+  min_lat: number;
+  max_lon: number;
+  min_lon: number;
+  max_mercator_extent: number;
+}
+
+export interface RuntimeMapSettings {
+  default_size_m: number;
+  render_delay_s: number;
+  tiles: string;
+}
+
+export interface RuntimeJobsSettings {
+  polling_interval: number;
+}
+
+export interface RuntimeChatSettings {
+  max_history_messages: number;
+  application_timezone: string;
+}
+
+export interface RuntimeOpenMeteoSettings {
+  weather_base_url: string;
+  air_quality_base_url: string;
+  user_agent: string;
+  timeout: number;
+  cache_ttl_s: number;
+  min_call_interval_s: number;
+}
+
+export interface RuntimeOverpassSettings {
+  base_url: string;
+  user_agent: string;
+  timeout: number;
+  cache_ttl_s: number;
+  min_call_interval_s: number;
+  default_radius_m: number;
+  default_limit: number;
+}
+
+export interface RuntimeRainViewerSettings {
+  metadata_url: string;
+  user_agent: string;
+  timeout: number;
+  cache_ttl_s: number;
+  min_call_interval_s: number;
+  tile_color_scheme: number;
+  tile_smooth: number;
+  tile_snow: number;
+}
+
+export interface RuntimeGibsSettings {
+  user_agent: string;
+  timeout: number;
+  capabilities_ttl_s: number;
+  max_cache_entries: number;
+  bbox_precision: number;
+  wms_base_endpoints: Record<string, string>;
+  retry_backoff_s: number;
+  min_visual_radius_m: number;
+  image_width: number;
+  image_height: number;
+  default_layer: string;
+  capabilities_endpoints: Record<string, string>;
+  ows_namespaces: Record<string, string>;
+  layer_sync_user_agent: string;
+  layer_sync_timeout: number;
+}
+
+export interface RuntimeAgentExecutionSettings {
+  initial_run_seconds: number;
+  simple_seconds: number;
+  complex_seconds: number;
+  context_assembly_seconds: number;
+  native_model_call_seconds: number;
+  tool_execution_seconds: number;
+  tool_absolute_seconds: number;
+  map_assembly_seconds: number;
+  persistence_seconds: number;
+  render_ack_seconds: number;
+  max_tool_result_chars: number;
+  max_iterations: number;
+  max_render_attempts: number;
+  max_discovery_attempts: number;
+  max_no_progress_corrections: number;
+  simple_max_model_calls: number;
+  complex_max_model_calls: number;
+  simple_max_tool_calls: number;
+  complex_max_tool_calls: number;
+  simple_max_state_transitions: number;
+  complex_max_state_transitions: number;
+  max_parallel_tool_calls: number;
+  max_consecutive_tool_failures: number;
+  max_same_failed_fingerprint: number;
+  max_route_corrections: number;
+  max_validation_corrections: number;
+  model_max_attempts: number;
+  provider_max_attempts: number;
+  retry_backoff_base_seconds: number;
+  retry_backoff_max_seconds: number;
+  provider_request_seconds: number;
+  vision_policy: VisionPolicy;
+  vision_max_calls: number;
+}
+
+export type VisionPolicy = 'disabled' | 'always' | 'on_failure' | 'final_check';
+
+export const VISION_POLICY_VALUES: readonly VisionPolicy[] = [
+  'disabled',
+  'always',
+  'on_failure',
+  'final_check',
+];
+
+export interface RuntimeSettingsResponse {
+  schema_version: number;
+  nominatim: RuntimeNominatimSettings;
+  geospatial: RuntimeGeospatialSettings;
+  map: RuntimeMapSettings;
+  jobs: RuntimeJobsSettings;
+  chat: RuntimeChatSettings;
+  openmeteo: RuntimeOpenMeteoSettings;
+  overpass: RuntimeOverpassSettings;
+  rainviewer: RuntimeRainViewerSettings;
+  gibs: RuntimeGibsSettings;
+  agent_execution: RuntimeAgentExecutionSettings;
+  restart_required: boolean;
+  message: string | null;
+}
+
+export interface RuntimeSettingsUpdateRequest {
+  nominatim?: Partial<RuntimeNominatimSettings>;
+  geospatial?: Partial<RuntimeGeospatialSettings>;
+  map?: Partial<RuntimeMapSettings>;
+  jobs?: Partial<RuntimeJobsSettings>;
+  chat?: Partial<RuntimeChatSettings>;
+  openmeteo?: Partial<RuntimeOpenMeteoSettings>;
+  overpass?: Partial<RuntimeOverpassSettings>;
+  rainviewer?: Partial<RuntimeRainViewerSettings>;
+  gibs?: Partial<RuntimeGibsSettings>;
+  agent_execution?: Partial<RuntimeAgentExecutionSettings>;
+}
+
 export interface OllamaHealthResponse {
-  ok?: boolean;
-  detail?: string;
+  ok: boolean | null;
+  detail: string | null;
   [key: string]: unknown;
 }
 

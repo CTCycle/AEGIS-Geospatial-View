@@ -1,0 +1,1279 @@
+{
+ "lane": "opencode-go / deepseek-v4.1-flash",
+ "runs": [
+  {
+   "run_id": "run_d550c9223d5e4b41b4a7c726ac3527f7",
+   "request": "Show me Tokyo on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:18:13",
+   "tool_results": [
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Tokyo, Japan",
+     "resolved_bbox": [
+      135.8536855,
+      20.2145811,
+      154.205541,
+      35.8984245
+     ]
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-00cb05badbe84ca2897f6ed56d07dc10",
+     "collection_revision": 0,
+     "viewport_bounds": [
+      139.67797818083307,
+      35.62287709908698,
+      139.8498112191627,
+      35.73080660885559
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "capture_missing",
+     "capture_ref": "candidate-00cb05badbe84ca2897f6ed56d07dc10:0"
+    }
+   ],
+   "completion_decisions": [
+    "complete:goal_satisfied"
+   ],
+   "answer_excerpt": "Tokyo is now shown on the map.\n\n- **Location:** Tokyo, Japan (city center at 139.7639°E, 35.6769°N)\n- **View:** The map is centered on the Tokyo area, with the viewport covering roughly 139.68°E–139.85°E and 35.62°N–35.73°N\n- **Basemap:** Standard OpenStreetMap\n- **Status:** Render verified — the map loaded successfully with a valid viewport\n\nNo data layers were requested, so this is a location-on"
+  },
+  {
+   "run_id": "run_2b76588cf6ee4b01a2aba37769d38755",
+   "request": "Show me New York on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:19:05",
+   "tool_results": [
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "New York, United States",
+     "resolved_bbox": [
+      -74.258843,
+      40.476578,
+      -73.700233,
+      40.91763
+     ]
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-8b8186071bdf4438979eec88b6cb24ca",
+     "collection_revision": 0,
+     "viewport_bounds": [
+      -74.38732490723216,
+      40.457982508543466,
+      -73.57175109276481,
+      40.93609764800544
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "capture_missing",
+     "capture_ref": "candidate-8b8186071bdf4438979eec88b6cb24ca:0"
+    }
+   ],
+   "completion_decisions": [
+    "complete:goal_satisfied"
+   ],
+   "answer_excerpt": "New York is now shown on the map.\n\n- **Location:** New York, United States (administrative area)\n- **Center:** 40.7127°N, 74.0060°W\n- **Viewport:** covers roughly 40.46°–40.94°N, 74.39°–73.57°W, so the city and its surrounding metro area are in frame\n- **Basemap:** standard OpenStreetMap\n- **Render status:** verified ready — sources loaded, viewport valid, no overlay layers\n\nOne note: the location"
+  },
+  {
+   "run_id": "run_5615ebbefde64b98b6bac74512aefe0b",
+   "request": "Show recent earthquakes near Tokyo on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:19:41",
+   "tool_results": [
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "valid_empty",
+     "capability_id": "usgs_earthquakes",
+     "feature_count": 0,
+     "query_bbox": [
+      135.8536855,
+      20.2145811,
+      154.205541,
+      35.8984245
+     ]
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "usgs_earthquakes"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Tokyo, Japan",
+     "resolved_bbox": [
+      135.8536855,
+      20.2145811,
+      154.205541,
+      35.8984245
+     ]
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-84015e50118049868187f7ed05f73e55",
+     "collection_revision": 0,
+     "viewport_bounds": [
+      139.67797818083307,
+      35.62287709908698,
+      139.8498112191627,
+      35.73080660885559
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "capture_missing",
+     "capture_ref": "candidate-84015e50118049868187f7ed05f73e55:0"
+    }
+   ],
+   "completion_decisions": [
+    "complete:goal_satisfied"
+   ],
+   "answer_excerpt": "Here's the outcome for your request:\n\n**Map:** A map centered on Tokyo, Japan is now displayed (OpenStreetMap basemap), verified as rendered successfully.\n\n**Earthquakes:** No recent earthquake data could be shown. The USGS earthquake feed returned **zero matching events** for the Tokyo area. This was a valid, complete query — the spatial and temporal scopes were both satisfied — so the empty resu"
+  },
+  {
+   "run_id": "run_4fa45b53a54c41a19c5581e80394ad02",
+   "request": "Show earthquakes near Tokyo from the past week on the map",
+   "state": "failed",
+   "presentation_status": "failed",
+   "created_at": "2026-10-18 16:22:33",
+   "tool_results": [
+    {
+     "tool": "discover_geospatial_capabilities",
+     "status": "valid_empty"
+    },
+    {
+     "tool": "discover_geospatial_capabilities",
+     "status": "valid_empty"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Tokyo, Japan",
+     "resolved_bbox": [
+      139.0138947,
+      34.9268601,
+      140.5138947,
+      35.8984245
+     ]
+    }
+   ],
+   "render_observations": [],
+   "vision_capture_requested": [],
+   "vision_events": [],
+   "completion_decisions": [
+    "fail:insufficient_evidence"
+   ],
+   "answer_excerpt": null
+  },
+  {
+   "run_id": "run_0aa35f424f3445f693f8f2daf8f24a26",
+   "request": "Show recent earthquakes around Tokyo on the map and describe what the rendered map shows.",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:24:46",
+   "tool_results": [
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Tokyo, Japan",
+     "resolved_bbox": [
+      139.0138947,
+      34.9268601,
+      140.5138947,
+      35.8984245
+     ]
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "discover_geospatial_capabilities",
+     "status": "success"
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "valid_empty",
+     "capability_id": "usgs_earthquakes",
+     "feature_count": 0,
+     "query_bbox": [
+      139.0138947,
+      34.9268601,
+      140.5138947,
+      35.8984245
+     ]
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "usgs_earthquakes"
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-70cda1859bbd4ec3af1d40164dc47192",
+     "collection_revision": 0,
+     "viewport_bounds": [
+      138.92823330212474,
+      34.88578218902663,
+      140.59955609787778,
+      35.93898956355879
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "capture_missing",
+     "capture_ref": "candidate-70cda1859bbd4ec3af1d40164dc47192:0"
+    }
+   ],
+   "completion_decisions": [
+    "complete:goal_satisfied"
+   ],
+   "answer_excerpt": "The map is prepared and rendered. Here's the summary:\n\n**Map: Tokyo, Japan — recent earthquakes**\n\nThe map is centered on Tokyo, Japan (approximately 139.76°E, 35.68°N), using the default OpenStreetMap basemap. The viewport spans roughly 138.93°E–140.60°E and 34.89°N–35.94°N, covering Tokyo and its surrounding region. The render completed successfully (basemap loaded, viewport valid).\n\n**Earthquak"
+  },
+  {
+   "run_id": "run_4b03bd179b9e4d6dad279de8376b23b3",
+   "request": "Show me Tokyo on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:25:47",
+   "tool_results": [
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Tokyo, Japan",
+     "resolved_bbox": [
+      139.0138947,
+      34.9268601,
+      140.5138947,
+      35.8984245
+     ]
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-abc507f5f6e045bcbcd9930f2edab2e2",
+     "collection_revision": 0,
+     "viewport_bounds": [
+      138.92823330212474,
+      34.88578218902663,
+      140.59955609787778,
+      35.93898956355879
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "capture_missing",
+     "capture_ref": "candidate-abc507f5f6e045bcbcd9930f2edab2e2:0"
+    }
+   ],
+   "completion_decisions": [
+    "complete:goal_satisfied"
+   ],
+   "answer_excerpt": "Tokyo is now displayed on the map.\n\n- **Location:** Tokyo, Japan (city)\n- **Center:** 139.7639°E, 35.6769°N\n- **Basemap:** OpenStreetMap default\n- **Render status:** Verified ready — sources loaded, viewport valid\n\nThe view is centered on Tokyo with the surrounding region visible. No data layers were requested, so this is a location-only view."
+  },
+  {
+   "run_id": "run_248da3c62570421db5698c2c26a7fb90",
+   "request": "Add live subway train positions for Tokyo to this map.",
+   "state": "failed",
+   "presentation_status": "failed",
+   "created_at": "2026-10-18 16:26:22",
+   "tool_results": [
+    {
+     "tool": "discover_geospatial_capabilities",
+     "status": "valid_empty"
+    },
+    {
+     "tool": "discover_geospatial_capabilities",
+     "status": "valid_empty"
+    },
+    {
+     "tool": "discover_geospatial_capabilities",
+     "status": "valid_empty"
+    }
+   ],
+   "render_observations": [],
+   "vision_capture_requested": [],
+   "vision_events": [],
+   "completion_decisions": [
+    "fail:insufficient_evidence"
+   ],
+   "answer_excerpt": null
+  },
+  {
+   "run_id": "run_4226b30d903046dfb0147dc5657b0bef",
+   "request": "Show current traffic incidents in Rome on the map",
+   "state": "failed",
+   "presentation_status": "failed",
+   "created_at": "2026-10-18 16:30:38",
+   "tool_results": [
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "tomtom_traffic_incidents"
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Rome, Roma Capitale, Lazio, Italy",
+     "resolved_bbox": [
+      12.2344416,
+      41.6556417,
+      12.8557603,
+      42.1410285
+     ]
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "tomtom_traffic_incidents",
+     "feature_count": 300,
+     "query_bbox": [
+      12.2344416,
+      41.6556417,
+      12.8557603,
+      42.1410285
+     ]
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "failed",
+     "error_code": "semantic_validation_failed"
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "failed",
+     "map_session_id": "candidate-88a272930e45416297a20fca9f67e444",
+     "collection_revision": 1,
+     "viewport_bounds": [
+      12.087979982371223,
+      41.635166560941,
+      13.002221917631289,
+      42.16134211392233
+     ]
+    },
+    {
+     "status": "failed",
+     "map_session_id": "candidate-4ac939d539334e53b738e0ac4a5d1017",
+     "collection_revision": 1,
+     "viewport_bounds": [
+      12.191579848570456,
+      41.651579547182195,
+      13.080407988530084,
+      42.1630562938748
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false,
+    false
+   ],
+   "vision_events": [],
+   "completion_decisions": [
+    "fail:no_progress"
+   ],
+   "answer_excerpt": null
+  },
+  {
+   "run_id": "run_6c1e4c5f79fb4809b40a83b5a11a6f88",
+   "request": "Show live traffic flow in Rome on the map",
+   "state": "failed",
+   "presentation_status": "failed",
+   "created_at": "2026-10-18 16:31:49",
+   "tool_results": [
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "tomtom_traffic_incidents"
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "failed",
+     "error_code": "tool_not_exposed"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Rome, Roma Capitale, Lazio, Italy",
+     "resolved_bbox": [
+      12.2344416,
+      41.6556417,
+      12.8557603,
+      42.1410285
+     ]
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "tomtom_traffic_flow"
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "failed",
+     "error_code": "evidence_not_renderable"
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "tomtom_traffic_flow",
+     "query_bbox": [
+      12.2344416,
+      41.6556417,
+      12.8557603,
+      42.1410285
+     ]
+    },
+    {
+     "tool": "discover_geospatial_capabilities",
+     "status": "success"
+    }
+   ],
+   "render_observations": [],
+   "vision_capture_requested": [],
+   "vision_events": [],
+   "completion_decisions": [
+    "continue:no_progress"
+   ],
+   "answer_excerpt": null
+  },
+  {
+   "run_id": "run_926f69c5ab744c2c820638e727baace3",
+   "request": "Show air quality monitoring stations in Rome on the map",
+   "state": "failed",
+   "presentation_status": "failed",
+   "created_at": "2026-10-18 16:33:00",
+   "tool_results": [
+    {
+     "tool": "discover_geospatial_capabilities",
+     "status": "valid_empty"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Rome, Roma Capitale, Lazio, Italy",
+     "resolved_bbox": [
+      12.2344416,
+      41.6556417,
+      12.8557603,
+      42.1410285
+     ]
+    },
+    {
+     "tool": "discover_geospatial_capabilities",
+     "status": "valid_empty"
+    },
+    {
+     "tool": "discover_geospatial_capabilities",
+     "status": "valid_empty"
+    }
+   ],
+   "render_observations": [],
+   "vision_capture_requested": [],
+   "vision_events": [],
+   "completion_decisions": [
+    "fail:insufficient_evidence"
+   ],
+   "answer_excerpt": null
+  },
+  {
+   "run_id": "run_08f105281ce749dfb904cfe9fd9823f8",
+   "request": "Show NASA FIRMS active fire detections in northern California on the map",
+   "state": "completed",
+   "presentation_status": "not_required",
+   "created_at": "2026-10-18 16:34:21",
+   "tool_results": [
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "failed",
+     "error_code": "clarification_required"
+    }
+   ],
+   "render_observations": [],
+   "vision_capture_requested": [],
+   "vision_events": [],
+   "completion_decisions": [
+    "request_clarification:clarification_required"
+   ],
+   "answer_excerpt": null
+  },
+  {
+   "run_id": "run_4cfb2c0cf4964c3a8e3ea2f6bb88d89d",
+   "request": "Show EV charging stations in Rome on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:35:32",
+   "tool_results": [
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "openchargemap_ev_charging"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Rome, Roma Capitale, Lazio, Italy",
+     "resolved_bbox": [
+      12.2344416,
+      41.6556417,
+      12.8557603,
+      42.1410285
+     ]
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "openchargemap_ev_charging",
+     "feature_count": 100,
+     "query_bbox": [
+      12.2344416,
+      41.6556417,
+      12.8557603,
+      42.1410285
+     ]
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-9d84ec0f9607471988d1165ac25a4145",
+     "collection_revision": 1,
+     "viewport_bounds": [
+      12.411490387097984,
+      41.84867818808371,
+      12.562049000484507,
+      41.9353387459922
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "capture_missing",
+     "capture_ref": "candidate-9d84ec0f9607471988d1165ac25a4145:1"
+    }
+   ],
+   "completion_decisions": [
+    "await_render:awaiting_render"
+   ],
+   "answer_excerpt": "EV charging stations in Rome are now displayed on the map.\n\n**What's shown**\n- **Location:** Rome, Roma Capitale, Lazio, Italy\n- **Layer:** Open Charge Map EV charging stations (clustered points)\n- **Data:** 100 charging stations retrieved; 43 rendered in the current viewport\n- **Basemap:** OpenStreetMap default\n- **Attribution:** Open Charge Map\n\n**Notes**\n- The provider's coverage is global-part"
+  },
+  {
+   "run_id": "run_2310692de7e3425c978655c3eb66eef4",
+   "request": "Show webcams near Lucerne, Switzerland on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:36:43",
+   "tool_results": [
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "windy_webcams",
+     "feature_count": 8,
+     "query_bbox": [
+      8.2065198,
+      46.9980047,
+      8.4279853,
+      47.083522
+     ]
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "windy_webcams"
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Lucerne, Switzerland",
+     "resolved_bbox": [
+      8.2065198,
+      46.9980047,
+      8.4279853,
+      47.083522
+     ]
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-7b678e7e077a44a7b1252f88cef62bc5",
+     "collection_revision": 1,
+     "viewport_bounds": [
+      8.20655102018992,
+      46.98205381566672,
+      8.408718979807617,
+      47.08859438868322
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "capture_missing",
+     "capture_ref": "candidate-7b678e7e077a44a7b1252f88cef62bc5:1"
+    }
+   ],
+   "completion_decisions": [
+    "complete:goal_satisfied"
+   ],
+   "answer_excerpt": "I've placed **8 webcams near Lucerne, Switzerland** on the map.\n\n- **Source:** Windy Webcams (global-partial coverage), current data fetched 2026-10-18\n- **Extent:** cameras span roughly 8.21–8.40°E, 47.01–47.06°N — all within the Lucerne area\n- **Basemap:** OpenStreetMap standard\n- **Render check:** passed — layer loaded, all 8 camera points visible, viewport fitted to the data\n\nA couple of cavea"
+  },
+  {
+   "run_id": "run_f94522bde71c4c65bcaaa32c8e19fcf4",
+   "request": "Show NASA FIRMS active fire detections in California on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:38:00",
+   "tool_results": [
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "nasa_firms_active_fires"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "California, United States",
+     "resolved_bbox": [
+      -124.482003,
+      32.5295236,
+      -114.1307816,
+      42.009499
+     ]
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "nasa_firms_active_fires",
+     "feature_count": 81,
+     "query_bbox": [
+      -124.482003,
+      32.5295236,
+      -114.1307816,
+      42.009499
+     ]
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-2298eb94b2e34216b41cdaa65e4540c9",
+     "collection_revision": 1,
+     "viewport_bounds": [
+      -126.77524004070617,
+      32.13744335615053,
+      -111.02827995929354,
+      41.838302696699145
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "capture_missing",
+     "capture_ref": "candidate-2298eb94b2e34216b41cdaa65e4540c9:1"
+    }
+   ],
+   "completion_decisions": [
+    "await_render:awaiting_render"
+   ],
+   "answer_excerpt": "Done — NASA FIRMS active fire detections for California are now displayed on the map.\n\n**What was shown**\n- **Layer:** NASA FIRMS Active Fires (active fire detections, point locations)\n- **Area:** California, United States (state bounding box)\n- **Time scope:** Current (latest available provider window)\n- **Basemap:** Standard OpenStreetMap\n\n**Results**\n- **81 active fire detections** returned fro"
+  },
+  {
+   "run_id": "run_a64fae1e309f4e4fa21930ecb6ed7322",
+   "request": "Show the current rain radar over Germany on the map",
+   "state": "completed",
+   "presentation_status": "not_required",
+   "created_at": "2026-10-18 16:40:20",
+   "tool_results": [
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "failed",
+     "error_code": "policy_rejection"
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "rainviewer_precipitation_radar"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Germany",
+     "resolved_bbox": [
+      5.8663153,
+      47.2701114,
+      15.0419309,
+      55.099161
+     ]
+    }
+   ],
+   "render_observations": [],
+   "vision_capture_requested": [],
+   "vision_events": [],
+   "completion_decisions": [
+    "request_clarification:clarification_required"
+   ],
+   "answer_excerpt": null
+  },
+  {
+   "run_id": "run_a319700fa77c4219b0342aa0f18a3246",
+   "request": "Show the current rain radar around Rouen, France on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:41:37",
+   "tool_results": [
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "rainviewer_precipitation_radar"
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "failed",
+     "error_code": "viewport_bounds_unavailable"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Rouen, Seine-Maritime, Normandy, Metropolitan France, France",
+     "resolved_bbox": [
+      1.0300648,
+      49.4172001,
+      1.1521157,
+      49.4652601
+     ]
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "rainviewer_precipitation_radar",
+     "query_bbox": [
+      1.0300648,
+      49.4172001,
+      1.1521157,
+      49.4652601
+     ]
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-dc77a4c6c35d416386f3b26e3cb94883",
+     "collection_revision": 1,
+     "viewport_bounds": [
+      -4.407566976561441,
+      46.59839290931484,
+      6.589747476563559,
+      52.12832907084865
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "vision_attached",
+     "capture_ref": "candidate-dc77a4c6c35d416386f3b26e3cb94883:1",
+     "mime_type": "image/jpeg",
+     "width": 1000,
+     "height": 773,
+     "call_kind": "terminal",
+     "vision_calls": 1
+    }
+   ],
+   "completion_decisions": [
+    "await_render:awaiting_render"
+   ],
+   "answer_excerpt": "The current rain radar around Rouen is now on the map.\n\n**What's shown**\n- **Location:** Rouen, Seine-Maritime, Normandy, France\n- **Layer:** RainViewer recent precipitation radar (latest observed frame, ~16:40 UTC), rendered over the standard basemap\n- **View:** Centered on Rouen and the surrounding Normandy / Channel coast area\n\n**Reading the radar**\n- A band of moderate-to-heavy rain (yellow/or"
+  },
+  {
+   "run_id": "run_90d1462131e546d3a9ba1b46e5716c02",
+   "request": "Show me Lisbon on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:43:16",
+   "tool_results": [
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Lisbon, Portugal",
+     "resolved_bbox": [
+      -9.2298356,
+      38.6913994,
+      -9.0863328,
+      38.7967584
+     ]
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-83e270b0cb724d818eb64b02dbb02ed4",
+     "collection_revision": 0,
+     "viewport_bounds": [
+      -9.252775777855305,
+      38.68696914856133,
+      -9.06339262214567,
+      38.80118184503689
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "capture_missing",
+     "capture_ref": "candidate-83e270b0cb724d818eb64b02dbb02ed4:0"
+    }
+   ],
+   "completion_decisions": [
+    "await_render:awaiting_render"
+   ],
+   "answer_excerpt": "Lisbon is now shown on the map.\n\n- **Location:** Lisbon, Portugal (city)\n- **Center:** 38.7078° N, 9.1366° W\n- **Viewport:** covers roughly 38.687–38.801° N, 9.253–9.063° W, which frames the city and its immediate surroundings\n- **Basemap:** standard OpenStreetMap\n- **Render status:** verified ready — sources loaded, viewport valid\n\nNote: the location resolution confidence was moderate (≈0.84), re"
+  },
+  {
+   "run_id": "run_de811ddf396b42b0a9267731f8ac2312",
+   "request": "Show EV charging stations in Rome on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:44:12",
+   "tool_results": [
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Rome, Roma Capitale, Lazio, Italy",
+     "resolved_bbox": [
+      12.2344416,
+      41.6556417,
+      12.8557603,
+      42.1410285
+     ]
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "openchargemap_ev_charging"
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "openchargemap_ev_charging",
+     "feature_count": 100,
+     "query_bbox": [
+      12.2344416,
+      41.6556417,
+      12.8557603,
+      42.1410285
+     ]
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-4f9c52a3bcae4823908d22bf45ae7b17",
+     "collection_revision": 1,
+     "viewport_bounds": [
+      12.411490387097984,
+      41.84867818808371,
+      12.562049000484507,
+      41.9353387459922
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "capture_missing",
+     "capture_ref": "candidate-4f9c52a3bcae4823908d22bf45ae7b17:1"
+    }
+   ],
+   "completion_decisions": [
+    "await_render:awaiting_render"
+   ],
+   "answer_excerpt": "The map is ready. Here's what I did:\n\n**EV charging stations in Rome** — displayed on the map.\n\n- **Location:** Rome, Roma Capitale, Lazio, Italy (resolved with moderate confidence, ~0.83).\n- **Data source:** Open Charge Map EV charging points (current snapshot, fetched 2026-10-18).\n- **Results:** 100 charging stations retrieved within Rome's bounding area, rendered as a clustered point layer over"
+  },
+  {
+   "run_id": "run_fa977de5ff4b4a6c9720d7312ceb7c1d",
+   "request": "Show the current rain radar around Rouen, France on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:46:33",
+   "tool_results": [
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "rainviewer_precipitation_radar",
+     "query_bbox": [
+      1.0300648,
+      49.4172001,
+      1.1521157,
+      49.4652601
+     ]
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Rouen, Seine-Maritime, Normandy, Metropolitan France, France",
+     "resolved_bbox": [
+      1.0300648,
+      49.4172001,
+      1.1521157,
+      49.4652601
+     ]
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "rainviewer_precipitation_radar"
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-3e8d0fd5796940f482b0da893212641d",
+     "collection_revision": 1,
+     "viewport_bounds": [
+      -4.407566976561441,
+      46.59839290931484,
+      6.589747476563559,
+      52.12832907084865
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "capture_missing",
+     "capture_ref": "candidate-3e8d0fd5796940f482b0da893212641d:1"
+    }
+   ],
+   "completion_decisions": [
+    "await_render:awaiting_render"
+   ],
+   "answer_excerpt": "The current rain radar around Rouen, France is now displayed on the map.\n\n**What's shown**\n- **Location:** Rouen, Seine-Maritime, Normandy, France (centered on the city)\n- **Layer:** RainViewer recent precipitation radar (raster overlay), rendered and verified visible\n- **Observation time:** 2026-10-18 16:40 UTC (latest observed frame)\n- **Basemap:** OpenStreetMap default\n- **Attribution:** © Rain"
+  },
+  {
+   "run_id": "run_8b52bc8d03314c13bdcc50da9b594ba7",
+   "request": "Show the current rain radar around Brest, France on the map and describe what the rendered map shows",
+   "state": "completed",
+   "presentation_status": "not_required",
+   "created_at": "2026-10-18 16:48:03",
+   "tool_results": [
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "failed",
+     "error_code": "policy_rejection"
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "rainviewer_precipitation_radar"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Brest, Finistère, Brittany, Metropolitan France, 29200, France",
+     "resolved_bbox": [
+      -4.5689169,
+      48.3572972,
+      -4.4278311,
+      48.4595521
+     ]
+    }
+   ],
+   "render_observations": [],
+   "vision_capture_requested": [],
+   "vision_events": [],
+   "completion_decisions": [
+    "request_clarification:clarification_required"
+   ],
+   "answer_excerpt": null
+  },
+  {
+   "run_id": "run_0756dc47b6bb43848d51ddc3cdcb2c4a",
+   "request": "Show the current rain radar over Germany on the map",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:50:41",
+   "tool_results": [
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "rainviewer_precipitation_radar",
+     "query_bbox": [
+      5.8663153,
+      47.2701114,
+      15.0419309,
+      55.099161
+     ]
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "rainviewer_precipitation_radar"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Germany",
+     "resolved_bbox": [
+      5.8663153,
+      47.2701114,
+      15.0419309,
+      55.099161
+     ]
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "failed",
+     "error_code": "policy_rejection"
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-11b0228d035a4ba4b8dccdaf40dbf205",
+     "collection_revision": 1,
+     "viewport_bounds": [
+      1.6706704111735178,
+      46.911665624361234,
+      19.237575788827144,
+      55.39925748519383
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "vision_attached",
+     "capture_ref": "candidate-11b0228d035a4ba4b8dccdaf40dbf205:1",
+     "mime_type": "image/jpeg",
+     "width": 1000,
+     "height": 773,
+     "call_kind": "terminal",
+     "vision_calls": 1
+    }
+   ],
+   "completion_decisions": [
+    "await_render:awaiting_render"
+   ],
+   "answer_excerpt": "The current rain radar is now displayed over Germany.\n\n**What's shown**\n- **Basemap:** standard OpenStreetMap view centered on Germany.\n- **Overlay:** RainViewer recent precipitation radar (latest observed frame), rendered as a blue intensity raster.\n- **Observation time:** 2026-10-18 16:50 UTC (most recent available frame).\n\n**What the radar shows**\n- A large, well-organized precipitation band is"
+  },
+  {
+   "run_id": "run_58bbae7176c142f0b0df098783880b57",
+   "request": "Show the current rain radar around Brest, France on the map and describe what the rendered map shows",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 16:51:57",
+   "tool_results": [
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Brest, Finistère, Brittany, Metropolitan France, 29200, France",
+     "resolved_bbox": [
+      -4.5689169,
+      48.3572972,
+      -4.4278311,
+      48.4595521
+     ]
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "rainviewer_precipitation_radar"
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "failed",
+     "error_code": "viewport_bounds_unavailable"
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "rainviewer_precipitation_radar",
+     "query_bbox": [
+      -5.161511843525634,
+      47.94207681250449,
+      -3.808716356474365,
+      48.84038798749551
+     ]
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "map_session_id": "candidate-ac7559260100477c92c46574a9302849",
+     "collection_revision": 1,
+     "viewport_bounds": [
+      -9.99703122656473,
+      45.50753383595662,
+      1.0002832265600716,
+      51.15284843475641
+     ]
+    }
+   ],
+   "vision_capture_requested": [
+    false
+   ],
+   "vision_events": [
+    {
+     "kind": "vision_attached",
+     "capture_ref": "candidate-ac7559260100477c92c46574a9302849:1",
+     "mime_type": "image/jpeg",
+     "width": 1000,
+     "height": 773,
+     "call_kind": "terminal",
+     "vision_calls": 1
+    }
+   ],
+   "completion_decisions": [
+    "await_render:awaiting_render"
+   ],
+   "answer_excerpt": "The map is rendered and verified. Here's what it shows.\n\n**Map setup**\n- Basemap: standard OpenStreetMap, centered on Brest, Finistère, Brittany, France, with the viewport covering roughly the western English Channel, Brittany, and the Loire region.\n- Overlay: RainViewer recent precipitation radar (Universal Blue color scheme), latest observed frame timestamped **2026-10-18 16:50 UTC** (fetched 16"
+  },
+  {
+   "run_id": "run_dcb629b264814ddcb019166049b90cd4",
+   "request": "Show FEMA flood hazard zones in Zurich on the map",
+   "state": "completed",
+   "presentation_status": "not_required",
+   "created_at": "2026-10-18 16:53:13",
+   "tool_results": [
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success",
+     "resolved": "Zurich, Switzerland",
+     "resolved_bbox": [
+      8.4480182,
+      47.3202184,
+      8.6254529,
+      47.434665
+     ]
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "failed",
+     "error_code": "policy_rejection"
+    }
+   ],
+   "render_observations": [],
+   "vision_capture_requested": [],
+   "vision_events": [],
+   "completion_decisions": [
+    "request_clarification:clarification_required"
+   ],
+   "answer_excerpt": null
+  }
+ ]
+}

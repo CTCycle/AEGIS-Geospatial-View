@@ -7,18 +7,47 @@
     <aside class="toolbar-panel" aria-label="Chat toolbar">
       <div class="toolbar-panel__content">
         <section class="agent-chat-panel" aria-label="Agent Chat">
-          <button
-            type="button"
-            class="agent-chat-panel__new-chat"
-            aria-label="Start new chat"
-            title="Start new chat"
-            (click)="startNewChat()"
-          >
-            <span class="sr-only">Start new chat</span>
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-              <path d="M19.6 6.8a8.1 8.1 0 1 0 1.6 8 .9.9 0 1 0-1.8-.3 6.3 6.3 0 1 1-1.3-6.2l-2.2.2a.9.9 0 0 0 .1 1.8h4.1a.9.9 0 0 0 .9-.9V5.3a.9.9 0 1 0-1.8 0l.4 1.5Z" fill="currentColor" />
-            </svg>
-          </button>
+          <div class="agent-chat-panel__actions">
+            <button
+              type="button"
+              class="agent-chat-panel__icon-button"
+              aria-label="Start new chat"
+              title="Start new chat"
+              (click)="startNewChat()"
+            >
+              <span class="sr-only">Start new chat</span>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                <path d="M19.6 6.8a8.1 8.1 0 1 0 1.6 8 .9.9 0 1 0-1.8-.3 6.3 6.3 0 1 1-1.3-6.2l-2.2.2a.9.9 0 0 0 .1 1.8h4.1a.9.9 0 0 0 .9-.9V5.3a.9.9 0 1 0-1.8 0l.4 1.5Z" fill="currentColor" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="agent-chat-panel__history-button"
+              [attr.aria-expanded]="isConversationHistoryOpen"
+              aria-controls="conversation-history-drawer"
+              (click)="toggleConversationHistory()"
+            >
+              <span aria-hidden="true">History</span>
+              <span class="sr-only">{{ isConversationHistoryOpen ? 'Hide' : 'Show' }} conversation history</span>
+            </button>
+          </div>
+          @if (isConversationHistoryOpen) {
+            <div id="conversation-history-drawer" class="conversation-history-drawer">
+              <app-conversation-history
+                [conversations]="conversationHistory"
+                [query]="conversationHistoryQuery"
+                [selectedConversationId]="conversationId"
+                [loading]="conversationHistoryLoading"
+                [error]="conversationHistoryError"
+                [nextCursor]="conversationHistoryCursor"
+                (queryChange)="onConversationHistoryQuery($event)"
+                (selectConversation)="selectConversation($event)"
+                (loadMore)="loadMoreConversations()"
+                (close)="isConversationHistoryOpen = false"
+                (newConversation)="startNewChat()"
+              ></app-conversation-history>
+            </div>
+          }
           <div
             #transcript
             class="chat-transcript"
@@ -32,8 +61,10 @@
 
           <div class="chat-composer">
             <textarea
+              #composerInput
               aria-label="Chat message"
               [value]="composerDraft"
+              [attr.maxlength]="maxChatMessageLength"
               (input)="onComposerInput($event)"
               (keydown)="onComposerKeydown($event)"
               placeholder="Ask for a location, map data, or coordinates for a place."
@@ -41,45 +72,51 @@
             <button
               type="button"
               class="primary-button"
-              [attr.aria-label]="isLoading ? 'Send steering update' : 'Send message'"
-              (click)="sendMessage()"
-              [disabled]="!composerDraft.trim()"
+              [attr.aria-label]="isLoading ? 'Stop generating' : 'Send message'"
+              [attr.title]="isLoading ? 'Stop generating' : 'Send message'"
+              (click)="onComposerAction()"
+              [disabled]="!isLoading && !composerDraft.trim()"
             >
-              <span class="sr-only">Send message</span>
-              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-                <path
-                  d="M21.7 3.3a1 1 0 0 0-1-.2L3.6 9.7a1 1 0 0 0 0 1.9l7.8 2.6 2.6 7.8a1 1 0 0 0 .9.7h.1a1 1 0 0 0 .9-.6l6.8-17.8a1 1 0 0 0-.2-1zM15 18.8l-1.8-5.5 4.6-4.6-5.9 3.6-5.5-1.8L19.2 5 15 18.8z"
-                  fill="currentColor"
-                />
-              </svg>
+              @if (isLoading) {
+                <span class="composer-stop-icon" aria-hidden="true"></span>
+                <span class="sr-only">Stop generating</span>
+              } @else {
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <path
+                    d="M2 21 23 12 2 3v7l15 2-15 2v7z"
+                    fill="currentColor"
+                  />
+                </svg>
+                <span class="sr-only">Send message</span>
+              }
             </button>
-            @if (isLoading && conversationId && activeRunId) {
-              <button
-                type="button"
-                class="secondary-button"
-                aria-label="Cancel active run"
-                (click)="cancelActiveRun()"
-              >
-                Cancel
-              </button>
+          </div>
+          <div
+            class="context-window-row"
+            [class.context-window-row--warning]="contextUsageTone === 'warning'"
+            [class.context-window-row--critical]="contextUsageTone === 'critical'"
+            aria-label="Context window usage"
+            [attr.title]="contextUsageDetail"
+          >
+            <span class="context-window-row__label">Context</span>
+            @if (hasContextMeasurement && effectiveContextUsagePercent !== null) {
+              <progress
+                class="context-window-row__progress"
+                max="100"
+                [attr.value]="contextUsagePercent"
+                [attr.aria-valuenow]="contextUsagePercent"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                [attr.aria-valuetext]="contextUsageDetail"
+              ></progress>
             }
+            <span class="context-window-row__value">{{ contextUsageLabel }}</span>
           </div>
+          @if (composerError) {
+            <p class="chat-composer-error" role="alert">{{ composerError }}</p>
+          }
         </section>
 
-        <section class="rail-context-strip" aria-label="Context window utilization">
-          <div class="context-window-tracker__meta">
-            <span>{{ contextTrackerText }}</span>
-            <strong>{{ contextUsageLabel }}</strong>
-          </div>
-          <span class="sr-only">{{ contextUsageDetail }}</span>
-          <div class="context-window-tracker__bar" aria-hidden="true">
-            <span [style.width.%]="contextUsagePercent"></span>
-          </div>
-        </section>
-
-        <section class="rail-capability-card" aria-label="Capability status">
-          <app-capability-status-list [items]="capabilityStatusItems"></app-capability-status-list>
-        </section>
       </div>
     </aside>
 
@@ -93,12 +130,43 @@
 
     <section class="canvas-panel" aria-label="Map canvas">
       <header class="canvas-header" aria-label="Workspace header">
+        <div class="canvas-header__status" role="status" aria-live="polite">
+          @if (isLoading) {
+            <span class="chat-progress-spinner" aria-hidden="true"></span>
+          }
+          <span>
+            {{ showProgressIndicator
+              ? (progressLabel || status)
+              : (mapSession?.resolved_location?.label || 'Ready for a location or data request') }}
+          </span>
+        </div>
         <div class="canvas-header__actions">
+          <button
+            type="button"
+            class="canvas-header__icon-button"
+            [attr.aria-pressed]="!isToolbarCollapsed"
+            [attr.aria-label]="isToolbarCollapsed ? 'Show chat panel' : 'Hide chat panel'"
+            [attr.title]="isToolbarCollapsed ? 'Show chat' : 'Hide chat'"
+            (click)="toggleToolbar()"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+              <path
+                d="M4 5.5h16v13H4zM9 5.5v13M6.2 8.3h.8M6.2 11.3h.8M6.2 14.3h.8"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="sr-only">{{ isToolbarCollapsed ? 'Show chat' : 'Hide chat' }}</span>
+          </button>
           <button
             type="button"
             class="canvas-header__icon-button"
             [class.canvas-header__icon-button--active]="isAlertsOpen"
             aria-label="Alerts"
+            title="Alerts"
             [attr.aria-expanded]="isAlertsOpen"
             (click)="toggleAlerts()"
           >
@@ -108,10 +176,9 @@
                 fill="currentColor"
               />
             </svg>
+            <span class="sr-only">Alerts</span>
           </button>
         </div>
-      </header>
-      <div class="canvas-panel__body">
         @if (isAlertsOpen) {
           <section class="workspace-alerts" role="status" aria-live="polite">
             <header class="workspace-alerts__header">
@@ -122,32 +189,67 @@
               <p class="workspace-alerts__empty">No active alerts. Search results and map warnings will appear here.</p>
             } @else {
               <ul class="workspace-alerts__list">
-                @for (alert of activeAlertItems; track alert) {
+                @for (alert of activeAlertItems; track $index) {
                   <li>{{ alert }}</li>
                 }
               </ul>
             }
           </section>
         }
+      </header>
+      <div class="canvas-panel__body">
         <app-map-preview
           [payload]="payload"
           [isLoading]="isLoading"
-          [emptyMessage]="''"
+          [emptyMessage]="'Ask for a location or map data to load the workspace.'"
           [initialOverlayVisibility]="mapState.overlayVisibility"
           [initialOverlayOpacity]="mapState.overlayOpacity"
+          [initialOverlayOrder]="mapState.overlayOrder"
+          [availableBasemaps]="availableBasemaps"
+          [renderIdentity]="mapRenderIdentity"
           (overlayStateChange)="onOverlayStateChange($event)"
+          (basemapChange)="onBasemapChange($event)"
+          (renderStateChange)="onMapRenderStateChange($event)"
         ></app-map-preview>
       </div>
     </section>
 
-    @if (showProgressIndicator) {
-    <div class="chat-progress-indicator" aria-live="polite">
-      @if (isLoading) {
-        <span class="chat-progress-spinner" aria-hidden="true"></span>
-      }
-      <span>{{ progressLabel || status }}</span>
-    </div>
-    }
+    <footer class="workspace-status-bar" aria-label="Workspace status">
+      <div class="workspace-status-bar__capabilities">
+        <app-capability-status-list
+          [items]="capabilityStatusItems"
+          [nowrap]="true"
+          [interactions]="{
+            'Agent model': {
+              route: '/settings',
+              actionLabel: 'Open agent settings',
+              description: agentReadiness.message || 'Review the configured agent model and provider.'
+            },
+            'Optional Keys': {
+              route: '/settings',
+              queryParams: { tab: 'geospatial-access' },
+              actionLabel: 'Open geospatial access settings',
+              description: 'Optional provider credentials are managed in Settings under Geospatial Access.'
+            }
+          }"
+        ></app-capability-status-list>
+      </div>
+      <app-execution-status
+        [runId]="inspectedRunId"
+        [runVersion]="activeRunVersion"
+        [taskState]="taskState"
+        [toolProgress]="toolProgress"
+        [traceEntries]="traceEntries"
+        [active]="isLoading"
+        [traceLoading]="runTraceLoading"
+        [runError]="runFailureSummary"
+        [traceError]="runTraceError"
+        [expanded]="isExecutionStatusOpen"
+        (expandedChange)="toggleExecutionStatus($event)"
+        (refresh)="refreshRunTrace()"
+      ></app-execution-status>
+    </footer>
+
   </div>
 </div>
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
+
 import csv
 import io
 import zipfile
@@ -74,7 +76,9 @@ class GTFSStaticProvider(GeospatialProvider):
             return payload
         except ProviderError:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 stale_payload = dict(cached.value)
                 stale_payload["stale"] = True
                 stale_payload.setdefault("warnings", []).append(
@@ -121,7 +125,9 @@ class GTFSStaticProvider(GeospatialProvider):
         }
 
     # -------------------------------------------------------------------------
-    def _read_csv(self, archive: zipfile.ZipFile, filename: str) -> list[dict[str, str]]:
+    def _read_csv(
+        self, archive: zipfile.ZipFile, filename: str
+    ) -> list[dict[str, str]]:
         try:
             raw = archive.read(filename)
         except KeyError:
@@ -197,7 +203,7 @@ class GTFSStaticProvider(GeospatialProvider):
             if not shape_id:
                 continue
             grouped.setdefault(shape_id, []).append(row)
-        features = []
+        features: list[dict[str, Any]] = []
         for shape_id, points in grouped.items():
             ordered = sorted(points, key=lambda row: self._sequence(row))
             coordinates = [

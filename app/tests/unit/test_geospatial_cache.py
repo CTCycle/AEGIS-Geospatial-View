@@ -23,7 +23,12 @@ def test_geospatial_cache_returns_hit_stale_then_miss() -> None:
     clock = _Clock()
     cache = GeospatialCache(clock=clock)
 
-    cache.set("rainviewer:metadata", {"frame": 1}, ttl_seconds=10, stale_while_revalidate_seconds=5)
+    cache.set(
+        "rainviewer:metadata",
+        {"frame": 1},
+        ttl_seconds=10,
+        stale_while_revalidate_seconds=5,
+    )
 
     assert cache.get("rainviewer:metadata").status == CacheLookupStatus.HIT
     clock.value = 11.0

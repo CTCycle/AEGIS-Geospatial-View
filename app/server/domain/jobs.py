@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-BackgroundJobType = Literal["chat_turn", "map_fetch"]
+BackgroundJobType = Literal["chat_turn"]
 BackgroundJobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 BackgroundJobEventType = Literal[
     "queued",
@@ -40,7 +40,7 @@ class BackgroundJobEvent(BaseModel):
     event_type: BackgroundJobEventType
     sequence: int
     created_at: datetime
-    payload_json: dict[str, Any] = Field(default_factory=dict)
+    payload_json: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 class BackgroundJobStatusResponse(BaseModel):
@@ -51,7 +51,6 @@ class BackgroundJobStatusResponse(BaseModel):
     status: BackgroundJobStatus
     request_id: str
     parent_job_id: str | None = None
-    session_id: int | None = None
     priority: int = 0
     progress_percent: int | None = None
     status_message: str | None = None
@@ -70,7 +69,9 @@ class BackgroundJobEventsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     job_id: str
-    events: list[BackgroundJobEvent] = Field(default_factory=list)
+    events: list[BackgroundJobEvent] = Field(
+        default_factory=lambda: list[BackgroundJobEvent]()
+    )
 
 ###############################################################################
 class JobCancelResponse(BaseModel):
@@ -92,7 +93,6 @@ class BackgroundJob:
     request_id: str
     input_json: dict[str, Any]
     parent_job_id: str | None = None
-    session_id: int | None = None
     status: str = "queued"
     priority: int = 0
     progress_percent: int | None = 0
@@ -106,4 +106,6 @@ class BackgroundJob:
     attempt_count: int = 0
     max_attempts: int = 1
     last_heartbeat_at: datetime | None = None
-    events: list["BackgroundJobEvent"] = field(default_factory=list)
+    events: list["BackgroundJobEvent"] = field(
+        default_factory=lambda: list["BackgroundJobEvent"]()
+    )

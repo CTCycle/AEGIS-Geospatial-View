@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 type CredentialHealth = 'healthy' | 'unreadable' | string | null;
@@ -7,7 +7,9 @@ type CredentialHealth = 'healthy' | 'unreadable' | string | null;
   selector: 'app-settings-api-key-field',
   standalone: true,
   imports: [FormsModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './settings-api-key-field.component.html',
+  styleUrl: './settings-api-key-field.component.css',
 })
 export class SettingsApiKeyFieldComponent {
   @Input({ required: true }) label = '';
@@ -15,15 +17,31 @@ export class SettingsApiKeyFieldComponent {
   @Input({ required: true }) placeholder = '';
   @Input() value = '';
   @Input() hint = '';
-  @Input() configured = false;
   @Input() credentialHealth: CredentialHealth = null;
   @Input() validationError: string | undefined;
-  @Input() providerSection = false;
 
   @Output() valueChange = new EventEmitter<string>();
 
   get labelText(): string {
-    return `${this.label} API key ${this.configured ? '(Configured)' : '(Not configured)'}`;
+    return `${this.label} API key`;
+  }
+
+  get inputId(): string {
+    return `settings-key-${this.inputName}`;
+  }
+
+  get descriptionIds(): string | null {
+    const ids: string[] = [];
+    if (this.hint) {
+      ids.push(`${this.inputId}-hint`);
+    }
+    if (this.credentialHealth) {
+      ids.push(`${this.inputId}-health`);
+    }
+    if (this.validationError) {
+      ids.push(`${this.inputId}-error`);
+    }
+    return ids.length ? ids.join(' ') : null;
   }
 
   onValueChange(value: string): void {

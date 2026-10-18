@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 
-from server.domain.chat import ModelSettingsUpdateRequest
+from server.contracts.chat import ModelSettingsUpdateRequest
 
 ###############################################################################
 def test_model_settings_update_request_forbids_unknown_fields() -> None:

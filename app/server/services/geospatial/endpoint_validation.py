@@ -12,7 +12,9 @@ class EndpointValidationService:
     """Performs sampled, read-only health checks for manifest endpoints."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, timeout_seconds: float = 5.0, max_bytes: int = 1_000_000) -> None:
+    def __init__(
+        self, *, timeout_seconds: float = 5.0, max_bytes: int = 1_000_000
+    ) -> None:
         self.timeout_seconds = timeout_seconds
         self.max_bytes = max_bytes
 
@@ -26,12 +28,16 @@ class EndpointValidationService:
             or metadata.get("url_template")
             or metadata.get("tile_url")
             or metadata.get("tile_url_template")
+            or metadata.get("style_url")
         )
         if not isinstance(raw_url, str) or not raw_url.strip():
             return None
         url = raw_url.strip().replace("{bbox}", sample_bbox)
         url = url.replace("{lat}", "41.9028").replace("{lon}", "12.4964")
+        url = url.replace("{z}", "6").replace("{x}", "33").replace("{y}", "23")
         if "{api_key}" in url:
+            return None
+        if "{" in url or "}" in url:
             return None
         manifest_type = str(manifest.get("type") or "").lower()
         if manifest_type in {"wms", "wmts"} and "request=" not in url.lower():
@@ -61,7 +67,9 @@ class EndpointValidationService:
                 message="No public sampled endpoint is available for this manifest.",
             )
         try:
-            request = Request(url, headers={"User-Agent": "AEGIS-EndpointValidation/1.0"})
+            request = Request(
+                url, headers={"User-Agent": "AEGIS-EndpointValidation/1.0"}
+            )
             with urlopen(request, timeout=self.timeout_seconds) as response:  # noqa: S310
                 status = getattr(response, "status", None)
                 read_limit = self.max_bytes if "json" in data_format.lower() else 2048

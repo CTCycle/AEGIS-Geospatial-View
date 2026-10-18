@@ -1,0 +1,13 @@
+# Raster diagnostics quality checks
+
+- Date: 2026-09-28
+- Source: `develop@047673c6712512c93cc828895536727255fe2cca`
+- Live diagnostic E2E: `1 passed in 80.26s`
+- Backend raster/provider focus: `40 passed in 3.31s`
+- Frontend MapLibre focus: `55 SUCCESS`
+- Ruff check for `app/tests/e2e/test_live_raster_diagnostics.py`: `All checks passed!`
+- `git diff --check`: PASS; Git emitted only the repository's LF-to-CRLF normalization warnings for the two modified Markdown ledgers.
+
+The earlier 150-test focused suite, 86-manifest strict audit, and four-job hosted
+Actions result remain linked in the preceding raster remediation evidence and
+were not rerun in this continuation.

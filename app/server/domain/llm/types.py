@@ -1,7 +1,24 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from typing import Any, Literal
+
+CapabilityState = Literal["supported", "unsupported", "unknown"]
+ContextUsageSource = Literal[
+    "not_measured",
+    "estimated",
+    "provider_reported",
+    "hybrid",
+]
+ContextMetadataAuthority = Literal["provider", "configured", "inferred", "unknown"]
+FailureCategory = Literal[
+    "model_capability",
+    "provider_api",
+    "schema_definition",
+    "response_parsing",
+    "context_limit",
+]
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -9,8 +26,22 @@ class ModelDescriptor:
     name: str
     description: str
     provider: str
-    capabilities: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    capabilities: list[str] = field(default_factory=lambda: list[str]())
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+
+###############################################################################
+@dataclass(frozen=True)
+class ModelContextProfile:
+    provider: str
+    model: str
+    context_window_tokens: int | None
+    maximum_output_tokens: int | None
+    default_output_reserve: int
+    tokenizer_strategy: str = "chars_per_token_4"
+    supports_context_caching: bool = False
+    supports_server_compaction: bool = False
+    metadata_source: str = "catalog"
+    metadata_authority: ContextMetadataAuthority = "unknown"
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -19,23 +50,79 @@ class LLMRequest:
     messages: list[dict[str, Any]]
     temperature: float = 0.2
     provider: str | None = None
+    # Opaque conversation-scoped value used by providers that require a
+    # stable session header.  It is deliberately not persisted by the LLM
+    # boundary or interpreted by provider-neutral code.
+    provider_session_id: str | None = None
     tools: list["LLMToolDefinition"] | None = None
     tool_choice: Literal["auto", "none", "required"] | str | None = "auto"
     response_json_schema: dict[str, Any] | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
     # -------------------------------------------------------------------------
     def __post_init__(self) -> None:
-        if self.tools and self.response_json_schema is not None:
-            raise ValueError("LLMRequest cannot combine native tools with structured response_schema")
+        # Providers perform final request validation so malformed combinations
+        # can be reported with a categorized diagnostic at the LLM boundary.
+        return None
 
 ###############################################################################
 @dataclass(frozen=True)
 class LLMResult:
     content: str
-    raw: dict[str, Any] = field(default_factory=dict)
-    tool_calls: list["LLMToolCall"] = field(default_factory=list)
+    raw: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+    tool_calls: list["LLMToolCall"] = field(
+        default_factory=lambda: list["LLMToolCall"]()
+    )
     finish_reason: str | None = None
+    context_usage: dict[str, Any] | None = None
+    # JSON-safe provider-native continuation, isolated from observations/traces.
+    provider_continuation: dict[str, Any] | None = None
+    # JSON-safe provider-native continuation, isolated from observations/traces.
+    provider_continuation: dict[str, Any] | None = None
+
+###############################################################################
+class LLMStructuredOutput(dict[str, Any]):
+    """Validated structured data with invocation-local provider telemetry."""
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        payload: dict[str, Any],
+        *,
+        context_usage: dict[str, Any] | None = None,
+        provided_fields: Iterable[str] | None = None,
+    ) -> None:
+        super().__init__(payload)
+        self.context_usage = (
+            dict(context_usage) if context_usage is not None else None
+        )
+        self.provided_fields = (
+            frozenset(str(field) for field in provided_fields)
+            if provided_fields is not None
+            else None
+        )
+
+###############################################################################
+class LLMTextStream(Iterator[str]):
+    """Text iterator carrying usage for the request that produced the stream."""
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        chunks: Iterable[str],
+        *,
+        context_usage: dict[str, Any] | None = None,
+    ) -> None:
+        self._iterator = iter(chunks)
+        self.context_usage = dict(context_usage) if context_usage is not None else None
+
+    # -------------------------------------------------------------------------
+    def __iter__(self) -> "LLMTextStream":
+        return self
+
+    # -------------------------------------------------------------------------
+    def __next__(self) -> str:
+        return next(self._iterator)
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -49,14 +136,17 @@ class LLMToolDefinition:
 class LLMToolCall:
     id: str | None = None
     name: str = ""
-    arguments: dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] | None = None
+    parse_error: str | None = None
 
 ###############################################################################
 @dataclass(frozen=True)
 class LLMToolResult:
     tool_call_id: str | None = None
     name: str = ""
-    content: dict[str, Any] | list[Any] | str | int | float | bool | None = field(default_factory=dict)
+    content: dict[str, Any] | list[Any] | str | int | float | bool | None = field(
+        default_factory=lambda: dict[str, Any]()
+    )
     error: str | None = None
     is_error: bool = False
 
@@ -65,7 +155,7 @@ class LLMToolResult:
 class LLMAssistantToolCallMessage:
     role: Literal["assistant"] = "assistant"
     content: str | None = None
-    tool_calls: list[LLMToolCall] = field(default_factory=list)
+    tool_calls: list[LLMToolCall] = field(default_factory=lambda: list[LLMToolCall]())
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -81,17 +171,60 @@ class ContextUsage:
     estimated_input_tokens: int
     selected_context_window: int | None
     model_context_limit: int | None
-    usage_percent: float
+    usage_percent: float | None
     provider: str
     model: str
+    reported_input_tokens: int | None = None
+    reported_output_tokens: int | None = None
+    reserved_output_tokens: int = 0
+    tool_schema_tokens: int = 0
+    response_schema_tokens: int = 0
+    safety_margin_tokens: int = 512
+    usage_source: ContextUsageSource = "estimated"
+    usable_prompt_budget_tokens: int | None = None
+    current_conversation_tokens: int | None = None
+    expected_output_tokens: int | None = None
+    context_profile_source: str = "unknown"
+    context_metadata_authority: ContextMetadataAuthority = "unknown"
+    compaction_applied: bool = False
+    peak_request_tokens: int | None = None
+    total_input_tokens: int | None = None
+    total_output_tokens: int | None = None
+
+    # -------------------------------------------------------------------------
+    @property
+    def effective_input_tokens(self) -> int:
+        """Return the best available input count for the usage indicator."""
+
+        return (
+            self.reported_input_tokens
+            if self.reported_input_tokens is not None
+            else self.estimated_input_tokens
+        )
 
     # -------------------------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:
         return {
             "estimated_input_tokens": self.estimated_input_tokens,
+            "reported_input_tokens": self.reported_input_tokens,
+            "reported_output_tokens": self.reported_output_tokens,
             "selected_context_window": self.selected_context_window,
             "model_context_limit": self.model_context_limit,
             "usage_percent": self.usage_percent,
             "provider": self.provider,
             "model": self.model,
+            "reserved_output_tokens": self.reserved_output_tokens,
+            "tool_schema_tokens": self.tool_schema_tokens,
+            "response_schema_tokens": self.response_schema_tokens,
+            "safety_margin_tokens": self.safety_margin_tokens,
+            "usage_source": self.usage_source,
+            "usable_prompt_budget_tokens": self.usable_prompt_budget_tokens,
+            "current_conversation_tokens": self.current_conversation_tokens,
+            "expected_output_tokens": self.expected_output_tokens,
+            "context_profile_source": self.context_profile_source,
+            "context_metadata_authority": self.context_metadata_authority,
+            "compaction_applied": self.compaction_applied,
+            "peak_request_tokens": self.peak_request_tokens,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
         }

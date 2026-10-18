@@ -1,6 +1,6 @@
 # Workflows
 
-Last updated: 2026-06-25
+Last updated: 2026-08-02
 
 ## Core Journeys
 
@@ -22,6 +22,17 @@ Last updated: 2026-06-25
 1. Start with a broad location request.
 2. Ask follow-up refinements in chat.
 3. Compare updated map-session results after each turn.
+
+### Clarification And Overlay Control
+
+1. If the request contains similarly likely locations, answer the clarification
+   with the intended candidate.
+2. Ask to add a layer or focus to extend the current map session.
+3. Ask to remove, hide, clear, or stop showing a named overlay to remove the
+   matching active layer while preserving the rest of the session.
+
+Clarifications and unavailable providers are shown as explicit assistant
+messages or warnings; they are not treated as successful empty map results.
 
 ## Recommended Prompt Pattern
 
@@ -47,3 +58,4 @@ Last updated: 2026-06-25
 - session persistence within the same tab
 - optional provider-key workflows
 - one selectable agent model for extraction, orchestration, tools, and responses
+- durable run progress with steering while a request is active

@@ -1,209 +1,725 @@
 <div class="settings-page">
-  <header class="settings-page__header">
-    <div class="settings-page__heading">
-      <p>Select one AEGIS agent model across cloud providers and local Ollama. The selected model handles structured extraction, orchestration, tool calling, and chat.</p>
-    </div>
-    <div class="settings-page__header-actions">
-      <app-settings-icon-action
-        ariaLabel="Open Ollama settings"
-        title="Ollama settings"
-        (buttonClick)="ollamaModalStatusText = ''; isOllamaModalOpen = true"
-      >
-          <img class="settings-page__ollama-logo" src="ollama-logo.svg" alt="" aria-hidden="true" />
-      </app-settings-icon-action>
-
-      <app-settings-icon-action
-        ariaLabel="Manage API keys"
-        title="API key settings"
-        (buttonClick)="keysModalStatusText = ''; keyValidationErrors = {}; isKeysModalOpen = true"
-      >
-          <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
-            <path d="M9.5 4a5.5 5.5 0 1 0 3.4 9.8l2.1 2.1V18h2v2h3v-3.8l-4.7-4.7A5.5 5.5 0 0 0 9.5 4Zm0 1.8a3.7 3.7 0 1 1 0 7.4 3.7 3.7 0 0 1 0-7.4Zm0 2a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Z" fill="currentColor" />
-          </svg>
-      </app-settings-icon-action>
-
-    </div>
-  </header>
-
   <div class="settings-page__content">
+    <nav class="settings-sidebar" aria-label="Settings sections">
+      @for (section of settingsSections; track section.id) {
+        <button
+          type="button"
+          class="settings-sidebar__item"
+          [class.settings-sidebar__item--active]="isActiveSection(section.id)"
+          [attr.aria-current]="isActiveSection(section.id) ? 'page' : null"
+          (click)="setSettingsSection(section.id)"
+        >{{ section.label }}</button>
+      }
+    </nav>
+
+    <main class="settings-page__main">
+
     @if (unavailableAssignedOllamaModels.length > 0) {
-      <section class="settings-page__warning" role="status" aria-live="polite">
-        <span class="settings-page__warning-badge">Needs attention</span>
-        <span class="settings-page__warning-copy">
-          <strong>Selected local model unavailable.</strong>
-          {{ unavailableAssignedOllamaModels.join(', ') }} {{ unavailableAssignedOllamaModels.length === 1 ? 'is' : 'are' }}
-          selected but not installed in Ollama. Pull the model or select an installed local model before using the workspace.
-        </span>
-      </section>
+      <section
+        appSettingsWarning
+        class="settings-page__warning"
+        role="status"
+        aria-live="polite"
+        badge="Needs attention"
+        title="Selected local model unavailable."
+        [message]="unavailableAssignedOllamaModelsMessage"
+      ></section>
     }
-    @if (deepSeekLoadFailed) {
-      <section class="settings-page__warning" role="status" aria-live="polite">
-        <span class="settings-page__warning-badge">DeepSeek</span>
-        <span class="settings-page__warning-copy">
-          <strong>DeepSeek models could not be loaded.</strong>
-          {{ deepSeekFailureMessage }}
-        </span>
-      </section>
+    @if (dynamicProviderLoadFailed && activeSection === 'models') {
+      <section
+        appSettingsWarning
+        class="settings-page__warning"
+        role="status"
+        aria-live="polite"
+        [badge]="dynamicProviderLabel"
+        [title]="dynamicProviderLabel + ' models could not be loaded.'"
+        [message]="dynamicProviderFailureMessage"
+      ></section>
     }
-    <div class="settings-page__layout">
-      <section class="settings-page__left-column">
-        <section class="settings-page__controls settings-page__controls--navbar" aria-label="Settings controls">
-          <div class="settings-page__controls-left">
-            <div class="provider-filter-toggle provider-toggle" role="group" aria-label="Model provider filter">
-              <button type="button" [class.active]="providerFilter === 'all'" (click)="setProviderFilter('all')">All</button>
-              <button type="button" [class.active]="providerFilter === 'ollama'" (click)="setProviderFilter('ollama')">Ollama</button>
-              <button type="button" [class.active]="providerFilter === 'openai'" (click)="setProviderFilter('openai')">OpenAI</button>
-              <button type="button" [class.active]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
-              <button type="button" [class.active]="providerFilter === 'deepseek'" (click)="setProviderFilter('deepseek')">DeepSeek</button>
+
+    @if (activeSection === 'models') {
+      <section
+        id="settings-panel-models"
+        class="settings-page__section-panel settings-page__section-panel--models"
+      >
+        <div class="settings-page__layout">
+          <section class="settings-page__left-column">
+            <section class="settings-page__controls settings-page__controls--navbar" aria-label="Model catalog controls">
+              <div class="settings-page__controls-left">
+                <div class="provider-filter-toggle provider-toggle" role="group" aria-label="Model provider filter">
+                  <button type="button" [class.active]="providerFilter === 'all'" [attr.aria-pressed]="providerFilter === 'all'" (click)="setProviderFilter('all')">All</button>
+                  <button type="button" [class.active]="providerFilter === 'ollama'" [attr.aria-pressed]="providerFilter === 'ollama'" (click)="setProviderFilter('ollama')">Ollama</button>
+                  <button type="button" [class.active]="providerFilter === 'openai'" [attr.aria-pressed]="providerFilter === 'openai'" (click)="setProviderFilter('openai')">OpenAI</button>
+                  <button type="button" [class.active]="providerFilter === 'google'" [attr.aria-pressed]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
+                  <button type="button" [class.active]="providerFilter === 'deepseek'" [attr.aria-pressed]="providerFilter === 'deepseek'" (click)="setProviderFilter('deepseek')">DeepSeek</button>
+                  <button type="button" [class.active]="providerFilter === 'opencode'" [attr.aria-pressed]="providerFilter === 'opencode'" (click)="setProviderFilter('opencode')">OpenCode Zen</button>
+                  <button type="button" [class.active]="providerFilter === 'opencode-go'" [attr.aria-pressed]="providerFilter === 'opencode-go'" (click)="setProviderFilter('opencode-go')">OpenCode Go</button>
+                </div>
+              </div>
+
+              <div class="settings-page__controls-right">
+                <button
+                  type="button"
+                  class="settings-page__refresh"
+                  aria-label="Refresh from Ollama API"
+                  [attr.aria-busy]="isRefreshingOllama"
+                  [disabled]="isRefreshingOllama"
+                  [attr.title]="isRefreshingOllama ? 'Refreshing available Ollama models' : 'Refresh from Ollama API'"
+                  (click)="refreshOllamaLibrary()"
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
+                    <path d="M12 4V1L8 5l4 4V6a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6H4a8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8z" fill="currentColor" />
+                  </svg>
+                </button>
+                <input
+                  class="model-search-bar"
+                  type="search"
+                  placeholder="Search models"
+                  aria-label="Search models"
+                  [ngModel]="searchText"
+                  (ngModelChange)="setSearchText($event)"
+                />
+              </div>
+            </section>
+
+            <div #modelGridScroll class="model-grid-scroll" (scroll)="onModelGridScroll($event)">
+              @if (isLoadingModels) {
+                <section class="settings-empty-state" aria-live="polite">
+                  <h2>Loading model catalog</h2>
+                  <p>Fetching model assignments and provider metadata.</p>
+                </section>
+              } @else if (isLoadingDynamicProviderModels) {
+                <section class="settings-empty-state" aria-live="polite">
+                  <h2>Loading {{ dynamicProviderLabel }} models</h2>
+                  <p>Fetching the live {{ dynamicProviderLabel }} catalog from the configured provider account.</p>
+                </section>
+              } @else if (!hasDisplayedModels) {
+                <section class="settings-empty-state" aria-live="polite">
+                  <h2>{{ dynamicProviderLoadFailed ? dynamicProviderLabel + ' models unavailable' : 'No models match this filter' }}</h2>
+                  <p>{{ dynamicProviderLoadFailed ? dynamicProviderFailureMessage : 'Adjust the provider tabs or search query to show available models.' }}</p>
+                  @if (dynamicProviderLoadFailed) {
+                    <button type="button" class="settings-page__inline-link" (click)="setSettingsSection('model-providers')">Open Model Providers</button>
+                  }
+                </section>
+              } @else {
+                @for (provider of providerKeys; track trackProviderGroup(provider)) {
+                  <section class="model-grid-provider">
+                    @if (providerKeys.length > 1) {
+                      <header class="model-grid-provider__heading">
+                        <p>{{ providerLabel(provider) }}</p>
+                      </header>
+                    }
+                    <div class="model-grid">
+                      @for (model of groupedDisplayedModels[provider]; track model.provider + ':' + model.id) {
+                        <article
+                          appModelCard
+                          [model]="model"
+                          [description]="modelDescription(model)"
+                          [isLocal]="model.provider === 'ollama' && localModelIds.has(model.id)"
+                          [requiresPull]="requiresPull(model)"
+                          [isSelected]="isAgentModelSelected(model)"
+                          [disabledReason]="agentModelDisabledReason(model)"
+                          (modelSelected)="onModelSelected(model)"
+                          (pullRequested)="pullLocalModel($event)"
+                        ></article>
+                      }
+                    </div>
+                  </section>
+                }
+              }
             </div>
+          </section>
 
-          </div>
+          <aside class="settings-page__right-column" aria-label="Selected agent model">
+            <app-selected-model-summary [summary]="selectedAgentModelSummary" [isLoading]="isLoadingModels"></app-selected-model-summary>
+            @if (selectedAgentModelSummary) {
+              <section class="settings-page__probe" aria-label="Native route and tool verification">
+                <div>
+                  <p class="settings-page__probe-label">Native route and tools</p>
+                  <strong>{{ structuredProbeLabel }}</strong>
+                  @if (structuredProbe.message) {
+                    <p>{{ structuredProbe.message }}</p>
+                  }
+                </div>
+                <button
+                  type="button"
+                  class="primary-button"
+                  [disabled]="isTestingStructuredProbe"
+                  [attr.aria-busy]="isTestingStructuredProbe"
+                  (click)="testSelectedModel()"
+                >{{ isTestingStructuredProbe ? 'Testing…' : 'Test selected model' }}</button>
+              </section>
+            }
+          </aside>
+        </div>
+      </section>
+    }
 
-          <div class="settings-page__controls-right">
-            <button
-              type="button"
-              class="settings-page__refresh"
-              aria-label="Refresh from Ollama API"
-              [attr.aria-busy]="isRefreshingOllama"
-              [disabled]="isRefreshingOllama"
-              [attr.title]="isRefreshingOllama ? 'Refreshing available Ollama models' : 'Refresh from Ollama API'"
-              (click)="refreshOllamaLibrary()"
-            >
-              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
-                <path d="M12 4V1L8 5l4 4V6a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6H4a8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8z" fill="currentColor" />
-              </svg>
-            </button>
-            <input
-              class="model-search-bar"
-              placeholder="Search models"
-              aria-label="Search models"
-              [ngModel]="searchText"
-              (ngModelChange)="setSearchText($event)"
-            />
+    @if (activeSection === 'model-providers') {
+      <section
+        id="settings-panel-model-providers"
+        class="settings-page__section-panel settings-page__section-panel--providers"
+      >
+        <section class="settings-section" aria-labelledby="model-provider-heading">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Cloud access</p>
+              <h2 id="model-provider-heading">Model providers</h2>
+              <p>Save provider credentials to discover account-visible models. A readable saved key is not proof that a provider endpoint is reachable.</p>
+            </div>
+          </header>
+          <div class="settings-provider-list">
+            @for (provider of cloudProviders; track provider.id) {
+              <article class="settings-provider-card">
+                <header class="settings-provider-card__header">
+                  <div>
+                    <h3>{{ provider.name }}</h3>
+                    <p>{{ provider.purpose }}</p>
+                  </div>
+                  <span class="settings-status" [class.settings-status--ready]="isCloudCredentialConfigured(provider.id)">
+                    <span aria-hidden="true"></span>{{ modelProviderHealth(provider.id) }}
+                  </span>
+                </header>
+                <app-settings-api-key-field
+                  [label]="provider.name"
+                  [inputName]="provider.id + '_api_key'"
+                  [placeholder]="provider.placeholder"
+                  [hint]="provider.hint ?? ''"
+                  [value]="cloudCredentialValue(provider.id)"
+                  [credentialHealth]="credentialHealthForTemplate(provider.id)"
+                  [validationError]="cloudCredentialValidationError(provider.id)"
+                  (valueChange)="setCloudCredentialValue(provider.id, $event)"
+                ></app-settings-api-key-field>
+                <footer class="settings-actions">
+                  <button type="button" class="secondary-button" [disabled]="isSavingCredential || !isCloudCredentialConfigured(provider.id)" (click)="clearCloudProvider(provider.id)">Clear saved key</button>
+                  <button type="button" class="primary-button" [disabled]="isSavingCredential" (click)="saveCloudProvider(provider.id)">Save key</button>
+                </footer>
+              </article>
+            }
           </div>
         </section>
 
-        <div #modelGridScroll class="model-grid-scroll" (scroll)="onModelGridScroll($event)">
-          @if (isLoadingModels) {
-            <section class="settings-empty-state" aria-live="polite">
-              <h2>Loading model catalog</h2>
-              <p>Fetching model assignments and provider metadata.</p>
-            </section>
-          } @else if (providerFilter === 'deepseek' && isLoadingDeepSeekModels) {
-            <section class="settings-empty-state" aria-live="polite">
-              <h2>Loading DeepSeek models</h2>
-              <p>Fetching the live DeepSeek catalog from the configured provider account.</p>
-            </section>
-          } @else if (!hasDisplayedModels) {
-            <section class="settings-empty-state" aria-live="polite">
-              <h2>{{ deepSeekLoadFailed ? 'DeepSeek models unavailable' : 'No models match this filter' }}</h2>
-              <p>{{ deepSeekLoadFailed ? deepSeekFailureMessage : 'Adjust the provider tabs or search query to show available models.' }}</p>
-            </section>
-          } @else {
-            @for (provider of providerKeys; track trackProviderGroup(provider)) {
-              <section class="model-grid-provider">
-                @if (providerKeys.length > 1) {
-                  <header class="model-grid-provider__separator">
-                    <span></span>
-                    <p>{{ providerLabel(provider) }}</p>
-                  </header>
-                }
-                <div class="model-grid">
-                  @for (model of groupedDisplayedModels[provider]; track model.provider + ':' + model.id) {
-                    <article
-                      appModelCard
-                      [model]="model"
-                      [description]="modelDescription(model)"
-                      [isLocal]="model.provider === 'ollama' && localModelIds.has(model.id)"
-                      [requiresPull]="requiresPull(model)"
-                      [isSelected]="isAgentModelSelected(model)"
-                      [disabledReason]="agentModelDisabledReason(model)"
-                      (modelSelected)="onModelSelected(model)"
-                      (pullRequested)="pullLocalModel($event)"
-                    ></article>
-                  }
-                </div>
-              </section>
-            }
+        <section class="settings-section settings-section--runtime" aria-labelledby="ollama-heading">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Local runtime</p>
+              <h2 id="ollama-heading">Ollama</h2>
+              <p>Connect to a local Ollama server, refresh its model library, or pull a model before selecting it.</p>
+            </div>
+            <span class="settings-status" [class.settings-status--ready]="ollamaStatus?.ok === true">
+              <span aria-hidden="true"></span>{{ ollamaStatus?.ok === true ? 'Connection healthy' : 'Not checked' }}
+            </span>
+          </header>
+          <form class="settings-runtime-form" (ngSubmit)="saveOllamaSettings()">
+            <label>
+              Ollama server URL
+              <input class="settings-control" [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" name="ollama_server_url" autocomplete="off" />
+            </label>
+            <div class="settings-actions">
+              <button type="button" class="secondary-button" (click)="checkOllamaConnection()">Check connection</button>
+              <button type="button" class="secondary-button" [disabled]="isRefreshingOllama" (click)="refreshOllamaLibrary()">Refresh models</button>
+              <button type="submit" class="primary-button">Save settings</button>
+            </div>
+          </form>
+          @if (ollamaStatusText) {
+            <p class="settings-inline-status" role="status" aria-live="polite">{{ visibleOllamaStatusText }}</p>
           }
-        </div>
+        </section>
       </section>
+    }
 
-      <aside class="settings-page__right-column" aria-label="Selected agent model">
-        <app-selected-model-summary [summary]="selectedAgentModelSummary" [isLoading]="isLoadingModels"></app-selected-model-summary>
-      </aside>
-    </div>
-    <footer class="settings-page__status">{{ visibleStatusText }}</footer>
+    @if (activeSection === 'geospatial-access') {
+      <section
+        id="settings-panel-geospatial-access"
+        class="settings-page__section-panel settings-page__section-panel--providers"
+      >
+        <section class="settings-section" aria-labelledby="geospatial-access-heading">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Geospatial access</p>
+              <h2 id="geospatial-access-heading">Optional provider credentials</h2>
+              <p>Manage access for credential-gated geospatial capabilities. Public providers remain available subject to attribution and usage limits.</p>
+            </div>
+            <span class="settings-status">{{ geoProviders.length }} providers</span>
+          </header>
+
+          @if (isLoadingAccountSetups) {
+            <p class="settings-inline-status" role="status" aria-live="polite">Loading provider setup metadata…</p>
+          } @else if (!geoProviders.length) {
+            <p class="settings-inline-status" role="status">No optional geospatial provider setup is currently published.</p>
+          } @else {
+            <div class="settings-provider-list" aria-label="Geospatial provider access">
+              @for (provider of geoProviders; track provider.id) {
+                <article class="settings-provider-card settings-provider-card--geospatial">
+                  <header class="settings-provider-card__header">
+                    <div>
+                      <h3>{{ provider.name }}</h3>
+                      <p>{{ provider.purpose }}</p>
+                    </div>
+                    <span class="settings-status" [class.settings-status--ready]="geoProviderConfigured(provider.id)">
+                      <span aria-hidden="true"></span>{{ geoProviderHealth(provider.id) }}
+                    </span>
+                  </header>
+                  <div class="settings-provider-card__details">
+                    <span>{{ provider.requiresCredentials ? 'API key required for selected capabilities' : 'Documentation and setup guidance' }}</span>
+                    @if (provider.docsUrl) {
+                      <a [href]="provider.docsUrl" target="_blank" rel="noreferrer">Provider documentation</a>
+                    }
+                  </div>
+                  @if (provider.instructions.length) {
+                    <details class="settings-provider-card__instructions">
+                      <summary>Setup notes</summary>
+                      <ul>
+                        @for (instruction of provider.instructions; track instruction) {
+                          <li>{{ instruction }}</li>
+                        }
+                      </ul>
+                    </details>
+                  }
+                  @if (provider.requiresCredentials) {
+                    <app-settings-api-key-field
+                      [label]="provider.name"
+                      [inputName]="provider.id + '_api_key'"
+                      [placeholder]="provider.placeholder"
+                      [value]="geoCredentialDrafts[provider.id] ?? ''"
+                      [credentialHealth]="geoProviderCredentialHealth(provider.id)"
+                      (valueChange)="setGeoCredentialDraft(provider.id, $event)"
+                    ></app-settings-api-key-field>
+                    <footer class="settings-actions">
+                      @if (canShowGeoSignupTrigger(provider.id)) {
+                        <button type="button" class="secondary-button" [disabled]="isLoadingAccountSetups" (click)="openGeoProviderSignup(provider.id)">Get API key</button>
+                      }
+                      <button type="button" class="secondary-button" [disabled]="isSavingGeospatialCredential || !geoProviderConfigured(provider.id)" (click)="clearGeoProvider(provider.id)">Clear saved key</button>
+                      <button type="button" class="primary-button" [disabled]="isSavingGeospatialCredential" (click)="saveGeoProvider(provider.id)">Save key</button>
+                    </footer>
+                  } @else if (canShowGeoSignupTrigger(provider.id)) {
+                    <footer class="settings-actions">
+                      <button type="button" class="secondary-button" (click)="openGeoProviderSignup(provider.id)">Open setup guidance</button>
+                    </footer>
+                  }
+                </article>
+              }
+            </div>
+          }
+        </section>
+      </section>
+    }
+
+    @if (activeSection === 'application') {
+      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="application-settings-heading">
+        <section class="settings-section">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Runtime settings</p>
+              <h2 id="application-settings-heading">Application</h2>
+              <p>Control conversation history, timezone handling, and background job polling. Changes are validated and stored atomically.</p>
+            </div>
+          </header>
+          <div class="runtime-settings__fields">
+            <label>Maximum history messages
+              <input class="settings-control" type="number" min="1" max="100" [(ngModel)]="runtimeSettingsDraft.chat.max_history_messages" />
+            </label>
+            <label>Application timezone
+              <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.chat.application_timezone" />
+            </label>
+            <label>Job polling interval (seconds)
+              <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.jobs.polling_interval" />
+            </label>
+          </div>
+          <div class="settings-actions">
+            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save application settings' }}</button>
+          </div>
+        </section>
+      </section>
+    }
+
+    @if (activeSection === 'map-search') {
+      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="map-search-settings-heading">
+        <section class="settings-section">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Runtime settings</p>
+              <h2 id="map-search-settings-heading">Map &amp; Search</h2>
+              <p>Configure the default map request, geospatial bounds, and the Nominatim search endpoint used by location resolution.</p>
+            </div>
+          </header>
+          <div class="runtime-settings__group">
+            <h3>Map defaults</h3>
+            <div class="runtime-settings__fields">
+              <label>Default map size (m)
+                <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.map.default_size_m" />
+              </label>
+              <label>Render delay (seconds)
+                <input class="settings-control" type="number" min="0" step="0.1" [(ngModel)]="runtimeSettingsDraft.map.render_delay_s" />
+              </label>
+              <label>Tile source
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.map.tiles" />
+              </label>
+            </div>
+          </div>
+          <div class="runtime-settings__group">
+            <h3>Search endpoint</h3>
+            <div class="runtime-settings__fields">
+              <label>Nominatim base URL
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.nominatim.base_url" />
+              </label>
+              <label>User agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.nominatim.user_agent" />
+              </label>
+              <label>Request timeout (seconds)
+                <input class="settings-control" type="number" min="1" step="0.1" [(ngModel)]="runtimeSettingsDraft.nominatim.timeout" />
+              </label>
+            </div>
+          </div>
+          <div class="runtime-settings__group">
+            <h3>Geospatial bounds</h3>
+            <div class="runtime-settings__fields">
+              <label>Minimum timeline year
+                <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.geospatial.min_timeline_year" />
+              </label>
+              <label>Minimum latitude
+                <input class="settings-control" type="number" min="-90" max="90" step="0.01" [(ngModel)]="runtimeSettingsDraft.geospatial.min_lat" />
+              </label>
+              <label>Maximum latitude
+                <input class="settings-control" type="number" min="-90" max="90" step="0.01" [(ngModel)]="runtimeSettingsDraft.geospatial.max_lat" />
+              </label>
+              <label>Minimum longitude
+                <input class="settings-control" type="number" min="-180" max="180" step="0.01" [(ngModel)]="runtimeSettingsDraft.geospatial.min_lon" />
+              </label>
+              <label>Maximum longitude
+                <input class="settings-control" type="number" min="-180" max="180" step="0.01" [(ngModel)]="runtimeSettingsDraft.geospatial.max_lon" />
+              </label>
+              <label>Maximum Mercator extent
+                <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.geospatial.max_mercator_extent" />
+              </label>
+            </div>
+          </div>
+          <div class="settings-actions">
+            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save map &amp; search settings' }}</button>
+          </div>
+        </section>
+      </section>
+    }
+
+    @if (activeSection === 'data-sources') {
+      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="data-source-settings-heading">
+        <section class="settings-section">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Runtime settings</p>
+              <h2 id="data-source-settings-heading">Data Sources</h2>
+              <p>Keep provider endpoints, request pacing, cache lifetimes, and GIBS layer mappings in one auditable settings surface.</p>
+            </div>
+          </header>
+          <div class="runtime-settings__group">
+            <h3>Open-Meteo</h3>
+            <div class="runtime-settings__fields">
+              <label>Weather base URL
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.openmeteo.weather_base_url" />
+              </label>
+              <label>Air quality base URL
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.openmeteo.air_quality_base_url" />
+              </label>
+              <label>User agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.openmeteo.user_agent" />
+              </label>
+              <label>Timeout (seconds)
+                <input class="settings-control" type="number" min="1" step="0.1" [(ngModel)]="runtimeSettingsDraft.openmeteo.timeout" />
+              </label>
+              <label>Cache TTL (seconds)
+                <input class="settings-control" type="number" min="30" [(ngModel)]="runtimeSettingsDraft.openmeteo.cache_ttl_s" />
+              </label>
+              <label>Minimum call interval (seconds)
+                <input class="settings-control" type="number" min="0.05" step="0.05" [(ngModel)]="runtimeSettingsDraft.openmeteo.min_call_interval_s" />
+              </label>
+            </div>
+          </div>
+          <div class="runtime-settings__group">
+            <h3>Overpass</h3>
+            <div class="runtime-settings__fields">
+              <label>Base URL
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.overpass.base_url" />
+              </label>
+              <label>User agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.overpass.user_agent" />
+              </label>
+              <label>Timeout (seconds)
+                <input class="settings-control" type="number" min="1" step="0.1" [(ngModel)]="runtimeSettingsDraft.overpass.timeout" />
+              </label>
+              <label>Cache TTL (seconds)
+                <input class="settings-control" type="number" min="30" [(ngModel)]="runtimeSettingsDraft.overpass.cache_ttl_s" />
+              </label>
+              <label>Minimum call interval (seconds)
+                <input class="settings-control" type="number" min="0.05" step="0.05" [(ngModel)]="runtimeSettingsDraft.overpass.min_call_interval_s" />
+              </label>
+              <label>Default radius (m)
+                <input class="settings-control" type="number" min="100" [(ngModel)]="runtimeSettingsDraft.overpass.default_radius_m" />
+              </label>
+              <label>Default result limit
+                <input class="settings-control" type="number" min="1" max="200" [(ngModel)]="runtimeSettingsDraft.overpass.default_limit" />
+              </label>
+            </div>
+          </div>
+          <div class="runtime-settings__group">
+            <h3>RainViewer</h3>
+            <div class="runtime-settings__fields">
+              <label>Metadata URL
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.rainviewer.metadata_url" />
+              </label>
+              <label>User agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.rainviewer.user_agent" />
+              </label>
+              <label>Timeout (seconds)
+                <input class="settings-control" type="number" min="1" step="0.1" [(ngModel)]="runtimeSettingsDraft.rainviewer.timeout" />
+              </label>
+              <label>Cache TTL (seconds)
+                <input class="settings-control" type="number" min="30" [(ngModel)]="runtimeSettingsDraft.rainviewer.cache_ttl_s" />
+              </label>
+              <label>Minimum call interval (seconds)
+                <input class="settings-control" type="number" min="0.05" step="0.05" [(ngModel)]="runtimeSettingsDraft.rainviewer.min_call_interval_s" />
+              </label>
+              <label>Tile color scheme
+                <input class="settings-control" type="number" min="0" max="6" [(ngModel)]="runtimeSettingsDraft.rainviewer.tile_color_scheme" />
+              </label>
+              <label class="settings-checkbox">Smooth tiles
+                <input type="checkbox" [ngModel]="runtimeSettingsDraft.rainviewer.tile_smooth === 1" (ngModelChange)="runtimeSettingsDraft.rainviewer.tile_smooth = $event ? 1 : 0" />
+              </label>
+              <label class="settings-checkbox">Show snow tiles
+                <input type="checkbox" [ngModel]="runtimeSettingsDraft.rainviewer.tile_snow === 1" (ngModelChange)="runtimeSettingsDraft.rainviewer.tile_snow = $event ? 1 : 0" />
+              </label>
+            </div>
+          </div>
+          <div class="runtime-settings__group">
+            <h3>GIBS layer mappings</h3>
+            <div class="runtime-settings__mapping-list">
+              <label>WMS EPSG:3857
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.wms_base_endpoints['EPSG:3857']" />
+              </label>
+              <label>WMS EPSG:4326
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.wms_base_endpoints['EPSG:4326']" />
+              </label>
+              <label>WMTS EPSG:4326 capabilities
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.capabilities_endpoints['EPSG:4326']" />
+              </label>
+              <label>WMTS EPSG:3857 capabilities
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.capabilities_endpoints['EPSG:3857']" />
+              </label>
+              <label>WMTS EPSG:3413 capabilities
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.capabilities_endpoints['EPSG:3413']" />
+              </label>
+              <label>WMTS EPSG:3031 capabilities
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.capabilities_endpoints['EPSG:3031']" />
+              </label>
+              <label>OWS namespace
+                <input class="settings-control" type="url" [(ngModel)]="runtimeSettingsDraft.gibs.ows_namespaces.ows" />
+              </label>
+            </div>
+            <div class="runtime-settings__fields">
+              <label>GIBS user agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.gibs.user_agent" />
+              </label>
+              <label>GIBS request timeout (seconds)
+                <input class="settings-control" type="number" min="1" step="0.1" [(ngModel)]="runtimeSettingsDraft.gibs.timeout" />
+              </label>
+              <label>Capabilities cache TTL (seconds)
+                <input class="settings-control" type="number" min="60" [(ngModel)]="runtimeSettingsDraft.gibs.capabilities_ttl_s" />
+              </label>
+              <label>Maximum cached entries
+                <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.gibs.max_cache_entries" />
+              </label>
+              <label>Bounding-box precision
+                <input class="settings-control" type="number" min="0" [(ngModel)]="runtimeSettingsDraft.gibs.bbox_precision" />
+              </label>
+              <label>Retry backoff (seconds)
+                <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.gibs.retry_backoff_s" />
+              </label>
+              <label>Minimum visual radius (m)
+                <input class="settings-control" type="number" min="1000" [(ngModel)]="runtimeSettingsDraft.gibs.min_visual_radius_m" />
+              </label>
+              <label>Image width
+                <input class="settings-control" type="number" min="256" [(ngModel)]="runtimeSettingsDraft.gibs.image_width" />
+              </label>
+              <label>Image height
+                <input class="settings-control" type="number" min="256" [(ngModel)]="runtimeSettingsDraft.gibs.image_height" />
+              </label>
+              <label>Default layer
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.gibs.default_layer" />
+              </label>
+              <label>Layer sync user agent
+                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.gibs.layer_sync_user_agent" />
+              </label>
+              <label>Layer sync timeout (seconds)
+                <input class="settings-control" type="number" min="1" [(ngModel)]="runtimeSettingsDraft.gibs.layer_sync_timeout" />
+              </label>
+            </div>
+          </div>
+          <div class="settings-actions">
+            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save data source settings' }}</button>
+          </div>
+        </section>
+      </section>
+    }
+
+    @if (activeSection === 'agent-runtime') {
+      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="agent-runtime-settings-heading">
+        <section class="settings-section">
+          <header class="settings-section__header">
+            <div>
+              <p class="page-kicker">Runtime settings</p>
+              <h2 id="agent-runtime-settings-heading">Agent Runtime</h2>
+              <p>Adjust execution budgets, correction limits, and retry behavior used by the native agent loop.</p>
+            </div>
+          </header>
+          <h3>Execution budgets</h3>
+          <p>New runs use saved values immediately. Active and suspended runs retain their original limits.</p>
+          <div class="runtime-settings__fields runtime-settings__fields--wide">
+            <label>Initial run seconds <input class="settings-control" type="number" max="300.0" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.initial_run_seconds" /></label>
+            <label>Simple run seconds <input class="settings-control" type="number" max="300.0" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_seconds" /></label>
+            <label>Complex run seconds <input class="settings-control" type="number" max="300.0" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_seconds" /></label>
+            <label>Simple model calls <input class="settings-control" type="number" max="100" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_model_calls" /></label>
+            <label>Complex model calls <input class="settings-control" type="number" max="100" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_model_calls" /></label>
+            <label>Simple tool calls <input class="settings-control" type="number" max="200" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_tool_calls" /></label>
+            <label>Complex tool calls <input class="settings-control" type="number" max="500" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_tool_calls" /></label>
+            <label>Simple state transitions <input class="settings-control" type="number" max="500" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_state_transitions" /></label>
+            <label>Complex state transitions <input class="settings-control" type="number" max="1000" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_max_state_transitions" /></label>
+            <label>Maximum iterations <input class="settings-control" type="number" max="100" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_iterations" /></label>
+          </div>
+          <h3>Failure recovery</h3>
+          <p>Bound retries and corrections before the agent returns an incomplete result.</p>
+          <div class="runtime-settings__fields runtime-settings__fields--wide">
+            <label>Maximum render attempts <input class="settings-control" type="number" max="32" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_render_attempts" /></label>
+            <label>Maximum discovery attempts <input class="settings-control" type="number" min="1" max="100" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_discovery_attempts" /></label>
+            <label>No-progress corrections <input class="settings-control" type="number" max="8" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_no_progress_corrections" /></label>
+            <label>Consecutive tool failures <input class="settings-control" type="number" max="20" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_consecutive_tool_failures" /></label>
+            <label>Same failed fingerprint limit <input class="settings-control" type="number" max="20" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_same_failed_fingerprint" /></label>
+            <label>Route corrections <input class="settings-control" type="number" max="10" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_route_corrections" /></label>
+            <label>Validation corrections <input class="settings-control" type="number" max="20" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_validation_corrections" /></label>
+          </div>
+          <h3>Timeouts and retries</h3>
+          <p>Stage deadlines are capped by the remaining run budget. Provider attempts include the first request.</p>
+          <div class="runtime-settings__fields runtime-settings__fields--wide">
+            <label>Context assembly seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.context_assembly_seconds" /></label>
+            <label>Native model call seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.native_model_call_seconds" /></label>
+            <label>Tool execution seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_execution_seconds" /></label>
+            <label>Tool absolute seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_absolute_seconds" /></label>
+            <label>Map assembly seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.map_assembly_seconds" /></label>
+            <label>Persistence seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.persistence_seconds" /></label>
+            <label>Render acknowledgement seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.render_ack_seconds" /></label>
+            <label>Model attempts <input class="settings-control" type="number" max="10" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.model_max_attempts" /></label>
+            <label>Provider attempts <input class="settings-control" type="number" max="10" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_max_attempts" /></label>
+            <label>Retry backoff base seconds <input class="settings-control" type="number" max="60.0" min="0" step="0.05" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_base_seconds" /></label>
+            <label>Retry backoff max seconds <input class="settings-control" type="number" max="120.0" min="0" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_max_seconds" /></label>
+            <label>Provider request seconds <input class="settings-control" type="number" max="120.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_request_seconds" /></label>
+          </div>
+<h3>Advanced limits</h3>
+          <p>Limit parallel work and the size of each model-visible tool observation.</p>
+          <div class="runtime-settings__fields runtime-settings__fields--wide">
+            <label>Maximum parallel tool calls <input class="settings-control" type="number" max="32" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_parallel_tool_calls" /></label>
+            <label>Maximum tool result characters <input class="settings-control" type="number" max="100000" min="128" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_tool_result_chars" /></label>
+          </div>
+          <h3>Vision inspection</h3>
+          <p>When the selected model supports image input, AEGIS can capture the rendered map and give it to the agent as visual context.</p>
+          <div class="runtime-settings__fields runtime-settings__fields--wide">
+            <label class="settings-select-field">Vision policy
+              <select class="settings-control" [value]="runtimeSettingsDraft.agent_execution.vision_policy"
+                [disabled]="visionPolicyUnavailable"
+                (change)="runtimeSettingsDraft.agent_execution.vision_policy = $any($event.target).value"
+                aria-label="Vision inspection policy">
+                @for (option of visionPolicyOptions; track option.value) {
+                  <option [value]="option.value">{{ option.label }}</option>
+                }
+              </select>
+            </label>
+            <label>Vision calls per run <input class="settings-control" type="number" max="8" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.vision_max_calls" /></label>
+          </div>
+          <p class="settings-hint">{{ visionPolicyHint }}</p>
+          <div class="settings-actions">
+            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save agent runtime settings' }}</button>
+            <button type="button" class="secondary-button" [disabled]="isSavingRuntimeSettings" (click)="restoreAgentExecutionDefaults()">Restore agent defaults</button>
+          </div>
+        </section>
+      </section>
+    }
+
+    <footer class="settings-page__status" role="status" aria-live="polite">{{ visibleStatusText }}</footer>
+    @if (runtimeSettingsError) {
+      <p class="settings-inline-status settings-inline-status--error" role="alert">{{ runtimeSettingsError }}</p>
+    }
+    @if (runtimeRestartRequired) {
+      <p class="settings-inline-status" role="status" aria-live="polite">Runtime settings saved. Restart AEGIS to apply the changes to active services.</p>
+    }
+    </main>
   </div>
 
-  @if (isKeysModalOpen) {
-    <app-settings-modal-shell title="API keys" ariaLabel="API key management" (requestClose)="closeModal()">
-      <form class="settings-modal__form settings-modal__form--keys" (ngSubmit)="saveKeys()">
-        <div class="settings-modal__body">
-          <app-settings-api-key-field
-            label="OpenAI"
-            inputName="openai_api_key"
-            placeholder="sk-..."
-            [value]="openaiKey"
-            [configured]="openAiConfigured()"
-            [credentialHealth]="openAiCredentialHealth()"
-            [validationError]="keyValidationErrors.openai"
-            (valueChange)="openaiKey = $event; keyValidationErrors.openai = undefined"
-          ></app-settings-api-key-field>
-          <app-settings-api-key-field
-            label="Google"
-            inputName="google_api_key"
-            placeholder="AIza..."
-            [value]="googleKey"
-            [configured]="googleConfigured()"
-            [credentialHealth]="googleCredentialHealth()"
-            [validationError]="keyValidationErrors.google"
-            (valueChange)="googleKey = $event; keyValidationErrors.google = undefined"
-          ></app-settings-api-key-field>
-          <app-settings-api-key-field
-            label="DeepSeek"
-            inputName="deepseek_api_key"
-            placeholder="sk-..."
-            hint="Used to discover DeepSeek models and run the selected agent model through the DeepSeek API."
-            [value]="deepseekKey"
-            [configured]="deepSeekConfigured()"
-            [credentialHealth]="deepSeekCredentialHealth()"
-            [validationError]="keyValidationErrors.deepseek"
-            [providerSection]="true"
-            (valueChange)="deepseekKey = $event; keyValidationErrors.deepseek = undefined"
-          ></app-settings-api-key-field>
-          @if (keysModalStatusText) {
-            <p class="settings-modal__status" aria-live="polite">{{ keysModalStatusText }}</p>
-          }
-        </div>
-        <footer class="settings-modal__footer">
-          <button type="submit" class="primary-button">Save keys</button>
-        </footer>
-      </form>
-    </app-settings-modal-shell>
-  }
+  @if (isSignupModalOpen && selectedProviderAccountSetup; as setup) {
+    <app-settings-modal-shell
+      title=""
+      [ariaLabel]="'API key setup for ' + setup.name"
+      [showHeader]="false"
+      [closeOnBackdrop]="false"
+      panelClass="provider-signup-modal__panel"
+      (requestClose)="closeProviderSignup()"
+    >
+      <div class="provider-signup-modal">
+        <header>
+          <p class="page-kicker">{{ setup.automation.experimentalLabel }}</p>
+          <h2>{{ setup.name }}</h2>
+          <p>{{ supportLabel(setup) }}. Automation is best-effort and pauses for provider-controlled steps.</p>
+        </header>
 
-  @if (isOllamaModalOpen) {
-    <app-settings-modal-shell title="Ollama settings" ariaLabel="Ollama settings" (requestClose)="closeModal()">
-      <form class="settings-modal__form" (ngSubmit)="saveOllamaSettings()">
-        <div class="settings-modal__body">
-          <label>
-            Ollama server URL
-            <input [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" name="ollama_server_url" />
+        <section class="provider-signup-modal__notes" aria-label="Guided setup notes">
+          <h3>What AEGIS can help with</h3>
+          <ul>
+            @for (note of setup.automation.userActionNotes; track note) { <li>{{ note }}</li> }
+          </ul>
+        </section>
+
+        <section class="provider-signup-modal__notes" aria-label="Safety boundaries">
+          <h3>Safety boundaries</h3>
+          <ul>
+            @for (note of setup.automation.safetyNotes; track note) { <li>{{ note }}</li> }
+          </ul>
+        </section>
+
+        @if (setup.automation.requiredFields.length) {
+          <section class="provider-signup-modal__notes" aria-label="Provider information guidance">
+            <h3>Provider information</h3>
+            <ul>
+              @for (field of setup.automation.requiredFields; track field.label) {
+                <li>{{ field.label }}@if (field.helpText) { — {{ field.helpText }} }</li>
+              }
+            </ul>
+          </section>
+        }
+
+        @if (signupModalError) {
+          <p class="settings-inline-status" role="status" aria-live="polite">{{ signupModalError }}</p>
+        }
+
+        @if (setup.automation.support !== 'unsupported') {
+          <label class="settings-secret-field">
+            Generated API key
+            <input
+              type="password"
+              autocomplete="off"
+              [attr.aria-label]="'Generated API key for ' + setup.name"
+              [placeholder]="setup.keyFormatHint || 'Paste generated API key'"
+              [(ngModel)]="signupKeyInput"
+              name="guided_signup_api_key"
+            />
           </label>
-          @if (visibleOllamaModalStatusText) {
-            <p class="settings-modal__status" aria-live="polite">{{ visibleOllamaModalStatusText }}</p>
+        }
+
+        <div class="settings-actions provider-signup-modal__actions">
+          <button type="button" class="secondary-button" (click)="closeProviderSignup()" aria-label="Cancel guided setup">Cancel</button>
+          <button type="button" class="secondary-button" (click)="openProviderPortal(setup)">
+            {{ setup.automation.support === 'unsupported' ? 'Open documentation' : 'Start guided setup' }}
+          </button>
+          @if (setup.automation.support !== 'unsupported') {
+            <button type="button" class="primary-button" [disabled]="isSavingGeospatialCredential" (click)="saveGeneratedCredential(setup)">Save generated API key</button>
           }
         </div>
-        <footer class="settings-modal__footer settings-modal__footer--spread">
-          <div class="row-actions">
-            <button type="button" (click)="checkOllamaConnection()">Check connection</button>
-            <button type="button" (click)="refreshOllamaLibrary()">Refresh models</button>
-          </div>
-          <button type="submit" class="primary-button">Save settings</button>
-        </footer>
-      </form>
+      </div>
     </app-settings-modal-shell>
   }
 </div>
-

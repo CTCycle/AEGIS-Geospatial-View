@@ -1,11 +1,17 @@
 import { ModelSettingsResponse, ModelSettingsUpdateRequest } from './types';
 
-export type CloudCredentialProvider = 'openai' | 'google' | 'deepseek';
+export type CloudCredentialProvider = 'openai' | 'google' | 'deepseek' | 'opencode' | 'opencode-go';
 export type ModelProviderFilter = 'all' | 'ollama' | CloudCredentialProvider;
 export type ApiKeyValidationErrors = Partial<Record<CloudCredentialProvider, string>>;
 export type CloudCredentialDrafts = Record<CloudCredentialProvider, string>;
 
-export const CLOUD_CREDENTIAL_PROVIDERS: readonly CloudCredentialProvider[] = ['openai', 'google', 'deepseek'];
+export const CLOUD_CREDENTIAL_PROVIDERS: readonly CloudCredentialProvider[] = [
+  'openai',
+  'google',
+  'deepseek',
+  'opencode',
+  'opencode-go',
+];
 
 export const buildSettingsUpdateBase = (
   settings: ModelSettingsResponse,
@@ -36,7 +42,12 @@ export const buildCloudCredentialUpdateRequest = (
 ): ModelSettingsUpdateRequest => ({
   credentials: CLOUD_CREDENTIAL_PROVIDERS.reduce<ModelSettingsUpdateRequest['credentials']>((acc, provider) => {
     const apiKey = drafts[provider].trim();
-    acc[provider] = apiKey ? { api_key: apiKey } : {};
+    // An untouched/blank draft means "no replacement supplied". Clearing a
+    // saved credential is an explicit action and sends an empty api_key via
+    // buildCredentialUpdateRequest instead of silently deactivating siblings.
+    if (apiKey) {
+      acc[provider] = { api_key: apiKey };
+    }
     return acc;
   }, {}),
 });

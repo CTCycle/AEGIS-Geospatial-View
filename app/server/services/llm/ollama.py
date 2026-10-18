@@ -1,23 +1,48 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
+import asyncio
 import json
+import logging
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import replace
 from html.parser import HTMLParser
 from typing import Any, TextIO
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+from urllib.request import ProxyHandler, Request, build_opener, urlopen
 
-from server.services.llm.base import LLMProvider
-from server.services.llm.context_budget import compute_ollama_context_usage
+from server.services.llm.base import (
+    LLMProvider,
+    normalize_native_tool_name,
+    parse_native_tool_arguments,
+)
+from server.services.llm.context_budget import (
+    apply_reported_usage,
+    compute_context_usage,
+    prepare_request,
+)
+from server.services.llm.multimodal import normalize_image_content_for_ollama
+from server.prompts.providers import OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT
+from server.services.llm.errors import (
+    LLMProviderRequestError,
+    LLMResponseParsingError,
+    LLMStructuredOutputError,
+)
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
+from server.services.llm.request_deadline import remaining_request_seconds
+from server.services.llm.transport import LLMTransportPolicy
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
+    LLMStructuredOutput,
+    LLMTextStream,
     LLMToolCall,
     LLMToolDefinition,
     ModelDescriptor,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 class _OllamaLibraryParser(HTMLParser):
@@ -69,32 +94,77 @@ class _OllamaLibraryParser(HTMLParser):
 class OllamaProvider(LLMProvider):
     provider_name = "ollama"
 
+    # Local structured native responses can include the full agent schema and
+    # needs more time than lightweight health, capability, and chat probes.
+    _DEFAULT_REQUEST_TIMEOUT_SECONDS = 30
+    _STRUCTURED_REQUEST_TIMEOUT_SECONDS = 90
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
         base_url: str,
         tool_capability_cache: OllamaToolCapabilityCache | None = None,
+        transport_policy: LLMTransportPolicy | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
-        self.tool_capability_cache = tool_capability_cache or OllamaToolCapabilityCache()
-        self.last_context_usage: dict[str, Any] | None = None
+        self.tool_capability_cache = (
+            tool_capability_cache or OllamaToolCapabilityCache()
+        )
+        self.transport_policy = transport_policy or LLMTransportPolicy()
         self.last_list_models_error: str | None = None
+        self.last_list_models_diagnostics: dict[str, Any] = {}
+        self.last_list_library_models_error: str | None = None
+        self.last_list_library_models_diagnostics: dict[str, Any] = {}
+        self._show_payload_cache: dict[str, dict[str, Any] | None] = {}
 
     # -------------------------------------------------------------------------
-    def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _open_url(self, request: Request, *, timeout: float) -> Any:
+        if self.transport_policy.proxy:
+            handler = ProxyHandler(
+                {
+                    "http": self.transport_policy.proxy,
+                    "https": self.transport_policy.proxy,
+                }
+            )
+            return build_opener(handler).open(request, timeout=timeout)
+        if self.transport_policy.trust_env:
+            return urlopen(request, timeout=timeout)
+        return build_opener(ProxyHandler({})).open(request, timeout=timeout)
+
+    # -------------------------------------------------------------------------
+    def _post_json(
+        self,
+        path: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         request = Request(
             f"{self.base_url}{path}",
             data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urlopen(request, timeout=30) as response:
+        timeout_stage = (
+            "structured_output"
+            if path == "/api/chat" and payload.get("format")
+            else "chat"
+        )
+        default_timeout = self.transport_policy.timeout_for(timeout_stage)
+        effective_timeout = default_timeout if timeout is None else min(
+            default_timeout, max(0.1, timeout)
+        )
+        with self._open_url(request, timeout=effective_timeout) as response:
             return json.loads(response.read().decode("utf-8"))
 
     # -------------------------------------------------------------------------
     def _stream_post(
-        self, path: str, payload: dict[str, Any]
+        self,
+        path: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
     ) -> Iterator[dict[str, Any]]:
         request = Request(
             f"{self.base_url}{path}",
@@ -102,7 +172,11 @@ class OllamaProvider(LLMProvider):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urlopen(request, timeout=60) as response:
+        default_timeout = self.transport_policy.timeout_for("stream")
+        effective_timeout = default_timeout if timeout is None else min(
+            default_timeout, max(0.1, timeout)
+        )
+        with self._open_url(request, timeout=effective_timeout) as response:
             reader: TextIO = response  # type: ignore[assignment]
             for line in reader:
                 line = line.strip()
@@ -116,33 +190,91 @@ class OllamaProvider(LLMProvider):
     # -------------------------------------------------------------------------
     def _get_json(self, path: str) -> dict[str, Any]:
         request = Request(f"{self.base_url}{path}", method="GET")
-        with urlopen(request, timeout=10) as response:
+        with self._open_url(
+            request, timeout=self.transport_policy.timeout_for("catalog")
+        ) as response:
             return json.loads(response.read().decode("utf-8"))
 
     # -------------------------------------------------------------------------
     def _get_text(self, url: str) -> str:
         request = Request(url, headers={"User-Agent": "AEGIS/1.0"}, method="GET")
-        with urlopen(request, timeout=20) as response:
+        with self._open_url(
+            request, timeout=self.transport_policy.timeout_for("catalog")
+        ) as response:
             return response.read().decode("utf-8", errors="ignore")
+
+    # -------------------------------------------------------------------------
+    async def achat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
+        return await asyncio.to_thread(
+            self.chat,
+            request,
+            tools=tools,
+            tool_choice=tool_choice,
+            response_json_schema=response_json_schema,
+        )
+
+    # -------------------------------------------------------------------------
+    async def astructured_output(
+        self, request: LLMRequest, schema: type[Any]
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(self.structured_output, request, schema)
+
+    # -------------------------------------------------------------------------
+    def _post_json_for_request(
+        self, path: str, payload: dict[str, Any], request: LLMRequest
+    ) -> dict[str, Any]:
+        remaining = remaining_request_seconds(request)
+        if remaining is None:
+            return self._post_json(path, payload)
+        if remaining <= 0:
+            raise TimeoutError("The bounded LLM request deadline has expired.")
+        return self._post_json(path, payload, timeout=remaining)
+
+    # -------------------------------------------------------------------------
+    def _stream_post_for_request(
+        self, path: str, payload: dict[str, Any], request: LLMRequest
+    ) -> Iterator[dict[str, Any]]:
+        remaining = remaining_request_seconds(request)
+        if remaining is None:
+            yield from self._stream_post(path, payload)
+            return
+        if remaining <= 0:
+            raise TimeoutError("The bounded LLM request deadline has expired.")
+        yield from self._stream_post(path, payload, timeout=remaining)
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
         try:
             payload = self._get_json("/api/tags")
+            if not is_json_array(payload.get("models")):
+                raise ValueError("Ollama tags response has no models array")
         except Exception as exc:
-            self.last_list_models_error = str(exc) or f"Unable to reach Ollama at {self.base_url}."
+            error = LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model="*",
+                stage="catalog",
+            )
+            self.last_list_models_error = str(error)
+            self.last_list_models_diagnostics = dict(error.diagnostics)
             return []
         self.last_list_models_error = None
+        self.last_list_models_diagnostics = {}
         models: list[ModelDescriptor] = []
         for item in payload.get("models", []):
-            if not isinstance(item, dict):
+            if not is_json_object(item):
                 continue
             model_name = str(item.get("name") or "")
             if not model_name:
                 continue
-            details = (
-                item.get("details") if isinstance(item.get("details"), dict) else {}
-            )
+            details = json_object(item.get("details"))
             family = str(details.get("family") or "").strip()
             parameter_size = str(details.get("parameter_size") or "").strip()
             quantization_level = str(details.get("quantization_level") or "").strip()
@@ -163,7 +295,7 @@ class OllamaProvider(LLMProvider):
                     parameter_size=parameter_size,
                     quantization_level=quantization_level,
                     tag_capabilities=item.get("capabilities")
-                    if isinstance(item.get("capabilities"), list)
+                    if is_json_array(item.get("capabilities"))
                     else None,
                 )
             )
@@ -192,7 +324,13 @@ class OllamaProvider(LLMProvider):
                 capabilities.add("embeddings")
         else:
             capabilities = self.get_model_capabilities(model_name)
-        supports_tools = "tools" in capabilities
+        supports_tools: bool | None = (
+            "tools" in capabilities
+            if tag_capabilities is not None
+            else self.supports_tools(model_name)
+        )
+        if supports_tools is True:
+            capabilities.add("tools")
         source = (
             "ollama_tags"
             if tag_capabilities is not None
@@ -236,27 +374,135 @@ class OllamaProvider(LLMProvider):
         return capabilities
 
     # -------------------------------------------------------------------------
-    def supports_tools(self, model: str) -> bool:
-        return "tools" in self.get_model_capabilities(model)
+    def supports_tools(self, model: str) -> bool | None:
+        show_capabilities = self._show_capabilities(model)
+        if show_capabilities is not None:
+            supported = "tools" in show_capabilities
+            self.tool_capability_cache.set(
+                self.base_url,
+                model,
+                supported,
+                source="ollama_show",
+            )
+            return supported
+        return self._probe_tool_support(model)
 
     # -------------------------------------------------------------------------
-    def supports_structured_output(self, model: str) -> bool:
+    def supports_structured_output(self, model: str) -> bool | None:
         _ = model
         return True
 
     # -------------------------------------------------------------------------
-    def _show_capabilities(self, model: str) -> set[str] | None:
+    def supports_vision(self, model: str) -> bool | None:
+        show_capabilities = self._show_capabilities(model)
+        if show_capabilities is not None:
+            return "vision" in show_capabilities
+        return None
+
+    # -------------------------------------------------------------------------
+    def get_model_context_metadata(self, model: str) -> dict[str, Any]:
+        """Read an exact context declaration from Ollama's model metadata.
+
+        Ollama's tags endpoint does not expose the model context window.  The
+        show endpoint may expose it in ``model_info`` (for example as
+        ``general.context_length``).  Only that provider-declared value is
+        accepted; model names, families, and Modelfile text are intentionally
+        not interpreted as limits.
+        """
+
+        payload = self._show_payload(model)
+        if payload is None:
+            return {}
+        model_info = json_object(payload.get("model_info"))
+        candidates: list[object] = []
+        for key, value in model_info.items():
+            normalized_key = str(key).strip().lower()
+            if normalized_key.endswith((".context_length", ".context_window_tokens")):
+                candidates.append(value)
+        for key in ("context_window_tokens", "context_length"):
+            if payload.get(key) is not None:
+                candidates.append(payload[key])
+        valid_values: list[int] = []
+        for value in candidates:
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, int):
+                context_window = value
+            elif isinstance(value, str) and value.strip().isdigit():
+                context_window = int(value.strip())
+            else:
+                continue
+            if context_window > 0:
+                valid_values.append(context_window)
+        distinct_values = set(valid_values)
+        if len(distinct_values) > 1:
+            _LOGGER.warning(
+                "Ignoring conflicting Ollama context metadata for %s: %s",
+                model,
+                sorted(distinct_values),
+            )
+            return {}
+        if valid_values:
+            return {
+                "context_window_tokens": valid_values[0],
+                "context_profile_source": "ollama_show_model_info",
+                "context_metadata_authority": "provider",
+            }
+        return {}
+
+    # -------------------------------------------------------------------------
+    def _show_payload(self, model: str) -> dict[str, Any] | None:
+        normalized_model = model.strip()
+        if normalized_model in self._show_payload_cache:
+            return self._show_payload_cache[normalized_model]
         try:
-            payload = self._post_json("/api/show", {"name": model})
+            payload = self._post_json("/api/show", {"name": normalized_model})
         except Exception:
+            payload = None
+        self._show_payload_cache[normalized_model] = payload
+        return payload
+
+    # -------------------------------------------------------------------------
+    def _show_capabilities(self, model: str) -> set[str] | None:
+        payload = self._show_payload(model)
+        if payload is None:
             return None
         raw = payload.get("capabilities")
-        if not isinstance(raw, list):
+        if not is_json_array(raw):
             return None
         return {str(item).strip().lower() for item in raw if str(item).strip()}
 
     # -------------------------------------------------------------------------
-    def _probe_tool_support(self, model: str) -> bool:
+    def _thinking_option(self, model: str) -> str | bool | None:
+        """Return only a provider-declared thinking control.
+
+        Ollama's GPT-OSS family requires a level such as ``low`` while other
+        thinking-capable families accept the boolean disable form.  Unknown
+        metadata deliberately leaves the field out so the request cannot send
+        a value that the model contract did not declare.
+        """
+
+        payload = self._show_payload(model)
+        if payload is None:
+            return None
+        details = json_object(payload.get("details"))
+        family = str(details.get("family") or "").strip().lower()
+        if not family:
+            model_info = json_object(payload.get("model_info"))
+            family = str(
+                model_info.get("general.architecture")
+                or model_info.get("general.family")
+                or ""
+            ).strip().lower()
+        if family in {"gpt-oss", "gptoss"}:
+            return "low"
+        capabilities = self._show_capabilities(model)
+        if capabilities is not None and "thinking" in capabilities:
+            return False
+        return None
+
+    # -------------------------------------------------------------------------
+    def _probe_tool_support(self, model: str) -> bool | None:
         cached = self.tool_capability_cache.get(self.base_url, model)
         if cached is not None:
             return cached
@@ -270,37 +516,36 @@ class OllamaProvider(LLMProvider):
             "messages": [
                 {
                     "role": "user",
-                    "content": "Call the aegis_tool_probe tool with empty arguments.",
+                    "content": OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT,
                 }
             ],
             "stream": False,
             "tools": [self.tool_to_ollama_schema(tool)],
             "options": {"temperature": 0},
         }
-        supported = False
+        supported: bool | None = None
         try:
             response = self._post_json("/api/chat", payload)
-            message = response.get("message") if isinstance(response, dict) else None
+            message = response.get("message") if is_json_object(response) else None
             supported = True
             source = "ollama_tool_request_accepted"
-            if isinstance(message, dict) and self._parse_tool_calls(message):
+            if is_json_object(message) and self._parse_tool_calls(message):
                 source = "ollama_probe"
         except HTTPError as exc:
-            supported = False
-            source = (
-                "ollama_tool_request_rejected"
-                if self._is_explicit_tool_unsupported_error(exc)
-                else "ollama_probe"
-            )
+            if self._is_explicit_tool_unsupported_error(exc):
+                supported = False
+                source = "ollama_tool_request_rejected"
+            else:
+                source = "ollama_probe"
         except Exception:
-            supported = False
             source = "ollama_probe"
-        self.tool_capability_cache.set(
-            self.base_url,
-            model,
-            supported,
-            source=source,
-        )
+        if supported is not None:
+            self.tool_capability_cache.set(
+                self.base_url,
+                model,
+                supported,
+                source=source,
+            )
         return supported
 
     # -------------------------------------------------------------------------
@@ -334,8 +579,18 @@ class OllamaProvider(LLMProvider):
             html = self._get_text("https://registry.ollama.ai/library")
             parser = _OllamaLibraryParser()
             parser.feed(html)
-        except Exception:
+        except Exception as exc:
+            error = LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model="*",
+                stage="library_catalog",
+            )
+            self.last_list_library_models_error = str(error)
+            self.last_list_library_models_diagnostics = dict(error.diagnostics)
             return []
+        self.last_list_library_models_error = None
+        self.last_list_library_models_diagnostics = {}
         return [
             ModelDescriptor(
                 name=name,
@@ -349,7 +604,15 @@ class OllamaProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def pull_model(self, *, model: str) -> dict[str, Any]:
-        return self._post_json("/api/pull", {"name": model, "stream": False})
+        try:
+            return self._post_json("/api/pull", {"name": model, "stream": False})
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=model,
+                stage="pull",
+            ) from exc
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -367,15 +630,21 @@ class OllamaProvider(LLMProvider):
     @staticmethod
     def _parse_tool_calls(message: dict[str, Any]) -> list[LLMToolCall]:
         calls: list[LLMToolCall] = []
-        for item in message.get("tool_calls", []) if isinstance(message, dict) else []:
-            if not isinstance(item, dict):
+        for item in json_array(message.get("tool_calls")):
+            item = json_object(item)
+            if not item:
                 continue
-            function = item.get("function") if isinstance(item.get("function"), dict) else {}
+            function = json_object(item.get("function"))
+            args, parse_error = parse_native_tool_arguments(function.get("arguments"))
+            name, parse_error = normalize_native_tool_name(
+                function.get("name") or item.get("name"), parse_error
+            )
             calls.append(
                 LLMToolCall(
                     id=item.get("id"),
-                    name=str(function.get("name") or item.get("name") or ""),
-                    arguments=function.get("arguments") if isinstance(function.get("arguments"), dict) else {},
+                    name=name,
+                    arguments=args,
+                    parse_error=parse_error,
                 )
             )
         return calls
@@ -389,8 +658,6 @@ class OllamaProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
-        usage = compute_ollama_context_usage(request)
-        self.last_context_usage = usage.to_dict()
         native_tools = list(tools or request.tools or [])
         schema = response_json_schema or request.response_json_schema
         effective_request = replace(
@@ -398,66 +665,220 @@ class OllamaProvider(LLMProvider):
             tools=native_tools or None,
             response_json_schema=schema,
         )
-        self._validate_request_capabilities(effective_request)
+        effective_request = prepare_request(
+            effective_request, provider=self.provider_name
+        )
+        usage = compute_context_usage(
+            effective_request, provider=self.provider_name
+        )
+        try:
+            self._validate_request_capabilities(effective_request)
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
         payload: dict[str, Any] = {
-            "model": request.model,
-            "messages": request.messages,
+            "model": effective_request.model,
+            "messages": self._normalize_ollama_messages(effective_request.messages),
             "stream": False,
-            "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
+            "options": {"temperature": effective_request.temperature},
         }
+        if usage.selected_context_window is not None:
+            payload["options"]["num_ctx"] = usage.selected_context_window
         if native_tools:
-            payload["tools"] = [self.tool_to_ollama_schema(tool) for tool in native_tools]
+            payload["tools"] = [
+                self.tool_to_ollama_schema(tool) for tool in native_tools
+            ]
         if schema:
             payload["format"] = schema
-        response = self._post_json("/api/chat", payload)
-        message = response.get("message") if isinstance(response.get("message"), dict) else {}
+        try:
+            response = self._post_json_for_request(
+                "/api/chat",
+                payload,
+                effective_request,
+            )
+        except LLMStructuredOutputError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=effective_request.model,
+                stage="chat",
+                context_usage=usage.to_dict(),
+            ) from exc
+        usage = apply_reported_usage(usage, response)
+        message = json_object(response.get("message"))
         return LLMResult(
             content=str(message.get("content") or ""),
             raw=response,
             tool_calls=self._parse_tool_calls(message),
             finish_reason=str(response.get("done_reason") or "") or None,
+            context_usage=usage.to_dict(),
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_ollama_messages(
+        messages: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Project neutral multimodal parts into Ollama's ``images`` form.
+
+        Plain string content is passed through untouched.  When a message's
+        content is a parts list the text is folded into ``content`` and the
+        base64 images into the message's ``images`` array (Ollama's native
+        multimodal field).
+        """
+
+        normalized: list[dict[str, Any]] = []
+        for message in messages:
+            content = message.get("content")
+            if isinstance(content, list):
+                text, images = normalize_image_content_for_ollama(content)
+                if images:
+                    copy = dict(message)
+                    copy["content"] = text
+                    copy["images"] = images
+                    normalized.append(copy)
+                    continue
+            normalized.append(message)
+        return normalized
+
+    # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
-        usage = compute_ollama_context_usage(request)
-        self.last_context_usage = usage.to_dict()
+        request = prepare_request(request, provider=self.provider_name)
+        usage = compute_context_usage(request, provider=self.provider_name)
         payload: dict[str, Any] = {
             "model": request.model,
-            "messages": request.messages,
+            "messages": self._normalize_ollama_messages(request.messages),
             "stream": True,
-            "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
+            "options": {"temperature": request.temperature},
         }
-        for event in self._stream_post("/api/chat", payload):
-            message = event.get("message") if isinstance(event.get("message"), dict) else None
-            if message is not None:
-                content = message.get("content")
-                if isinstance(content, str) and content:
-                    yield content
-            if event.get("done"):
-                break
+        if usage.selected_context_window is not None:
+            payload["options"]["num_ctx"] = usage.selected_context_window
+        stream: LLMTextStream
+
+        def iterate() -> Iterable[str]:
+            nonlocal usage
+            try:
+                for event in self._stream_post_for_request("/api/chat", payload, request):
+                    message = (
+                        event.get("message")
+                        if is_json_object(event.get("message"))
+                        else None
+                    )
+                    if message is not None:
+                        content = message.get("content")
+                        if isinstance(content, str) and content:
+                            yield content
+                    if event.get("done"):
+                        usage = apply_reported_usage(usage, event)
+                        stream.context_usage = usage.to_dict()
+                        break
+            except LLMProviderRequestError:
+                raise
+            except Exception as exc:
+                raise LLMProviderRequestError.from_exception(
+                    exc,
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="stream",
+                    context_usage=usage.to_dict(),
+                ) from exc
+
+        stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
+        return stream
 
     # -------------------------------------------------------------------------
     def structured_output(
-        self, request: LLMRequest, schema: type[object]
+        self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
-        usage = compute_ollama_context_usage(request)
-        self.last_context_usage = usage.to_dict()
-        schema_json = schema.model_json_schema() if hasattr(schema, "model_json_schema") else {}
+        model_json_schema = getattr(schema, "model_json_schema", None)
+        schema_json = (
+            json_object(model_json_schema()) if callable(model_json_schema) else {}
+        )
+        effective_request = prepare_request(
+            replace(request, response_json_schema=schema_json),
+            provider=self.provider_name,
+        )
+        usage = compute_context_usage(effective_request, provider=self.provider_name)
+        try:
+            self._validate_request_capabilities(effective_request)
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
         payload: dict[str, Any] = {
-            "model": request.model,
-            "messages": request.messages,
+            "model": effective_request.model,
+            "messages": self._normalize_ollama_messages(effective_request.messages),
             "stream": False,
             "format": schema_json,
-            "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
+            "options": {"temperature": effective_request.temperature},
         }
-        response = self._post_json("/api/chat", payload)
-        message = response.get("message") if isinstance(response.get("message"), dict) else {}
+        thinking_option = self._thinking_option(effective_request.model)
+        if thinking_option is not None:
+            payload["think"] = thinking_option
+        if usage.selected_context_window is not None:
+            payload["options"]["num_ctx"] = usage.selected_context_window
+        try:
+            response = self._post_json_for_request(
+                "/api/chat",
+                payload,
+                effective_request,
+            )
+        except LLMStructuredOutputError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=effective_request.model,
+                stage="structured_output",
+                context_usage=usage.to_dict(),
+            ) from exc
+        usage = apply_reported_usage(usage, response)
+        message = json_object(response.get("message"))
         content = str(message.get("content") or "{}")
         try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            return {}
+            loaded = json.loads(content)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=effective_request.model,
+                stage="structured_output",
+                detail="The provider returned invalid JSON for the structured native response.",
+                context_usage=usage.to_dict(),
+            ) from exc
+        if not is_json_object(loaded):
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=effective_request.model,
+                stage="structured_output",
+                detail="The provider returned a JSON value instead of an object.",
+                context_usage=usage.to_dict(),
+            )
+        validator = getattr(schema, "model_validate", None)
+        if callable(validator):
+            try:
+                validated = validator(loaded)
+            except Exception as exc:  # noqa: BLE001
+                raise LLMResponseParsingError(
+                    provider=self.provider_name,
+                    model=effective_request.model,
+                    stage="structured_output",
+                    detail="The provider response did not match the requested extraction schema.",
+                    context_usage=usage.to_dict(),
+                ) from exc
+            dumper = getattr(validated, "model_dump", None)
+            if callable(dumper):
+                return LLMStructuredOutput(
+                    json_object(dumper(mode="json")),
+                    context_usage=usage.to_dict(),
+                    provided_fields=loaded.keys(),
+                )
+        return LLMStructuredOutput(
+            loaded,
+            context_usage=usage.to_dict(),
+            provided_fields=loaded.keys(),
+        )
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
@@ -467,11 +888,22 @@ class OllamaProvider(LLMProvider):
         }
         try:
             response = self._post_json("/api/embeddings", payload)
-        except Exception:
-            return []
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=model,
+                stage="embeddings",
+            ) from exc
         embedding = response.get("embedding")
-        if not isinstance(embedding, list):
-            return []
+        if not is_json_array(embedding):
+            raise LLMProviderRequestError(
+                provider=self.provider_name,
+                model=model,
+                stage="embeddings",
+                code="provider_invalid_response",
+                retryable=False,
+            )
         return [float(value) for value in embedding if isinstance(value, (int | float))]
 
     # -------------------------------------------------------------------------
@@ -483,5 +915,16 @@ class OllamaProvider(LLMProvider):
                 "detail": "reachable",
                 "models": len(payload.get("models", [])),
             }
-        except (HTTPError, URLError, TimeoutError) as exc:
-            return {"ok": False, "detail": str(exc)}
+        except Exception as exc:
+            error = LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model="*",
+                stage="health",
+            )
+            return {
+                "ok": False,
+                "detail": str(error),
+                "error_code": error.code,
+                "diagnostics": dict(error.diagnostics),
+            }

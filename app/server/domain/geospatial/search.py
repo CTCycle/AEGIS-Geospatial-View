@@ -12,7 +12,7 @@ class IndexedFeature:
     source: str | None = None
     latitude: float | None = None
     longitude: float | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 @dataclass(frozen=True)

@@ -7,6 +7,16 @@ set "APP_DIR=%PROJECT_ROOT%\app"
 set "SERVER_DIR=%APP_DIR%\server"
 set "CLIENT_DIR=%APP_DIR%\client"
 set "TESTS_DIR=%APP_DIR%\tests"
+set "RUNTIME_CACHE_DIR=%PROJECT_ROOT%\runtimes\cache"
+set "PYTHON_BYTECODE_CACHE_DIR=%RUNTIME_CACHE_DIR%\python"
+set "UV_CACHE_DIR=%RUNTIME_CACHE_DIR%\uv"
+set "NPM_CACHE_DIR=%RUNTIME_CACHE_DIR%\npm"
+set "PIP_CACHE_DIR=%RUNTIME_CACHE_DIR%\pip"
+set "PLAYWRIGHT_BROWSERS_DIR=%RUNTIME_CACHE_DIR%\playwright-browsers"
+set "PYTEST_CACHE_DIR=%RUNTIME_CACHE_DIR%\pytest"
+set "PYTEST_TEMP_DIR=%RUNTIME_CACHE_DIR%\pytest-tmp"
+set "RUFF_CACHE_DIR=%RUNTIME_CACHE_DIR%\ruff"
+set "COVERAGE_DIR=%RUNTIME_CACHE_DIR%\coverage"
 set "SETTINGS_ENV=%PROJECT_ROOT%\settings\.env"
 set "VENV_PYTHON=%SERVER_DIR%\.venv\Scripts\python.exe"
 set "RUNTIME_NPM=%PROJECT_ROOT%\runtimes\nodejs\npm.cmd"
@@ -14,7 +24,7 @@ set "RUNTIME_NPM=%PROJECT_ROOT%\runtimes\nodejs\npm.cmd"
 set "FASTAPI_HOST=127.0.0.1"
 set "FASTAPI_PORT=8000"
 set "UI_HOST=127.0.0.1"
-set "UI_PORT=7861"
+set "UI_PORT=8001"
 set "TEST_RESULT=0"
 set "LIVE_SERVER_PHASE=SKIPPED"
 set "PYTEST_PHASE=SKIPPED"
@@ -25,6 +35,22 @@ set "STARTED_BACKEND=0"
 set "STARTED_FRONTEND=0"
 set "SKIP_LIVE_SERVERS=0"
 set "SKIP_FRONTEND=0"
+for %%D in ("%RUNTIME_CACHE_DIR%" "%PYTHON_BYTECODE_CACHE_DIR%" "%PYTEST_CACHE_DIR%" "%PYTEST_TEMP_DIR%" "%RUFF_CACHE_DIR%" "%UV_CACHE_DIR%" "%NPM_CACHE_DIR%" "%PIP_CACHE_DIR%" "%COVERAGE_DIR%" "%PLAYWRIGHT_BROWSERS_DIR%") do (
+  if not exist "%%~D" mkdir "%%~D"
+  if not exist "%%~D" (
+    echo [ERROR] Unable to create canonical cache directory: "%%~D"
+    exit /b 1
+  )
+)
+set "AEGIS_CACHE_ROOT=%RUNTIME_CACHE_DIR%"
+set "PYTHONPYCACHEPREFIX=%PYTHON_BYTECODE_CACHE_DIR%"
+set "UV_CACHE_DIR=%UV_CACHE_DIR%"
+set "RUFF_CACHE_DIR=%RUFF_CACHE_DIR%"
+set "NPM_CONFIG_CACHE=%NPM_CACHE_DIR%"
+set "PIP_CACHE_DIR=%PIP_CACHE_DIR%"
+set "PLAYWRIGHT_BROWSERS_PATH=%PLAYWRIGHT_BROWSERS_DIR%"
+set "COVERAGE_FILE=%COVERAGE_DIR%\.coverage"
+set PYTEST_ADDOPTS=--basetemp="%PYTEST_TEMP_DIR%"
 if /i "%STANDARD_TEST_SKIP_LIVE_SERVERS%"=="true" set "SKIP_LIVE_SERVERS=1"
 if "%STANDARD_TEST_SKIP_LIVE_SERVERS%"=="1" set "SKIP_LIVE_SERVERS=1"
 if /i "%STANDARD_TEST_SKIP_FRONTEND%"=="true" set "SKIP_FRONTEND=1"
@@ -69,22 +95,17 @@ if exist "%RUNTIME_NPM%" (
   set "NPM_CMD=npm"
 )
 
-set "UVICORN_APP=app.server.app:app"
-set "BACKEND_WORKDIR=%PROJECT_ROOT%"
-set "PYTHONPATH=%PROJECT_ROOT%;%APP_DIR%"
-"%PYTHON_CMD%" -c "import importlib; importlib.import_module('app.server.app')" >nul 2>&1
-if errorlevel 1 (
-  set "UVICORN_APP=server.app:app"
-  set "BACKEND_WORKDIR=%SERVER_DIR%"
-  set "PYTHONPATH=%APP_DIR%"
-)
+set "UVICORN_APP=server.app:app"
+set "BACKEND_WORKDIR=%APP_DIR%"
+set "PYTHONPATH=%APP_DIR%"
 
 set "PYTEST_TARGET=%TESTS_DIR%"
 if not "%STANDARD_TEST_PYTEST_TARGET%"=="" set "PYTEST_TARGET=%STANDARD_TEST_PYTEST_TARGET%"
 
-set "NEED_FRONTEND=1"
+set "NEED_FRONTEND=0"
 echo %PYTEST_TARGET% | findstr /I "\\e2e" >nul 2>&1
 if not errorlevel 1 set "NEED_FRONTEND=1"
+if /i "%PYTEST_TARGET%"=="%TESTS_DIR%" set "NEED_FRONTEND=1"
 if "%SKIP_FRONTEND%"=="1" set "NEED_FRONTEND=0"
 
 
@@ -104,7 +125,7 @@ set "LIVE_SERVER_PHASE=PASS"
 curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
 if errorlevel 1 (
   echo [INFO] Starting backend server...
-  start "" /B /D "%BACKEND_WORKDIR%" "%PYTHON_CMD%" -m uvicorn %UVICORN_APP% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning
+  start "" /B /D "%BACKEND_WORKDIR%" "%PYTHON_CMD%" -m uvicorn %UVICORN_APP% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning --ws-max-size 65536 --ws-ping-interval 15 --ws-ping-timeout 10
   set "STARTED_BACKEND=1"
 )
 
@@ -143,7 +164,7 @@ if "%NEED_FRONTEND%"=="1" (
 
 :run_pytests
 echo [STEP] Running Python tests...
-"%PYTHON_CMD%" -m pytest "%PYTEST_TARGET%" -v --tb=short %*
+"%PYTHON_CMD%" -m pytest -c "%SERVER_DIR%\pyproject.toml" -o "cache_dir=%PYTEST_CACHE_DIR%" --basetemp "%PYTEST_TEMP_DIR%" "%PYTEST_TARGET%" -v --tb=short %*
 if errorlevel 1 (
   set "PYTEST_PHASE=FAIL"
   set "TEST_RESULT=1"

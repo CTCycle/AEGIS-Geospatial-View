@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 from urllib.parse import urlencode
 
+from server.configurations.settings import JsonNominatimSettings, NominatimSettings
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
@@ -24,15 +27,23 @@ class NominatimProvider(GeospatialProvider):
     def __init__(
         self,
         *,
+        settings: NominatimSettings | None = None,
         fetcher: JsonFetcher | None = None,
         cache: GeospatialCache | None = None,
     ) -> None:
         self.fetcher = fetcher or fetch_json_url
         self.cache = cache or GeospatialCache()
+        configured = settings or NominatimSettings(
+            **JsonNominatimSettings().model_dump()
+        )
+        self.base_url = configured.base_url
+        self.user_agent = configured.user_agent
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
-        query = str(request.params.get("query") or request.params.get("q") or "").strip()
+        query = str(
+            request.params.get("query") or request.params.get("q") or ""
+        ).strip()
         if not query:
             return ProviderResponse(
                 capability_id=request.capability_id,
@@ -50,10 +61,15 @@ class NominatimProvider(GeospatialProvider):
             payload = await call_json_fetcher(
                 self.fetcher,
                 url,
-                {"User-Agent": "AEGIS-Geospatial-View/1.0"},
+                {"User-Agent": self.user_agent},
             )
             normalized = self._normalize(payload, query=query)
-            self.cache.set(cache_key, normalized, ttl_seconds=3600, stale_while_revalidate_seconds=86400)
+            self.cache.set(
+                cache_key,
+                normalized,
+                ttl_seconds=3600,
+                stale_while_revalidate_seconds=86400,
+            )
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -62,13 +78,17 @@ class NominatimProvider(GeospatialProvider):
             )
         except ProviderError:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return ProviderResponse(
                     capability_id=request.capability_id,
                     provider_id=self.provider_id,
                     payload=cached.value,
                     attribution=["OpenStreetMap contributors", "Nominatim"],
-                    warnings=["Nominatim request failed; serving stale geocode result."],
+                    warnings=[
+                        "Nominatim request failed; serving stale geocode result."
+                    ],
                     stale=True,
                 )
             raise
@@ -85,15 +105,18 @@ class NominatimProvider(GeospatialProvider):
             "limit": "5",
             "addressdetails": "1",
         }
-        return f"https://nominatim.openstreetmap.org/search?{urlencode(params)}"
+        return f"{self.base_url}?{urlencode(params)}"
 
     # -------------------------------------------------------------------------
     def _normalize(self, payload: object, *, query: str) -> dict[str, object]:
-        if not isinstance(payload, list):
-            raise ProviderMalformedPayloadError("Nominatim search payload must be a list.")
-        results = []
+        if not is_json_array(payload):
+            raise ProviderMalformedPayloadError(
+                "Nominatim search payload must be a list."
+            )
+        results: list[dict[str, object]] = []
         for item in payload:
-            if not isinstance(item, dict):
+            item = json_object(item)
+            if not item:
                 continue
             lat = self._float_or_none(item.get("lat"))
             lon = self._float_or_none(item.get("lon"))

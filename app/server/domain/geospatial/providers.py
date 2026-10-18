@@ -1,8 +1,11 @@
 from __future__ import annotations
+from contextvars import ContextVar
+from contextlib import contextmanager
+from collections.abc import Generator
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -11,7 +14,7 @@ class ProviderRequest:
     bbox: tuple[float, float, float, float] | None = None
     zoom: int | None = None
     time: datetime | None = None
-    params: dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -19,17 +22,47 @@ class ProviderResponse:
     capability_id: str
     provider_id: str
     payload: dict[str, Any]
-    attribution: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    attribution: list[str] = field(default_factory=lambda: list[str]())
+    warnings: list[str] = field(default_factory=lambda: list[str]())
     stale: bool = False
     fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    result_status: Literal["ok", "valid_empty", "partial", "stale"] = "ok"
+    result_type: Literal["features", "raster", "metadata", "unknown"] = "unknown"
+    observation_time: str | None = None
+    coverage: dict[str, Any] | None = None
+    spatial_resolution: str | None = None
+    units: dict[str, str] = field(default_factory=lambda: dict[str, str]())
+    source_url: str | None = None
+    partial: bool = False
 
 ###############################################################################
 @dataclass(frozen=True)
 class ProviderExecutionPolicy:
     timeout_seconds: float = 10.0
-    max_attempts: int = 1
+    provider_timeout_seconds: dict[str, float] = field(
+        default_factory=lambda: dict[str, float]()
+    )
+    max_attempts: int = 2
+    retry_backoff_base_seconds: float = 0.25
+    retry_backoff_max_seconds: float = 2.0
     circuit_breaker_failures: int = 3
+    circuit_recovery_seconds: float = 60.0
+
+
+_RUN_PROVIDER_POLICY: ContextVar[ProviderExecutionPolicy | None] = ContextVar("run_provider_policy", default=None)
+
+
+def current_provider_policy(default: ProviderExecutionPolicy) -> ProviderExecutionPolicy:
+    return _RUN_PROVIDER_POLICY.get() or default
+
+
+@contextmanager
+def provider_execution_scope(policy: ProviderExecutionPolicy | None) -> Generator[None]:
+    token = _RUN_PROVIDER_POLICY.set(policy)
+    try:
+        yield
+    finally:
+        _RUN_PROVIDER_POLICY.reset(token)
 
 
 FeatureRequest = ProviderRequest

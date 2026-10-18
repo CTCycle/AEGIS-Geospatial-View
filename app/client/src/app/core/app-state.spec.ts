@@ -1,120 +1,82 @@
 import {
+  APP_STATE_STORAGE_KEY,
   defaultAppState,
   loadPersistedAppState,
   persistAppState,
 } from './app-state';
 
 describe('core/app-state', () => {
-  const storageKey = 'aegis:webapp-state:v3';
-  const tabKey = 'aegis:webapp-tab-id:v1';
-  const heartbeatPrefix = 'aegis:webapp-tab-heartbeat:v1:';
+  const storageKey = APP_STATE_STORAGE_KEY;
 
   beforeEach(() => {
     window.sessionStorage.clear();
-    window.localStorage.clear();
-    spyOn(window.crypto, 'randomUUID').and.returnValue('11111111-1111-4111-8111-111111111111');
   });
 
-  it('creates default state', () => {
+  it('creates UI-only default state', () => {
     const state = defaultAppState();
-    expect(state.version).toBe(3);
-    expect(state.chatPage.chatPanel.messages).toEqual([]);
-    expect(state.settingsPage.providerMode).toBe('local');
+    expect(state.version).toBe(1);
+    expect(state.chatPage.chatPanel.composerDraft).toBe('');
+    expect(state.chatPage.chatPanel.lastRunSequence).toBe(0);
+    expect(state.settingsPage.searchText).toBe('');
   });
 
-  it('loads valid persisted state', () => {
+  it('loads valid UI state without restoring server-owned fields', () => {
     const now = Date.now();
-    window.sessionStorage.setItem(tabKey, 'tab-1');
     window.sessionStorage.setItem(storageKey, JSON.stringify({
       ...defaultAppState(),
-      tabId: 'tab-1',
       savedAt: now,
       chatPage: {
         ...defaultAppState().chatPage,
         chatPanel: {
           ...defaultAppState().chatPage.chatPanel,
+          conversationId: 'conversation-1',
+          lastRunSequence: 12,
           composerDraft: 'persisted draft',
-          lastOperation: {
-            kind: 'direct_answer',
-            status: 'success',
-            message: 'Persisted operation',
-          },
-          contextUsage: {
-            estimated_input_tokens: 200,
-            selected_context_window: 2048,
-            model_context_limit: 8192,
-            usage_percent: 9.8,
-            provider: 'ollama',
-            model: 'llama3.2',
-          },
+          messages: [{ role: 'assistant', content: 'must not hydrate' }],
+          mapSession: { session_id: 'must not hydrate' },
+          memorySnapshot: { key: 'must not hydrate' },
         },
+      },
+      settingsPage: {
+        ...defaultAppState().settingsPage,
+        providerMode: 'cloud',
+        statusText: 'must not hydrate',
       },
     }));
     const state = loadPersistedAppState();
+    expect(state.chatPage.chatPanel.conversationId).toBe('conversation-1');
+    expect(state.chatPage.chatPanel.lastRunSequence).toBe(12);
     expect(state.chatPage.chatPanel.composerDraft).toBe('persisted draft');
-    expect(state.chatPage.chatPanel.lastOperation?.kind).toBe('direct_answer');
-    expect(state.chatPage.chatPanel.contextUsage?.usage_percent).toBe(9.8);
-    expect(state.tabId).toBe('tab-1');
+    expect((state.chatPage.chatPanel as unknown as Record<string, unknown>).messages).toBeUndefined();
+    expect((state.chatPage.chatPanel as unknown as Record<string, unknown>).mapSession).toBeUndefined();
+    expect((state.chatPage.chatPanel as unknown as Record<string, unknown>).memorySnapshot).toBeUndefined();
+    expect((state.settingsPage as unknown as Record<string, unknown>).providerMode).toBeUndefined();
+    expect((state.settingsPage as unknown as Record<string, unknown>).statusText).toBeUndefined();
   });
 
   it('resets on corrupted storage', () => {
-    window.sessionStorage.setItem(tabKey, 'tab-2');
     window.sessionStorage.setItem(storageKey, '{invalid');
     const state = loadPersistedAppState();
     expect(state.chatPage.chatPanel.composerDraft).toBe('');
+    expect(window.sessionStorage.getItem(storageKey)).toBeNull();
   });
 
   it('resets on expired ttl', () => {
     const old = Date.now() - (7 * 60 * 60 * 1000);
-    window.sessionStorage.setItem(tabKey, 'tab-3');
     window.sessionStorage.setItem(storageKey, JSON.stringify({
       ...defaultAppState(),
-      tabId: 'tab-3',
       savedAt: old,
     }));
     const state = loadPersistedAppState();
-    expect(state.chatPage.chatPanel.messages.length).toBe(0);
+    expect(state.chatPage.chatPanel.conversationId).toBeUndefined();
+    expect(window.sessionStorage.getItem(storageKey)).toBeNull();
   });
 
-  it('rotates tab on heartbeat ownership conflict', () => {
-    window.sessionStorage.setItem(tabKey, 'tab-owned');
-    window.localStorage.setItem(`${heartbeatPrefix}tab-owned`, String(Date.now()));
-    (window.crypto.randomUUID as jasmine.Spy).and.returnValue('22222222-2222-4222-8222-222222222222');
-    window.sessionStorage.setItem(storageKey, JSON.stringify({
-      ...defaultAppState(),
-      tabId: 'tab-owned',
-      savedAt: Date.now(),
-      chatPage: {
-        ...defaultAppState().chatPage,
-        chatPanel: {
-          ...defaultAppState().chatPage.chatPanel,
-          composerDraft: 'should be reset',
-        },
-      },
-    }));
-    const state = loadPersistedAppState();
-    expect(state.chatPage.chatPanel.composerDraft).toBe('');
-    expect(state.tabId).toBe('22222222-2222-4222-8222-222222222222');
-  });
-
-  it('persists schema version and timestamp', () => {
-    const state = defaultAppState();
-    persistAppState(state);
-    const raw = window.sessionStorage.getItem(storageKey);
-    expect(raw).toBeTruthy();
-    const persisted = JSON.parse(String(raw));
-    expect(persisted.version).toBe(3);
-    expect(typeof persisted.savedAt).toBe('number');
-  });
-
-  it('invalidates persisted state from older schema versions', () => {
-    const now = Date.now();
-    window.sessionStorage.setItem(tabKey, 'tab-old-version');
+  it('ignores older schema versions without migration', () => {
     window.sessionStorage.setItem(storageKey, JSON.stringify({
       ...defaultAppState(),
       version: 2,
-      tabId: 'tab-old-version',
-      savedAt: now,
+      savedAt: Date.now(),
       chatPage: {
         ...defaultAppState().chatPage,
         chatPanel: {
@@ -124,17 +86,54 @@ describe('core/app-state', () => {
       },
     }));
     const loaded = loadPersistedAppState();
-    expect(loaded.version).toBe(3);
+    expect(loaded.version).toBe(1);
     expect(loaded.chatPage.chatPanel.composerDraft).toBe('');
+    expect(window.sessionStorage.getItem(storageKey)).toBeNull();
   });
 
-  it('stale overlay ids are tolerated in persisted payload and remain serializable', () => {
+  it('persists only the current UI schema', () => {
+    const state = defaultAppState();
+    state.chatPage.chatPanel.conversationId = 'conversation-1';
+    state.chatPage.chatPanel.composerDraft = 'draft';
+    persistAppState(state);
+    const persisted = JSON.parse(String(window.sessionStorage.getItem(storageKey))) as Record<string, unknown>;
+    expect(persisted.version).toBe(1);
+    expect(typeof persisted.savedAt).toBe('number');
+    const raw = JSON.stringify(persisted);
+    expect(raw).not.toContain('messages');
+    expect(raw).not.toContain('mapSession');
+    expect(raw).not.toContain('memorySnapshot');
+    expect(raw).not.toContain('providerMode');
+    expect(raw).not.toContain('statusText');
+  });
+
+  it('retains presentation overlay preferences', () => {
     const state = defaultAppState();
     state.chatPage.mapState.overlayVisibility = { removed_overlay: true };
     state.chatPage.mapState.overlayOpacity = { removed_overlay: 0.4 };
+    state.chatPage.mapState.overlayOrder = ['vector', 'raster'];
     persistAppState(state);
     const loaded = loadPersistedAppState();
     expect(loaded.chatPage.mapState.overlayVisibility['removed_overlay']).toBeTrue();
     expect(loaded.chatPage.mapState.overlayOpacity['removed_overlay']).toBe(0.4);
+    expect(loaded.chatPage.mapState.overlayOrder).toEqual(['vector', 'raster']);
+  });
+
+  it('filters invalid and duplicate persisted overlay order entries', () => {
+    const state = defaultAppState();
+    const persisted = {
+      ...state,
+      savedAt: Date.now(),
+      chatPage: {
+        ...state.chatPage,
+        mapState: {
+          ...state.chatPage.mapState,
+          overlayOrder: ['raster', '', 'vector', 'raster', 3],
+        },
+      },
+    };
+    window.sessionStorage.setItem(storageKey, JSON.stringify(persisted));
+
+    expect(loadPersistedAppState().chatPage.mapState.overlayOrder).toEqual(['raster', 'vector']);
   });
 });

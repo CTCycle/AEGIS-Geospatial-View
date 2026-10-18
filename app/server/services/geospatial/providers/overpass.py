@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, json_array, json_object
+
 from typing import Any
 
+from server.configurations.settings import OverpassSettings
 from server.services.geospatial.normalizers import (
     NormalizationError,
     normalize_poi_feature,
 )
 from server.services.geospatial.overpass import (
+    OverpassInvalidQueryError,
     OverpassRateLimitError,
+    OverpassRequestError,
     OverpassService,
     OverpassServiceError,
 )
@@ -17,8 +22,9 @@ from server.services.geospatial.providers._request import (
 )
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
-    ProviderRateLimitError,
+    ProviderInvalidQueryError,
     ProviderRequest,
+    ProviderRateLimitError,
     ProviderResponse,
     ProviderUnavailableError,
 )
@@ -37,8 +43,13 @@ class OverpassProvider(GeospatialProvider):
     provider_id = "overpass"
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, service: OverpassService | None = None) -> None:
-        self.service = service or OverpassService()
+    def __init__(
+        self,
+        *,
+        service: OverpassService | None = None,
+        settings: OverpassSettings | None = None,
+    ) -> None:
+        self.service = service or OverpassService(settings=settings)
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
@@ -54,6 +65,10 @@ class OverpassProvider(GeospatialProvider):
                 )
             except OverpassRateLimitError as exc:
                 raise ProviderRateLimitError(str(exc)) from exc
+            except OverpassInvalidQueryError as exc:
+                raise ProviderInvalidQueryError(str(exc)) from exc
+            except OverpassRequestError as exc:
+                raise ProviderUnavailableError(str(exc)) from exc
             except (OverpassServiceError, ValueError) as exc:
                 raise ProviderUnavailableError(str(exc)) from exc
             return ProviderResponse(
@@ -61,27 +76,55 @@ class OverpassProvider(GeospatialProvider):
                 provider_id=self.provider_id,
                 payload=payload,
                 attribution=["© OpenStreetMap contributors (ODbL)"],
+                coverage={
+                    "type": "circle",
+                    "center": {"latitude": latitude, "longitude": longitude},
+                    "radius_m": radius_m,
+                },
+                spatial_resolution="building footprints",
+                source_url=getattr(self.service, "base_url", None),
+                result_type="features",
+                result_status=(
+                    "valid_empty" if not json_array(payload.get("features")) else "ok"
+                ),
             )
         tags = request.params.get("amenity_tags")
-        amenity_tags = [str(tag) for tag in tags] if isinstance(tags, list) else None
+        amenity_tags = [str(tag) for tag in tags] if is_json_array(tags) else None
+        categories_value = request.params.get("poi_categories")
+        categories = (
+            [str(item) for item in categories_value]
+            if is_json_array(categories_value)
+            else None
+        )
         if amenity_tags is None:
-            category = str(request.params.get("category") or "").strip().lower()
+            filters = json_object(request.params.get("filters"))
+            category = str(
+                request.params.get("category") or filters.get("category") or ""
+            ).strip().lower()
             amenity_tags = AMENITY_GROUPS.get(category)
+            if category and amenity_tags is None and categories is None:
+                categories = [category]
         try:
             payload = await self.service.get_nearby_poi(
                 latitude=latitude,
                 longitude=longitude,
                 radius_m=radius_m,
                 amenity_tags=amenity_tags,
+                categories=categories,
                 limit=_optional_int(request.params.get("limit")),
             )
         except OverpassRateLimitError as exc:
             raise ProviderRateLimitError(str(exc)) from exc
+        except OverpassInvalidQueryError as exc:
+            raise ProviderInvalidQueryError(str(exc)) from exc
+        except OverpassRequestError as exc:
+            raise ProviderUnavailableError(str(exc)) from exc
         except (OverpassServiceError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
-        features = []
-        for item in payload.get("items") or []:
-            if not isinstance(item, dict):
+        features: list[dict[str, Any]] = []
+        for item in json_array(payload.get("items")):
+            item = json_object(item)
+            if not item:
                 continue
             try:
                 feature = normalize_poi_feature(
@@ -101,7 +144,10 @@ class OverpassProvider(GeospatialProvider):
             payload={
                 "renderingMode": "clustered-points",
                 "features": features,
-                "totalResults": len(features),
+                "totalResults": payload.get("total_results", len(features)),
+                "returnedResults": payload.get("returned_results", len(features)),
+                "limit": payload.get("limit"),
+                "truncated": bool(payload.get("truncated")),
                 "center": {"latitude": latitude, "longitude": longitude},
                 "radiusM": radius_m,
                 "resolvedAt": payload.get("resolved_at"),
@@ -109,6 +155,23 @@ class OverpassProvider(GeospatialProvider):
             attribution=[
                 str(payload.get("attribution") or "© OpenStreetMap contributors (ODbL)")
             ],
+            coverage={
+                "type": "circle",
+                "center": {"latitude": latitude, "longitude": longitude},
+                "radius_m": radius_m,
+            },
+            spatial_resolution="point features",
+            units={"distance_m": "m", "radius_m": "m"},
+            source_url=getattr(self.service, "base_url", None),
+            result_type="features",
+            result_status=(
+                "partial"
+                if bool(payload.get("truncated"))
+                else "valid_empty"
+                if not features
+                else "ok"
+            ),
+            partial=bool(payload.get("truncated")),
         )
 
 ###############################################################################

@@ -1,0 +1,25 @@
+{
+  "campaign": "AEGIS Tier 3 follow-up",
+  "slice_id": "RASTER-DESCRIPTOR-20260928",
+  "scope": "Public raster descriptor propagation and WMTS/raster renderer contract",
+  "status": "PASS",
+  "verification_date": "2026-09-28",
+  "tested_source_base": "develop@9170f813",
+  "environment": {
+    "backend": "127.0.0.1:7059",
+    "frontend": "127.0.0.1:4512",
+    "data_root": "runtimes/cache/test-runtime/validation-20260924-exact-lane",
+    "provider_lane": "opencode-go / deepseek-v4.1-flash; final catalog/native-probe readiness is recorded separately"
+  },
+  "evidence": {
+    "layer_auditor": "86 manifests; 0 errors; 0 warnings; FEMA, ESA, raster-tile, and WMTS coverage present",
+    "backend_tests": "76 passed, 2 existing dependency deprecation warnings",
+    "frontend_browser_tests": "ChromeHeadlessNoGpu geospatial module: 6/6 passed",
+    "api_contract": "ESA returns wmts, Terrascope serviceUrl, WORLDCOVER_2021_MAP, and EPSG:3857; FEMA returns raster-tile descriptor with NFHL export template"
+  },
+  "limits": [
+    "This slice validates descriptor construction and the controlled client renderer contract; it is not a live public MapLibre source-load or map.render_ack PASS.",
+    "The initial OpenCode Go native probe failed because the isolated runtime held a different credential; final catalog/native-probe readiness passed after the credential-path correction. No provider or model fallback was used.",
+    "The in-app browser could inspect the saved FEMA failure boundary, but this descriptor slice did not execute a new exact-lane raster chat; live raster rendering remains a separate browser-authoritative gate."
+  ]
+}

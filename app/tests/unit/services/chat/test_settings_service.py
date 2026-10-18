@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from server.domain.chat import ModelSettingsUpdateRequest
+from server.contracts.chat import ModelSettingsUpdateRequest
 from server.services.chat.settings_service import (
     ChatSettingsService,
     ChatSettingsValidationError,
@@ -44,7 +44,7 @@ class FakeSettingsRepository:
         self.last_update: dict[str, Any] | None = None
 
     # -------------------------------------------------------------------------
-    def get_or_create(self) -> FakeSettingsRecord:
+    def get_required(self) -> FakeSettingsRecord:
         return self.record
 
     # -------------------------------------------------------------------------
@@ -72,7 +72,9 @@ class FakeCredentialsRepository:
         self.deactivated.append((provider, label))
 
     # -------------------------------------------------------------------------
-    def upsert(self, *, provider: str, label: str, encrypted_value: str, key_version: str) -> None:
+    def upsert(
+        self, *, provider: str, label: str, encrypted_value: str, key_version: str
+    ) -> None:
         self.upserts.append((provider, label, encrypted_value, key_version))
 
 ###############################################################################
@@ -104,7 +106,9 @@ class FakeModelLibraryService:
         return ollama_url.replace("http://localhost", "http://127.0.0.1")
 
     # -------------------------------------------------------------------------
-    def list_models(self, *, ollama_url: str, cloud_provider: str | None = None) -> dict[str, object]:
+    def list_models(
+        self, *, ollama_url: str, cloud_provider: str | None = None
+    ) -> dict[str, object]:
         _ = cloud_provider
         local = [
             {
@@ -156,6 +160,29 @@ class FakeModelLibraryService:
         return None
 
 ###############################################################################
+class NoLiveCatalogModelLibraryService(FakeModelLibraryService):
+
+    # -------------------------------------------------------------------------
+    def find_model(self, **kwargs: Any) -> dict[str, object] | None:
+        _ = kwargs
+        raise AssertionError("reading settings must not query a live model catalog")
+
+###############################################################################
+class NoSelectedModelResolution:
+
+    # -------------------------------------------------------------------------
+    def resolve_selected(self, *_args: object, **_kwargs: object) -> None:
+        raise AssertionError("startup validation must not resolve model metadata")
+
+###############################################################################
+class UnreadableCredentialCrypto:
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def decrypt(_value: str) -> str:
+        raise ValueError("Credential cannot be decrypted with current key.")
+
+###############################################################################
 def build_service(
     *,
     settings_repo: FakeSettingsRepository | None = None,
@@ -191,35 +218,48 @@ def test_update_settings_rejects_blank_agent_selection() -> None:
     service = build_service()
 
     with pytest.raises(ChatSettingsValidationError, match="Agent model provider"):
-        service.update_settings(ModelSettingsUpdateRequest(agent_model_provider="", agent_model_name=""))
+        service.update_settings(
+            ModelSettingsUpdateRequest(agent_model_provider="", agent_model_name="")
+        )
+
 
 ###############################################################################
-def test_get_settings_repairs_blank_agent_using_configured_provider_models() -> None:
-    settings_repo = FakeSettingsRepository(FakeSettingsRecord(agent_model_provider="", agent_model_name=""))
-    credentials_repo = FakeCredentialsRepository([
-        FakeCredentialRecord(provider="deepseek", label="api_key", encrypted_value="enc:deepseek-key")
-    ])
-    model_library_service = FakeModelLibraryService(
-        model_overrides={
-            ("deepseek", "deepseek-chat"): {
-                "provider": "deepseek",
-                "name": "deepseek-chat",
-                "id": "deepseek-chat",
-                "supports_tools": True,
-                "supports_structured_output": True,
-            }
-        }
-    )
-    service = build_service(
-        settings_repo=settings_repo,
-        credentials_repo=credentials_repo,
-        model_library_service=model_library_service,
-    )
+@pytest.mark.parametrize(
+    "provider",
+    ["OpenAI", " openai", "openai ", "openai-compatible", "opencode_go"],
+)
+def test_update_settings_rejects_noncanonical_provider_ids(provider: str) -> None:
+    service = build_service()
 
-    response = service.get_settings()
+    with pytest.raises(ChatSettingsValidationError, match="Unsupported model provider"):
+        service.update_settings(
+            ModelSettingsUpdateRequest(
+                agent_model_provider=provider,
+                agent_model_name="gpt-4.1",
+            )
+        )
 
-    assert response.agent_model_provider == "deepseek"
-    assert response.agent_model_name == "deepseek-chat"
+###############################################################################
+@pytest.mark.parametrize(
+    "provider",
+    ["OpenAI", "openai-compatible", "opencode_go", "not-registered"],
+)
+def test_update_settings_rejects_noncanonical_credential_provider_ids(provider: str) -> None:
+    service = build_service()
+
+    with pytest.raises(ChatSettingsValidationError, match="Unsupported credential provider"):
+        service.update_settings(
+            ModelSettingsUpdateRequest(credentials={provider: {"api_key": "secret"}})
+        )
+
+###############################################################################
+def test_update_settings_rejects_noncanonical_credential_labels() -> None:
+    service = build_service()
+
+    with pytest.raises(ChatSettingsValidationError, match="Unsupported credential label"):
+        service.update_settings(
+            ModelSettingsUpdateRequest(credentials={"openai": {"token": "secret"}})
+        )
 
 ###############################################################################
 def test_get_settings_preserves_blank_agent_when_no_models_are_available() -> None:
@@ -235,12 +275,80 @@ def test_get_settings_preserves_blank_agent_when_no_models_are_available() -> No
     assert settings_repo.last_update is None
 
 ###############################################################################
+def test_get_settings_uses_canonical_static_context_without_live_catalog() -> None:
+    service = build_service(model_library_service=NoLiveCatalogModelLibraryService())
+
+    response = service.get_settings()
+
+    assert response.selected_model_context.model_dump(mode="json") == {
+        "provider": "openai",
+        "model": "gpt-4.1",
+        "context_window_tokens": 1_047_576,
+        "maximum_output_tokens": 32_768,
+        "context_profile_source": "openai_model_catalog",
+        "context_metadata_authority": "configured",
+    }
+
+###############################################################################
+def test_validate_persisted_settings_avoids_provider_and_model_lookups() -> None:
+    service = build_service(
+        settings_repo=FakeSettingsRepository(
+            FakeSettingsRecord(
+                agent_model_provider="deepseek",
+                agent_model_name="deepseek-chat",
+            )
+        ),
+        credentials_repo=FakeCredentialsRepository(
+            [FakeCredentialRecord("openai", "api_key", "encrypted")]
+        ),
+        model_library_service=NoLiveCatalogModelLibraryService(),
+    )
+    service.context_profile_resolver = NoSelectedModelResolution()  # type: ignore[assignment]
+
+    service.validate_persisted_settings()
+
+###############################################################################
+def test_validate_persisted_settings_rejects_unreadable_credentials() -> None:
+    service = build_service(
+        credentials_repo=FakeCredentialsRepository(
+            [FakeCredentialRecord("openai", "api_key", "unreadable")]
+        )
+    )
+
+    service.crypto_service = UnreadableCredentialCrypto()  # type: ignore[assignment]
+    with pytest.raises(ChatSettingsValidationError, match="cannot be decrypted"):
+        service.validate_persisted_settings()
+
+###############################################################################
+def test_updating_only_credentials_is_allowed_before_first_agent_selection() -> None:
+    settings_repo = FakeSettingsRepository(
+        FakeSettingsRecord(agent_model_provider="", agent_model_name="")
+    )
+    credentials_repo = FakeCredentialsRepository()
+    service = build_service(
+        settings_repo=settings_repo, credentials_repo=credentials_repo
+    )
+
+    service.update_settings(
+        ModelSettingsUpdateRequest(credentials={"opencode-go": {"api_key": " secret "}})
+    )
+
+    assert credentials_repo.upserts == [("opencode-go", "api_key", "enc:secret", "v1")]
+    assert settings_repo.last_update is not None
+    assert settings_repo.last_update["agent_model_provider"] == ""
+    assert settings_repo.last_update["agent_model_name"] == ""
+
+###############################################################################
 def test_updating_only_credentials_preserves_selected_agent_and_base_urls() -> None:
     settings_repo = FakeSettingsRepository()
     credentials_repo = FakeCredentialsRepository()
-    service = build_service(settings_repo=settings_repo, credentials_repo=credentials_repo)
+    service = build_service(
+        settings_repo=settings_repo, credentials_repo=credentials_repo
+    )
 
-    service.update_settings(ModelSettingsUpdateRequest(credentials={"openai": {"api_key": " secret "}}))
+    service.update_settings(
+        ModelSettingsUpdateRequest(credentials={"openai": {"api_key": " secret "}})
+    )
 
     assert credentials_repo.upserts == [("openai", "api_key", "enc:secret", "v1")]
     assert settings_repo.last_update is not None
@@ -264,9 +372,11 @@ def test_updating_only_credentials_skips_unrelated_local_model_validation() -> N
         model_library_service=FakeModelLibraryService({"different-installed-model"}),
     )
 
-    service.update_settings(ModelSettingsUpdateRequest(credentials={"geoapify": {"api_key": " geo "}}))
+    service.update_settings(
+        ModelSettingsUpdateRequest(credentials={"tomtom": {"api_key": " key "}})
+    )
 
-    assert credentials_repo.upserts == [("geoapify", "api_key", "enc:geo", "v1")]
+    assert credentials_repo.upserts == [("tomtom", "api_key", "enc:key", "v1")]
     assert settings_repo.last_update is not None
     assert settings_repo.last_update["agent_model_name"] == "missing-agent"
 
@@ -276,7 +386,9 @@ def test_local_model_validation_rejects_unavailable_agent_model() -> None:
 
     with pytest.raises(ChatSettingsValidationError, match="Selected agent model"):
         service.update_settings(
-            ModelSettingsUpdateRequest(agent_model_provider="ollama", agent_model_name="missing-agent")
+            ModelSettingsUpdateRequest(
+                agent_model_provider="ollama", agent_model_name="missing-agent"
+            )
         )
 
 ###############################################################################
@@ -303,23 +415,41 @@ def test_available_local_model_allows_update() -> None:
 def test_agent_model_without_tools_is_rejected() -> None:
     service = build_service(
         model_library_service=FakeModelLibraryService(
-            model_overrides={("openai", "no-tools"): {"supports_tools": False, "supports_structured_output": True}}
+            model_overrides={
+                ("openai", "no-tools"): {
+                    "supports_tools": False,
+                    "supports_structured_output": True,
+                }
+            }
         )
     )
 
     with pytest.raises(ChatSettingsValidationError, match="native tool calling"):
-        service.update_settings(ModelSettingsUpdateRequest(agent_model_provider="openai", agent_model_name="no-tools"))
+        service.update_settings(
+            ModelSettingsUpdateRequest(
+                agent_model_provider="openai", agent_model_name="no-tools"
+            )
+        )
 
 ###############################################################################
 def test_agent_model_without_structured_output_is_rejected() -> None:
     service = build_service(
         model_library_service=FakeModelLibraryService(
-            model_overrides={("google", "no-structured"): {"supports_tools": True, "supports_structured_output": False}}
+            model_overrides={
+                ("google", "no-structured"): {
+                    "supports_tools": True,
+                    "supports_structured_output": False,
+                }
+            }
         )
     )
 
     with pytest.raises(ChatSettingsValidationError, match="structured output"):
-        service.update_settings(ModelSettingsUpdateRequest(agent_model_provider="google", agent_model_name="no-structured"))
+        service.update_settings(
+            ModelSettingsUpdateRequest(
+                agent_model_provider="google", agent_model_name="no-structured"
+            )
+        )
 
 ###############################################################################
 def test_agent_model_with_tools_and_structured_output_is_accepted() -> None:
@@ -327,11 +457,20 @@ def test_agent_model_with_tools_and_structured_output_is_accepted() -> None:
     service = build_service(
         settings_repo=settings_repo,
         model_library_service=FakeModelLibraryService(
-            model_overrides={("google", "gemini-2.5-pro"): {"supports_tools": True, "supports_structured_output": True}}
+            model_overrides={
+                ("google", "gemini-2.5-pro"): {
+                    "supports_tools": True,
+                    "supports_structured_output": True,
+                }
+            }
         ),
     )
 
-    service.update_settings(ModelSettingsUpdateRequest(agent_model_provider="google", agent_model_name="gemini-2.5-pro"))
+    service.update_settings(
+        ModelSettingsUpdateRequest(
+            agent_model_provider="google", agent_model_name="gemini-2.5-pro"
+        )
+    )
 
     assert settings_repo.last_update is not None
     assert settings_repo.last_update["agent_model_name"] == "gemini-2.5-pro"

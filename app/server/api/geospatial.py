@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 
-from server.domain.geographics import (
+from server.contracts.geospatial import (
     GeospatialCameraDetailResponse,
     GeospatialCatalogResponse,
     GeospatialCredentialStatusResponse,
@@ -18,20 +18,28 @@ from server.domain.geographics import (
     GeospatialProviderPayloadResponse,
     LayerAuditReport,
 )
+from server.contracts.render_capture import (
+    RenderCaptureCreateRequest,
+    RenderCaptureResponse,
+)
 from server.services.geospatial.api_service import (
     GeospatialApiService,
     GeospatialApiServiceError,
+    GeospatialCapabilityDisabledError,
     GeospatialCapabilityNotFoundError,
     GeospatialInvalidRequestError,
+    GeospatialProviderResponseError,
     GeospatialTileCredentialError,
     GeospatialTileRequestError,
     GeospatialUnsupportedTileError,
 )
+from server.services.geospatial.render_capture import RenderCaptureStore
 
 router = APIRouter(prefix="/geospatial", tags=["geospatial"])
 
 GEOSPATIAL_ERROR_STATUS = {
     GeospatialCapabilityNotFoundError: status.HTTP_404_NOT_FOUND,
+    GeospatialCapabilityDisabledError: status.HTTP_403_FORBIDDEN,
     GeospatialInvalidRequestError: status.HTTP_400_BAD_REQUEST,
     GeospatialUnsupportedTileError: status.HTTP_404_NOT_FOUND,
     GeospatialTileCredentialError: status.HTTP_401_UNAUTHORIZED,
@@ -49,7 +57,25 @@ def get_geospatial_api_service(request: Request) -> GeospatialApiService:
     return runtime.api_service
 
 ###############################################################################
+def get_render_capture_store(request: Request) -> RenderCaptureStore:
+    store = getattr(request.app.state, "render_capture_store", None)
+    if store is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Render capture store is not initialized.",
+        )
+    return store
+
+###############################################################################
 def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
+    if isinstance(error, GeospatialProviderResponseError):
+        raise HTTPException(
+            status_code=error.status_code,
+            detail={
+                "error_code": error.error_code,
+                "message": str(error),
+            },
+        ) from error
     status_code = next(
         (
             mapped_status
@@ -193,7 +219,7 @@ async def get_layer_geojson(
     live: bool = Query(default=False),
     incidents: bool = Query(default=False),
     service: GeospatialApiService = Depends(get_geospatial_api_service),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return await service.get_layer_geojson(
             layer_id,
@@ -216,10 +242,17 @@ async def proxy_capability_tile(
     z: int,
     x: int,
     y: int,
+    request: Request,
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> Response:
     try:
-        body = await service.fetch_capability_tile(capability_id, z, x, y)
+        body = await service.fetch_capability_tile(
+            capability_id,
+            z,
+            x,
+            y,
+            time=request.query_params.get("time"),
+        )
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
     return Response(
@@ -248,6 +281,39 @@ async def proxy_tomtom_tile(
         content=body,
         media_type="image/png",
         headers={"Cache-Control": "private, max-age=60"},
+    )
+
+###############################################################################
+@router.post(
+    "/render-captures",
+    response_model=RenderCaptureResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def store_render_capture(
+    payload: RenderCaptureCreateRequest,
+    store: RenderCaptureStore = Depends(get_render_capture_store),
+) -> RenderCaptureResponse:
+    try:
+        store.save(
+            run_id=payload.run_id,
+            map_session_id=payload.map_session_id,
+            collection_revision=payload.collection_revision,
+            mime_type=payload.mime_type,
+            image_base64=payload.image_base64,
+            width=payload.width,
+            height=payload.height,
+            viewport_bounds=payload.viewport_bounds,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    return RenderCaptureResponse(
+        run_id=payload.run_id,
+        map_session_id=payload.map_session_id,
+        collection_revision=payload.collection_revision,
+        stored=True,
     )
 
 ###############################################################################
@@ -283,7 +349,7 @@ async def get_geospatial_cameras_geojson(
     provider: str | None = Query(default=None),
     camera_type: str | None = Query(default=None),
     service: GeospatialApiService = Depends(get_geospatial_api_service),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return await service.list_cameras_geojson(
             bbox=bbox,

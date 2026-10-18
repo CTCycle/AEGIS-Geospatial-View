@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit } from '@angular/core';
 
 import { ApiClientService } from '../core/api-client.service';
 import { CapabilityDescriptor, CatalogResponse } from '../core/types';
@@ -21,12 +21,14 @@ const EMPTY_CATALOG: CatalogResponse = {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './capabilities-page.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './capabilities-page.component.css',
 })
 export class CapabilitiesPageComponent implements OnInit {
   catalog: CatalogResponse = { ...EMPTY_CATALOG };
   statusText = 'Loading capabilities';
   isLoading = true;
+  catalogLoadFailed = false;
 
   readonly groups: Array<{ id: CapabilityGroup; label: string; description: string }> = [
     { id: 'providers', label: 'Data Providers', description: 'Source systems and access constraints.' },
@@ -46,11 +48,14 @@ export class CapabilitiesPageComponent implements OnInit {
     try {
       this.catalog = await this.apiClient.fetchCatalog();
       this.statusText = 'Capability catalog loaded';
+      this.catalogLoadFailed = false;
     } catch {
       this.catalog = { ...EMPTY_CATALOG };
       this.statusText = 'Capability catalog unavailable.';
+      this.catalogLoadFailed = true;
     } finally {
       this.isLoading = false;
+      // Eager change detection does not automatically publish the async catalog result.
       this.changeDetector.detectChanges();
     }
   }
@@ -59,17 +64,52 @@ export class CapabilitiesPageComponent implements OnInit {
     return this.catalog[group] ?? [];
   }
 
+  get catalogEntryCount(): number {
+    return this.groups.reduce((count, group) => count + this.itemsFor(group.id).length, 0);
+  }
+
+  get emptyGroups(): string[] {
+    return this.groups
+      .filter((group) => this.itemsFor(group.id).length === 0)
+      .map((group) => group.label);
+  }
+
   capabilityPurpose(item: CapabilityDescriptor): string {
     return item.description || String(item.metadata?.['human_summary'] ?? 'Manifest-backed geospatial capability.');
   }
 
   dataSource(item: CapabilityDescriptor): string {
-    const source = item.metadata?.['docs_url'];
-    if (typeof source === 'string' && source.trim()) {
-      return source;
+    const source = this.dataSourceUrl(item);
+    if (!source) {
+      return item.provider;
     }
-    const url = item.metadata?.['url'] ?? item.metadata?.['tile_url'] ?? item.metadata?.['url_template'] ?? item.metadata?.['tile_url_template'];
-    return typeof url === 'string' && url.trim() ? url : item.provider;
+    try {
+      return new URL(source).hostname || 'Official source';
+    } catch {
+      return 'Official source';
+    }
+  }
+
+  dataSourceUrl(item: CapabilityDescriptor): string | undefined {
+    const candidates = [
+      item.metadata?.['docs_url'],
+      item.metadata?.['url'],
+      item.metadata?.['tile_url'],
+      item.metadata?.['url_template'],
+      item.metadata?.['tile_url_template'],
+    ];
+    return candidates.find((candidate): candidate is string => (
+      typeof candidate === 'string' && this.isSafeUrl(candidate)
+    ));
+  }
+
+  private isSafeUrl(value: string): boolean {
+    try {
+      const protocol = new URL(value).protocol;
+      return protocol === 'http:' || protocol === 'https:';
+    } catch {
+      return false;
+    }
   }
 
   updateFrequency(item: CapabilityDescriptor): string {
@@ -84,6 +124,12 @@ export class CapabilitiesPageComponent implements OnInit {
   }
 
   accessConstraints(item: CapabilityDescriptor): string {
+    if (!item.is_available) {
+      const reason = item.availability_reason?.trim();
+      if (reason) {
+        return reason;
+      }
+    }
     if (item.requires_credentials) {
       return item.is_available ? 'Optional provider key configured.' : 'Optional provider key required before use.';
     }

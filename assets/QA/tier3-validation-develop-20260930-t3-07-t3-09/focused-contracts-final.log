@@ -1,0 +1,12 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0
+cachedir: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\pytest
+rootdir: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\server
+configfile: pyproject.toml
+plugins: anyio-4.14.2, asyncio-1.4.0, base-url-2.1.0, playwright-0.8.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 34 items
+
+. ..................................                                     [100%]
+
+============================= 34 passed in 2.97s ==============================

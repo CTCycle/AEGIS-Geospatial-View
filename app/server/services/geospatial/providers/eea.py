@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
+
 from typing import Any
 
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
@@ -70,48 +72,64 @@ class EEAProvider(GeospatialProvider):
         service_url = str(payload.get("serviceUrl") or "").strip()
         cache_key = f"{self.provider_id}:{request.capability_id}:{service_url}"
         cached = self.cache.get(cache_key)
-        if cached.status == CacheLookupStatus.HIT and isinstance(cached.value, dict):
+        if cached.status == CacheLookupStatus.HIT and is_json_object(cached.value):
             cached_payload = {**payload, "liveValidation": cached.value}
             return self._response(request, metadata, cached_payload)
         try:
             validation = await call_json_fetcher(self.fetcher, service_url, None)
         except ProviderUnavailableError:
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     metadata,
                     {**payload, "liveValidation": cached.value},
                     stale=True,
-                    warnings=["EEA WMS validation failed; using stale validation metadata."],
+                    warnings=[
+                        "EEA WMS validation failed; using stale validation metadata."
+                    ],
                 )
             raise
         except Exception as exc:
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     metadata,
                     {**payload, "liveValidation": cached.value},
                     stale=True,
-                    warnings=["EEA WMS validation failed; using stale validation metadata."],
+                    warnings=[
+                        "EEA WMS validation failed; using stale validation metadata."
+                    ],
                 )
             raise ProviderUnavailableError("EEA WMS validation failed.") from exc
-        if not isinstance(validation, dict):
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+        if not is_json_object(validation):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     metadata,
                     {**payload, "liveValidation": cached.value},
                     stale=True,
-                    warnings=["EEA WMS validation was malformed; using stale validation metadata."],
+                    warnings=[
+                        "EEA WMS validation was malformed; using stale validation metadata."
+                    ],
                 )
-            raise ProviderUnavailableError("EEA WMS validation returned malformed metadata.")
+            raise ProviderUnavailableError(
+                "EEA WMS validation returned malformed metadata."
+            )
         self.cache.set(
             cache_key,
             validation,
             ttl_seconds=self.cache_ttl_seconds,
             stale_while_revalidate_seconds=self.stale_while_revalidate_seconds,
         )
-        return self._response(request, metadata, {**payload, "liveValidation": validation})
+        return self._response(
+            request, metadata, {**payload, "liveValidation": validation}
+        )
 
     # -------------------------------------------------------------------------
     def _response(
@@ -127,7 +145,10 @@ class EEAProvider(GeospatialProvider):
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload=payload,
-            attribution=[str(metadata.get("attribution") or "European Environment Agency")],
+            result_type="raster",
+            attribution=[
+                str(metadata.get("attribution") or "European Environment Agency")
+            ],
             warnings=warnings or [],
             stale=stale,
         )
@@ -135,4 +156,4 @@ class EEAProvider(GeospatialProvider):
 ###############################################################################
 def _metadata(request: ProviderRequest) -> dict[str, Any]:
     value = request.params.get("metadata")
-    return dict(value) if isinstance(value, dict) else {}
+    return dict(value) if is_json_object(value) else {}

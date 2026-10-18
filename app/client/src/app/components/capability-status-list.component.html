@@ -1,14 +1,68 @@
-<ul>
+<ul [class.status-list--nowrap]="nowrap">
   @for (item of items; track trackStatusItem($index, item)) {
-    <li>
-      <span
-        class="state-dot"
-        [class.state-dot--ok]="item.tone === 'ok'"
-        [class.state-dot--warn]="item.tone === 'warn'"
-        [class.state-dot--neutral]="item.tone === 'none'"
-      ></span>
-      {{ item.label }}
-      <strong>{{ item.statusLabel }}</strong>
+    <li
+      [class.status-item--ok]="item.tone === 'ok'"
+      [class.status-item--warn]="item.tone === 'warn'"
+      [class.status-item--error]="item.tone === 'error'"
+      [class.status-item--neutral]="item.tone === 'none'"
+      [class.status-item--interactive]="interactionFor(item)?.route !== undefined"
+      (mouseenter)="showTooltip($index, $event)"
+      (mouseleave)="hideTooltip($index)"
+      (focusin)="showTooltip($index, $event)"
+      (focusout)="hideTooltip($index)"
+    >
+      @if (interactionFor(item)?.route; as route) {
+        <a
+          class="status-item__action"
+          [routerLink]="route"
+          [queryParams]="interactionFor(item)?.queryParams"
+          [attr.aria-label]="item.label + ': ' + item.statusLabel + '. ' + (interactionFor(item)?.actionLabel || 'Open details')"
+          [attr.aria-describedby]="tooltipId($index)"
+        >
+          <span
+            class="state-dot"
+            [class.state-dot--ok]="item.tone === 'ok'"
+            [class.state-dot--warn]="item.tone === 'warn'"
+            [class.state-dot--error]="item.tone === 'error'"
+            [class.state-dot--neutral]="item.tone === 'none'"
+          ></span>
+          {{ item.label }}
+          <strong>{{ item.statusLabel }}</strong>
+        </a>
+      } @else {
+        <span
+          class="status-item__content"
+          tabindex="0"
+          [attr.aria-label]="item.label + ': ' + item.statusLabel"
+          [attr.aria-describedby]="tooltipId($index)"
+        >
+          <span
+            class="state-dot"
+            [class.state-dot--ok]="item.tone === 'ok'"
+            [class.state-dot--warn]="item.tone === 'warn'"
+            [class.state-dot--error]="item.tone === 'error'"
+            [class.state-dot--neutral]="item.tone === 'none'"
+          ></span>
+          {{ item.label }}
+          <strong>{{ item.statusLabel }}</strong>
+        </span>
+      }
+
+      @if (activeTooltipIndex === $index) {
+        <span
+          class="status-tooltip"
+          [class.status-tooltip--below]="tooltipPlacement === 'below'"
+          role="tooltip"
+          [id]="tooltipId($index)"
+          [style.left.px]="tooltipLeft"
+          [style.top.px]="tooltipTop"
+        >
+          <span>{{ descriptionFor(item) }}</span>
+          @if (interactionFor(item)?.actionLabel; as actionLabel) {
+            <span class="status-tooltip__action">{{ actionLabel }}</span>
+          }
+        </span>
+      }
     </li>
   }
 </ul>

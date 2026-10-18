@@ -1,0 +1,416 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, field_serializer
+from server.domain.agent.trace import public_protocol_projection
+
+from server.common.time import utc_now
+from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.capability_route import (
+    AgentGoal,
+    AgentTaskState,
+    CapabilityRoute,
+    CompletionContract,
+)
+from server.domain.agent.conversation import ConversationState
+from server.domain.agent.tool_result import ToolExecutionError
+from server.contracts.geospatial import MapSession
+from server.contracts.runs import AgentRunState
+
+ChatRole = Literal["user", "assistant", "system", "tool"]
+ModelProviderMode = Literal["local", "cloud"]
+
+###############################################################################
+class ChatMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: ChatRole
+    content: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+###############################################################################
+class ChatTurnRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = None
+    message: str
+    datetime: str | None = None
+    timezone: str | None = Field(default=None, max_length=64)
+    request_id: str | None = None
+    conversation_id: str
+
+###############################################################################
+class ContextUsageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    estimated_input_tokens: int
+    selected_context_window: int | None = None
+    model_context_limit: int | None = None
+    usage_percent: float | None
+    provider: str
+    model: str
+    reported_input_tokens: int | None = None
+    reported_output_tokens: int | None = None
+    reserved_output_tokens: int = 0
+    tool_schema_tokens: int = 0
+    response_schema_tokens: int = 0
+    safety_margin_tokens: int = 512
+    usage_source: Literal[
+        "not_measured", "estimated", "provider_reported", "hybrid"
+    ] = "estimated"
+    usable_prompt_budget_tokens: int | None = None
+    current_conversation_tokens: int | None = None
+    expected_output_tokens: int | None = None
+    context_profile_source: str = "unknown"
+    context_metadata_authority: Literal[
+        "provider", "configured", "inferred", "unknown"
+    ] = "unknown"
+    compaction_applied: bool = False
+    phases: dict[str, dict[str, Any]] = Field(
+        default_factory=lambda: dict[str, dict[str, Any]]()
+    )
+    peak_request_tokens: int | None = None
+    total_input_tokens: int | None = None
+    total_output_tokens: int | None = None
+
+###############################################################################
+class ChatOperationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal[
+        "map_session",
+        "direct_answer",
+        "capability_catalog",
+        "clarification",
+        "rejection",
+        "error",
+    ]
+    status: Literal["success", "partial", "pending", "failed"]
+    message: str
+    warnings: list[str] = Field(default_factory=lambda: list[str]())
+    direct_result: dict[str, Any] | None = None
+    provider_error: dict[str, Any] | None = None
+    failure_category: (
+        Literal[
+            "model_capability",
+            "provider_api",
+            "provider_failure",
+            "schema_definition",
+            "response_parsing",
+            "context_limit",
+            "insufficient_evidence",
+            "model_budget_exhausted",
+            "tool_budget_exhausted",
+            "transition_budget_exhausted",
+            "iteration_budget_exhausted",
+            "run_deadline_exhausted",
+            "no_progress",
+            "render_recovery_exhausted",
+            "cancelled",
+            "superseded",
+        ]
+        | None
+    ) = None
+
+###############################################################################
+class AgentToolResultSummary(BaseModel):
+    """Bounded model-independent summary of one native tool result."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    call_id: str
+    tool_name: str
+    status: Literal["success", "valid_empty", "partial", "failed"]
+    summary: str
+    evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
+    map_candidate_id: str | None = None
+    error: ToolExecutionError | None = None
+
+###############################################################################
+class AgentTurnResponse(BaseModel):
+    """Canonical response emitted by one native agent turn."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: str
+    conversation_id: str
+    assistant_message: str
+    route: CapabilityRoute | None = None
+    operation: ChatOperationResult
+    map_session: MapSession | None = None
+    presentation_status: Literal[
+        "not_requested", "prepared", "prepared_unverified", "ready", "failed"
+    ]
+    tool_results: list[AgentToolResultSummary] = Field(
+        default_factory=lambda: list[AgentToolResultSummary]()
+    )
+    conversation_state: ConversationState | None = None
+    goal: AgentGoal | None = None
+    completion_contract: CompletionContract | None = None
+    task_state: AgentTaskState | None = None
+    execution_trace: dict[str, Any] | None = None
+    context_usage: ContextUsageResponse | None = None
+    location_refs: dict[str, ResolvedLocation] = Field(
+        default_factory=lambda: dict[str, ResolvedLocation]()
+    )
+
+###############################################################################
+class ChatTurnResponse(BaseModel):
+    """Canonical public response for one native agent turn."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: str
+    conversation_id: str
+    assistant_message: str
+    operation: ChatOperationResult
+    tool_payload: dict[str, Any] | None = None
+    map_session: MapSession | None = None
+    memory_snapshot: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    context_usage: ContextUsageResponse | None = None
+    context_revision: int | None = None
+    execution_trace: dict[str, Any] | None = None
+    route: CapabilityRoute | None = None
+    goal: AgentGoal | None = None
+    completion_contract: CompletionContract | None = None
+    task_state: AgentTaskState | None = None
+    presentation_status: Literal[
+        "not_requested", "prepared", "prepared_unverified", "ready", "failed"
+    ] = "not_requested"
+    tool_results: list[AgentToolResultSummary] = Field(
+        default_factory=lambda: list[AgentToolResultSummary]()
+    )
+    conversation_state: ConversationState | None = None
+
+###############################################################################
+class AgentRunAcceptedResponse(BaseModel):
+    """Stable response for work accepted outside the synchronous window."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str
+    run_id: str
+    run_version: int = Field(..., ge=1)
+    state: AgentRunState
+    presentation_status: Literal[
+        "not_required", "pending", "ready", "failed", "render_timeout"
+    ] = "not_required"
+    status_url: str
+    realtime_url: str | None = None
+    terminal: bool = False
+
+###############################################################################
+class ChatStreamEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event: Literal[
+        "status",
+        "context_usage",
+        "tool_call_started",
+        "tool_call_completed",
+        "tool_started",
+        "tool_completed",
+        "map_session_created",
+        "stage",
+        "final",
+        "error",
+    ]
+    data: dict[str, Any]
+
+    @field_serializer("data")
+    def serialize_public_data(self, value: dict[str, Any]) -> dict[str, Any]:
+        return public_protocol_projection(value)
+
+###############################################################################
+class ModelCardDescriptor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str
+    description: str
+    provider: str
+    capabilities: list[str] = Field(default_factory=lambda: list[str]())
+    supports_tools: bool | None = None
+    supports_structured_output: bool | None = None
+    supports_vision: bool | None = None
+    supports_embeddings: bool | None = None
+    tool_support_source: str = "unknown"
+    protocol: str | None = None
+    agent_selection_disabled_reason: str | None = None
+    context_window_tokens: int | None = None
+    maximum_output_tokens: int | None = None
+    context_profile_source: str = "unknown"
+    context_metadata_authority: Literal[
+        "provider", "configured", "inferred", "unknown"
+    ] = "unknown"
+    metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+
+###############################################################################
+class ModelLibrarySourceStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    reachable: bool | None = None
+    stale: bool = False
+    message: str | None = None
+    model_count: int | None = None
+    structured_probe_status: Literal[
+        "not_tested", "passed", "failed", "timeout", "unsupported"
+    ] = "not_tested"
+    structured_probe_checked_at: datetime | None = None
+    structured_probe_expires_at: datetime | None = None
+
+###############################################################################
+class StructuredProbeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    model: str
+    protocol: str
+    status: Literal["not_tested", "passed", "failed", "timeout", "unsupported"]
+    parse_status: str
+    duration_ms: int | None = None
+    checked_at: datetime | None = None
+    expires_at: datetime | None = None
+    message: str | None = None
+
+###############################################################################
+class SelectedModelContextResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    model: str
+    context_window_tokens: int | None = None
+    maximum_output_tokens: int | None = None
+    context_profile_source: str = "unknown"
+    context_metadata_authority: Literal[
+        "provider", "configured", "inferred", "unknown"
+    ] = "unknown"
+
+###############################################################################
+class ModelSettingsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    active_provider_mode: ModelProviderMode
+    agent_model_provider: str
+    agent_model_name: str
+    ollama_url: str
+    openai_base_url: str | None = None
+    google_base_url: str | None = None
+    deepseek_base_url: str | None = None
+    credentials: dict[str, dict[str, bool]]
+    credential_health: dict[str, dict[str, str]] = Field(
+        default_factory=lambda: dict[str, dict[str, str]]()
+    )
+    selected_model_context: SelectedModelContextResponse
+
+###############################################################################
+@dataclass(frozen=True)
+class ModelSettingsSnapshot:
+    """Persistence-neutral model settings returned by the repository boundary."""
+
+    id: int
+    active_provider_mode: str
+    agent_model_provider: str
+    agent_model_name: str
+    ollama_url: str
+    openai_base_url: str | None
+    google_base_url: str | None
+    deepseek_base_url: str | None
+
+###############################################################################
+class ModelSettingsUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    active_provider_mode: ModelProviderMode | None = None
+    agent_model_provider: str | None = None
+    agent_model_name: str | None = None
+    ollama_url: str | None = None
+    openai_base_url: str | None = None
+    google_base_url: str | None = None
+    deepseek_base_url: str | None = None
+    credentials: dict[str, dict[str, str]] = Field(
+        default_factory=lambda: dict[str, dict[str, str]]()
+    )
+
+    # -------------------------------------------------------------------------
+    @field_validator("agent_model_provider", mode="before")
+    @classmethod
+    def preserve_optional_provider_id(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("agent_model_provider must be a string")
+        return value
+
+    # -------------------------------------------------------------------------
+    @field_validator("agent_model_name", mode="before")
+    @classmethod
+    def normalize_optional_model_name(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("agent_model_name must be a string")
+        return value.strip()
+
+    # -------------------------------------------------------------------------
+    @field_validator(
+        "ollama_url", "openai_base_url", "google_base_url", "deepseek_base_url"
+    )
+    @classmethod
+    def validate_base_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        normalized = value.strip()
+        if not normalized:
+            return normalized
+        if not (normalized.startswith("http://") or normalized.startswith("https://")):
+            raise ValueError("Base URL must start with http:// or https://")
+        return normalized
+
+###############################################################################
+class ModelLibraryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cloud: list[ModelCardDescriptor] = Field(
+        default_factory=lambda: list[ModelCardDescriptor]()
+    )
+    local: list[ModelCardDescriptor] = Field(
+        default_factory=lambda: list[ModelCardDescriptor]()
+    )
+    sources: dict[str, ModelLibrarySourceStatus] = Field(
+        default_factory=lambda: dict[str, ModelLibrarySourceStatus]()
+    )
+
+###############################################################################
+class OllamaRefreshResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    message: str | None = None
+    stale: bool = False
+    library_models: list[str] = Field(default_factory=lambda: list[str]())
+    local_models: list[str] = Field(default_factory=lambda: list[str]())
+    local_model_capabilities: list[ModelCardDescriptor] = Field(
+        default_factory=lambda: list[ModelCardDescriptor]()
+    )
+
+###############################################################################
+class OllamaPullRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model: str
+
+###############################################################################
+class OllamaPullResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+###############################################################################
+class OllamaHealthResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    ok: bool | None = None
+    detail: str | None = None

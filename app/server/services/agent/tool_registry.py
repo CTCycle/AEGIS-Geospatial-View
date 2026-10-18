@@ -1,291 +1,403 @@
+"""Single source of truth for tools exposed by the native agent harness."""
+
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import TYPE_CHECKING
 
-from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
-from server.domain.agent.tools import (
-    RegisteredNativeTool,
-    ToolError,
-    ToolExecutionEnvelope,
-)
-from server.services.agent.tool_handlers import air_quality, coordinates, poi, weather
+from server.common.identifiers import location_ref_matches
+from server.domain.agent.capability_domains import CapabilityDomain
+from server.domain.agent.tools import RegisteredTool
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMToolDefinition
 
-ToolHandler = Callable[[ExecutionPlan, ResolvedLocation], Awaitable[dict[str, object]]]
-NativeToolHandler = Callable[[dict[str, Any], Any], Awaitable[Any]]
+if TYPE_CHECKING:
+    from server.domain.agent.capability_route import AgentRunState
 
 ###############################################################################
 class ToolRegistry:
+    """Register, expose, and retrieve the typed native tool catalogue.
+
+    Capability manifests are data, while this registry contains only the small
+    permanent meta-tool surface. Capability-specific eligibility is applied by
+    the route compiler and the registered semantic validators at execution
+    time; there is no second registry.
+    """
 
     # -------------------------------------------------------------------------
     def __init__(self, *, runtime_registry: RuntimeRegistry | None = None) -> None:
-        self.runtime_registry = runtime_registry or RuntimeRegistry()
-        self._handlers: dict[str, ToolHandler] = {}
-        self._native_tools: dict[str, RegisteredNativeTool] = {}
+        # Retain the shared runtime reference for diagnostics and composition
+        # checks. Tool eligibility is intentionally not inferred from it here.
+        self.runtime_registry = runtime_registry
+        self._registered_tools: dict[str, RegisteredTool] = {}
 
     # -------------------------------------------------------------------------
-    def register_native_tool(
-        self,
-        definition: LLMToolDefinition,
-        handler: NativeToolHandler,
-    ) -> None:
-        self._native_tools[definition.name] = RegisteredNativeTool(
-            definition=definition,
-            handler=handler,
-        )
+    def register(self, tool: RegisteredTool) -> None:
+        """Register one typed tool and reject duplicate definitions."""
 
-    # -------------------------------------------------------------------------
-    def list_native_tools(self) -> list[LLMToolDefinition]:
-        return [item.definition for item in self._native_tools.values()]
-
-    # -------------------------------------------------------------------------
-    def has_native_tool(self, name: str) -> bool:
-        return name in self._native_tools
-
-    # -------------------------------------------------------------------------
-    async def execute_native_tool(
-        self,
-        name: str,
-        arguments: dict[str, Any],
-        context: Any,
-    ) -> ToolExecutionEnvelope:
-        registered = self._native_tools.get(name)
-        if registered is None:
-            return ToolExecutionEnvelope(
-                ok=False,
-                error=ToolError(
-                    code="unknown_tool",
-                    message=f"No native tool registered for '{name}'.",
-                ),
+        name = tool.definition.name.strip()
+        if not name:
+            raise ValueError("Registered tools must have a non-empty name.")
+        if name != tool.definition.name:
+            raise ValueError(
+                "Registered tool names must not contain surrounding whitespace."
             )
-        validation_error = self._validate_arguments(
-            registered.definition.parameters_json_schema,
-            arguments,
-        )
-        if validation_error is not None:
-            return ToolExecutionEnvelope(
-                ok=False,
-                error=ToolError(code="invalid_arguments", message=validation_error),
-            )
-        try:
-            result = await registered.handler(arguments, context)
-        except Exception as exc:
-            return ToolExecutionEnvelope(
-                ok=False,
-                error=ToolError(code="tool_execution_error", message=str(exc)),
-            )
-        return ToolExecutionEnvelope(ok=True, data=result)
+        if name in self._registered_tools:
+            raise ValueError(f"Tool '{name}' is already registered.")
+        self._registered_tools[name] = tool
 
     # -------------------------------------------------------------------------
-    @classmethod
-    def _validate_arguments(
-        cls,
-        schema: dict[str, Any],
-        arguments: dict[str, Any],
-    ) -> str | None:
-        if not isinstance(arguments, dict):
-            return "Tool arguments must be an object."
-        return cls._validate_schema_node(schema, arguments, path="")
+    def get(self, name: str) -> RegisteredTool | None:
+        """Return one registered tool by its exact public name."""
+
+        return self._registered_tools.get(str(name).strip())
 
     # -------------------------------------------------------------------------
-    @classmethod
-    def _validate_schema_node(
-        cls,
-        schema: dict[str, Any],
-        value: Any,
-        *,
-        path: str,
-    ) -> str | None:
-        expected_type = schema.get("type")
-        if expected_type and not cls._matches_json_type(value, expected_type):
-            return f"{cls._label_for_path(path)} must be {cls._format_expected_type(expected_type)}."
+    def expose(self, state: "AgentRunState") -> list[LLMToolDefinition]:
+        """Return only tools valid for the current native run state."""
 
-        enum_values = schema.get("enum")
-        if isinstance(enum_values, list) and value not in enum_values:
-            return f"{cls._label_for_path(path)} must be one of {enum_values!r}."
-
-        if isinstance(value, dict):
-            object_error = cls._validate_object_schema(schema, value, path=path)
-            if object_error is not None:
-                return object_error
-        if isinstance(value, list):
-            array_error = cls._validate_array_schema(schema, value, path=path)
-            if array_error is not None:
-                return array_error
-
-        numeric_error = cls._validate_numeric_schema(schema, value, path=path)
-        if numeric_error is not None:
-            return numeric_error
-        return None
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _validate_object_schema(
-        cls,
-        schema: dict[str, Any],
-        value: dict[str, Any],
-        *,
-        path: str,
-    ) -> str | None:
-        required = schema.get("required")
-        if isinstance(required, list):
-            for field_name in required:
-                if isinstance(field_name, str) and field_name not in value:
-                    missing_path = cls._child_path(path, field_name)
-                    return f"Missing required argument '{missing_path}'."
-
-        properties = schema.get("properties")
-        if not isinstance(properties, dict):
-            return None
-
-        if schema.get("additionalProperties") is False:
-            for field_name in value:
-                if field_name not in properties:
-                    unknown_path = cls._child_path(path, field_name)
-                    return f"Unknown argument '{unknown_path}'."
-
-        for field_name, field_value in value.items():
-            field_schema = properties.get(field_name)
-            if not isinstance(field_schema, dict):
+        exposed: list[LLMToolDefinition] = []
+        active_map_update = _is_active_map_update(state)
+        for registered in self._registered_tools.values():
+            if (
+                registered.visibility == "internal"
+                and state.phase.value != "route_request"
+            ):
                 continue
-            field_path = cls._child_path(path, field_name)
-            field_error = cls._validate_schema_node(field_schema, field_value, path=field_path)
-            if field_error is not None:
-                return field_error
-        return None
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _validate_array_schema(
-        cls,
-        schema: dict[str, Any],
-        value: list[Any],
-        *,
-        path: str,
-    ) -> str | None:
-        min_items = schema.get("minItems")
-        if isinstance(min_items, int) and len(value) < min_items:
-            return f"{cls._label_for_path(path)} must contain at least {min_items} items."
-        max_items = schema.get("maxItems")
-        if isinstance(max_items, int) and len(value) > max_items:
-            return f"{cls._label_for_path(path)} must contain at most {max_items} items."
-
-        item_schema = schema.get("items")
-        if not isinstance(item_schema, dict):
-            return None
-        for index, item in enumerate(value):
-            item_path = cls._child_path(path, str(index))
-            item_error = cls._validate_schema_node(item_schema, item, path=item_path)
-            if item_error is not None:
-                return item_error
-        return None
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _validate_numeric_schema(
-        cls,
-        schema: dict[str, Any],
-        value: Any,
-        *,
-        path: str,
-    ) -> str | None:
-        if not isinstance(value, int | float) or isinstance(value, bool):
-            return None
-        minimum = schema.get("minimum")
-        if isinstance(minimum, int | float) and value < minimum:
-            return f"{cls._label_for_path(path)} must be >= {minimum}."
-        maximum = schema.get("maximum")
-        if isinstance(maximum, int | float) and value > maximum:
-            return f"{cls._label_for_path(path)} must be <= {maximum}."
-        return None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _child_path(path: str, child: str) -> str:
-        if not path:
-            return child
-        if child.isdigit():
-            return f"{path}[{child}]"
-        return f"{path}.{child}"
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _label_for_path(path: str) -> str:
-        return f"Argument '{path}'" if path else "Tool arguments"
+            if state.phase not in registered.phases:
+                continue
+            if not _task_mode_allows_tool(registered, state):
+                continue
+            if not _domain_allows_tool(registered, state):
+                continue
+            if active_map_update and registered.definition.name in {
+                "discover_geospatial_capabilities",
+                "discover_geospatial_provider_layers",
+                "describe_geospatial_capability",
+                "inspect_evidence",
+                "transform_evidence",
+            }:
+                continue
+            if not self._prerequisites_satisfied(registered.prerequisites, state):
+                continue
+            definition = registered.definition
+            if definition.name == "execute_geospatial_capability" and state.capability_ids:
+                schema = dict(definition.parameters_json_schema)
+                properties = dict(schema.get("properties") or {})
+                capability_schema = dict(properties.get("capability_id") or {})
+                capability_schema["enum"] = list(state.capability_ids)
+                properties["capability_id"] = capability_schema
+                if len(state.capability_ids) > 1:
+                    properties["arguments"] = {
+                        **dict(properties.get("arguments") or {}),
+                        "description": "Capability-specific arguments. Call describe_geospatial_capability for the selected capability's argument_schema before execution; contracts differ between capabilities.",
+                    }
+                if len(state.capability_ids) == 1 and registered.argument_schema_provider:
+                    try:
+                        request = registered.input_model.model_validate(
+                            {"capability_id": state.capability_ids[0]}
+                        )
+                        argument_schema = registered.argument_schema_provider(
+                            request, state
+                        )
+                    except Exception:
+                        argument_schema = None
+                    if isinstance(argument_schema, dict):
+                        properties["arguments"] = dict(argument_schema)
+                schema["properties"] = properties
+                definition = LLMToolDefinition(
+                    name=definition.name,
+                    description=definition.description,
+                    parameters_json_schema=schema,
+                )
+            exposed.append(definition)
+            if len(state.exposure_trace) < 64:
+                state.exposure_trace.append(
+                    {
+                        "iteration": state.current_iteration,
+                        "phase": state.phase.value,
+                        "tool": definition.name,
+                        "reason": "task_mode_domain_phase_and_prerequisites_satisfied",
+                    }
+                )
+        return exposed
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _format_expected_type(expected_type: Any) -> str:
-        if isinstance(expected_type, str):
-            return expected_type
-        if isinstance(expected_type, list):
-            return " or ".join(str(item) for item in expected_type)
-        return str(expected_type)
+    def _prerequisites_satisfied(
+        prerequisites: frozenset[str], state: "AgentRunState"
+    ) -> bool:
+        has_location = _route_target_location_available(state)
+        for prerequisite in prerequisites:
+            if prerequisite == "route" and state.route is None:
+                return False
+            if prerequisite == "capability_shortlist" and not state.capability_ids:
+                return False
+            if (
+                prerequisite == "capability_shortlist_missing"
+                and state.capability_ids
+                and not _catalog_discovery_can_continue(state)
+            ):
+                return False
+            if prerequisite == "location" and not has_location:
+                return False
+            if prerequisite == "location_required" and (
+                state.route is None or not state.route.requires_location
+            ):
+                return False
+            if prerequisite == "location_missing" and has_location:
+                return False
+            if prerequisite == "location_if_required" and (
+                state.route is not None
+                and state.route.requires_location
+                and not has_location
+            ):
+                return False
+            if prerequisite == "evidence" and not _evidence_available_for_route(state):
+                return False
+            if prerequisite == "evidence_analysis_required" and not _evidence_analysis_required(state):
+                return False
+            if prerequisite == "history_recall_required" and not _history_recall_required(state):
+                return False
+            if prerequisite == "data_obligation_unmet" and not _data_obligation_unmet(state):
+                return False
+            if prerequisite == "active_map" and state.active_map_session is None:
+                return False
+            if prerequisite == "provider_discovery_route":
+                if state.route is None:
+                    return False
+                route_domains = {
+                    state.route.primary_domain,
+                    *state.route.secondary_domains,
+                }
+                if CapabilityDomain.PROVIDER_DISCOVERY not in route_domains:
+                    return False
+            if prerequisite == "data_route":
+                if state.route is None:
+                    return False
+                if state.route.operation == "discover_available_map_data":
+                    return False
+                route_domains = {
+                    state.route.primary_domain,
+                    *state.route.secondary_domains,
+                }
+                if state.route.primary_domain is CapabilityDomain.MAP_STATE or (
+                    state.route.primary_domain is CapabilityDomain.MAP_RENDERING
+                    and CapabilityDomain.DATA_RETRIEVAL not in route_domains
+                ):
+                    return False
+            if prerequisite == "map_presentation":
+                if state.route is None or state.route.presentation not in {"map", "both"}:
+                    return False
+        return True
 
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _matches_json_type(value: Any, expected_type: Any) -> bool:
-        expected = {expected_type} if isinstance(expected_type, str) else set(expected_type)
-        return (
-            ("string" in expected and isinstance(value, str))
-            or ("integer" in expected and isinstance(value, int) and not isinstance(value, bool))
-            or ("number" in expected and isinstance(value, (int, float)) and not isinstance(value, bool))
-            or ("boolean" in expected and isinstance(value, bool))
-            or ("object" in expected and isinstance(value, dict))
-            or ("array" in expected and isinstance(value, list))
-            or ("null" in expected and value is None)
+
+###############################################################################
+def _catalog_discovery_can_continue(state: "AgentRunState") -> bool:
+    """Expose discovery again only while a catalog page remains or a retry is needed."""
+
+    route = state.route
+    if route is None or route.operation != "discover_available_map_data":
+        return False
+    discovery_results = [
+        result
+        for result in state.tool_results
+        if result.tool_name == "discover_geospatial_capabilities"
+    ]
+    if not discovery_results:
+        return True
+    latest = discovery_results[-1]
+    if latest.status not in {"success", "valid_empty"}:
+        return True
+    return bool(
+        isinstance(latest.data, dict)
+        and latest.data.get("next_cursor") not in {None, ""}
+    )
+
+_ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
+    {
+        "remove_layer",
+        "set_layer_visibility",
+        "set_layer_opacity",
+        "set_basemap",
+        "keep_only_layers",
+        "fit_layer",
+        "reset_view",
+    }
+)
+
+
+###############################################################################
+def _route_target_location_available(state: "AgentRunState") -> bool:
+    """Check the validated route targets, not merely any prior map state."""
+
+    route = state.route
+    if _is_active_map_update(state):
+        return state.active_map_session is not None
+    target_refs = (
+        list(route.spatial_scope.target_refs)
+        if route is not None
+        and route.spatial_scope is not None
+        and route.spatial_scope.target_refs
+        else list(route.target_refs) if route is not None else []
+    )
+    if not target_refs:
+        return bool(state.location_refs) or state.active_map_session is not None
+    return all(
+        any(
+            location_ref_matches(str(target), str(key), location.label)
+            for key, location in state.location_refs.items()
         )
+        for target in target_refs
+    )
 
-    # -------------------------------------------------------------------------
-    def load_tool_bindings(self) -> dict[str, ToolHandler]:
-        self.runtime_registry.build_snapshot()
-        handler_lookup: dict[str, ToolHandler] = {
-            "coordinates": coordinates.execute,
-            "weather": weather.execute,
-            "air_quality": air_quality.execute,
-            "poi": poi.execute,
+
+###############################################################################
+def _is_active_map_update(state: "AgentRunState") -> bool:
+    route = state.route
+    return bool(
+        route is not None
+        and route.task_mode == "execute"
+        and route.primary_domain is CapabilityDomain.MAP_STATE
+        and state.active_map_session is not None
+        and str(route.operation or "").strip().casefold()
+        in _ACTIVE_MAP_UPDATE_OPERATIONS
+        and route.spatial_scope is None
+    )
+
+
+###############################################################################
+def _evidence_available_for_route(state: "AgentRunState") -> bool:
+    """Do not expose stale evidence tools before a new map-data retrieval."""
+
+    route = state.route
+    route_domains: set[CapabilityDomain] = (
+        {
+            route.primary_domain,
+            *route.secondary_domains,
         }
-        bindings: dict[str, ToolHandler] = {}
-        for capability_id, profile in self.runtime_registry._ensure().profiles.items():
-            handler_name = str(profile.get("handler_name") or "").strip()
-            if not handler_name:
-                continue
-            handler = handler_lookup.get(handler_name)
-            if handler is None:
-                continue
-            bindings[capability_id] = handler
-        self._handlers = bindings
-        return bindings
+        if route is not None
+        else set()
+    )
+    if (
+        route is not None
+        and CapabilityDomain.DATA_RETRIEVAL in route_domains
+        and route.presentation in {"map", "both"}
+        and str(route.operation or "").strip().casefold()
+        in {"", "retrieve", "search", "query", "add_layer"}
+    ):
+        return any(
+            result.status in {"success", "valid_empty", "partial"}
+            and bool(result.evidence_refs)
+            for result in state.tool_results
+        )
+    return bool(state.evidence_refs)
 
-    # -------------------------------------------------------------------------
-    def get_handler(self, tool_id: str) -> ToolHandler | None:
-        if not self._handlers:
-            self.load_tool_bindings()
-        return self._handlers.get(tool_id)
 
-    # -------------------------------------------------------------------------
-    async def execute(
-        self,
-        tool_id: str,
-        plan: ExecutionPlan,
-        location: ResolvedLocation,
-    ) -> dict[str, object]:
-        handler = self.get_handler(tool_id)
-        if handler is None:
-            return {
-                "tool": tool_id,
-                "error": f"No tool handler registered for '{tool_id}'.",
-            }
-        payload = await handler(plan, location)
-        return {
-            "tool_id": tool_id,
-            "plan_state": plan.state,
-            "location": {
-                "label": location.label,
-                "latitude": location.latitude,
-                "longitude": location.longitude,
-            },
-            "result": payload,
-        }
+###############################################################################
+def _task_mode_allows_tool(
+    registered: RegisteredTool, state: "AgentRunState"
+) -> bool:
+    """Keep execution tools out of answer/clarify model turns."""
+
+    if registered.visibility == "internal":
+        return True
+    if state.route is None and state.phase.value == "route_request":
+        return True
+    return state.route is not None and state.route.task_mode == "execute"
+
+
+###############################################################################
+def _route_domains(state: "AgentRunState") -> set[CapabilityDomain]:
+    route = state.route
+    if route is None:
+        return set()
+    return {route.primary_domain, *route.secondary_domains}
+
+
+###############################################################################
+def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> bool:
+    """Expose only tools that can satisfy the validated route's domains."""
+
+    if registered.visibility == "internal" or state.route is None:
+        return True
+    route = state.route
+    route_domains = _route_domains(state)
+    if registered.definition.name == "resolve_geospatial_location":
+        return route.requires_location and not _route_target_location_available(state)
+    if registered.definition.name == "apply_map_plan":
+        return route.presentation in {"map", "both"}
+    if route.primary_domain is CapabilityDomain.MAP_STATE:
+        return registered.definition.name == "apply_map_plan"
+    if (
+        route.primary_domain is CapabilityDomain.MAP_RENDERING
+        and route.presentation in {"map", "both"}
+        and not (
+            CapabilityDomain.DATA_RETRIEVAL in route_domains
+            or CapabilityDomain.SPATIAL_ANALYSIS in route_domains
+        )
+    ):
+        return registered.definition.name == "apply_map_plan"
+    if not registered.domains:
+        return True
+    if CapabilityDomain.MIXED in registered.domains:
+        return True
+    if CapabilityDomain.MIXED in route_domains:
+        return True
+    return bool(registered.domains.intersection(route_domains))
+
+
+###############################################################################
+def _evidence_analysis_required(state: "AgentRunState") -> bool:
+    route = state.route
+    if route is None:
+        return False
+    domains = _route_domains(state)
+    if CapabilityDomain.SPATIAL_ANALYSIS in domains:
+        return True
+    terms = " ".join(
+        [str(route.operation or ""), *[str(value) for value in route.capability_queries]]
+    ).casefold()
+    return any(
+        marker in terms
+        for marker in ("analy", "aggregate", "statistic", "transform", "inspect")
+    )
+
+
+###############################################################################
+def _history_recall_required(state: "AgentRunState") -> bool:
+    route = state.route
+    if route is None:
+        return False
+    terms = " ".join(
+        [str(route.operation or ""), *[str(value) for value in route.capability_queries]]
+    ).casefold()
+    return CapabilityDomain.CONVERSATION in _route_domains(state) and any(
+        marker in terms
+        for marker in ("history", "conversation", "earlier", "previous", "remember")
+    )
+
+
+###############################################################################
+def _data_obligation_unmet(state: "AgentRunState") -> bool:
+    contract = state.completion_contract
+    if contract is not None and contract.data_requirement != "provider_data":
+        return True
+    successful_data_tools = {
+        "execute_geospatial_capability",
+        "inspect_evidence",
+        "transform_evidence",
+    }
+    return not any(
+        (
+            result.status in {"success", "partial"}
+            or (
+                result.status == "valid_empty"
+                and result.semantic_outcome != "not_found"
+            )
+        )
+        and result.tool_name in successful_data_tools
+        for result in state.tool_results
+    )
+
+
+__all__ = ["ToolRegistry"]

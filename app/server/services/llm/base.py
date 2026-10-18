@@ -1,15 +1,54 @@
 from __future__ import annotations
 
+import json
+
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from typing import Any
 
+from server.common.typing import is_json_array, is_json_object
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
     LLMToolDefinition,
     ModelDescriptor,
 )
+from server.services.llm.errors import LLMRequestSchemaError, LLMStructuredOutputError
+
+###############################################################################
+def parse_native_tool_arguments(
+    value: object,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Parse one provider tool-argument frame without losing protocol errors.
+
+    An empty object is valid only when the provider actually supplied an empty
+    object.  Missing, malformed, scalar, and array values stay distinguishable
+    so the agent loop can return a recoverable malformed-call result.
+    """
+
+    if value is None:
+        return None, "arguments_missing"
+    if is_json_object(value):
+        return dict(value), None
+    if isinstance(value, str):
+        try:
+            loaded = json.loads(value)
+        except json.JSONDecodeError:
+            return None, "invalid_json"
+        if is_json_object(loaded):
+            return dict(loaded), None
+        return None, "arguments_not_object"
+    return None, "arguments_not_object"
+
+###############################################################################
+def normalize_native_tool_name(
+    value: object,
+    parse_error: str | None,
+) -> tuple[str, str | None]:
+    """Normalize a function name and preserve missing-name diagnostics."""
+
+    name = str(value or "").strip()
+    return name, parse_error or ("missing_name" if not name else None)
 
 ###############################################################################
 class LLMProvider(ABC):
@@ -42,6 +81,27 @@ class LLMProvider(ABC):
 
     # -------------------------------------------------------------------------
     @abstractmethod
+    async def achat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
+        """Execute the provider's canonical asynchronous chat protocol."""
+        raise NotImplementedError
+
+    # -------------------------------------------------------------------------
+    @abstractmethod
+    async def astructured_output(
+        self, request: LLMRequest, schema: type[object]
+    ) -> dict[str, Any]:
+        """Execute the provider's canonical asynchronous structured protocol."""
+        raise NotImplementedError
+
+    # -------------------------------------------------------------------------
+    @abstractmethod
     def embeddings(self, *, model: str, input_text: str) -> list[float]: ...
 
     # -------------------------------------------------------------------------
@@ -49,33 +109,140 @@ class LLMProvider(ABC):
     def health_check(self) -> dict[str, Any]: ...
 
     # -------------------------------------------------------------------------
-    def supports_tools(self, model: str) -> bool:
+    def supports_tools(self, model: str) -> bool | None:
         _ = model
-        return False
+        return None
 
     # -------------------------------------------------------------------------
-    def supports_structured_output(self, model: str) -> bool:
+    def supports_structured_output(self, model: str) -> bool | None:
         _ = model
-        return False
+        return None
 
     # -------------------------------------------------------------------------
-    def normalize_tool_messages(
-        self, messages: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def supports_vision(self, model: str) -> bool | None:
+        """Report whether ``model`` can accept image content parts.
+
+        ``True``/``False`` are explicit; ``None`` means unknown.  Vision
+        attachment is gated on this predicate so images are never sent to a
+        model that cannot consume them.
+        """
+        _ = model
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return messages
 
     # -------------------------------------------------------------------------
     def _validate_request_capabilities(self, request: LLMRequest) -> None:
         if request.tools and request.response_json_schema is not None:
-            raise ValueError("LLMRequest cannot combine native tools with structured response_schema")
-        if request.tools and not self.supports_tools(request.model):
-            raise ValueError(
-                f"Model '{request.model}' for provider '{self.provider_name}' does not support native tools."
+            raise LLMRequestSchemaError(
+                provider=self.provider_name,
+                model=request.model,
+                stage="request_validation",
+                detail="Native tools cannot be combined with a structured response schema.",
             )
+        for tool in request.tools or []:
+            if (
+                not tool.name.strip()
+                or not self._is_json_schema(tool.parameters_json_schema)
+            ):
+                raise LLMRequestSchemaError(
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="tool_definition",
+                    detail="A native tool definition has an invalid name or parameters schema.",
+                )
+        if request.response_json_schema is not None and not self._is_json_schema(
+            request.response_json_schema
+        ):
+            raise LLMRequestSchemaError(
+                provider=self.provider_name,
+                model=request.model,
+                stage="response_schema",
+                detail="The structured response schema is not a JSON object.",
+            )
+        request_tool_state = request.metadata.get("supports_tools")
+        supports_tools = (
+            request_tool_state
+            if isinstance(request_tool_state, bool)
+            else self.supports_tools(request.model)
+        )
+        if request.tools and supports_tools is False:
+            raise LLMStructuredOutputError(
+                category="model_capability",
+                provider=self.provider_name,
+                model=request.model,
+                stage="tool_calling",
+                code="model_tools_unsupported",
+                detail=(
+                    f"Model '{request.model}' for provider '{self.provider_name}' "
+                    "does not support native tools."
+                ),
+            )
+        request_structured_state = request.metadata.get("supports_structured_output")
+        supports_structured_output = (
+            request_structured_state
+            if isinstance(request_structured_state, bool)
+            else self.supports_structured_output(request.model)
+        )
         if (
             request.response_json_schema is not None
-            and not self.supports_structured_output(request.model)
+            and supports_structured_output is False
         ):
-            raise ValueError(
-                f"Model '{request.model}' for provider '{self.provider_name}' does not support structured output."
+            raise LLMStructuredOutputError(
+                category="model_capability",
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                code="model_structured_output_unsupported",
+                detail=(
+                    f"Model '{request.model}' for provider '{self.provider_name}' "
+                    "does not support structured output."
+                ),
             )
+        if request.metadata.get("requires_vision") is True:
+            supports_vision = self.supports_vision(request.model)
+            if supports_vision is not True:
+                raise LLMStructuredOutputError(
+                    category="model_capability",
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="vision_content",
+                    code="model_vision_unsupported",
+                    detail=(
+                        f"Model '{request.model}' for provider '{self.provider_name}' "
+                        "does not support vision content."
+                    ),
+                )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_json_schema(value: object) -> bool:
+        if not is_json_object(value):
+            return False
+        schema_type = value.get("type")
+        if schema_type is not None and schema_type not in {
+            "array",
+            "boolean",
+            "integer",
+            "null",
+            "number",
+            "object",
+            "string",
+        }:
+            return False
+        properties = value.get("properties")
+        if properties is not None and not is_json_object(properties):
+            return False
+        required = value.get("required")
+        if required is not None and (
+            not is_json_array(required)
+            or not all(isinstance(item, str) and item.strip() for item in required)
+        ):
+            return False
+        items = value.get("items")
+        if items is not None and not is_json_object(items):
+            return False
+        return True

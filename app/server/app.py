@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import asyncio
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -8,10 +9,18 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+# Configure application logging before importing modules that may emit startup
+# diagnostics (for example, Alembic plugin discovery).
+from server.common.logger import logger as _application_logger
+
 from server.api.chat import router as chat_router
 from server.api.conversations import router as conversations_router
+from server.api.realtime import metrics_router as realtime_metrics_router
+from server.api.realtime import router as realtime_router
 from server.api.geospatial import router as geospatial_router
 from server.api.jobs import router as jobs_router
+from server.api.settings import router as settings_router
+from server.common.constants import AEGIS_VERSION
 from server.common.paths import (
     CLIENT_ASSETS_PATH,
     CLIENT_DIST_PATH,
@@ -22,29 +31,30 @@ from server.common.paths import (
     FASTAPI_ROOT_ENDPOINT,
     FASTAPI_SPA_FALLBACK_ENDPOINT,
 )
-from server.configurations import get_server_settings
-from server.repositories.credential_material import seed_credential_encryption_material
-from server.repositories.database import get_database
-from server.repositories.database.initializer import (
-    initialize_database,
-    seed_reference_catalog,
-)
+from server.configurations import build_database_settings, ensure_environment_loaded
+from server.repositories.runtime_settings import RuntimeSettingsRepository
+from server.repositories.database.initializer import initialize_database
+from server.repositories.database.sqlite import SQLiteRepository
 from server.services.chat.composition import build_chat_runtime
 from server.services.chat.streaming import ChatStreamingService
+from server.services.chat.conversation_snapshot import ConversationSnapshotService
 from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
+from server.services.agent_runs.render_completion import RenderCompletionService
 from server.services.agent_runs.steering import RunSteeringService
-from server.services.agent_runs.streaming import RunEventStreamService
+from server.services.agent_runs.realtime import RealtimeConnectionRegistry
+from server.services.agent_runs.metrics import RealtimeMetrics
 from server.services.geospatial.composition import build_geospatial_runtime
+from server.services.geospatial.render_capture import RenderCaptureStore
 from server.services.jobs import BackgroundJobService
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
-from server.repositories.conversations import ConversationRepository
-from server.services.search.composition import build_search_runtime
+from server.services.catalog.startup import seed_reference_catalog
 from server.services.startup_validation import run_startup_validations
+from server.services.settings.runtime_settings import RuntimeSettingsService
 
 ###############################################################################
 def health_check() -> dict[str, str]:
@@ -53,6 +63,13 @@ def health_check() -> dict[str, str]:
 ###############################################################################
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
+
+###############################################################################
+def _dispose_sqlite_engine(database: object) -> None:
+    engine = getattr(database, "engine", None)
+    dispose = getattr(engine, "dispose", None)
+    if callable(dispose):
+        dispose()
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
@@ -84,74 +101,140 @@ def redirect_root_to_docs() -> RedirectResponse:
 
 ###############################################################################
 @asynccontextmanager
-async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
-    settings = get_server_settings()
-    database = get_database()
+async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
+    _application_logger.debug("Application logging configured.")
+    ensure_environment_loaded()
+    database_settings = build_database_settings()
+    database = SQLiteRepository(database_settings)
 
-    initialize_database(database.backend)
-    seed_credential_encryption_material()
-    seed_reference_catalog(database.backend)
+    try:
+        initialize_database(
+            database,
+            on_ready=lambda: seed_reference_catalog(database),
+        )
+    except BaseException:
+        _dispose_sqlite_engine(database)
+        raise
 
-    search_runtime = build_search_runtime()
-    chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)
-    geospatial_runtime = build_geospatial_runtime()
-    chat_streaming_service = ChatStreamingService(chat_runtime.agent_orchestrator)
-    run_event_publisher = RunEventPublisher(AgentRunEventRepository())
-    run_repository = AgentRunRepository()
+    runtime_repository = RuntimeSettingsRepository(database)
+    runtime_app_settings = runtime_repository.get_required()
+    settings = runtime_app_settings.to_server_settings(database_settings)
+    runtime_settings_service = RuntimeSettingsService(runtime_repository)
+    geospatial_runtime = build_geospatial_runtime(database, settings=settings)
+    render_capture_store = RenderCaptureStore()
+    chat_runtime = build_chat_runtime(
+        database,
+        geospatial_runtime=geospatial_runtime,
+        application_timezone=getattr(
+            getattr(settings, "chat", None), "application_timezone", "UTC"
+        ),
+        execution_settings=getattr(settings, "agent_execution", None),
+        render_capture_store=render_capture_store,
+    )
+    event_repository = AgentRunEventRepository(database)
+    run_event_publisher = RunEventPublisher(event_repository)
+    run_repository = AgentRunRepository(database, event_repository=event_repository)
+    conversation_repository = chat_runtime.conversation_repository
+    steering_repository = AgentSteeringRepository(database)
+    conversation_snapshot_service = ConversationSnapshotService(
+        conversation_repository=conversation_repository,
+        history_service=chat_runtime.history_service,
+        run_repository=run_repository,
+    )
     aggregation_service = AggregatedRequestService()
+    render_completion_service = RenderCompletionService(
+        run_repository=run_repository,
+        event_publisher=run_event_publisher,
+        render_ack_timeout_seconds=getattr(
+            getattr(settings, "agent_execution", None),
+            "render_ack_seconds",
+            90.0,
+        ),
+        resume_mode=True,
+        max_render_attempts=getattr(
+            getattr(settings, "agent_execution", None),
+            "max_render_attempts",
+            3,
+        ),
+    )
     run_orchestrator = AgentRunOrchestrator(
         agent_orchestrator=chat_runtime.agent_orchestrator,
         run_repository=run_repository,
         event_publisher=run_event_publisher,
+        conversation_repository=conversation_repository,
+        steering_repository=steering_repository,
+        render_completion_service=render_completion_service,
+        defer_map_completion=True,
     )
     run_lifecycle_service = RunLifecycleService(
-        conversation_repository=ConversationRepository(),
+        conversation_repository=conversation_repository,
         run_repository=run_repository,
         aggregation_service=aggregation_service,
         event_publisher=run_event_publisher,
         run_orchestrator=run_orchestrator,
     )
-    run_steering_service = RunSteeringService(
-        run_repository=run_repository,
-        steering_repository=AgentSteeringRepository(),
-        aggregation_service=aggregation_service,
+    chat_streaming_service = ChatStreamingService(
+        lifecycle_service=run_lifecycle_service,
         event_publisher=run_event_publisher,
     )
-    run_event_stream_service = RunEventStreamService(
-        run_event_publisher,
+    run_steering_service = RunSteeringService(
         run_repository=run_repository,
+        steering_repository=steering_repository,
+        aggregation_service=aggregation_service,
+        event_publisher=run_event_publisher,
+        conversation_repository=conversation_repository,
     )
+    realtime_connections = RealtimeConnectionRegistry()
+    realtime_metrics = RealtimeMetrics()
     job_service = BackgroundJobService(
         chat_streaming_service=chat_streaming_service,
-        map_search_runner=search_runtime.search_orchestrator.execute,
         polling_interval=settings.jobs.polling_interval,
     )
-    job_service.start()
-
-    application.state.search_runtime = search_runtime
     application.state.chat_runtime = chat_runtime
     application.state.geospatial_runtime = geospatial_runtime
     application.state.chat_streaming_service = chat_streaming_service
     application.state.run_lifecycle_service = run_lifecycle_service
     application.state.run_steering_service = run_steering_service
-    application.state.run_event_stream_service = run_event_stream_service
+    application.state.conversation_repository = conversation_repository
+    application.state.conversation_snapshot_service = conversation_snapshot_service
+    application.state.run_repository = run_repository
+    application.state.run_event_publisher = run_event_publisher
+    application.state.render_completion_service = render_completion_service
+    application.state.render_capture_store = render_capture_store
+    application.state.realtime_connections = realtime_connections
+    application.state.realtime_metrics = realtime_metrics
     application.state.job_service = job_service
+    application.state.runtime_settings_service = runtime_settings_service
 
-    chat_runtime.settings_service.get_settings()
-
-    run_startup_validations()
-
-    yield
-    job_service.stop()
+    try:
+        job_service.start()
+        chat_runtime.settings_service.validate_persisted_settings()
+        run_startup_validations(geospatial_runtime.catalog_snapshot)
+        resume_active_runs = getattr(run_lifecycle_service, "resume_active_runs", None)
+        if callable(resume_active_runs):
+            resume_active_runs()
+        yield
+    finally:
+        await realtime_connections.close_all()
+        await asyncio.to_thread(job_service.stop)
+        await run_lifecycle_service.shutdown()
+        _dispose_sqlite_engine(database)
 
 ###############################################################################
 def create_app() -> FastAPI:
-    application = FastAPI(title="AEGIS API", lifespan=app_lifespan)
+    application = FastAPI(
+        title="AEGIS API",
+        version=AEGIS_VERSION,
+        lifespan=app_lifespan,
+    )
 
     application.include_router(chat_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(conversations_router, prefix=FASTAPI_API_PREFIX)
+    application.include_router(realtime_router, prefix=FASTAPI_API_PREFIX)
+    application.include_router(realtime_metrics_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(jobs_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(geospatial_router, prefix=FASTAPI_API_PREFIX)
+    application.include_router(settings_router, prefix=FASTAPI_API_PREFIX)
     application.add_api_route(
         f"{FASTAPI_API_PREFIX}/health",
         health_check,

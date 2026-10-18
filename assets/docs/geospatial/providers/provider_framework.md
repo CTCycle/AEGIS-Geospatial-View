@@ -1,6 +1,6 @@
 # Provider Framework
 
-Last updated: 2026-06-19
+Last updated: 2026-09-08
 
 ## Provider Adapter Location
 
@@ -10,25 +10,36 @@ Provider adapters live under `app/server/services/geospatial/providers`.
 
 - `arcgis_rest.py`
 - `census.py`
-- `geoapify.py`
+- `eea.py`
+- `esa.py`
+- `eurostat.py`
 - `gtfs_realtime.py`
 - `gtfs_static.py`
 - `fema.py`
+- `local_open_data.py`
+- `mobility_database.py`
 - `nasa_gibs.py`
 - `nasa_firms.py`
+- `natural_earth.py`
 - `noaa.py`
-- `nrel.py`
+- `nominatim.py`
+- `openaddresses.py`
 - `openaq.py`
 - `openchargemap.py`
 - `openmeteo.py`
 - `opentripmap.py`
 - `overpass.py`
+- `overture.py`
 - `ourairports.py`
 - `pvgis.py`
 - `rainviewer.py`
 - `tomtom.py`
 - `usgs.py`
 - `windy_webcams.py`
+
+MapLibre style basemap providers such as OpenFreeMap are rendering-only
+providers. They do not require a backend adapter; their concrete fetch path is
+the public style document consumed by the frontend renderer.
 
 ## Response Contract
 
@@ -39,6 +50,8 @@ Adapters return normalized `ProviderResponse` objects with:
 - warnings
 - stale state
 - provider ID
+- result status: `ok`, `valid_empty`, or `stale`
+- result type: `features`, `raster`, `metadata`, or `unknown`
 
 Adapters that support live layer discovery additionally expose:
 
@@ -52,10 +65,22 @@ These methods return normalized provider layer descriptors. NASA GIBS parses WMS
 - Feature providers expose `fetch_features(request)` or an equivalent registry path.
 - Cache keys include safe request-shaping parameters such as provider, layer ID, bbox, zoom, time, category, variables, and credential-safe request parameters.
 - Provider results include attribution and source-health metadata when available.
-- 401, 403, 429, timeout, malformed, empty, and stale-cache states are surfaced as safe payloads without leaking credentials.
+- Feature, location, raster, and dataset metadata is normalized by
+  `MapInspectionService` before it enters a map session. The inspection
+  contract keeps category-specific fields (measurements, places/assets,
+  hazards, transit/cameras, and statistical results) bounded and allowlisted;
+  only spatially associated data becomes a feature or scoped point inspection.
+  Raster metadata stays at overlay level and non-spatial metadata opens in the
+  details panel. Unsafe links and oversized/non-scalar values are omitted.
+- 401, 403, 429, timeout, malformed, empty, and stale-cache states are surfaced with stable semantics without leaking credentials. A valid empty result is emitted only after a successful semantic response; provider failures must not be converted into empty feature collections.
+- Shared HTTP retrieval does not follow redirects, bounds response bodies to the configured maximum, preserves `Retry-After` on rate-limit errors, and treats deterministic 4xx responses as non-retryable.
 - Hazard providers include legends and freshness labels where applicable.
-- Local open-data camera templates read configured JSON source URLs or files through `LOCAL_OPEN_DATA_SOURCES`.
-- Provider adapters must not return credentials or raw capability XML to frontend API responses.
+- Local open-data camera and dataset sources are selected by configured source IDs in `LOCAL_OPEN_DATA_SOURCES`; callers cannot supply arbitrary URLs, and private-network targets are rejected.
+- Mobility Database discovery reads a local CSV snapshot and refreshes it from the public catalog only when the snapshot is missing or explicitly requested; each feed's authentication and license metadata is preserved.
+- Provider adapters must not return credentials, credential-bearing URLs, or raw capability XML to frontend API responses.
+- The provider registry and the live smoke matrix must remain one-to-one. A
+  provider is not exposed as an adapter until it has a real normalized fetch
+  path; metadata-only placeholders are not registered.
 
 ## Dataset Processing Boundary
 

@@ -1,0 +1,53 @@
+{
+  "slice_id": "T3-12",
+  "name": "Overpass residential buildings and POI amenity overlays",
+  "date": "2026-10-01",
+  "branch": "validation",
+  "provider_lane": "opencode-go / deepseek-v4.1-flash",
+  "runtime": "isolated runtimes/cache/test-runtime/t3-07-live-* (disposable, port 5079)",
+  "status": "PASS",
+  "scenarios": [
+    {
+      "id": "t3_12_buildings_rome",
+      "prompt": "Show residential buildings around the Colosseum, Rome, Italy.",
+      "expected_kind": "map",
+      "expected_capability": "overpass_residential_buildings",
+      "classification": "map_render_pass",
+      "evidence": "http/VECTOR-POINT-MATRIX-LIVE/t3_12_buildings_rome.json"
+    },
+    {
+      "id": "t3_12_poi_bologna",
+      "prompt": "Show nearby pharmacies around Bologna, Italy.",
+      "expected_kind": "map",
+      "expected_capability": "overpass_poi_amenities",
+      "classification": "map_render_pass",
+      "evidence": "http/VECTOR-POINT-MATRIX-LIVE/t3_12_poi_bologna.json"
+    },
+    {
+      "id": "t3_12_poi_valid_empty",
+      "prompt": "Show nearby pharmacies within 5 kilometers of latitude 25, longitude 13.",
+      "expected_kind": "map",
+      "expected_capability": "overpass_poi_amenities",
+      "classification": "map_render_pass",
+      "evidence": "http/VECTOR-POINT-MATRIX-LIVE/t3_12_poi_valid_empty.json"
+    }
+  ],
+  "fixes": [
+    {
+      "id": "provider-circle-coverage-spatial-scope",
+      "file": "app/server/services/agent/capability_execution.py",
+      "summary": "Honor provider-declared circle coverage (type=circle, center, radius_m) as the authoritative spatial scope for radius-bounded vector results, instead of the narrow geocoder bbox intersection check that rejected POI/landmark \"around <place>\" renders.",
+      "tests": "test_capability_execution.py::test_provider_declared_circle_coverage_satisfies_spatial_scope"
+    }
+  ],
+  "remaining_limitation": "Visibility mutation and remove/re-add lifecycle actions rely on the shared overlay-controls mechanism validated in T3-02/T3-06; the buildings/POI render, attribution, valid-empty, and acknowledgement boundaries are the new evidence recorded here. Overpass retains its documented partial general reliability; one transient provider timeout was observed on a re-attempt and recovered on retry.",
+  "quality": {
+    "backend_unit_passed": true,
+    "focused_backend_passed": true,
+    "frontend_karma_passed": null,
+    "ruff": "pass",
+    "pyright_errors": 0,
+    "strict_manifest_audit": "pass"
+  },
+  "harness": "app/tests/e2e/test_live_vector_point_matrix.py"
+}

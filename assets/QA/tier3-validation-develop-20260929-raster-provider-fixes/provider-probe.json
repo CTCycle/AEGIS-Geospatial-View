@@ -1,0 +1,45 @@
+{
+  "date": "2026-09-29",
+  "lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "protocol": "openai-chat-completions",
+    "status": "passed",
+    "http_status": 200,
+    "parse_status": "complete"
+  },
+  "terrascope": {
+    "capabilities_url": "https://titiler.terrascope.be/wms?service=WMS&request=GetCapabilities",
+    "capabilities_status": 200,
+    "layer": "esa-worldcover-map-10m-2021-v2_map",
+    "crs": "EPSG:3857",
+    "format": "image/png",
+    "version": "1.3.0",
+    "required_time": "2021-01-01",
+    "get_map_probe": {
+      "status": 200,
+      "content_type": "image/png",
+      "transport": "AEGIS proxy"
+    }
+  },
+  "gibs": {
+    "wms_capabilities_status": 200,
+    "provider_native_layer": "MODIS_Combined_Thermal_Anomalies_All",
+    "stable_aegis_capability": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "render_transport": "WMS",
+    "fire_proxy_probe": {
+      "status": 200,
+      "content_type": "image/png",
+      "time": "2026-09-29"
+    }
+  },
+  "fema": {
+    "endpoint": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export",
+    "request_contract_verified": true,
+    "observed_browser_result": "transport_error",
+    "status": null,
+    "content_type": null,
+    "implementation_changed": false
+  },
+  "browser_direct_provider_requests": 0
+}

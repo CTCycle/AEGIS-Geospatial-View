@@ -1,0 +1,222 @@
+import {
+  parseRenderObservationPayload,
+  parseRealtimeServerMessage,
+  parseRunCompletionPayload,
+  parseRunEvent,
+} from './realtime-parsers';
+
+describe('realtime parsers', () => {
+  it('parses JSON envelopes and enforces protocol and conversation boundaries', () => {
+    const message = parseRealtimeServerMessage(JSON.stringify({
+      protocol_version: 1,
+      type: 'run.event',
+      message_id: 'message-1',
+      correlation_id: null,
+      conversation_id: 'conversation-1',
+      payload: { event_id: 'event-1' },
+    }), 'conversation-1');
+
+    expect(message).toEqual(jasmine.objectContaining({
+      protocol_version: 1,
+      type: 'run.event',
+      conversation_id: 'conversation-1',
+      payload: { event_id: 'event-1' },
+    }));
+    expect(parseRealtimeServerMessage({
+      protocol_version: 1,
+      type: 'run.event',
+      conversation_id: 'conversation-2',
+      payload: {},
+    }, 'conversation-1')).toBeNull();
+    expect(parseRealtimeServerMessage({
+      protocol_version: 1,
+      type: 'run.event',
+      conversation_id: 'conversation-1',
+      payload: [],
+    }, 'conversation-1')).toBeNull();
+  });
+
+  it('accepts only discriminated, sequenced run events', () => {
+    const event = parseRunEvent({
+      event_id: 'event-1',
+      sequence: 4,
+      conversation_id: 'conversation-1',
+      run_id: 'run-1',
+      run_version: 2,
+      type: 'assistant_text_delta',
+      timestamp: '2026-08-17T08:00:00Z',
+      visibility: 'user',
+      payload: { delta: 'hello' },
+    }, 'conversation-1');
+
+    expect(event?.sequence).toBe(4);
+    const delta: unknown = event?.payload['delta'];
+    expect(delta).toBe('hello');
+    expect(parseRunEvent({
+      event_id: 'event-2',
+      sequence: 4.5,
+      conversation_id: 'conversation-1',
+      run_id: 'run-1',
+      run_version: 2,
+      type: 'unknown',
+      timestamp: '2026-08-17T08:00:00Z',
+      visibility: 'user',
+      payload: {},
+    }, 'conversation-1')).toBeUndefined();
+  });
+
+  it('accepts context usage as a sequenced non-progress run event', () => {
+    const event = parseRunEvent({
+      event_id: 'context-1',
+      sequence: 5,
+      conversation_id: 'conversation-1',
+      run_id: 'run-1',
+      run_version: 2,
+      type: 'context_usage',
+      timestamp: '2026-08-17T08:00:00Z',
+      visibility: 'user',
+      payload: {
+        phase: 'native_loop',
+        context_usage: {
+          estimated_input_tokens: 700,
+          model_context_limit: 4096,
+          usage_percent: 17.1,
+          provider: 'test',
+          model: 'runtime-model',
+        },
+      },
+    }, 'conversation-1');
+
+    expect(event?.type).toBe('context_usage');
+    const phase: unknown = event?.payload['phase'];
+    expect(phase).toBe('native_loop');
+  });
+
+  it('accepts render observations as replayable run events', () => {
+    const event = parseRunEvent({
+      event_id: 'render-1',
+      sequence: 6,
+      conversation_id: 'conversation-1',
+      run_id: 'run-1',
+      run_version: 3,
+      type: 'render_observed',
+      timestamp: '2026-08-17T08:00:00Z',
+      visibility: 'user',
+      payload: {
+        map_session_id: 'map-1',
+        collection_revision: 2,
+        attempt: 1,
+        status: 'ready',
+        checks: { viewport_valid: true },
+        overlay_results: [],
+        recovery: 'continue',
+      },
+    }, 'conversation-1');
+
+    expect(event?.type).toBe('render_observed');
+    expect(parseRenderObservationPayload(event?.payload)?.status).toBe('ready');
+  });
+
+  it('parses bounded render observations and rejects malformed evidence', () => {
+    const observation = parseRenderObservationPayload({
+      map_session_id: 'map-1',
+      collection_revision: 3,
+      attempt: 2,
+      status: 'failed',
+      viewport_bounds: [12, 41, 13, 42],
+      checks: { required_sources_loaded: false, viewport_valid: true },
+      overlay_results: [{ overlay_id: 'roads', layer_present: false }],
+      failure_code: 'render_failed',
+      failure_stage: 'maplibre',
+      failure_summary: 'Required layer was not registered.',
+      recovery: 'revise_map',
+    });
+
+    expect(observation).toEqual(jasmine.objectContaining({
+      map_session_id: 'map-1',
+      attempt: 2,
+      status: 'failed',
+      failure_code: 'render_failed',
+      recovery: 'revise_map',
+    }));
+    expect(parseRenderObservationPayload({
+      map_session_id: 'map-1',
+      collection_revision: 3,
+      attempt: 2,
+      status: 'failed',
+      checks: { required_sources_loaded: 'false' },
+      overlay_results: [],
+      recovery: 'revise_map',
+    })).toBeUndefined();
+  });
+
+  it('normalizes valid terminal fields and ignores malformed optional fields', () => {
+    const parsed = parseRunCompletionPayload({
+      context_revision: 3,
+      operation: {
+        kind: 'direct_answer',
+        status: 'success',
+        message: 'Completed',
+      },
+      memory_snapshot: { topic: 'maps' },
+      context_usage: {
+        estimated_input_tokens: 120,
+        usage_percent: 4.5,
+        provider: 'ollama',
+        model: 'llama3.2',
+      },
+      map_session: { session_id: 42 },
+      route: {
+        primary_domain: 'data_retrieval',
+        secondary_domains: [],
+        task_mode: 'execute',
+        presentation: 'text',
+        requires_location: false,
+        capability_queries: ['evidence'],
+        explicit_capability_ids: [],
+        clarification_question: null,
+        operation: 'retrieve',
+        target_refs: [],
+        temporal_scope: { mode: 'none', granularity: 'none', aggregation: 'none' },
+        spatial_scope: null,
+        filters: {},
+      },
+      presentation_status: 'not_requested',
+      completion_contract: {
+        operation: 'retrieve',
+        requirements: [],
+        location_required: false,
+        evidence_required: true,
+        map_preparation_required: false,
+        temporal_scope_required: false,
+        spatial_scope_required: false,
+        render_verification_required: false,
+        render_verified: false,
+      },
+      tool_results: [{
+        call_id: 'call-1',
+        tool_name: 'execute_geospatial_capability',
+        status: 'success',
+        summary: 'Evidence fetched.',
+        evidence_refs: ['evidence-1'],
+        map_candidate_id: null,
+        error: null,
+      }],
+      execution_trace: { stopped_reason: 'goal_satisfied' },
+    });
+
+    expect(parsed.contextRevision).toBe(3);
+    expect(parsed.operation?.kind).toBe('direct_answer');
+    const memorySnapshot: unknown = parsed.memorySnapshot;
+    expect(memorySnapshot).toEqual({ topic: 'maps' });
+    expect(parsed.contextUsage?.estimated_input_tokens).toBe(120);
+    expect(parsed.mapSession).toBeUndefined();
+    expect(parsed.route?.primary_domain).toBe('data_retrieval');
+    expect(parsed.presentationStatus).toBe('not_requested');
+    expect(parsed.completionContract?.render_verification_required).toBeFalse();
+    expect(parsed.completionContract?.render_verified).toBeFalse();
+    expect(parsed.toolResults?.[0].evidence_refs).toEqual(['evidence-1']);
+    const executionTrace: Record<string, unknown> = parsed.executionTrace ?? {};
+    expect(executionTrace['stopped_reason']).toBe('goal_satisfied');
+  });
+});

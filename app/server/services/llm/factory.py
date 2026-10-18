@@ -9,7 +9,14 @@ from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
+from server.services.llm.opencode_provider import (
+    OPENCODE_GO_PROVIDER,
+    OPENCODE_PROVIDER,
+    OpenCodeProvider,
+)
 from server.services.llm.openai_provider import OpenAIProvider
+from server.services.llm.provider_contract import require_canonical_provider
+from server.services.llm.transport import LLMTransportPolicy
 
 ###############################################################################
 class LLMFactory:
@@ -18,49 +25,53 @@ class LLMFactory:
     def __init__(
         self,
         *,
-        settings_repo: ModelSettingsRepository | None = None,
-        credentials_repo: CredentialRepository | None = None,
-        crypto_service: CredentialEncryptionService | None = None,
+        settings_repo: ModelSettingsRepository,
+        credentials_repo: CredentialRepository,
+        crypto_service: CredentialEncryptionService,
         ollama_tool_capability_cache: OllamaToolCapabilityCache | None = None,
+        transport_policy: LLMTransportPolicy | None = None,
     ) -> None:
-        self.settings_repo = settings_repo or ModelSettingsRepository()
-        self.credentials_repo = credentials_repo or CredentialRepository()
+        self.settings_repo = settings_repo
+        self.credentials_repo = credentials_repo
         self.crypto_service = crypto_service
         self.ollama_tool_capability_cache = (
             ollama_tool_capability_cache or OllamaToolCapabilityCache()
         )
+        self.transport_policy = transport_policy or LLMTransportPolicy()
 
     # -------------------------------------------------------------------------
     def _get_crypto_service(self) -> CredentialEncryptionService:
-        if self.crypto_service is None:
-            self.crypto_service = CredentialEncryptionService()
         return self.crypto_service
 
     # -------------------------------------------------------------------------
     def _resolve_provider_api_key(self, provider: str) -> str:
-        credential = self.credentials_repo.get_active(provider=provider, label="api_key")
+        credential = self.credentials_repo.get_active(
+            provider=provider, label="api_key"
+        )
         if credential is None:
-            if provider == "openai":
-                raise LLMConfigurationError(
-                    "OpenAI credentials are not configured. Add an OpenAI API key in Settings."
-                )
-            if provider == "deepseek":
-                raise LLMConfigurationError(
-                    "DeepSeek credentials are not configured. Add a DeepSeek API key in Settings."
-                )
+            provider_labels = {
+                "openai": ("OpenAI", "OpenAI"),
+                "google": ("Google", "Google/Gemini"),
+                "deepseek": ("DeepSeek", "DeepSeek"),
+                OPENCODE_PROVIDER: ("OpenCode Zen", "OpenCode Zen"),
+                OPENCODE_GO_PROVIDER: ("OpenCode Go", "OpenCode Go"),
+            }
+            label, credential_label = provider_labels.get(
+                provider, (provider, provider)
+            )
             raise LLMConfigurationError(
-                "Google credentials are not configured. Add a Google/Gemini API key in Settings."
+                f"{label} credentials are not configured. Add an {credential_label} API key in Settings."
             )
         try:
             api_key = self._get_crypto_service().decrypt(credential.encrypted_value)
         except ValueError as exc:
-            provider_label = (
-                "OpenAI"
-                if provider == "openai"
-                else "DeepSeek"
-                if provider == "deepseek"
-                else "Google"
-            )
+            provider_label = {
+                "openai": "OpenAI",
+                "google": "Google",
+                "deepseek": "DeepSeek",
+                OPENCODE_PROVIDER: "OpenCode Zen",
+                OPENCODE_GO_PROVIDER: "OpenCode Go",
+            }.get(provider, provider)
             raise LLMConfigurationError(
                 f"{provider_label} credentials are saved but cannot be decrypted. Re-enter the API key in Settings."
             ) from exc
@@ -69,23 +80,39 @@ class LLMFactory:
 
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> LLMProvider:
-        normalized = provider.strip().lower()
-        settings = self.settings_repo.get_or_create()
-        if normalized == "ollama":
+        canonical_provider = require_canonical_provider(provider)
+        settings = self.settings_repo.get_required()
+        if canonical_provider == "ollama":
             return OllamaProvider(
                 base_url=settings.ollama_url,
                 tool_capability_cache=self.ollama_tool_capability_cache,
+                transport_policy=self.transport_policy,
             )
-        if normalized == "openai":
+        if canonical_provider == "openai":
             api_key = self._resolve_provider_api_key("openai")
-            return OpenAIProvider(api_key=api_key, base_url=settings.openai_base_url)
-        if normalized == "google":
+            return OpenAIProvider(
+                api_key=api_key,
+                base_url=settings.openai_base_url,
+                transport_policy=self.transport_policy,
+            )
+        if canonical_provider == "google":
             api_key = self._resolve_provider_api_key("google")
-            return GoogleProvider(api_key=api_key, base_url=settings.google_base_url)
-        if normalized == "deepseek":
+            return GoogleProvider(
+                api_key=api_key,
+                base_url=settings.google_base_url,
+                transport_policy=self.transport_policy,
+            )
+        if canonical_provider == "deepseek":
             api_key = self._resolve_provider_api_key("deepseek")
             return DeepSeekProvider(
                 api_key=api_key,
                 base_url=settings.deepseek_base_url,
+                transport_policy=self.transport_policy,
+            )
+        if canonical_provider in {OPENCODE_PROVIDER, OPENCODE_GO_PROVIDER}:
+            return OpenCodeProvider(
+                api_key=self._resolve_provider_api_key(canonical_provider),
+                provider_name=canonical_provider,
+                transport_policy=self.transport_policy,
             )
         raise ValueError(f"Unsupported model provider '{provider}'.")

@@ -1,10 +1,10 @@
 # Schema V2
 
-Last updated: 2026-06-02
+Last updated: 2026-09-28
 
 ## Required Fields
 
-Every manifest under `app/resources/catalog` must define:
+Every manifest under `data/catalog` must define:
 
 - `capabilityKind`
 - `renderingMode`
@@ -15,10 +15,12 @@ Every manifest under `app/resources/catalog` must define:
 - `cachePolicy`
 - `normalization`
 
+`agenticUse` is required by the current loader, even when the capability is
+not exposed to the agent.
+
 Optional but supported fields include:
 
 - `account_setup`
-- `agenticUse`
 
 ## Supported Values
 

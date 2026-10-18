@@ -1,0 +1,180 @@
+{
+  "date": "2026-10-17T11:20:47.801783+00:00",
+  "optional_modules": {
+    "geopandas": false,
+    "rasterio": false,
+    "pyogrio": false,
+    "duckdb": false,
+    "rtree": false
+  },
+  "configured_source_catalog": [
+    {
+      "id": "census_tigerweb_demographics",
+      "is_available": true,
+      "availability_reason": null,
+      "endpoint_health": "partial",
+      "reliability": {
+        "status": "partial",
+        "last_audited": "2026-08-27",
+        "known_limitations": [
+          "Boundary layer and vintage selection are discovered from live TIGERweb metadata.",
+          "This capability supplies geometry only; ACS values require the demographic-join capability."
+        ]
+      }
+    },
+    {
+      "id": "eea_noise_2019",
+      "is_available": true,
+      "availability_reason": null,
+      "endpoint_health": "partial",
+      "reliability": {
+        "status": "partial",
+        "last_audited": "2026-05-11",
+        "known_limitations": []
+      }
+    },
+    {
+      "id": "local_parcel_template",
+      "is_available": true,
+      "availability_reason": null,
+      "endpoint_health": "disabled",
+      "reliability": {
+        "status": "disabled",
+        "last_audited": "2026-05-11",
+        "known_limitations": [
+          "Template only; enable by replacing source URL, license, attribution, and jurisdiction coverage."
+        ]
+      }
+    },
+    {
+      "id": "openchargemap_ev_charging",
+      "is_available": false,
+      "availability_reason": "Configure an Open Charge Map API key in Settings under Geospatial Access or a local snapshot via AEGIS_OCM_SNAPSHOT_PATH.",
+      "endpoint_health": "partial",
+      "reliability": {
+        "status": "partial",
+        "last_audited": "2026-05-11",
+        "known_limitations": [
+          "Provider may require an API key or stricter usage terms depending on request volume."
+        ]
+      }
+    },
+    {
+      "id": "openmeteo_elevation",
+      "is_available": false,
+      "availability_reason": "Capability is disabled.",
+      "endpoint_health": "functional",
+      "reliability": {
+        "status": "functional",
+        "last_audited": "2026-09-03",
+        "known_limitations": [
+          "Approximately 90 m source resolution.",
+          "Free hosted API is restricted to non-commercial use.",
+          "Point elevation does not provide slope, aspect, or local terrain profiles."
+        ]
+      }
+    },
+    {
+      "id": "overture_maps_places",
+      "is_available": false,
+      "availability_reason": "Configure the required local or trusted source before use.",
+      "endpoint_health": "partial",
+      "reliability": {
+        "status": "partial",
+        "last_audited": "2026-07-29",
+        "known_limitations": [
+          "Interactive queries require an ingested local GeoJSON index; Overpass augmentation is bounded and optional."
+        ]
+      }
+    },
+    {
+      "id": "gtfs_realtime",
+      "is_available": false,
+      "availability_reason": "Configure the required local or trusted source before use.",
+      "endpoint_health": "partial",
+      "reliability": {
+        "status": "partial",
+        "last_audited": "2026-05-11",
+        "known_limitations": [
+          "Agency feed URLs must be configured before live fetches.",
+          "Some feeds omit vehicle positions or require agency-specific credentials."
+        ]
+      }
+    },
+    {
+      "id": "gtfs_static",
+      "is_available": false,
+      "availability_reason": "Configure the required local or trusted source before use.",
+      "endpoint_health": "partial",
+      "reliability": {
+        "status": "partial",
+        "last_audited": "2026-05-11",
+        "known_limitations": [
+          "Agency feed discovery and scheduled ingestion must be configured before map rendering.",
+          "Feed licensing is agency-specific and must be preserved in generated layers."
+        ]
+      }
+    }
+  ],
+  "static": {
+    "status": "PASS",
+    "url": "https://www.bart.gov/sites/default/files/2026-08/google_transit_20260810-20270108_v02.zip",
+    "summary": {
+      "stopCount": 287,
+      "routeCount": 14,
+      "agencyCount": 1,
+      "calendarCount": 11,
+      "shapeCount": 28,
+      "shapePointCount": 27893
+    },
+    "renderingMode": "clustered-points",
+    "feedTimestamp": null,
+    "vehicleRenderingAllowed": null,
+    "attribution": [
+      "GTFS Static feed publisher"
+    ]
+  },
+  "realtime": {
+    "status": "PASS",
+    "url": "https://cdn.mbta.com/realtime/VehiclePositions.pb",
+    "summary": {
+      "vehicleCount": 382,
+      "renderedVehicleCount": 382,
+      "alertCount": 0,
+      "tripUpdateCount": 0
+    },
+    "renderingMode": "clustered-points",
+    "feedTimestamp": "2026-10-17T11:20:48+00:00",
+    "vehicleRenderingAllowed": true,
+    "attribution": [
+      "GTFS Realtime feed publisher"
+    ]
+  },
+  "configured_live_validator": {
+    "checked_at": "2026-10-17T11:20:47.448089Z",
+    "error_count": 0,
+    "skipped_count": 0,
+    "results": [
+      {
+        "provider_id": "gtfs_static",
+        "capability_id": "gtfs_static",
+        "access_mode": "configured_source",
+        "status": "passed",
+        "message": null,
+        "feature_count": 287,
+        "checked_at": "2026-10-17T11:20:47.758195Z"
+      },
+      {
+        "provider_id": "gtfs_realtime",
+        "capability_id": "gtfs_realtime",
+        "access_mode": "configured_source",
+        "status": "passed",
+        "message": null,
+        "feature_count": 382,
+        "checked_at": "2026-10-17T11:20:47.798912Z"
+      }
+    ]
+  },
+  "static_url_resolution": "BART's /dev/schedules/google_transit.zip returned HTTP 307 to the dated official same-host archive used here. Production transport rejects redirects by design.",
+  "boundary": "Direct production-adapter feed probes; browser rendering and full agent route are separate."
+}

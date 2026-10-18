@@ -1,0 +1,166 @@
+{
+  "id": "windy_webcams",
+  "name": "Windy Webcams",
+  "provider": "windy_webcams",
+  "type": "camera-network",
+  "description": "Optional Windy webcam network capability for camera locations, refreshed previews, timelapses, and official links.",
+  "capabilities": [
+    "camera",
+    "webcam",
+    "visual-confirmation"
+  ],
+  "coverage": "global-partial",
+  "metadata": {
+    "label": "Windy Webcams",
+    "requires_key": true,
+    "attribution": "Windy Webcams",
+    "keywords": [
+      "webcam",
+      "camera",
+      "live view",
+      "visual confirmation",
+      "road condition",
+      "beach condition",
+      "ski condition"
+    ],
+    "action_tags": [
+      "webcam",
+      "camera",
+      "visual_status",
+      "travel_condition"
+    ],
+    "task_tags": [
+      "road condition",
+      "beach condition",
+      "ski condition",
+      "airport view",
+      "port view"
+    ],
+    "source_protocol": "JSON API",
+    "data_format": "JSON",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "credential-gated",
+    "auth_mode": "api_key",
+    "official_docs_url": "https://api.windy.com/webcams/docs",
+    "rate_limit_notes": "Preview image tokens expire and must be refreshed when loading the page.",
+    "last_validated": "2026-05-11"
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "camera-network",
+  "renderingMode": "camera-points",
+  "sourceOfficialDocs": [
+    "https://api.windy.com/webcams/docs"
+  ],
+  "license": {
+    "name": "Windy Webcams",
+    "url": "https://api.windy.com/webcams/docs",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "metadata-only"
+  },
+  "auth": {
+    "type": "api-key",
+    "required": true,
+    "providerKey": "windy_webcams",
+    "accessPageProviderId": "windy_webcams"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "domains": ["place_search", "data_retrieval"],
+    "plannerHints": [
+      "webcam",
+      "live view",
+      "road condition",
+      "visual confirmation",
+      "beach condition",
+      "ski condition",
+      "airport view",
+      "port view",
+      "traffic camera"
+    ],
+    "requiredUserAction": [
+      "visual_status",
+      "travel_condition"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": [
+      "Requires user-supplied Windy Webcams API key.",
+      "Preview image URL tokens expire and must be refreshed on page load.",
+      "Live feed embedding is not assumed unless explicitly allowed."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 3600
+  },
+  "normalization": {
+    "geometryPath": "webcams[].location",
+    "idPath": "webcams[].id",
+    "timestampPath": "webcams[].status.lastUpdatedOn",
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  },
+  "account_setup": {
+    "automation": {
+      "support": "agent_assisted",
+      "signup_url": "https://api.windy.com/webcams/docs",
+      "developer_portal_url": "https://api.windy.com/webcams/docs",
+      "docs_url": "https://api.windy.com/webcams/docs",
+      "required_fields": [],
+      "user_action_notes": [
+        "Open the provider portal from AEGIS and complete account-controlled steps in the provider site.",
+        "Pause for any CAPTCHA, login, email verification, 2FA, billing, consent, or key-generation prompts.",
+        "Paste the generated API key back into AEGIS when the provider flow is complete."
+      ],
+      "safety_notes": [
+        "AEGIS does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials.",
+        "Guided setup is experimental and best-effort; manual provider instructions remain the fallback."
+      ],
+      "experimental": true,
+      "experimental_label": "Experimental guided setup"
+    }
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "inspect",
+      "search"
+    ],
+    "supported_scope_kinds": [
+      "point",
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "global-partial",
+    "limitations": [
+      "Requires user-supplied Windy Webcams API key.",
+      "Preview image URL tokens expire and must be refreshed on page load.",
+      "Live feed embedding is not assumed unless explicitly allowed."
+    ],
+    "fallback_ids": []
+  }
+}

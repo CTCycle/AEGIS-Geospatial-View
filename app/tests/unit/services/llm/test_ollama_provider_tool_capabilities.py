@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 from urllib.error import HTTPError
 
+from server.prompts.providers import OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.types import LLMToolDefinition
 
@@ -58,6 +59,13 @@ def test_ollama_tag_capabilities_include_structured_output() -> None:
     assert "tools" in model.capabilities
 
 ###############################################################################
+def test_ollama_structured_requests_allow_the_longer_local_inference_window() -> None:
+    provider = OllamaProvider(base_url="http://ollama.test")
+
+    assert provider._STRUCTURED_REQUEST_TIMEOUT_SECONDS == 90
+    assert provider._DEFAULT_REQUEST_TIMEOUT_SECONDS == 30
+
+###############################################################################
 def test_ollama_falls_back_to_probe_when_show_capabilities_absent() -> None:
 
     ###############################################################################
@@ -106,6 +114,33 @@ def test_ollama_accepts_successful_tool_request_without_tool_call() -> None:
     assert provider._tool_support_source("llama") == "ollama_tool_request_accepted"
 
 ###############################################################################
+def test_ollama_tool_probe_uses_canonical_prompt() -> None:
+
+    ###############################################################################
+    class _Provider(OllamaProvider):
+
+        # -------------------------------------------------------------------------
+        def __init__(self) -> None:
+            super().__init__(base_url="http://ollama-canonical-probe.test")
+            self.chat_payload = None
+
+        # -------------------------------------------------------------------------
+        def _post_json(self, path: str, payload: dict):
+            if path == "/api/show":
+                return {}
+            self.chat_payload = payload
+            return {"message": {"content": "No call made."}}
+
+    provider = _Provider()
+
+    assert provider.supports_tools("llama") is True
+    assert provider.chat_payload is not None
+    assert (
+        provider.chat_payload["messages"][0]["content"]
+        == OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT
+    )
+
+###############################################################################
 def test_ollama_rejects_explicit_unsupported_tool_error() -> None:
 
     ###############################################################################
@@ -130,7 +165,7 @@ def test_ollama_rejects_explicit_unsupported_tool_error() -> None:
     assert provider._tool_support_source("plain") == "ollama_tool_request_rejected"
 
 ###############################################################################
-def test_ollama_marks_transport_probe_failure_false() -> None:
+def test_ollama_keeps_transport_probe_failure_unknown() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
@@ -143,7 +178,7 @@ def test_ollama_marks_transport_probe_failure_false() -> None:
 
     provider = _Provider(base_url="http://ollama-timeout.test")
 
-    assert provider.supports_tools("plain") is False
+    assert provider.supports_tools("plain") is None
     assert "tools" not in provider.get_model_capabilities("plain")
 
 ###############################################################################
@@ -152,3 +187,67 @@ def test_ollama_emits_native_tool_result_message_format() -> None:
     assert schema["type"] == "function"
     assert schema["function"]["name"] == "execute_geospatial_capability"
 
+###############################################################################
+def test_ollama_reads_context_window_only_from_show_metadata() -> None:
+
+    ###############################################################################
+    class _Provider(OllamaProvider):
+
+        # -------------------------------------------------------------------------
+        def _post_json(self, path: str, payload: dict):
+            assert path == "/api/show"
+            assert payload == {"name": "runtime-model"}
+            return {
+                "model_info": {
+                    "general.architecture": "llama",
+                    "general.context_length": 8192,
+                }
+            }
+
+    provider = _Provider(base_url="http://ollama-context.test")
+
+    assert provider.get_model_context_metadata("runtime-model") == {
+        "context_window_tokens": 8192,
+        "context_profile_source": "ollama_show_model_info",
+        "context_metadata_authority": "provider",
+    }
+
+###############################################################################
+def test_ollama_does_not_infer_context_from_missing_or_malformed_metadata() -> None:
+
+    ###############################################################################
+    class _Provider(OllamaProvider):
+
+        # -------------------------------------------------------------------------
+        def __init__(self, payload: dict):
+            super().__init__(base_url="http://ollama-context-empty.test")
+            self.payload = payload
+
+        # -------------------------------------------------------------------------
+        def _post_json(self, path: str, payload: dict):
+            assert path == "/api/show"
+            return self.payload
+
+    assert _Provider({"model_info": {}}).get_model_context_metadata("custom-4k") == {}
+    assert _Provider(
+        {"model_info": {"general.context_length": "not-a-number"}}
+    ).get_model_context_metadata("custom-4k") == {}
+
+
+###############################################################################
+def test_ollama_rejects_conflicting_show_context_metadata() -> None:
+
+    ###############################################################################
+    class _Provider(OllamaProvider):
+
+        # ---------------------------------------------------------------------
+        def _post_json(self, path: str, payload: dict):
+            assert path == "/api/show"
+            return {
+                "context_length": 8192,
+                "model_info": {"general.context_length": 16_384},
+            }
+
+    assert _Provider(base_url="http://ollama-context-conflict.test").get_model_context_metadata(
+        "runtime-model"
+    ) == {}

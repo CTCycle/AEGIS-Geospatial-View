@@ -1,0 +1,1620 @@
+[CmdletBinding()]
+param(
+    [ValidateSet('Launch', 'ClearCache')]
+    [string]$Action
+)
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+$script:ProcessAegisDataDirOverride = [Environment]::GetEnvironmentVariable('AEGIS_DATA_DIR', 'Process')
+
+$RootDir = $PSScriptRoot
+$AppDir = Join-Path $RootDir 'app'
+$ServerDir = Join-Path $AppDir 'server'
+$ClientDir = Join-Path $AppDir 'client'
+$TestsDir = Join-Path $AppDir 'tests'
+$SettingsDir = Join-Path $RootDir 'settings'
+$RuntimesDir = Join-Path $RootDir 'runtimes'
+$DataDir = Join-Path $RootDir 'data'
+$DefaultRuntimeDataDir = Join-Path $DataDir 'runtime'
+$IngestionDataDir = Join-Path $DataDir 'geospatial'
+$VectorsDir = Join-Path $DataDir 'vectors'
+$RuntimeCacheDir = Join-Path $RuntimesDir 'cache'
+$PythonDir = Join-Path $RuntimesDir 'python'
+$PythonExe = Join-Path $PythonDir 'python.exe'
+$PythonPth = Join-Path $PythonDir 'python314._pth'
+$UvDir = Join-Path $RuntimesDir 'uv'
+$UvExe = Join-Path $UvDir 'uv.exe'
+$NodeDir = Join-Path $RuntimesDir 'nodejs'
+$NodeExe = Join-Path $NodeDir 'node.exe'
+$NpmCmd = Join-Path $NodeDir 'npm.cmd'
+$UvCacheDir = Join-Path $RuntimeCacheDir 'uv'
+$NpmCacheDir = Join-Path $RuntimeCacheDir 'npm'
+$PipCacheDir = Join-Path $RuntimeCacheDir 'pip'
+$PythonBytecodeCacheDir = Join-Path $RuntimeCacheDir 'python'
+$PlaywrightBrowsersDir = Join-Path $RuntimeCacheDir 'playwright-browsers'
+$PytestCacheDir = Join-Path $RuntimeCacheDir 'pytest'
+$PytestTempDir = Join-Path $RuntimeCacheDir 'pytest-tmp'
+$RuffCacheDir = Join-Path $RuntimeCacheDir 'ruff'
+$CoverageDir = Join-Path $RuntimeCacheDir 'coverage'
+$AngularCacheDir = Join-Path $RuntimeCacheDir 'angular'
+$TestRuntimeCacheDir = Join-Path $RuntimeCacheDir 'test-runtime'
+$CacheDirectories = @(
+    $RuntimeCacheDir,
+    $UvCacheDir,
+    $NpmCacheDir,
+    $PipCacheDir,
+    $PythonBytecodeCacheDir,
+    $PlaywrightBrowsersDir,
+    $PytestCacheDir,
+    $PytestTempDir,
+    $RuffCacheDir,
+    $CoverageDir,
+    $AngularCacheDir,
+    $TestRuntimeCacheDir
+)
+$VenvDir = Join-Path $ServerDir '.venv'
+$FrontendStateScript = Join-Path $ClientDir 'scripts\frontend-state.cjs'
+$DotEnvPath = Join-Path $SettingsDir '.env'
+$DotEnvExamplePath = Join-Path $SettingsDir '.env.example'
+$LogsDir = Join-Path $DataDir 'logs'
+$TestScript = Join-Path $AppDir 'tests\run_tests.bat'
+$InitializeDatabaseScript = Join-Path $AppDir 'scripts\initialize_database.py'
+$PythonVersion = '3.14.7'
+$PythonArchiveName = "python-$PythonVersion-embed-amd64.zip"
+$PythonArchiveUri = "https://www.python.org/ftp/python/$PythonVersion/$PythonArchiveName"
+$UvAmd64Uri = 'https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip'
+$UvArm64Uri = 'https://github.com/astral-sh/uv/releases/latest/download/uv-aarch64-pc-windows-msvc.zip'
+$NodeVersion = '22.23.1'
+$NodeArchiveName = "node-v$NodeVersion-win-x64.zip"
+$NodeArchiveUri = "https://nodejs.org/dist/v$NodeVersion/$NodeArchiveName"
+$script:NextProgressId = 1
+$script:ActiveProgressActivities = [Collections.Generic.Dictionary[int, string]]::new()
+$script:LauncherInteractive = -not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected
+
+# -----------------------------------------------------------------------------
+# RUNTIME AND DOWNLOAD HELPERS
+# -----------------------------------------------------------------------------
+function Invoke-DownloadAndExtract {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Uri,
+        [Parameter(Mandatory)]
+        [string]$ArchivePath,
+        [Parameter(Mandatory)]
+        [string]$DestinationPath
+    )
+    $ErrorActionPreference = 'Stop'
+    $previousProgressPreference = $ProgressPreference
+    $activity = "AEGIS: download and extract $([IO.Path]::GetFileName($ArchivePath))"
+    $progressId = Start-LauncherProgress -Activity $activity -Status "Downloading $Uri"
+    try {
+        $ProgressPreference = 'SilentlyContinue'
+        New-Item -ItemType Directory -Path (Split-Path -Parent $ArchivePath) -Force | Out-Null
+        New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
+        Invoke-WebRequest -Uri $Uri -OutFile $ArchivePath
+        $ProgressPreference = $previousProgressPreference
+        Update-LauncherProgress -Id $progressId -Activity $activity -Status 'Extracting archive'
+        Expand-Archive -LiteralPath $ArchivePath -DestinationPath $DestinationPath -Force
+    }
+    finally {
+        $ProgressPreference = $previousProgressPreference
+        Remove-Item -LiteralPath $ArchivePath -Force -ErrorAction SilentlyContinue
+        Complete-LauncherProgress $progressId
+    }
+}
+
+function Enable-EmbeddedPythonSitePackages {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path
+    )
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+    $content = Get-Content -LiteralPath $Path -Raw
+    $patched = $content -replace '(?m)^#import site\s*$', 'import site'
+    if ($patched -ne $content) {
+        Set-Content -LiteralPath $Path -Value $patched -NoNewline
+    }
+}
+
+function Find-UvExecutable {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$SearchPath
+    )
+    Get-ChildItem -LiteralPath $SearchPath -Recurse -Filter 'uv.exe' -File -ErrorAction SilentlyContinue |
+        Select-Object -First 1 -ExpandProperty FullName
+}
+
+function Get-PythonRuntimeVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$PythonExecutable
+    )
+    & $PythonExecutable -c 'import platform; print(platform.python_version())'
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to execute Python at $PythonExecutable."
+    }
+}
+
+function Test-PythonRuntimeVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$PythonExecutable
+    )
+    if (-not (Test-Path -LiteralPath $PythonExecutable)) {
+        return $false
+    }
+    try {
+        return (Get-PythonRuntimeVersion -PythonExecutable $PythonExecutable).Trim() -eq $PythonVersion
+    }
+    catch {
+        return $false
+    }
+}
+
+function Wait-HttpHealth {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Uri,
+        [System.Diagnostics.Process]$Process,
+        [ValidateRange(1, 600)]
+        [int]$TimeoutSeconds = 60,
+        [ValidateRange(1, 60)]
+        [int]$IntervalSeconds = 1
+    )
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $activity = "AEGIS: wait for health $Uri"
+    $progressId = Start-LauncherProgress -Activity $activity -Status "Waiting up to $TimeoutSeconds seconds"
+    try {
+        do {
+            if ($null -ne $Process) {
+                $Process.Refresh()
+                if ($Process.HasExited) {
+                    throw "Service process $($Process.Id) exited with code $($Process.ExitCode) before becoming healthy at $Uri."
+                }
+            }
+            $elapsed = [int](([DateTime]::UtcNow - $deadline.AddSeconds(-$TimeoutSeconds)).TotalSeconds)
+            Update-LauncherProgress -Id $progressId -Activity $activity -Status "Waiting for healthy response; ${elapsed}s elapsed"
+            try {
+                $response = Invoke-WebRequest -UseBasicParsing -Uri $Uri -TimeoutSec 2
+                if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) {
+                    return $true
+                }
+            }
+            catch {
+            }
+            Start-Sleep -Seconds $IntervalSeconds
+        } while ([DateTime]::UtcNow -lt $deadline)
+        return $false
+    }
+    finally {
+        Complete-LauncherProgress $progressId
+    }
+}
+
+function Write-Status {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('STEP', 'OK', 'INFO', 'WARN', 'FATAL', 'SUCCESS', 'RUN', 'WAIT')]
+        [string]$Level,
+
+        [Parameter(Mandatory)]
+        [string]$Message
+    )
+
+    Clear-LauncherProgress
+    $color = switch ($Level) {
+        'STEP' { 'Cyan' }
+        'OK' { 'Green' }
+        'INFO' { 'Gray' }
+        'WARN' { 'Yellow' }
+        'FATAL' { 'Red' }
+        'SUCCESS' { 'Green' }
+        'RUN' { 'Cyan' }
+        'WAIT' { 'Yellow' }
+    }
+    Write-Host "[$Level] $Message" -ForegroundColor $color
+}
+
+function Start-LauncherProgress {
+    param([Parameter(Mandatory)][string]$Activity, [Parameter(Mandatory)][string]$Status)
+    $id = $script:NextProgressId++
+    $script:ActiveProgressActivities[$id] = $Activity
+    if ($script:LauncherInteractive) { Write-Progress -Id $id -Activity $Activity -Status $Status }
+    return $id
+}
+
+function Update-LauncherProgress {
+    param(
+        [Parameter(Mandatory)][int]$Id,
+        [Parameter(Mandatory)][string]$Activity,
+        [Parameter(Mandatory)][string]$Status,
+        [Nullable[int]]$PercentComplete
+    )
+    if (-not $script:ActiveProgressActivities.ContainsKey($Id)) { return }
+    $activity = $script:ActiveProgressActivities[$Id]
+    $progress = @{ Id = $Id; Activity = $activity; Status = $Status }
+    if ($null -ne $PercentComplete) { $progress.PercentComplete = $PercentComplete }
+    if ($script:LauncherInteractive) { Write-Progress @progress }
+}
+
+function Complete-LauncherProgress([int]$Id) {
+    if ($script:ActiveProgressActivities.ContainsKey($Id)) {
+        $activity = $script:ActiveProgressActivities[$Id]
+        try {
+            if ($script:LauncherInteractive) {
+                try { Write-Progress -Id $Id -Activity $activity -Completed } catch { }
+            }
+        }
+        finally {
+            [void]$script:ActiveProgressActivities.Remove($Id)
+        }
+    }
+}
+
+function Clear-LauncherProgress {
+    foreach ($id in @($script:ActiveProgressActivities.Keys)) {
+        Complete-LauncherProgress -Id $id
+    }
+}
+
+function Invoke-TrackedLauncherAction {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][scriptblock]$Action
+    )
+    Write-Status RUN "Starting $Name"
+    try {
+        & $Action
+        Write-Status SUCCESS "$Name completed"
+    }
+    catch {
+        if ($_.Exception -is [System.OperationCanceledException]) {
+            Write-Status INFO "$Name cancelled: $($_.Exception.Message)"
+        }
+        else {
+            Write-Status FATAL "$Name failed: $($_.Exception.Message)"
+        }
+        throw
+    }
+    finally {
+        Clear-LauncherProgress
+    }
+}
+
+# -----------------------------------------------------------------------------
+# ENVIRONMENT AND CACHE CONFIGURATION
+# -----------------------------------------------------------------------------
+function Import-EnvironmentFile {
+    $environmentSourcePath = $DotEnvPath
+    if (-not (Test-Path -LiteralPath $environmentSourcePath)) {
+        $environmentSourcePath = $DotEnvExamplePath
+    }
+    if (-not (Test-Path -LiteralPath $environmentSourcePath)) {
+        throw "Missing environment file and template: $DotEnvPath"
+    }
+
+    $defaults = [ordered]@{
+        FASTAPI_HOST = '127.0.0.1'
+        FASTAPI_PORT = '8000'
+        UI_HOST = '127.0.0.1'
+        UI_PORT = '8001'
+        RELOAD = 'false'
+        BACKEND_LOGS_VISIBLE = 'true'
+    }
+    foreach ($entry in $defaults.GetEnumerator()) {
+        [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
+    }
+
+    foreach ($rawLine in Get-Content -LiteralPath $environmentSourcePath) {
+        $line = $rawLine.Trim()
+        if (-not $line -or $line.StartsWith('#') -or $line.StartsWith(';') -or -not $line.Contains('=')) {
+            continue
+        }
+
+        $parts = $line.Split('=', 2)
+        $key = $parts[0].Trim()
+        $value = $parts[1].Trim()
+        if (-not $key) {
+            continue
+        }
+        if (($value.StartsWith('"') -and $value.EndsWith('"')) -or
+            ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+        [Environment]::SetEnvironmentVariable($key, $value, 'Process')
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($script:ProcessAegisDataDirOverride)) {
+        [Environment]::SetEnvironmentVariable('AEGIS_DATA_DIR', $script:ProcessAegisDataDirOverride, 'Process')
+    }
+}
+
+function Set-LauncherEnvironment {
+    foreach ($cachePath in $CacheDirectories) {
+        New-Item -ItemType Directory -Path $cachePath -Force -ErrorAction Stop | Out-Null
+        if (-not (Test-Path -LiteralPath $cachePath -PathType Container)) {
+            throw "Canonical cache directory could not be created: $cachePath"
+        }
+    }
+    $env:AEGIS_CACHE_ROOT = $RuntimeCacheDir
+    $env:UV_CACHE_DIR = $UvCacheDir
+    $env:UV_PROJECT_ENVIRONMENT = $VenvDir
+    $env:UV_LINK_MODE = 'copy'
+    $env:NPM_CONFIG_CACHE = $NpmCacheDir
+    $env:PIP_CACHE_DIR = $PipCacheDir
+    $env:PLAYWRIGHT_BROWSERS_PATH = $PlaywrightBrowsersDir
+    $env:PYTHONPYCACHEPREFIX = $PythonBytecodeCacheDir
+    $env:RUFF_CACHE_DIR = $RuffCacheDir
+    $env:COVERAGE_FILE = Join-Path $CoverageDir '.coverage'
+    $env:PYTEST_ADDOPTS = '--basetemp="' + $PytestTempDir + '"'
+    Remove-Item Env:\PYTHONHOME -ErrorAction SilentlyContinue
+    Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue
+    Remove-Item Env:\PYTHONNOUSERSITE -ErrorAction SilentlyContinue
+    $env:PATH = "$NodeDir;$($env:PATH)"
+}
+
+# -----------------------------------------------------------------------------
+# PORTABLE RUNTIMES AND DEPENDENCIES
+# -----------------------------------------------------------------------------
+function Ensure-NodeRuntime {
+    New-Item -ItemType Directory -Path $RuntimesDir, $NodeDir -Force | Out-Null
+
+    Write-Status STEP 'Installing Node.js (portable)'
+    if (-not (Test-Path -LiteralPath $NodeExe)) {
+        Write-Status INFO "Downloading $NodeArchiveUri"
+        Invoke-DownloadAndExtract -Uri $NodeArchiveUri -ArchivePath (Join-Path $NodeDir $NodeArchiveName) -DestinationPath $NodeDir
+    }
+    $nestedNodeDir = Join-Path $NodeDir "node-v$NodeVersion-win-x64"
+    if (Test-Path -LiteralPath (Join-Path $nestedNodeDir 'node.exe')) {
+        Get-ChildItem -LiteralPath $nestedNodeDir -Force | Move-Item -Destination $NodeDir -Force
+        [void](Remove-LauncherPath -Path $nestedNodeDir -Activity 'AEGIS: flatten Node.js runtime' -Strict)
+    }
+    if (-not (Test-Path -LiteralPath $NodeExe) -or -not (Test-Path -LiteralPath $NpmCmd)) {
+        throw "The portable Node.js runtime is incomplete at $NodeDir."
+    }
+    $nodeVersionOutput = & $NodeExe --version
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to execute Node.js at $NodeExe."
+    }
+    Write-Status OK "Node.js ready: $nodeVersionOutput"
+}
+
+function Ensure-PortableRuntimes {
+    New-Item -ItemType Directory -Path $RuntimesDir, $PythonDir, $UvDir -Force | Out-Null
+
+    Write-Status STEP 'Setting up Python (embeddable) locally'
+    $pythonExists = Test-Path -LiteralPath $PythonExe
+    $pythonNeedsUpdate = $false
+    $currentPythonVersion = $null
+    if ($pythonExists) {
+        try {
+            $currentPythonVersion = (Get-PythonRuntimeVersion -PythonExecutable $PythonExe).Trim()
+            $pythonNeedsUpdate = $currentPythonVersion -ne $PythonVersion
+        }
+        catch {
+            $pythonNeedsUpdate = $true
+        }
+    }
+    if (-not $pythonExists -or $pythonNeedsUpdate) {
+        $pythonAction = if ($pythonExists) { "Updating portable Python from $currentPythonVersion to $PythonVersion" } else { "Downloading portable Python $PythonVersion" }
+        Write-Status INFO "$pythonAction from $PythonArchiveUri"
+        Invoke-DownloadAndExtract -Uri $PythonArchiveUri -ArchivePath (Join-Path $PythonDir $PythonArchiveName) -DestinationPath $PythonDir
+    }
+    Enable-EmbeddedPythonSitePackages -Path $PythonPth
+    Write-Status OK "Python ready: $(Get-PythonRuntimeVersion -PythonExecutable $PythonExe)"
+
+    Write-Status STEP 'Installing uv (portable)'
+    if (-not (Test-Path -LiteralPath $UvExe)) {
+        $uvUri = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { $UvArm64Uri } else { $UvAmd64Uri }
+        Write-Status INFO "Downloading $uvUri"
+        Invoke-DownloadAndExtract -Uri $uvUri -ArchivePath (Join-Path $UvDir 'uv.zip') -DestinationPath $UvDir
+        $foundUv = Find-UvExecutable -SearchPath $UvDir
+        if (-not $foundUv) {
+            throw 'uv.exe was not found after extraction.'
+        }
+        if ([IO.Path]::GetFullPath($foundUv) -ne [IO.Path]::GetFullPath($UvExe)) {
+            Copy-Item -LiteralPath $foundUv -Destination $UvExe -Force
+        }
+    }
+    $uvVersion = & $UvExe --version
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to execute uv at $UvExe."
+    }
+    Write-Status OK ($uvVersion -join ' ')
+
+    Ensure-NodeRuntime
+}
+
+function Ensure-VirtualEnvironment {
+    $venvPython = Join-Path $VenvDir 'Scripts\python.exe'
+    if (Test-PythonRuntimeVersion -PythonExecutable $venvPython) {
+        return
+    }
+
+    $currentVenvVersion = $null
+    if (Test-Path -LiteralPath $venvPython) {
+        try { $currentVenvVersion = (Get-PythonRuntimeVersion -PythonExecutable $venvPython).Trim() } catch { }
+    }
+    $versionDescription = if ($currentVenvVersion) { "from $currentVenvVersion to $PythonVersion" } else { "for Python $PythonVersion" }
+    Write-Status INFO "Recreating backend virtual environment $versionDescription"
+    & $UvExe venv --python $PythonExe --clear --prompt aegis $VenvDir
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to recreate the backend virtual environment at $VenvDir. Stop running application processes and retry."
+    }
+}
+
+function Build-Frontend {
+    if (-not (Test-Path -LiteralPath (Join-Path $ClientDir 'package.json'))) {
+        throw "Frontend package manifest was not found at $ClientDir."
+    }
+
+    Write-Status STEP 'Building frontend'
+    Push-Location $ClientDir
+    try {
+        & $NpmCmd run build
+        if ($LASTEXITCODE -ne 0) {
+            throw "Frontend build failed with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Sync-Dependencies {
+    param(
+        [bool]$BuildFrontend = $false,
+        [ValidateSet('Standard', 'Development')]
+        [string]$InstallationType = 'Standard'
+    )
+
+    Write-Status STEP 'Installing Python dependencies with uv'
+    Ensure-VirtualEnvironment
+    $uvArguments = @('sync', '--python', $PythonExe, '--no-install-project')
+    if ($InstallationType -eq 'Development') {
+        $uvArguments += '--all-extras'
+    }
+    Push-Location $ServerDir
+    try {
+        & $UvExe @uvArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "uv sync failed with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    Write-Status STEP 'Installing frontend dependencies'
+    Invoke-FrontendStateCommand -Command 'invalidate-dependencies'
+    Push-Location $ClientDir
+    try {
+        if (Test-Path -LiteralPath (Join-Path $ClientDir 'package-lock.json')) {
+            & $NpmCmd ci
+        }
+        else {
+            & $NpmCmd install
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw "npm dependency installation failed with exit code $LASTEXITCODE."
+        }
+        Invoke-FrontendStateCommand -Command 'record-dependencies'
+    }
+    finally {
+        Pop-Location
+    }
+
+    if ($BuildFrontend) {
+        Build-Frontend
+    }
+}
+
+# -----------------------------------------------------------------------------
+# APPLICATION ACTIONS
+# -----------------------------------------------------------------------------
+function Invoke-RebuildFrontend {
+    Import-EnvironmentFile
+    Set-LauncherEnvironment
+    Ensure-NodeRuntime
+    Build-Frontend
+    Write-Status SUCCESS 'Frontend rebuilt successfully.'
+}
+
+function Invoke-FrontendStateCommand {
+    param(
+        [Parameter(Mandatory)][string]$Command,
+        [switch]$ExpectState
+    )
+    if (-not (Test-Path -LiteralPath $NodeExe) -or
+        -not (Test-Path -LiteralPath $FrontendStateScript)) {
+        throw 'Node.js or the frontend state evaluator is missing.'
+    }
+    $output = @(& $NodeExe $FrontendStateScript $Command 2>&1)
+    $exitCode = $LASTEXITCODE
+    if (-not $ExpectState) {
+        if ($exitCode -ne 0) {
+            throw "Frontend state command '$Command' failed with exit code ${exitCode}: $($output -join [Environment]::NewLine)"
+        }
+        return
+    }
+    $status = if ($output.Count -gt 0) { [string]$output[-1] } else { '' }
+    $status = $status.Trim()
+    $expectedExitCode = switch ($status) {
+        'Current' { 0 }
+        'Missing' { 2 }
+        'Stale' { 3 }
+        default { -1 }
+    }
+    if ($expectedExitCode -lt 0 -or $exitCode -ne $expectedExitCode) {
+        throw "Frontend state evaluator '$Command' failed with exit code ${exitCode}: $($output -join [Environment]::NewLine)"
+    }
+    return $status
+}
+
+function Get-FrontendDependencyState {
+    return Invoke-FrontendStateCommand -Command 'dependency-state' -ExpectState
+}
+
+function Get-FrontendBuildState {
+    return Invoke-FrontendStateCommand -Command 'build-state' -ExpectState
+}
+
+function Ensure-FrontendBuildCurrent {
+    $state = Get-FrontendBuildState
+    switch ($state) {
+        'Current' {
+            Write-Status OK 'Frontend production build is current; skipped rebuild.'
+        }
+        { $_ -in @('Missing', 'Stale') } {
+            Write-Status STEP "Frontend production build is $($state.ToLowerInvariant()); rebuilding."
+            Build-Frontend
+        }
+        default { throw "Unsupported frontend build state '$state'." }
+    }
+}
+
+function Test-LaunchDependenciesReady {
+    $frontendPackage = Join-Path $ClientDir 'package.json'
+    $frontendLock = Join-Path $ClientDir 'package-lock.json'
+    $frontendModules = Join-Path $ClientDir 'node_modules'
+    $frontendInstallState = Join-Path $frontendModules '.package-lock.json'
+    $frontendDependencyMarker = Join-Path $frontendModules '.aegis-dependency-state.json'
+    $frontendRunner = Join-Path $frontendModules '@angular/cli/bin/ng.js'
+    $backendEntrypoint = Join-Path $ServerDir 'app.py'
+    $venvPython = Join-Path $VenvDir 'Scripts\python.exe'
+
+    if (-not (Test-Path -LiteralPath $NodeExe) -or
+        -not (Test-Path -LiteralPath $NpmCmd) -or
+        -not (Test-Path -LiteralPath $venvPython) -or
+        -not (Test-Path -LiteralPath $backendEntrypoint) -or
+        -not (Test-Path -LiteralPath $frontendPackage) -or
+        -not (Test-Path -LiteralPath $frontendLock) -or
+        -not (Test-Path -LiteralPath $frontendInstallState) -or
+        -not (Test-Path -LiteralPath $frontendDependencyMarker) -or
+        -not (Test-Path -LiteralPath $frontendRunner)) {
+        return $false
+    }
+
+    if ((Get-FrontendDependencyState) -ne 'Current') { return $false }
+    $pythonCheck = "import sys; import alembic, fastapi, filelock, uvicorn; assert tuple(sys.version_info[:3]) == ($($PythonVersion.Replace('.', ', ')))"
+    & $venvPython -c $pythonCheck *> $null
+    if ($LASTEXITCODE -ne 0) { return $false }
+
+    return $true
+}
+
+function Get-PortListenerPids {
+    param([Parameter(Mandatory)][int]$Port)
+
+    $pattern = "^\s*TCP\s+\S+:$Port\s+\S+\s+LISTENING\s+(\d+)\s*$"
+    @(netstat.exe -ano -p TCP 2>$null) | ForEach-Object {
+        if ($_ -match $pattern) {
+            [int]$Matches[1]
+        }
+    } | Sort-Object -Unique
+}
+
+function Stop-PortListeners {
+    param([Parameter(Mandatory)][int]$Port)
+
+    foreach ($processId in @(Get-PortListenerPids -Port $Port)) {
+        Write-Status INFO "Releasing port $Port from PID $processId."
+        & taskkill.exe /PID $processId /T /F | Out-Null
+    }
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    while (@(Get-PortListenerPids -Port $Port).Count -gt 0 -and [DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Seconds 1
+    }
+    if (@(Get-PortListenerPids -Port $Port).Count -gt 0) {
+        throw "Port $Port is still occupied after 20 seconds."
+    }
+}
+
+function Get-ConfiguredApplicationPorts {
+    $configuredPorts = [ordered]@{}
+    foreach ($name in @('FASTAPI_PORT', 'UI_PORT')) {
+        $rawValue = [Environment]::GetEnvironmentVariable($name, 'Process')
+        $port = 0
+        if (-not [int]::TryParse($rawValue, [ref]$port) -or $port -lt 1 -or $port -gt 65535) {
+            throw "$name must be a TCP port from 1 through 65535; received '$rawValue'."
+        }
+        $configuredPorts[$name] = $port
+    }
+    if ($configuredPorts.FASTAPI_PORT -eq $configuredPorts.UI_PORT) {
+        throw "FASTAPI_PORT and UI_PORT must differ; both are configured as $($configuredPorts.FASTAPI_PORT)."
+    }
+    return [int[]]@($configuredPorts.FASTAPI_PORT, $configuredPorts.UI_PORT)
+}
+
+function Get-PortConflicts {
+    param([Parameter(Mandatory)][int[]]$Ports)
+
+    $byProcessId = [Collections.Generic.Dictionary[int, object]]::new()
+    foreach ($port in @($Ports | Sort-Object -Unique)) {
+        foreach ($processId in @(Get-PortListenerPids -Port $port)) {
+            if ($byProcessId.ContainsKey($processId)) {
+                $entry = $byProcessId[$processId]
+                if (-not $entry.Ports.Contains($port)) { [void]$entry.Ports.Add($port) }
+                continue
+            }
+            $processName = 'unavailable'
+            $startTimeUtcTicks = $null
+            try {
+                $process = Get-Process -Id $processId -ErrorAction Stop
+                $processName = $process.ProcessName
+                try { $startTimeUtcTicks = $process.StartTime.ToUniversalTime().Ticks } catch { }
+            }
+            catch { }
+            $occupiedPorts = [Collections.Generic.List[int]]::new()
+            [void]$occupiedPorts.Add($port)
+            $byProcessId[$processId] = [pscustomobject]@{
+                ProcessId = [int]$processId
+                ProcessName = $processName
+                StartTimeUtcTicks = $startTimeUtcTicks
+                Ports = $occupiedPorts
+            }
+        }
+    }
+    return @(
+        $byProcessId.Values |
+            Sort-Object ProcessId |
+            ForEach-Object {
+                [pscustomobject]@{
+                    ProcessId = $_.ProcessId
+                    ProcessName = $_.ProcessName
+                    StartTimeUtcTicks = $_.StartTimeUtcTicks
+                    Ports = @($_.Ports | Sort-Object -Unique)
+                }
+            }
+    )
+}
+
+function Get-PortConflictSignature {
+    param([object[]]$Conflicts)
+
+    return (@(
+        $Conflicts |
+            Sort-Object ProcessId |
+            ForEach-Object {
+                $ports = @($_.Ports | Sort-Object -Unique) -join ','
+                "$($_.ProcessId)|$($_.ProcessName)|$($_.StartTimeUtcTicks)|$ports"
+            }
+    ) -join ';')
+}
+
+function Write-PortConflicts {
+    param([Parameter(Mandatory)][object[]]$Conflicts)
+
+    Write-Status WARN 'The configured AEGIS ports are already occupied:'
+    foreach ($conflict in $Conflicts) {
+        $ports = @($conflict.Ports | Sort-Object -Unique) -join ', '
+        Write-Host "  PID $($conflict.ProcessId) ($($conflict.ProcessName)) — port(s) $ports"
+    }
+}
+
+function Confirm-PortConflictTermination {
+    param([Parameter(Mandatory)][object[]]$Conflicts)
+
+    Write-PortConflicts -Conflicts $Conflicts
+    $unresolvedOwners = @(
+        $Conflicts | Where-Object {
+            [string]::IsNullOrWhiteSpace([string]$_.ProcessName) -or
+                $_.ProcessName -eq 'unavailable' -or
+                $null -eq $_.StartTimeUtcTicks
+        }
+    )
+    if ($unresolvedOwners.Count -gt 0) {
+        $details = @(
+            $unresolvedOwners | ForEach-Object {
+                "PID $($_.ProcessId) ($($_.ProcessName)), port(s) $(@($_.Ports) -join ', ')"
+            }
+        ) -join '; '
+        throw "Unable to resolve the identity of configured port owner(s); no existing process was terminated: $details."
+    }
+    if (-not $script:LauncherInteractive) {
+        $details = @(
+            $Conflicts | ForEach-Object {
+                "PID $($_.ProcessId) ($($_.ProcessName)), port(s) $(@($_.Ports) -join ', ')"
+            }
+        ) -join '; '
+        throw "Launch is non-interactive and a configured port is occupied; no existing process was terminated: $details."
+    }
+    $answer = (Read-Host '  Terminate these process trees and continue? [y/N]').Trim()
+    return $answer.ToLowerInvariant() -in @('y', 'yes')
+}
+
+function Resolve-LaunchPortConflicts {
+    param([Parameter(Mandatory)][int[]]$Ports)
+
+    $conflicts = @(Get-PortConflicts -Ports $Ports)
+    while ($conflicts.Count -gt 0) {
+        if (-not (Confirm-PortConflictTermination -Conflicts $conflicts)) {
+            throw [System.OperationCanceledException]::new(
+                'Launch cancelled. No existing processes were terminated.'
+            )
+        }
+
+        $currentConflicts = @(Get-PortConflicts -Ports $Ports)
+        if ((Get-PortConflictSignature $currentConflicts) -ne (Get-PortConflictSignature $conflicts)) {
+            $conflicts = $currentConflicts
+            continue
+        }
+        if ($currentConflicts.Count -eq 0) { return }
+
+        $authorizedByPid = @{}
+        foreach ($conflict in $currentConflicts) {
+            $authorizedByPid[[int]$conflict.ProcessId] = $conflict
+        }
+        $terminated = [Collections.Generic.HashSet[int]]::new()
+        $taskkillFailures = [Collections.Generic.List[string]]::new()
+        $ownershipChanged = $false
+        foreach ($conflict in $currentConflicts) {
+            $processId = [int]$conflict.ProcessId
+            if (-not $terminated.Add($processId)) { continue }
+
+            $latestForPid = @(
+                Get-PortConflicts -Ports $Ports |
+                    Where-Object { $_.ProcessId -eq $processId }
+            ) | Select-Object -First 1
+            if ($null -eq $latestForPid) { continue }
+            if ((Get-PortConflictSignature @($latestForPid)) -ne
+                (Get-PortConflictSignature @($authorizedByPid[$processId]))) {
+                $ownershipChanged = $true
+                break
+            }
+
+            Write-Status INFO "Terminating confirmed PID $processId on port(s) $(@($conflict.Ports) -join ', ')."
+            $nativeOutput = @(& taskkill.exe /PID $processId /T /F 2>&1)
+            $nativeExitCode = $LASTEXITCODE
+            if ($nativeExitCode -ne 0) {
+                [void]$taskkillFailures.Add("PID ${processId}: exit code ${nativeExitCode}; $($nativeOutput -join ' ')")
+            }
+        }
+        if ($ownershipChanged) {
+            $conflicts = @(Get-PortConflicts -Ports $Ports)
+            continue
+        }
+
+        $deadline = [DateTime]::UtcNow.AddSeconds(20)
+        $remaining = @(Get-PortConflicts -Ports $Ports)
+        while ($remaining.Count -gt 0 -and [DateTime]::UtcNow -lt $deadline) {
+            Start-Sleep -Seconds 1
+            $remaining = @(Get-PortConflicts -Ports $Ports)
+        }
+        if ($remaining.Count -gt 0) {
+            $newOwners = @(
+                $remaining | Where-Object {
+                    $ownerId = [int]$_.ProcessId
+                    -not $authorizedByPid.ContainsKey($ownerId) -or
+                        (Get-PortConflictSignature @($_)) -ne
+                        (Get-PortConflictSignature @($authorizedByPid[$ownerId]))
+                }
+            )
+            if ($newOwners.Count -gt 0) {
+                if ($taskkillFailures.Count -gt 0) {
+                    Write-Status WARN ('A termination command failed before ownership changed: ' + ($taskkillFailures -join '; '))
+                }
+                $conflicts = $remaining
+                continue
+            }
+            $identity = @(
+                $remaining | ForEach-Object {
+                    "PID $($_.ProcessId) ($($_.ProcessName)), port(s) $(@($_.Ports) -join ', ')"
+                }
+            ) -join '; '
+            $failureText = if ($taskkillFailures.Count -gt 0) {
+                ' Termination errors: ' + ($taskkillFailures -join '; ')
+            } else { '' }
+            throw "Configured ports remain occupied after 20 seconds: $identity.$failureText"
+        }
+        if ($taskkillFailures.Count -gt 0) {
+            Write-Status WARN ('A termination command failed, but the configured ports are now free: ' + ($taskkillFailures -join '; '))
+        }
+        return
+    }
+}
+
+function Stop-StartedProcessTree {
+    param([System.Diagnostics.Process[]]$Processes)
+
+    foreach ($process in $Processes) {
+        if ($null -eq $process) { continue }
+        try {
+            $process.Refresh()
+            if ($process.HasExited) { continue }
+            $output = @(& taskkill.exe /PID $process.Id /T /F 2>&1)
+            if ($LASTEXITCODE -ne 0) {
+                $process.Refresh()
+                if (-not $process.HasExited) {
+                    Write-Status WARN "Could not stop launch-owned process tree $($process.Id): $($output -join ' ')"
+                }
+            }
+        }
+        catch {
+            Write-Status WARN "Could not inspect or stop launch-owned process $($process.Id): $($_.Exception.Message)"
+        }
+    }
+}
+
+function Get-BrowserHost {
+    param([Parameter(Mandatory)][string]$HostName)
+    if ($HostName -in @('0.0.0.0', '::')) {
+        return '127.0.0.1'
+    }
+    return $HostName
+}
+
+function Invoke-LaunchApplication {
+    Import-EnvironmentFile
+    Set-LauncherEnvironment
+    $applicationPorts = Get-ConfiguredApplicationPorts
+    Resolve-LaunchPortConflicts -Ports $applicationPorts
+
+    if (-not (Test-LaunchDependenciesReady)) {
+        Write-Status STEP 'Required application environments or frontend dependencies are missing or stale; installing dependencies.'
+        Ensure-PortableRuntimes
+        Sync-Dependencies -BuildFrontend $false -InstallationType 'Standard'
+    }
+    else {
+        Write-Status OK 'Application environments and frontend dependencies are ready; skipped dependency installation.'
+    }
+    Ensure-FrontendBuildCurrent
+
+    $fastApiPort = [int]$env:FASTAPI_PORT
+    $uiPort = [int]$env:UI_PORT
+    $browserBackendHost = Get-BrowserHost -HostName $env:FASTAPI_HOST
+    $browserUiHost = Get-BrowserHost -HostName $env:UI_HOST
+    $backendHealthUri = "http://${browserBackendHost}:$fastApiPort/api/health"
+    $uiUri = "http://${browserUiHost}:$uiPort"
+
+    Resolve-LaunchPortConflicts -Ports $applicationPorts
+
+    $venvPython = Join-Path $VenvDir 'Scripts\python.exe'
+    if (-not (Test-Path -LiteralPath $venvPython)) {
+        throw "Virtual-environment Python was not found at $venvPython."
+    }
+
+    $backendModule = 'server.app:app'
+    $backendWorkingDirectory = $AppDir
+    $env:PYTHONPATH = $AppDir
+
+    $backendArguments = @('-m', 'uvicorn', $backendModule, '--host', $env:FASTAPI_HOST, '--port', "$fastApiPort", '--log-level', 'info', '--ws-max-size', '65536', '--ws-ping-interval', '15', '--ws-ping-timeout', '10')
+    if ($env:RELOAD -ieq 'true') {
+        $backendArguments += '--reload'
+    }
+
+    $backendProcess = $null
+    $frontendProcess = $null
+    try {
+        Write-Status RUN "Launching backend ($backendModule)"
+        if ($env:BACKEND_LOGS_VISIBLE -ieq 'true') {
+            $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -WindowStyle Normal -PassThru
+        }
+        else {
+            $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -WindowStyle Hidden -PassThru
+        }
+
+        Write-Status RUN 'Launching frontend preview'
+        $frontendProcess = Start-Process -FilePath $NpmCmd -ArgumentList @('run', 'preview', '--', '--host', $env:UI_HOST, '--port', "$uiPort") -WorkingDirectory $ClientDir -WindowStyle Hidden -PassThru
+
+        Write-Status WAIT "Waiting for backend readiness at $backendHealthUri"
+        if (-not (Wait-HttpHealth -Uri $backendHealthUri -Process $backendProcess -TimeoutSeconds 60 -IntervalSeconds 1)) {
+            throw "Backend did not become ready within 60 seconds at $backendHealthUri."
+        }
+        Write-Status OK 'Backend health check passed.'
+
+        Write-Status WAIT "Waiting for frontend readiness at $uiUri"
+        if (-not (Wait-HttpHealth -Uri $uiUri -Process $frontendProcess -TimeoutSeconds 60 -IntervalSeconds 1)) {
+            throw "Frontend preview did not become ready within 60 seconds at $uiUri."
+        }
+    }
+    catch {
+        Stop-StartedProcessTree -Processes @($frontendProcess, $backendProcess)
+        throw
+    }
+
+    try {
+        Start-Process -FilePath $uiUri -ErrorAction Stop | Out-Null
+    }
+    catch {
+        Write-Status WARN "The browser could not be opened automatically. Open $uiUri manually."
+    }
+    $backendPid = @(Get-PortListenerPids -Port $fastApiPort) | Select-Object -First 1
+    $frontendPid = @(Get-PortListenerPids -Port $uiPort) | Select-Object -First 1
+    if (-not $backendPid -and $backendProcess) { $backendPid = $backendProcess.Id }
+    if (-not $frontendPid) { $frontendPid = $frontendProcess.Id }
+
+    Write-Host ''
+    Write-Status SUCCESS 'AEGIS started successfully.'
+    Write-Host "  Backend: $backendHealthUri (PID $backendPid)"
+    Write-Host "  Frontend: $uiUri (PID $frontendPid)"
+}
+
+function Invoke-InstallOrUpdate {
+    Import-EnvironmentFile
+    Set-LauncherEnvironment
+    Ensure-PortableRuntimes
+    Write-Status OK 'Portable runtimes ready.'
+    $installationType = Read-InstallationType
+    Sync-Dependencies -BuildFrontend $true -InstallationType $installationType
+    if (Test-Path -LiteralPath $UvCacheDir) {
+        [void](Remove-PathBestEffort -Path $UvCacheDir)
+    }
+    Write-Status SUCCESS 'Dependencies installed, frontend built, and uv cache pruning attempted.'
+}
+
+function Read-InstallationType {
+    Clear-LauncherProgress
+    Write-Host '  [1] Development - include Ruff, Pyright, and pytest'
+    Write-Host '  [2] Standard    - install runtime dependencies only'
+    $selection = (Read-Host '  Select installation profile [1-2]').Trim()
+    switch ($selection) {
+        '1' { return 'Development' }
+        '2' { return 'Standard' }
+        default { throw 'Invalid installation profile. Enter 1 for Development or 2 for Standard.' }
+    }
+}
+
+function Invoke-InitializeDatabase {
+    Import-EnvironmentFile
+    Set-LauncherEnvironment
+    Ensure-PortableRuntimes
+    if (-not (Test-Path -LiteralPath $InitializeDatabaseScript)) {
+        throw "Missing database initialization script: $InitializeDatabaseScript"
+    }
+
+    Push-Location $AppDir
+    try {
+        & $UvExe run --project server --python $PythonExe python -m scripts.initialize_database
+        if ($LASTEXITCODE -ne 0) {
+            throw "Database initialization failed with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        Pop-Location
+    }
+    Write-Status SUCCESS 'Database initialization completed.'
+}
+
+# -----------------------------------------------------------------------------
+# SOURCE CONTROL ACTIONS
+# -----------------------------------------------------------------------------
+function Get-GitExecutable {
+    $gitCommand = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $gitCommand) {
+        throw 'Git was not found on PATH. Install Git before using source-control options.'
+    }
+    return $gitCommand.Path
+}
+
+function Invoke-GitCommand {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$Arguments
+    )
+
+    $gitExecutable = Get-GitExecutable
+    $display = "git $($Arguments -join ' ')"
+    Write-Status RUN $display
+    $output = @(& $gitExecutable -C $RootDir @Arguments)
+    $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+    if ($exitCode -ne 0) {
+        throw "Git command failed: $display (exit code $exitCode)."
+    }
+    Write-Status OK "Completed $display"
+    return $output
+}
+
+function Invoke-ApplicationUpdate {
+    $statusLines = @(Invoke-GitCommand -Arguments @('status', '--porcelain'))
+    if ($statusLines.Count -gt 0) {
+        throw 'The working tree contains local changes. Commit or stash them before updating from main.'
+    }
+
+    $currentBranch = (@(Invoke-GitCommand -Arguments @('branch', '--show-current')) -join [Environment]::NewLine).Trim()
+    if (-not $currentBranch) {
+        throw 'The repository is in a detached HEAD state. Switch to a local branch before updating.'
+    }
+
+    if ($currentBranch -ne 'main') {
+        throw "Update requires the main branch to be checked out; current branch is '$currentBranch'. No files were changed."
+    }
+
+    Write-Status RUN 'Updating the application from origin/main with git pull.'
+    Invoke-GitCommand -Arguments @('pull', '--ff-only', 'origin', 'main') |
+        ForEach-Object { Write-Host "  $_" }
+    Write-Status SUCCESS 'Application update from origin/main completed.'
+}
+
+function Invoke-CheckForUpdates {
+    $localMainCommit = ((Invoke-GitCommand -Arguments @('rev-parse', 'main')) | Select-Object -First 1).Trim()
+    if (-not $localMainCommit) {
+        throw 'The local main branch could not be resolved.'
+    }
+
+    Write-Status RUN 'Checking origin/main for a newer application version (read-only).'
+    $gitExecutable = Get-GitExecutable
+    $remoteLines = @(& $gitExecutable -C $RootDir ls-remote origin refs/heads/main)
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to check origin/main. Verify the Git remote and network connection.'
+    }
+    $remoteLine = $remoteLines | Select-Object -First 1
+    $remoteCommit = if ($remoteLine) { ($remoteLine -split "`t", 2)[0].Trim() } else { '' }
+    if (-not $remoteCommit) {
+        throw 'The origin/main branch could not be resolved.'
+    }
+
+    if ($remoteCommit -eq $localMainCommit) {
+        Write-Status SUCCESS 'The local main branch is up to date with origin/main.'
+        return
+    }
+
+    Write-Status WARN 'A newer or different main branch revision is available on origin.'
+    Write-Host "  Local main:  $localMainCommit" -ForegroundColor DarkGray
+    Write-Host "  Origin main: $remoteCommit" -ForegroundColor DarkGray
+    Write-Status INFO 'No files were downloaded or changed. Use Update application to apply the revision.'
+}
+
+# -----------------------------------------------------------------------------
+# DATABASE, DATA, AND MAINTENANCE ACTIONS
+# -----------------------------------------------------------------------------
+function Confirm-DestructiveAction([string]$Description) {
+    if (-not $script:LauncherInteractive) {
+        throw "The destructive action '$Description' requires an interactive console; no files were changed."
+    }
+    Clear-LauncherProgress
+    $confirmation = ([string](Read-Host "Continue to $($Description)? [y/N]")).Trim()
+    if ($confirmation -notmatch '^(?i:y|yes)$') {
+        Write-Status INFO 'Operation cancelled. No changes were made.'
+        return $false
+    }
+    return $true
+}
+
+function Get-ConfiguredDataDirectory {
+    $configuredDataDir = if ($null -eq $env:AEGIS_DATA_DIR) { '' } else { $env:AEGIS_DATA_DIR.Trim() }
+    if (-not $configuredDataDir) {
+        return $DefaultRuntimeDataDir
+    }
+
+    if ($configuredDataDir.StartsWith('~')) {
+        $userProfileDir = [Environment]::GetFolderPath('UserProfile')
+        $configuredDataDir = Join-Path $userProfileDir $configuredDataDir.TrimStart([char]'~', [char]'\', [char]'/')
+    }
+    if ([IO.Path]::IsPathRooted($configuredDataDir)) {
+        return [IO.Path]::GetFullPath($configuredDataDir)
+    }
+    return [IO.Path]::GetFullPath((Join-Path $RootDir $configuredDataDir))
+}
+
+function Get-NormalizedPath {
+    param([Parameter(Mandatory)][string]$Path)
+
+    return ([IO.Path]::GetFullPath($Path)).TrimEnd([char]'\', [char]'/')
+}
+
+function Test-SafeDataDirectory {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $candidate = Get-NormalizedPath -Path $Path
+    $root = Get-NormalizedPath -Path $RootDir
+    $protectedPaths = @(
+        $root,
+        (Get-NormalizedPath -Path $AppDir),
+        (Get-NormalizedPath -Path $DataDir),
+        (Get-NormalizedPath -Path $ServerDir),
+        (Get-NormalizedPath -Path $ClientDir),
+        (Get-NormalizedPath -Path $SettingsDir),
+        (Get-NormalizedPath -Path $RuntimesDir)
+    )
+
+    if ($candidate -eq (Get-NormalizedPath -Path $DefaultRuntimeDataDir)) {
+        return
+    }
+    if ($candidate -in $protectedPaths) {
+        throw "Refusing to remove application files from the configured data path: $Path"
+    }
+    if ($root.StartsWith("$candidate\", [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove a data path that contains the application checkout: $Path"
+    }
+}
+
+function Remove-DirectoryContents {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [string[]]$PreserveNames = @('.gitkeep')
+    )
+
+    $result = Remove-LauncherPath -Path $Path -KeepRoot -PreserveNames $PreserveNames -Activity "AEGIS: remove data from $Path"
+    return [pscustomobject]@{
+        Path = $result.Path
+        Removed = $result.Removed
+        Skipped = $result.Skipped + $result.EnumerationErrors.Count
+        Planned = $result.Planned
+        Preserved = $result.Preserved
+        RemovedPaths = $result.RemovedPaths
+        PreservedPaths = $result.PreservedEntries
+        SkippedPaths = $result.SkippedPaths
+        EnumerationErrors = $result.EnumerationErrors
+    }
+}
+
+function Invoke-RemoveAllData {
+    Import-EnvironmentFile
+    $configuredDataDir = Get-ConfiguredDataDirectory
+    Test-SafeDataDirectory -Path $configuredDataDir
+
+    if (-not (Confirm-DestructiveAction 'remove all user-generated application data')) {
+        return
+    }
+
+    $targets = @(
+        $configuredDataDir,
+        $IngestionDataDir,
+        $VectorsDir,
+        $LogsDir
+    ) | ForEach-Object { Get-NormalizedPath -Path $_ } | Select-Object -Unique
+
+    Write-Status INFO 'Stopping configured local application services before removing data.'
+    $applicationPorts = @([int]$env:FASTAPI_PORT, [int]$env:UI_PORT) | Select-Object -Unique
+    foreach ($port in $applicationPorts) {
+        Stop-PortListeners -Port $port
+    }
+
+    $removed = 0
+    $skipped = 0
+    foreach ($target in $targets) {
+        $result = Remove-DirectoryContents -Path $target
+        $removed += $result.Removed
+        $skipped += $result.Skipped
+    }
+    $statusLevel = if ($skipped -gt 0) { 'WARN' } else { 'SUCCESS' }
+    Write-Status $statusLevel "User-generated data removal completed where permitted; removed $removed item(s), skipped $skipped locked or inaccessible item(s)."
+}
+
+function Invoke-TestSuite {
+    if (-not (Test-Path -LiteralPath $TestScript)) {
+        throw "Missing test runner: $TestScript"
+    }
+    & cmd.exe /d /c $TestScript
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        throw "Test suite failed with exit code $exitCode."
+    }
+    Write-Status SUCCESS 'Test suite completed successfully.'
+}
+
+function Remove-ApplicationLogs {
+    if (-not (Confirm-DestructiveAction 'remove application log files')) { return }
+    if (-not (Test-Path -LiteralPath $LogsDir)) {
+        Write-Status INFO "Log directory does not exist: $LogsDir"
+        return
+    }
+    $logs = @(Get-ChildItem -LiteralPath $LogsDir -Filter '*.log' -File -ErrorAction SilentlyContinue |
+        Sort-Object @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
+    if ($logs.Count -eq 0) {
+        Write-Status INFO 'No log files found.'
+        return
+    }
+    $removed = 0
+    $skipped = 0
+    $progressId = Start-LauncherProgress -Activity 'AEGIS: remove application logs' -Status "0 of $($logs.Count) files"
+    try {
+        for ($index = 0; $index -lt $logs.Count; $index++) {
+            $log = $logs[$index]
+            $percent = [int](($index + 1) * 100 / $logs.Count)
+            Update-LauncherProgress -Id $progressId -Activity 'AEGIS: remove application logs' -Status "$($index + 1) of $($logs.Count): $($log.Name)" -PercentComplete $percent
+            if (Remove-PathBestEffort -Path $log.FullName) {
+                $removed++
+            }
+            else {
+                $skipped++
+            }
+        }
+    }
+    finally {
+        Complete-LauncherProgress $progressId
+    }
+    Write-Status SUCCESS "Removed $removed log file(s); skipped $skipped locked or inaccessible file(s)."
+}
+
+function Remove-LauncherPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [switch]$KeepRoot,
+        [string[]]$PreserveNames = @('.gitkeep'),
+        [switch]$Strict,
+        [switch]$WhatIf,
+        [string]$Activity = 'AEGIS: remove files'
+    )
+
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    $removed = [Collections.Generic.List[string]]::new()
+    $skipped = [Collections.Generic.List[string]]::new()
+    $preserved = [Collections.Generic.List[string]]::new()
+    $enumerationErrors = [Collections.Generic.List[string]]::new()
+    $result = [ordered]@{
+        Target = $fullPath
+        Path = $fullPath
+        Planned = 0
+        PlannedCount = 0
+        Removed = 0
+        RemovedCount = 0
+        RemovedPaths = $removed
+        Preserved = 0
+        PreservedEntries = $preserved
+        Skipped = 0
+        SkippedPaths = $skipped
+        EnumerationErrors = $enumerationErrors
+        WhatIf = [bool]$WhatIf
+    }
+
+    try {
+        $item = Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop
+    } catch {
+        if ($_.CategoryInfo.Category -eq [System.Management.Automation.ErrorCategory]::ObjectNotFound) {
+            return [pscustomobject]$result
+        }
+        $message = "$fullPath ($($_.Exception.Message))"
+        [void]$enumerationErrors.Add($message)
+        [void]$skipped.Add($message)
+        $result.Skipped = 1
+        Write-Status WARN "Skipped inaccessible path: $message"
+        if ($Strict) { throw }
+        return [pscustomobject]$result
+    }
+
+    $entries = if ($item.PSIsContainer) {
+        $errors = @()
+        $found = @(Get-ChildItem -LiteralPath $item.FullName -Force -Recurse -ErrorAction SilentlyContinue -ErrorVariable errors)
+        foreach ($errorRecord in $errors) {
+            [void]$enumerationErrors.Add("$($errorRecord.Exception.Message)")
+            Write-Status WARN "Skipped inaccessible path below $fullPath ($($errorRecord.Exception.Message))"
+        }
+        if (-not $KeepRoot) { $found += $item }
+        $found
+    }
+    else { @($item) }
+
+    $protectedDirectories = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $preservedPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($entry in @($entries)) {
+        if ($entry.Name -in $PreserveNames) {
+            [void]$preservedPaths.Add($entry.FullName)
+            [void]$preserved.Add($entry.FullName)
+            [void]$protectedDirectories.Add($item.FullName)
+            $ancestor = [IO.Path]::GetDirectoryName($entry.FullName)
+            while ($ancestor -and $ancestor.StartsWith($item.FullName.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
+                [void]$protectedDirectories.Add($ancestor)
+                $ancestor = [IO.Path]::GetDirectoryName($ancestor)
+            }
+        }
+    }
+
+    $candidates = @($entries |
+        Where-Object { -not $preservedPaths.Contains($_.FullName) -and -not $protectedDirectories.Contains($_.FullName) } |
+        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
+    $result.Planned = $candidates.Count
+    $result.PlannedCount = $candidates.Count
+    $result.Preserved = $preserved.Count
+    $progressId = $null
+    try {
+        if ($candidates.Count -gt 0) {
+            $progressId = Start-LauncherProgress -Activity $Activity -Status "0 of $($candidates.Count) items"
+        }
+        for ($index = 0; $index -lt $candidates.Count; $index++) {
+            $entry = $candidates[$index]
+            if ($null -ne $progressId) {
+                Update-LauncherProgress -Id $progressId -Activity $Activity -Status "$($index + 1) of $($candidates.Count): $($entry.Name)" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $candidates.Count)))
+            }
+            if ($WhatIf) { continue }
+            try {
+                Remove-Item -LiteralPath $entry.FullName -Force -Confirm:$false -ErrorAction Stop
+                [void]$removed.Add($entry.FullName)
+            }
+            catch {
+                [void]$skipped.Add("$($entry.FullName) ($($_.Exception.Message))")
+                Write-Status WARN "Skipped locked or protected path: $($entry.FullName) ($($_.Exception.Message))"
+            }
+        }
+    }
+    finally {
+        if ($null -ne $progressId) { Complete-LauncherProgress -Id $progressId }
+    }
+    $result.Removed = $removed.Count
+    $result.RemovedCount = $removed.Count
+    $result.Skipped = $skipped.Count
+
+    if ($Strict -and ($skipped.Count -gt 0 -or $enumerationErrors.Count -gt 0)) {
+        throw "Removal of '$fullPath' was incomplete. Skipped $($skipped.Count) item(s) and encountered $($enumerationErrors.Count) enumeration error(s)."
+    }
+    return [pscustomobject]$result
+}
+
+function Remove-PathBestEffort([string]$Path) {
+    $result = Remove-LauncherPath -Path $Path -Activity "AEGIS: remove $([IO.Path]::GetFileName($Path))"
+    return $result.Skipped -eq 0 -and $result.EnumerationErrors.Count -eq 0
+}
+
+function Remove-PythonCaches {
+    $scriptsDir = Join-Path $AppDir 'scripts'
+    $searchRoots = @(
+        Get-ChildItem -LiteralPath $ServerDir -Directory -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne '.venv' } |
+            Select-Object -ExpandProperty FullName
+        $TestsDir
+        $scriptsDir
+    )
+    $cacheDirectories = @(
+        Get-ChildItem -LiteralPath $ServerDir -Directory -Filter '__pycache__' -Force -ErrorAction SilentlyContinue
+        foreach ($searchRoot in $searchRoots) {
+            if (Test-Path -LiteralPath $searchRoot) {
+                Get-ChildItem -LiteralPath $searchRoot -Directory -Filter '__pycache__' -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    ) | Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false }
+    foreach ($cacheDirectory in $cacheDirectories) {
+        [void](Remove-PathBestEffort -Path $cacheDirectory.FullName)
+    }
+}
+
+function Clear-ApplicationCache {
+    param(
+        [switch]$SkipConfirmation,
+        [switch]$Strict
+    )
+    if (-not $SkipConfirmation -and -not (Confirm-DestructiveAction 'clear runtime and test caches')) { return }
+    Remove-PythonCaches
+    $result = Remove-LauncherPath -Path $RuntimeCacheDir -KeepRoot -Strict:$Strict -Activity 'AEGIS: clear canonical cache'
+    $skipped = $result.Skipped + $result.EnumerationErrors.Count
+    if ($skipped -gt 0) {
+        Write-Status WARN "Canonical cache cleanup skipped $skipped locked or inaccessible item(s)."
+    }
+    New-Item -ItemType Directory -Path $RuntimeCacheDir -Force -ErrorAction Stop | Out-Null
+    Write-Status SUCCESS "Development caches cleared where permitted; skipped $skipped locked or inaccessible item(s)."
+}
+
+function Uninstall-Application {
+    if (-not (Confirm-DestructiveAction 'remove local runtimes, dependencies, caches, and build outputs')) { return }
+    $targets = @(
+        $RuntimesDir,
+        $VenvDir,
+        (Join-Path $RootDir '.venv'),
+        (Join-Path $ClientDir 'node_modules'),
+        (Join-Path $ClientDir 'dist')
+    ) | Select-Object -Unique
+    $skipped = 0
+    $progressId = Start-LauncherProgress -Activity 'AEGIS: uninstall application' -Status "0 of $($targets.Count) paths"
+    try {
+        for ($index = 0; $index -lt $targets.Count; $index++) {
+            $target = $targets[$index]
+            Update-LauncherProgress -Id $progressId -Activity 'AEGIS: uninstall application' -Status "$($index + 1) of $($targets.Count): $target" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $targets.Count)))
+        try {
+            $targetExists = Test-Path -LiteralPath $target -ErrorAction Stop
+        }
+        catch {
+            Write-Status WARN "Skipped inaccessible uninstall target: $target ($($_.Exception.Message))"
+            $skipped++
+            continue
+        }
+        if ($targetExists -and -not (Remove-PathBestEffort -Path $target)) {
+            $skipped++
+        }
+    }
+    }
+    finally {
+        Complete-LauncherProgress $progressId
+    }
+
+    # Keep dependency lockfiles: install/update uses them for reproducible restores.
+    New-Item -ItemType Directory -Path $RuntimesDir -Force | Out-Null
+    $runtimeKeepFile = Join-Path $RuntimesDir '.gitkeep'
+    if (-not (Test-Path -LiteralPath $runtimeKeepFile)) {
+        New-Item -ItemType File -Path $runtimeKeepFile -Force | Out-Null
+    }
+    Remove-PythonCaches
+    Write-Status SUCCESS "Application runtimes, dependencies, caches, and build outputs uninstalled where permitted; skipped $skipped locked or inaccessible item(s). Dependency lockfiles and user data were preserved."
+}
+
+function Wait-ForMenuReturn {
+    Clear-LauncherProgress
+    Write-Host ''
+    Write-Host '  Press any key to return to the menu...' -ForegroundColor DarkGray
+    if (-not $script:LauncherInteractive) {
+        return
+    }
+    [Console]::ReadKey($true) | Out-Null
+}
+
+function Write-MenuRule {
+    param([string]$Character = '-')
+
+    Write-Host "  $($Character * 57)" -ForegroundColor DarkCyan
+}
+
+function Write-MenuSection {
+    param([Parameter(Mandatory)][string]$Title)
+
+    Write-Host "  $Title" -ForegroundColor DarkCyan
+}
+
+function Get-LauncherMenuEntries {
+    return @(
+        [pscustomobject]@{ Section = 'APPLICATION'; Label = 'Launch application'; Description = 'Start local services'; Key = 'Launch'; Destructive = $false }
+        [pscustomobject]@{ Section = 'SETUP & VALIDATION'; Label = 'Install / update dependencies'; Description = 'Sync and build'; Key = 'Install'; Destructive = $false }
+        [pscustomobject]@{ Section = 'SETUP & VALIDATION'; Label = 'Rebuild frontend'; Description = 'Run frontend production build'; Key = 'Rebuild'; Destructive = $false }
+        [pscustomobject]@{ Section = 'SETUP & VALIDATION'; Label = 'Initialize database'; Description = 'Create, upgrade, and seed SQLite schema'; Key = 'Database'; Destructive = $false }
+        [pscustomobject]@{ Section = 'SETUP & VALIDATION'; Label = 'Run test suite'; Description = 'Validate installation'; Key = 'Tests'; Destructive = $false }
+        [pscustomobject]@{ Section = 'SOURCE CONTROL'; Label = 'Check for updates'; Description = 'Report main branch status only'; Key = 'Check'; Destructive = $false }
+        [pscustomobject]@{ Section = 'SOURCE CONTROL'; Label = 'Update application'; Description = 'Pull the latest main branch'; Key = 'Update'; Destructive = $false }
+        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Remove logs'; Description = 'Clear application logs'; Key = 'Logs'; Destructive = $true }
+        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Clear cache'; Description = 'Remove runtime and test caches'; Key = 'Cache'; Destructive = $true }
+        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Remove all data'; Description = 'Delete user-generated data'; Key = 'AllData'; Destructive = $true }
+        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Uninstall application'; Description = 'Remove local dependencies'; Key = 'Uninstall'; Destructive = $true }
+        [pscustomobject]@{ Section = 'EXIT'; Label = 'Exit'; Description = 'Close launcher'; Key = 'Exit'; Destructive = $false }
+    )
+}
+
+function Write-MenuOption {
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Entry,
+        [Parameter(Mandatory)][int]$NumberWidth,
+        [Parameter(Mandatory)][int]$LabelWidth
+    )
+
+    $color = if ($Entry.Destructive) { 'Yellow' } elseif ($Entry.Key -eq 'Exit') { 'DarkGray' } else { 'White' }
+    Write-Host ("  {0,$NumberWidth}. {1,-$LabelWidth}  {2}" -f $Entry.Number, $Entry.Label, $Entry.Description) -ForegroundColor $color
+}
+
+function Show-LauncherMenu {
+    Clear-LauncherProgress
+    if ($script:LauncherInteractive) { try { Clear-Host } catch { } }
+    $entries = @(Get-LauncherMenuEntries)
+    for ($index = 0; $index -lt $entries.Count; $index++) {
+        $entries[$index] = [pscustomobject]@{
+            Number = $index + 1
+            Section = $entries[$index].Section
+            Label = $entries[$index].Label
+            Description = $entries[$index].Description
+            Key = $entries[$index].Key
+            Destructive = $entries[$index].Destructive
+        }
+    }
+    $numberWidth = ([string]$entries.Count).Length
+    $labelWidth = ($entries | ForEach-Object { $_.Label.Length } | Measure-Object -Maximum).Maximum
+    Write-Host ''
+    Write-MenuRule
+    Write-Host '  AEGIS' -ForegroundColor Cyan -NoNewline
+    Write-Host '  /  GEOSPATIAL VIEW' -ForegroundColor White
+    Write-Host '  Local application control center' -ForegroundColor DarkGray
+    Write-MenuRule
+    Write-Host ''
+    $lastSection = $null
+    foreach ($entry in $entries) {
+        if ($entry.Section -ne $lastSection) {
+            if ($null -ne $lastSection) { Write-Host '' }
+            Write-MenuSection -Title $entry.Section
+            $lastSection = $entry.Section
+        }
+        Write-MenuOption -Entry $entry -NumberWidth $numberWidth -LabelWidth $labelWidth
+    }
+    Write-MenuRule
+    Write-Host ''
+    return $entries
+}
+
+if ($Action -eq 'Launch') {
+    try {
+        Invoke-TrackedLauncherAction -Name 'Launch application' -Action {
+            Invoke-LaunchApplication
+        }
+        exit 0
+    }
+    catch {
+        if ($_.Exception -is [System.OperationCanceledException]) {
+            exit 0
+        }
+        Write-Status FATAL $_.Exception.Message
+        exit 1
+    }
+}
+
+if ($Action -eq 'ClearCache') {
+    try {
+        Invoke-TrackedLauncherAction -Name 'Clear canonical cache' -Action {
+            Clear-ApplicationCache -SkipConfirmation -Strict
+        }
+        exit 0
+    }
+    catch {
+        Write-Status FATAL $_.Exception.Message
+        exit 1
+    }
+}
+
+while ($true) {
+    $entries = @(Show-LauncherMenu)
+    $maxOption = $entries.Count
+    if (-not $script:LauncherInteractive) { break }
+    Clear-LauncherProgress
+    $selection = (Read-Host "  Select an option (1-$maxOption)").Trim()
+
+    if ($selection -notmatch '^[1-9][0-9]*$' -or [int]$selection -lt 1 -or [int]$selection -gt $maxOption) {
+        Write-Status WARN "Invalid option. Enter a number from 1 to $maxOption."
+        Wait-ForMenuReturn
+        continue
+    }
+
+    $entry = $entries[[int]$selection - 1]
+    if ($entry.Key -eq 'Exit') { break }
+
+    try {
+        Invoke-TrackedLauncherAction -Name $entry.Label -Action {
+            switch ($entry.Key) {
+                'Launch' {
+                    Invoke-LaunchApplication
+                    exit 0
+                }
+                'Install' { Invoke-InstallOrUpdate }
+                'Rebuild' { Invoke-RebuildFrontend }
+                'Database' { Invoke-InitializeDatabase }
+                'Tests' { Invoke-TestSuite }
+                'Check' { Invoke-CheckForUpdates }
+                'Update' { Invoke-ApplicationUpdate }
+                'Logs' { Remove-ApplicationLogs }
+                'Cache' { Clear-ApplicationCache }
+                'AllData' { Invoke-RemoveAllData }
+                'Uninstall' { Uninstall-Application }
+            }
+        }
+    }
+    catch {
+        if ($_.Exception -is [System.OperationCanceledException]) {
+            continue
+        }
+        Write-Status FATAL $_.Exception.Message
+        if ([Console]::IsInputRedirected) {
+            exit 1
+        }
+    }
+
+    Wait-ForMenuReturn
+}
+Clear-LauncherProgress

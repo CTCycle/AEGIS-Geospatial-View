@@ -35,14 +35,36 @@ def test_all_manifest_entries_expose_source_traits() -> None:
     assert not missing
 
 ###############################################################################
-def test_credentialed_capabilities_are_not_healthy_without_credentials(monkeypatch) -> None:
+def test_enabled_executable_manifests_declare_execution_contracts() -> None:
+    payload = GeospatialManifestLoader().load_all()
+    profiles = {
+        str(item["capability_id"]): item for item in payload["runtime_profiles"]
+    }
+    missing = [
+        f"{collection_name}:{item['id']}"
+        for collection_name in ("basemaps", "overlays", "cameras", "transit", "tools")
+        for item in payload[collection_name]
+        if (
+            bool(profiles.get(item["id"], {}).get("enabled_by_default"))
+            or bool(profiles.get(item["id"], {}).get("manual_toggle"))
+        )
+        and not isinstance(item.get("executionContract"), dict)
+    ]
+
+    assert not missing
+
+###############################################################################
+def test_credentialed_capabilities_are_not_healthy_without_credentials(
+    monkeypatch,
+) -> None:
     monkeypatch.delenv("OPENAQ_API_KEY", raising=False)
-    monkeypatch.delenv("FRED_API_KEY", raising=False)
-    runtime = RuntimeRegistry(credentials_repo=_NoCredentials())  # type: ignore[arg-type]
+    runtime = RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_NoCredentials(),  # type: ignore[arg-type]
+    )
     runtime.build_snapshot()
 
     assert runtime.provider_health("openaq_air_quality") == "missing_credentials"
-    assert runtime.provider_health("fred_regional_market_indicators") == "missing_credentials"
 
 ###############################################################################
 def test_endpoint_validation_builds_sampled_urls_without_network_calls() -> None:
@@ -58,3 +80,10 @@ def test_endpoint_validation_builds_sampled_urls_without_network_calls() -> None
     esa_url = service.build_validation_url(overlays["esa_worldcover"])
     assert esa_url is not None
     assert "GetCapabilities" in esa_url
+
+    basemaps = {item["id"]: item for item in payload["basemaps"]}
+    openfreemap_url = service.build_validation_url(basemaps["openfreemap_liberty"])
+    assert openfreemap_url == "https://tiles.openfreemap.org/styles/liberty"
+    osm_url = service.build_validation_url(basemaps["osm_default"])
+    assert osm_url is not None
+    assert osm_url.endswith("/6/33/23.png")

@@ -1,10 +1,13 @@
 # Repository Structure
 
-Last updated: 2026-07-01
+Last updated: 2026-09-28
 
 ## Purpose
 
-This file inventories the source and operational layout of the repository. Generated directories such as `node_modules`, `dist`, `.angular`, and `__pycache__` are intentionally excluded.
+This file inventories the source and operational layout of the repository.
+Generated directories such as `node_modules`, `dist`, and Python bytecode are
+intentionally excluded. All disposable cache data belongs under
+`runtimes/cache`.
 
 ## Repository Root
 
@@ -13,39 +16,38 @@ AEGIS Geospatial View/
   app/
     client/
       src/
+        app/e2e/
       package.json
       proxy.conf.cjs
-    resources/
-      catalog/
-      database.db
-    src-tauri/
-      gen/
-      icons/
-      src/
-      target/
+    shared/
+      openapi.json
     scripts/
+      generate_openapi.py
+      initialize_database.py
     server/
+      alembic.ini
       api/
       common/
       configurations/
+      contracts/
       domain/
+      prompts/
+      migrations/
       repositories/
       services/
       app.py
-    shared/
     tests/
       e2e/
       unit/
       run_tests.bat
   settings/
     .env
-    .env.local.example
-    .env.local.tauri.example
-    configurations.json
-  start_on_windows.bat
-  setup_and_maintenance.bat
-  release/
-    tauri/
+    .env.example
+  data/
+    catalog/
+  runtimes/
+    cache/
+  start_on_windows.ps1
   README.md
 ```
 
@@ -59,13 +61,72 @@ Key backend directories under `app/server`:
   Shared constants, logging, time, and common types.
 - `configurations/`
   Environment loading, settings composition, and startup config.
+- `contracts/`
+  Canonical transport, extraction, run-event, normalized-provider, and
+  persistence-neutral application models.
 - `domain/`
-  Request/response contracts and domain models.
+  Structured domain schemas, behavior, policies, and agent decision/runtime
+  models. It remains the source of truth for typed agent extraction and
+  execution contracts.
+- `prompts/`
+  Sole source of free-form model instructions and prompt templates. Modules are
+  separated by parser, native-agent, grounded-response, context, and provider
+  responsibilities; builders perform composition.
 - `repositories/`
   Persistence, serialization, database helpers, credential encryption material, and reference catalog seeding.
+- `repositories/runtime_settings.py`
+  Typed SQLite ownership and atomic partial updates for application runtime
+  settings.
+- `repositories/database/`
+  Concrete SQLite engine/session setup, repository holder, initializer, and
+  Alembic migration runner.
+- `migrations/`
+  Alembic environment and reviewed schema revisions, including the
+  `application_runtime_settings` table.
 - `services/`
   Runtime orchestration for agent, chat, geospatial, LLM, and search workflows.
-  The agent orchestration area now includes focused helpers such as `turn_history.py`, `turn_state_assembler.py`, and `turn_support.py` to keep `AgentOrchestrator` under the repository Python size constraint without changing the public chat-turn contract.
+  The agent orchestration area includes focused helpers such as
+  `direct_turn_response.py`, `turn_history.py`, `turn_state_assembler.py`, and
+  `turn_support.py` to keep `AgentOrchestrator` under the repository Python
+  size constraint without changing the public chat-turn contract.
+- `services/catalog/startup.py`
+  Startup callback that loads static reference files and delegates database
+  writes to the catalog repository.
+- `services/agent_runs/`
+  Durable conversation-run lifecycle, steering, event publication, WebSocket
+  lifecycle/replay services, and bounded realtime metrics.
+- `services/llm/`
+  Provider invocation, model catalogs, structured-output handling, request
+  normalization, protocol translation, and safe provider error classification.
+  Provider-specific prompt text is declared in `prompts/providers.py`.
+- `app.py`
+  Sole composition root. It constructs the SQLite repository, initializes the
+  schema, wires explicit repository/service dependencies, and owns lifecycle
+  shutdown.
+
+## Shared Contracts
+
+`app/shared/openapi.json` is the checked-in OpenAPI contract exported from the
+runtime FastAPI application. Regenerate it from the repository root with:
+
+```powershell
+python app/scripts/generate_openapi.py
+```
+
+The unit contract test and CI diff check keep the shared file synchronized with
+the current backend routes and Pydantic response models.
+
+## Ownership Boundaries
+
+- `prompts/` owns free-form instructions and prompt templates only.
+- `domain/` owns structured schemas and domain contracts.
+- `services/agent/` owns deterministic orchestration, planning, policy, and
+  validation.
+- `services/llm/` owns provider invocation and protocol translation.
+- Executable native-tool schemas remain in
+  `services/agent/agent_tool_catalog_service.py`, the runtime catalog source of
+  truth. They are not duplicated into prompt modules.
+- No business service defines free-form model instructions inline.
 
 ## Frontend Areas
 
@@ -80,7 +141,7 @@ Key frontend directories under `app/client/src/app`:
 
 ## Catalog Areas
 
-`app/resources/catalog` contains manifest-backed geospatial configuration:
+`data/catalog` contains manifest-backed geospatial configuration:
 
 - `index.json`
 - `runtime_profiles.json`
@@ -88,10 +149,13 @@ Key frontend directories under `app/client/src/app`:
 - `basemaps/*.json`
 - `overlays/*.json`
 - `tools/*.json`
+- `cameras/*.json`
+- `transit/*.json`
 - `reference/*.json`
 
 ## Tests
 
-- E2E tests: `app/tests/e2e/*.py`
+- Backend/API E2E tests: `app/tests/e2e/*.py`
+- Browser smoke tests: `app/client/src/app/e2e/*.spec.ts`
 - Unit tests: `app/tests/unit/**/*.py`
 - Test runner: `app/tests/run_tests.bat`

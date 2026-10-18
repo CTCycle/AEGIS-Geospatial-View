@@ -1,0 +1,247 @@
+{
+  "source_commit": "be61298ddf4ae1c0b6900810b046c10d97e4993a",
+  "branch": "develop",
+  "runtime_data_root": "runtimes/cache/test-runtime/tier3-raster-remediation-20260928",
+  "database_integrity": "ok",
+  "runs": [
+    {
+      "scenario_id": "fema_new_orleans",
+      "scenario": "Standalone FEMA NFHL flood zones, New Orleans, Louisiana",
+      "run_id": "run_159619620ee74aa98ff11917d26d9836",
+      "conversation_id": "conv_d57b0513ecb04645b34f7ecc50a0a036",
+      "run_state": "failed",
+      "error_code": "agent_operation_failed",
+      "presentation_status": "failed",
+      "presentation_status_detail": "failed",
+      "acknowledgment": {
+        "run_id": "run_159619620ee74aa98ff11917d26d9836",
+        "run_version": 1,
+        "map_session_id": "candidate-841eb8416468462b820a5d1a0b4b553e",
+        "collection_revision": 1,
+        "status": "failed",
+        "viewport_bounds": [
+          -90.1399307,
+          29.8654809,
+          -89.6251763,
+          30.1994687
+        ],
+        "checks": {
+          "required_sources_loaded": false,
+          "required_layers_present": false,
+          "viewport_valid": false
+        },
+        "overlay_results": [
+          {
+            "metadata_only": false,
+            "loaded": true,
+            "zoom_range_valid": false,
+            "rendered_feature_count": null,
+            "failure_code": null,
+            "overlay_id": "evidence:evidence_f95208e4b9094d1cb393d8e7a91a34b4:fema_nfhl_flood_zones",
+            "source_present": false,
+            "capability_id": "fema_nfhl_flood_zones",
+            "layer_present": false,
+            "style_valid": false,
+            "visibility_matches": false
+          }
+        ],
+        "failure_code": "render_failed",
+        "failure_stage": "maplibre",
+        "failure_summary": "A map data source could not be loaded. Check provider availability and try again."
+      },
+      "descriptor_overlays": [
+        {
+          "capability_id": "fema_nfhl_flood_zones",
+          "provider": "fema",
+          "rendering_mode": "raster-tile",
+          "visible": true,
+          "attribution": "Federal Emergency Management Agency",
+          "endpoint": {
+            "host": "hazards.fema.gov",
+            "path": "/arcgis/rest/services/public/NFHL/MapServer/export",
+            "query_keys": [
+              "bbox",
+              "bboxSR",
+              "f",
+              "format",
+              "imageSR",
+              "size",
+              "transparent"
+            ]
+          },
+          "descriptor_fields": {}
+        }
+      ],
+      "render_attempts": 2,
+      "observation_count": 2
+    },
+    {
+      "scenario_id": "usgs_gauges_control",
+      "scenario": "Add nearby USGS water gauges in the same conversation after FEMA source failure",
+      "run_id": "run_2a10da588f54475a95f78a336464f0a4",
+      "conversation_id": "conv_d57b0513ecb04645b34f7ecc50a0a036",
+      "run_state": "completed",
+      "error_code": null,
+      "presentation_status": "ready",
+      "presentation_status_detail": "resuming",
+      "acknowledgment": {
+        "run_id": "run_2a10da588f54475a95f78a336464f0a4",
+        "run_version": 1,
+        "map_session_id": "candidate-b6ef782157f74e9cb78619daa5082e1d",
+        "collection_revision": 1,
+        "status": "ready",
+        "viewport_bounds": [
+          -90.14217156449374,
+          29.922158706079884,
+          -89.69643954661628,
+          30.179948004173937
+        ],
+        "checks": {
+          "required_sources_loaded": true,
+          "required_layers_present": true,
+          "viewport_valid": true
+        },
+        "overlay_results": [
+          {
+            "metadata_only": false,
+            "loaded": true,
+            "zoom_range_valid": true,
+            "rendered_feature_count": 6,
+            "failure_code": null,
+            "overlay_id": "evidence:evidence_e53a972ca1104d42a5d6b4cc245d4e1c:usgs_water_gauges",
+            "source_present": true,
+            "capability_id": "usgs_water_gauges",
+            "layer_present": true,
+            "style_valid": true,
+            "visibility_matches": true
+          }
+        ],
+        "failure_code": null,
+        "failure_stage": null,
+        "failure_summary": null
+      },
+      "descriptor_overlays": [
+        {
+          "capability_id": "usgs_water_gauges",
+          "provider": "usgs",
+          "rendering_mode": "clustered-points",
+          "visible": true,
+          "attribution": "U.S. Geological Survey",
+          "endpoint": null,
+          "descriptor_fields": {
+            "format": "geojson"
+          }
+        }
+      ],
+      "render_attempts": 1,
+      "observation_count": 1
+    },
+    {
+      "scenario_id": "remove_gauges_keep_fema",
+      "scenario": "Remove USGS gauges while requesting FEMA retention; FEMA had never rendered",
+      "run_id": "run_74fcdd6260384a8eb02ac25c890e0b4c",
+      "conversation_id": "conv_d57b0513ecb04645b34f7ecc50a0a036",
+      "run_state": "completed",
+      "error_code": null,
+      "presentation_status": "ready",
+      "presentation_status_detail": "resuming",
+      "acknowledgment": {
+        "run_id": "run_74fcdd6260384a8eb02ac25c890e0b4c",
+        "run_version": 1,
+        "map_session_id": "candidate-d4cdb1ff78f440cc9b60ecd37de5447b",
+        "collection_revision": 2,
+        "status": "ready",
+        "viewport_bounds": [
+          -90.14217156449374,
+          29.922158706079884,
+          -89.69643954661628,
+          30.179948004173937
+        ],
+        "checks": {
+          "required_sources_loaded": true,
+          "required_layers_present": true,
+          "viewport_valid": true
+        },
+        "overlay_results": [],
+        "failure_code": null,
+        "failure_stage": null,
+        "failure_summary": null
+      },
+      "descriptor_overlays": [],
+      "render_attempts": 1,
+      "observation_count": 1
+    },
+    {
+      "scenario_id": "esa_worldcover_rome",
+      "scenario": "Standalone ESA WorldCover, Rome, Italy; second basemap candidate also failed",
+      "run_id": "run_b5095da78bf84dea8dbc68a766b34cfa",
+      "conversation_id": "conv_e358d3a750674a83ac6723e39f02196e",
+      "run_state": "failed",
+      "error_code": "agent_operation_failed",
+      "presentation_status": "failed",
+      "presentation_status_detail": "failed",
+      "acknowledgment": {
+        "run_id": "run_b5095da78bf84dea8dbc68a766b34cfa",
+        "run_version": 1,
+        "map_session_id": "candidate-9867e088539b497bb05f8af29cba47b9",
+        "collection_revision": 1,
+        "status": "failed",
+        "viewport_bounds": [
+          12.2344416,
+          41.6556417,
+          12.8557603,
+          42.1410285
+        ],
+        "checks": {
+          "required_sources_loaded": false,
+          "required_layers_present": false,
+          "viewport_valid": false
+        },
+        "overlay_results": [
+          {
+            "metadata_only": false,
+            "loaded": true,
+            "zoom_range_valid": false,
+            "rendered_feature_count": null,
+            "failure_code": null,
+            "overlay_id": "evidence:evidence_db7ad68e80604a6ab45ec873e36cbda6:esa_worldcover",
+            "source_present": false,
+            "capability_id": "esa_worldcover",
+            "layer_present": false,
+            "style_valid": false,
+            "visibility_matches": false
+          }
+        ],
+        "failure_code": "render_failed",
+        "failure_stage": "maplibre",
+        "failure_summary": "A map data source could not be loaded. Check provider availability and try again."
+      },
+      "descriptor_overlays": [
+        {
+          "capability_id": "esa_worldcover",
+          "provider": "esa",
+          "rendering_mode": "wmts",
+          "visible": true,
+          "attribution": "© ESA WorldCover / Terrascope",
+          "endpoint": {
+            "host": "services.terrascope.be",
+            "path": "/wmts/v2",
+            "query_keys": []
+          },
+          "descriptor_fields": {
+            "layer_id": "WORLDCOVER_2021_MAP",
+            "layerId": "WORLDCOVER_2021_MAP",
+            "tile_matrix_set": "EPSG:3857",
+            "tileMatrixSet": "EPSG:3857",
+            "format": "image/png",
+            "wmts_format": "image/png",
+            "style": "",
+            "wmts_style": ""
+          }
+        }
+      ],
+      "render_attempts": 2,
+      "observation_count": 2
+    }
+  ]
+}

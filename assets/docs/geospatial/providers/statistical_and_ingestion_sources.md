@@ -1,6 +1,6 @@
 # Statistical And Ingestion Sources
 
-Last updated: 2026-06-02
+Last updated: 2026-08-02
 
 ## Downloadable And Ingestion-Oriented Sources
 
@@ -36,19 +36,11 @@ Use for EU or EEA demographic, housing, rent, and economic indicators.
 - Use dataset-specific API URLs and JSON-stat responses.
 - Results are statistical time series, not map geometry by themselves.
 
-### FRED
-
-Use for U.S. economic, housing, rent, and market indicators.
-
-- Configure `FRED_API_KEY` or Access credentials.
-- Review redistribution restrictions for third-party series.
-- FRED provides time-series data, not direct geometry.
-
 ## Additional Classified Sources
 
 The current source catalog also classifies or partially supports:
 
-- Transitland
+- Mobility Database feed discovery
 - Natural Earth
 - Census cartographic boundaries
 - Census ACS joins
@@ -58,3 +50,9 @@ The current source catalog also classifies or partially supports:
 - local parcel templates
 
 These sources commonly participate in dataset-ingestion or metadata-only workflows rather than direct live map toggles.
+
+Mobility Database discovery uses the official public `feeds_v2.csv` catalog as a local snapshot. Feed-level authentication, licensing, and realtime URLs remain attached to each catalog record.
+
+## Snapshot prototypes
+
+Open Charge Map supports local JSON snapshots for prototype validation. Snapshot mode preserves the existing provider ID and normalized response contract; it does not change the catalog access status or declare hosted replacement parity.

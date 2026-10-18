@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "gate": "T3-17",
+  "date": "2026-10-17",
+  "branch": "validation",
+  "source_base_commit": "7dc62147219bd84ef259b4826c10ead9dfa3fadf",
+  "source_tested_with_scoped_working_tree_changes": true,
+  "conversation_id": "conv_77c80ca6b01d43b8b4e398bc37d2b52f",
+  "browser": "Codex in-app Browser",
+  "agent_lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "isolated_runtime_probe": "passed",
+    "fallback_used": false
+  },
+  "render_acknowledgements": [
+    {
+      "run_id": "run_db2ebef2fc874ea598d30a911b76691e",
+      "scenario": "Open-Meteo pressure, humidity, and wind over Rome",
+      "state": "completed",
+      "render_event_sequence": 57,
+      "render_status": "ready",
+      "observed_at": "2026-10-17T18:15:59.829969+02:00",
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlays": [
+        {"capability_id": "openmeteo_pressure_humidity_wind", "loaded": true, "visible": true, "rendered_feature_count": 1}
+      ]
+    },
+    {
+      "run_id": "run_82cb60fa8bdd4443b0ace489edaf74b3",
+      "scenario": "Add NASA GIBS MODIS Terra daytime LST while retaining Open-Meteo",
+      "state": "completed",
+      "render_event_sequence": 67,
+      "render_status": "ready",
+      "observed_at": "2026-10-17T18:16:34.568221+02:00",
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlays": [
+        {"capability_id": "openmeteo_pressure_humidity_wind", "loaded": true, "visible": true, "rendered_feature_count": 1},
+        {"capability_id": "MODIS_Terra_Land_Surface_Temp_Day", "loaded": true, "visible": true, "raster_source_loaded": true, "raster_tile_intersects_viewport": true, "raster_nontransparent_pixel_count": 21584}
+      ]
+    },
+    {
+      "run_id": "run_0ff17bce9ee9469997d9f2185a3ff156",
+      "scenario": "Add bounded GBIF occurrences within 5 km of Rome",
+      "state": "completed",
+      "render_event_sequence": 43,
+      "render_status": "ready",
+      "observed_at": "2026-10-17T18:17:41.646744+02:00",
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "gbif_records_loaded": 300,
+      "overlays": [
+        {"capability_id": "openmeteo_pressure_humidity_wind", "loaded": true, "visible": true, "rendered_feature_count": 1},
+        {"capability_id": "MODIS_Terra_Land_Surface_Temp_Day", "loaded": true, "visible": true, "raster_nontransparent_pixel_count": 21584},
+        {"capability_id": "gbif_species_occurrences", "loaded": true, "visible": true, "rendered_feature_count": 3}
+      ]
+    },
+    {
+      "run_id": "run_126e74801ba54c92a7588ef831969db0",
+      "scenario": "Remove only the GIBS raster",
+      "state": "completed",
+      "render_event_sequence": 23,
+      "render_status": "ready",
+      "collection_revision": 4,
+      "observed_at": "2026-10-17T18:19:51.579469+02:00",
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlays": [
+        {"capability_id": "openmeteo_pressure_humidity_wind", "loaded": true, "visible": true, "rendered_feature_count": 1},
+        {"capability_id": "gbif_species_occurrences", "loaded": true, "visible": true, "rendered_feature_count": 3}
+      ]
+    },
+    {
+      "run_id": "run_91bdef6dbe6f45bab2e3915fb2edd7ef",
+      "scenario": "Freshly retrieve and re-add GIBS raster after its removal",
+      "state": "completed",
+      "observed_at": "2026-10-17T18:24:18.908513+02:00",
+      "attempts": [
+        {
+          "attempt": 1,
+          "render_event_sequence": 23,
+          "render_status": "failed",
+          "failure_stage": "backend_validation",
+          "failure_code": "render_validation_failed",
+          "reason": "The reused raster evidence lacked this turn's temporal and spatial scope markers."
+        },
+        {
+          "attempt": 2,
+          "render_event_sequence": 71,
+          "render_status": "ready",
+          "collection_revision": 5,
+          "observed_at": "2026-10-17T18:24:18.908513+02:00",
+          "checks": {
+            "required_sources_loaded": true,
+            "required_layers_present": true,
+            "viewport_valid": true
+          },
+          "overlays": [
+            {"capability_id": "openmeteo_pressure_humidity_wind", "loaded": true, "visible": true, "rendered_feature_count": 1},
+            {"capability_id": "gbif_species_occurrences", "loaded": true, "visible": true, "rendered_feature_count": 3},
+            {"capability_id": "MODIS_Terra_Land_Surface_Temp_Day", "loaded": true, "visible": true, "raster_source_loaded": true, "raster_tile_intersects_viewport": true, "raster_nontransparent_pixel_count": 21584}
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": "run_48c93e84d7314e65ad78a2d74d04c7e4",
+      "scenario": "Remove only GBIF; retain Open-Meteo and GIBS raster",
+      "state": "completed",
+      "render_event_sequence": 23,
+      "render_status": "ready",
+      "collection_revision": 6,
+      "observed_at": "2026-10-17T18:24:46.169768+02:00",
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlays": [
+        {"capability_id": "openmeteo_pressure_humidity_wind", "loaded": true, "visible": true, "rendered_feature_count": 1},
+        {"capability_id": "MODIS_Terra_Land_Surface_Temp_Day", "loaded": true, "visible": true, "raster_source_loaded": true, "raster_tile_intersects_viewport": true, "raster_nontransparent_pixel_count": 21584}
+      ]
+    }
+  ],
+  "automated_checks": {
+    "focused_karma": "176 SUCCESS",
+    "production_client_build": "passed"
+  }
+}

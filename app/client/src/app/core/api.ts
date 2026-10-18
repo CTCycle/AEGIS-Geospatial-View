@@ -1,40 +1,51 @@
 import {
   API_BASE_URL,
   API_CHAT_MODELS_PATH,
+  API_CHAT_STRUCTURED_PROBE_PATH,
   API_CHAT_SETTINGS_PATH,
   API_CHAT_TURN_PATH,
-  API_CONVERSATION_RUN_CANCEL_PATH,
-  API_CONVERSATION_RUN_EVENTS_PATH,
-  API_CONVERSATION_RUN_STEERING_PATH,
-  API_CONVERSATION_RUNS_PATH,
+  API_CONVERSATION_PATH,
+  API_CONVERSATION_RUN_STATUS_PATH,
   API_CONVERSATIONS_PATH,
   API_GEOSPATIAL_CAMERAS_PATH,
   API_GEOSPATIAL_CAPABILITIES_PATH,
   API_GEOSPATIAL_LAYERS_PATH,
   API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH,
+  API_GEOSPATIAL_RENDER_CAPTURES_PATH,
   API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH,
   API_OLLAMA_HEALTH_PATH,
   API_OLLAMA_PULL_PATH,
   API_OLLAMA_REFRESH_PATH,
+  API_RUNTIME_SETTINGS_PATH,
 } from './constants';
 import {
-  normalizeCapabilities,
-  normalizeModelCards,
   parseCatalogResponse,
-  parseChatTurnResponse,
+  parseChatTurnApiResponse,
+  parseConversationCreateResponse,
+  parseConversationListResponse,
+  parseConversationSnapshotResponse,
+  parseGenericObjectResponse,
+  parseGeospatialCredentialStatus,
+  parseGeospatialLayersResponse,
+  parseGeospatialProviderPayload,
   parseGeospatialProviderAccountSetups,
-  parseModelLibrarySources,
+  parseModelLibraryResponse,
   parseModelSettingsResponse,
+  parseRuntimeSettingsResponse,
+  parseOllamaHealthResponse,
+  parseOllamaRefreshResponse,
+  parseStructuredProbeResponse,
+  parseRunTraceResponse,
+  parseAgentRunSnapshot,
 } from './api-parsers';
 import {
   CatalogResponse,
-  AgentRunCancelResponse,
-  AgentRunCreateRequest,
-  AgentRunCreateResponse,
   ChatTurnRequest,
-  ChatTurnResponse,
+  ChatTurnApiResponse,
   ConversationCreateRequest,
   ConversationCreateResponse,
+  ConversationListResponse,
+  ConversationSnapshotResponse,
   GenericObjectResponse,
   GeospatialCredentialStatus,
   GeospatialProviderAccountSetupListResponse,
@@ -42,25 +53,38 @@ import {
   ModelLibraryResponse,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
+  RuntimeSettingsResponse,
+  RuntimeSettingsUpdateRequest,
+  StructuredProbeResponse,
+  RunTraceResponse,
+  AgentRunSnapshot,
   OllamaHealthResponse,
-  SteeringMessageRequest,
-  SteeringMessageResponse,
 } from './types';
-import { isRecord } from './type-guards';
+import { ApiRequestError } from './api-errors';
 
-export class ApiRequestError extends Error {
-  detail?: unknown;
-  status?: number;
-  raw?: unknown;
+export { ApiContractError, ApiRequestError } from './api-errors';
 
-  constructor(message: string, options?: { detail?: unknown; status?: number; raw?: unknown }) {
-    super(message);
-    this.name = 'ApiRequestError';
-    this.detail = options?.detail;
-    this.status = options?.status;
-    this.raw = options?.raw;
+const API_REQUEST_TIMEOUTS = {
+  metadata: 30_000,
+  ordinary: 60_000,
+  long_operation: 180_000,
+} as const;
+
+const requestTimeoutMs = (url: string, init: RequestInit): number => {
+  const normalizedUrl = url.toLowerCase();
+  if (
+    normalizedUrl.includes('/chat/turn')
+    || normalizedUrl.includes('/chat/structured-probe')
+    || normalizedUrl.includes('/ollama/pull')
+    || normalizedUrl.includes('/geospatial/layers/') && normalizedUrl.includes('/features')
+  ) {
+    return API_REQUEST_TIMEOUTS.long_operation;
   }
-}
+  if (init.method?.toUpperCase() === 'GET') {
+    return API_REQUEST_TIMEOUTS.metadata;
+  }
+  return API_REQUEST_TIMEOUTS.ordinary;
+};
 
 const buildQuerySuffix = (params: Record<string, string | number | boolean | undefined>): string => {
   const query = new URLSearchParams();
@@ -74,18 +98,38 @@ const buildQuerySuffix = (params: Record<string, string | number | boolean | und
   return serialized ? `?${serialized}` : '';
 };
 
-const asProviderPayload = (data: unknown): GeospatialProviderPayload =>
-  isRecord(data) ? data as unknown as GeospatialProviderPayload : { status: 'unavailable', provider: 'unknown' };
+export const executeApiRequest = async (
+  url: string,
+  init: RequestInit,
+  timeoutMs = requestTimeoutMs(url, init),
+): Promise<unknown> => {
+  const controller = new AbortController();
+  const callerSignal = init.signal;
+  let timedOut = false;
+  const forwardAbort = (): void => controller.abort();
+  if (callerSignal?.aborted) {
+    controller.abort();
+  } else {
+    callerSignal?.addEventListener('abort', forwardAbort, { once: true });
+  }
+  const timeoutHandle = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, Math.max(1, timeoutMs));
 
-export const executeApiRequest = async (url: string, init: RequestInit): Promise<unknown> => {
   let response: Response;
   try {
-    response = await fetch(url, init);
+    response = await fetch(url, { ...init, signal: controller.signal });
   } catch (error: unknown) {
     const message = (error as { name?: string })?.name === 'AbortError'
-      ? 'Request interrupted before completion.'
+      ? timedOut
+        ? 'Request timed out before completion.'
+        : 'Request interrupted before completion.'
       : 'Network request failed.';
     throw new ApiRequestError(message, { detail: error, raw: error });
+  } finally {
+    clearTimeout(timeoutHandle);
+    callerSignal?.removeEventListener('abort', forwardAbort);
   }
   if (!response.ok) {
     throw await buildApiError(response);
@@ -115,24 +159,11 @@ export const fetchCatalog = async (): Promise<CatalogResponse> => {
   return parseCatalogResponse(data);
 };
 
-export const fetchGeospatialCapabilities = async (): Promise<CatalogResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAPABILITIES_PATH}`, {
-    method: 'GET',
-  });
-  return parseCatalogResponse(data);
-};
-
 export const fetchGeospatialLayers = async (): Promise<Pick<CatalogResponse, 'basemaps' | 'overlays' | 'cameras' | 'transit'>> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_LAYERS_PATH}`, {
     method: 'GET',
   });
-  const value = isRecord(data) ? data : {};
-  return {
-    basemaps: normalizeCapabilities(value.basemaps),
-    overlays: normalizeCapabilities(value.overlays),
-    cameras: normalizeCapabilities(value.cameras),
-    transit: normalizeCapabilities(value.transit),
-  };
+  return parseGeospatialLayersResponse(data);
 };
 
 export const fetchGeospatialLayerFeatures = async (
@@ -144,7 +175,7 @@ export const fetchGeospatialLayerFeatures = async (
     `${API_BASE_URL}${API_GEOSPATIAL_LAYERS_PATH}/${encodeURIComponent(layerId)}/features${suffix}`,
     { method: 'GET' },
   );
-  return asProviderPayload(data);
+  return parseGeospatialProviderPayload(data, 'geospatial layer features');
 };
 
 export const fetchGeospatialCameras = async (
@@ -154,22 +185,14 @@ export const fetchGeospatialCameras = async (
   const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAMERAS_PATH}${suffix}`, {
     method: 'GET',
   });
-  return asProviderPayload(data);
+  return parseGeospatialProviderPayload(data, 'geospatial cameras');
 };
 
 export const fetchGeospatialCredentialStatus = async (providerId: string): Promise<GeospatialCredentialStatus> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH(providerId)}`, {
     method: 'GET',
   });
-  if (!isRecord(data)) {
-    return { provider: providerId, required: false, configured: false };
-  }
-  return {
-    provider: String(data.provider ?? providerId),
-    required: Boolean(data.required),
-    configured: Boolean(data.configured),
-    environmentVariable: typeof data.environmentVariable === 'string' ? data.environmentVariable : null,
-  };
+  return parseGeospatialCredentialStatus(data);
 };
 
 export const fetchGeospatialProviderAccountSetups = async (): Promise<GeospatialProviderAccountSetupListResponse> => {
@@ -177,13 +200,13 @@ export const fetchGeospatialProviderAccountSetups = async (): Promise<Geospatial
   return parseGeospatialProviderAccountSetups(data);
 };
 
-export const sendChatTurn = async (payload: ChatTurnRequest): Promise<ChatTurnResponse> => {
+export const sendChatTurn = async (payload: ChatTurnRequest): Promise<ChatTurnApiResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_TURN_PATH}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return parseChatTurnResponse(data);
+  return parseChatTurnApiResponse(data);
 };
 
 export const createConversation = async (
@@ -194,71 +217,68 @@ export const createConversation = async (
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return data as ConversationCreateResponse;
+  return parseConversationCreateResponse(data);
 };
 
-export const createAgentRun = async (
+export const fetchConversationSnapshot = async (
   conversationId: string,
-  payload: AgentRunCreateRequest,
-): Promise<AgentRunCreateResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_CONVERSATION_RUNS_PATH(conversationId)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+): Promise<ConversationSnapshotResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CONVERSATION_PATH(conversationId)}`, {
+    method: 'GET',
+    cache: 'no-store',
   });
-  return data as AgentRunCreateResponse;
+  return parseConversationSnapshotResponse(data);
 };
 
-export const sendRunSteering = async (
+export const fetchConversations = async (
+  params: { query?: string; limit?: number; cursor?: string } = {},
+): Promise<ConversationListResponse> => {
+  const suffix = buildQuerySuffix({
+    query: params.query,
+    limit: params.limit,
+    cursor: params.cursor,
+  });
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CONVERSATIONS_PATH}${suffix}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  return parseConversationListResponse(data);
+};
+
+export const fetchConversationRunTrace = async (
   conversationId: string,
   runId: string,
-  payload: SteeringMessageRequest,
-): Promise<SteeringMessageResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_CONVERSATION_RUN_STEERING_PATH(conversationId, runId)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+  params: { limit?: number; cursor?: string } = {},
+): Promise<RunTraceResponse> => {
+  const suffix = buildQuerySuffix({ limit: params.limit, cursor: params.cursor });
+  const path = `${API_CONVERSATION_PATH(conversationId)}/runs/${encodeURIComponent(runId)}/trace`;
+  const data = await executeApiRequest(`${API_BASE_URL}${path}${suffix}`, {
+    method: 'GET',
+    cache: 'no-store',
   });
-  return data as SteeringMessageResponse;
+  return parseRunTraceResponse(data);
 };
 
-export const cancelAgentRun = async (
+export const fetchConversationRunStatus = async (
   conversationId: string,
   runId: string,
-): Promise<AgentRunCancelResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_CONVERSATION_RUN_CANCEL_PATH(conversationId, runId)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reason: 'user_cancelled' }),
-  });
-  return data as AgentRunCancelResponse;
-};
-
-export const openRunEventSource = (
-  conversationId: string,
-  runId: string,
-  afterEventId?: string,
-): EventSource => {
-  const path = API_CONVERSATION_RUN_EVENTS_PATH(conversationId, runId);
-  const suffix = afterEventId ? `?after_event_id=${encodeURIComponent(afterEventId)}` : '';
-  return new EventSource(`${API_BASE_URL}${path}${suffix}`);
+): Promise<AgentRunSnapshot> => {
+  const data = await executeApiRequest(
+    `${API_BASE_URL}${API_CONVERSATION_RUN_STATUS_PATH(conversationId, runId)}`,
+    { method: 'GET', cache: 'no-store' },
+  );
+  return parseAgentRunSnapshot(data);
 };
 
 export const fetchChatModels = async (
-  provider?: 'deepseek',
+  provider?: 'deepseek' | 'opencode' | 'opencode-go',
 ): Promise<ModelLibraryResponse> => {
   const suffix = provider ? `?provider=${encodeURIComponent(provider)}` : '';
   const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_MODELS_PATH}${suffix}`, {
     method: 'GET',
     cache: 'no-store',
   });
-  const value = isRecord(data) ? data : {};
-
-  return {
-    cloud: normalizeModelCards(value.cloud),
-    local: normalizeModelCards(value.local),
-    sources: parseModelLibrarySources(value.sources),
-  };
+  return parseModelLibraryResponse(data);
 };
 
 export const fetchChatSettings = async (): Promise<ModelSettingsResponse> => {
@@ -271,16 +291,58 @@ export const fetchChatSettings = async (): Promise<ModelSettingsResponse> => {
 
 export const updateChatSettings = async (payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_SETTINGS_PATH}`, {
-    method: 'PUT',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   return parseModelSettingsResponse(data);
 };
 
+export const fetchRuntimeSettings = async (): Promise<RuntimeSettingsResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_RUNTIME_SETTINGS_PATH}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  return parseRuntimeSettingsResponse(data);
+};
+
+export const updateRuntimeSettings = async (
+  payload: RuntimeSettingsUpdateRequest,
+): Promise<RuntimeSettingsResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_RUNTIME_SETTINGS_PATH}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return parseRuntimeSettingsResponse(data);
+};
+
 export const refreshOllamaModels = async (): Promise<GenericObjectResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_REFRESH_PATH}`, { method: 'POST' });
-  return isRecord(data) ? data : {};
+  return parseOllamaRefreshResponse(data);
+};
+
+export interface RenderCapturePayload {
+  run_id: string;
+  run_version: number;
+  map_session_id: string;
+  collection_revision: number;
+  mime_type: string;
+  image_base64: string;
+  width: number;
+  height: number;
+  viewport_bounds?: [number, number, number, number] | number[];
+}
+
+export const postRenderCapture = async (
+  payload: RenderCapturePayload,
+): Promise<boolean> => {
+  await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_RENDER_CAPTURES_PATH}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return true;
 };
 
 export const pullOllamaModel = async (model: string): Promise<GenericObjectResponse> => {
@@ -289,10 +351,26 @@ export const pullOllamaModel = async (model: string): Promise<GenericObjectRespo
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model }),
   });
-  return isRecord(data) ? data : {};
+  return parseGenericObjectResponse(data, 'Ollama model pull');
 };
 
 export const checkOllamaHealth = async (): Promise<OllamaHealthResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_HEALTH_PATH}`, { method: 'GET' });
-  return isRecord(data) ? data : {};
+  return parseOllamaHealthResponse(data);
+};
+
+export const fetchStructuredProbe = async (): Promise<StructuredProbeResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_STRUCTURED_PROBE_PATH}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  return parseStructuredProbeResponse(data);
+};
+
+export const runStructuredProbe = async (): Promise<StructuredProbeResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_STRUCTURED_PROBE_PATH}`, {
+    method: 'POST',
+    cache: 'no-store',
+  });
+  return parseStructuredProbeResponse(data);
 };

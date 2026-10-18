@@ -1,0 +1,46 @@
+{
+  "slice_id": "T1-07",
+  "name": "Background chat jobs",
+  "status": "PASS",
+  "verified_at": "2026-09-23",
+  "branch": "develop",
+  "implementation_commit": "3fd0c820c2d4de0fb06120b6feac80b199d57f26",
+  "source_fingerprints": "source-sha256.txt",
+  "evidence": {
+    "focused_job_tests": {
+      "status": "PASS",
+      "passed": 11
+    },
+    "backend_unit_suite": {
+      "status": "PASS",
+      "passed": 918,
+      "log": "backend-unit.log"
+    },
+    "exact_lane_live_job": {
+      "status": "PASS",
+      "provider": "opencode-go",
+      "model": "deepseek-v4.1-flash",
+      "fallback_used": false,
+      "record": "live-job-evidence.json"
+    },
+    "application_restart": {
+      "status": "PASS",
+      "old_job_routes_http": 404,
+      "record": "restart-evidence.json"
+    },
+    "shutdown_boundary": {
+      "status": "PASS",
+      "detail": "Active job completed cooperatively and the worker joined before stop returned."
+    },
+    "ruff": "PASS",
+    "pyright": "PASS",
+    "hosted_ci": {
+      "status": "PASS",
+      "implementation_commit": "3fd0c820c2d4de0fb06120b6feac80b199d57f26",
+      "run_id": 35861096479,
+      "conclusion": "success",
+      "jobs_passed": 4,
+      "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35861096479"
+    }
+  }
+}

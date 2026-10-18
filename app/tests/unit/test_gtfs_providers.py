@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 import io
 import zipfile
 from datetime import UTC, datetime
 
 import pytest
 
-from server.services.geospatial.providers.base import ProviderRequest, ProviderUnavailableError
+from server.services.geospatial.providers.base import (
+    ProviderRequest,
+    ProviderUnavailableError,
+)
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
 
@@ -43,7 +46,7 @@ def _gtfs_zip() -> bytes:
 
 ###############################################################################
 def test_gtfs_static_provider_normalizes_stops_routes_and_shapes() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         GTFSStaticProvider().fetch(
             ProviderRequest(
                 capability_id="gtfs_static",
@@ -63,7 +66,7 @@ def test_gtfs_static_provider_normalizes_stops_routes_and_shapes() -> None:
 ###############################################################################
 def test_gtfs_static_provider_rejects_bad_zip() -> None:
     with pytest.raises(ProviderUnavailableError):
-        asyncio.run(
+        run_async_in_thread(
             GTFSStaticProvider().fetch(
                 ProviderRequest(
                     capability_id="gtfs_static",
@@ -75,7 +78,7 @@ def test_gtfs_static_provider_rejects_bad_zip() -> None:
 ###############################################################################
 def test_gtfs_realtime_provider_normalizes_decoded_feed() -> None:
     now = int(datetime.now(UTC).timestamp())
-    response = asyncio.run(
+    response = run_async_in_thread(
         GTFSRealtimeProvider().fetch(
             ProviderRequest(
                 capability_id="gtfs_realtime",
@@ -116,7 +119,7 @@ def test_gtfs_realtime_provider_normalizes_decoded_feed() -> None:
 
 ###############################################################################
 def test_gtfs_realtime_provider_suppresses_stale_vehicle_rendering() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         GTFSRealtimeProvider().fetch(
             ProviderRequest(
                 capability_id="gtfs_realtime",
@@ -145,5 +148,3 @@ def test_gtfs_realtime_provider_suppresses_stale_vehicle_rendering() -> None:
     assert response.payload["summary"]["renderedVehicleCount"] == 0
     assert response.payload["vehicles"] == []
     assert response.payload["vehicleRenderingAllowed"] is False
-
-

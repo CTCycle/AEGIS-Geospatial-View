@@ -2,7 +2,24 @@
 E2E tests for AEGIS chat-first UI flow.
 """
 
-from playwright.sync_api import Page, expect
+import json
+import re
+from typing import Any
+
+from playwright.sync_api import Page, Route, expect
+from server.configurations.settings import AppSettings
+from tests.e2e.helpers.chat_stub_payloads import (
+    model_catalog_payload,
+    selected_agent_settings_payload,
+)
+
+
+def _fulfill_json(route: Route, payload: dict[str, Any]) -> None:
+    route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(payload),
+    )
 
 ###############################################################################
 class TestAppShell:
@@ -24,7 +41,7 @@ class TestChatFlow:
         composer = page.get_by_label("Chat message")
         expect(composer).to_be_visible()
         composer.fill("show map at 41.9028, 12.4964")
-        page.get_by_role("button", name="Send").click()
+        page.get_by_role("button", name="Send message").click()
         expect(page.get_by_text("show map at 41.9028, 12.4964")).to_be_visible()
         expect(page.locator(".chat-message--assistant").last).to_be_visible(
             timeout=45000
@@ -32,26 +49,58 @@ class TestChatFlow:
 
     # -------------------------------------------------------------------------
     def test_settings_page_opens_from_toolbar(self, page: Page, base_url: str):
+        settings_payload = selected_agent_settings_payload()
+        runtime_settings = {
+            "schema_version": 1,
+            **AppSettings.model_construct().runtime_payload(),
+            "restart_required": False,
+            "message": None,
+        }
+        page.route(
+            re.compile(r".*/api/chat/settings(?:\?.*)?$"),
+            lambda route: _fulfill_json(route, settings_payload),
+        )
+        page.route(
+            re.compile(r".*/api/chat/models(?:\?.*)?$"),
+            lambda route: _fulfill_json(route, model_catalog_payload()),
+        )
+        page.route(
+            re.compile(r".*/api/settings/runtime(?:\?.*)?$"),
+            lambda route: _fulfill_json(route, runtime_settings),
+        )
+        page.route(
+            re.compile(r".*/api/geospatial/providers/account-setup(?:\?.*)?$"),
+            lambda route: _fulfill_json(route, {"providers": []}),
+        )
+
         page.goto(base_url)
-        page.get_by_role("link", name="Model Settings").click()
+        page.get_by_role("link", name="Settings", exact=True).click()
         expect(page).to_have_url(f"{base_url.rstrip('/')}/settings")
-        expect(page.get_by_text("Select AEGIS models")).to_be_visible()
+        expect(page.get_by_role("link", name="Settings", exact=True)).to_have_class(
+            re.compile(r"\bactive\b")
+        )
         expect(page.get_by_placeholder("Search models")).to_be_visible()
         expect(page.get_by_role("button", name="All")).to_be_visible()
-        expect(page.get_by_role("button", name="Open Ollama settings")).to_be_visible()
+        expect(page.get_by_role("button", name="Models", exact=True)).to_be_visible()
+        expect(page.get_by_role("button", name="Model Providers", exact=True)).to_be_visible()
+        expect(page.get_by_role("button", name="Geospatial Access", exact=True)).to_be_visible()
+        page.get_by_role("button", name="Model Providers", exact=True).click()
+        expect(page.get_by_role("heading", name="Ollama", exact=True)).to_be_visible()
 
     # -------------------------------------------------------------------------
     def test_back_forward_restores_route_and_settings_search(
         self, page: Page, base_url: str
     ):
         page.goto(base_url)
-        page.get_by_role("link", name="Model Settings").click()
+        page.get_by_role("link", name="Settings", exact=True).click()
         search = page.get_by_placeholder("Search models")
         search.fill("gpt")
         page.go_back()
         expect(page.get_by_label("Chat message")).to_be_visible()
         page.go_forward()
-        expect(page.get_by_text("Select AEGIS models")).to_be_visible()
+        expect(page.get_by_role("link", name="Settings", exact=True)).to_have_class(
+            re.compile(r"\bactive\b")
+        )
         expect(search).to_have_value("gpt")
 
     # -------------------------------------------------------------------------
@@ -70,17 +119,15 @@ class TestChatFlow:
     ):
         page.goto(f"{base_url.rstrip('/')}/settings?q=gpt&mode=cloud")
         expect(page.get_by_placeholder("Search models")).to_have_value("gpt")
-        expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?q=gpt&mode=cloud")
+        expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?q=gpt")
 
     # -------------------------------------------------------------------------
     def test_model_selection_persists(self, page: Page, base_url: str):
         page.goto(base_url)
-        page.get_by_role("link", name="Model Settings").click()
-        first_card_button = page.locator(
-            ".model-card__actions button", has_text="Use for chat"
-        ).first
+        page.get_by_role("link", name="Settings", exact=True).click()
+        first_card_button = page.locator("button.model-card__select:not([disabled])").first
         if first_card_button.count() == 0:
             expect(page.locator(".settings-empty-state").first).to_be_visible()
             return
         first_card_button.click()
-        expect(page.get_by_text("Selected")).to_be_visible(timeout=15000)
+        expect(page.get_by_text(re.compile(r"Selected agent model"))).to_be_visible(timeout=15000)

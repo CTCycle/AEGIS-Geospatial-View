@@ -8,7 +8,7 @@ from server.services.chat.settings_service import ChatSettingsService
 class _SettingsRepo:
 
     # -------------------------------------------------------------------------
-    def get_or_create(self):  # noqa: ANN201
+    def get_required(self):  # noqa: ANN201
         return SimpleNamespace(
             active_provider_mode="cloud",
             agent_model_provider="openai",
@@ -52,6 +52,9 @@ def test_settings_response_reports_credential_health() -> None:
         settings_repo=_SettingsRepo(),
         credentials_repo=_CredentialsRepo(),
         crypto_service=_Crypto(),
+        model_library_service=SimpleNamespace(
+            normalize_ollama_url=lambda value: value,
+        ),
     )
 
     response = service.get_settings()

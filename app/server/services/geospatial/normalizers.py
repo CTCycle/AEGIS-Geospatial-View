@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from server.domain.geographics import CameraFeature, PoiFeature
+from server.contracts.geospatial import CameraFeature, PoiFeature
 
 ###############################################################################
 class NormalizationError(ValueError):
@@ -30,7 +30,9 @@ def normalize_poi_feature(
         opening_hours=_optional_string(payload.get("opening_hours")),
         website=_optional_string(payload.get("website")),
         phone=_optional_string(payload.get("phone")),
-        metadata={key: value for key, value in payload.items() if key not in _POI_FIELDS},
+        metadata={
+            key: value for key, value in payload.items() if key not in _POI_FIELDS
+        },
     )
 
 ###############################################################################

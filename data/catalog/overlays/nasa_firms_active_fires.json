@@ -1,0 +1,137 @@
+{
+  "id": "nasa_firms_active_fires",
+  "name": "NASA FIRMS Active Fires",
+  "provider": "nasa_firms",
+  "type": "vector-overlay",
+  "description": "NASA FIRMS active fire detections for bounded hazard checks.",
+  "capabilities": [
+    "fire",
+    "wildfire",
+    "smoke",
+    "hazard",
+    "current"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "NASA FIRMS Active Fires",
+    "requires_key": true,
+    "attribution": "NASA FIRMS",
+    "keywords": [
+      "fire",
+      "wildfire",
+      "active fire",
+      "smoke"
+    ],
+    "action_tags": [
+      "fire",
+      "hazard",
+      "smoke"
+    ],
+    "task_tags": [
+      "fire detections",
+      "route safety",
+      "smoke context"
+    ],
+    "source_protocol": "CSV API",
+    "data_format": "CSV",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": false,
+    "endpoint_health": "credential-gated",
+    "auth_mode": "api_key",
+    "official_docs_url": "https://firms.modaps.eosdis.nasa.gov/api/",
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Credential-gated provider limits apply; use bounded requests and cache responses."
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://firms.modaps.eosdis.nasa.gov/api/"
+  ],
+  "license": {
+    "name": "NASA FIRMS terms",
+    "url": "https://firms.modaps.eosdis.nasa.gov/api/",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "api-key",
+    "required": true,
+    "providerKey": "nasa_firms",
+    "accessPageProviderId": "nasa_firms"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "domains": ["data_retrieval", "map_rendering"],
+    "plannerHints": [
+      "fire",
+      "wildfire",
+      "smoke",
+      "active fire"
+    ],
+    "requiredUserAction": [
+      "fire",
+      "hazard",
+      "freshness"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": [
+      "Requires NASA FIRMS map key and bounded requests for responsible usage."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 1800,
+    "staleWhileRevalidateSeconds": 3600
+  },
+  "normalization": {
+    "geometryPath": "latitude,longitude",
+    "idPath": "source,latitude,longitude,acq_date,acq_time",
+    "timestampPath": "acq_date,acq_time",
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  },
+  "executionContract": {
+    "supported_operations": ["show", "search", "filter", "near", "around", "within_distance"],
+    "supported_scope_kinds": ["point", "bbox", "radius"],
+    "temporal_modes": ["current"],
+    "temporal_windows": ["supported_provider_window"],
+    "required_inputs": ["location", "analysis_scope", "provider_credentials"],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "global",
+    "limitations": ["Requires NASA FIRMS credentials and its supported time window."],
+    "fallback_ids": []
+  },
+  "account_setup": {
+    "automation": {
+      "support": "agent_assisted",
+      "signup_url": "https://firms.modaps.eosdis.nasa.gov/api/map_key/",
+      "developer_portal_url": "https://firms.modaps.eosdis.nasa.gov/api/map_key/",
+      "docs_url": "https://firms.modaps.eosdis.nasa.gov/api/",
+      "required_fields": [],
+      "user_action_notes": [
+        "Open the provider portal from AEGIS and complete account-controlled steps in the provider site.",
+        "Pause for any CAPTCHA, login, email verification, 2FA, billing, consent, or key-generation prompts.",
+        "Paste the generated API key back into AEGIS when the provider flow is complete."
+      ],
+      "safety_notes": [
+        "AEGIS does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials.",
+        "Guided setup is experimental and best-effort; manual provider instructions remain the fallback."
+      ],
+      "experimental": true,
+      "experimental_label": "Experimental guided setup"
+    }
+  }
+}

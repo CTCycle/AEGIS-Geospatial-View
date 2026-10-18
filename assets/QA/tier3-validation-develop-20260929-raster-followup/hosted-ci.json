@@ -1,0 +1,14 @@
+{
+  "workflow": "ci.yml",
+  "implementation_sha": "2c9112d0142f4425da418912d23c5a903606b4f8",
+  "run_id": 36594073100,
+  "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36594073100",
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": {
+    "capability-contract-validation": "success",
+    "backend-unit-tests": "success",
+    "frontend-build-and-tests": "success",
+    "persistence-conformance": "success"
+  }
+}

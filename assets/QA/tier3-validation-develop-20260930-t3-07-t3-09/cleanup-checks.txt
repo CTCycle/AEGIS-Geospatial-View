@@ -1,0 +1,10 @@
+2026-09-30 cleanup checks
+=========================
+temporary transport_probe.py: removed
+isolated QA runtime data root: removed after fresh-root capability check
+canonical data database: preserved; no destructive conversation/database cleanup performed
+backend port 7059: verified not listening after launcher stop
+frontend port 4512: verified not listening after launcher stop
+repo-local app/.ruff_cache: absent after final Ruff run
+repo-local app/server/.ruff_cache: absent after final Ruff run
+remaining generated pytest state: confined to runtimes/cache/pytest and runtimes/cache/pytest-tmp

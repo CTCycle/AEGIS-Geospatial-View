@@ -1,6 +1,6 @@
 # Dataset Ingestion
 
-Last updated: 2026-06-02
+Last updated: 2026-10-17
 
 ## Scope
 
@@ -51,7 +51,19 @@ They should also define checksum and bbox constraints when the source publishes 
 - OpenAddresses points
 - local parcel template
 - OurAirports airport CSV
+- GTFS static feed snapshots
+
+Overture Places is the preferred bulk POI path when
+`AEGIS_OVERTURE_PLACES_INDEX` points to an ingested GeoJSON index. Interactive
+requests can optionally augment it with bounded Overpass results; normalization
+and deduplication happen before the map/session contract is built.
 
 ## Optional Heavy Dependencies
 
 Use the optional `geospatial-ingestion` extra for packages such as GeoPandas, Rasterio, Pyogrio, DuckDB, and Rtree. Do not add them to the default backend dependency set unless required by the default runtime.
+
+The current executor normalizes only CSV and GeoJSON. Other formats preserve
+the raw source and emit partial-health warnings regardless of installed
+packages. Successful heavy-format ingestion requires implementation of the
+optional adapters as well as the extra; installation alone does not close
+T4-03. See the [2026-10-17 follow-up](../../../QA/tier3-validation-validation-20261017-t3-16/report.md).

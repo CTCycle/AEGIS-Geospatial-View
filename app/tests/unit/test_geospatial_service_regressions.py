@@ -22,4 +22,3 @@ def test_layer_provider_maps_active_fires_to_supported_provider_layer() -> None:
 
     assert entry.name == "MODIS_Combined_Thermal_Anomalies_Fire"
     assert entry.provider_name == "MODIS_Combined_Thermal_Anomalies_All"
-

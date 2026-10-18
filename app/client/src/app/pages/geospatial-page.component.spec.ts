@@ -1,11 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import { MapRenderStateChange } from '../components/map-preview.component';
 import { AgentReadinessService } from '../core/agent-readiness.service';
 import { ApiClientService } from '../core/api-client.service';
 import { defaultAppState } from '../core/app-state';
 import { AppStateStoreService } from '../core/app-state-store.service';
-import { ChatTurnResponse } from '../core/types';
+import { FakeRealtimeService } from '../core/realtime.test-support';
+import { RealtimeService } from '../core/realtime.service';
+import { ChatTurnResponse, MapRenderAcknowledgement, MapSession } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { GeospatialPageComponent } from './geospatial-page.component';
 
@@ -13,27 +16,56 @@ describe('pages/geospatial-page.component', () => {
   let store: jasmine.SpyObj<AppStateStoreService>;
   let errors: jasmine.SpyObj<UserFacingErrorService>;
   let apiClient: jasmine.SpyObj<ApiClientService>;
+  let realtime: FakeRealtimeService;
   let agentReadiness: jasmine.SpyObj<AgentReadinessService>;
   let sendChatTurnMock: jasmine.Spy;
 
   const makeTurnResponse = (overrides: Record<string, unknown> = {}): ChatTurnResponse => ({
+    conversation_id: 'conv-1',
     request_id: 'chat-1',
-    session_id: 1,
     assistant_message: 'ok',
-    turn_contract: {
-      user_text: 'x',
-      task_class: 'direct_query',
-      location_signals: [],
-      normalized_action: { action_id: 'x', action_label: 'X', task_tags: [], action_tags: [], requires_location: false },
-      temporal_signal: { mode: 'none' },
-      ambiguities: [],
-      parser_confidence: 0.9,
-    },
-    decision: { plan: { state: 'reject', action_id: 'x', overlay_ids: [] } },
     operation: { kind: 'rejection', status: 'failed', message: 'ok', warnings: [] },
     memory_snapshot: {},
+    context_revision: 0,
+    presentation_status: 'not_requested',
+    tool_results: [],
     ...overrides,
   });
+
+  const selectContextProfile = (
+    component: GeospatialPageComponent,
+    provider = 'test',
+    model = 'runtime-model',
+    contextWindow: number | null = 4096,
+  ): void => {
+    component.isContextProfileLoading = false;
+    component.selectedModelContext = {
+      provider,
+      model,
+      context_window_tokens: contextWindow,
+      maximum_output_tokens: null,
+      context_profile_source: contextWindow === null ? 'unknown' : 'provider_metadata',
+      context_metadata_authority: contextWindow === null ? 'unknown' : 'provider',
+    };
+  };
+
+  const stagePendingRender = (component: GeospatialPageComponent): void => {
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.isLoading = true;
+    component.mapSession = { session_id: 'committed-map' } as never;
+    component['committedMapSession'] = component.mapSession;
+    component['pendingMapSession'] = {
+      session_id: 'candidate-map',
+      overlay_collection: { revision: 4, instances: [] },
+    } as never;
+    component['pendingRenderContext'] = {
+      runId: 'run-1',
+      runVersion: 1,
+      mapSessionId: 'candidate-map',
+      collectionRevision: 4,
+    };
+  };
 
   beforeEach(async () => {
     store = jasmine.createSpyObj<AppStateStoreService>('AppStateStoreService', ['getChatPage', 'updateChatPage', 'resetChatPage']);
@@ -41,14 +73,46 @@ describe('pages/geospatial-page.component', () => {
     errors = jasmine.createSpyObj<UserFacingErrorService>('UserFacingErrorService', ['toUserFacingError']);
     errors.toUserFacingError.and.returnValue('fallback error');
 
-    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['sendChatTurn']);
+    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', [
+      'createConversation',
+      'fetchConversationSnapshot',
+      'sendChatTurn',
+      'fetchCatalog',
+      'fetchChatSettings',
+      'fetchConversationRunTrace',
+      'fetchConversations',
+    ]);
+    apiClient.createConversation.and.resolveTo({ conversation_id: 'conv-1', title: 'test' });
     sendChatTurnMock = jasmine.createSpy('sendChatTurn').and.resolveTo(makeTurnResponse());
     apiClient.sendChatTurn.and.callFake((payload) => sendChatTurnMock(payload));
+    apiClient.fetchCatalog.and.resolveTo({ capabilities: [], basemaps: [], overlays: [], tools: [] });
+    apiClient.fetchConversationRunTrace.and.resolveTo({
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      entries: [],
+      next_cursor: null,
+    });
+    apiClient.fetchConversations.and.resolveTo({ conversations: [], next_cursor: null });
+    apiClient.fetchChatSettings.and.resolveTo({
+      active_provider_mode: 'cloud',
+      agent_model_provider: 'openai',
+      agent_model_name: 'gpt-4.1',
+      ollama_url: 'http://127.0.0.1:11434',
+      credentials: {},
+      selected_model_context: {
+        provider: 'openai',
+        model: 'gpt-4.1',
+        context_window_tokens: 1_047_576,
+        maximum_output_tokens: 32_768,
+        context_profile_source: 'openai_model_catalog',
+      },
+    });
+    realtime = new FakeRealtimeService((payload) => apiClient.sendChatTurn(payload));
     agentReadiness = jasmine.createSpyObj<AgentReadinessService>('AgentReadinessService', ['loadReadiness']);
     agentReadiness.loadReadiness.and.resolveTo({
       status: 'active',
-      label: 'Active',
-      message: 'gpt-4.1-mini is ready through OpenAI.',
+      label: 'Configured',
+      message: 'gpt-4.1-mini is configured through OpenAI. Live inference is verified on the first request.',
     });
 
     await TestBed.configureTestingModule({
@@ -56,6 +120,7 @@ describe('pages/geospatial-page.component', () => {
       providers: [
         provideRouter([]),
         { provide: ApiClientService, useValue: apiClient },
+        { provide: RealtimeService, useValue: realtime },
         { provide: AppStateStoreService, useValue: store },
         { provide: AgentReadinessService, useValue: agentReadiness },
         { provide: UserFacingErrorService, useValue: errors },
@@ -66,17 +131,65 @@ describe('pages/geospatial-page.component', () => {
   it('loads initial persisted state', () => {
     const seeded = defaultAppState().chatPage;
     seeded.chatPanel.composerDraft = 'seed draft';
-    seeded.chatPanel.messages = [{ role: 'user', content: 'hello' }];
+    seeded.chatPanel.conversationId = undefined;
     store.getChatPage.and.returnValue(seeded);
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     expect(fixture.componentInstance.composerDraft).toBe('seed draft');
-    expect(fixture.componentInstance.messages.length).toBe(1);
+    expect(fixture.componentInstance.messages.length).toBe(0);
+  });
+
+  it('hydrates durable conversation state before connecting realtime', async () => {
+    const seeded = defaultAppState().chatPage;
+    seeded.chatPanel.conversationId = 'conv-restore';
+    seeded.chatPanel.lastRunSequence = 7;
+    store.getChatPage.and.returnValue(seeded);
+    apiClient.fetchConversationSnapshot.and.resolveTo({
+      conversation_id: 'conv-restore',
+      title: 'Restored conversation',
+      context_revision: 3,
+      messages: [
+        { role: 'user', content: 'Show Rome', created_at: '2026-08-31T10:00:00Z' },
+        { role: 'assistant', content: 'Restored', created_at: '2026-08-31T10:00:01Z' },
+      ],
+      conversation_state: {
+        schema_version: 2,
+        conversation_id: 'conv-restore',
+        revision: 3,
+        active_directives: [],
+        summary: null,
+        goal: null,
+        route: null,
+        constraints: {},
+        resolved_locations: {},
+        evidence_refs: [],
+        committed_map_session: null,
+        pending_clarification: null,
+      },
+      memory_snapshot: { location_slots: [] },
+      map_session: null,
+      active_run: { run_id: 'run-restore', run_version: 2, state: 'running' },
+    });
+    const connectSpy = spyOn(realtime, 'connect').and.callThrough();
+
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(apiClient.fetchConversationSnapshot).toHaveBeenCalledWith('conv-restore');
+    expect(fixture.componentInstance.contextRevision).toBe(3);
+    expect(fixture.componentInstance.messages.map((message) => message.content)).toEqual(['Show Rome', 'Restored']);
+    expect(fixture.componentInstance.activeRunId).toBe('run-restore');
+    expect(fixture.componentInstance.isLoading).toBeTrue();
+    expect(connectSpy.calls.mostRecent().args[0]).toBe('conv-restore');
+    expect(connectSpy.calls.mostRecent().args[1]).toEqual({
+      runId: 'run-restore',
+      afterSequence: 7,
+    });
   });
 
   it('sendMessage happy path updates status and appends assistant', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
-      session_id: 42,
       assistant_message: 'Search executed successfully.',
       operation: { kind: 'direct_answer', status: 'success', message: 'Search executed successfully.', warnings: [] },
       map_session: null,
@@ -85,13 +198,14 @@ describe('pages/geospatial-page.component', () => {
         selected_context_window: 2048,
         model_context_limit: 8192,
         usage_percent: 5.9,
-        provider: 'ollama',
-        model: 'llama3.2',
+        provider: 'openai',
+        model: 'gpt-4.1',
       },
     }));
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    selectContextProfile(component, 'openai', 'gpt-4.1', 1_047_576);
     component.composerDraft = 'show map';
     await component.sendMessage();
     expect(component.status).toBe('Agent ready');
@@ -101,10 +215,8 @@ describe('pages/geospatial-page.component', () => {
 
   it('clarification responses return the persistent agent status to ready', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
-      session_id: 42,
       assistant_message: 'Which location should I use?',
       operation: { kind: 'clarification', status: 'partial', message: 'Which location should I use?', warnings: [] },
-      decision: { plan: { state: 'clarify', action_id: 'weather', overlay_ids: [] } },
       map_session: null,
       tool_payload: null,
     }));
@@ -119,7 +231,6 @@ describe('pages/geospatial-page.component', () => {
 
   it('direct tool payload responses render as assistant message without map session', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
-      session_id: 42,
       assistant_message: 'Coordinates: 41.8902, 12.4922',
       operation: {
         kind: 'direct_answer',
@@ -128,7 +239,6 @@ describe('pages/geospatial-page.component', () => {
         direct_result: { latitude: 41.8902, longitude: 12.4922 },
         warnings: [],
       },
-      decision: { plan: { state: 'direct_tool', action_id: 'location_lookup', overlay_ids: [], tool_id: 'location_to_coordinates' } },
       tool_payload: { tool_id: 'location_to_coordinates', result: { latitude: 41.8902, longitude: 12.4922 } },
       map_session: null,
     }));
@@ -142,53 +252,425 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.at(-1)?.content).toContain('Coordinates: 41.8902, 12.4922');
   });
 
-  it('prefers operation.map_session over the top-level response map_session', async () => {
-    sendChatTurnMock.and.resolveTo(makeTurnResponse({
+  it('uses the top-level response map_session as the single map result', async () => {
+    const mapResponse = makeTurnResponse({
       assistant_message: 'Map ready.',
       operation: {
         kind: 'map_session',
         status: 'success',
         message: 'Map ready.',
         warnings: [],
-        map_session: {
-          session_id: 'operation-map',
-          resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
-          basemap_id: 'osm_default',
-          overlay_ids: ['safe_overlay'],
-          viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
-          center: { latitude: 41.9, longitude: 12.5 },
-          overlays: [{ id: 'safe_overlay', label: 'Safe overlay', provider: 'fixture', type: 'geojson', url: '/api/geospatial/layers/safe_overlay/features' }],
-        },
       },
       map_session: {
-        session_id: 'fallback-map',
-        resolved_location: { label: 'Leaky Rome', latitude: 41.9, longitude: 12.5 },
+        session_id: 'canonical-map',
+        resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
         basemap_id: 'osm_default',
-        overlay_ids: ['leaky_overlay'],
+        basemap: {
+          id: 'osm_default',
+          label: 'OpenStreetMap',
+          provider: 'openstreetmap',
+          tile_url: '/api/geospatial/tiles/osm_default/{z}/{x}/{y}.png',
+          render_status: 'available',
+        },
         viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
         center: { latitude: 41.9, longitude: 12.5 },
-        overlays: [{ id: 'leaky_overlay', label: 'Leaky overlay', provider: 'fixture', type: 'tile', url: 'https://tiles.example/{z}/{x}/{y}.png?api_key=forbidden-secret' }],
+        overlay_collection: {
+          collection_id: 'active-map',
+          revision: 0,
+          instances: [{
+            instance_id: 'safe_overlay',
+            capability_id: 'safe_overlay',
+            label: 'Safe overlay',
+            provider: 'fixture',
+            overlay_type: 'geojson',
+            rendering_mode: 'geojson',
+            scope_key: 'global',
+            scope: { kind: 'global' },
+            visible: true,
+            opacity: 1,
+            render_variant: {},
+            descriptor: {
+              id: 'safe_overlay',
+              url: '/api/geospatial/layers/safe_overlay/features',
+            },
+            inspections: [],
+          }],
+        },
       },
-    }));
+    });
+    sendChatTurnMock.and.resolveTo(mapResponse);
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
     component.composerDraft = 'show Rome';
 
     await component.sendMessage();
+    await Promise.resolve();
+    // The component's eager change detection starts MapLibre in a real
+    // browser; this unit spec focuses on the single map result path.
+    component['applyTurnResponse'](mapResponse, component.conversationNonce);
 
-    expect(component.mapSession?.session_id).toBe('operation-map');
-    expect(component.mapSession?.overlay_ids).toEqual(['safe_overlay']);
-    expect(JSON.stringify(component.payload)).not.toContain('forbidden-secret');
-    expect(JSON.stringify(component.payload)).not.toContain('api_key=');
+    expect(component['pendingMapSession']?.session_id).toBe('canonical-map');
+    component.onMapRenderStateChange({ sessionId: 'canonical-map', state: 'ready' });
+    expect(component.mapSession?.session_id).toBe('canonical-map');
+    expect(component.mapSession?.overlay_collection.instances.map((instance) => instance.capability_id))
+      .toEqual(['safe_overlay']);
   });
 
-  it('operation-driven failures preserve the response and return the agent to ready', async () => {
+  it('preserves a synchronous protocol rejection after a failed render ack', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    const sendMapRenderAck = jasmine.createSpy('sendMapRenderAck');
+    Object.assign(realtime, { sendMapRenderAck });
+    sendMapRenderAck.and.callFake(() => {
+      component['handleRealtimeMessage']({
+        protocol_version: 1,
+        type: 'protocol.error',
+        message_id: 'render-rejected',
+        correlation_id: 'unexpected-current-render-ack',
+        conversation_id: 'conv-1',
+        payload: {
+          code: 'render_ack_rejected',
+          command: 'map.render_ack',
+          run_id: 'run-1',
+          run_version: 1,
+        },
+      } as never);
+      return 'ack-1';
+    });
+
+    component.onMapRenderStateChange({
+      sessionId: 'candidate-map',
+      runId: 'run-1',
+      runVersion: 1,
+      state: 'failed',
+      collectionRevision: 4,
+    });
+
+    expect(component.status).toBe('Agent ready');
+    expect(component.isLoading).toBeFalse();
+    expect(component['pendingMapSession']).toBeUndefined();
+    expect(component['pendingRenderContext']).toBeUndefined();
+    expect(component.messages).toEqual([]);
+    expect(component.runFailureSummary).toContain('real-time connection');
+  });
+
+  it('retries a mismatched render acknowledgment against the expected candidate identity', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    const acknowledgement: MapRenderAcknowledgement = {
+      run_id: 'old-run',
+      run_version: 1,
+      map_session_id: 'old-candidate',
+      collection_revision: 3,
+      status: 'ready',
+      viewport_bounds: [-1, 41, 1, 43],
+      checks: { viewport_valid: true },
+      overlay_results: [],
+    };
+    component['pendingRenderAcknowledgement'] = acknowledgement;
+    const sendMapRenderAck = jasmine.createSpy('sendMapRenderAck').and.returnValue('retry-1');
+    Object.assign(realtime, { sendMapRenderAck });
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'protocol.error',
+      message_id: 'mismatch',
+      conversation_id: 'conv-1',
+      payload: {
+        code: 'render_ack_mismatch',
+        command: 'map.render_ack',
+        details: {
+          expected: {
+            run_id: 'run-1',
+            run_version: 1,
+            map_session_id: 'candidate-map',
+            collection_revision: 4,
+          },
+          observed: {
+            run_id: 'old-run',
+            run_version: 1,
+            map_session_id: 'old-candidate',
+            collection_revision: 3,
+          },
+        },
+      },
+    } as never);
+
+    expect(sendMapRenderAck).toHaveBeenCalledWith(jasmine.objectContaining({
+      run_id: 'run-1',
+      run_version: 1,
+      map_session_id: 'candidate-map',
+      collection_revision: 4,
+    }));
+    expect(component.status).toBe('Map data ready; rendering');
+    expect(component.isLoading).toBeTrue();
+    expect(component['pendingRenderContext']?.mapSessionId).toBe('candidate-map');
+  });
+
+  it('ignores a stale render rejection after a newer run version is staged', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    component.activeRunVersion = 2;
+    component['pendingMapSession'] = {
+      session_id: 'new-candidate-map',
+      overlay_collection: { revision: 5, instances: [] },
+    } as never;
+    component['pendingRenderContext'] = {
+      runId: 'run-1',
+      runVersion: 2,
+      mapSessionId: 'new-candidate-map',
+      collectionRevision: 5,
+    };
+    component['renderAckQueued'] = true;
+    component['pendingRenderAckMessageId'] = 'new-render-ack';
+    component.status = 'Map data ready; rendering';
+    component.progressLabel = 'Map data ready; rendering';
+    component.messages = [{ role: 'assistant', content: 'Data prepared; the map is loading.' }];
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'protocol.error',
+      message_id: 'stale-render-rejected',
+      correlation_id: 'old-render-ack',
+      conversation_id: 'conv-1',
+      payload: {
+        code: 'render_ack_rejected',
+        command: 'map.render_ack',
+        run_id: 'run-1',
+        run_version: 1,
+      },
+    } as never);
+
+    expect(component.status).toBe('Map data ready; rendering');
+    expect(component.progressLabel).toBe('Map data ready; rendering');
+    expect(component.isLoading).toBeTrue();
+    expect(component.activeRunId).toBe('run-1');
+    expect(component.activeRunVersion).toBe(2);
+    const pendingMapSession = component['pendingMapSession'] as MapSession | undefined;
+    expect(pendingMapSession?.session_id).toBe('new-candidate-map');
+    expect(component['pendingRenderContext']?.runVersion).toBe(2);
+    expect(component.messages.at(-1)?.content).not.toContain('real-time connection');
+  });
+
+  it('ignores an old render rejection that arrives before the steer acknowledgment', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    component['pendingSupersession'] = {
+      runId: 'run-1',
+      previousVersion: 1,
+      expectedVersion: 2,
+    };
+    component.status = 'Request updated';
+    component.progressLabel = 'Request updated';
+    component.messages = [{ role: 'assistant', content: 'Request updated' }];
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'protocol.error',
+      message_id: 'old-render-rejected-before-steer-ack',
+      conversation_id: 'conv-1',
+      payload: {
+        code: 'render_ack_rejected',
+        command: 'map.render_ack',
+        run_id: 'run-1',
+        run_version: 1,
+      },
+    } as never);
+
+    expect(component.status).toBe('Request updated');
+    expect(component.isLoading).toBeTrue();
+    expect(component['pendingRenderContext']?.runVersion).toBe(1);
+    expect(component.messages.at(-1)?.content).toBe('Request updated');
+  });
+
+  it('ignores an older render rejection after the accepted run has completed', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.activeRunVersion = 1;
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'run.ack',
+      message_id: 'run-2-accepted',
+      conversation_id: 'conv-1',
+      payload: {
+        accepted: true,
+        command: 'run.steer',
+        run_id: 'run-1',
+        run_version: 2,
+      },
+    } as never);
+
+    component.activeRunId = undefined;
+    component.activeRunVersion = undefined;
+    component['lastHandledRunId'] = undefined;
+    component.status = 'Agent ready';
+    component.messages = [{ role: 'assistant', content: 'Map ready.' }];
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'protocol.error',
+      message_id: 'late-old-render-rejected',
+      conversation_id: 'conv-1',
+      payload: {
+        code: 'render_ack_rejected',
+        command: 'map.render_ack',
+        run_id: 'run-1',
+        run_version: 1,
+      },
+    } as never);
+
+    expect(component.status).toBe('Agent ready');
+    expect(component.isLoading).toBeFalse();
+    expect(component.messages.at(-1)?.content).toBe('Map ready.');
+    expect(component['latestAcceptedRunId']).toBe('run-1');
+    expect(component['latestAcceptedRunVersion']).toBe(2);
+  });
+
+  it('preserves a synchronous failed run ack after a failed render ack', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    const sendMapRenderAck = jasmine.createSpy('sendMapRenderAck');
+    Object.assign(realtime, { sendMapRenderAck });
+    sendMapRenderAck.and.callFake(() => {
+      component['handleRealtimeMessage']({
+        protocol_version: 1,
+        type: 'run.ack',
+        message_id: 'render-failed',
+        conversation_id: 'conv-1',
+        payload: {
+          command: 'map.render_ack',
+          run_id: 'run-1',
+          run_version: 1,
+          presentation_status: 'failed',
+        },
+      } as never);
+      return 'ack-1';
+    });
+
+    component.onMapRenderStateChange({
+      sessionId: 'candidate-map',
+      runId: 'run-1',
+      runVersion: 1,
+      state: 'failed',
+      collectionRevision: 4,
+    });
+
+    expect(component.status).toBe('Map update failed; previous map retained');
+    expect(component.isLoading).toBeFalse();
+    expect(component['pendingMapSession']).toBeUndefined();
+    expect(component['pendingRenderContext']).toBeUndefined();
+  });
+
+  it('preserves a synchronous completed event after a ready render ack', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    stagePendingRender(component);
+    const sendMapRenderAck = jasmine.createSpy('sendMapRenderAck');
+    Object.assign(realtime, { sendMapRenderAck });
+    sendMapRenderAck.and.callFake(() => {
+      component['handleRunEvent']({
+        event_id: 'render-completed',
+        sequence: 1,
+        conversation_id: 'conv-1',
+        run_id: 'run-1',
+        run_version: 1,
+        type: 'completed',
+        timestamp: new Date().toISOString(),
+        visibility: 'user',
+        payload: {},
+      } as never);
+      return 'ack-1';
+    });
+
+    component.onMapRenderStateChange({
+      sessionId: 'candidate-map',
+      runId: 'run-1',
+      runVersion: 1,
+      state: 'ready',
+      collectionRevision: 4,
+    });
+
+    expect(component.status).toBe('Agent ready');
+    expect(component.isLoading).toBeFalse();
+    expect(component.activeRunId).toBeUndefined();
+  });
+
+  it('ignores a stale render callback before mutating presentation state', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component['pendingMapSession'] = {
+      session_id: 'map-current',
+      overlay_collection: { revision: 4, instances: [] },
+    } as never;
+    component['pendingRenderContext'] = {
+      runId: 'run-current',
+      runVersion: 2,
+      mapSessionId: 'map-current',
+      collectionRevision: 4,
+    };
+    component.mapRenderState = 'preparing';
+
+    component.onMapRenderStateChange({
+      sessionId: 'map-current',
+      runId: 'run-stale',
+      runVersion: 1,
+      state: 'ready',
+      collectionRevision: 4,
+    });
+
+    expect(component.mapRenderState).toBe('preparing');
+  });
+
+  it('restores the committed map when a pending candidate is cancelled after reconnect', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
+    component.mapSession = { session_id: 'committed-map' } as never;
+    component['committedMapSession'] = component.mapSession;
+    component['pendingMapSession'] = { session_id: 'candidate-map' } as never;
+    component['pendingRenderContext'] = {
+      runId: 'run-current',
+      runVersion: 1,
+      mapSessionId: 'candidate-map',
+      collectionRevision: 2,
+    };
+    component.isLoading = true;
+
+    component['handleRealtimeMessage']({
+      type: 'session.resumed',
+      conversation_id: 'conv-1',
+      payload: { state: 'cancelled' },
+    } as never);
+
+    const currentMap = component.mapSession as unknown as { session_id?: string } | undefined;
+    expect(currentMap?.session_id).toBe('committed-map');
+    expect(component['pendingMapSession']).toBeUndefined();
+    expect(component['pendingRenderContext']).toBeUndefined();
+    expect(component.isLoading).toBeFalse();
+  });
+
+  it('operation-driven failures preserve the response and flag the agent model', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
-      session_id: 42,
       assistant_message: 'Tool timed out.',
       operation: { kind: 'error', status: 'failed', message: 'Tool timed out.', warnings: [] },
-      decision: { plan: { state: 'direct_response', action_id: 'weather', overlay_ids: [] } },
       map_session: null,
       tool_payload: null,
     }));
@@ -197,7 +679,7 @@ describe('pages/geospatial-page.component', () => {
     const component = fixture.componentInstance;
     component.composerDraft = 'show weather';
     await component.sendMessage();
-    expect(component.status).toBe('Agent ready');
+    expect(component.status).toBe('Agent needs attention');
     expect(component.messages.at(-1)?.content).toContain('Tool timed out.');
   });
 
@@ -211,23 +693,27 @@ describe('pages/geospatial-page.component', () => {
     component.composerDraft = 'first';
     const sendPromise = component.sendMessage();
     component.startNewChat();
-    resolveTurn!(makeTurnResponse({ session_id: 7, assistant_message: 'late response', map_session: null }));
+    resolveTurn!(makeTurnResponse({ assistant_message: 'late response', map_session: null }));
     await sendPromise;
     expect(component.messages.find((entry) => entry.content === 'late response')).toBeUndefined();
   });
 
-  it('error path adds fallback assistant message and returns the agent to ready', async () => {
+  it('error path keeps transport failures out of chat and exposes execution status', async () => {
     sendChatTurnMock.and.rejectWith(new Error('boom'));
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
     component.composerDraft = 'show map';
+
     await component.sendMessage();
-    expect(component.status).toBe('Agent ready');
-    expect(component.messages.at(-1)?.content).toBe('fallback error');
+
+    expect(component.status).toBe('Agent needs attention');
+    expect(component.messages).toEqual([{ role: 'user', content: 'show map', kind: 'normal' }]);
+    expect(component.runFailureSummary)
+      .toBe('The request could not be completed. Open Tool activity for execution details.');
   });
 
-  it('operation-aware alerts include structured failure message', () => {
+  it('operation-aware alerts use the concise execution failure summary', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
@@ -238,9 +724,11 @@ describe('pages/geospatial-page.component', () => {
       message: 'Tool timed out.',
       warnings: [],
     };
-    component.messages = [{ role: 'assistant', content: 'Tool timed out.' }];
+    component.runFailureSummary = 'The selected model or data provider could not complete the request.';
 
-    expect(component.activeAlertItems).toContain('Tool timed out.');
+    expect(component.activeAlertItems)
+      .toContain('The selected model or data provider could not complete the request.');
+    expect(component.activeAlertItems).not.toContain('Tool timed out.');
   });
 
   it('loads typed agent readiness through the core service', async () => {
@@ -257,7 +745,7 @@ describe('pages/geospatial-page.component', () => {
 
     expect(component.agentReadiness.status).toBe('needs_attention');
     expect(component.capabilityStatusItems[0]).toEqual({
-      label: 'Agent online',
+      label: 'Agent model',
       statusLabel: 'Needs attention',
       tone: 'warn',
     });
@@ -268,6 +756,7 @@ describe('pages/geospatial-page.component', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
     component.isLoading = true;
     component.activeRunId = 'run-1';
     component['handleRunEvent']({
@@ -289,12 +778,19 @@ describe('pages/geospatial-page.component', () => {
           session_id: 'street-map',
           resolved_location: { label: 'Colosseum, Rome', latitude: 41.8902, longitude: 12.4922 },
           basemap_id: 'osm_default',
-          overlay_ids: ['overpass_residential_buildings'],
+          basemap: {
+            id: 'osm_default',
+            label: 'OpenStreetMap',
+            provider: 'openstreetmap',
+            tile_url: '/api/geospatial/tiles/osm_default/{z}/{x}/{y}.png',
+            render_status: 'available',
+          },
           viewport: { center_latitude: 41.8902, center_longitude: 12.4922, radius_m: 2500 },
-          overlays: [],
+          overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
         },
       },
     });
+    component.onMapRenderStateChange({ sessionId: 'street-map', state: 'ready' });
     expect(component.status).toBe('Agent ready');
     expect(component.isLoading).toBeFalse();
     expect(component.activeRunId).toBeUndefined();
@@ -302,11 +798,134 @@ describe('pages/geospatial-page.component', () => {
     expect(component.mapSession?.resolved_location.label).toBe('Colosseum, Rome');
   });
 
-  it('does not duplicate an assistant message when the matching error event arrives', () => {
+  it('refreshes the visible progress state when a run event arrives', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
-    component.messages = [{ role: 'assistant', content: 'Provider timed out.' }];
+    component.conversationId = 'conv-1';
+    component.isLoading = true;
+    component.progressLabel = 'Understanding the request';
+    fixture.detectChanges();
+
+    component['handleRunEvent']({
+      event_id: 'event-progress',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'progress',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: { stage: 'rendering_map', label: 'Rendering map...' },
+    });
+
+    expect(fixture.nativeElement.textContent).toContain('Rendering map...');
+  });
+
+  it('promotes an acknowledged render candidate while the run resumes', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const candidate = {
+      session_id: 'candidate-map',
+      overlay_collection: { revision: 2, instances: [] },
+    } as never;
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.isLoading = true;
+    component['pendingMapSession'] = candidate;
+    component['pendingRenderContext'] = {
+      runId: 'run-1',
+      runVersion: 1,
+      mapSessionId: 'candidate-map',
+      collectionRevision: 2,
+    };
+
+    component['handleRunEvent']({
+      event_id: 'render-observed-ready',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'render_observed',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: {
+        map_session_id: 'candidate-map',
+        collection_revision: 2,
+        attempt: 1,
+        status: 'ready',
+        checks: { viewport_valid: true },
+        overlay_results: [],
+        recovery: 'continue',
+      },
+    });
+
+    expect(component.mapSession?.session_id).toBe('candidate-map');
+    expect(component['pendingMapSession']).toBeUndefined();
+    expect(component['pendingRenderContext']).toBeUndefined();
+    expect(component.presentationStatus).toBe('ready');
+    expect(component.isLoading).toBeTrue();
+  });
+
+  it('keeps the last-known-good map after a failed render observation', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const committed = { session_id: 'good-map' } as unknown as MapSession;
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.isLoading = true;
+    component.mapSession = committed;
+    component['committedMapSession'] = committed;
+    component['pendingMapSession'] = {
+      session_id: 'candidate-map',
+      overlay_collection: { revision: 4, instances: [] },
+    } as never;
+    component['pendingRenderContext'] = {
+      runId: 'run-1',
+      runVersion: 1,
+      mapSessionId: 'candidate-map',
+      collectionRevision: 4,
+    };
+
+    component['handleRunEvent']({
+      event_id: 'render-observed-failed',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'render_observed',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: {
+        map_session_id: 'candidate-map',
+        collection_revision: 4,
+        attempt: 1,
+        status: 'failed',
+        checks: { required_layers_present: false },
+        overlay_results: [],
+        failure_code: 'render_failed',
+        failure_stage: 'maplibre',
+        failure_summary: 'Layer was not registered.',
+        recovery: 'revise_map',
+      },
+    });
+
+    expect(component.mapSession?.session_id).toBe('good-map');
+    expect(component['pendingMapSession']).toBeUndefined();
+    expect(component['pendingRenderContext']).toBeUndefined();
+    expect(component.progressStage).toBe('correcting_render');
+    expect(component.isLoading).toBeTrue();
+  });
+
+  it('keeps raw run errors out of the transcript and exposes a human-readable execution summary', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    selectContextProfile(component, 'opencode-go', 'deepseek-v4-flash', null);
+    component.conversationId = 'conv-1';
+    component.messages = [{ role: 'user', content: 'Show the requested data.' }];
     component['handleRunEvent']({
       event_id: 'event-error',
       sequence: 2,
@@ -316,10 +935,59 @@ describe('pages/geospatial-page.component', () => {
       type: 'error',
       timestamp: new Date().toISOString(),
       visibility: 'user',
-      payload: { message: 'Provider timed out.' },
+      payload: {
+        message: 'provider_http_502: upstream request failed with internal trace metadata',
+        operation: {
+          kind: 'error',
+          status: 'failed',
+          message: 'Provider request failed.',
+          warnings: [],
+          failure_category: 'provider_failure',
+        },
+        presentation_status: 'not_requested',
+        tool_results: [],
+        context_usage: {
+          estimated_input_tokens: 321,
+          selected_context_window: null,
+          model_context_limit: null,
+          usage_percent: null,
+          provider: 'opencode-go',
+          model: 'deepseek-v4-flash',
+          usage_source: 'estimated',
+        },
+      },
     });
-    expect(component.messages.length).toBe(1);
-    expect(component.status).toBe('Agent ready');
+
+    expect(component.messages).toEqual([{ role: 'user', content: 'Show the requested data.' }]);
+    expect(component.messages.some((message) => message.content.includes('provider_http_502'))).toBeFalse();
+    expect(component.status).toBe('Agent needs attention');
+    expect(component.lastOperation?.kind).toBe('error');
+    expect(component.presentationStatus).toBe('not_requested');
+    expect(component.contextUsage?.estimated_input_tokens).toBe(321);
+    expect(component.contextUsageLabel).toBe('Unavailable');
+    expect(component.contextUsageDetail).toContain('max context unavailable');
+    expect(component.contextUsageDetail.toLowerCase()).not.toContain('token');
+    expect(component.runFailureSummary).toBe('The selected model or data provider could not complete the request.');
+    expect(component.agentReadiness).toEqual({
+      status: 'needs_attention',
+      label: 'Needs attention',
+      message: 'The selected model or data provider could not complete the request.',
+    });
+  });
+
+  it('rejects messages beyond the realtime contract before creating a conversation', async () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.composerDraft = 'a'.repeat(component.maxChatMessageLength + 1);
+
+    await component.sendMessage();
+    fixture.detectChanges();
+
+    expect(apiClient.createConversation).not.toHaveBeenCalled();
+    expect(component.status).toBe(`Message must be ${component.maxChatMessageLength.toLocaleString()} characters or fewer.`);
+    expect(component.composerDraft.length).toBe(component.maxChatMessageLength + 1);
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(component.composerError);
   });
 
   it('starts each request at understanding and returns the persistent agent to ready', async () => {
@@ -343,14 +1011,15 @@ describe('pages/geospatial-page.component', () => {
       operation: { kind: 'direct_answer', status: 'success', message: 'Rain ready.', warnings: [] },
     }));
     await pending;
+    await Promise.resolve();
     expect(component.status).toBe('Agent ready');
   });
 
-  it('startNewChat clears session and map/chat state', () => {
+  it('startNewChat clears conversation and map/chat state', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
-    component.sessionId = 7;
+    component.conversationId = 'conv-1';
     component.messages = [{ role: 'assistant', content: 'x' }];
     component.composerDraft = 'draft';
     component.payload = {
@@ -358,9 +1027,15 @@ describe('pages/geospatial-page.component', () => {
         session_id: 's1',
         resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
         basemap_id: 'osm_default',
-        overlay_ids: [],
+        basemap: {
+          id: 'osm_default',
+          label: 'OpenStreetMap',
+          provider: 'openstreetmap',
+          tile_url: '/api/geospatial/tiles/osm_default/{z}/{x}/{y}.png',
+          render_status: 'available',
+        },
         viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
-        overlays: [],
+        overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
       },
     };
     component.contextUsage = {
@@ -372,7 +1047,7 @@ describe('pages/geospatial-page.component', () => {
       model: 'llama3.2',
     };
     component.startNewChat();
-    expect(component.sessionId).toBeUndefined();
+    expect(component.conversationId).toBeUndefined();
     expect(component.messages.length).toBe(0);
     expect(component.composerDraft).toBe('');
     expect(component.payload).toBeUndefined();
@@ -384,9 +1059,57 @@ describe('pages/geospatial-page.component', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
-    component.onOverlayStateChange({ overlayVisibility: { overlay_a: false }, overlayOpacity: { overlay_a: 0.3 } });
+    component.onOverlayStateChange({
+      overlayVisibility: { overlay_a: false },
+      overlayOpacity: { overlay_a: 0.3 },
+      overlayOrder: ['overlay_a'],
+    });
     expect(component.mapState.overlayVisibility['overlay_a']).toBeFalse();
+    expect(component.mapState.overlayOrder).toEqual(['overlay_a']);
     expect(store.updateChatPage).toHaveBeenCalled();
+  });
+
+  it('keeps saved overlay preferences when the restored map session is replayed', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const session = {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      overlay_collection: {
+        collection_id: 'active-map',
+        revision: 1,
+        instances: [{
+          instance_id: 'weather',
+          capability_id: 'weather',
+          label: 'Weather',
+          provider: 'fixture',
+          overlay_type: 'tile',
+          rendering_mode: 'xyz',
+          scope_key: 'global',
+          scope: {},
+          visible: true,
+          opacity: 0.65,
+          render_variant: {},
+          descriptor: { id: 'weather', type: 'tile' },
+          inspections: [],
+        }],
+      },
+    } as MapSession;
+    component.mapSession = session;
+    component.mapState = {
+      overlayVisibility: { weather: false },
+      overlayOpacity: { weather: 0.34 },
+      overlayOrder: ['weather'],
+    };
+
+    component['handleMapSession'](session);
+
+    expect(component.mapState.overlayVisibility['weather']).toBeFalse();
+    expect(component.mapState.overlayOpacity['weather']).toBe(0.34);
+    expect(component.mapState.overlayOrder).toEqual(['weather']);
   });
 
   it('handles zoom commands locally without chat API request', async () => {
@@ -421,6 +1144,585 @@ describe('pages/geospatial-page.component', () => {
 
     expect(sendChatTurnMock).toHaveBeenCalled();
     expect(component.messages.at(-1)?.content).toContain('**Capabilities**');
+  });
+
+  it('keeps send and stop in one composer action cell', async () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const sendMessage = spyOn(component, 'sendMessage').and.resolveTo();
+    const cancelActiveRun = spyOn(component, 'cancelActiveRun').and.resolveTo();
+    const button = (): HTMLButtonElement => fixture.nativeElement.querySelector('.chat-composer .primary-button');
+
+    component.composerDraft = 'show Rome';
+    fixture.detectChanges();
+    expect(button().getAttribute('aria-label')).toBe('Send message');
+    expect(fixture.nativeElement.querySelector('[aria-label="Cancel active run"]')).toBeNull();
+    button().click();
+    expect(sendMessage).toHaveBeenCalled();
+
+    component.isLoading = true;
+    fixture.detectChanges();
+    expect(button().getAttribute('aria-label')).toBe('Stop generating');
+    expect(button().querySelector('.composer-stop-icon')).not.toBeNull();
+    button().click();
+    expect(cancelActiveRun).toHaveBeenCalled();
+  });
+
+  it('only enables the composer scrollbar when content exceeds its maximum height', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector('.chat-composer textarea') as HTMLTextAreaElement;
+    let scrollHeight = 60;
+    Object.defineProperty(input, 'scrollHeight', {
+      configurable: true,
+      get: () => scrollHeight,
+    });
+
+    fixture.componentInstance['resizeComposer'](input);
+    expect(input.style.overflowX).toBe('hidden');
+    expect(input.style.overflowY).toBe('hidden');
+
+    scrollHeight = 180;
+    fixture.componentInstance['resizeComposer'](input);
+    expect(input.style.overflowY).toBe('auto');
+  });
+
+  it('honors a stop request made before the run acknowledgement arrives', async () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
+    component.isLoading = true;
+
+    await component.cancelActiveRun();
+    expect(component['cancelRequested']).toBeTrue();
+    realtime.connect('conv-1');
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'run.ack',
+      message_id: 'ack-start',
+      conversation_id: 'conv-1',
+      payload: { command: 'run.start', run_id: 'run-1', run_version: 1, duplicate: false },
+    } as never);
+
+    expect(component['cancelRequested']).toBeFalse();
+    expect(component.isLoading).toBeFalse();
+    expect(component.status).toBe('Agent ready');
+  });
+
+  it('shows the selected model context cap and exposes the compact workspace footer', async () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+
+    expect(component.selectedModelContext?.context_window_tokens).toBe(1_047_576);
+    expect(component.contextUsageLabel).toBe('1.05M tokens');
+    expect(component.contextUsageDetail).toMatch(/max context 1[,.]047[,.]576/);
+    const footer = fixture.nativeElement.querySelector('.workspace-status-bar') as HTMLElement | null;
+    expect(footer).not.toBeNull();
+    expect(footer?.textContent).toContain('Agent model');
+    expect(footer?.textContent).toContain('Satellite');
+    expect(footer?.textContent).not.toContain('Weather');
+    expect(footer?.textContent).toContain('Optional Keys');
+    expect(footer?.textContent).toContain('Tool activity');
+    expect(footer?.querySelector('app-execution-status')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.context-window-row')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.context-window-row progress')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.chat-status-strip')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.rail-capability-card')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.rail-context-strip')).toBeNull();
+  });
+
+  it('keeps execution widgets out of the chat surface', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+
+    const chat = fixture.nativeElement.querySelector('.agent-chat-panel') as HTMLElement;
+    const footer = fixture.nativeElement.querySelector('.workspace-status-bar') as HTMLElement;
+
+    expect(chat.querySelector('.tool-progress-row')).toBeNull();
+    expect(chat.querySelector('app-run-inspector')).toBeNull();
+    expect(chat.querySelector('app-execution-status')).toBeNull();
+    expect(footer.querySelector('app-execution-status')).not.toBeNull();
+  });
+
+  it('keeps canvas icon actions fixed on the right when progress text becomes long', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.isLoading = true;
+    component.progressLabel = 'Searching several geospatial providers and validating a deliberately long execution status that must truncate before the controls.';
+    fixture.detectChanges();
+
+    const header = fixture.nativeElement.querySelector('.canvas-header') as HTMLElement;
+    const status = header.querySelector('.canvas-header__status') as HTMLElement;
+    const actions = header.querySelector('.canvas-header__actions') as HTMLElement;
+    const buttons = actions.querySelectorAll('.canvas-header__icon-button');
+
+    expect(status.textContent).toContain('Searching several geospatial providers');
+    expect(buttons.length).toBe(2);
+    expect(actions.querySelector('.canvas-header__text-button')).toBeNull();
+    expect(actions.querySelector('.canvas-header__alert-button')).toBeNull();
+    expect((buttons[0] as HTMLButtonElement).getAttribute('aria-label')).toBe('Hide chat panel');
+    expect((buttons[1] as HTMLButtonElement).getAttribute('aria-label')).toBe('Alerts');
+
+    component.toggleToolbar();
+    fixture.detectChanges();
+    expect((actions.querySelectorAll('.canvas-header__icon-button')[0] as HTMLButtonElement).getAttribute('aria-label')).toBe('Show chat panel');
+  });
+
+  it('shows tool activity in the footer without adding tool diagnostics to messages', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.isLoading = true;
+    component.messages = [{ role: 'user', content: 'Find parks in Rome.' }];
+
+    component['handleRunEvent']({
+      event_id: 'event-tool-start',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'tool_started',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: {
+        call_id: 'call-1',
+        tool_name: 'discover_geospatial_capabilities',
+        label: 'Discovering capabilities',
+        status: 'running',
+        iteration: 1,
+      },
+    });
+    fixture.detectChanges();
+
+    expect(component.messages).toEqual([{ role: 'user', content: 'Find parks in Rome.' }]);
+    expect(fixture.nativeElement.querySelector('.agent-chat-panel')?.textContent)
+      .not.toContain('discover_geospatial_capabilities');
+    expect(fixture.nativeElement.querySelector('.workspace-status-bar')?.textContent)
+      .toContain('Discovering capabilities');
+  });
+
+  it('loads the context indicator from current backend model settings', async () => {
+    apiClient.fetchChatSettings.and.resolveTo({
+      active_provider_mode: 'local',
+      agent_model_provider: 'ollama',
+      agent_model_name: 'qwen3.5:2b',
+      ollama_url: 'http://127.0.0.1:11434',
+      credentials: {},
+      selected_model_context: {
+        provider: 'ollama',
+        model: 'qwen3.5:2b',
+        context_window_tokens: 40_960,
+        maximum_output_tokens: null,
+        context_profile_source: 'provider_metadata',
+      },
+    });
+
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(fixture.componentInstance.selectedModelContext?.context_window_tokens).toBe(40_960);
+    expect(fixture.componentInstance.selectedModelContext?.provider).toBe('ollama');
+    expect(fixture.componentInstance.selectedModelContext?.model).toBe('qwen3.5:2b');
+  });
+
+  it('distinguishes estimated, provider-reported, unknown-cap, and unmeasured states', async () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    selectContextProfile(component);
+
+    component.contextUsage = {
+      estimated_input_tokens: 300,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: 10.4,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'estimated',
+    };
+    expect(component.contextUsageLabel).toBe('~10%');
+
+    component.contextUsage = {
+      estimated_input_tokens: 300,
+      reported_input_tokens: 280,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: 9.1,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'provider_reported',
+    };
+    expect(component.contextUsageLabel).toBe('9%');
+
+    selectContextProfile(component, 'test', 'runtime-model', null);
+    component.contextUsage = {
+      estimated_input_tokens: 321,
+      selected_context_window: null,
+      model_context_limit: null,
+      usage_percent: null,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'estimated',
+    };
+    fixture.detectChanges();
+    expect(component.contextUsageLabel).toBe('Unavailable');
+    expect(component.contextUsageDetail).toContain('max context unavailable');
+    expect(component.contextUsageDetail.toLowerCase()).not.toContain('token');
+    expect(fixture.nativeElement.querySelector('.context-window-row progress')).toBeNull();
+
+    selectContextProfile(component);
+    component.contextUsage = {
+      estimated_input_tokens: 0,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: null,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'not_measured',
+    };
+    expect(component.contextUsageLabel).toBe('4.1K tokens');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.context-window-row progress')).toBeNull();
+  });
+
+  it('uses peak request telemetry for the visible context status', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    selectContextProfile(component);
+
+    component.contextUsage = {
+      estimated_input_tokens: 300,
+      reported_input_tokens: 280,
+      peak_request_tokens: 900,
+      total_input_tokens: 1180,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: 22,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'provider_reported',
+    };
+    fixture.detectChanges();
+
+    expect(component.contextUsageLabel).toBe('22%');
+    expect(component.contextUsageDetail).toContain('900 peak');
+    expect(component.contextUsageDetail).toMatch(/remaining 3[,.]?196/);
+    expect((fixture.nativeElement.querySelector('.context-window-row progress') as HTMLProgressElement).getAttribute('value')).toBe('22');
+  });
+
+  it('shows raw over-cap context percentage while clamping only the progress bar', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    selectContextProfile(component);
+
+    component.contextUsage = {
+      estimated_input_tokens: 5000,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: 122.1,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'estimated',
+    };
+    fixture.detectChanges();
+
+    expect(component.contextUsageLabel).toBe('~122%');
+    expect(component.contextUsagePercent).toBe(100);
+    expect(component.contextUsageDetail).toContain('(122.1%)');
+    expect((fixture.nativeElement.querySelector('.context-window-row progress') as HTMLProgressElement).getAttribute('value')).toBe('100');
+  });
+
+  it('applies live context events without changing progress status', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    selectContextProfile(component);
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.status = 'Calling a relevant tool';
+    component.progressStage = 'calling_tool';
+    component.progressLabel = 'Calling a relevant tool';
+
+    component['handleRunEvent']({
+      event_id: 'context-1',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'context_usage',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: {
+        phase: 'parser',
+        context_usage: {
+          estimated_input_tokens: 700,
+          selected_context_window: 4096,
+          model_context_limit: 4096,
+          usage_percent: 17.1,
+          provider: 'test',
+          model: 'runtime-model',
+          usage_source: 'estimated',
+        },
+      },
+    });
+
+    expect(component.contextUsageLabel).toBe('~17%');
+    expect(component.status).toBe('Calling a relevant tool');
+    expect(component.progressStage).toBe('calling_tool');
+    expect(component.progressLabel).toBe('Calling a relevant tool');
+  });
+
+  it('retains the last measured context sample after failed or partial turns', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    selectContextProfile(component);
+    const previous = {
+      estimated_input_tokens: 240,
+      reported_input_tokens: 220,
+      selected_context_window: 4096,
+      model_context_limit: 4096,
+      usage_percent: 7.8,
+      provider: 'test',
+      model: 'runtime-model',
+      usage_source: 'provider_reported' as const,
+    };
+    component.contextUsage = previous;
+
+    component['applyTurnResponse'](makeTurnResponse({
+      operation: { kind: 'error', status: 'failed', message: 'Provider failed.', warnings: [] },
+      context_usage: {
+        estimated_input_tokens: 900,
+        selected_context_window: null,
+        model_context_limit: null,
+        usage_percent: null,
+        provider: 'test',
+        model: 'runtime-model',
+        usage_source: 'not_measured',
+      },
+    }), component.conversationNonce);
+    expect(component.contextUsage).toEqual(previous);
+
+    component['applyTurnResponse'](makeTurnResponse({
+      operation: { kind: 'clarification', status: 'partial', message: 'Need clarification.', warnings: [] },
+      context_usage: {
+        estimated_input_tokens: 901,
+        selected_context_window: null,
+        model_context_limit: null,
+        usage_percent: null,
+        provider: 'test',
+        model: 'runtime-model',
+        usage_source: 'not_measured',
+      },
+    }), component.conversationNonce);
+    expect(component.contextUsage).toEqual(previous);
+
+    component['applyTurnResponse'](makeTurnResponse({
+      operation: { kind: 'error', status: 'failed', message: 'Measured failure.', warnings: [] },
+      context_usage: {
+        estimated_input_tokens: 900,
+        peak_request_tokens: 640,
+        selected_context_window: 4096,
+        model_context_limit: 4096,
+        usage_percent: 15.6,
+        provider: 'test',
+        model: 'runtime-model',
+        usage_source: 'provider_reported',
+      },
+    }), component.conversationNonce);
+    expect(component.contextUsage?.peak_request_tokens).toBe(640);
+  });
+
+  it('switches the active session to a catalog-provided satellite descriptor', async () => {
+    apiClient.fetchCatalog.and.resolveTo({
+      capabilities: [],
+      basemaps: [
+        {
+          id: 'esri_world_imagery',
+          name: 'Satellite Imagery Basemap',
+          provider: 'arcgis',
+          kind: 'basemap',
+          type: 'tile',
+          description: 'Public satellite imagery',
+          requires_credentials: false,
+          is_available: true,
+          supports_map: true,
+          supports_direct_text: false,
+          coverage: 'global',
+          render: {
+            status: 'available',
+            tile_url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attribution: 'Esri',
+          },
+          action_tags: [],
+          task_tags: [],
+          metadata: {},
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    component.mapSession = {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      overlay_ids: [],
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      overlays: [],
+    } as never;
+    component.onBasemapChange('esri_world_imagery');
+
+    expect(component.payload?.map_session?.basemap_id).toBe('esri_world_imagery');
+    expect(component.payload?.map_session?.basemap?.tile_url).toContain('World_Imagery');
+    expect(component.availableBasemaps.map((item) => item.id)).toEqual(['esri_world_imagery']);
+  });
+
+  it('preserves a manual basemap choice when the next location candidate uses the default', async () => {
+    apiClient.fetchCatalog.and.resolveTo({
+      capabilities: [],
+      basemaps: [
+        {
+          id: 'osm_default',
+          name: 'OpenStreetMap',
+          provider: 'openstreetmap',
+          kind: 'basemap',
+          type: 'tile',
+          description: 'Public street map',
+          requires_credentials: false,
+          is_available: true,
+          supports_map: true,
+          supports_direct_text: false,
+          coverage: 'global',
+          render: { status: 'available', tile_url: '/tiles/osm/{z}/{x}/{y}.png', attribution: 'OSM' },
+          action_tags: [],
+          task_tags: [],
+          metadata: {},
+        },
+        {
+          id: 'osm_dark',
+          name: 'Dark Basemap',
+          provider: 'openstreetmap',
+          kind: 'basemap',
+          type: 'tile',
+          description: 'Dark street map',
+          requires_credentials: false,
+          is_available: true,
+          supports_map: true,
+          supports_direct_text: false,
+          coverage: 'global',
+          render: { status: 'available', tile_url: '/tiles/osm/{z}/{x}/{y}.png', attribution: 'OSM' },
+          action_tags: [],
+          task_tags: [],
+          metadata: {},
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    component.mapSession = {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      basemap: { id: 'osm_default', label: 'OpenStreetMap', render_status: 'available' },
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
+    } as MapSession;
+    component.onBasemapChange('osm_dark');
+
+    component['handleMapSession']({
+      session_id: 'map-2',
+      resolved_location: { label: 'Zurich', latitude: 47.4, longitude: 8.5 },
+      basemap_id: 'osm_default',
+      basemap: { id: 'osm_default', label: 'OpenStreetMap', render_status: 'available' },
+      viewport: { center_latitude: 47.4, center_longitude: 8.5, radius_m: 2500 },
+      overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
+    });
+
+    expect(component.payload?.map_session?.basemap_id).toBe('osm_dark');
+    expect(component.payload?.map_session?.basemap?.label).toBe('Dark Basemap');
+    expect(component.payload?.map_session?.resolved_location.label).toBe('Zurich');
+  });
+
+  it('clears a previous basemap render warning after a manual recovery renders', async () => {
+    apiClient.fetchCatalog.and.resolveTo({
+      capabilities: [],
+      basemaps: [
+        {
+          id: 'osm_default',
+          name: 'OpenStreetMap',
+          provider: 'openstreetmap',
+          kind: 'basemap',
+          type: 'tile',
+          description: 'Public street map',
+          requires_credentials: false,
+          is_available: true,
+          supports_map: true,
+          supports_direct_text: false,
+          coverage: 'global',
+          render: { status: 'available', tile_url: '/tiles/osm/{z}/{x}/{y}.png', attribution: 'OSM' },
+          action_tags: [],
+          task_tags: [],
+          metadata: {},
+        },
+        {
+          id: 'osm_dark',
+          name: 'Dark Basemap',
+          provider: 'openstreetmap',
+          kind: 'basemap',
+          type: 'tile',
+          description: 'Dark street map',
+          requires_credentials: false,
+          is_available: true,
+          supports_map: true,
+          supports_direct_text: false,
+          coverage: 'global',
+          render: { status: 'available', tile_url: '/tiles/osm/{z}/{x}/{y}.png', attribution: 'OSM' },
+          action_tags: [],
+          task_tags: [],
+          metadata: {},
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    component.mapSession = {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      basemap: { id: 'osm_default', label: 'OpenStreetMap', render_status: 'available' },
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
+    } as MapSession;
+    component.onBasemapChange('osm_dark');
+    component.runFailureSummary = 'The map update could not be rendered. The previous map remains available.';
+
+    const readyChange: MapRenderStateChange = {
+      sessionId: 'map-1',
+      state: 'ready',
+      collectionRevision: 0,
+    };
+    component.onMapRenderStateChange(readyChange);
+
+    expect(component.runFailureSummary).toBe('');
+    expect(component.status).toBe('Agent ready');
   });
 
 });

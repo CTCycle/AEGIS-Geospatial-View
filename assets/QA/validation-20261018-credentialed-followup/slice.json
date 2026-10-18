@@ -1,0 +1,9 @@
+{"base":"815fb89d13a9ea62e42e26d9605b12e81749b898","files":{
+"app/server/services/geospatial/providers/tomtom.py":"9ff9f7d7d3a3fbb332a24114bdf9bfe1f41113ada3d7ee968383479ea30fb0c6"
+,
+"app/tests/unit/services/geospatial/test_agentic_manifest_contract.py":"e35bce9877558f5ea9487191e68d5281fa7c4bcbbd8c175606fe5d58e13f9a3f"
+,
+"app/tests/unit/test_geospatial_optional_provider_adapters.py":"23e678f6a874702cbf4931fd83cbcb011ce6b7f1f6038a88b66ded4d824a844a"
+,
+"data/catalog/overlays/openaq_air_quality.json":"f5d92b15a6b529156484297f0a39243db249001b6814dac26b0f7eaaafbc1d76"
+}}
