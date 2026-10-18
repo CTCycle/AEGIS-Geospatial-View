@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-09-18
+Last updated: 2026-10-18
 
 ## Mounting
 
@@ -31,9 +31,14 @@ Defined in `app/server/api/geospatial.py`:
 - `GET /api/geospatial/layers/{layer_id}/health`
   Returns `GeospatialLayerHealthResponse`.
 - `GET /api/geospatial/layers/{layer_id}/features`
-  Returns `GeospatialProviderPayloadResponse`.
+  Returns `GeospatialProviderPayloadResponse`. A capability that is disabled
+  for the deployment (for example a `restricted_usage_opt_in` source without
+  `AEGIS_ALLOW_RESTRICTED_SOURCES`) returns `403` with its availability reason
+  and never reaches the provider. Unconfigured but enabled sources still return
+  their metadata payload.
 - `GET /api/geospatial/layers/{layer_id}/geojson`
-  Returns raw GeoJSON `FeatureCollection` for map rendering.
+  Returns raw GeoJSON `FeatureCollection` for map rendering, with the same
+  `403` rule for disabled capabilities.
 - `GET /api/geospatial/providers/{provider_id}/layers`
   Returns normalized live provider-native layer descriptors. NASA GIBS uses WMS/WMTS XML capabilities and does not expose raw XML to the frontend.
 - `GET /api/geospatial/providers/{provider_id}/layers/{layer_id}`
