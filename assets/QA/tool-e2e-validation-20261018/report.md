@@ -86,7 +86,7 @@ Per-run tool sequences, render observations, vision events and answer excerpts a
 
 | ID | Finding | Why not fixed |
 |---|---|---|
-| F-12 | "Tokyo" requested as a city is rejected: Nominatim classifies it as `province`, and the run ends with "could not safely resolve Tokyo". Two of two Tokyo requests were blocked. | Accepting province-level candidates for city targets risks resolving New York city to New York state. This needs a product decision. |
+| F-12 | Resolved in the [F-12/vision follow-up](../validation-20261018-f12-vision/report.md): a state-level candidate satisfies a city target only by its own ISO 3166-2 single-city-subdivision code, and its extent is clamped to the city scale. Tokyo resolves; New York still resolves to the city. | — |
 | F-13 | When a radar request is framed as a point scope, every bbox/viewport raster is excluded. The model then claimed RainViewer "is not available". | The contract filtering is correct. The real problems are model framing and over-confident narration. |
 | F-14 | The pixel-count render check cannot tell an error image from data, and a pre-fix error tile was reused from the browser HTTP cache (`max-age=60`). | Fix 11 removes the known source. A generic content check is a design change. |
 | F-15 | WMS requests on the generic manifest path still default to 1.1.1 with `se_inimage`. That pairing is valid, but errors would also render as images. | Changing it was out of scope; no failure was observed. |
