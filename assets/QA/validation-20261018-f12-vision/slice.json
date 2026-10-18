@@ -1,0 +1,23 @@
+{
+ "campaign": "validation-20261018-f12-vision",
+ "branch": "develop",
+ "base": "d033d726abb87fbe9671cc5d7e8a087d96bda9b3",
+ "lane": "opencode-go / deepseek-v4.1-flash",
+ "runtime": "isolated backend 127.0.0.1:5079 serving the production client build; disposable data root copied from data/database.db by SQLite backup, deleted after the run",
+ "gates": [
+  "F-12 / ROUTE-LIVE",
+  "T3-18 Tokyo variants",
+  "T4-07",
+  "AGENT-XTOOL X-12",
+  "VISION-INSPECT"
+ ],
+ "source_sha256": {
+  "app/server/services/agent/agent_loop.py": "eb3dbcc296ea5678b7791e589a944fd970ef52b511b02f762f2b8cf2ae026fdf",
+  "app/server/services/agent/location_resolver.py": "c3097e4a0e088a0ff879783d6efb804bf82305b16d4f6f96f649dfc68e903efe",
+  "app/server/services/geospatial/providers/windy_webcams.py": "5d257166af734fb68e6eb4c7bd290c7ecbca2a3e53c89d4dde5fe3000f229b93",
+  "app/tests/unit/services/agent/test_agent_loop_v2.py": "e06045eaff057e80acb999a2e503ec68eb361fc0301ff9f59ea5576ba1001b47",
+  "app/tests/unit/services/agent/test_location_resolver.py": "7478931fa68e20fcb86e7a1fc43fe3174be77896dd667614eb04c574327fe23c",
+  "app/tests/unit/test_geospatial_provider_adapters_core.py": "73dc20072e465a3484e678b99a351aae5bc6c0f52e323a7628c7fe2246bacc78",
+  "app/tests/unit/test_geospatial_webcam_provider.py": "109b77cb33816d1059a8cb223dce16b3d757224370d27ef392cea81aa0e7c3db"
+ }
+}
