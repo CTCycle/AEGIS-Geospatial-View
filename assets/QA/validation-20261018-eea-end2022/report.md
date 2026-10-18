@@ -3,6 +3,7 @@
 Date: 2026-10-18
 Branch: `develop`
 Starting HEAD: `1e1fac3652c7280a6ffadff88fb28c50cb40d26b`
+Validated implementation commit: `c09763096d1f4aa1b9a31e37a88e4c16b0b9716c`
 Runtime: isolated local backend on port `5079`; exact `opencode-go / deepseek-v4.1-flash` lane; no fallback.
 
 ## Result
@@ -25,7 +26,7 @@ The EEA END-2022 service renders successfully in Milan through the new same-orig
 - Exact-lane browser: EEA Milan render and GBIF add/remove passed; Chicago coverage guardrail rejected; ESA Rome rendered with 64,744 non-transparent pixels; FEMA New Orleans retrieval succeeded but MapLibre source loading failed at the relay boundary.
 - Automated browser request capture: not completed. The Playwright test remained in `browser_type_launch_args` / Chromium fixture setup and was interrupted after it produced no test artifacts; no browser request-count claim is made.
 - The helper runtime launcher failed to start its backend. A manually launched isolated backend was then bootstrapped in-process to the exact provider/model lane; the sanitized records are in `runtime/`.
-- Hosted CI is recorded separately after push and is not inferred from local checks.
+- Hosted CI run [39161534103](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/39161534103) completed successfully for pushed `develop@c09763096d1f4aa1b9a31e37a88e4c16b0b9716c`: all four standard jobs passed. This hosted result is separate from the local exact-lane browser evidence.
 
 ## Official source metadata
 
@@ -55,3 +56,4 @@ and checking that its path was within `runtimes/cache/test-runtime`.
 - [Full backend unit suite](backend-unit-full.log)
 - [Ruff](ruff.log)
 - [Strict Pyright](pyright.log)
+- [Hosted CI result](hosted-ci.json)
