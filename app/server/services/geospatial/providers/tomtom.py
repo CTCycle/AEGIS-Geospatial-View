@@ -5,6 +5,9 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 from collections.abc import Mapping
 from urllib.parse import urlencode
 
+from shapely.errors import GEOSException
+from shapely.geometry import box, shape
+
 from server.contracts.geospatial import ProviderCredentialValidationResult
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
@@ -38,7 +41,7 @@ class TomTomProvider(GeospatialProvider):
         if "incident" in request.capability_id or request.params.get("incidents"):
             url = _build_incidents_url(request, self.api_key)
             payload = await call_json_fetcher(self.fetcher, url)
-            features = _normalize_incidents(payload)
+            features = _normalize_incidents(payload, bbox=request.bbox)
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -48,6 +51,7 @@ class TomTomProvider(GeospatialProvider):
                     "totalResults": len(features),
                     "credentialPolicy": "server-side-only",
                 },
+                result_type="features",
                 attribution=["TomTom"],
             )
         return ProviderResponse(
@@ -58,6 +62,7 @@ class TomTomProvider(GeospatialProvider):
                 "tileUrl": self.flow_proxy_template,
                 "credentialPolicy": "server-side-only",
             },
+            result_type="raster",
             attribution=["TomTom"],
         )
 
@@ -108,7 +113,7 @@ class TomTomProvider(GeospatialProvider):
 def build_tomtom_tile_url(kind: str, z: int, x: int, y: int, api_key: str) -> str:
     return (
         "https://api.tomtom.com/traffic/map/4/tile/flow/"
-        f"absolute/relative0/{z}/{x}/{y}.png?key={api_key}"
+        f"absolute/{z}/{x}/{y}.png?key={api_key}"
     )
 
 ###############################################################################
@@ -133,7 +138,11 @@ def _build_incidents_url(request: ProviderRequest, api_key: str) -> str:
     )
 
 ###############################################################################
-def _normalize_incidents(payload: object) -> list[dict[str, object]]:
+def _normalize_incidents(
+    payload: object,
+    *,
+    bbox: tuple[float, float, float, float] | None = None,
+) -> list[dict[str, object]]:
     if not is_json_object(payload):
         return []
     raw_incidents = payload.get("incidents")
@@ -144,7 +153,7 @@ def _normalize_incidents(payload: object) -> list[dict[str, object]]:
         if not is_json_object(incident):
             continue
         properties = json_object(incident.get("properties"))
-        coordinate = _representative_coordinate(incident.get("geometry"))
+        coordinate = _representative_coordinate(incident.get("geometry"), bbox)
         if coordinate is None:
             continue
         longitude, latitude = coordinate
@@ -178,7 +187,16 @@ def _normalize_incidents(payload: object) -> list[dict[str, object]]:
     return features
 
 ###############################################################################
-def _representative_coordinate(geometry: object) -> tuple[float, float] | None:
+def _representative_coordinate(
+    geometry: object,
+    bbox: tuple[float, float, float, float] | None = None,
+) -> tuple[float, float] | None:
+    """Return a point for an incident, inside ``bbox`` when one was queried.
+
+    TomTom returns every incident line that intersects the query bbox, so a
+    line's first vertex can lie outside it.  The point stands for the incident
+    in the requested extent, so it is taken from the part inside the bbox.
+    """
     if not is_json_object(geometry):
         return None
     coordinates = geometry.get("coordinates")
@@ -192,7 +210,19 @@ def _representative_coordinate(geometry: object) -> tuple[float, float] | None:
         latitude, (int, float)
     ):
         return None
-    return float(longitude), float(latitude)
+    if bbox is None:
+        return float(longitude), float(latitude)
+    west, south, east, north = bbox
+    if west <= longitude <= east and south <= latitude <= north:
+        return float(longitude), float(latitude)
+    try:
+        inside = shape(geometry).intersection(box(west, south, east, north))
+    except (ValueError, TypeError, KeyError, AttributeError, GEOSException):
+        return None
+    if inside.is_empty:
+        return None
+    representative = inside.representative_point()
+    return float(representative.x), float(representative.y)
 
 ###############################################################################
 def _first_coordinate_pair(value: object) -> tuple[object, object] | None:

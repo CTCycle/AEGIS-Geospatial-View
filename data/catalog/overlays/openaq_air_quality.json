@@ -3,7 +3,7 @@
   "name": "OpenAQ Air Quality",
   "provider": "openaq",
   "type": "point-insight",
-  "description": "OpenAQ v3 air-quality locations with their latest available measurements.",
+  "description": "OpenAQ v3 air-quality monitoring stations and sensors with their latest available measurements.",
   "capabilities": [
     "air-quality",
     "point-insight"
@@ -141,7 +141,7 @@
       "location"
     ],
     "output_geometry_type": "Point",
-    "render_support": "metadata_only",
+    "render_support": "vector",
     "coverage": "global-partial",
     "limitations": [
       "A configured OpenAQ API key is required for v3 location and latest-measurement requests.",
