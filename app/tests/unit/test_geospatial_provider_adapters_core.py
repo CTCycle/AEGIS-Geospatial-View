@@ -727,7 +727,7 @@ def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
     )
 
     assert calls[0][1] == {"x-windy-api-key": "windy-test"}
-    assert "bbox=7.0,45.0,7.5,45.5" in calls[0][0]
+    assert "bbox=45.5,7.5,45.0,7.0" in calls[0][0]
     assert response.payload["renderingMode"] == "camera-points"
     assert response.payload["features"][0]["preview_image_url"].endswith("preview.jpg")
     assert response.payload["features"][0]["embedding_allowed"] is False
