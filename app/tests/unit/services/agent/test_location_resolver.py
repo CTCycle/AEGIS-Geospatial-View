@@ -567,6 +567,63 @@ def test_location_resolver_accepts_compound_city_signal_from_city_boundary() -> 
     run_async_in_thread(_run())
 
 ###############################################################################
+@pytest.mark.parametrize(
+    ("raw_value", "address_type", "address_key", "iso_code", "country", "resolved"),
+    [
+        ("Tokyo", "province", "province", "JP-13", "Japan", True),
+        ("New York", "state", "state", "US-NY", "United States", False),
+    ],
+)
+def test_location_resolver_accepts_city_subdivision_only_by_iso_code(
+    raw_value: str,
+    address_type: str,
+    address_key: str,
+    iso_code: str,
+    country: str,
+    resolved: bool,
+) -> None:
+
+    ###############################################################################
+    class _SubdivisionBoundary:
+
+        # -------------------------------------------------------------------------
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            # Nominatim's live shape: both objects are first-level boundaries
+            # without a city key; only the subdivision code differs.  The
+            # extent is Tokyo Metropolis, which reaches the Ogasawara Islands.
+            return {
+                "display_name": f"{raw_value}, {country}",
+                "lat": 35.68,
+                "lon": 139.76,
+                "bbox": [135.8536855, 20.2145811, 154.205541, 35.8984245],
+                "selected_result_type": "administrative",
+                "selected_address_type": address_type,
+                "address": {
+                    address_key: raw_value,
+                    "ISO3166-2-lvl4": iso_code,
+                    "country": country,
+                },
+                "namedetails": {"name:en": raw_value, "ISO3166-2": iso_code},
+            }
+
+    resolver = LocationResolver(nominatim_service=_SubdivisionBoundary())
+
+    async def _run() -> None:
+        result = await resolver.resolve_location_signals(
+            [LocationSignal(signal_type="city", raw_value=raw_value)], {}
+        )
+        if resolved:
+            assert isinstance(result, ResolvedLocation)
+            assert result.label == f"{raw_value}, {country}"
+            assert result.location_type == "city"
+            assert result.bbox == pytest.approx([139.01, 34.93, 140.51, 35.8984245])
+        else:
+            assert isinstance(result, ClarificationRequest)
+            assert "safely resolve" in result.question
+
+    run_async_in_thread(_run())
+
+###############################################################################
 def test_location_resolver_rejects_parent_only_geocoder_result() -> None:
 
     ###############################################################################

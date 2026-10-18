@@ -76,6 +76,33 @@ class LocationResolver:
         {"country", "state", "region", "county", "province", "administrative"}
     )
     CITY_RESULT_TYPES = frozenset({"city", "town", "village", "municipality", "hamlet"})
+    # First-level subdivisions that are exactly one city (Tokyo Metropolis,
+    # federal cities, city-states).  Geocoder fields cannot tell these apart
+    # from a same-named state such as US-NY or BR-SP, so a state-level
+    # candidate satisfies a city target only by its own ISO 3166-2 code.
+    # DE-HB and BE-BRU are excluded: each spans more than one city.
+    CITY_SUBDIVISION_CODES = frozenset(
+        {
+            "ar-c",
+            "at-9",
+            "cn-bj",
+            "cn-sh",
+            "cz-10",
+            "de-be",
+            "de-hh",
+            "jp-13",
+            "kr-11",
+            "mx-cmx",
+            "ru-mow",
+            "ru-spe",
+            "th-10",
+            "ua-30",
+        }
+    )
+    # A city subdivision's boundary can span remote territory (Tokyo
+    # Metropolis reaches the Ogasawara Islands near 20N), so its extent is
+    # clamped to this half-span in degrees around the geocoded centre.
+    CITY_SUBDIVISION_MAX_HALF_SPAN_DEGREES = 0.75
     GENERIC_TARGET_DESCRIPTORS = frozenset(
         {
             "site",
@@ -622,6 +649,18 @@ class LocationResolver:
             return None
         assert latitude is not None and longitude is not None
         bbox = self._valid_bbox(geocoded.get("bbox"))
+        if (
+            bbox is not None
+            and signal.signal_type in {"city", "municipality"}
+            and self._city_subdivision_candidate(geocoded)
+        ):
+            half_span = self.CITY_SUBDIVISION_MAX_HALF_SPAN_DEGREES
+            bbox = [
+                max(bbox[0], longitude - half_span),
+                max(bbox[1], latitude - half_span),
+                min(bbox[2], longitude + half_span),
+                min(bbox[3], latitude + half_span),
+            ]
         geocoder_type = self._normalize_text(
             str(geocoded.get("selected_result_type") or "")
         )
@@ -729,6 +768,20 @@ class LocationResolver:
             return None
 
     # -------------------------------------------------------------------------
+    def _city_subdivision_candidate(self, candidate: dict[str, Any]) -> bool:
+        """Whether a state-level candidate is a single-city subdivision."""
+
+        address_type = self._normalize_text(
+            str(candidate.get("selected_address_type") or "")
+        )
+        namedetails = json_object(candidate.get("namedetails"))
+        return (
+            address_type in {"state", "region", "province"}
+            and str(namedetails.get("ISO3166-2") or "").strip().lower()
+            in self.CITY_SUBDIVISION_CODES
+        )
+
+    # -------------------------------------------------------------------------
     def _candidate_matches_target(
         self,
         candidate: dict[str, Any],
@@ -798,7 +851,7 @@ class LocationResolver:
             ):
                 return False
         elif signal.signal_type in {"city", "municipality"}:
-            if address_type in {
+            if not self._city_subdivision_candidate(candidate) and address_type in {
                 "country",
                 "state",
                 "region",
