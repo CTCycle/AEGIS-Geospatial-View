@@ -16,6 +16,7 @@ from server.contracts.geospatial import (
 )
 from server.domain.geospatial.providers import ProviderResponse
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
+from server.services.geospatial import api_service as api_service_module
 from server.services.geospatial.api_service import (
     GeospatialApiService,
     GeospatialApiServiceError,
@@ -863,7 +864,9 @@ def test_geospatial_tile_proxy_rejects_non_image_http_200_body(monkeypatch) -> N
 
 def test_geospatial_tile_proxy_logs_safe_raster_diagnostic_and_normalizes_response(
     caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(api_service_module, "_RELAY_RETRY_BACKOFF_SECONDS", 0)
     diagnostic = RasterHttpDiagnostic(
         category="upstream_http_5xx",
         failure_phase="response_headers",
@@ -904,6 +907,44 @@ def test_geospatial_tile_proxy_logs_safe_raster_diagnostic_and_normalizes_respon
     assert "content_type=text/html" in caplog.text
     assert "content_length=42" in caplog.text
     assert "upstream=https://fema.example/arcgis/tile" in caplog.text
+
+###############################################################################
+def test_geospatial_relay_tile_proxy_retries_transient_upstream_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(api_service_module, "_RELAY_RETRY_BACKOFF_SECONDS", 0)
+    diagnostic = RasterHttpDiagnostic(
+        category="upstream_http_5xx",
+        failure_phase="response_headers",
+        upstream="https://relay.example/proxy",
+        status_code=500,
+        content_type="text/html",
+        content_length=5190,
+        provider_id="fema",
+        capability_id="fema_nfhl_flood_zones",
+    )
+    calls = 0
+
+    async def flaky_fetch_binary_url(
+        url: str, headers: dict[str, str] | None = None
+    ) -> bytes:
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise RasterHttpError("relay failure", diagnostic)
+        return b"\x89PNG\r\n\x1a\npng-tile"
+
+    service = _build_api_service(ProviderRegistry())
+    service._fetch_binary_url = flaky_fetch_binary_url  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get("/api/geospatial/tiles/fema_nfhl_flood_zones/4/5/6.png")
+
+    assert response.status_code == 200
+    assert calls == 3
 
 ###############################################################################
 def test_geospatial_tile_proxy_sanitizes_sensitive_query_values_in_logs() -> None:

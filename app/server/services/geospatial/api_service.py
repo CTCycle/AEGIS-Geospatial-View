@@ -4,6 +4,7 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 
 from collections.abc import Iterator
 from datetime import datetime
+import asyncio
 import logging
 import math
 from typing import Any, TypeGuard
@@ -71,6 +72,19 @@ _SENSITIVE_TILE_QUERY_MARKERS = (
 
 _FEMA_RELAY_HOST = "hazards-fema.maps.arcgis.com"
 _FEMA_RELAY_PATH = "/sharing/proxy"
+# The official relay intermittently answers 5xx/timeouts for valid tiles, so
+# relayed fetches get a bounded retry on transient failures only.
+_RELAY_MAX_ATTEMPTS = 4
+_RELAY_RETRY_BACKOFF_SECONDS = 0.5
+_RELAY_TRANSIENT_CATEGORIES = frozenset(
+    {
+        "upstream_http_5xx",
+        "connect_timeout",
+        "read_timeout",
+        "timeout",
+        "remote_protocol_failure",
+    }
+)
 
 ###############################################################################
 class GeospatialApiServiceError(Exception):
@@ -498,7 +512,11 @@ class GeospatialApiService:
                 provider_id=provider or "unknown",
                 capability_id=capability_id,
             ):
-                return await self._fetch_binary_url(upstream_url, headers=fetch_headers)
+                return await self._fetch_tile_with_relay_retry(
+                    upstream_url,
+                    fetch_headers,
+                    attempts=_RELAY_MAX_ATTEMPTS if relay is not None else 1,
+                )
         except ProviderAuthError as exc:
             raise GeospatialTileCredentialError(
                 f"{self._humanize_provider(provider)} rejected the configured credentials."
@@ -1367,6 +1385,25 @@ class GeospatialApiService:
         return {"base_url": base_url, "required_headers": headers}
 
     # -------------------------------------------------------------------------
+    async def _fetch_tile_with_relay_retry(
+        self,
+        url: str,
+        headers: dict[str, str] | None,
+        *,
+        attempts: int,
+    ) -> bytes:
+        for attempt in range(1, attempts + 1):
+            try:
+                return await self._fetch_binary_url(url, headers=headers)
+            except RasterHttpError as exc:
+                if (
+                    attempt == attempts
+                    or exc.diagnostic.category not in _RELAY_TRANSIENT_CATEGORIES
+                ):
+                    raise
+                await asyncio.sleep(_RELAY_RETRY_BACKOFF_SECONDS * attempt)
+        raise AssertionError("unreachable")
+
     async def _fetch_binary_url(
         self,
         url: str,
