@@ -698,3 +698,160 @@ async def test_cancellation_during_tool_call_does_not_apply_a_partial_result() -
     assert outcome.state.termination_reason == "cancelled"
     assert outcome.state.tool_calls == 1
     assert outcome.state.tool_results == []
+
+###############################################################################
+def _execute_call(call_id: str, capability_id: str, **arguments: Any) -> LLMToolCall:
+    return LLMToolCall(
+        id=call_id,
+        name="execute_geospatial_capability",
+        arguments={"capability_id": capability_id, "arguments": arguments},
+    )
+
+###############################################################################
+def _request(**limits: Any) -> AgentLoopRequest:
+    return AgentLoopRequest(
+        provider="fake",
+        model="fake-model",
+        state=_state(),
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        max_model_calls=8,
+        max_tool_calls=8,
+        max_state_transitions=64,
+        **limits,
+    )
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_excluded_capability_cannot_be_executed_again_in_the_same_run() -> None:
+    calls: list[str] = []
+
+    async def execute(
+        arguments: ExecuteCapabilityInput, _state: AgentRunState
+    ) -> ToolResult:
+        calls.append(arguments.capability_id)
+        return ToolResult(
+            call_id="handler-call",
+            tool_name="execute_geospatial_capability",
+            status="failed",
+            summary="The primary provider timed out.",
+            error=ToolExecutionError(
+                error_type="provider_unavailable",
+                code="provider_timeout",
+                message="The primary provider timed out.",
+                retryable=False,
+                recovery="replan",
+            ),
+            metadata=ToolExecutionMetadata(
+                capability_id="primary-source", provider_id="primary", duration_ms=0
+            ),
+        )
+
+    provider = _Provider(
+        [
+            _route_call(complex_route=True),
+            LLMResult(content="", tool_calls=[_execute_call("first", "primary-source")]),
+            LLMResult(
+                content="",
+                tool_calls=[
+                    LLMToolCall(
+                        id="discover", name="discover_geospatial_capabilities", arguments={}
+                    )
+                ],
+            ),
+            # A materially different argument set must not bypass exclusion.
+            LLMResult(
+                content="",
+                tool_calls=[_execute_call("again", "primary-source", query="other")],
+            ),
+            LLMResult(content="No source could answer the request."),
+        ]
+    )
+    outcome = await _loop(
+        provider, catalog=_Catalog(empty_first=False), execute_handler=execute
+    ).run(_request())
+
+    assert calls == ["primary-source"]
+    rejected = next(item for item in outcome.state.tool_results if item.call_id == "again")
+    assert rejected.error is not None
+    assert rejected.error.error_type == "policy_rejection"
+    assert rejected.error.recovery == "choose_alternate_tool"
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_truncated_tool_batch_answers_every_model_call_id() -> None:
+    async def execute(
+        arguments: ExecuteCapabilityInput, _state: AgentRunState
+    ) -> ToolResult:
+        return _success("handler-call", arguments.capability_id)
+
+    provider = _Provider(
+        [
+            _route_call(complex_route=True),
+            LLMResult(
+                content="",
+                tool_calls=[
+                    _execute_call(f"batch-{index}", "primary-source", index=index)
+                    for index in range(3)
+                ],
+            ),
+            LLMResult(content="The data was retrieved."),
+            LLMResult(content="The data was retrieved."),
+        ]
+    )
+    outcome = await _loop(
+        provider, catalog=_Catalog(empty_first=False), execute_handler=execute
+    ).run(_request(max_parallel_tool_calls=2))
+
+    assert outcome.state.tool_calls == 2
+    follow_up = provider.requests[2].messages
+    requested = [
+        call["id"]
+        for message in follow_up
+        if message.get("role") == "assistant"
+        for call in message.get("tool_calls") or []
+    ]
+    answered = {
+        message["tool_call_id"]: json.loads(message["content"])
+        for message in follow_up
+        if message.get("role") == "tool"
+    }
+    assert requested == ["batch-0", "batch-1", "batch-2"]
+    assert set(answered) == set(requested)
+    assert "tool_call_not_executed" in json.dumps(answered["batch-2"])
+    assert "tool_call_not_executed" not in json.dumps(answered["batch-0"])
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_cancellation_in_parallel_batch_stops_sibling_tool_handlers() -> None:
+    run_signal: dict[str, str | None] = {"value": None}
+    completed: list[int] = []
+
+    async def execute(
+        arguments: ExecuteCapabilityInput, _state: AgentRunState
+    ) -> ToolResult:
+        index = int(arguments.arguments["index"])
+        await asyncio.sleep(0.01 if index == 0 else 0.2)
+        if index == 0:
+            run_signal["value"] = "cancelled"
+        completed.append(index)
+        return _success("handler-call", arguments.capability_id)
+
+    provider = _Provider(
+        [
+            _route_call(complex_route=True),
+            LLMResult(
+                content="",
+                tool_calls=[
+                    _execute_call(f"parallel-{index}", "primary-source", index=index)
+                    for index in range(2)
+                ],
+            ),
+        ]
+    )
+    outcome = await _loop(
+        provider, catalog=_Catalog(empty_first=False), execute_handler=execute
+    ).run(_request(run_state_check=lambda: run_signal["value"]))
+    await asyncio.sleep(0.3)
+
+    assert outcome.stopped_reason == "cancelled"
+    assert completed == [0]

@@ -83,11 +83,14 @@ class PolicyEngine:
         if not capability_id:
             return ToolAuthorizationResult(allowed=True)
 
-        if (
-            state.capability_ids
-            and capability_id not in state.capability_ids
-            and capability_id not in state.excluded_capability_ids
-        ):
+        if capability_id in state.excluded_capability_ids:
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="Capability was excluded after a failed attempt in this run.",
+                metadata={"code": "capability_excluded"},
+            )
+
+        if state.capability_ids and capability_id not in state.capability_ids:
             return ToolAuthorizationResult(
                 allowed=False,
                 reason="Capability is outside the validated shortlist.",
