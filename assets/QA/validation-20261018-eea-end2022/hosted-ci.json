@@ -1,0 +1,35 @@
+{
+  "workflow": "CI",
+  "run_id": 39161534103,
+  "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/39161534103",
+  "branch": "develop",
+  "head_sha": "c09763096d1f4aa1b9a31e37a88e4c16b0b9716c",
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "name": "backend-unit-tests",
+      "conclusion": "success",
+      "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/39161534103/job/117775678259"
+    },
+    {
+      "name": "capability-contract-validation",
+      "conclusion": "success",
+      "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/39161534103/job/117775678398"
+    },
+    {
+      "name": "persistence-conformance",
+      "conclusion": "success",
+      "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/39161534103/job/117775678430"
+    },
+    {
+      "name": "frontend-build-and-tests",
+      "conclusion": "success",
+      "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/39161534103/job/117775678444"
+    }
+  ],
+  "observed_annotations": [
+    "GitHub warned that several actions target Node.js 20 and were forced to run on Node.js 24; no job failed from this warning.",
+    "The ubuntu-latest image migration notice was informational."
+  ]
+}
