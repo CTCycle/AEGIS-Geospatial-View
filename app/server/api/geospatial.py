@@ -25,6 +25,7 @@ from server.contracts.render_capture import (
 from server.services.geospatial.api_service import (
     GeospatialApiService,
     GeospatialApiServiceError,
+    GeospatialCapabilityDisabledError,
     GeospatialCapabilityNotFoundError,
     GeospatialInvalidRequestError,
     GeospatialProviderResponseError,
@@ -38,6 +39,7 @@ router = APIRouter(prefix="/geospatial", tags=["geospatial"])
 
 GEOSPATIAL_ERROR_STATUS = {
     GeospatialCapabilityNotFoundError: status.HTTP_404_NOT_FOUND,
+    GeospatialCapabilityDisabledError: status.HTTP_403_FORBIDDEN,
     GeospatialInvalidRequestError: status.HTTP_400_BAD_REQUEST,
     GeospatialUnsupportedTileError: status.HTTP_404_NOT_FOUND,
     GeospatialTileCredentialError: status.HTTP_401_UNAUTHORIZED,

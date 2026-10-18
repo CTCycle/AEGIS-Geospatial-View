@@ -450,6 +450,30 @@ def test_router_normalizes_data_bearing_add_layer_routes_after_active_map() -> N
 
 
 ###############################################################################
+def test_router_keeps_named_provider_layer_requests_executable() -> None:
+    # "Add the RainViewer radar to this map" names a provider, but it asks for
+    # that provider's data on the map; execute must be allowed for that route.
+    state = _state(active_map=True)
+    state.location_refs["zurich"] = ResolvedLocation(
+        label="Zurich, Switzerland", latitude=47.37, longitude=8.54
+    )
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
+            secondary_domains=(CapabilityDomain.MAP_RENDERING,),
+            operation="add_layer",
+            capability_queries=["rainviewer precipitation radar"],
+        ),
+        user_message="Add the RainViewer precipitation radar to this map.",
+        active_state=state,
+    )
+
+    assert decision.route.primary_domain is CapabilityDomain.MAP_RENDERING
+    assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
+    assert "data_bearing_map_route_normalized" in decision.reason_codes
+
+
+###############################################################################
 def test_router_normalizes_new_data_bearing_map_routes() -> None:
     decision = _router().validate_route(
         _route(

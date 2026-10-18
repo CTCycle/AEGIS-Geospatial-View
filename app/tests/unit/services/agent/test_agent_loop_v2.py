@@ -916,6 +916,76 @@ def test_empty_catalog_discovery_can_complete_as_a_reportable_result() -> None:
 
 
 ###############################################################################
+def test_exhausted_discovery_after_provider_failure_names_the_provider() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.PLACE_SEARCH,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        operation="find_nearby",
+    )
+    state.discovery_attempts = 2
+    state.tool_results = [
+        ToolResult(
+            call_id="execute-overpass",
+            tool_name="execute_geospatial_capability",
+            status="failed",
+            summary="The provider did not respond within its execution deadline.",
+            error=ToolExecutionError(
+                error_type="timeout",
+                code="provider_timeout",
+                message="The provider did not respond within its execution deadline.",
+                retryable=False,
+                recovery="replan",
+                timeout_origin="provider_transport",
+            ),
+            metadata=ToolExecutionMetadata(
+                capability_id="overpass_poi_amenities",
+                provider_id="overpass",
+                duration_ms=20000,
+            ),
+        )
+    ]
+    empty_result = ToolResult(
+        call_id="discover-empty",
+        tool_name="discover_geospatial_capabilities",
+        status="valid_empty",
+        summary="No eligible capabilities matched the request.",
+        data={"capabilities": [], "next_cursor": None, "total": 0},
+        metadata=ToolExecutionMetadata(duration_ms=1),
+    )
+
+    stop = AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
+        state,
+        route,
+        [empty_result],
+        max_consecutive_tool_failures=3,
+        max_validation_corrections=3,
+        max_discovery_attempts=2,
+    )
+
+    # The user must learn that the source failed, not that nothing matched.
+    assert stop == (
+        "insufficient_evidence",
+        "The overpass provider did not respond within its execution deadline, "
+        "and no alternative capability matched the request after discovery.",
+    )
+    state.tool_results = []
+    assert AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
+        state,
+        route,
+        [empty_result],
+        max_consecutive_tool_failures=3,
+        max_validation_corrections=3,
+        max_discovery_attempts=2,
+    ) == (
+        "insufficient_evidence",
+        "No supported capability matched the request after discovery.",
+    )
+
+
+###############################################################################
 def test_text_geocode_resolution_satisfies_data_and_spatial_completion() -> None:
     state = _state()
     route = CapabilityRoute(

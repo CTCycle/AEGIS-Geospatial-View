@@ -6,6 +6,7 @@ from server.domain.agent.decision import ResolvedLocation
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.capability_registry import _operation_candidates
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
@@ -161,6 +162,88 @@ def test_metadata_only_solar_estimate_is_direct_text_and_operation_compatible() 
 def test_add_layer_operations_include_the_manifest_render_primitives() -> None:
     assert {"show", "overlay"}.issubset(_operation_candidates("add_layer"))
 
+
+###############################################################################
+def test_comparing_places_matches_the_same_capabilities_as_retrieving_them() -> None:
+    # "Compare today's weather in Zurich and Lisbon" is a per-target retrieval;
+    # no manifest declares a "compare" primitive, so it must not filter the
+    # catalog down to nothing.
+    registry = CapabilityRegistry(manifest_loader=GeospatialManifestLoader())
+    route = dict(
+        domains={
+            CapabilityDomain.DATA_RETRIEVAL,
+            CapabilityDomain.MAP_RENDERING,
+            CapabilityDomain.PLACE_SEARCH,
+        },
+        queries=["weather forecast", "temperature", "precipitation"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+        scope_kind="point",
+        temporal_mode="forecast",
+        temporal_granularity="day",
+        requires_render=True,
+    )
+
+    compared = [item["id"] for item in registry.shortlist(operation="compare", **route)]
+    retrieved = [item["id"] for item in registry.shortlist(operation="retrieve", **route)]
+
+    assert "openmeteo_weather_forecast" in compared
+    assert compared == retrieved
+
+###############################################################################
+def test_avoid_condition_needs_the_whole_phrase_not_one_shared_word() -> None:
+    registry = CapabilityRegistry(manifest_loader=GeospatialManifestLoader())
+    route = dict(
+        domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+        operation="add_layer",
+        scope_kind="bbox",
+        temporal_mode="current",
+        requires_render=True,
+        # A European map: the CONUS-only NOAA radar is out of coverage.
+        location=ResolvedLocation(
+            label="Lisbon, Portugal", latitude=38.7078, longitude=-9.1366, country="Portugal"
+        ),
+    )
+
+    def shortlisted(queries: list[str]) -> list[object]:
+        return [item["id"] for item in registry.shortlist(queries=queries, **route)]
+
+    # RainViewer avoids "satellite infrared imagery"; "rain radar imagery"
+    # shares only the word "imagery" and is exactly what it provides.
+    assert "rainviewer_precipitation_radar" in shortlisted(
+        ["precipitation radar", "weather radar latest", "rain radar imagery"]
+    )
+    assert "rainviewer_precipitation_radar" not in shortlisted(
+        ["satellite infrared imagery"]
+    )
+
+###############################################################################
+def test_plain_subject_query_still_counts_beside_an_alias_variant() -> None:
+    # "pharmacies" names the subject; the alias variant "points of interest
+    # near a landmark" carries the anchor word "landmark".  The subject query
+    # alone must keep the POI source eligible.
+    registry = CapabilityRegistry(manifest_loader=GeospatialManifestLoader())
+
+    candidates = registry.shortlist(
+        domains={
+            CapabilityDomain.PLACE_SEARCH,
+            CapabilityDomain.MAP_RENDERING,
+            CapabilityDomain.DATA_RETRIEVAL,
+        },
+        queries=["pharmacies", "points of interest near a landmark"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+        operation="find_nearby",
+        scope_kind="bbox",
+        requires_render=True,
+        location=ResolvedLocation(
+            label="Pantheon, Rome", latitude=41.8986, longitude=12.4768, country="Italy"
+        ),
+    )
+
+    assert "overpass_poi_amenities" in [item["id"] for item in candidates]
 
 ###############################################################################
 def test_dated_historical_intent_does_not_match_current_only_feed() -> None:

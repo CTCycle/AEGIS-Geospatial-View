@@ -137,3 +137,36 @@ def test_opencode_provider_vision_only_for_explicit_vision_models() -> None:
     provider = OpenCodeProvider(api_key="test", provider_name="opencode")
     assert provider.supports_vision("deepseek-v4-flash-vision-exp") is True
     assert provider.supports_vision("deepseek-v4-flash") is False
+
+
+###############################################################################
+def test_opencode_go_vision_includes_verified_models_and_catalog_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, Any]:
+            return {
+                "data": [
+                    {"id": "deepseek-v4.1-flash", "owned_by": "opencode"},
+                    {"id": "deepseek-v4-pro", "owned_by": "opencode"},
+                ]
+            }
+
+    monkeypatch.setattr(
+        "server.services.llm.opencode_provider.httpx.get",
+        lambda *_args, **_kwargs: _Response(),
+    )
+    provider = OpenCodeProvider(api_key="test", provider_name="opencode-go")
+
+    assert provider.supports_vision("deepseek-v4.1-flash") is True
+    assert provider.supports_vision("deepseek-v4-pro") is False
+    assert [model.metadata["supports_vision"] for model in provider.list_models()] == [
+        True,
+        False,
+    ]
+    # The verification is per endpoint: the Zen catalog does not inherit it.
+    zen = OpenCodeProvider(api_key="test", provider_name="opencode")
+    assert zen.supports_vision("deepseek-v4.1-flash") is False

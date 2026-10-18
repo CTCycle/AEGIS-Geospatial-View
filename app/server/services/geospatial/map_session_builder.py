@@ -186,6 +186,11 @@ class MapSessionBuilder:
                     "default_opacity": action.opacity,
                 }
             )
+            # Every layer carries the session location, so its own extent is
+            # what distinguishes one compared place from another.
+            evidence_extent = _single_evidence_bbox(evidence)
+            if evidence_extent is not None:
+                descriptor["evidence_bbox"] = evidence_extent
             evidence_payload = json_object(evidence.payload)
             for key in (
                 "url",
@@ -744,17 +749,32 @@ def _valid_bbox(value: object) -> list[float] | None:
 
 ###############################################################################
 def _evidence_bbox(evidence: list[AgentEvidenceEnvelope]) -> list[float] | None:
-    for item in evidence:
-        for source in (item.summary, item.provenance):
-            for key in ("bbox", "bounds", "analysis_bbox"):
-                bbox = _valid_bbox(source.get(key))
-                if bbox is not None:
-                    return bbox
-            coverage = json_object(source.get("coverage"))
-            if coverage:
-                bbox = _valid_bbox(coverage.get("bbox"))
-                if bbox is not None:
-                    return bbox
+    """Return the union of every evidence item's extent."""
+
+    extents = [
+        extent for extent in (_single_evidence_bbox(item) for item in evidence) if extent
+    ]
+    if not extents:
+        return None
+    return [
+        min(extent[0] for extent in extents),
+        min(extent[1] for extent in extents),
+        max(extent[2] for extent in extents),
+        max(extent[3] for extent in extents),
+    ]
+
+###############################################################################
+def _single_evidence_bbox(item: AgentEvidenceEnvelope) -> list[float] | None:
+    for source in (item.summary, item.provenance):
+        for key in ("bbox", "bounds", "analysis_bbox"):
+            bbox = _valid_bbox(source.get(key))
+            if bbox is not None:
+                return bbox
+        coverage = json_object(source.get("coverage"))
+        if coverage:
+            bbox = _valid_bbox(coverage.get("bbox"))
+            if bbox is not None:
+                return bbox
     return None
 
 

@@ -904,9 +904,15 @@ def _normalize_data_bearing_map_route(
     if route.presentation not in {"map", "both"}:
         return route, None
 
+    # Adding a named provider's layer ("add the RainViewer radar") asks for
+    # that provider's data on the map, not for a provider-layer listing.
     if (
         route.primary_domain
-        not in {CapabilityDomain.MAP_STATE, CapabilityDomain.MAP_RENDERING}
+        not in {
+            CapabilityDomain.MAP_STATE,
+            CapabilityDomain.MAP_RENDERING,
+            CapabilityDomain.PROVIDER_DISCOVERY,
+        }
         or operation != "add_layer"
         or not (route.capability_queries or route.explicit_capability_ids)
     ):

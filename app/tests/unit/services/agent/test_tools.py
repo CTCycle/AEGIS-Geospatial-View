@@ -230,6 +230,35 @@ def test_new_route_target_requires_location_resolution_even_with_active_map() ->
 
 
 ###############################################################################
+def test_follow_up_target_spelled_as_resolved_label_needs_no_new_resolution() -> None:
+    # The first turn resolved "Zurich" and "Lisbon"; a follow-up route names
+    # them by their resolved labels.  They are already known locations.
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        secondary_domains=(CapabilityDomain.MAP_RENDERING,),
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        operation="add_layer",
+        target_refs=["Zurich, Switzerland", "Lisbon, Portugal"],
+        capability_queries=["precipitation radar"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["traffic"]
+    state.location_refs = {
+        "zurich": ResolvedLocation(label="Zurich, Switzerland", latitude=47.37, longitude=8.54),
+        "lisbon": ResolvedLocation(label="Lisbon, Portugal", latitude=38.71, longitude=-9.14),
+    }
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    assert "resolve_geospatial_location" not in exposed
+    assert "execute_geospatial_capability" in exposed
+
+
+###############################################################################
 def test_active_map_layer_lifecycle_exposes_only_map_plan_for_mutation() -> None:
     registry = _registry()
     state = _state()
@@ -870,6 +899,48 @@ def test_location_reference_never_falls_back_to_another_resolved_location() -> N
     assert _location_for_request(
         ExecuteCapabilityInput(capability_id="places:hospitals"), state
     ) is None
+
+
+###############################################################################
+def test_location_reference_also_matches_the_resolved_label() -> None:
+    state = _state()
+    state.location_refs = {
+        "zurich": ResolvedLocation(
+            label="Zurich, Switzerland", latitude=47.3769, longitude=8.5417
+        ),
+        "lisbon": ResolvedLocation(
+            label="Lisbon, Portugal", latitude=38.7078, longitude=-9.1366
+        ),
+    }
+
+    by_label = ExecuteCapabilityInput(
+        capability_id="places:hospitals",
+        location_ref="Lisbon, Portugal",
+    )
+
+    assert _location_for_request(by_label, state) == state.location_refs["lisbon"]
+
+    # A follow-up goal names its targets by label; the resolved key of the
+    # same place is the same target, while an unrelated place stays rejected.
+    state.goal = AgentGoal(
+        goal="Add radar to this map",
+        task_mode="execute",
+        presentation="map",
+        operation="add_layer",
+        requires_location=True,
+        target_ids=["Zurich, Switzerland", "Lisbon, Portugal"],
+    )
+    by_key = ExecuteCapabilityInput(capability_id="places:hospitals", location_ref="lisbon")
+    elsewhere = ExecuteCapabilityInput(capability_id="places:hospitals", location_ref="rome")
+
+    assert _location_for_request(by_key, state) == state.location_refs["lisbon"]
+    assert not any(
+        "exact target" in error for error in _capability_semantic_validator(by_key, state)
+    )
+    assert _location_for_request(elsewhere, state) is None
+    assert any(
+        "exact target" in error for error in _capability_semantic_validator(elsewhere, state)
+    )
 
 ###############################################################################
 class _FakeProviderLayerService:

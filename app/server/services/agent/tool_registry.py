@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from server.common.identifiers import location_ref_matches
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.tools import RegisteredTool
 from server.services.geospatial.runtime_registry import RuntimeRegistry
@@ -241,9 +242,11 @@ def _route_target_location_available(state: "AgentRunState") -> bool:
     )
     if not target_refs:
         return bool(state.location_refs) or state.active_map_session is not None
-    resolved_keys = {" ".join(str(key).casefold().split()) for key in state.location_refs}
     return all(
-        " ".join(str(target).casefold().split()) in resolved_keys
+        any(
+            location_ref_matches(str(target), str(key), location.label)
+            for key, location in state.location_refs.items()
+        )
         for target in target_refs
     )
 
