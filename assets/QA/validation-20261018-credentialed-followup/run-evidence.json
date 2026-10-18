@@ -1,0 +1,194 @@
+{
+ "lane": "opencode-go / deepseek-v4.1-flash",
+ "structured_probe": "passed (Settings > Test selected model, 17:18 UTC)",
+ "runs": [
+  {
+   "run_id": "run_12b49439eb9d4f2296c20124f3130d30",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 17:20:40",
+   "request": "Show air quality monitoring stations in Rome on the map",
+   "tool_results": [
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "openaq_air_quality"
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "openaq_air_quality",
+     "spatial_scope_satisfied": true,
+     "feature_count": 10,
+     "map_eligibility": "renderable",
+     "result_type": "features"
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success"
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "attempt": 1,
+     "checks": {
+      "required_sources_loaded": true,
+      "required_layers_present": true,
+      "viewport_valid": true
+     }
+    }
+   ],
+   "answer_excerpt": "Data prepared; the map is loading.",
+   "final_ack": {
+    "status": "ready",
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null,
+    "failure_summary": null
+   },
+   "final_render_observations": [
+    {
+     "status": "ready",
+     "attempt": 1,
+     "recovery": "continue",
+     "failure_code": null
+    }
+   ]
+  },
+  {
+   "run_id": "run_65ec7e8d830040dfbc791b83c8a0f794",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 17:22:01",
+   "request": "Show current traffic incidents in Rome on the map",
+   "tool_results": [
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success"
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    },
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "tomtom_traffic_incidents",
+     "spatial_scope_satisfied": true,
+     "feature_count": 267,
+     "map_eligibility": "renderable",
+     "result_type": "features"
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "tomtom_traffic_incidents"
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "attempt": 1,
+     "checks": {
+      "required_sources_loaded": true,
+      "required_layers_present": true,
+      "viewport_valid": true
+     }
+    }
+   ],
+   "answer_excerpt": "Current traffic incidents in Rome are now on the map.\n\n**What's shown**\n- **Location:** Rome, Roma Capitale, Lazio, Italy\n- **Layer:** TomTom live traffic incidents (clustered points), current conditions\n- **Incidents retrieved:** 267 within Rome's bounding area\n- **Rendered on screen:** 34 incident markers visible at the current zoom level (the rest appear as you zoom in, since the layer clusters",
+   "final_ack": {
+    "status": "ready",
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null,
+    "failure_summary": null
+   },
+   "final_render_observations": [
+    {
+     "status": "ready",
+     "attempt": 1,
+     "recovery": "continue",
+     "failure_code": null
+    }
+   ]
+  },
+  {
+   "run_id": "run_c6bd6b11756e4dc3ae56ea4a7017989a",
+   "state": "completed",
+   "presentation_status": "ready",
+   "created_at": "2026-10-18 17:22:49",
+   "request": "Show live traffic flow in Rome on the map",
+   "tool_results": [
+    {
+     "tool": "execute_geospatial_capability",
+     "status": "success",
+     "capability_id": "tomtom_traffic_flow",
+     "spatial_scope_satisfied": true,
+     "feature_count": null,
+     "map_eligibility": "renderable",
+     "result_type": "raster"
+    },
+    {
+     "tool": "resolve_geospatial_location",
+     "status": "success"
+    },
+    {
+     "tool": "describe_geospatial_capability",
+     "status": "success",
+     "capability_id": "tomtom_traffic_flow"
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "failed",
+     "error_code": "viewport_bounds_unavailable"
+    },
+    {
+     "tool": "apply_map_plan",
+     "status": "success"
+    }
+   ],
+   "render_observations": [
+    {
+     "status": "ready",
+     "attempt": 1,
+     "checks": {
+      "required_sources_loaded": true,
+      "required_layers_present": true,
+      "viewport_valid": true
+     }
+    }
+   ],
+   "answer_excerpt": "Data prepared; the map is loading.",
+   "final_ack": {
+    "status": "ready",
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null,
+    "failure_summary": null
+   },
+   "final_render_observations": [
+    {
+     "status": "ready",
+     "attempt": 1,
+     "recovery": "continue",
+     "failure_code": null
+    }
+   ]
+  }
+ ]
+}

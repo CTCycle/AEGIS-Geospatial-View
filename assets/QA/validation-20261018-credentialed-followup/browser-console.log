@@ -1,0 +1,8 @@
+Total messages: 0 (Errors: 0, Warnings: 0)
+Returning 5 messages for level "warning"
+
+[ERROR] WebSocket connection to 'ws://127.0.0.1:5079/api/conversations/conv_9d3f2ca1e0bf449d85abc7a604f4caed/realtime' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5079/main-RQ6JSYAU.js:644
+[ERROR] WebSocket connection to 'ws://127.0.0.1:5079/api/conversations/conv_9d3f2ca1e0bf449d85abc7a604f4caed/realtime' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5079/main-RQ6JSYAU.js:644
+[ERROR] WebSocket connection to 'ws://127.0.0.1:5079/api/conversations/conv_9d3f2ca1e0bf449d85abc7a604f4caed/realtime' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5079/main-RQ6JSYAU.js:644
+[ERROR] WebSocket connection to 'ws://127.0.0.1:5079/api/conversations/conv_9d3f2ca1e0bf449d85abc7a604f4caed/realtime' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5079/main-RQ6JSYAU.js:644
+[ERROR] WebSocket connection to 'ws://127.0.0.1:5079/api/conversations/conv_9d3f2ca1e0bf449d85abc7a604f4caed/realtime' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5079/main-RQ6JSYAU.js:644

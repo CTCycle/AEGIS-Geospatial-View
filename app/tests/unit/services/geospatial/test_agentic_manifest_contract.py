@@ -847,3 +847,24 @@ def test_real_catalog_keyless_vector_point_capabilities_route_for_tier3() -> Non
     # non-renderable capability into the shortlist.
     assert "opentripmap_tourism_pois" not in amenities
     assert "openmeteo_elevation" not in atmospheric
+
+###############################################################################
+def test_openaq_stations_are_discoverable_for_a_map_request() -> None:
+    registry = CapabilityRegistry(manifest_loader=GeospatialManifestLoader())
+
+    # The queries the live model issued for "air quality monitoring stations".
+    shortlisted = registry.shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        queries=["air quality monitoring stations", "air quality sensors"],
+        explicit_ids=[],
+        runtime_registry=_RuntimeEligibility(),
+        operation="show",
+        scope_kind="bbox",
+        temporal_mode="current",
+        requires_render=True,
+        location=ResolvedLocation(
+            label="Rome, Italy", latitude=41.8933, longitude=12.4829, country="Italy"
+        ),
+    )
+
+    assert "openaq_air_quality" in [item["id"] for item in shortlisted]
