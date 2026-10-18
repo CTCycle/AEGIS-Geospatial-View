@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-18",
+  "runtime": "isolated local AEGIS backend on 127.0.0.1:5079",
+  "lane": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "fallback": false,
+    "probe_status": "passed",
+    "parse_status": "complete"
+  },
+  "eea_milan": {
+    "capability_id": "eea_noise_end2022",
+    "reporting_vintage": "END-2022",
+    "service_update": 2025,
+    "service_url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/Noise_exposure_2025/MapServer/WMSServer",
+    "same_origin_tile_template": "/api/geospatial/tiles/eea_noise_end2022/{z}/{x}/{y}.png",
+    "wms_version": "1.1.1",
+    "layers": "0,17,34,51",
+    "exceptions": "application/vnd.ogc.se_xml",
+    "render_event": "render_observed",
+    "render_event_sequence": 53,
+    "render_status": "ready",
+    "required_sources_loaded": true,
+    "required_layers_present": true,
+    "viewport_valid": true,
+    "raster_source_loaded": true,
+    "raster_layer_present": true,
+    "raster_visible": true,
+    "raster_tile_intersects_viewport": true,
+    "nontransparent_pixels": 1584,
+    "spatial_scope_satisfied": true,
+    "attribution": "© European Environment Agency — END-2022; research/non-profit use only; nationally restricted contours excluded",
+    "run_completed": true,
+    "direct_browser_request_count": "unobserved",
+    "http_status_capture": "unobserved",
+    "map_render_ack": {
+      "accepted": true,
+      "evidence": "Backend emitted render_observed=ready for the same candidate, then resumed and completed the run.",
+      "acknowledgement_frame_captured": false
+    }
+  },
+  "coverage_guardrail": {
+    "location": "Chicago, Illinois",
+    "result": "rejected",
+    "reason": "raster_tile_outside_viewport; EEA coverage is Europe-only",
+    "last_known_good_preserved": true
+  },
+  "vector_lifecycle": {
+    "provider": "GBIF",
+    "added_while_eea_visible": true,
+    "both_attributions_visible": true,
+    "eea_removed": true,
+    "gbif_retained_visible": true
+  },
+  "esa_rome": {
+    "capability_id": "esa_worldcover",
+    "render_status": "passed",
+    "raster_source_loaded": true,
+    "raster_layer_visible": true,
+    "nontransparent_pixels": 64744,
+    "attribution": "© ESA WorldCover / Terrascope",
+    "vintage": 2021
+  },
+  "fema_new_orleans": {
+    "capability_id": "fema_nfhl_flood_zones",
+    "provider_data_renderable": true,
+    "spatial_scope_satisfied": true,
+    "render_status": "blocked",
+    "maplibre_source_present": false,
+    "required_sources_loaded": false,
+    "provider_limitation": "FEMA official ArcGIS Online relay unavailable",
+    "pixels_presented": false
+  },
+  "playwright_capture_runner": {
+    "status": "incomplete",
+    "last_observed_setup": "browser_type_launch_args / Chromium fixture setup",
+    "test_body_entered": false,
+    "request_count_recorded": false
+  },
+  "source_usage_limit": "Research/non-profit use only; nationally restricted contours excluded; this is not commercial-use clearance."
+}

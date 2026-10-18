@@ -432,7 +432,7 @@ def build_inventory(
                 "id": "eea-noise-upstream-service",
                 "severity": "high",
                 "status": "upstream_unavailable",
-                "detail": "The configured EEA noise ArcGIS service returned a service-not-started/404 response during validation; the layer remains an unresolved external risk and should not be treated as healthy.",
+                "detail": "The configured EEA noise WMS endpoint failed validation; treat the layer as unavailable until a live source check succeeds.",
             }
         )
 

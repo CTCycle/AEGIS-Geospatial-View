@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "parse_status": "complete",
+  "fallback_used": false,
+  "credentials_included": false,
+  "evidence_source": "in-process bootstrap of isolated backend from the existing provider store; secrets omitted"
+}

@@ -708,7 +708,7 @@
       "auth_required": false
     },
     {
-      "capability_id": "eea_noise_2019",
+      "capability_id": "eea_noise_end2022",
       "enabled_by_default": true,
       "credential_provider": null,
       "supports_map": true,
@@ -723,7 +723,7 @@
         "noise",
         "wms",
         "eea",
-        "eea noise exposure 2019"
+        "eea END-2022 noise exposure"
       ],
       "manual_toggle": true,
       "auth_required": false

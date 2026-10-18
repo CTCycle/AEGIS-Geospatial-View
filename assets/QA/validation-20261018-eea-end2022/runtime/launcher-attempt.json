@@ -1,0 +1,13 @@
+{
+  "backend": "http://127.0.0.1:5079",
+  "credential_present": false,
+  "data_root_isolated": true,
+  "model": "deepseek-v4.1-flash",
+  "probe": null,
+  "provider": "opencode-go",
+  "reason": "Backend did not become ready.",
+  "selected_model": null,
+  "selected_provider": null,
+  "status": "BLOCKED",
+  "tested_at": "2026-10-18T19:22:08.941975+00:00"
+}

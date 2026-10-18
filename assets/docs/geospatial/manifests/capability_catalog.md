@@ -47,7 +47,7 @@ This file is the reviewable inventory of geospatial capabilities implemented by 
 
 Representative implemented layers include:
 
-- `eea_noise_2019`
+- `eea_noise_end2022`
 - `esa_worldcover`
 - `IMERG_Precipitation_Rate`
 - `MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual`

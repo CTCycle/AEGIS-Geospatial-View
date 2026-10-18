@@ -2,17 +2,9 @@
 
 Last updated: 2026-10-18
 
-The [2026-10-17 follow-up](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16`
-basemap rendering/preferences and advances `T4-04` to `PASS` for configured live
-GTFS static/realtime validation. Location-only spatial completion and the
-realtime-validator contract were repaired; 1,088 backend unit tests, changed-file
-Ruff, and full strict Pyright pass. Census now reaches execution but times out,
-numeric elevation remains disabled, imagery temporal completion fails, and EEA
-still returns upstream 404. Manual preference persists visually but backend
-narration can name OSM incorrectly. Those broader components remain PARTIAL;
-VISION-INSPECT remains UNRUN.
+The [2026-10-17 follow-up](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16` basemap rendering/preferences and advances `T4-04` to `PASS` for configured live GTFS static/realtime validation. Location-only spatial completion and the realtime-validator contract were repaired; 1,088 backend unit tests, changed-file Ruff, and full strict Pyright pass. At that time Census timed out, elevation was disabled, imagery temporal completion failed, EEA returned upstream 404, and VISION-INSPECT was not yet run. Later reports supersede the EEA and vision statuses; Census, elevation, imagery, and narration limitations remain.
 
-The [T3-17 continuation](../../QA/tier3-validation-20261017-t3-17/report.md) is `PARTIAL`: mixed GIBS raster/Open-Meteo vector rendering, independent opacity, and selective raster removal pass. The raster probe now supports MapLibre source-tile overzoom. Three-layer composition and reverse retention remain unproven after routing/tool failures and a valid-empty USGS result.
+The [T3-17 continuation](../../QA/tier3-validation-20261017-t3-17/report.md) is superseded by the [2026-10-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md), which passes mixed GIBS/Open-Meteo/GBIF composition, opacity, ordering, selective removal, and retention.
 
 This document is the durable digest of the AEGIS comprehensive validation
 roadmap, first established on `loop-dev` and continued on `develop`. It defines
@@ -79,12 +71,12 @@ trusting downstream feature evidence.
 | Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | The [2026-09-22 Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md) passed all five on its tested boundary. The [2026-09-25 T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) revalidated the exact-head Windows launcher boundary: fresh/warm readiness, outage startup, ownership/PID-reuse safety, injected cleanup, canonical-state protection, and final port cleanup pass. `T0-04` is `PASS`; its unavailable historical timing comparator is explicitly non-gating. |
 | Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 checklist](tier1_application_foundations.md), [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [2026-09-23 T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), [2026-09-22 T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md), and [2026-09-21 baseline](../../QA/tier1-application-foundations-20260921/report.md). Tier 1 remains 12/12 `PASS`. |
 | Tier 2 | `T2-01` through `T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | The [2026-09-24 continuation](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md) passes `T2-01`/`T2-02` on the exact OpenCode Go lane; `T2-03` remains `PASS`. The [2026-09-25 continuation](../../QA/tier2-validation-develop-20260925-next-slices/report.md) passes the tested `T2-05`/`T2-06`/`T2-07` scenarios, and the [T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) passes `T2-04` with five pages, 50 unique candidates, and `next_cursor=null` under an approved isolated six-call budget restored to four afterward. `ISSUE-001` is resolved. |
-| Tier 3 | `T3-01`–`T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | `T3-01`/`T3-02`/`T3-03`/`T3-04`/`T3-05`/`T3-06`, `T3-07`, `T3-08`, and `T3-09` pass current browser-authoritative checks. `T3-07` is now `PASS`: FEMA and ESA public raster overlays load through the same-origin AEGIS tile proxy and render with accepted `map.render_ack`; FEMA reaches the US-egress-restricted `hazards.fema.gov` through FEMA's official ArcGIS Online relay, raster results satisfy the `spatial_scope_applied` requirement, and scale-dependent NFHL layer 28 is presented at a visible zoom. The dependent FEMA composition/removal mechanism is validated; a single-viewport FEMA+partner composition is limited by NFHL layer 28's scale-dependency. `T3-08` remains `PASS` after all 12 advertised GIBS cases met the browser acceptance boundary. `T3-09` is `PASS`: the exact Settings-API bootstrap persisted `opencode-go / deepseek-v4.1-flash`, the native structured probe passed, and the browser acknowledgement recorded source/layer/pixel evidence. See the [2026-10-01 T3-07 report](../../QA/tier3-validation-develop-20261001-t3-07-final/report.md), [final 2026-09-30 T3-07/T3-09 report](../../QA/tier3-validation-develop-20260930-t3-07-t3-09-final/report.md), [raster-provider-fixes follow-up](../../QA/tier3-validation-develop-20260929-raster-provider-fixes/report.md), [environmental follow-up](../../QA/tier3-validation-develop-20260928-environmental/report.md), and [vector-composition report](../../QA/tier3-validation-develop-20260926-vector-composition/report.md). The 2026-10-01 route-matrix continuation runs the `ISSUE-006`/`ROUTE-LIVE` rows and the EEA render retry (Acropolis, Open-Meteo aliases, generic-infrastructure clarification pass; the weather-forecast row passes at an adequate runtime budget; census demographics / numeric elevation / imagery extent remain `PARTIAL`; EEA is now routed through the same-origin AEGIS tile proxy but its render stays blocked by the retired `noise.discomap.eea.europa.eu` 2019 WMS). See the [route-matrix report](../../QA/tier3-validation-develop-20261001-route-matrix/report.md). Keep provider retrieval, routing, renderer loading, and acknowledgement as distinct boundaries. |
-| Tier 4A | `T4-01`–`T4-08` | Ingestion, heavy formats, mobility, configured sources, credentials and descriptors. | T4-01/T4-02/T4-04/T4-08 PASS; T4-03/T4-05 PARTIAL; T4-06/T4-07 BLOCKED. [2026-10-17 continuation](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes configured live GTFS and corrects the heavy-format implementation boundary. |
+| Tier 3 | `T3-01` to `T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Current count: 16 `PASS`, 2 `PARTIAL`. `T3-07` is `PARTIAL`: ESA renders in the current exact-lane check, but FEMA retrieval succeeded while MapLibre source loading failed at the official relay boundary. `T3-15` is `PARTIAL`: EEA END-2022 renders in Milan through the same-origin proxy with attribution, spatial-scope evidence, accepted `map.render_ack`, a passing EU coverage guardrail, and EEA-plus-GBIF add/remove; direct browser request count remains unobserved. `T3-18` is `PASS` per the 2026-10-18 campaign. See [current raster/EEA evidence](../../QA/validation-20261018-eea-end2022/report.md), [T3-07 history](../../QA/tier3-validation-develop-20261001-t3-07-final/report.md), [2026-10-18 campaign](../../QA/tool-e2e-validation-20261018/report.md), and [T3-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md). Keep provider retrieval, routing, renderer loading, browser requests, and acknowledgement as distinct evidence boundaries. |
+| Tier 4A | `T4-01`–`T4-08` | Ingestion, heavy formats, mobility, configured sources, credentials and descriptors. | T4-01/T4-02/T4-04/T4-08 PASS; T4-03/T4-05/T4-07 PARTIAL; T4-06 BLOCKED. [2026-10-17 continuation](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes configured live GTFS and corrects the heavy-format implementation boundary. |
 | Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
 | Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Requires the lower-tier contracts and exact-head evidence to be stable. |
 
-The current roll-up is 45 `PASS`, 2 `PARTIAL`, 2 `BLOCKED`, and 19 `UNRUN`. The 2026-10-18 reconciliation counts `T3-17` (passed 2026-10-17 but still listed as partial) and `T3-18` (passed in the [2026-10-18 tool-interaction campaign](../../QA/tool-e2e-validation-20261018/report.md)).
+The current roll-up is 44 `PASS`, 5 `PARTIAL`, 1 `BLOCKED`, and 18 `UNRUN`. This reconciliation counts the current FEMA recheck (`T3-07` PARTIAL), the EEA END-2022 result (`T3-15` PARTIAL), the subsequent `T3-17` pass, and the `T3-18` pass from the [2026-10-18 tool-interaction campaign](../../QA/tool-e2e-validation-20261018/report.md). Tier 4A is 4 PASS, 3 PARTIAL (`T4-03`, `T4-05`, `T4-07`), and 1 BLOCKED (`T4-06`); Tier 4B and Tier 5 remain UNRUN.
 
 ### Campaign inventory reconciliation
 
@@ -92,37 +84,22 @@ The 68 campaign slices are counted exactly once as follows:
 
 | Status | Explicit slice IDs | Count |
 | --- | --- | ---: |
-| `PASS` | `T0-01`–`T0-05`, `T1-01`–`T1-12`, `T2-01`–`T2-07`, `T3-01`–`T3-14`, `T3-16`–`T3-18`, `T4-01`, `T4-02`, `T4-04`, `T4-08` | 45 |
-| `PARTIAL` | `T4-03`, `T4-05` | 2 |
-| `BLOCKED` | `T4-06`, `T4-07` | 2 |
-| `UNRUN` | `T3-15`, `T4-09`–`T4-13`, `T5-01`–`T5-13` | 19 |
+| `PASS` | `T0-01` to `T0-05`, `T1-01` to `T1-12`, `T2-01` to `T2-07`, `T3-01` to `T3-06`, `T3-08` to `T3-14`, `T3-16` to `T3-18`, `T4-01`, `T4-02`, `T4-04`, `T4-08` | 44 |
+| `PARTIAL` | `T3-07`, `T3-15`, `T4-03`, `T4-05`, `T4-07` | 5 |
+| `BLOCKED` | `T4-06` | 1 |
+| `UNRUN` | `T4-09` to `T4-13`, `T5-01` to `T5-13` | 18 |
 
 `T4-01`/`T4-02`/`T4-08` are `PASS` for the deterministic isolated fixture and
 descriptor boundaries recorded in the [2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md).
 `T4-04` is now PASS for configured live feeds; `T4-03`/`T4-05` remain PARTIAL
 (heavy normalizers are not implemented beyond raw preservation, optional packages
 are absent, and approved configured datasets are missing),
-and `T4-06`/`T4-07` are `BLOCKED` on missing configured camera sources and
-approved credentials respectively. These classifications do not claim browser transit rendering, cross-agency
+`T4-06` is `BLOCKED` on missing configured camera sources; `T4-07` is
+`PARTIAL` because OpenTripMap has no key while the other configured provider
+scenarios pass. These classifications do not claim browser transit rendering, cross-agency
 schedule matching, complete agent routing, or credentialed-provider behavior.
 
-`T3-15` remains an explicit `UNRUN` inventory entry (`T3-10`–`T3-14` are
-`PASS` per the [T3-10](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-10/report.md),
-[T3-11](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-11/report.md),
-[T3-12](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-12/report.md),
-[T3-13](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-13/report.md), and
-[T3-14](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-14/report.md)
-slices). Their individual
-acceptance criteria were never preserved in the repository or its history
-(verified against the campaign-creation commit `9c2da7a4` and the QA
-consolidation `f3b819f2`); the reconstructed per-gate contracts are now
-preserved in the
-[Tier 3 rendering and feature families checklist](tier3_rendering_and_feature_families.md)
-so they must not be re-inferred from the broad Tier 3 description. The grouped
-Tier 4B (`T4-09`–`T4-13`) and Tier 5 (`T5-01`–`T5-13`) ranges are counted by
-their declared cardinalities above; Tier 4B carries a one-lane-per-gate mapping
-recoverable from this document, while Tier 5 has a 12-theme-to-13-gate
-cardinality mismatch that must be resolved before execution.
+`T3-15` is now `PARTIAL` after the 2026-10-18 END-2022 EEA re-point and exact-lane browser validation; direct browser request-count evidence is still missing. `T3-10` to `T3-14` are `PASS` per the [T3-10](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-10/report.md), [T3-11](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-11/report.md), [T3-12](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-12/report.md), [T3-13](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-13/report.md), and [T3-14](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-14/report.md) slices. Their individual acceptance criteria were never preserved in the repository or its history (verified against campaign creation commit `9c2da7a4` and QA consolidation `f3b819f2`); reconstructed criteria remain in the Tier 3 checklist.
 
 The 2026-09-30 T3-07/T3-09 implementation follow-up centralizes public
 raster browser transport at the manifest-backed AEGIS tile proxy, including
@@ -136,8 +113,7 @@ ArcGIS Online relay (the same relay FEMA's own NFHL Viewer uses), raster
 results satisfy the `spatial_scope_applied` completion requirement, and
 scale-dependent NFHL layer 28 is presented at a visible zoom. FEMA and ESA
 public raster overlays now load through the same-origin AEGIS tile proxy and
-render with accepted `map.render_ack` (`render_observed=ready`); `T3-07` is
-`PASS`, `T3-08` remains `PASS`, and
+render with accepted `map.render_ack` (`render_observed=ready`). T3-07 was PASS at the time of that 2026-10-01 validation; the 2026-10-18 FEMA recheck now makes it PARTIAL. T3-08 remains PASS, and
 `T3-09` is `PASS`: the exact Settings-API bootstrap persisted
 `opencode-go / deepseek-v4.1-flash` in a fresh disposable runtime, the native
 structured probe passed, and the subsequent browser run received an accepted visible-raster acknowledgement.
@@ -146,8 +122,7 @@ set and runs the `ISSUE-006`/`ROUTE-LIVE` rows: Acropolis, Open-Meteo aliases,
 and generic-infrastructure clarification pass, and the weather-forecast row
 passes at an adequate runtime budget (the default simple budget is a configuration
 value); census demographics / numeric elevation / imagery extent
-remain `PARTIAL`; EEA is proxied (same-origin) but its render stays blocked by
-the retired `noise.discomap.eea.europa.eu` 2019 WMS. See the
+remain `PARTIAL`; in that 2026-10-01 check EEA was proxied but the then-configured 2019 WMS was retired. The 2026-10-18 END-2022 follow-up supersedes that EEA status. See the
 [route-matrix report](../../QA/tier3-validation-develop-20261001-route-matrix/report.md).
 The subsequent current-head contract follow-up at
 `develop@889066b3` closes a repository defect where `tile`, `xyz`, `wms`, and
@@ -213,7 +188,7 @@ The Tier 1 application-foundations baseline remains recorded at
 `loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 43 `PASS`, 3 `PARTIAL`, 2 `BLOCKED`, and 20 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
+The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 44 `PASS`, 5 `PARTIAL`, 1 `BLOCKED`, and 18 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
 Tier 1 remains 12/12 `PASS`; the current Tier 2 ledger has seven `PASS` slices.
 Preserve historical source boundaries in the linked T1 reports.
 

@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "backend": "http://127.0.0.1:5079",
+  "data_root_isolated": true,
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "selected_provider": "opencode-go",
+  "selected_model": "deepseek-v4.1-flash",
+  "probe_status": "passed",
+  "parse_status": "complete",
+  "fallback_used": false,
+  "credential_value_recorded": false,
+  "startup_method": "direct Uvicorn launch followed by in-process bootstrap from the existing provider store",
+  "tested_at": "2026-10-18T19:25:00Z",
+  "launcher_attempt": "BLOCKED; see launcher-attempt.json"
+}

@@ -59,7 +59,7 @@ class EEAProvider(GeospatialProvider):
                 "title": metadata.get("label") or request.capability_id,
                 "source": "European Environment Agency",
             },
-            "freshnessLabel": "Static 2019 source layer",
+            "freshnessLabel": "END-2022 reporting vintage; service updated 2025",
         }
 
     # -------------------------------------------------------------------------
