@@ -47,9 +47,9 @@ class WindyWebcamsProvider(GeospatialProvider):
             self._last_response = response
             return response
         if not request.params.get("live"):
-            response = self._response_from_cameras(request, [])
-            self._last_response = response
-            return response
+            # A descriptor is not camera metadata; caching it would let a
+            # later live failure pose as a stale, empty camera result.
+            return self._response_from_cameras(request, [])
         try:
             payload = await call_json_fetcher(
                 self.fetcher,
@@ -107,10 +107,11 @@ def _build_windy_webcams_url(request: ProviderRequest) -> str:
     params = ["include=images,location,urls,player", "limit=50"]
     if request.bbox is not None:
         west, south, east, north = request.bbox
-        params.append(f"bbox={west},{south},{east},{north}")
+        # Webcams API v3 orders the box north, east, south, west.
+        params.append(f"bbox={north},{east},{south},{west}")
     camera_type = request.params.get("camera_type")
     if camera_type:
-        params.append(f"category={camera_type}")
+        params.append(f"categories={camera_type}")
     return f"{WINDY_WEBCAMS_ENDPOINT}?{'&'.join(params)}"
 
 ###############################################################################
